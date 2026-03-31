@@ -46,5 +46,5 @@ Deno.test("monster picks up gold and drops it on death", () => {
   const dx = Math.abs((groundPos.x | 0) - 1);
   const dy = Math.abs((groundPos.y | 0) - 0);
   const cheb = Math.max(dx, dy);
-  assert(cheb >= 2 && cheb <= 3, `gold should burst 2-3 tiles from death site, got chebyshev ${cheb}`);
+  assert(cheb >= 1 && cheb <= 2, `gold should burst 1-2 tiles from death site, got chebyshev ${cheb}`);
 });

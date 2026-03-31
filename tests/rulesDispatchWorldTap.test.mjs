@@ -58,6 +58,22 @@ Deno.test("rulesDispatch worldTap: taps adjacent interactable and queues interac
   assertEquals(getTickCount(), 1);
 });
 
+Deno.test("rulesDispatch worldTap: disambiguates nearby pickup tile when tap is slightly off", () => {
+  const { world, actor, getTickCount } = makeWorldAt(5, 5);
+  const item = world.create();
+  world.add(item, Position, { x: 6, y: 5 });
+  world.add(item, ItemInfo, { type: "scroll", count: 1 });
+
+  const dispatch = makeRulesDispatcher(world, () => actor);
+  dispatch({ type: "rules.worldTap", payload: { x: 7, y: 5 } });
+
+  const intent = world.get(actor, PickupIntent);
+  assertEquals(!!intent, true);
+  assertEquals(intent.targetId, item);
+  assertEquals(world.has(actor, MoveIntent), false);
+  assertEquals(getTickCount(), 1);
+});
+
 Deno.test("rulesDispatch worldTap: unopened chest interaction is prioritized over floor pickup", () => {
   const { world, actor, getTickCount } = makeWorldAt(5, 5);
   const chest = world.create();

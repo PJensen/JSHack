@@ -2200,6 +2200,63 @@ function lootRarityColorHex(itemInfo) {
   return "#c2c2c2";
 }
 
+/** @type {Map<number, {fromX:number,fromY:number,toX:number,toY:number,start:number,duration:number,peak:number}>} */
+const _deathLootArcs = new Map();
+
+function seededUnit(seed) {
+  const s = (Math.imul((seed | 0) ^ 0x9e3779b9, 0x85ebca6b) ^ 0xc2b2ae35) >>> 0;
+  return (s & 0xffff) / 0xffff;
+}
+
+function scheduleDeathLootArc(itemId, origin, at) {
+  const id = Number(itemId || 0) | 0;
+  if (!(id > 0)) return;
+  const fx = _fxTime;
+  const fromX = Number(origin?.x);
+  const fromY = Number(origin?.y);
+  const toX = Number(at?.x);
+  const toY = Number(at?.y);
+  if (![fromX, fromY, toX, toY].every(Number.isFinite)) return;
+  const cheb = Math.max(Math.abs((toX | 0) - (fromX | 0)), Math.abs((toY | 0) - (fromY | 0)));
+  if (cheb < 1 || cheb > 2) return;
+  const jitter = seededUnit(id ^ (world.step | 0));
+  const duration = 0.28 + cheb * 0.10 + jitter * 0.07;
+  const peak = 0.30 + cheb * 0.22 + jitter * 0.10;
+  _deathLootArcs.set(id, {
+    fromX,
+    fromY,
+    toX,
+    toY,
+    start: fx,
+    duration,
+    peak,
+  });
+}
+
+function deathLootArcPos(itemId) {
+  const id = Number(itemId || 0) | 0;
+  if (!(id > 0)) return null;
+  const rec = _deathLootArcs.get(id);
+  if (!rec) return null;
+  const t = (Math.max(0, _fxTime - rec.start)) / Math.max(0.001, rec.duration);
+  if (t >= 1) {
+    _deathLootArcs.delete(id);
+    return null;
+  }
+  const ease = 1 - Math.pow(1 - t, 3);
+  const lift = 4 * rec.peak * ease * (1 - ease);
+  return {
+    x: rec.fromX + (rec.toX - rec.fromX) * ease,
+    y: rec.fromY + (rec.toY - rec.fromY) * ease - lift,
+    airborne: true,
+  };
+}
+
+world.on("item:dropped", ({ itemId, source, origin, at }) => {
+  if (String(source || "") !== "death") return;
+  scheduleDeathLootArc(itemId, origin, at);
+});
+
 world.on("chest:burst", ({ actor, targetId, origin, drops }) => {
   const ox = Number(origin?.x || 0);
   const oy = Number(origin?.y || 0);
@@ -3582,18 +3639,33 @@ canvas.addEventListener('pointerdown', (ev) => {
 
   const set = world.get(pe.id, Settings);
   const pickupRange = Math.max(0, Number(set?.pickupRange ?? 0));
-  const pickupDist = Math.abs((pe.pos.x | 0) - tx) + Math.abs((pe.pos.y | 0) - ty);
-  const hasTapPickup = pickupDist <= pickupRange && itemsAt(world, tx, ty).length > 0;
+  const nearbyOffsets = [
+    { x: 0, y: 0 },
+    { x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 },
+    { x: 1, y: 1 }, { x: -1, y: 1 }, { x: 1, y: -1 }, { x: -1, y: -1 },
+  ];
+
+  const hasTapPickup = nearbyOffsets.some((off) => {
+    const cx = (tx | 0) + (off.x | 0);
+    const cy = (ty | 0) + (off.y | 0);
+    const dist = Math.abs((pe.pos.x | 0) - cx) + Math.abs((pe.pos.y | 0) - cy);
+    return dist <= pickupRange && itemsAt(world, cx, cy).length > 0;
+  });
 
   let hasTapInteract = false;
-  for (const [, pos, inter] of world.query(Position, Interactable)) {
-    if (!inter) continue;
-    if ((pos.x | 0) !== tx || (pos.y | 0) !== ty) continue;
-    const dist = Math.abs((pe.pos.x | 0) - tx) + Math.abs((pe.pos.y | 0) - ty);
-    if (dist <= 1) {
-      hasTapInteract = true;
-      break;
+  for (const off of nearbyOffsets) {
+    const cx = (tx | 0) + (off.x | 0);
+    const cy = (ty | 0) + (off.y | 0);
+    for (const [, pos, inter] of world.query(Position, Interactable)) {
+      if (!inter) continue;
+      if ((pos.x | 0) !== cx || (pos.y | 0) !== cy) continue;
+      const dist = Math.abs((pe.pos.x | 0) - cx) + Math.abs((pe.pos.y | 0) - cy);
+      if (dist <= 1) {
+        hasTapInteract = true;
+        break;
+      }
     }
+    if (hasTapInteract) break;
   }
 
   if (!hasTapPickup && !hasTapInteract) return;
@@ -5258,61 +5330,66 @@ function render(worldView) {
       if (throwFx.isItemHidden(e.id) || delayedDeathFx.isItemHidden(e.id)) continue;
       const topItemId = stackMeta.get(`${e.pos.x},${e.pos.y}`) || 0;
       if (topItemId !== e.id) continue;
-      drawKind(glyphAtlas, bctx, resolveRenderableKind(glyphAtlas, e), e.pos.x, e.pos.y);
-      if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('glowing')) {
-        drawGlowingTagAura(bctx, e, _fxTime);
+      const arcPos = deathLootArcPos(e.id);
+      const itemRender = arcPos
+        ? { ...e, pos: { x: arcPos.x, y: arcPos.y } }
+        : e;
+      drawKind(glyphAtlas, bctx, resolveRenderableKind(glyphAtlas, itemRender), itemRender.pos.x, itemRender.pos.y);
+      if (PERF.quality !== 'low' && Array.isArray(itemRender.tags) && itemRender.tags.includes('glowing')) {
+        drawGlowingTagAura(bctx, itemRender, _fxTime);
       }
-      if (Array.isArray(e.tags) && e.tags.includes('venom_glowing')) {
-        drawVenomTagAura(bctx, e, _fxTime);
+      if (Array.isArray(itemRender.tags) && itemRender.tags.includes('venom_glowing')) {
+        drawVenomTagAura(bctx, itemRender, _fxTime);
       }
-      if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('frost_glowing')) {
-        drawFrostTagAura(bctx, e, _fxTime);
+      if (PERF.quality !== 'low' && Array.isArray(itemRender.tags) && itemRender.tags.includes('frost_glowing')) {
+        drawFrostTagAura(bctx, itemRender, _fxTime);
       }
-      if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('storm_glowing')) {
-        drawStormTagAura(bctx, e, _fxTime);
+      if (PERF.quality !== 'low' && Array.isArray(itemRender.tags) && itemRender.tags.includes('storm_glowing')) {
+        drawStormTagAura(bctx, itemRender, _fxTime);
       }
-      if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('soul_glowing')) {
-        drawSoulTagAura(bctx, e, _fxTime);
+      if (PERF.quality !== 'low' && Array.isArray(itemRender.tags) && itemRender.tags.includes('soul_glowing')) {
+        drawSoulTagAura(bctx, itemRender, _fxTime);
       }
-      if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('blood_glowing')) {
-        drawBloodTagAura(bctx, e, _fxTime);
+      if (PERF.quality !== 'low' && Array.isArray(itemRender.tags) && itemRender.tags.includes('blood_glowing')) {
+        drawBloodTagAura(bctx, itemRender, _fxTime);
       }
-      if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('caustic_glowing')) {
-        drawCausticTagAura(bctx, e, _fxTime);
+      if (PERF.quality !== 'low' && Array.isArray(itemRender.tags) && itemRender.tags.includes('caustic_glowing')) {
+        drawCausticTagAura(bctx, itemRender, _fxTime);
       }
-      if (Array.isArray(e.tags) && e.tags.includes('legendary_glowing')) {
-        drawLegendaryChestAura(bctx, e, _fxTime);
+      if (Array.isArray(itemRender.tags) && itemRender.tags.includes('legendary_glowing')) {
+        drawLegendaryChestAura(bctx, itemRender, _fxTime);
       }
-      if (Array.isArray(e.tags) && e.tags.includes('epic_glowing')) {
-        drawEpicChestAura(bctx, e, _fxTime);
+      if (Array.isArray(itemRender.tags) && itemRender.tags.includes('epic_glowing')) {
+        drawEpicChestAura(bctx, itemRender, _fxTime);
       }
-      if (Array.isArray(e.tags) && e.tags.includes('rare_glowing')) {
-        drawRareGlowAura(bctx, e, _fxTime);
+      if (Array.isArray(itemRender.tags) && itemRender.tags.includes('rare_glowing')) {
+        drawRareGlowAura(bctx, itemRender, _fxTime);
       }
-      if (Array.isArray(e.tags) && e.tags.includes('potion_glow')) {
-        drawPotionGlyphAura(bctx, e, _fxTime);
+      if (Array.isArray(itemRender.tags) && itemRender.tags.includes('potion_glow')) {
+        drawPotionGlyphAura(bctx, itemRender, _fxTime);
       }
-      if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('rare')) {
-        drawRareStar(bctx, e, _fxTime);
+      if (PERF.quality !== 'low' && Array.isArray(itemRender.tags) && itemRender.tags.includes('rare')) {
+        drawRareStar(bctx, itemRender, _fxTime);
       }
-      if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('quest_giver')) {
-        drawQuestBang(bctx, e, _fxTime);
+      if (PERF.quality !== 'low' && Array.isArray(itemRender.tags) && itemRender.tags.includes('quest_giver')) {
+        drawQuestBang(bctx, itemRender, _fxTime);
       }
-      if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('blinded')) {
-        drawBlindEye(bctx, e, _fxTime);
+      if (PERF.quality !== 'low' && Array.isArray(itemRender.tags) && itemRender.tags.includes('blinded')) {
+        drawBlindEye(bctx, itemRender, _fxTime);
       }
       const playerPos = worldView?.player?.pos;
       if (
-        playerPos
-        && (!worldView?.isVisible || worldView.isVisible(e.pos.x, e.pos.y))
-        && chebyshevScalar(playerPos.x | 0, playerPos.y | 0, e.pos.x | 0, e.pos.y | 0) <= 3
+        !arcPos
+        && playerPos
+        && (!worldView?.isVisible || worldView.isVisible(itemRender.pos.x, itemRender.pos.y))
+        && chebyshevScalar(playerPos.x | 0, playerPos.y | 0, itemRender.pos.x | 0, itemRender.pos.y | 0) <= 3
       ) {
         _groundLootLabels.push({
-          id: e.id,
-          x: e.pos.x,
-          y: e.pos.y,
-          text: lootLabelFromKind(e.kind),
-          color: lootLabelColorFromTags(e.tags),
+          id: itemRender.id,
+          x: itemRender.pos.x,
+          y: itemRender.pos.y,
+          text: lootLabelFromKind(itemRender.kind),
+          color: lootLabelColorFromTags(itemRender.tags),
         });
       }
       continue;

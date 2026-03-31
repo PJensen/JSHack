@@ -23,22 +23,29 @@ const MAX_NESTING = 5;
 const TOUCHSTONE_IDENTITY = 'stone_touchstone';
 const TOUCHSTONE_OWNED_KEY = Symbol.for('jshack:touchstone:owned');
 
-// Archetype name -> archetype object
-const ARCHETYPE_MAP = {
-  HealthPotion,
-  GoldStack,
-  ArrowsStack,
-  FireArrowsStack,
-  PiercingArrowsStack,
-  BodkinArrowsStack,
-  BluntHeadArrowsStack,
-  ScrollOfMapping,
-  Bone,
-  Ration,
-  IronRation,
-  WildBerries,
-  WildHerbs,
-};
+/** @type {Record<string, any> | null} */
+let _ARCHETYPE_MAP = null;
+
+function getArchetypeMap() {
+  // Lazily resolve to avoid module-init TDZ in rare circular import paths.
+  if (_ARCHETYPE_MAP) return _ARCHETYPE_MAP;
+  _ARCHETYPE_MAP = {
+    HealthPotion,
+    GoldStack,
+    ArrowsStack,
+    FireArrowsStack,
+    PiercingArrowsStack,
+    BodkinArrowsStack,
+    BluntHeadArrowsStack,
+    ScrollOfMapping,
+    Bone,
+    Ration,
+    IronRation,
+    WildBerries,
+    WildHerbs,
+  };
+  return _ARCHETYPE_MAP;
+}
 
 // ── Resolution ──────────────────────────────────────────────────────
 
@@ -284,7 +291,7 @@ export function materializeDrop(world, drop, pos) {
     }
 
     case "archetype": {
-      const arch = ARCHETYPE_MAP[drop.params.archetype];
+      const arch = getArchetypeMap()[drop.params.archetype];
       if (!arch) return null;
       const id = createFrom(world, arch, {});
       if (!(id > 0)) return null;

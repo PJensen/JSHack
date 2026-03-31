@@ -278,12 +278,78 @@ export function makeRulesDispatcher(world, getActorId, opts = {}) {
       case "rules.worldTap": {
         const { x = null, y = null } = action.payload || {};
         if (!Number.isFinite(x) || !Number.isFinite(y)) break;
-        const tx = Math.floor(Number(x));
-        const ty = Math.floor(Number(y));
+        const tapX = Math.floor(Number(x));
+        const tapY = Math.floor(Number(y));
         const actorPos = world?.get?.(actorId, Position);
         if (!actorPos) break;
         const px = actorPos.x | 0;
         const py = actorPos.y | 0;
+        const set = world?.get?.(actorId, Settings);
+        const pickupRange = Math.max(0, Number(set?.pickupRange ?? 0));
+
+        const nearbyOffsets = [
+          { x: 0, y: 0 },
+          { x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 },
+          { x: 1, y: 1 }, { x: -1, y: 1 }, { x: 1, y: -1 }, { x: -1, y: -1 },
+        ];
+
+        const inPickupRange = (xv, yv) => Math.abs((xv | 0) - px) + Math.abs((yv | 0) - py) <= pickupRange;
+
+        const resolveInteractAt = (xv, yv) => {
+          let id = 0;
+          let dist = Infinity;
+          let action = "";
+          for (const [eid, pos, inter] of world.query(Position, Interactable)) {
+            if ((pos.x | 0) !== (xv | 0) || (pos.y | 0) !== (yv | 0)) continue;
+            const d = Math.abs((pos.x | 0) - px) + Math.abs((pos.y | 0) - py);
+            if (d < dist) {
+              dist = d;
+              id = Number(eid || 0) | 0;
+              action = String(inter?.action || "");
+            }
+          }
+          return { id, dist, action };
+        };
+
+        let tx = tapX | 0;
+        let ty = tapY | 0;
+        let bestPickup = null;
+        for (let i = 0; i < nearbyOffsets.length; i++) {
+          const off = nearbyOffsets[i];
+          const cx = (tapX | 0) + (off.x | 0);
+          const cy = (tapY | 0) + (off.y | 0);
+          const ids = itemsAt(world, cx, cy);
+          if (!Array.isArray(ids) || ids.length <= 0) continue;
+          if (!inPickupRange(cx, cy)) continue;
+          const tapDist = Math.abs(cx - (tapX | 0)) + Math.abs(cy - (tapY | 0));
+          const actorDist = Math.abs(cx - px) + Math.abs(cy - py);
+          const score = tapDist * 10 + actorDist;
+          if (!bestPickup || score < bestPickup.score) {
+            bestPickup = { x: cx, y: cy, score };
+          }
+        }
+        if (bestPickup) {
+          tx = bestPickup.x | 0;
+          ty = bestPickup.y | 0;
+        } else {
+          let bestInteract = null;
+          for (let i = 0; i < nearbyOffsets.length; i++) {
+            const off = nearbyOffsets[i];
+            const cx = (tapX | 0) + (off.x | 0);
+            const cy = (tapY | 0) + (off.y | 0);
+            const inter = resolveInteractAt(cx, cy);
+            if (!(inter.id > 0) || inter.dist > 1) continue;
+            const tapDist = Math.abs(cx - (tapX | 0)) + Math.abs(cy - (tapY | 0));
+            const score = tapDist * 10 + inter.dist;
+            if (!bestInteract || score < bestInteract.score) {
+              bestInteract = { x: cx, y: cy, score };
+            }
+          }
+          if (bestInteract) {
+            tx = bestInteract.x | 0;
+            ty = bestInteract.y | 0;
+          }
+        }
 
         let interactTargetId = 0;
         let interactDist = Infinity;
@@ -306,8 +372,6 @@ export function makeRulesDispatcher(world, getActorId, opts = {}) {
 
         const tappedItems = itemsAt(world, tx, ty);
         if (Array.isArray(tappedItems) && tappedItems.length > 0) {
-          const set = world?.get?.(actorId, Settings);
-          const pickupRange = Math.max(0, Number(set?.pickupRange ?? 0));
           const dist = Math.abs(tx - px) + Math.abs(ty - py);
           if (dist <= pickupRange) {
             world?.add?.(actorId, PickupIntent, { targetId: tappedItems[0] });
