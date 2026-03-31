@@ -1582,7 +1582,7 @@ function createQuickSlot(opts = {}) {
     zIndex: 901,
   });
 
-  /** @type {Array<{id:number, identity?:string, type:string, slot?:string, name:string, count:number, rarityName?:string, glyph?:string, glyphColor?:string, hasScrollOfIdentify?:boolean, details?:any, addedAt:number}>} */
+  /** @type {Array<{id:number, identity?:string, type:string, slot?:string, name:string, count:number, rarityName?:string, glyph?:string, glyphColor?:string, hasScrollOfIdentify?:boolean, details?:any, interacted?:boolean, addedAt:number}>} */
   const stack = [];
   const AUTO_DISMISS_MS = 3000;
 
@@ -1601,6 +1601,7 @@ function createQuickSlot(opts = {}) {
       hasScrollOfIdentify: !!item?.hasScrollOfIdentify,
       canApply: !!item?.canApply,
       applyTargetCount: Math.max(0, Number(item?.applyTargetCount || 0) | 0),
+      interacted: false,
       details: item?.details || item,
     };
   }
@@ -1611,10 +1612,34 @@ function createQuickSlot(opts = {}) {
 
   let dismissTimer = 0;
   let fadeTimer = 0;
+  function stopFadeForTopChip() {
+    if (dismissTimer) clearTimeout(dismissTimer);
+    if (fadeTimer) clearTimeout(fadeTimer);
+    dismissTimer = 0;
+    fadeTimer = 0;
+    const topChip = el.firstElementChild instanceof HTMLElement ? el.firstElementChild : null;
+    if (topChip) {
+      topChip.style.transition = '';
+      topChip.style.opacity = '1';
+    }
+  }
+
+  function markTopInteracted() {
+    const top = peekStackTop(stack);
+    if (!top) return;
+    top.interacted = true;
+    stopFadeForTopChip();
+  }
+
   function resetDismissTimer() {
     if (dismissTimer) clearTimeout(dismissTimer);
     if (fadeTimer) clearTimeout(fadeTimer);
     if (stack.length === 0) return;
+    const top = peekStackTop(stack);
+    if (top?.interacted) {
+      stopFadeForTopChip();
+      return;
+    }
     const topChip = el.firstElementChild instanceof HTMLElement ? el.firstElementChild : null;
     if (topChip) {
       topChip.style.opacity = '1';
@@ -1639,6 +1664,7 @@ function createQuickSlot(opts = {}) {
       onThrow: Number(it?.id || 0) > 0 ? () => dispatchThrow(it) : null,
       onDrop: Number(it?.id || 0) > 0 ? () => dispatchDrop(it) : null,
       onPin: Number(it?.id || 0) > 0 && onPinItem ? () => dispatchPin(it) : null,
+      onInteracted: () => markTopInteracted(),
       onDismiss: () => dismissTop()
     });
     el.appendChild(chip);
@@ -2864,9 +2890,10 @@ function createMobileSpellRadial(mobileLayoutMq) {
   return { el };
 }
 
-/** @param {{id:number,identity?:string,name:string,type:string,count:number}} it @param {{onUse:Function,onDismiss:Function,onThrow?:Function|null,onDrop?:Function|null,onPin?:Function|null}} h */
+/** @param {{id:number,identity?:string,name:string,type:string,count:number}} it @param {{onUse:Function,onDismiss:Function,onThrow?:Function|null,onDrop?:Function|null,onPin?:Function|null,onInteracted?:Function|null}} h */
 function renderQuickChip(it, h) {
   const actionable = isQuickChipActionable(it);
+  const markInteracted = () => { if (typeof h.onInteracted === 'function') h.onInteracted(); };
   const chip = document.createElement('div');
   Object.assign(chip.style, {
     display: 'flex',
@@ -2992,7 +3019,10 @@ function renderQuickChip(it, h) {
     border: '1px solid #2d3b52', borderRadius: '6px', cursor: 'pointer'
   });
   btn.textContent = getQuickChipPrimaryActionLabel(it);
-  btn.addEventListener('click', () => h.onUse && h.onUse());
+  btn.addEventListener('click', () => {
+    markInteracted();
+    h.onUse && h.onUse();
+  });
 
   let identifyBtn = null;
   if (canQuickChipIdentify(it)) {
@@ -3003,6 +3033,7 @@ function renderQuickChip(it, h) {
     });
     identifyBtn.textContent = 'Identify';
     identifyBtn.addEventListener('click', () => {
+      markInteracted();
       window.dispatchEvent(new CustomEvent('ui:requestQuickChipIdentify', { detail: { targetItemId: it.id } }));
     });
   }
@@ -3015,7 +3046,10 @@ function renderQuickChip(it, h) {
       border: '1px solid #2d3b52', borderRadius: '6px', cursor: 'pointer'
     });
     throwBtn.textContent = 'Throw';
-    throwBtn.addEventListener('click', () => h.onThrow && h.onThrow());
+    throwBtn.addEventListener('click', () => {
+      markInteracted();
+      h.onThrow && h.onThrow();
+    });
   }
 
   let dropBtn = null;
@@ -3026,7 +3060,10 @@ function renderQuickChip(it, h) {
       border: '1px solid #2d3b52', borderRadius: '6px', cursor: 'pointer'
     });
     dropBtn.textContent = 'Drop';
-    dropBtn.addEventListener('click', () => h.onDrop && h.onDrop());
+    dropBtn.addEventListener('click', () => {
+      markInteracted();
+      h.onDrop && h.onDrop();
+    });
   }
 
   const x = document.createElement('button');
@@ -3042,7 +3079,10 @@ function renderQuickChip(it, h) {
   });
   x.textContent = '\u00D7';
   x.title = 'Dismiss';
-  x.addEventListener('click', () => h.onDismiss && h.onDismiss());
+  x.addEventListener('click', () => {
+    markInteracted();
+    h.onDismiss && h.onDismiss();
+  });
   let pinBtn = null;
   if (typeof h.onPin === 'function') {
     pinBtn = document.createElement('button');
@@ -3058,7 +3098,10 @@ function renderQuickChip(it, h) {
     });
     pinBtn.textContent = '\uD83D\uDCCC';
     pinBtn.title = 'Pin to quick slot';
-    pinBtn.addEventListener('click', () => h.onPin && h.onPin());
+    pinBtn.addEventListener('click', () => {
+      markInteracted();
+      h.onPin && h.onPin();
+    });
   }
 
   const actions = document.createElement('div');
@@ -3084,7 +3127,11 @@ function renderQuickChip(it, h) {
           ? `x${normalizePositiveCount(it.count)} • tap for details`
           : `x${normalizePositiveCount(it.count)} • picked up`);
   };
-  header.addEventListener('click', () => setExpanded(!expanded));
+  header.addEventListener('click', () => {
+    markInteracted();
+    setExpanded(!expanded);
+  });
+  expandedWrap.addEventListener('pointerdown', markInteracted);
 
   chip.appendChild(x);
   if (pinBtn) chip.appendChild(pinBtn);
