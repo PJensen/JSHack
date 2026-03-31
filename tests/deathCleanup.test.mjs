@@ -12,6 +12,10 @@ import { equipmentSystem } from '../src/rules/systems/equipmentSystem.js';
 import { combatSystem } from '../src/rules/systems/combatSystem.js';
 import { cleanupSystem } from '../src/rules/systems/cleanupSystem.js';
 import { Position } from '../src/rules/components/Position.js';
+import { Inventory } from '../src/rules/components/Inventory.js';
+import { addToInventory } from '../src/rules/utils/inventoryFacade.js';
+import { clearAll, getTile, loadChunk } from '../src/rules/environment/dungeon/tileMap.js';
+import { CHUNK_SIZE, TILE_FLOOR, TILE_WALL } from '../src/rules/environment/dungeon/constants.js';
 
 function makeActor(world, name, eq, hp = 10) {
   const id = world.create();
@@ -93,4 +97,44 @@ Deno.test("non-burning dead pets still drop corpses", () => {
     identities.push(String(ni?.identity || ''));
   }
   assert(identities.includes('corpse_kitty'), 'non-burning pet death should still drop corpse');
+});
+
+Deno.test("monster death burst places dropped gear in 2-3 tile radius and avoids wall tiles when possible", () => {
+  clearAll();
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR);
+  tiles[3 * CHUNK_SIZE + 5] = TILE_WALL; // one candidate ring tile around (3,3)
+  loadChunk(0, 0, tiles);
+
+  const world = new World({ seed: 31337 });
+  const monster = world.create();
+  world.add(monster, NamedIdentity, { name: "Goblin", identity: "goblin" });
+  world.add(monster, Position, { x: 3, y: 3 });
+  world.add(monster, Vitality, { maxHp: 10, hp: 0 });
+  world.add(monster, Inventory, { capacity: 8 });
+
+  const item = world.create();
+  world.add(item, NamedIdentity, { name: "Rusty Dagger", identity: "test_rusty_dagger" });
+  world.add(item, ItemInfo, {
+    type: "equip",
+    slot: "weapon",
+    weight: 1,
+    value: 1,
+    description: "",
+    count: 1,
+    bonuses: {},
+    rarity: 1,
+    rarityName: "common",
+    affixes: [],
+  });
+  addToInventory(world, monster, item);
+
+  cleanupSystem(world);
+
+  const droppedPos = world.get(item, Position);
+  assert(droppedPos, "monster item should be dropped to ground");
+  const dx = Math.abs((droppedPos.x | 0) - 3);
+  const dy = Math.abs((droppedPos.y | 0) - 3);
+  const cheb = Math.max(dx, dy);
+  assert(cheb >= 2 && cheb <= 3, `expected death burst in radius 2-3, got chebyshev ${cheb}`);
+  assert(getTile(droppedPos.x, droppedPos.y) !== TILE_WALL, "death burst should avoid wall tiles when floor alternatives exist");
 });

@@ -11,8 +11,9 @@ import { Material } from "../../components/Material.js";
 import { NamedIdentity } from "../../components/NamedIdentity.js";
 import { Player } from "../../components/Player.js";
 import { Position } from "../../components/Position.js";
+import { DungeonState } from "../../components/DungeonState.js";
 import { degradeExplored } from "../../environment/dungeon/exploredMap.js";
-import { combatSeed, mulberry32, rngInt } from "../../utils/rng.js";
+import { combatSeed, createRng, mulberry32, rngInt } from "../../utils/rng.js";
 import { createCombatStatFacade } from "../../utils/resolveCombatSnapshot.js";
 import { createStatusFacade } from "../../utils/statusFacade.js";
 import { upsertTimedEffect } from "../../utils/effectSemantics.js";
@@ -20,6 +21,7 @@ import { findNearestValidTileAround } from "../../utils/queries.js";
 import { inventoryItems, addToInventory, removeFromInventory } from "../../utils/inventoryFacade.js";
 import { dealDamage } from "../../utils/dealDamage.js";
 import { emitSafe } from "../../utils/emitSafe.js";
+import { dropLoot } from "../lootResolver.js";
 
 // ── CombatCallbackContext ──────────────────────────────────────────
 
@@ -559,5 +561,79 @@ export function stealAndBlinkOnHit(opts = {}) {
         });
       }
     }
+  };
+}
+
+const LOOT_GOBLIN_SPILL_STATE_KEY = Symbol.for("jshack:combat:lootGoblinSpill:state");
+
+function currentDepth(world) {
+  for (const [, ds] of world.query(DungeonState)) {
+    return Math.max(1, Number(ds?.currentDepth || 1) | 0);
+  }
+  return 1;
+}
+
+/**
+ * On damaged: spill loot at current tile and optionally short-blink.
+ * Intended for loot goblins.
+ *
+ * @param {{
+ *   dropTable?: string,
+ *   dropChancePct?: number,
+ *   dropCooldownTurns?: number,
+ *   blinkChancePct?: number,
+ *   blinkCooldownTurns?: number,
+ *   blinkDistance?: number,
+ *   seedSalt?: number,
+ * }} [opts]
+ */
+export function spillLootAndShortBlinkOnDamaged(opts = {}) {
+  const dropTable = String(opts.dropTable || "hit:loot_goblin");
+  const dropChancePct = Math.max(0, Math.min(100, Number(opts.dropChancePct) || 100));
+  const dropCooldownTurns = Math.max(0, Number(opts.dropCooldownTurns) || 0);
+  const blinkChancePct = Math.max(0, Math.min(100, Number(opts.blinkChancePct) || 55));
+  const blinkCooldownTurns = Math.max(0, Number(opts.blinkCooldownTurns) || 2);
+  const blinkDistance = Math.max(1, Number(opts.blinkDistance) || 4);
+  const seedSalt = Number(opts.seedSalt) || 0xdead00b0;
+
+  return (ctx) => {
+    const defender = ctx.defender | 0;
+    if (!(defender > 0) || !ctx.world.isAlive(defender)) return;
+
+    if (!ctx.world[LOOT_GOBLIN_SPILL_STATE_KEY]) ctx.world[LOOT_GOBLIN_SPILL_STATE_KEY] = new Map();
+    const state = ctx.world[LOOT_GOBLIN_SPILL_STATE_KEY];
+    const now = Number(ctx.world.step || 0) | 0;
+    const rec = state.get(defender) || { dropTurn: -1e9, blinkTurn: -1e9 };
+
+    const pos = ctx.world.get(defender, Position);
+    if (!pos) return;
+    const at = { x: pos.x | 0, y: pos.y | 0 };
+
+    if ((now - rec.dropTurn) >= dropCooldownTurns && ctx.roll(dropChancePct, seedSalt)) {
+      const lootSeed = combatSeed(ctx.world.seed, now, ctx.attacker, defender, seedSalt ^ 0x51f15e);
+      const rng = createRng(lootSeed >>> 0);
+      dropLoot(ctx.world, dropTable, rng, currentDepth(ctx.world), at);
+      rec.dropTurn = now;
+      ctx.emit("loot_goblin:spilled", { id: defender, at });
+    }
+
+    if ((now - rec.blinkTurn) >= blinkCooldownTurns && ctx.roll(blinkChancePct, seedSalt + 1)) {
+      const attackerPos = ctx.world.get(ctx.attacker, Position);
+      const exclude = [{ x: at.x, y: at.y }];
+      if (attackerPos) exclude.push({ x: attackerPos.x | 0, y: attackerPos.y | 0 });
+
+      const landing = findNearestValidTileAround(ctx.world, at, { maxDistance: blinkDistance, exclude });
+      if (landing && ((landing.x | 0) !== at.x || (landing.y | 0) !== at.y)) {
+        ctx.world.set(defender, Position, { x: landing.x | 0, y: landing.y | 0 });
+        rec.blinkTurn = now;
+        ctx.emit("loot_goblin:blinked", {
+          id: defender,
+          from: at,
+          to: { x: landing.x | 0, y: landing.y | 0 },
+        });
+      }
+    }
+
+    state.set(defender, rec);
   };
 }

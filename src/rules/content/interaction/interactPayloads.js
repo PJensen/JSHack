@@ -22,6 +22,7 @@ import {
   hasCapacity,
   inventoryContains,
   inventoryItems,
+  placeOnGround,
   removeFromInventory,
 } from "../../utils/inventoryFacade.js";
 import { Vitality } from "../../components/Vitality.js";
@@ -79,6 +80,8 @@ import { effectiveMaxHp, effectiveMaxMana, effectiveMaxStamina } from "../../uti
 import { buildNoticeBoardPayload } from "../../quests/localGenerator.js";
 import { GroundStackOrder } from "../../components/GroundStackOrder.js";
 import { HazardArea } from "../../components/HazardArea.js";
+import { emitSafe } from "../../utils/emitSafe.js";
+import { isWalkable } from "../../environment/dungeon/tileMap.js";
 
 // Maps catalog item IDs → archetypes for harvest yield entity creation.
 const CATALOG_ARCHETYPES = {
@@ -210,6 +213,110 @@ function ensureFountainState(world, targetId) {
 }
 
 const FIERY_WEAPON_AFFIXES = new Set(["flaming", "firestorm1"]);
+const GROUND_STACK_SEQ_KEY = Symbol.for("jshack:groundStack:seq");
+const CHEST_BURST_OFFSETS = Object.freeze([
+  { x: 0, y: 0 },
+  { x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 },
+  { x: 1, y: 1 }, { x: -1, y: 1 }, { x: 1, y: -1 }, { x: -1, y: -1 },
+  { x: 2, y: 0 }, { x: -2, y: 0 }, { x: 0, y: 2 }, { x: 0, y: -2 },
+  { x: 2, y: 1 }, { x: 2, y: -1 }, { x: -2, y: 1 }, { x: -2, y: -1 },
+  { x: 1, y: 2 }, { x: -1, y: 2 }, { x: 1, y: -2 }, { x: -1, y: -2 },
+  { x: 2, y: 2 }, { x: -2, y: 2 }, { x: 2, y: -2 }, { x: -2, y: -2 },
+]);
+
+function nextGroundStackSeq(world) {
+  const current = Number((/** @type {any} */ (world))[GROUND_STACK_SEQ_KEY] || 0) | 0;
+  const next = (current + 1) | 0;
+  (/** @type {any} */ (world))[GROUND_STACK_SEQ_KEY] = next;
+  return next;
+}
+
+function stampGroundTop(world, itemId) {
+  if (!(Number(itemId) > 0)) return;
+  world.add(itemId, GroundStackOrder, { seq: nextGroundStackSeq(world) });
+}
+
+function buildChestBurstOffsets(world, chestId, count) {
+  const n = Math.max(0, Number(count || 0) | 0);
+  if (n <= 0) return [];
+  const out = [];
+  const base = ((world.seed >>> 0) ^ ((Number(chestId || 0) * 0x9e3779b9) >>> 0) ^ ((world.step | 0) >>> 0)) >>> 0;
+  const start = Math.abs(base | 0) % CHEST_BURST_OFFSETS.length;
+  for (let i = 0; i < n; i++) {
+    out.push(CHEST_BURST_OFFSETS[(start + i) % CHEST_BURST_OFFSETS.length]);
+  }
+  return out;
+}
+
+function isSolidBlockedAt(world, x, y, ignoreId = 0) {
+  const tx = x | 0;
+  const ty = y | 0;
+  for (const [id, pos, col] of world.query(Position, Collider)) {
+    if ((Number(id) | 0) === (Number(ignoreId) | 0)) continue;
+    if (!col?.solid) continue;
+    if ((pos.x | 0) !== tx || (pos.y | 0) !== ty) continue;
+    return true;
+  }
+  return false;
+}
+
+function buildChestBurstTargets(world, chestId, chestPos, count) {
+  const n = Math.max(0, Number(count || 0) | 0);
+  if (n <= 0) return [];
+  const cx = chestPos.x | 0;
+  const cy = chestPos.y | 0;
+
+  const walkableReachable = [];
+  const q = [{ x: cx, y: cy, d: 0 }];
+  const seen = new Set([`${cx},${cy}`]);
+  for (let i = 0; i < q.length; i++) {
+    const cur = q[i];
+    if (cur.d > 2) continue;
+    if (isWalkable(cur.x, cur.y) && !isSolidBlockedAt(world, cur.x, cur.y, chestId)) {
+      walkableReachable.push(cur);
+    }
+    if (cur.d === 2) continue;
+    const next = [
+      { x: cur.x + 1, y: cur.y },
+      { x: cur.x - 1, y: cur.y },
+      { x: cur.x, y: cur.y + 1 },
+      { x: cur.x, y: cur.y - 1 },
+    ];
+    for (const p of next) {
+      const k = `${p.x},${p.y}`;
+      if (seen.has(k)) continue;
+      seen.add(k);
+      q.push({ x: p.x, y: p.y, d: cur.d + 1 });
+    }
+  }
+
+  let candidates = [];
+  if (walkableReachable.length > 0) {
+    const away = walkableReachable
+      .filter((p) => (p.x | 0) !== cx || (p.y | 0) !== cy)
+      .sort((a, b) => a.d - b.d || a.x - b.x || a.y - b.y);
+    const origin = walkableReachable
+      .filter((p) => (p.x | 0) === cx && (p.y | 0) === cy);
+    candidates = away.length > 0 ? away.concat(origin) : walkableReachable.slice();
+  } else {
+    const offsets = buildChestBurstOffsets(world, chestId, n);
+    candidates = offsets.map((off, i) => ({
+      x: cx + (off.x | 0),
+      y: cy + (off.y | 0),
+      d: i,
+    }));
+  }
+
+  if (!candidates.length) return [];
+  const base = ((world.seed >>> 0) ^ ((Number(chestId || 0) * 0x9e3779b9) >>> 0) ^ ((world.step | 0) >>> 0)) >>> 0;
+  const start = Math.abs(base | 0) % candidates.length;
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const p = candidates[(start + i) % candidates.length];
+    out.push({ x: p.x | 0, y: p.y | 0 });
+  }
+  return out;
+}
 
 function actorHasFieryWieldedWeapon(world, actor) {
   const eq = world.get(actor, Equipment);
@@ -388,13 +495,58 @@ export const INTERACT_PAYLOADS = {
   openChest: {
     onInteract(ctx) {
       const { world, actor, targetId } = ctx;
-      if (world.has(targetId, Inventory)) {
+      if (!world.has(targetId, Inventory)) return;
+      const chestItems = inventoryItems(world, targetId);
+      if (!chestItems.length) {
+        world.emit?.("chest:empty", { actor, targetId });
+        return;
+      }
+      const chestPos = world.get(targetId, Position);
+      if (!chestPos) {
+        // Non-ground containers (if any) still use UI-driven inventory transfer.
         world.emit?.("chest:open", {
           actor,
           targetId,
-          chestItems: inventoryItems(world, targetId),
+          chestItems: chestItems.slice(),
         });
+        return;
       }
+
+      const targets = buildChestBurstTargets(world, targetId, chestPos, chestItems.length);
+      const drops = [];
+      for (let i = 0; i < chestItems.length; i++) {
+        const itemId = chestItems[i];
+        if (!removeFromInventory(world, targetId, itemId)) continue;
+        const target = targets[i] || { x: chestPos.x | 0, y: chestPos.y | 0 };
+        const px = target.x | 0;
+        const py = target.y | 0;
+        const placed = placeOnGround(world, itemId, px, py, { mergeCompatibleAmmo: true });
+        const finalId = Number(placed.itemId || itemId) | 0;
+        if (!(finalId > 0)) continue;
+        stampGroundTop(world, finalId);
+        const finalPos = world.get(finalId, Position);
+        const at = {
+          x: Number(finalPos?.x ?? px) | 0,
+          y: Number(finalPos?.y ?? py) | 0,
+        };
+        const info = world.get(finalId, ItemInfo);
+        emitSafe(world, "item:dropped", {
+          actor,
+          itemId: finalId,
+          count: Math.max(1, Number(placed.movedCount || info?.count || 1) | 0),
+          at,
+          source: "chest",
+          targetId,
+        });
+        drops.push({ itemId: finalId, at });
+      }
+
+      world.emit?.("chest:burst", {
+        actor,
+        targetId,
+        origin: { x: chestPos.x | 0, y: chestPos.y | 0 },
+        drops,
+      });
     },
   },
 

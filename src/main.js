@@ -30,6 +30,7 @@ import { Particle, ParticleFX } from "./display/passes/vfx/particles/particlePoo
 import { setupInput } from "./display/input/InputRouter.js";
 import { isInputLocked } from "./display/input/inputLock.js";
 import { enableInputLockdown } from "./display/input/lockdown.js";
+import { readInputMode } from "./display/input/inputSettings.js";
 import { makeRulesDispatcher } from "./main/input/rulesDispatch.js";
 // simple UI overlays
 import { initOverlays } from "./display/ui/overlay.js";
@@ -1186,13 +1187,10 @@ const inputDisposers = [];
           }
         }
         if (chestId) {
-          try {
-            world.emit?.('chest:open', {
-              actor: p.id,
-              targetId: chestId,
-              chestItems: inventoryItems(world, chestId),
-            });
-          } catch (e) { console.debug('[main] emit chest:open failed:', e); }
+          const chestPos = world.get(chestId, Position);
+          if (chestPos) {
+            rulesHandler({ type: 'rules.worldTap', payload: { x: chestPos.x, y: chestPos.y } });
+          }
         }
         break;
       }
@@ -1619,14 +1617,10 @@ addEventListener('ui:tapOpenChest', (e) => {
   if (!(chestId > 0)) return;
   const pe = playerEntity(world);
   if (!pe) return;
-  const chestInv = world.get(chestId, Inventory);
-  try {
-    world.emit?.('chest:open', {
-      actor: pe.id,
-      targetId: chestId,
-      chestItems: inventoryItems(world, chestId),
-    });
-  } catch (err) { console.debug('[main] emit chest:open failed:', err); }
+  const chestPos = world.get(chestId, Position);
+  if (!chestPos) return;
+  const rulesHandler = makeRulesDispatcher(world, () => pe.id);
+  rulesHandler({ type: 'rules.worldTap', payload: { x: chestPos.x, y: chestPos.y } });
 });
 
 // When user selects items from the pickup chooser overlay
@@ -2193,6 +2187,97 @@ world.on('item:pickup', ({ actor, itemId, count }) => {
   if (n > 0) {
     ftext.addGold(pos.x, pos.y, n, { color: '#ffcd45' });
   }
+});
+
+function lootRarityColorHex(itemInfo) {
+  const type = String(itemInfo?.type || "").toLowerCase();
+  if (type === "currency") return "#ffd34d";
+  const rarity = String(itemInfo?.rarityName || "common").toLowerCase();
+  if (rarity === "legendary") return "#ff8a3d";
+  if (rarity === "epic") return "#c77dff";
+  if (rarity === "rare") return "#ffd54f";
+  if (rarity === "magic") return "#63b3ff";
+  return "#c2c2c2";
+}
+
+world.on("chest:burst", ({ actor, targetId, origin, drops }) => {
+  const ox = Number(origin?.x || 0);
+  const oy = Number(origin?.y || 0);
+  if (Number.isFinite(ox) && Number.isFinite(oy)) {
+    for (let i = 0; i < 18; i++) {
+      const a = (Math.PI * 2 * i) / 18;
+      const spd = 0.12 + (i % 3) * 0.03;
+      fx.pool.spawn(new Particle({
+        x: ox + Math.cos(a) * 0.12,
+        y: oy + Math.sin(a) * 0.08,
+        vx: Math.cos(a) * spd,
+        vy: Math.sin(a) * spd - 0.04,
+        ay: 0.06,
+        life: 0.28 + (i % 4) * 0.04,
+        size0: 0.05,
+        size1: 0.018,
+        r: 199,
+        g: 125,
+        b: 255,
+        a0: 0.66,
+      }));
+    }
+  }
+
+  const burstDrops = Array.isArray(drops) ? drops : [];
+  for (let i = 0; i < burstDrops.length; i++) {
+    const d = burstDrops[i];
+    const itemId = Number(d?.itemId || 0) | 0;
+    const atX = Number(d?.at?.x || 0);
+    const atY = Number(d?.at?.y || 0);
+    const info = world.get(itemId, ItemInfo);
+    const color = lootRarityColorHex(info);
+    const rgb = color.startsWith("#")
+      ? {
+        r: Number.parseInt(color.slice(1, 3), 16) || 255,
+        g: Number.parseInt(color.slice(3, 5), 16) || 255,
+        b: Number.parseInt(color.slice(5, 7), 16) || 255,
+      }
+      : { r: 255, g: 255, b: 255 };
+    fx.pool.spawn(new Particle({
+      x: atX,
+      y: atY - 0.05,
+      vx: 0,
+      vy: -0.03,
+      ay: -0.02,
+      life: 0.22,
+      size0: 0.055,
+      size1: 0.014,
+      r: rgb.r,
+      g: rgb.g,
+      b: rgb.b,
+      a0: 0.62,
+    }));
+  }
+
+  const pe = playerEntity(world);
+  if (!pe || pe.id !== (Number(actor) | 0)) return;
+  const chestName = String(world.get(Number(targetId) | 0, NamedIdentity)?.name || "chest").toLowerCase();
+  try { messageLog.log({ text: `You crack open the ${chestName}. Loot spills out.`, type: "system" }); } catch {}
+  if (DEBUG_DISABLE_LEGACY_FLOOR_PICKUP_TOOLTIP) {
+    try { window.dispatchEvent(new CustomEvent("ui:hideGroundItem")); } catch {}
+    try { window.dispatchEvent(new CustomEvent("ui:requestInventoryData")); } catch {}
+    return;
+  }
+  const detail = buildGroundPickupDetailAt(pe.id, pe.pos.x, pe.pos.y);
+  if (detail) {
+    try { window.dispatchEvent(new CustomEvent("ui:showGroundItem", { detail })); } catch {}
+  } else {
+    try { window.dispatchEvent(new CustomEvent("ui:hideGroundItem")); } catch {}
+  }
+  try { window.dispatchEvent(new CustomEvent("ui:requestInventoryData")); } catch {}
+});
+
+world.on("chest:empty", ({ actor, targetId }) => {
+  const pe = playerEntity(world);
+  if (!pe || pe.id !== (Number(actor) | 0)) return;
+  const chestName = String(world.get(Number(targetId) | 0, NamedIdentity)?.name || "chest").toLowerCase();
+  try { messageLog.log({ text: `The ${chestName} is empty.`, type: "system" }); } catch {}
 });
 // Centralized quick-slot chip for any item entering player inventory
 world.on('inventory:added', ({ ownerId, itemId }) => {
@@ -2891,10 +2976,18 @@ function hideTrapTooltip() {
   try { window.dispatchEvent(new CustomEvent('ui:hideTrapTooltip')); } catch (e) { console.debug('[main] dispatch ui:hideTrapTooltip:', e); }
 }
 
+// Temporary debug kill-switch while validating modern loot affordances.
+// Keep this code-only (no URL/localStorage) to make rollback cheap.
+const DEBUG_DISABLE_LEGACY_FLOOR_PICKUP_TOOLTIP = true;
+
 // When player moves, show a mobile-friendly ground item tooltip for non-currency items on the tile
 world.on('moved', ({ id, to }) => {
   const pe = playerEntity(world);
   if (!pe || pe.id !== id) return;
+  if (DEBUG_DISABLE_LEGACY_FLOOR_PICKUP_TOOLTIP) {
+    try { window.dispatchEvent(new CustomEvent('ui:hideGroundItem')); } catch (e) { console.debug('[main] dispatch ui:hideGroundItem:', e); }
+    return;
+  }
   const detail = buildGroundPickupDetailAt(pe.id, to.x, to.y);
   if (!detail) {
     try { window.dispatchEvent(new CustomEvent('ui:hideGroundItem')); } catch (e) { console.debug('[main] dispatch ui:hideGroundItem:', e); }
@@ -2907,6 +3000,10 @@ world.on('moved', ({ id, to }) => {
 world.on('rack:looted', ({ actor }) => {
   const pe = playerEntity(world);
   if (!pe || pe.id !== actor) return;
+  if (DEBUG_DISABLE_LEGACY_FLOOR_PICKUP_TOOLTIP) {
+    try { window.dispatchEvent(new CustomEvent('ui:hideGroundItem')); } catch (e) { console.debug('[main] dispatch ui:hideGroundItem:', e); }
+    return;
+  }
   const detail = buildGroundPickupDetailAt(pe.id, pe.pos.x, pe.pos.y);
   if (!detail) return;
   try { window.dispatchEvent(new CustomEvent('ui:showGroundItem', { detail })); } catch (e) { console.debug('[main] dispatch ui:showGroundItem:', e); }
@@ -3031,6 +3128,11 @@ world.on('moved', ({ id, to }) => {
 world.on('item:pickup', ({ actor, itemId }) => {
   const pe = playerEntity(world);
   if (!pe || pe.id !== actor) return;
+  if (DEBUG_DISABLE_LEGACY_FLOOR_PICKUP_TOOLTIP) {
+    try { window.dispatchEvent(new CustomEvent('ui:hideGroundItem')); } catch (e) { console.debug('[main] dispatch ui:hideGroundItem:', e); }
+    try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch (e) { console.debug('[main] dispatch ui:requestInventoryData:', e); }
+    return;
+  }
   const detail = buildGroundPickupDetailAt(pe.id, pe.pos.x, pe.pos.y);
   if (detail) {
     try { window.dispatchEvent(new CustomEvent('ui:showGroundItem', { detail })); } catch (e) { console.debug('[main] dispatch ui:showGroundItem:', e); }
@@ -3463,6 +3565,46 @@ canvas.addEventListener('pointerdown', (ev) => {
   if (typeof ev.stopImmediatePropagation === 'function') ev.stopImmediatePropagation();
 }, { capture: true });
 
+// Walk-mode tap interaction: if the tapped tile is a valid pickup/interact target,
+// consume the tap and route it through the canonical rules.worldTap path.
+canvas.addEventListener('pointerdown', (ev) => {
+  if (_pendingEnemyTargeting || _pendingSpellTargeting || _pendingThrowTargeting) return;
+  if (isSimUiBlocked()) return;
+  if (readInputMode() !== 'walk') return;
+  if (ev.pointerType === 'mouse' && ev.button !== 0) return;
+
+  const pe = playerEntity(world);
+  if (!pe) return;
+
+  const [wx, wy] = cameraClientToWorld(cam, ev.clientX, ev.clientY, canvas);
+  const tx = worldToTile(wx);
+  const ty = worldToTile(wy);
+
+  const set = world.get(pe.id, Settings);
+  const pickupRange = Math.max(0, Number(set?.pickupRange ?? 0));
+  const pickupDist = Math.abs((pe.pos.x | 0) - tx) + Math.abs((pe.pos.y | 0) - ty);
+  const hasTapPickup = pickupDist <= pickupRange && itemsAt(world, tx, ty).length > 0;
+
+  let hasTapInteract = false;
+  for (const [, pos, inter] of world.query(Position, Interactable)) {
+    if (!inter) continue;
+    if ((pos.x | 0) !== tx || (pos.y | 0) !== ty) continue;
+    const dist = Math.abs((pe.pos.x | 0) - tx) + Math.abs((pe.pos.y | 0) - ty);
+    if (dist <= 1) {
+      hasTapInteract = true;
+      break;
+    }
+  }
+
+  if (!hasTapPickup && !hasTapInteract) return;
+
+  const rulesHandler = makeRulesDispatcher(world, () => pe.id);
+  rulesHandler({ type: 'rules.worldTap', payload: { x: tx, y: ty } });
+  ev.preventDefault();
+  ev.stopPropagation();
+  if (typeof ev.stopImmediatePropagation === 'function') ev.stopImmediatePropagation();
+}, { capture: true });
+
 function particleWorldToScreen({ x, y, size = 1 }) {
   const sx = (x - cam.x) * cam.scale + canvas.width / (ctx.getTransform().a || 1) * 0.5;
   const sy = (y - cam.y) * cam.scale + canvas.height / (ctx.getTransform().d || 1) * 0.5;
@@ -3767,6 +3909,7 @@ const _roofParticleStamp = new Map();
 const _roofSmokeParticleStamp = new Map();
 /** @type {Array<{ id:number, pos:{x:number,y:number}, hp:number, maxHp:number, isPet?:boolean }>} */
 const _healthBarsToDraw = [];
+const _groundLootLabels = [];
 const _memoryGlyphByKind = new Map();
 const HP_BAR_MEANINGFUL_RATIO_DELTA = 0.08;
 const HP_BAR_SHOW_SECONDS = 2.25;
@@ -4277,6 +4420,50 @@ function hasAnyTag(entity, tags) {
     if (entity.tags.includes(tags[i])) return true;
   }
   return false;
+}
+
+function lootLabelColorFromTags(tags) {
+  const list = Array.isArray(tags) ? tags : [];
+  if (list.includes("legendary_glowing")) return "#ff9a5a";
+  if (list.includes("epic_glowing")) return "#d58bff";
+  if (list.includes("rare_glowing")) return "#ffe17a";
+  if (list.includes("gold_glow")) return "#ffd34d";
+  if (list.includes("potion_glow")) return "#8fd7ff";
+  return "#cfd7e6";
+}
+
+function lootLabelFromKind(kind) {
+  const key = String(kind || "item").trim().toLowerCase();
+  if (!key) return "Loot";
+  if (key.includes("gold")) return "Gold";
+  if (key.includes("potion")) return "Potion";
+  if (key.includes("scroll")) return "Scroll";
+  if (key.includes("wand")) return "Wand";
+  if (key.includes("chest")) return "Chest";
+  const words = key.split("_").filter(Boolean);
+  const core = words.slice(-2).join(" ");
+  const text = core || key;
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function drawGroundLootLabels(ctx, labels, fxTime) {
+  if (!Array.isArray(labels) || labels.length <= 0) return;
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.textBaseline = "bottom";
+  ctx.font = "700 0.20px monospace";
+  for (let i = 0; i < labels.length; i++) {
+    const rec = labels[i];
+    if (!rec) continue;
+    const bob = Math.sin(fxTime * 2.4 + rec.id * 0.13) * 0.03;
+    const y = rec.y - 0.55 + bob;
+    ctx.strokeStyle = "rgba(0,0,0,0.75)";
+    ctx.lineWidth = 0.06;
+    ctx.strokeText(rec.text, rec.x, y);
+    ctx.fillStyle = rec.color;
+    ctx.fillText(rec.text, rec.x, y);
+  }
+  ctx.restore();
 }
 
 function drawEntityGlyph(atlas, ctx, entity, scale = 1) {
@@ -5035,6 +5222,7 @@ function render(worldView) {
   _stackMeta.clear(); // "x,y" -> topItemId
   _stackSeqMeta.clear(); // "x,y" -> best stackSeq seen
   _healthBarsToDraw.length = 0;
+  _groundLootLabels.length = 0;
   flyingFx.syncWorldView(worldView);
   delayedDeathFx.syncWorldView(worldView);
   const renderEntities = delayedDeathFx.getRenderableEntities(worldView.entities);
@@ -5112,6 +5300,20 @@ function render(worldView) {
       }
       if (PERF.quality !== 'low' && Array.isArray(e.tags) && e.tags.includes('blinded')) {
         drawBlindEye(bctx, e, _fxTime);
+      }
+      const playerPos = worldView?.player?.pos;
+      if (
+        playerPos
+        && (!worldView?.isVisible || worldView.isVisible(e.pos.x, e.pos.y))
+        && chebyshevScalar(playerPos.x | 0, playerPos.y | 0, e.pos.x | 0, e.pos.y | 0) <= 3
+      ) {
+        _groundLootLabels.push({
+          id: e.id,
+          x: e.pos.x,
+          y: e.pos.y,
+          text: lootLabelFromKind(e.kind),
+          color: lootLabelColorFromTags(e.tags),
+        });
       }
       continue;
     }
@@ -5506,6 +5708,8 @@ function render(worldView) {
   }
 
 
+
+  drawGroundLootLabels(bctx, _groundLootLabels, _fxTime);
 
   for (let i = 0; i < _healthBarsToDraw.length; i++) {
     drawEntityHealthBar(bctx, _healthBarsToDraw[i]);

@@ -15,6 +15,7 @@ export const basePalette = {
   rat:      { glyph: "r", fg: "#b89070", glow: "#a06030" }, // 🐀
   goblin:   { glyph: "g", fg: "#7ecc5a", glow: "#4a9030" },
   goblin_archer: { glyph: "g", fg: "#5eaa3a", glow: "#3a7020" },
+  loot_goblin: { glyph: "g", fg: "#f4d46a", glow: "#b88b23" },
   bandit:   { glyph: "b", fg: "#c9b08c", glow: "#7b6547" },
   bandit_archer: { glyph: "b", fg: "#b2c6d9", glow: "#677f97" },
   boar:     { glyph: "b", fg: "#9c6f3d", glow: "#5f3f20" },

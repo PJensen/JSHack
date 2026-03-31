@@ -19,6 +19,7 @@ import {
   corrodeEquipmentOnHit,
   stealAndBlinkOnHit,
   typedDamageOnHit,
+  spillLootAndShortBlinkOnDamaged,
 } from "./callbacks/combat.js";
 import { selfThrowNearTargetOnSeen, gazeOnLOS, fireBreathLineOnLOS, castSpellOnLOS } from "./callbacks/ai.js";
 import { spawnPlasmaCloudOnDeath, centipedeSplitOnDeath, spawnFirePuffOnDeath } from "./callbacks/death.js";
@@ -132,6 +133,42 @@ export const MONSTERS = [
     specials: ["May spawn with barbed bow"],
     description: 'A goblin with a crude shortbow and a quiver of bent arrows.',
     lootTable: 'drop:goblin',
+  },
+  {
+    id: 'loot_goblin',
+    name: 'Loot Goblin',
+    tags: ['humanoid', 'rare'],
+    tier: 1,
+    rare: true,
+    intelligence: 9,
+    visionRange: 9,
+    // Keep retreating at all health values.
+    retreatHpPct: 2.0,
+    baseHp: 64,
+    hpPerLevel: 3.0,
+    attack: 1,
+    defense: 2,
+    damageDice: '1d3',
+    sizeClass: 'S',
+    massKg: 28,
+    resistances: { kinetic: { DR: 2 } },
+    speed: 3,
+    hooks: {
+      onDamaged: [
+        spillLootAndShortBlinkOnDamaged({
+          dropTable: 'hit:loot_goblin',
+          dropChancePct: 100,
+          dropCooldownTurns: 0,
+          blinkChancePct: 65,
+          blinkCooldownTurns: 2,
+          blinkDistance: 4,
+          seedSalt: 0xdead00b0,
+        }),
+      ],
+    },
+    specials: ['Always retreats', 'Short panic blink', 'Drops treasure when hit'],
+    description: 'A jittery, overstuffed goblin that bolts at first contact, blinking only a few tiles before spilling more treasure.',
+    lootTable: 'drop:loot_goblin',
   },
   {
     id: 'bandit',
