@@ -2857,13 +2857,83 @@ function renderQuickChip(it, h) {
     padding: '6px 8px', borderRadius: '6px',
     border: '1px solid #2d3b52', background: '#101626', color: '#cfe8ff'
   });
-  const content = document.createElement('div');
-  Object.assign(content.style, {
+  const header = document.createElement('button');
+  header.type = 'button';
+  Object.assign(header.style, {
     display: 'flex',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: '8px',
+    minWidth: '220px',
+    maxWidth: '320px',
+    padding: '6px 8px',
+    border: '1px solid #2d3b52',
+    borderRadius: '6px',
+    background: '#0a111f',
+    color: '#cfe8ff',
+    textAlign: 'left',
+    cursor: 'pointer',
     paddingRight: QUICK_CHIP_DISMISS_LAYOUT.contentPaddingRight,
   });
+
+  const glyph = document.createElement('span');
+  glyph.textContent = String(it.glyph || '⬢');
+  Object.assign(glyph.style, {
+    fontSize: '18px',
+    lineHeight: '1',
+    color: String(it.glyphColor || '#cfe8ff'),
+    minWidth: '18px',
+    textAlign: 'center',
+    pointerEvents: 'none',
+  });
+  header.appendChild(glyph);
+
+  const textWrap = document.createElement('span');
+  Object.assign(textWrap.style, {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '2px',
+    minWidth: '0',
+    pointerEvents: 'none',
+    flex: '1 1 auto',
+  });
+  const line1 = document.createElement('span');
+  line1.textContent = bracketize(String(it.name || 'item'));
+  Object.assign(line1.style, {
+    fontSize: '12px',
+    fontWeight: '600',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  });
+  const line2 = document.createElement('span');
+  line2.textContent = `x${normalizePositiveCount(it.count)} • tap for details`;
+  Object.assign(line2.style, {
+    fontSize: '10px',
+    opacity: '0.8',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  });
+  textWrap.appendChild(line1);
+  textWrap.appendChild(line2);
+  header.appendChild(textWrap);
+
+  const chevron = document.createElement('span');
+  chevron.textContent = '▾';
+  Object.assign(chevron.style, {
+    fontSize: '12px',
+    opacity: '0.85',
+    pointerEvents: 'none',
+  });
+  header.appendChild(chevron);
+
+  const expandedWrap = document.createElement('div');
+  Object.assign(expandedWrap.style, {
+    display: 'none',
+    flexDirection: 'column',
+    gap: '8px',
+  });
+
   const detailPanel = document.createElement('div');
   Object.assign(detailPanel.style, {
     minWidth: '180px',
@@ -2890,7 +2960,7 @@ function renderQuickChip(it, h) {
         glyphColor: it.glyphColor,
       };
   renderItemDetails(detailPanel, detailItem);
-  content.appendChild(detailPanel);
+  expandedWrap.appendChild(detailPanel);
 
   const btn = document.createElement('button');
   Object.assign(btn.style, {
@@ -2977,10 +3047,22 @@ function renderQuickChip(it, h) {
   if (identifyBtn) actions.appendChild(identifyBtn);
   if (throwBtn) actions.appendChild(throwBtn);
   if (dropBtn) actions.appendChild(dropBtn);
+  expandedWrap.appendChild(actions);
+
+  let expanded = false;
+  const setExpanded = (next) => {
+    expanded = !!next;
+    expandedWrap.style.display = expanded ? 'flex' : 'none';
+    chevron.textContent = expanded ? '▴' : '▾';
+    line2.textContent = expanded
+      ? `x${normalizePositiveCount(it.count)} • details open`
+      : `x${normalizePositiveCount(it.count)} • tap for details`;
+  };
+  header.addEventListener('click', () => setExpanded(!expanded));
 
   chip.appendChild(x);
   if (pinBtn) chip.appendChild(pinBtn);
-  chip.appendChild(content);
-  chip.appendChild(actions);
+  chip.appendChild(header);
+  chip.appendChild(expandedWrap);
   return chip;
 }

@@ -64,7 +64,7 @@ function isSolidBlockedAt(world, x, y, ignoreId = 0) {
 
 function makeBurstFallbackOffsets() {
   const out = [];
-  for (let r = 2; r <= 3; r++) {
+  for (let r = 1; r <= 2; r++) {
     for (let dy = -r; dy <= r; dy++) {
       for (let dx = -r; dx <= r; dx++) {
         const cheb = Math.max(Math.abs(dx), Math.abs(dy));
@@ -96,12 +96,12 @@ function buildDeathBurstTargets(world, deadId, deathPos, count) {
 
   for (let i = 0; i < q.length; i++) {
     const cur = q[i];
-    if (cur.d > 3) continue;
+    if (cur.d > 2) continue;
     const cheb = Math.max(Math.abs((cur.x | 0) - cx), Math.abs((cur.y | 0) - cy));
-    if (cheb >= 2 && cheb <= 3) {
+    if (cheb >= 1 && cheb <= 2) {
       reachable.push(cur);
     }
-    if (cur.d === 3) continue;
+    if (cur.d === 2) continue;
     const next = [
       { x: cur.x + 1, y: cur.y },
       { x: cur.x - 1, y: cur.y },
@@ -232,6 +232,8 @@ export function cleanupSystem(world) {
                 itemId: placed.itemId || itemId,
                 count: info?.count || 1,
                 at,
+                source: "death",
+                origin: { x: pos.x | 0, y: pos.y | 0 },
               });
           } catch (e) {
             console.debug("[cleanupSystem] emit item:dropped failed:", e);
