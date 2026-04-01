@@ -23,22 +23,22 @@ function writeSavedName(name) {
 }
 
 const CHAR_UI = Object.freeze({
-  panelBg: 'rgba(6, 4, 4, 0.965)',
-  panelText: '#d8c8b4',
-  boxBg: '#0d0908',
-  boxBorder: '#3b2a22',
-  boxGlow: 'rgba(255, 102, 38, 0.18)',
-  cardBg: '#140f0d',
-  cardBorder: '#2e211b',
-  cardSelectedBg: '#1f1310',
-  cardSelectedBorder: '#a64c2b',
-  inputBg: '#130f0d',
-  inputBorder: '#3a2b24',
-  inputFocus: '#b56239',
-  accent: '#e98a53',
-  accentMuted: '#9d765f',
-  textMuted: '#826a5a',
-  textLow: '#5f4d43',
+  panelBg: 'rgba(7, 8, 10, 0.965)',
+  panelText: '#dde2e8',
+  boxBg: '#111214',
+  boxBorder: '#4b5662',
+  boxGlow: 'rgba(132, 154, 178, 0.18)',
+  cardBg: '#171412',
+  cardBorder: '#4f443a',
+  cardSelectedBg: '#221d18',
+  cardSelectedBorder: '#8f9fb2',
+  inputBg: '#171412',
+  inputBorder: '#5b4f44',
+  inputFocus: '#9db1c7',
+  accent: '#c5d4e3',
+  accentMuted: '#ad9f8d',
+  textMuted: '#a29686',
+  textLow: '#918678',
 });
 
 function clamp01(v) {
@@ -59,8 +59,8 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     pointerEvents: 'auto',
     background: `
-      radial-gradient(1200px 700px at 50% -10%, rgba(110, 36, 16, 0.30), transparent 60%),
-      radial-gradient(1000px 700px at 50% 120%, rgba(30, 14, 10, 0.7), transparent 70%),
+      radial-gradient(1200px 700px at 50% -10%, rgba(88, 110, 136, 0.30), transparent 60%),
+      radial-gradient(1000px 700px at 50% 120%, rgba(28, 22, 16, 0.62), transparent 70%),
       ${CHAR_UI.panelBg}
     `,
     fontFamily: 'monospace', zIndex: '1400',
@@ -73,7 +73,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
     width: 'min(460px, 90vw)',
     maxHeight: '92vh', overflowY: 'auto',
     textAlign: 'center',
-    background: 'linear-gradient(180deg, rgba(15,10,9,0.86), rgba(11,8,7,0.90))',
+    background: 'linear-gradient(180deg, rgba(22,18,15,0.88), rgba(14,12,10,0.92))',
     border: `1px solid ${CHAR_UI.boxBorder}`,
     borderRadius: '12px',
     padding: '24px 20px',
@@ -81,8 +81,8 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
     boxShadow: `
       0 28px 80px rgba(0, 0, 0, 0.7),
       0 0 40px ${CHAR_UI.boxGlow},
-      inset 0 0 0 1px rgba(255, 160, 100, 0.05),
-      inset 0 -30px 60px rgba(255, 98, 28, 0.05)
+      inset 0 0 0 1px rgba(188, 206, 224, 0.08),
+      inset 0 -30px 60px rgba(112, 136, 162, 0.08)
     `,
   });
 
@@ -398,9 +398,9 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
     fontSize: '24px',
     fontWeight: 'bold',
     letterSpacing: '0.06em',
-    color: '#f0b38a',
+    color: '#d7e3f1',
     textTransform: 'uppercase',
-    textShadow: '0 0 18px rgba(255, 115, 44, 0.25)',
+    textShadow: '0 0 18px rgba(142, 170, 198, 0.28)',
   });
 
   const helpLink = document.createElement('a');
@@ -415,7 +415,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
     display: 'grid', placeItems: 'center',
     borderRadius: '6px',
     border: `1px solid ${CHAR_UI.inputBorder}`,
-    background: '#15100e',
+    background: '#1a1f26',
     color: CHAR_UI.accent,
     fontSize: '16px', textDecoration: 'none',
     lineHeight: '1',
@@ -424,7 +424,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
   helpLink.addEventListener('pointerenter', () => {
     helpLink.style.transform = 'translateY(-1px)';
     helpLink.style.borderColor = CHAR_UI.inputFocus;
-    helpLink.style.boxShadow = '0 0 16px rgba(242, 118, 59, 0.28)';
+    helpLink.style.boxShadow = '0 0 16px rgba(138, 168, 198, 0.30)';
   });
   helpLink.addEventListener('pointerleave', () => {
     helpLink.style.transform = '';
@@ -604,7 +604,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
   });
   nameInput.addEventListener('focus', () => {
     nameInput.style.borderColor = CHAR_UI.inputFocus;
-    nameInput.style.boxShadow = '0 0 0 2px rgba(240, 140, 84, 0.18)';
+    nameInput.style.boxShadow = '0 0 0 2px rgba(157, 177, 199, 0.24)';
     nameInput.style.transform = 'translateY(-1px)';
   });
   nameInput.addEventListener('blur', () => {
@@ -707,7 +707,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
   });
   seedInput.addEventListener('focus', () => {
     seedInput.style.borderColor = CHAR_UI.inputFocus;
-    seedInput.style.boxShadow = '0 0 0 2px rgba(240, 140, 84, 0.18)';
+    seedInput.style.boxShadow = '0 0 0 2px rgba(157, 177, 199, 0.24)';
     seedInput.style.transform = 'translateY(-1px)';
   });
   seedInput.addEventListener('blur', () => {
@@ -724,32 +724,20 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
     if (document.activeElement !== seedInput) return;
     if (valid) {
       seedInput.style.borderColor = CHAR_UI.inputFocus;
-      seedInput.style.boxShadow = '0 0 0 2px rgba(240, 140, 84, 0.18)';
+      seedInput.style.boxShadow = '0 0 0 2px rgba(157, 177, 199, 0.24)';
     } else {
-      seedInput.style.borderColor = '#95493a';
-      seedInput.style.boxShadow = '0 0 0 2px rgba(149, 73, 58, 0.22)';
+      seedInput.style.borderColor = '#8f5e4f';
+      seedInput.style.boxShadow = '0 0 0 2px rgba(143, 94, 79, 0.24)';
     }
   }
   seedInput.addEventListener('input', updateSeedFieldState);
 
   const rerollSeedBtn = makeMiniBtn('Reroll', 'Generate a random seed');
-  rerollSeedBtn.addEventListener('pointerdown', (e) => {
+  rerollSeedBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     const seed = (Math.random() * 0x100000000) >>> 0;
     seedInput.value = '0x' + seed.toString(16).toUpperCase();
     updateSeedFieldState();
-    seedInput.focus();
-    seedInput.select();
-    try {
-      seedInput.animate(
-        [
-          { transform: 'scale(0.985)' },
-          { transform: 'scale(1.01)' },
-          { transform: 'scale(1)' },
-        ],
-        { duration: 140, easing: 'ease-out' },
-      );
-    } catch {}
   });
   seedHeader.appendChild(seedLabel);
   seedHeader.appendChild(rerollSeedBtn);
@@ -835,7 +823,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
     }
     card.style.borderColor = CHAR_UI.cardSelectedBorder;
     card.style.background = CHAR_UI.cardSelectedBg;
-    card.style.boxShadow = '0 0 20px rgba(246, 120, 58, 0.25), inset 0 0 0 1px rgba(255, 158, 108, 0.14)';
+    card.style.boxShadow = '0 0 20px rgba(144, 170, 196, 0.24), inset 0 0 0 1px rgba(204, 219, 234, 0.16)';
     card.style.transform = 'translateY(-1px)';
     detailDesc.textContent = cls.description;
     detailDeity.textContent = `${cls.deityName} (${cls.deityAlignment})`;
@@ -881,15 +869,15 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
     const iconEl = document.createElement('div');
     Object.assign(iconEl.style, {
       fontSize: '23px',
-      color: '#efab84',
+      color: '#d2dfed',
       lineHeight: '1',
       marginBottom: '5px',
       filter: 'saturate(0.88) brightness(0.9)',
-      textShadow: '0 0 10px rgba(243, 124, 59, 0.18)',
+      textShadow: '0 0 10px rgba(148, 176, 204, 0.22)',
     });
     const icon = /** @type {any} */ (CLASS_ICONS)[cls.id];
     iconEl.textContent = icon ?? cls.name[0];
-    const glow = /** @type {any} */ (CLASS_ICON_GLOW)[cls.id] || 'rgba(243, 124, 59, 0.18)';
+    const glow = /** @type {any} */ (CLASS_ICON_GLOW)[cls.id] || 'rgba(148, 176, 204, 0.22)';
     iconEl.style.textShadow = `0 0 10px ${glow}`;
     card.appendChild(iconEl);
 
@@ -897,7 +885,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
     nameEl.textContent = cls.name;
     Object.assign(nameEl.style, {
       fontSize: '11px',
-      color: '#b8967f',
+      color: '#b7ac9d',
       textTransform: 'uppercase',
       letterSpacing: '0.05em',
       lineHeight: '1.3',
@@ -906,7 +894,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
 
     card.addEventListener('pointerenter', () => {
       if (selectedClassId === cls.id) return;
-      card.style.borderColor = '#4a3026';
+      card.style.borderColor = '#6a7684';
       card.style.transform = 'translateY(-1px)';
     });
     card.addEventListener('pointerleave', () => {
@@ -929,7 +917,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
   const detailPanel = document.createElement('div');
   Object.assign(detailPanel.style, {
     minHeight: '44px', padding: '10px 12px',
-    background: '#150f0e', border: `1px solid ${CHAR_UI.cardBorder}`,
+    background: '#1a1714', border: `1px solid ${CHAR_UI.cardBorder}`,
     borderRadius: '8px', marginBottom: '20px',
     textAlign: 'left', opacity: '0',
     transition: 'opacity 150ms, border-color 150ms',
@@ -937,7 +925,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
 
   const detailDesc = document.createElement('div');
   Object.assign(detailDesc.style, {
-    fontSize: '12px', color: '#b39c8f', lineHeight: '1.4',
+    fontSize: '12px', color: '#d0c5b6', lineHeight: '1.4',
     marginBottom: '4px',
   });
   detailPanel.appendChild(detailDesc);
@@ -976,9 +964,9 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
   Object.assign(hardBox.style, {
     width: '24px',
     height: '24px',
-    border: '1px solid #5a3026',
+    border: '1px solid #5a6573',
     borderRadius: '6px',
-    background: 'linear-gradient(180deg, #1a110e, #130c0a)',
+    background: 'linear-gradient(180deg, #21262d, #1a1f25)',
     display: 'grid',
     placeItems: 'center',
     color: 'transparent',
@@ -997,7 +985,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
   const hardTitle = document.createElement('span');
   hardTitle.textContent = 'Swear the Hard Vow';
   Object.assign(hardTitle.style, {
-    color: '#be7a67',
+    color: '#c2d2e1',
     fontSize: '12px',
     textTransform: 'uppercase',
     letterSpacing: '0.12em',
@@ -1019,15 +1007,15 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
 
   function renderHardModeVow() {
     if (hardModeInput.checked) {
-      hardBox.style.borderColor = '#8e4732';
-      hardBox.style.background = 'linear-gradient(180deg, rgba(122, 61, 52, 0.24), #1a0f0c)';
-      hardBox.style.boxShadow = 'inset 0 0 0 1px rgba(122, 61, 52, 0.22), 0 0 12px rgba(122, 61, 52, 0.22)';
-      hardBox.style.color = '#cb8773';
+      hardBox.style.borderColor = '#8ca2ba';
+      hardBox.style.background = 'linear-gradient(180deg, rgba(127, 152, 178, 0.24), #1c2128)';
+      hardBox.style.boxShadow = 'inset 0 0 0 1px rgba(127, 152, 178, 0.24), 0 0 12px rgba(127, 152, 178, 0.22)';
+      hardBox.style.color = '#d3e2f1';
       hardBox.style.transform = 'translateY(-1px)';
-      hardDesc.style.color = '#be7a67';
+      hardDesc.style.color = '#b7c6d6';
     } else {
-      hardBox.style.borderColor = '#5a3026';
-      hardBox.style.background = 'linear-gradient(180deg, #1a110e, #130c0a)';
+      hardBox.style.borderColor = '#5a6573';
+      hardBox.style.background = 'linear-gradient(180deg, #21262d, #1a1f25)';
       hardBox.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.03), inset 0 -1px 0 rgba(0,0,0,0.35)';
       hardBox.style.color = 'transparent';
       hardBox.style.transform = '';
@@ -1036,7 +1024,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
   }
 
   hardModeRow.addEventListener('pointerenter', () => {
-    hardBox.style.borderColor = hardModeInput.checked ? '#8e4732' : '#7b4030';
+    hardBox.style.borderColor = hardModeInput.checked ? '#8ca2ba' : '#798b9f';
     if (!hardModeInput.checked) hardBox.style.transform = 'translateY(-1px)';
   });
   hardModeRow.addEventListener('pointerleave', () => { renderHardModeVow(); });
@@ -1071,9 +1059,9 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
       minHeight: '52px',
       padding: '12px',
       fontSize: '16px', fontWeight: 'bold', fontFamily: 'monospace',
-      background: 'linear-gradient(180deg, #2a1712 0%, #1e0f0c 100%)',
-      color: '#efb08e',
-      border: '1px solid #6a402d',
+      background: 'linear-gradient(180deg, #2a2f35 0%, #1f2329 100%)',
+      color: '#dce5ef',
+      border: '1px solid #6f7d8d',
       borderRadius: '8px',
       cursor: 'default', opacity: '0.4',
       transition: 'opacity 120ms, background 120ms, transform 120ms, box-shadow 120ms, border-color 120ms',
@@ -1083,15 +1071,15 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
     btn.addEventListener('pointerenter', () => {
       if (btn.disabled) return;
       btn.style.transform = 'translateY(-1px)';
-      btn.style.borderColor = hardModeInput.checked ? '#b04a2c' : '#a05d41';
+      btn.style.borderColor = hardModeInput.checked ? '#9cb2ca' : '#879ab0';
       btn.style.boxShadow = hardModeInput.checked
-        ? '0 0 20px rgba(245, 90, 36, 0.35)'
-        : '0 0 18px rgba(231, 128, 74, 0.28)';
+        ? '0 0 20px rgba(152, 178, 204, 0.35)'
+        : '0 0 18px rgba(140, 164, 188, 0.30)';
     });
     btn.addEventListener('pointerleave', () => {
       btn.style.transform = '';
       btn.style.boxShadow = '';
-      btn.style.borderColor = hardModeInput.checked ? '#7a3725' : '#6a402d';
+      btn.style.borderColor = hardModeInput.checked ? '#8ca2ba' : '#6f7d8d';
     });
     btn.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
@@ -1118,8 +1106,8 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
     try {
       ctaPulseAnim = confirmBtn.animate(
         [
-          { boxShadow: '0 0 0 rgba(241, 128, 66, 0)', filter: 'brightness(1)' },
-          { boxShadow: '0 0 20px rgba(241, 128, 66, 0.22)', filter: 'brightness(1.04)' },
+          { boxShadow: '0 0 0 rgba(155, 181, 207, 0)', filter: 'brightness(1)' },
+          { boxShadow: '0 0 20px rgba(155, 181, 207, 0.24)', filter: 'brightness(1.04)' },
         ],
         { duration: 1300, direction: 'alternate', iterations: Infinity, easing: 'ease-in-out' },
       );
@@ -1130,18 +1118,18 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
     const hard = hardModeInput.checked;
     if (!selectedClassId) {
       confirmBtn.textContent = 'Choose a class';
-      confirmBtn.style.background = 'linear-gradient(180deg, #2a1712 0%, #1e0f0c 100%)';
-      confirmBtn.style.color = '#efb08e';
-      confirmBtn.style.borderColor = '#6a402d';
+      confirmBtn.style.background = 'linear-gradient(180deg, #2a2f35 0%, #1f2329 100%)';
+      confirmBtn.style.color = '#dce5ef';
+      confirmBtn.style.borderColor = '#6f7d8d';
       setCtaPulse(false);
       return;
     }
     confirmBtn.textContent = hard ? `Swear and descend as ${className}` : `Begin as ${className}`;
     confirmBtn.style.background = hard
-      ? 'linear-gradient(180deg, #25120f 0%, #1b0d0b 100%)'
-      : 'linear-gradient(180deg, #2a1712 0%, #1e0f0c 100%)';
-    confirmBtn.style.color = hard ? '#ff9468' : '#efb08e';
-    confirmBtn.style.borderColor = hard ? '#7a3725' : '#6a402d';
+      ? 'linear-gradient(180deg, #30363d 0%, #232930 100%)'
+      : 'linear-gradient(180deg, #2a2f35 0%, #1f2329 100%)';
+    confirmBtn.style.color = hard ? '#e8f1fb' : '#dce5ef';
+    confirmBtn.style.borderColor = hard ? '#8ca2ba' : '#6f7d8d';
     setCtaPulse(true);
   };
   refreshConfirmCta();
