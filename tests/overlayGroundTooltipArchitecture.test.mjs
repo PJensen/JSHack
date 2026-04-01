@@ -1,8 +1,11 @@
 import { assert } from "jsr:@std/assert";
 
 Deno.test("ground stack tooltip stays visible after requesting pickup", async () => {
-  const path = new URL("../src/display/ui/overlay.js", import.meta.url);
-  const text = await Deno.readTextFile(path);
+  const overlayPath = new URL("../src/display/ui/overlay.js", import.meta.url);
+  const utilsPath = new URL("../src/display/ui/overlayUtils.js", import.meta.url);
+  const overlayText = await Deno.readTextFile(overlayPath);
+  const utilsText = await Deno.readTextFile(utilsPath);
+  const text = overlayText + "\n" + utilsText;
 
   const stackStart = text.indexOf("if (mode === 'stack')");
   assert(stackStart >= 0, "expected stack mode section in overlay renderer");

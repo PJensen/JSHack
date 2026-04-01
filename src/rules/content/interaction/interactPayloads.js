@@ -40,7 +40,7 @@ import { Owner } from "../../components/Owner.js";
 import { Interactable } from "../../components/Interactable.js";
 import { ObjectState } from "../../components/ObjectState.js";
 import { DungeonState } from "../../components/DungeonState.js";
-import TombstoneComponent from "../../components/Tombstone.js";
+import { Tombstone as TombstoneComponent } from "../../components/Tombstone.js";
 import { createFrom } from "../../../lib/ecs-js/archetype.js";
 import {
   Carrot,

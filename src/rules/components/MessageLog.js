@@ -3,9 +3,7 @@
 // Stores recent combat messages for display in the HUD or UI
 import { defineComponent } from "../../lib/ecs-js/index.js";
 
-const CombatLog = defineComponent({
+export const CombatLog = defineComponent({
   entries: [],      // Array of combat log entries (strings or objects)
   maxEntries: 50,   // Maximum number of entries to keep (adjust as needed)
 });
-
-export default CombatLog;

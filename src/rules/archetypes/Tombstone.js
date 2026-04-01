@@ -3,7 +3,7 @@ import { Position } from "../components/Position.js";
 import { Interactable } from "../components/Interactable.js";
 import { Material } from "../components/Material.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
-import TombstoneComponent from "../components/Tombstone.js";
+import { Tombstone as TombstoneComponent } from "../components/Tombstone.js";
 
 /**
  * Tombstone archetype - physical tombstone entity in dungeon

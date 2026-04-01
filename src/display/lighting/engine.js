@@ -14,7 +14,8 @@ const SQRT2 = 1.4142;
  *   y: number,           // tile-space Y
  *   radius: number,      // falloff radius in tiles
  *   color?: [number, number, number],  // RGB 0-255, default warm orange
- *   flicker?: number     // 0-1 intensity multiplier (applied by caller)
+ *   flicker?: number,    // 0-1 intensity multiplier (applied by caller)
+ *   softness?: number    // penumbra softness (0=hard, 16=torch, 32=wide). Default 16.
  * }} LightDef
  */
 
@@ -63,6 +64,28 @@ export function createLightingEngine() {
 
   // Viewport origin (tile ints) — kept for coordinate math in render().
   let _tx0 = 0, _ty0 = 0;
+
+  // ---- Dirty-field tracking ------------------------------------------------
+  // Each field is rebuilt only when its dirty flag is set.  Flags cascade:
+  //   geometry → vision, lights     (SDF changed = re-march everything)
+  //   surface  → lights             (pool shapes changed)
+  //   relief   → lights             (floor height changed)
+  //   vision   → lights             (what player sees changed)
+  //   lights   → (terminal)
+  // A viewport pan (tx0/ty0 change) or resize dirties everything.
+  let _dirtyGeometry = true;
+  let _dirtySurface  = true;
+  let _dirtyRelief   = true;
+  let _dirtyVision   = true;
+  let _dirtyLights   = true;
+  // Previous viewport for change detection
+  let _prevTx0 = -9999, _prevTy0 = -9999, _prevTw = 0, _prevTh = 0;
+
+  // ---- Per-frame perf stats ------------------------------------------------
+  const _stats = {
+    builtSdf: 0, builtSurf: 0, builtRelief: 0, builtVision: 0,
+    lightCount: 0, dtMs: 0,
+  };
 
   // ---- Debug floor relief (generic terrain heightfield) -----------------
   // This is intentionally tag-agnostic: lava/water are just surface tags.
@@ -624,16 +647,18 @@ export function createLightingEngine() {
         const dist2 = dx * dx + dy2;
         if (dist2 > vrSub2) continue;
 
-        // Wall occlusion
-        if (!rayVisible(psx, psy, sx, sy, w)) continue;
+        // Wall occlusion — soft penumbra near wall edges.
+        // Vision uses moderate softness (k=10) for readable but soft edges.
+        const vis = rayVisible(psx, psy, sx, sy, w, 10);
+        if (vis <= 0) continue;
 
         // Distance falloff — smooth fade over last 1.5 tiles
         const dist = Math.sqrt(dist2);
         const edgeFade = 1.5 * SUB;  // fade zone width in sub-cells
-        let v = 1.0;
+        let v = vis;  // start from penumbra factor, not 1.0
         if (dist > vrSub - edgeFade) {
-          v = Math.max(0, (vrSub - dist) / edgeFade);
-          v = v * v * (3 - 2 * v);  // smoothstep
+          const fade = Math.max(0, (vrSub - dist) / edgeFade);
+          v *= fade * fade * (3 - 2 * fade);  // smoothstep
         }
 
         // Cone attenuation — applied everywhere except the player's own tile
@@ -664,18 +689,31 @@ export function createLightingEngine() {
 
   /**
    * March a ray from (ox, oy) toward (tx, ty) in sub-cell space.
-   * Returns true if the path is unoccluded (visible), false if a wall blocks it.
+   *
+   * Returns a penumbra factor: 1.0 = fully visible (no nearby walls),
+   * 0.0 = fully blocked.  Values in between give soft shadow edges.
+   *
+   * The softness parameter (`k`) controls penumbra width:
+   *   k = 0  → hard binary shadows (equivalent to old boolean mode)
+   *   k = 4  → narrow penumbra (spell bolts, lasers)
+   *   k = 16 → wide penumbra (torches, fires — soft and atmospheric)
+   *   k = 32 → very wide (large area lights)
+   *
+   * Technique: standard SDF soft shadow — at each march step, track the
+   * minimum ratio of (k × SDF / ray_t).  Where the ray passes close to a
+   * wall (small SDF) relative to how far it has traveled, the penumbra
+   * drops, darkening the sample smoothly without extra rays.
    *
    * Uses sphere-tracing: at each step, advance by the SDF distance at the
    * current sample point.  If the SDF drops below the hit threshold, the ray
    * has struck a wall.  Typical iteration count is 4-12 in corridors, 2-4 in
    * open rooms — driven by how large the SDF values are in open space.
    */
-  function rayVisible(ox, oy, tx, ty, w) {
+  function rayVisible(ox, oy, tx, ty, w, k) {
     const dx = tx - ox;
     const dy = ty - oy;
     const totalDist = Math.sqrt(dx * dx + dy * dy);
-    if (totalDist < 1.5) return true;       // adjacent cells — always visible
+    if (totalDist < 1.5) return 1.0;       // adjacent cells — always visible
 
     const invDist = 1 / totalDist;
     const rdx = dx * invDist;               // unit direction
@@ -685,6 +723,9 @@ export function createLightingEngine() {
     const MIN_STEP = 0.7;  // don't crawl — ensure forward progress
     const MAX_STEPS = 24;  // hard cap (generous; typical is 4-12)
 
+    const soft = k > 0;
+    let penumbra = 1.0;
+
     let t = 1.0;  // start slightly away from light centre
     for (let step = 0; step < MAX_STEPS; step++) {
       const cx = ox + rdx * t;
@@ -693,16 +734,23 @@ export function createLightingEngine() {
       // Sample SDF via nearest-neighbour (fast integer lookup)
       const si = (cx + 0.5) | 0;
       const sj = (cy + 0.5) | 0;
-      if (si < 0 || si >= w || sj < 0 || sj >= lmH) return false;  // off-grid = blocked
+      if (si < 0 || si >= w || sj < 0 || sj >= lmH) return 0.0;  // off-grid = blocked
 
       const d = sdf[sj * w + si];
-      if (d < HIT) return false;             // hit a wall
+      if (d < HIT) return 0.0;             // hit a wall
+
+      // Track penumbra: how close the ray skimmed past geometry.
+      // Smaller d/t ratio = closer shave = darker shadow edge.
+      if (soft) {
+        const p = k * d / t;
+        if (p < penumbra) penumbra = p;
+      }
 
       t += Math.max(d, MIN_STEP);
-      if (t >= totalDist - 0.5) return true; // reached the target
+      if (t >= totalDist - 0.5) return soft ? Math.min(1.0, penumbra) : 1.0; // reached the target
     }
 
-    return true;  // ran out of steps — assume visible (rare, open space)
+    return soft ? Math.min(1.0, penumbra) : 1.0;  // ran out of steps — assume visible (rare)
   }
 
   // ---- Light accumulation ----------------------------------------------
@@ -765,6 +813,7 @@ export function createLightingEngine() {
       const cr = (col[0] / 255) * flicker;
       const cg = (col[1] / 255) * flicker;
       const cb = (col[2] / 255) * flicker;
+      const softK = light.softness ?? 0;   // default: hard shadows (FX lights); world lights set explicit softness
       const lr  = light.radius;          // tile units
       const lrSub = lr * SUB;            // sub-cell units
       const lrSub2 = lrSub * lrSub;
@@ -806,12 +855,13 @@ export function createLightingEngine() {
           const dist2 = dwx * dwx + dwy2;
           if (dist2 > lrSub2) continue;
 
-          // SDF ray-march: skip cell if a wall blocks line-of-sight from light
-          if (!rayVisible(lsx, lsy, sx, sy, w)) continue;
+          // SDF ray-march: penumbra factor (0 = blocked, 1 = fully lit)
+          const pen = rayVisible(lsx, lsy, sx, sy, w, softK);
+          if (pen <= 0) continue;
 
           const dist = Math.sqrt(dist2);
           const atten = 1.0 - dist * invLrSub;
-          const atten2 = atten * atten;   // quadratic falloff
+          const atten2 = atten * atten * pen;   // quadratic falloff × penumbra
 
           // Near-wall diffuse catch-light (sub-cell threshold ≈ 0.5 tiles)
           const wallThresh = 4;
@@ -909,11 +959,46 @@ export function createLightingEngine() {
     activeReliefKey = normalizeReliefKey(reliefKey);
     const relief = getActiveReliefState();
 
-    buildSDF(isOpaque, tx0, ty0, tw, th);
-    buildSurfaceSDF(surfaceRegions || [], tx0, ty0, tw, th);
-    buildFloorRelief(tx0, ty0, tw, th, relief);
-    buildVision(visionDef || null);
+    // Viewport change dirties everything — all fields are viewport-relative.
+    if (tx0 !== _prevTx0 || ty0 !== _prevTy0 || tw !== _prevTw || th !== _prevTh) {
+      _dirtyGeometry = true;
+      _dirtySurface  = true;
+      _dirtyRelief   = true;
+      _dirtyVision   = true;
+      _dirtyLights   = true;
+      _prevTx0 = tx0; _prevTy0 = ty0; _prevTw = tw; _prevTh = th;
+    }
+
+    // Cascade: upstream dirty forces downstream dirty.
+    if (_dirtyGeometry) { _dirtyVision = true; _dirtyLights = true; }
+    if (_dirtySurface)  { _dirtyLights = true; }
+    if (_dirtyRelief)   { _dirtyLights = true; }
+    if (_dirtyVision)   { _dirtyLights = true; }
+
+    // Lights always rebuild — they depend on moving sources, flicker, and
+    // fxTime, which change every frame.  The expensive wins are skipping
+    // SDF, surface, relief, and vision when geometry hasn't changed.
+    _dirtyLights = true;
+
+    const _t0 = performance.now();
+
+    _stats.builtSdf     = _dirtyGeometry ? 1 : 0;
+    _stats.builtSurf    = _dirtySurface  ? 1 : 0;
+    _stats.builtRelief  = _dirtyRelief   ? 1 : 0;
+    _stats.builtVision  = _dirtyVision   ? 1 : 0;
+    _stats.lightCount   = lights.length;
+
+    if (_dirtyGeometry) buildSDF(isOpaque, tx0, ty0, tw, th);
+    if (_dirtySurface)  buildSurfaceSDF(surfaceRegions || [], tx0, ty0, tw, th);
+    if (_dirtyRelief)   buildFloorRelief(tx0, ty0, tw, th, relief);
+    if (_dirtyVision)   buildVision(visionDef || null);
     accumulateLights(lights, ambient || null, isRoofed || null);
+
+    _dirtyGeometry = false;
+    _dirtySurface  = false;
+    _dirtyRelief   = false;
+    _dirtyVision   = false;
+    _dirtyLights   = false;
     const n = lmW * lmH;
     // Lava self-emission (inside basin only): this is the "light in the pit".
     // Kept fully contained to lavaMask cells so it reads as below-grade glow.
@@ -1039,11 +1124,17 @@ export function createLightingEngine() {
         const lightBri = Math.min(1, (lightR[i] + lightG[i] + lightB[i]) * 0.4);
         pixels[pi + 3] = Math.min(255, (lightBri * 170 + sa * 210) | 0);
       } else {
-        // Standard warm-biased tint for non-surface cells
-        const brightness = Math.min(1, (lightR[i] + lightG[i] + lightB[i]) * 0.4);
-        let r = (lightR[i] * 255) | 0;
-        let g = (lightG[i] * 180) | 0;
-        let b = (lightB[i] * 60)  | 0;
+        // Warm-biased tint that preserves cool emissives.
+        // When accumulated light is warm-dominant (torch), the classic warm
+        // bias applies.  When blue/green dominates (potions, gems, altars),
+        // the multipliers open up so the hue reads correctly.
+        const lr = lightR[i], lg = lightG[i], lb = lightB[i];
+        const brightness = Math.min(1, (lr + lg + lb) * 0.4);
+        const peak = Math.max(lr, lg, lb) || 1;
+        const coolBias = Math.min(1, Math.max(0, (lb + lg * 0.5 - lr) / peak));
+        let r = (lr * 255) | 0;
+        let g = (lg * (180 + 75 * coolBias)) | 0;
+        let b = (lb * (60 + 195 * coolBias)) | 0;
         let a = (brightness * 120) | 0;
         if (surfType[i] === 0) {
           const hRel = floorH[i];
@@ -1075,6 +1166,8 @@ export function createLightingEngine() {
       0, 0, lmW, lmH,
       tx0 - 0.5, ty0 - 0.5, tw, th);
     ctx.restore();
+
+    _stats.dtMs = performance.now() - _t0;
   }
 
   function addFloorTileDelta(x, y, delta, reliefKeyOverride) {
@@ -1090,6 +1183,7 @@ export function createLightingEngine() {
     const next = Math.max(-4, Math.min(4, prev + dd));
     if (Math.abs(next) < 1e-5) relief.tileMods.delete(key);
     else relief.tileMods.set(key, { x: tx, y: ty, delta: next });
+    _dirtyRelief = true;
     return next;
   }
 
@@ -1119,6 +1213,7 @@ export function createLightingEngine() {
     if (relief.radialMods.length > MAX_RADIAL_MODS_PER_KEY) {
       relief.radialMods.splice(0, relief.radialMods.length - MAX_RADIAL_MODS_PER_KEY);
     }
+    _dirtyRelief = true;
     return relief.radialMods.length;
   }
 
@@ -1134,6 +1229,7 @@ export function createLightingEngine() {
     const key = `${tx},${ty}`;
     if (Math.abs(next) < 1e-5) relief.tileMods.delete(key);
     else relief.tileMods.set(key, { x: tx, y: ty, delta: next });
+    _dirtyRelief = true;
     return next;
   }
 
@@ -1146,18 +1242,21 @@ export function createLightingEngine() {
       const f = Number(frequency);
       if (Number.isFinite(f) && f > 0) relief.noiseFreq = Math.max(0.001, Math.min(2, f));
     }
+    _dirtyRelief = true;
     return relief.noiseAmp;
   }
 
   function clearFloorRelief(scope) {
     if (String(scope || "").toLowerCase() === "all") {
       floorReliefByKey.clear();
+      _dirtyRelief = true;
       return;
     }
     const relief = getActiveReliefState();
     relief.tileMods.clear();
     relief.radialMods.length = 0;
     relief.noiseAmp = 0;
+    _dirtyRelief = true;
   }
 
   function getFloorReliefState() {
@@ -1171,5 +1270,53 @@ export function createLightingEngine() {
     };
   }
 
-  return { render, addFloorTileDelta, addFloorRadialDelta, setFloorTileDelta, setFloorNoise, clearFloorRelief, getFloorReliefState };
+  // ---- Invalidation API ---------------------------------------------------
+  // Call these when the world changes between frames so the next render()
+  // knows which fields to rebuild.  Safe to over-invalidate; the worst case
+  // is one extra rebuild (which is what pre-dirty-fields did every frame).
+
+  /** Tile opacity changed (pickaxe dig, wall destroyed, door open/close). */
+  function invalidateGeometry() { _dirtyGeometry = true; }
+
+  /** Surface pools changed (lava/water added or removed). */
+  function invalidateSurface() { _dirtySurface = true; }
+
+  /** Floor relief changed (meteor impact, sculpt commands). */
+  function invalidateRelief() { _dirtyRelief = true; }
+
+  /** Player moved, turned, or vision radius changed. */
+  function invalidateVision() { _dirtyVision = true; }
+
+  /** Light sources changed (force full relight next frame). */
+  function invalidateLights() { _dirtyLights = true; }
+
+  /** Nuclear option — mark everything dirty. */
+  function invalidateAll() {
+    _dirtyGeometry = true;
+    _dirtySurface  = true;
+    _dirtyRelief   = true;
+    _dirtyVision   = true;
+    _dirtyLights   = true;
+  }
+
+  /** Return a snapshot of the last frame's build/perf stats. */
+  function getLastFrameStats() {
+    return {
+      builtSdf:    _stats.builtSdf,
+      builtSurf:   _stats.builtSurf,
+      builtRelief: _stats.builtRelief,
+      builtVision: _stats.builtVision,
+      lightCount:  _stats.lightCount,
+      dtMs:        _stats.dtMs,
+    };
+  }
+
+  return {
+    render,
+    addFloorTileDelta, addFloorRadialDelta, setFloorTileDelta,
+    setFloorNoise, clearFloorRelief, getFloorReliefState,
+    invalidateGeometry, invalidateSurface, invalidateRelief,
+    invalidateVision, invalidateLights, invalidateAll,
+    getLastFrameStats,
+  };
 }

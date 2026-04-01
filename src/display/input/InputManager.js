@@ -281,6 +281,13 @@ export class InputManager {
       return;
     }
 
+    // Lighting perf graph toggle: Shift+5
+    if (key === '%' || (key === '5' && e.shiftKey)) {
+      e.preventDefault();
+      window.dispatchEvent(new CustomEvent('ui:toggleLightingPerfGraph'));
+      return;
+    }
+
     // Apply tool: 'A' (Shift+A)
     if (key === "A") {
       e.preventDefault();

@@ -23,4 +23,3 @@ export const Alignment = defineComponent('Alignment', {
   goodEvil: GoodEvilAxis.NEUTRAL  // 'good', 'neutral', or 'evil'
 });
 
-export default Alignment;

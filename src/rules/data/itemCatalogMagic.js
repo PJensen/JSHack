@@ -1,0 +1,2183 @@
+// Magic, consumable, food, material, seed, and cursed item entries.
+import {
+  canTouchstoneDipTarget,
+  createTouchstoneDipHook,
+  canPoisonDipTarget,
+  createPoisonCoatDipHook,
+  createPoisonCloudThrowHook,
+  canStonecoatDipTarget,
+  createWaterPotionHooks,
+  createCastSpellFromIdentityHook,
+  createLearnSpellFromIdentityHook,
+  createOpenFlavorBookHook,
+  EAT_ON_USE,
+  MAPPING_ON_USE,
+  resolveApplyTargetName,
+} from "./itemCatalogHooks.js";
+import { requiresIdentification } from "./itemAppearances.js";
+import { isIdentified } from "./identification.js";
+import { Beatitude } from "../components/Beatitude.js";
+import { Equipment, GEAR_SLOTS } from "../components/Equipment.js";
+import { ItemCooldown } from "../components/ItemCooldown.js";
+import { Vitality } from "../components/Vitality.js";
+import { Stamina } from "../components/Stamina.js";
+import { Mana } from "../components/Mana.js";
+import { createStatusEvent } from "../../shared/events/statusEvent.js";
+import { getPassiveBonuses } from "../utils/passiveBonuses.js";
+
+export const MAGIC_ITEMS = {
+  // Magic / Usable
+  stone_touchstone: {
+    id: "stone_touchstone",
+    catalogKind: "magic",
+    name: "Touchstone",
+    type: "tool",
+    slot: "bag",
+    material: "mineral",
+    rarity: 1,
+    rarityName: "common",
+    value: 45,
+    weight: 10,
+    description: "A gray stone used to identify gem quality by streak and hardness.",
+    hooks: {
+      can_dip_target: canTouchstoneDipTarget,
+      on_dip: createTouchstoneDipHook(),
+    },
+  },
+  potion_poison: {
+    id: "potion_poison",
+    catalogKind: "magic",
+    name: "Potion of Poison",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 1,
+    rarityName: "common",
+    value: 20,
+    coating_color: "#66dd66",
+    description: "A toxic brew that can be used to coat a weapon.",
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [],
+      toxicity: null,
+      feel: "It tastes acrid and vile.",
+    },
+    hooks: {
+      can_dip_target: canPoisonDipTarget,
+      on_dip: createPoisonCoatDipHook({
+        chargesGranted: 12,
+        coatingColor: "#66dd66",
+        messageTemplate: "You coat $targetName with poison (+$chargesGranted charges, total $chargesTotal).",
+      }),
+      on_throw: createPoisonCloudThrowHook({
+        turnsLeft: 3,
+        radius: 1,
+        tickDamage: 2,
+        medium: "floor",
+      }),
+    },
+  },
+  potion_water: {
+    id: "potion_water",
+    catalogKind: "magic",
+    name: "Potion of Water",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 1,
+    rarityName: "common",
+    value: 12,
+    description: "Clear water in a fragile vial. Useful for quenching, blessing, and splashing.",
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [],
+      toxicity: null,
+      beatitude: "uncursed",
+      feel: "It tastes like plain water.",
+    },
+    hooks: createWaterPotionHooks(),
+  },
+  potion_holy_water: {
+    id: "potion_holy_water",
+    catalogKind: "magic",
+    name: "Vial of Holy Water",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 2,
+    rarityName: "magic",
+    value: 30,
+    description: "Consecrated water that purges flame and carries a blessing.",
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [],
+      toxicity: null,
+      beatitude: "blessed",
+      feel: "It tastes pure and faintly warm.",
+    },
+    hooks: createWaterPotionHooks(),
+  },
+  potion_stoneskin: {
+    id: "potion_stoneskin",
+    catalogKind: "magic",
+    name: "Potion of Stoneskin",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 2,
+    rarityName: "magic",
+    value: 60,
+    description: "Turns skin to granite, can harden gear, and can shatter into a taunting statue.",
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [],
+      toxicity: null,
+      feel: "Your skin prickles and feels curiously heavy.",
+    },
+    hooks: {
+      can_dip_target: canStonecoatDipTarget,
+      on_drink: (ctx, state) => {
+        const actorId = Number(state?.actor || ctx.actor || 0) | 0;
+        const targetId = ctx.rules.resolveTarget(actorId);
+        const turns = ctx.helpers.int(30, 40);
+        const potency = ctx.helpers.int(2, 3);
+        ctx.helpers.addEffect(targetId, {
+          key: "stoneskin",
+          potency,
+          turnsLeft: turns,
+          onsetLeft: 0,
+          peakLeft: 0,
+          stack: "refresh",
+          maxStacks: 1,
+          sourceId: Number(state?.itemId || ctx.primary || 0) | 0,
+          meta: { source: "potion_stoneskin", kind: "armor_buff", masked: !state.identified },
+        });
+        ctx.io.emit("status", createStatusEvent({ id: targetId, kind: "buff", effect: "stoneskin", source: actorId, masked: !state.identified }));
+        return { turns, potency };
+      },
+      on_throw: (ctx, state) => {
+        const actorId = Number(state?.actor || ctx.actor || 0) | 0;
+        const throwSpec = (state?.throw && typeof state.throw === "object") ? state.throw : null;
+        const fallbackPoint = ctx.helpers.adjacentPoint(actorId);
+        const rawLandingX = Number(throwSpec?.to?.x ?? state?.targetX);
+        const rawLandingY = Number(throwSpec?.to?.y ?? state?.targetY);
+        const spawnAt = {
+          x: Number.isFinite(rawLandingX) ? (rawLandingX | 0) : (fallbackPoint.x | 0),
+          y: Number.isFinite(rawLandingY) ? (rawLandingY | 0) : (fallbackPoint.y | 0),
+        };
+        const rawFromX = Number(throwSpec?.from?.x);
+        const rawFromY = Number(throwSpec?.from?.y);
+        const from = (
+          Number.isFinite(rawFromX) && Number.isFinite(rawFromY)
+            ? { x: rawFromX | 0, y: rawFromY | 0 }
+            : null
+        );
+        const taunts = [
+          "A stone statue lurches upright and starts heckling you.",
+          "The shattered potion hardens into a taunting idol.",
+          "Granite dust spirals into a jeering stone sentinel.",
+        ];
+        const tauntMessage = ctx.helpers.pick(taunts, taunts[0]);
+        ctx.helpers.spawnMonster("stone_taunter", spawnAt, {
+          name: "Taunting Statue",
+          faction: "stone_taunter",
+          tauntMessage,
+        });
+        ctx.io.emit("item:thrown", {
+          actor: actorId,
+          itemId: Number(state?.itemId || ctx.primary || 0) | 0,
+          targetId: Number(state?.targetId || ctx.target || 0) | 0,
+          from,
+          to: { x: spawnAt.x, y: spawnAt.y },
+          range: Number.isFinite(Number(throwSpec?.range)) ? (Number(throwSpec.range) | 0) : null,
+          maxRange: Number.isFinite(Number(throwSpec?.maxRange)) ? (Number(throwSpec.maxRange) | 0) : null,
+          weight: Number.isFinite(Number(throwSpec?.weight)) ? Number(throwSpec.weight) : null,
+          path: "itemHooks",
+          result: { type: "stone_statue" },
+        });
+        return { consumed: true, spawned: "stone_taunter", at: spawnAt };
+      },
+      on_dip: (ctx, state) => {
+        const actor = Number(state?.actor || ctx.actor || 0) | 0;
+        const toolId = Number(state?.toolId || ctx.primary || 0) | 0;
+        const targetId = Number(state?.targetId || ctx.target || 0) | 0;
+        const acBonus = 1;
+        if (!(targetId > 0) || !ctx.query.alive(targetId)) {
+          return { applied: false, consumedTool: false, resultType: "nothing" };
+        }
+
+        const info = ctx.query.itemInfo(targetId);
+        const bonuses = (info?.bonuses && typeof info.bonuses === "object")
+          ? { ...info.bonuses }
+          : {};
+        const baseDefense = Number(bonuses.defense || 0);
+        bonuses.defense = baseDefense + acBonus;
+        const targetName = resolveApplyTargetName(ctx, state, "item");
+        const acText = acBonus > 0 ? `+${acBonus}` : `${acBonus}`;
+
+        ctx.helpers.setMaterial(targetId, "stone");
+        ctx.helpers.patchItemInfo(targetId, {
+          bonuses,
+          description: `${String(info?.description || "Item")} Its surface is plated with living stone.`,
+        });
+        ctx.io.emit("item:applied", {
+          actor,
+          toolId,
+          targetId,
+          result: {
+            type: "stonecoat",
+            acBonus,
+            defenseBonus: acBonus,
+            message: `You harden ${targetName} into living stone (AC ${acText}).`,
+          },
+        });
+        return { applied: true, consumedTool: true, resultType: "stonecoat" };
+      },
+    },
+  },
+  potion_vigor: {
+    id: "potion_vigor",
+    catalogKind: "magic",
+    name: "Potion of Vigor",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 2,
+    rarityName: "magic",
+    value: 40,
+    description: "A crimson draught that mends wounds in a single heartbeat.",
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [],
+      toxicity: null,
+      feel: "Your wounds knit closed with a rush of heat.",
+    },
+    hooks: {
+      on_drink: (ctx, state) => {
+        const targetId = ctx.rules.resolveTarget(Number(state?.actor || ctx.actor || 0) | 0);
+        const vit = ctx.query.get(targetId, Vitality);
+        if (!vit) return { healed: 0 };
+        const amount = Math.max(1, Math.floor(vit.maxHp * 0.25));
+        ctx.helpers.heal(targetId, amount);
+        return { healed: amount };
+      },
+    },
+  },
+  potion_adrenaline: {
+    id: "potion_adrenaline",
+    catalogKind: "magic",
+    name: "Potion of Adrenaline",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 2,
+    rarityName: "magic",
+    value: 45,
+    description: "A jolt of pure energy that instantly restores all stamina.",
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [],
+      toxicity: null,
+      feel: "Your heart pounds with sudden, explosive energy.",
+    },
+    hooks: {
+      on_drink: (ctx, state) => {
+        const targetId = ctx.rules.resolveTarget(Number(state?.actor || ctx.actor || 0) | 0);
+        const stam = ctx.query.get(targetId, Stamina);
+        if (!stam) return { restored: 0 };
+        const maxBonus = Number(getPassiveBonuses(ctx.world, targetId)?.maxStaminaDerived ?? 0);
+        const cap = stam.maxStamina + maxBonus;
+        const before = stam.stamina;
+        stam.stamina = cap;
+        return { restored: stam.stamina - before };
+      },
+    },
+  },
+  potion_mana: {
+    id: "potion_mana",
+    catalogKind: "magic",
+    name: "Mana Potion",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 2,
+    rarityName: "magic",
+    identified: true,
+    value: 50,
+    description: "A shimmering azure elixir that instantly restores all mana.",
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [],
+      toxicity: null,
+      feel: "Your mind buzzes with arcane static.",
+    },
+    hooks: {
+      on_drink: (ctx, state) => {
+        const targetId = ctx.rules.resolveTarget(Number(state?.actor || ctx.actor || 0) | 0);
+        const mana = ctx.query.get(targetId, Mana);
+        if (!mana) return { restored: 0 };
+        const maxBonus = Number(getPassiveBonuses(ctx.world, targetId)?.maxManaDerived ?? 0);
+        const cap = mana.maxMana + maxBonus;
+        const before = mana.mana;
+        mana.mana = cap;
+        return { restored: mana.mana - before };
+      },
+    },
+  },
+  potion_endurance: {
+    id: "potion_endurance",
+    catalogKind: "magic",
+    name: "Potion of Endurance",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 2,
+    rarityName: "magic",
+    value: 35,
+    description: "Liquid lightning that floods the muscles with stamina.",
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [
+        { key: "stamina_restore", potency: 1, onset: 0, peak: 0, duration: 100,
+          stack: "refresh", maxStacks: 1 },
+      ],
+      toxicity: null,
+      feel: "Your muscles surge with newfound vigour.",
+    },
+  },
+  potion_second_wind: {
+    id: "potion_second_wind",
+    catalogKind: "magic",
+    name: "Potion of Second Wind",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 2,
+    rarityName: "magic",
+    value: 50,
+    description: "A cool teal elixir that quickens stamina recovery for several turns.",
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [
+        { key: "stamina_regen_boost", potency: 3, onset: 0, peak: 0, duration: 25,
+          stack: "refresh", maxStacks: 1 },
+      ],
+      toxicity: null,
+      feel: "Your lungs open; your breathing quickens and steadies.",
+    },
+  },
+  potion_resist_fire: {
+    id: "potion_resist_fire",
+    catalogKind: "magic",
+    name: "Potion of Fire Resistance",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 2,
+    rarityName: "magic",
+    value: 55,
+    description: "An icy draught that coats the drinker in a shimmering heat ward.",
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [],
+      toxicity: null,
+      feel: "A cool wave washes over your body.",
+    },
+    hooks: {
+      on_drink: (ctx, state) => {
+        const targetId = ctx.rules.resolveTarget(Number(state?.actor || ctx.actor || 0) | 0);
+        ctx.helpers.addEffect(targetId, {
+          key: "resist_fire",
+          potency: 0.3,
+          turnsLeft: 40,
+          onsetLeft: 0,
+          peakLeft: 0,
+          stack: "refresh",
+          maxStacks: 1,
+          sourceId: Number(state?.itemId || ctx.primary || 0) | 0,
+          meta: { source: "potion_resist_fire", kind: "resist_buff", masked: !state.identified },
+        });
+        ctx.io.emit("status", createStatusEvent({ id: targetId, kind: "buff", effect: "resist_fire", source: Number(state?.actor || ctx.actor || 0) | 0, masked: !state.identified }));
+        return { resist: "fire", duration: 40 };
+      },
+    },
+  },
+  potion_resist_poison: {
+    id: "potion_resist_poison",
+    catalogKind: "magic",
+    name: "Potion of Poison Resistance",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 2,
+    rarityName: "magic",
+    value: 55,
+    description: "A bitter emerald tonic that fortifies the body against toxins.",
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [],
+      toxicity: null,
+      feel: "It burns your throat with a sharp intensity.",
+    },
+    hooks: {
+      on_drink: (ctx, state) => {
+        const targetId = ctx.rules.resolveTarget(Number(state?.actor || ctx.actor || 0) | 0);
+        ctx.helpers.addEffect(targetId, {
+          key: "resist_poison",
+          potency: 0.3,
+          turnsLeft: 40,
+          onsetLeft: 0,
+          peakLeft: 0,
+          stack: "refresh",
+          maxStacks: 1,
+          sourceId: Number(state?.itemId || ctx.primary || 0) | 0,
+          meta: { source: "potion_resist_poison", kind: "resist_buff", masked: !state.identified },
+        });
+        ctx.io.emit("status", createStatusEvent({ id: targetId, kind: "buff", effect: "resist_poison", source: Number(state?.actor || ctx.actor || 0) | 0, masked: !state.identified }));
+        return { resist: "poison", duration: 40 };
+      },
+    },
+  },
+  potion_anti_venom: {
+    id: "potion_anti_venom",
+    catalogKind: "magic",
+    name: "Anti-Venom",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 2,
+    rarityName: "magic",
+    value: 40,
+    description: "A milky white serum that instantly neutralises all poisons in the body.",
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [],
+      toxicity: null,
+      feel: "It tastes medicinal and faintly chalky.",
+    },
+    hooks: {
+      on_drink: (ctx, state) => {
+        const actorId = Number(state?.actor || ctx.actor || 0) | 0;
+        const targetId = ctx.rules.resolveTarget(actorId);
+        const hadPoison = ctx.helpers.hasStatus(targetId, "poisoned") || ctx.helpers.hasStatus(targetId, "poison");
+        ctx.helpers.clearEffects(targetId, ["poison", "poisoned"]);
+        if (hadPoison) {
+          ctx.io.emit("status", createStatusEvent({ id: targetId, kind: "cure", effect: "poison", source: actorId }));
+        }
+        return { cured: hadPoison ? "poison" : "none" };
+      },
+    },
+  },
+  potion_resist_electric: {
+    id: "potion_resist_electric",
+    catalogKind: "magic",
+    name: "Potion of Lightning Resistance",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 2,
+    rarityName: "magic",
+    value: 55,
+    description: "A crackling blue elixir that grounds the drinker against electrical surges.",
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [],
+      toxicity: null,
+      feel: "A faint tingle runs over your skin.",
+    },
+    hooks: {
+      on_drink: (ctx, state) => {
+        const targetId = ctx.rules.resolveTarget(Number(state?.actor || ctx.actor || 0) | 0);
+        ctx.helpers.addEffect(targetId, {
+          key: "resist_electric",
+          potency: 0.3,
+          turnsLeft: 40,
+          onsetLeft: 0,
+          peakLeft: 0,
+          stack: "refresh",
+          maxStacks: 1,
+          sourceId: Number(state?.itemId || ctx.primary || 0) | 0,
+          meta: { source: "potion_resist_electric", kind: "resist_buff", masked: !state.identified },
+        });
+        ctx.io.emit("status", createStatusEvent({ id: targetId, kind: "buff", effect: "resist_electric", source: Number(state?.actor || ctx.actor || 0) | 0, masked: !state.identified }));
+        return { resist: "electric", duration: 40 };
+      },
+    },
+  },
+  potion_resist_acid: {
+    id: "potion_resist_acid",
+    catalogKind: "magic",
+    name: "Potion of Acid Resistance",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 2,
+    rarityName: "magic",
+    value: 55,
+    description: "A thick amber syrup that shields the skin from corrosive burns.",
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [],
+      toxicity: null,
+      feel: "It coats your throat with a thick, amber warmth.",
+    },
+    hooks: {
+      on_drink: (ctx, state) => {
+        const targetId = ctx.rules.resolveTarget(Number(state?.actor || ctx.actor || 0) | 0);
+        ctx.helpers.addEffect(targetId, {
+          key: "resist_acid",
+          potency: 0.3,
+          turnsLeft: 40,
+          onsetLeft: 0,
+          peakLeft: 0,
+          stack: "refresh",
+          maxStacks: 1,
+          sourceId: Number(state?.itemId || ctx.primary || 0) | 0,
+          meta: { source: "potion_resist_acid", kind: "resist_buff", masked: !state.identified },
+        });
+        ctx.io.emit("status", createStatusEvent({ id: targetId, kind: "buff", effect: "resist_acid", source: Number(state?.actor || ctx.actor || 0) | 0, masked: !state.identified }));
+        return { resist: "acid", duration: 40 };
+      },
+    },
+  },
+  book_lightning: {
+    id: "book_lightning",
+    catalogKind: "magic",
+    name: "Spellbook of Lightning",
+    type: "learn",
+    slot: "bag",
+    material: "paper",
+    rarity: 3,
+    rarityName: "rare",
+    description: "Grants the ability to cast a lightning spell.",
+    hooks: {
+      on_use: createLearnSpellFromIdentityHook({
+        identityPrefix: "book_",
+        consumeOnSuccess: true,
+      }),
+    },
+  },
+  book_meteor: {
+    id: "book_meteor",
+    catalogKind: "magic",
+    name: "Spellbook of Meteor",
+    type: "learn",
+    slot: "bag",
+    material: "paper",
+    rarity: 4,
+    rarityName: "epic",
+    description: "Grants the ability to cast a meteor spell.",
+    hooks: {
+      on_use: createLearnSpellFromIdentityHook({
+        identityPrefix: "book_",
+        consumeOnSuccess: true,
+      }),
+    },
+  },
+  book_blastwave: {
+    id: "book_blastwave",
+    catalogKind: "magic",
+    name: "Spellbook of Blast Wave",
+    type: "learn",
+    slot: "bag",
+    material: "paper",
+    rarity: 2,
+    rarityName: "magic",
+    description: "Grants the ability to cast a blast wave spell.",
+    hooks: {
+      on_use: createLearnSpellFromIdentityHook({
+        identityPrefix: "book_",
+        consumeOnSuccess: true,
+      }),
+    },
+  },
+  book_earthshatter: {
+    id: "book_earthshatter",
+    catalogKind: "magic",
+    name: "Spellbook of Earthshatter",
+    type: "learn",
+    slot: "bag",
+    material: "paper",
+    rarity: 2,
+    rarityName: "magic",
+    description: "Grants the ability to cast Earthshatter, cracking the ground to stun nearby foes.",
+    hooks: {
+      on_use: createLearnSpellFromIdentityHook({
+        identityPrefix: "book_",
+        consumeOnSuccess: true,
+      }),
+    },
+  },
+  book_blink: {
+    id: "book_blink",
+    catalogKind: "magic",
+    name: "Spellbook of Blink",
+    type: "learn",
+    slot: "bag",
+    material: "paper",
+    rarity: 2,
+    rarityName: "magic",
+    description: "Grants the ability to cast Blink.",
+    hooks: {
+      on_use: createLearnSpellFromIdentityHook({
+        identityPrefix: "book_",
+        consumeOnSuccess: true,
+      }),
+    },
+  },
+  book_frost: {
+    id: "book_frost",
+    catalogKind: "magic",
+    name: "Spellbook of Frost",
+    type: "learn",
+    slot: "bag",
+    material: "paper",
+    rarity: 2,
+    rarityName: "magic",
+    description: "Grants the ability to cast Frost.",
+    hooks: {
+      on_use: createLearnSpellFromIdentityHook({
+        identityPrefix: "book_",
+        consumeOnSuccess: true,
+      }),
+    },
+  },
+  book_blizzard: {
+    id: "book_blizzard",
+    catalogKind: "magic",
+    name: "Spellbook of Blizzard",
+    type: "learn",
+    slot: "bag",
+    material: "paper",
+    rarity: 3,
+    rarityName: "rare",
+    description: "Grants the ability to cast Blizzard.",
+    hooks: {
+      on_use: createLearnSpellFromIdentityHook({
+        identityPrefix: "book_",
+        consumeOnSuccess: true,
+      }),
+    },
+  },
+  book_firestorm: {
+    id: "book_firestorm",
+    catalogKind: "magic",
+    name: "Spellbook of Firestorm",
+    type: "learn",
+    slot: "bag",
+    material: "paper",
+    rarity: 3,
+    rarityName: "rare",
+    description: "Grants the ability to cast Firestorm.",
+    hooks: {
+      on_use: createLearnSpellFromIdentityHook({
+        identityPrefix: "book_",
+        consumeOnSuccess: true,
+      }),
+    },
+  },
+  book_heal: {
+    id: "book_heal",
+    catalogKind: "magic",
+    name: "Spellbook of Healing",
+    type: "learn",
+    slot: "bag",
+    material: "paper",
+    rarity: 2,
+    rarityName: "magic",
+    description: "Grants the ability to cast a healing spell.",
+    hooks: {
+      on_use: createLearnSpellFromIdentityHook({
+        identityPrefix: "book_",
+        consumeOnSuccess: true,
+      }),
+    },
+  },
+  book_blind: {
+    id: "book_blind",
+    catalogKind: "magic",
+    name: "Spellbook of Blindness",
+    type: "learn",
+    slot: "bag",
+    material: "paper",
+    rarity: 3,
+    rarityName: "rare",
+    description: "Grants the ability to cast a blinding spell.",
+    hooks: {
+      on_use: createLearnSpellFromIdentityHook({
+        identityPrefix: "book_",
+        consumeOnSuccess: true,
+      }),
+    },
+  },
+  book_verdant_ward: {
+    id: "book_verdant_ward",
+    catalogKind: "magic",
+    name: "Spellbook of Verdant Ward",
+    type: "learn",
+    slot: "bag",
+    material: "paper",
+    rarity: 3,
+    rarityName: "rare",
+    description: "Grants the ability to cast Verdant Ward.",
+    hooks: {
+      on_use: createLearnSpellFromIdentityHook({
+        identityPrefix: "book_",
+        consumeOnSuccess: true,
+      }),
+    },
+  },
+  book_harmony_ward: {
+    id: "book_harmony_ward",
+    catalogKind: "magic",
+    name: "Spellbook of Harmony Ward",
+    type: "learn",
+    slot: "bag",
+    material: "paper",
+    rarity: 3,
+    rarityName: "rare",
+    description: "Grants the ability to cast Harmony Ward.",
+    hooks: {
+      on_use: createLearnSpellFromIdentityHook({
+        identityPrefix: "book_",
+        consumeOnSuccess: true,
+      }),
+    },
+  },
+  book_shadow_veil: {
+    id: "book_shadow_veil",
+    catalogKind: "magic",
+    name: "Spellbook of Shadow Veil",
+    type: "learn",
+    slot: "bag",
+    material: "paper",
+    rarity: 3,
+    rarityName: "rare",
+    description: "Grants the ability to cast Shadow Veil.",
+    hooks: {
+      on_use: createLearnSpellFromIdentityHook({
+        identityPrefix: "book_",
+        consumeOnSuccess: true,
+      }),
+    },
+  },
+  book_flash_heal: {
+    id: "book_flash_heal",
+    catalogKind: "magic",
+    name: "Spellbook of Flash Heal",
+    type: "learn",
+    slot: "bag",
+    material: "paper",
+    rarity: 3,
+    rarityName: "rare",
+    description: "Grants the ability to cast Flash Heal.",
+    hooks: {
+      on_use: createLearnSpellFromIdentityHook({
+        identityPrefix: "book_",
+        consumeOnSuccess: true,
+      }),
+    },
+  },
+  book_smite: {
+    id: "book_smite",
+    catalogKind: "magic",
+    name: "Spellbook of Smite",
+    type: "learn",
+    slot: "bag",
+    material: "paper",
+    rarity: 2,
+    rarityName: "magic",
+    description: "Grants the ability to call down holy judgment on enemies.",
+    hooks: {
+      on_use: createLearnSpellFromIdentityHook({
+        identityPrefix: "book_",
+        consumeOnSuccess: true,
+      }),
+    },
+  },
+  book_summon_skeleton: {
+    id: "book_summon_skeleton",
+    catalogKind: "magic",
+    name: "Spellbook of Summon Skeleton",
+    type: "learn",
+    slot: "bag",
+    material: "paper",
+    rarity: 4,
+    rarityName: "epic",
+    description: "Grants the ability to rip a skeleton from the earth to fight at your side.",
+    hooks: {
+      on_use: createLearnSpellFromIdentityHook({
+        identityPrefix: "book_",
+        consumeOnSuccess: true,
+      }),
+    },
+  },
+  book_shadow_bolt: {
+    id: "book_shadow_bolt",
+    catalogKind: "magic",
+    name: "Spellbook of Shadow Bolt",
+    type: "learn",
+    slot: "bag",
+    material: "paper",
+    rarity: 4,
+    rarityName: "epic",
+    description: "Grants the ability to hurl a devastating bolt of pure shadow.",
+    hooks: {
+      on_use: createLearnSpellFromIdentityHook({
+        identityPrefix: "book_",
+        consumeOnSuccess: true,
+      }),
+    },
+  },
+  book_agony: {
+    id: "book_agony",
+    catalogKind: "magic",
+    name: "Spellbook of Agony",
+    type: "learn",
+    slot: "bag",
+    material: "paper",
+    rarity: 3,
+    rarityName: "rare",
+    description: "Grants the ability to weave shadow into a curse that gnaws at life force.",
+    hooks: {
+      on_use: createLearnSpellFromIdentityHook({
+        identityPrefix: "book_",
+        consumeOnSuccess: true,
+      }),
+    },
+  },
+  book_rampage: {
+    id: "book_rampage",
+    catalogKind: "magic",
+    name: "Spellbook of Rampage",
+    type: "learn",
+    slot: "bag",
+    material: "paper",
+    rarity: 3,
+    rarityName: "rare",
+    description: "Grants the ability to spend mana for a long, savage battle fury.",
+    hooks: {
+      on_use: createLearnSpellFromIdentityHook({
+        identityPrefix: "book_",
+        consumeOnSuccess: true,
+      }),
+    },
+  },
+  book_phase_strike: {
+    id: "book_phase_strike",
+    catalogKind: "magic",
+    name: "Spellbook of Phase Strike",
+    type: "learn",
+    slot: "bag",
+    material: "paper",
+    rarity: 3,
+    rarityName: "rare",
+    description: "Grants the ability to slip between moments and cut everything on your line.",
+    hooks: {
+      on_use: createLearnSpellFromIdentityHook({
+        identityPrefix: "book_",
+        consumeOnSuccess: true,
+      }),
+    },
+  },
+  book_scorch: {
+    id: "book_scorch",
+    catalogKind: "magic",
+    name: "Spellbook of Scorch",
+    type: "learn",
+    slot: "bag",
+    material: "paper",
+    rarity: 2,
+    rarityName: "magic",
+    description: "Grants the ability to sear a target with fire and leave them vulnerable to further burning.",
+    hooks: {
+      on_use: createLearnSpellFromIdentityHook({
+        identityPrefix: "book_",
+        consumeOnSuccess: true,
+      }),
+    },
+  },
+  book_homecoming: {
+    id: "book_homecoming",
+    catalogKind: "magic",
+    name: "Spellbook of Homecoming",
+    type: "learn",
+    slot: "bag",
+    material: "paper",
+    rarity: 2,
+    rarityName: "magic",
+    description: "Grants the ability to instantly return to the surface.",
+    hooks: {
+      on_use: createLearnSpellFromIdentityHook({
+        identityPrefix: "book_",
+        consumeOnSuccess: true,
+      }),
+    },
+  },
+  book_hearthstone: {
+    id: "book_hearthstone",
+    catalogKind: "magic",
+    name: "Spellbook of Hearthstone",
+    type: "learn",
+    slot: "bag",
+    material: "paper",
+    rarity: 3,
+    rarityName: "rare",
+    description: "Grants the ability to channel your will homeward and be pulled back to safety.",
+    hooks: {
+      on_use: createLearnSpellFromIdentityHook({
+        identityPrefix: "book_",
+        consumeOnSuccess: true,
+      }),
+    },
+  },
+  book_dead: {
+    id: "book_dead",
+    catalogKind: "magic",
+    name: "Book of the Dead",
+    type: "book",
+    slot: "bag",
+    material: "paper",
+    rarity: 3,
+    rarityName: "legendary",
+    description: "An ancient tome bound in pale leather. It records the fate of every hero who came before.",
+    hooks: {
+      on_use: (ctx, state) => {
+        const actor = Number(state?.actor || ctx.actor || 0) | 0;
+        ctx.io.emit("deathlog:open", { actor });
+        return { consumed: false };
+      },
+    },
+  },
+  book_kitty: {
+    id: "book_kitty",
+    catalogKind: "magic",
+    name: "On the Care of Dungeon Cats",
+    type: "book",
+    slot: "bag",
+    material: "paper",
+    rarity: 1,
+    rarityName: "common",
+    description: "A slim volume with claw marks on the cover.",
+    flavorText: "Your kitty will follow you, fetch items, and flee when injured. It will also drop things at your feet unprompted. Do not question why. This is simply what cats do.",
+    hooks: {
+      on_use: createOpenFlavorBookHook(
+        "On the Care of Dungeon Cats",
+        "Your kitty will follow you, fetch items, and flee when injured. It will also drop things at your feet unprompted. Do not question why. This is simply what cats do.",
+      ),
+    },
+  },
+  book_snakes: {
+    id: "book_snakes",
+    catalogKind: "magic",
+    name: "Snake Nest Husbandry",
+    type: "book",
+    slot: "bag",
+    material: "paper",
+    rarity: 1,
+    rarityName: "common",
+    description: "Smells faintly of venom.",
+    flavorText: "The snake trap releases a cluster of serpents when triggered. Venomous fangs, 25% poison chance. They appear from nowhere. Do not ask where they were hiding.",
+    hooks: {
+      on_use: createOpenFlavorBookHook(
+        "Snake Nest Husbandry",
+        "The snake trap releases a cluster of serpents when triggered. Venomous fangs, 25% poison chance. They appear from nowhere. Do not ask where they were hiding.",
+      ),
+    },
+  },
+  book_spikes: {
+    id: "book_spikes",
+    catalogKind: "magic",
+    name: "The Spike Trap Quarterly, Vol. III",
+    type: "book",
+    slot: "bag",
+    material: "paper",
+    rarity: 1,
+    rarityName: "common",
+    description: "A trade publication for trap enthusiasts.",
+    flavorText: "This season's models deliver a clean 35% of max HP in damage. Reader question: 'Can adventurers see them?' Editor's response: 'Not until it's too late.'",
+    hooks: {
+      on_use: createOpenFlavorBookHook(
+        "The Spike Trap Quarterly, Vol. III",
+        "This season's models deliver a clean 35% of max HP in damage. Reader question: 'Can adventurers see them?' Editor's response: 'Not until it's too late.'",
+      ),
+    },
+  },
+  book_touchstone: {
+    id: "book_touchstone",
+    catalogKind: "magic",
+    name: "Touchstone: A Gemcutter's Manual",
+    type: "book",
+    slot: "bag",
+    material: "paper",
+    rarity: 1,
+    rarityName: "common",
+    description: "Dog-eared and well-thumbed.",
+    flavorText: "Rub the stone across the touchstone. A hard white streak means value. A dull scratch means you've been carrying glass through fifteen floors of dungeon.",
+    hooks: {
+      on_use: createOpenFlavorBookHook(
+        "Touchstone: A Gemcutter's Manual",
+        "Rub the stone across the touchstone. A hard white streak means value. A dull scratch means you've been carrying glass through fifteen floors of dungeon.",
+      ),
+    },
+  },
+  book_corpses: {
+    id: "book_corpses",
+    catalogKind: "magic",
+    name: "On Eating Monster Corpses",
+    type: "book",
+    slot: "bag",
+    material: "paper",
+    rarity: 1,
+    rarityName: "common",
+    description: "Several pages are stained with something unidentifiable.",
+    flavorText: "Rat corpse: disease. Snake corpse: poison. Spider corpse: also poison. Floating eye corpse: you forget who you are. There is a pattern here. Please notice it.",
+    hooks: {
+      on_use: createOpenFlavorBookHook(
+        "On Eating Monster Corpses",
+        "Rat corpse: disease. Snake corpse: poison. Spider corpse: also poison. Floating eye corpse: you forget who you are. There is a pattern here. Please notice it.",
+      ),
+    },
+  },
+  book_gridbugs: {
+    id: "book_gridbugs",
+    catalogKind: "magic",
+    name: "A Field Guide to Grid Bugs",
+    type: "book",
+    slot: "bag",
+    material: "paper",
+    rarity: 1,
+    rarityName: "common",
+    description: "Illustrated with tiny diagrams of cardinal directions.",
+    flavorText: "The grid bug moves only along cardinal axes. Nobody knows why. One theory suggests they are bound by an ancient curse. Another theory: they are just very stubborn.",
+    hooks: {
+      on_use: createOpenFlavorBookHook(
+        "A Field Guide to Grid Bugs",
+        "The grid bug moves only along cardinal axes. Nobody knows why. One theory suggests they are bound by an ancient curse. Another theory: they are just very stubborn.",
+      ),
+    },
+  },
+  scroll_blastwave: {
+    id: "scroll_blastwave",
+    catalogKind: "magic",
+    name: "Scroll of Blast Wave",
+    type: "scroll",
+    slot: "bag",
+    material: "paper",
+    rarity: 2,
+    rarityName: "magic",
+    description: "Casts Blast Wave without learning it.",
+    hooks: {
+      on_use: createCastSpellFromIdentityHook({
+        identityPrefix: "scroll_",
+        targetMode: "self",
+        consumeOnSuccess: true,
+      }),
+    },
+  },
+  hearthstone: {
+    id: "hearthstone",
+    catalogKind: "magic",
+    name: "Hearthstone",
+    type: "tool",
+    slot: "bag",
+    value: 88,
+    material: "mineral",
+    rarity: 3,
+    rarityName: "unique",
+    description: "A warm stone that remembers the way home. Channel your will to return to the surface.",
+    hooks: (() => {
+      const _castHook = createCastSpellFromIdentityHook({
+        identityPrefix: "",
+        targetMode: "self",
+        consumeOnSuccess: false,
+      });
+      return {
+        on_use: (ctx, state) => {
+          const cd = ctx.query.get(state.itemId, ItemCooldown);
+          if (cd && cd.turnsRemaining > 0) {
+            ctx.io.message(`The hearthstone is still cooling down (${cd.turnsRemaining} turns).`, 'warning');
+            return { consumed: false, cancelled: true, consumesTurn: false, code: 'ITEM_ON_COOLDOWN', message: 'Hearthstone is on cooldown.' };
+          }
+          return _castHook(ctx, state);
+        },
+        after_use: (ctx, state) => {
+          ctx.mutate.queue({ type: 'setItemCooldown', entityId: state.itemId | 0, turns: 500 });
+          return {};
+        },
+      };
+    })(),
+  },
+  scroll_homecoming: {
+    id: "scroll_homecoming",
+    catalogKind: "magic",
+    name: "Scroll of Homecoming",
+    type: "scroll",
+    slot: "bag",
+    material: "paper",
+    rarity: 2,
+    rarityName: "magic",
+    description: "Returns you to the surface (dungeon level 0).",
+    hooks: {
+      on_use: createCastSpellFromIdentityHook({
+        identityPrefix: "scroll_",
+        targetMode: "self",
+        consumeOnSuccess: true,
+      }),
+      on_loot_roll: (ctx, _state) => {
+        if (ctx?.playerItemIds?.has('hearthstone')) return { cancel: true };
+        return {};
+      }
+    },
+  },
+  scroll_heal: {
+    id: "scroll_heal",
+    catalogKind: "magic",
+    name: "Scroll of Healing",
+    type: "scroll",
+    slot: "bag",
+    material: "paper",
+    rarity: 1,
+    rarityName: "common",
+    description: "Casts a healing spell on yourself or an ally.",
+    hooks: {
+      on_use: createCastSpellFromIdentityHook({
+        identityPrefix: "scroll_",
+        targetMode: "target",
+        consumeOnSuccess: true,
+      }),
+    },
+  },
+  scroll_summon_skeleton: {
+    id: "scroll_summon_skeleton",
+    catalogKind: "magic",
+    name: "Scroll of Summon Skeleton",
+    type: "scroll",
+    slot: "bag",
+    material: "paper",
+    rarity: 2,
+    rarityName: "magic",
+    description: "Rip a skeleton from the earth to fight at your side.",
+    hooks: {
+      on_use: createCastSpellFromIdentityHook({
+        identityPrefix: "scroll_",
+        targetMode: "self",
+        consumeOnSuccess: true,
+      }),
+    },
+  },
+  scroll_mapping: {
+    id: "scroll_mapping",
+    catalogKind: "magic",
+    name: "Scroll of Mapping",
+    type: "scroll",
+    slot: "bag",
+    material: "paper",
+    rarity: 1,
+    rarityName: "common",
+    weight: 0.1,
+    value: 100,
+    description: "Reveals the entire dungeon map.",
+    hooks: {
+      on_use: MAPPING_ON_USE,
+    },
+  },
+  wand_lightning: {
+    id: "wand_lightning",
+    catalogKind: "magic",
+    name: "Wand of Lightning",
+    type: "wand",
+    slot: "ranged",
+    material: "wood",
+    charges: 3,
+    rarity: 3,
+    rarityName: "rare",
+    description: "Zaps a bolt of chain lightning. 3 charges.",
+    hooks: {
+      on_use: createCastSpellFromIdentityHook({
+        identityPrefix: "wand_",
+        targetMode: "intentTarget",
+        castEventSource: "wand",
+        consumeOnSuccess: true,
+      }),
+    },
+  },
+  wand_meteor: {
+    id: "wand_meteor",
+    catalogKind: "magic",
+    name: "Wand of Meteor",
+    type: "wand",
+    slot: "ranged",
+    material: "wood",
+    charges: 2,
+    rarity: 4,
+    rarityName: "epic",
+    description: "Calls down a meteor. 2 charges.",
+    hooks: {
+      on_use: createCastSpellFromIdentityHook({
+        identityPrefix: "wand_",
+        targetMode: "intentTarget",
+        castEventSource: "wand",
+        consumeOnSuccess: true,
+      }),
+    },
+  },
+  wand_frost: {
+    id: "wand_frost",
+    catalogKind: "magic",
+    name: "Wand of Frost",
+    type: "wand",
+    slot: "ranged",
+    material: "wood",
+    charges: 10,
+    rarity: 2,
+    rarityName: "magic",
+    description: "Encases an enemy in frost, slowing them. Lighter foes freeze longer. 10 charges.",
+    hooks: {
+      on_use: createCastSpellFromIdentityHook({
+        identityPrefix: "wand_",
+        targetMode: "intentTarget",
+        castEventSource: "wand",
+        consumeOnSuccess: true,
+      }),
+    },
+  },
+  wand_heal: {
+    id: "wand_heal",
+    catalogKind: "magic",
+    name: "Wand of Healing",
+    type: "wand",
+    slot: "ranged",
+    material: "wood",
+    charges: 8,
+    rarity: 2,
+    rarityName: "magic",
+    description: "Restores health to yourself or an ally. 8 charges.",
+    hooks: {
+      on_use: createCastSpellFromIdentityHook({
+        identityPrefix: "wand_",
+        targetMode: "target",
+        castEventSource: "wand",
+        consumeOnSuccess: true,
+      }),
+    },
+  },
+  food_ration: {
+    id: "food_ration",
+    catalogKind: "food",
+    name: "Ration",
+    type: "food",
+    slot: "bag",
+    material: "organic",
+    rarity: 1,
+    rarityName: "common",
+    weight: 1,
+    value: 10,
+    description: "A dry but filling travel ration.",
+    hooks: {
+      on_use: EAT_ON_USE,
+    },
+  },
+  food_iron_ration: {
+    id: "food_iron_ration",
+    catalogKind: "food",
+    name: "Iron Ration",
+    type: "food",
+    slot: "bag",
+    material: "organic",
+    rarity: 1,
+    rarityName: "common",
+    weight: 1.5,
+    value: 25,
+    description: "A well-preserved military ration. Very filling.",
+    hooks: {
+      on_use: EAT_ON_USE,
+    },
+  },
+  food_wild_berries: {
+    id: "food_wild_berries",
+    catalogKind: "food",
+    name: "Wild Berries",
+    type: "food",
+    slot: "bag",
+    material: "organic",
+    rarity: 1,
+    rarityName: "common",
+    weight: 0.2,
+    value: 4,
+    description: "A handful of sweet wild berries.",
+    hooks: {
+      on_use: EAT_ON_USE,
+    },
+  },
+  food_wild_herbs: {
+    id: "food_wild_herbs",
+    catalogKind: "food",
+    name: "Wild Herbs",
+    type: "food",
+    slot: "bag",
+    material: "organic",
+    rarity: 1,
+    rarityName: "common",
+    weight: 0.15,
+    value: 3,
+    description: "Fresh herbs with a sharp, earthy bite.",
+    hooks: {
+      on_use: EAT_ON_USE,
+    },
+  },
+  food_wheat: {
+    id: "food_wheat",
+    catalogKind: "food",
+    name: "Wheat",
+    type: "food",
+    slot: "bag",
+    material: "organic",
+    rarity: 1,
+    rarityName: "common",
+    weight: 0.3,
+    value: 5,
+    description: "A sheaf of golden wheat. Can be cooked into bread.",
+    hooks: {
+      on_use: EAT_ON_USE,
+    },
+  },
+  food_carrot: {
+    id: "food_carrot",
+    catalogKind: "food",
+    name: "Carrot",
+    type: "food",
+    slot: "bag",
+    material: "organic",
+    rarity: 1,
+    rarityName: "common",
+    weight: 0.4,
+    value: 4,
+    description: "A fresh carrot, pulled straight from the soil.",
+    hooks: {
+      on_use: EAT_ON_USE,
+    },
+  },
+  food_corn: {
+    id: "food_corn",
+    catalogKind: "food",
+    name: "Corn",
+    type: "food",
+    slot: "bag",
+    material: "organic",
+    rarity: 1,
+    rarityName: "common",
+    weight: 1.0,
+    value: 8,
+    description: "An ear of golden corn.",
+    hooks: {
+      on_use: EAT_ON_USE,
+    },
+  },
+  ore_iron: {
+    id: "ore_iron",
+    catalogKind: "material",
+    name: "Iron Ore",
+    type: "material",
+    slot: "bag",
+    material: "iron",
+    rarity: 1,
+    rarityName: "common",
+    weight: 2.0,
+    value: 12,
+    description: "A chunk of raw iron ore, heavy and rust-red.",
+  },
+  ore_coal: {
+    id: "ore_coal",
+    catalogKind: "material",
+    name: "Coal",
+    type: "material",
+    slot: "bag",
+    material: "mineral",
+    rarity: 1,
+    rarityName: "common",
+    weight: 1.5,
+    value: 6,
+    description: "A lump of coal, black and crumbly.",
+  },
+  ore_stone: {
+    id: "ore_stone",
+    catalogKind: "material",
+    name: "Stone Chip",
+    type: "material",
+    slot: "bag",
+    material: "mineral",
+    rarity: 1,
+    rarityName: "common",
+    weight: 1.0,
+    value: 2,
+    description: "A rough chip of grey stone.",
+  },
+  seed_wheat: {
+    id: "seed_wheat",
+    catalogKind: "seed",
+    name: "Wheat Seeds",
+    type: "seed",
+    slot: "bag",
+    material: "organic",
+    rarity: 1,
+    rarityName: "common",
+    weight: 0.1,
+    value: 2,
+    description: "A handful of golden wheat seeds.",
+  },
+  seed_carrot: {
+    id: "seed_carrot",
+    catalogKind: "seed",
+    name: "Carrot Seeds",
+    type: "seed",
+    slot: "bag",
+    material: "organic",
+    rarity: 1,
+    rarityName: "common",
+    weight: 0.1,
+    value: 2,
+    description: "Tiny carrot seeds ready to plant.",
+  },
+  seed_corn: {
+    id: "seed_corn",
+    catalogKind: "seed",
+    name: "Corn Seeds",
+    type: "seed",
+    slot: "bag",
+    material: "organic",
+    rarity: 1,
+    rarityName: "common",
+    weight: 0.1,
+    value: 2,
+    description: "A few kernels of seed corn.",
+  },
+  reagent_thorn_pod: {
+    id: "reagent_thorn_pod",
+    catalogKind: "material",
+    name: "Thorn Pods",
+    type: "ingredient",
+    slot: "bag",
+    material: "organic",
+    rarity: 1,
+    rarityName: "common",
+    weight: 0.2,
+    value: 6,
+    description: "Hardened thorn pods packed with sharp resin.",
+  },
+  reagent_venom_frond: {
+    id: "reagent_venom_frond",
+    catalogKind: "material",
+    name: "Venom Fronds",
+    type: "ingredient",
+    slot: "bag",
+    material: "organic",
+    rarity: 1,
+    rarityName: "common",
+    weight: 0.2,
+    value: 7,
+    description: "Slick venom fronds that reek of bitter alkaloids.",
+  },
+  reagent_moonleaf: {
+    id: "reagent_moonleaf",
+    catalogKind: "material",
+    name: "Moonleaf",
+    type: "ingredient",
+    slot: "bag",
+    material: "organic",
+    rarity: 1,
+    rarityName: "common",
+    weight: 0.15,
+    value: 8,
+    description: "Cool silver leaves prized for soothing brews.",
+  },
+  reagent_ember_root: {
+    id: "reagent_ember_root",
+    catalogKind: "material",
+    name: "Ember Root",
+    type: "ingredient",
+    slot: "bag",
+    material: "organic",
+    rarity: 1,
+    rarityName: "common",
+    weight: 0.2,
+    value: 8,
+    description: "A hot, peppery root that keeps its heat long after harvest.",
+  },
+  // ── Scroll of Identify ─────────────────────────────────────────────
+  scroll_identify: {
+    id: "scroll_identify",
+    catalogKind: "magic",
+    name: "Scroll of Identify",
+    noQuickChip: true,
+    type: "scroll",
+    slot: "bag",
+    material: "paper",
+    rarity: 1,
+    rarityName: "common",
+    identified: true,
+    weight: 0.1,
+    value: 30,
+    description: "Reveals the true nature of an item.",
+    hooks: {
+      can_dip_target: (state) => {
+        const targetInfo = state?.targetInfo;
+        if (!targetInfo) return false;
+        const identity = String(state?.targetIdentity || "");
+        if (!identity) return false;
+        if (isIdentified(identity)) return false;
+        if (String(targetInfo?.type || "") === "gem") return true;
+        return requiresIdentification(targetInfo);
+      },
+      on_dip: (ctx, state) => {
+        const identity = String(state?.targetIdentity || "");
+        if (!identity) return { applied: false, consumedTool: false };
+
+        const wasNew = identify(identity);
+        const targetName = String(ctx?.query?.name?.(state.targetId) || identity.replace(/_/g, " "));
+        ctx.io.emit("item:identified", {
+          actor: state.actor,
+          identity,
+          name: targetName,
+          category: String(state?.targetInfo?.type || state?.targetInfo?.slot || "item"),
+          newlyIdentified: wasNew,
+        });
+        return { applied: true, consumedTool: true, resultType: "identify" };
+      },
+    },
+  },
+
+  scroll_remove_curse: {
+    id: "scroll_remove_curse",
+    catalogKind: "magic",
+    name: "Scroll of Remove Curse",
+    type: "scroll",
+    slot: "bag",
+    material: "paper",
+    rarity: 2,
+    rarityName: "magic",
+    weight: 0.1,
+    value: 50,
+    description: "Holy words purge corruption from an item.",
+    hooks: {
+      can_dip_target: (state) => {
+        return state?.targetBeatitude === 'cursed';
+      },
+      on_dip: (ctx, state) => {
+        const targetId = state?.targetId;
+        if (!targetId) return { applied: false, consumedTool: false };
+        const targetName = String(ctx?.query?.name?.(targetId) || "item");
+        ctx.io.emit("curse:removed", {
+          actor: state.actor,
+          itemId: targetId,
+          name: targetName,
+          source: 'scroll',
+        });
+        return { applied: true, consumedTool: true, resultType: "remove_curse" };
+      },
+    },
+  },
+
+  // ── Cursed / Negative Rings ───────────────────────────────────────
+  ring_hunger: {
+    id: "ring_hunger",
+    catalogKind: "equipment",
+    name: "Ring of Hunger",
+    type: "equip",
+    slot: "ring",
+    material: "iron",
+    rarity: 2,
+    rarityName: "magic",
+    bonuses: { hungerRate: 2 },
+    beatitude: "cursed",
+    description: "A dull iron band that gnaws at your stomach. You feel ravenous.",
+  },
+  ring_fumbling: {
+    id: "ring_fumbling",
+    catalogKind: "equipment",
+    name: "Ring of Fumbling",
+    type: "equip",
+    slot: "ring",
+    material: "copper",
+    rarity: 2,
+    rarityName: "magic",
+    bonuses: { attack: -3 },
+    beatitude: "cursed",
+    description: "A tarnished copper ring. Your hands feel clumsy.",
+  },
+  ring_weakness: {
+    id: "ring_weakness",
+    catalogKind: "equipment",
+    name: "Ring of Weakness",
+    type: "equip",
+    slot: "ring",
+    material: "lead",
+    rarity: 2,
+    rarityName: "magic",
+    bonuses: { maxHp: -5 },
+    beatitude: "cursed",
+    description: "A heavy leaden ring. It saps your vitality.",
+  },
+  ring_blindness: {
+    id: "ring_blindness",
+    catalogKind: "equipment",
+    name: "Ring of Blindness",
+    type: "equip",
+    slot: "ring",
+    material: "obsidian",
+    rarity: 2,
+    rarityName: "magic",
+    bonuses: { visionRange: -4 },
+    beatitude: "cursed",
+    description: "A ring of polished obsidian. Shadows creep at the edge of your vision.",
+  },
+  ring_teleportation: {
+    id: "ring_teleportation",
+    catalogKind: "equipment",
+    name: "Ring of Teleportation",
+    type: "equip",
+    slot: "ring",
+    material: "silver",
+    rarity: 3,
+    rarityName: "rare",
+    bonuses: { luck: -5, visionRange: -2 },
+    beatitude: "cursed",
+    description: "A shimmering silver ring. Reality warps and shifts around you.",
+  },
+
+  // ── Bad Scrolls ───────────────────────────────────────────────────
+  scroll_amnesia: {
+    id: "scroll_amnesia",
+    catalogKind: "magic",
+    name: "Scroll of Amnesia",
+    type: "scroll",
+    slot: "bag",
+    material: "paper",
+    rarity: 1,
+    rarityName: "common",
+    weight: 0.1,
+    value: 5,
+    description: "The words burn away everything you know. Total oblivion.",
+    hooks: {
+      on_use: (ctx, state) => {
+        const actor = Number(state?.actor || ctx.actor || 0) | 0;
+        const brain = ctx.query.brain(actor);
+        const forgottenSpells = [];
+        if (brain) {
+          if (Array.isArray(brain.learnedSpellIds)) {
+            forgottenSpells.push(...brain.learnedSpellIds);
+            brain.learnedSpellIds.length = 0;
+          }
+          if (Array.isArray(brain.itemKnowledgeIdentities)) {
+            brain.itemKnowledgeIdentities.length = 0;
+          }
+          if (brain.seenTiles) {
+            brain.seenTiles.fill(0);
+          }
+        }
+        ctx.io.emit("scroll:amnesia", { actor, forgottenSpells, total: true });
+        return { consumed: true };
+      },
+    },
+  },
+  scroll_fire: {
+    id: "scroll_fire",
+    catalogKind: "magic",
+    name: "Scroll of Fire",
+    type: "scroll",
+    slot: "bag",
+    material: "paper",
+    rarity: 1,
+    rarityName: "common",
+    weight: 0.1,
+    value: 5,
+    description: "The scroll erupts in flames as you read it!",
+    hooks: {
+      on_use: (ctx, state) => {
+        const actor = Number(state?.actor || ctx.actor || 0) | 0;
+        const damage = ctx.helpers.roll("2d6");
+        ctx.helpers.damage(actor, damage, "scroll_fire");
+        ctx.io.emit("scroll:fire", { actor, damage });
+        return { consumed: true };
+      },
+    },
+  },
+  scroll_aggravation: {
+    id: "scroll_aggravation",
+    catalogKind: "magic",
+    name: "Scroll of Aggravation",
+    type: "scroll",
+    slot: "bag",
+    material: "paper",
+    rarity: 1,
+    rarityName: "common",
+    weight: 0.1,
+    value: 5,
+    description: "A terrible shriek fills the dungeon!",
+    hooks: {
+      on_use: (ctx, state) => {
+        const actor = Number(state?.actor || ctx.actor || 0) | 0;
+        ctx.io.emit("scroll:aggravation", { actor });
+        return { consumed: true };
+      },
+    },
+  },
+
+  // ── Genocide ────────────────────────────────────────────────────
+  scroll_genocide: {
+    id: "scroll_genocide",
+    catalogKind: "magic",
+    name: "Scroll of Genocide",
+    type: "scroll",
+    slot: "bag",
+    material: "paper",
+    rarity: 4,
+    rarityName: "epic",
+    weight: 0.1,
+    value: 200,
+    description: "The parchment hums with finality. Name a creature, and it shall cease to exist.",
+    hooks: {
+      on_use: (ctx, state) => {
+        const actor = Number(state?.actor || ctx.actor || 0) | 0;
+        ctx.io.emit("scroll:genocide", { actor });
+        return { consumed: true };
+      },
+    },
+  },
+
+  // ── Teleportation & Polymorph ────────────────────────────────────
+  scroll_teleportation: {
+    id: "scroll_teleportation",
+    catalogKind: "magic",
+    name: "Scroll of Teleportation",
+    type: "scroll",
+    slot: "bag",
+    material: "paper",
+    rarity: 1,
+    rarityName: "common",
+    weight: 0.1,
+    value: 15,
+    description: "Reality lurches. You blink and find yourself somewhere else entirely.",
+    hooks: {
+      on_use: (ctx, state) => {
+        const actor = Number(state?.actor || ctx.actor || 0) | 0;
+        ctx.io.emit("scroll:teleportation", { actor });
+        return { consumed: true };
+      },
+    },
+  },
+  scroll_polymorph: {
+    id: "scroll_polymorph",
+    catalogKind: "magic",
+    name: "Scroll of Polymorph",
+    type: "scroll",
+    slot: "bag",
+    material: "paper",
+    rarity: 4,
+    rarityName: "epic",
+    weight: 0.1,
+    value: 80,
+    description: "The words twist reality itself. Name a creature and watch the nearest foe reshape.",
+    hooks: {
+      on_use: (ctx, state) => {
+        const actor = Number(state?.actor || ctx.actor || 0) | 0;
+        ctx.io.emit("scroll:polymorph", { actor });
+        return { consumed: true };
+      },
+    },
+  },
+
+  // ── Bad Potions ───────────────────────────────────────────────────
+  potion_sickness: {
+    id: "potion_sickness",
+    catalogKind: "magic",
+    name: "Potion of Sickness",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 1,
+    rarityName: "common",
+    value: 5,
+    description: "A foul brew that turns your stomach.",
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [{ type: "damage", amount: 4 }],
+      effects: [
+        { key: "poison", potency: 2, onset: 0, peak: 0, duration: 15, stack: "add", meta: { source: "potion_sickness" } },
+      ],
+      feel: "Your stomach lurches violently.",
+    },
+    hooks: {
+      on_drink: (ctx, state) => {
+        const actor = Number(state?.actor || ctx.actor || 0) | 0;
+        ctx.io.emit("potion:sickness", { actor });
+        return { consumed: true };
+      },
+    },
+  },
+
+  // ── Bad Potions ───────────────────────────────────────────────────
+
+  potion_paralysis: {
+    id: "potion_paralysis",
+    catalogKind: "magic",
+    name: "Potion of Paralysis",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 1,
+    rarityName: "common",
+    value: 5,
+    description: "A thick, syrupy liquid that locks every muscle in place.",
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [
+        { key: "stun", potency: 1, onset: 0, peak: 0, duration: 10, stack: "refresh", maxStacks: 1, meta: { source: "potion_paralysis" } },
+      ],
+      feel: "Your body goes rigid. You can't move!",
+    },
+    hooks: {
+      on_drink: (ctx, state) => {
+        const actor = Number(state?.actor || ctx.actor || 0) | 0;
+        ctx.io.emit("potion:paralysis", { actor });
+        return { consumed: true };
+      },
+    },
+  },
+  potion_hallucination: {
+    id: "potion_hallucination",
+    catalogKind: "magic",
+    name: "Potion of Hallucination",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 1,
+    rarityName: "common",
+    value: 5,
+    description: "A swirling iridescent brew. The walls are breathing.",
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [
+        { key: "hallucinating", potency: 1, onset: 0, peak: 0, duration: 35, stack: "refresh", maxStacks: 1, meta: { source: "potion_hallucination" } },
+      ],
+      feel: "The colours... they're singing.",
+    },
+    hooks: {
+      on_drink: (ctx, state) => {
+        const actor = Number(state?.actor || ctx.actor || 0) | 0;
+        ctx.io.emit("potion:hallucination", { actor });
+        return { consumed: true };
+      },
+    },
+  },
+  potion_blindness: {
+    id: "potion_blindness",
+    catalogKind: "magic",
+    name: "Potion of Blindness",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 1,
+    rarityName: "common",
+    value: 5,
+    description: "A pitch-black draught that steals the light from your eyes.",
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [],
+      feel: "Everything goes dark.",
+    },
+    hooks: {
+      on_drink: (ctx, state) => {
+        const actor = Number(state?.actor || ctx.actor || 0) | 0;
+        const startValue = Number(ctx.query.effectiveVisionRange(actor) || 0);
+        ctx.mutate.pushEffect(actor, {
+          key: "stat_envelope",
+          stat: "visionRange",
+          turnsLeft: 20,
+          potency: 1,
+          startValue,
+          toValue: 0,
+          endValue: startValue,
+          rampIn: 0,
+          hold: 20,
+          rampOut: 0,
+          sourceId: Number(state?.itemId || ctx.primary || 0) | 0,
+          startedAtTurn: Number(ctx.params?.stepHint || 0) | 0,
+          stack: "refresh",
+        });
+        ctx.io.emit("potion:blindness", { actor });
+        return { consumed: true };
+      },
+    },
+  },
+  potion_weakness: {
+    id: "potion_weakness",
+    catalogKind: "magic",
+    name: "Potion of Weakness",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 2,
+    rarityName: "magic",
+    value: 5,
+    description: "A thin grey liquid that drains your life force.",
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [
+        { key: "weakened", potency: 1, onset: 0, peak: 0, duration: 40, stack: "refresh", maxStacks: 1, meta: { source: "potion_weakness" } },
+      ],
+      feel: "Your strength fades. Everything feels heavier.",
+    },
+    hooks: {
+      on_drink: (ctx, state) => {
+        const actor = Number(state?.actor || ctx.actor || 0) | 0;
+        const vit = ctx.query.get(actor, Vitality);
+        if (vit) {
+          vit.maxHp = Math.max(1, (vit.maxHp | 0) - 8);
+          if (vit.hp > vit.maxHp) vit.hp = vit.maxHp;
+        }
+        const stam = ctx.query.get(actor, Stamina);
+        if (stam) {
+          stam.max = Math.max(1, (stam.max | 0) - 8);
+          if (stam.current > stam.max) stam.current = stam.max;
+        }
+        ctx.io.emit("potion:weakness", { actor, hpLost: 8, staminaLost: 8 });
+        return { consumed: true };
+      },
+    },
+  },
+  potion_confusion: {
+    id: "potion_confusion",
+    catalogKind: "magic",
+    name: "Potion of Confusion",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 1,
+    rarityName: "common",
+    value: 5,
+    description: "A fizzing, disorienting concoction.",
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [
+        { key: "confused", potency: 1, onset: 0, peak: 0, duration: 15, stack: "refresh", maxStacks: 1, meta: { source: "potion_confusion" } },
+      ],
+      feel: "Which way is up? You can't tell anymore.",
+    },
+    hooks: {
+      on_drink: (ctx, state) => {
+        const actor = Number(state?.actor || ctx.actor || 0) | 0;
+        ctx.io.emit("potion:confusion", { actor });
+        return { consumed: true };
+      },
+    },
+  },
+
+  // ── Bad Scrolls (new) ──────────────────────────────────────────────
+
+  scroll_cursing: {
+    id: "scroll_cursing",
+    catalogKind: "magic",
+    name: "Scroll of Cursing",
+    type: "scroll",
+    slot: "bag",
+    material: "paper",
+    rarity: 2,
+    rarityName: "magic",
+    weight: 0.1,
+    value: 5,
+    description: "Dark words slither off the page and weld your gear to your body.",
+    hooks: {
+      on_use: (ctx, state) => {
+        const actor = Number(state?.actor || ctx.actor || 0) | 0;
+        const equip = ctx.query.get(actor, Equipment);
+        let cursed = 0;
+        if (equip) {
+          for (const slot of GEAR_SLOTS) {
+            const itemId = equip[slot];
+            if (!(itemId > 0)) continue;
+            const beat = ctx.query.get(itemId, Beatitude);
+            if (beat && beat.state === 'cursed') continue;
+            cursed++;
+            ctx.io.emit("curse:equipment", { actor, itemId, source: "scroll_cursing" });
+            if (cursed >= 3) break;
+          }
+        }
+        ctx.io.emit("scroll:cursing", { actor, count: cursed });
+        return { consumed: true };
+      },
+    },
+  },
+  scroll_summoning: {
+    id: "scroll_summoning",
+    catalogKind: "magic",
+    name: "Scroll of Summoning",
+    type: "scroll",
+    slot: "bag",
+    material: "paper",
+    rarity: 2,
+    rarityName: "magic",
+    weight: 0.1,
+    value: 5,
+    description: "The words screech and claw shapes pour from the parchment.",
+    hooks: {
+      on_use: (ctx, state) => {
+        const actor = Number(state?.actor || ctx.actor || 0) | 0;
+        ctx.io.emit("scroll:summoning", { actor });
+        return { consumed: true };
+      },
+    },
+  },
+  scroll_decay: {
+    id: "scroll_decay",
+    catalogKind: "magic",
+    name: "Scroll of Decay",
+    type: "scroll",
+    slot: "bag",
+    material: "paper",
+    rarity: 1,
+    rarityName: "common",
+    weight: 0.1,
+    value: 5,
+    description: "The scroll crumbles and a wave of rot spreads through your pack.",
+    hooks: {
+      on_use: (ctx, state) => {
+        const actor = Number(state?.actor || ctx.actor || 0) | 0;
+        ctx.io.emit("scroll:decay", { actor });
+        return { consumed: true };
+      },
+    },
+  },
+
+  // ── Cursed Amulets ─────────────────────────────────────────────────
+
+  amulet_strangulation: {
+    id: "amulet_strangulation",
+    catalogKind: "equipment",
+    name: "Amulet of Strangulation",
+    type: "equip",
+    slot: "neck",
+    material: "iron",
+    rarity: 2,
+    rarityName: "magic",
+    bonuses: { maxHp: -3 },
+    beatitude: "cursed",
+    description: "The chain tightens around your throat. You can feel it constricting.",
+  },
+  amulet_aggravation: {
+    id: "amulet_aggravation",
+    catalogKind: "equipment",
+    name: "Amulet of Aggravation",
+    type: "equip",
+    slot: "neck",
+    material: "bone",
+    rarity: 2,
+    rarityName: "magic",
+    bonuses: { defense: -1 },
+    beatitude: "cursed",
+    description: "A crude fetish of yellowed bone. Everything in the dungeon knows exactly where you are.",
+  },
+
+  // ── Cursed Rings (new) ─────────────────────────────────────────────
+
+  ring_fragility: {
+    id: "ring_fragility",
+    catalogKind: "equipment",
+    name: "Ring of Fragility",
+    type: "equip",
+    slot: "ring",
+    material: "glass",
+    rarity: 2,
+    rarityName: "magic",
+    bonuses: { defense: -3, bluntResist: -0.15, slashResist: -0.15 },
+    beatitude: "cursed",
+    description: "A brittle glass ring. Your skin feels paper-thin.",
+  },
+  ring_mana_drain: {
+    id: "ring_mana_drain",
+    catalogKind: "equipment",
+    name: "Ring of Mana Drain",
+    type: "equip",
+    slot: "ring",
+    material: "lead",
+    rarity: 2,
+    rarityName: "magic",
+    bonuses: { manaRegen: -1.0, maxMana: -10 },
+    beatitude: "cursed",
+    description: "A dull leaden band that devours arcane energy. Your spells wither on your tongue.",
+  },
+
+  food_mushrooms: {
+    id: "food_mushrooms",
+    catalogKind: "food",
+    name: "Dungeon Mushrooms",
+    type: "food",
+    slot: "bag",
+    material: "organic",
+    rarity: 1,
+    rarityName: "common",
+    weight: 0.15,
+    value: 3,
+    description: "Pale mushrooms from the dungeon depths. Probably safe.",
+    hooks: {
+      on_use: (ctx, state) => {
+        const result = EAT_ON_USE(ctx, state);
+        const actor = Number(state?.actor || ctx.actor || 0) | 0;
+        ctx.mutate.pushEffect(actor, {
+          key: "hallucinating",
+          turnsLeft: 30,
+          potency: 1,
+          stacks: 1,
+        });
+        ctx.mutate.pushEffect(actor, {
+          key: "berserk",
+          turnsLeft: 30,
+          potency: 1,
+          stacks: 1,
+        });
+        ctx.io.emit("mushroom:hallucinate", { actor });
+        return result;
+      },
+    },
+  },
+
+};

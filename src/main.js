@@ -110,7 +110,7 @@ import { Interactable } from "./rules/components/Interactable.js";
 import { Faction } from "./rules/components/Faction.js";
 import { TombstoneRepository } from "./rules/repositories/TombstoneRepository.js";
 import { installTombstoneDeathListener } from "./rules/systems/tombstoneSystem.js";
-import TombstoneComponent from "./rules/components/Tombstone.js";
+import { Tombstone as TombstoneComponent } from "./rules/components/Tombstone.js";
 import { installDeathShareWiring } from "./main/wiring/deathShareWiring.js";
 import { installProofWiring } from "./main/proof/proofWiring.js";
 import { postVerifiedScore } from "./shared/tombstoneApi.js";
@@ -643,6 +643,12 @@ const throwFx = createThrowFxController({
 
 const weatherFx = createWeatherFxController();
 const lightingEngine = createLightingEngine();
+
+// Dirty-field tracking for lighting engine — detect player/world changes
+// between frames so we only rebuild what actually changed.
+let _prevLightPX = -1, _prevLightPY = -1;    // player tile position
+let _prevLightFDX = 0, _prevLightFDY = 0;    // player facing direction
+let _prevLightStep = -1;                      // last world.step we saw
 
 function getTargetedSpellConfig(spellId) {
   return TARGETED_SPELL_CONFIG[String(spellId || "").toLowerCase()] || null;
@@ -1270,6 +1276,16 @@ window.dispatchEvent(new CustomEvent('debug:registerEconomySampler', {
         if ((ds.currentDepth || 0) !== 0) return null;
       }
       return getTownEconomyData(world);
+    }
+  }
+}));
+
+// Register lighting engine perf sampler for the debug graph (Shift+5).
+window.dispatchEvent(new CustomEvent('debug:registerLightingPerfSampler', {
+  detail: {
+    sampler: () => {
+      if (!lightingEngine || typeof lightingEngine.getLastFrameStats !== 'function') return null;
+      return lightingEngine.getLastFrameStats();
     }
   }
 }));
@@ -2202,16 +2218,24 @@ function lootRarityColorHex(itemInfo) {
 
 /** @type {Map<number, {fromX:number,fromY:number,toX:number,toY:number,start:number,duration:number,peak:number}>} */
 const _deathLootArcs = new Map();
+/** @type {Map<number, number>} target entity → projectile delay (seconds) for loot arc offset */
+const _pendingProjectileDelay = new Map();
+world.on("damaged", ({ target, projectileDelay }) => {
+  const tid = Number(target || 0) | 0;
+  const d = Number(projectileDelay || 0);
+  if (tid > 0 && d > 0) _pendingProjectileDelay.set(tid, d);
+  else if (tid > 0) _pendingProjectileDelay.delete(tid);
+});
 
 function seededUnit(seed) {
   const s = (Math.imul((seed | 0) ^ 0x9e3779b9, 0x85ebca6b) ^ 0xc2b2ae35) >>> 0;
   return (s & 0xffff) / 0xffff;
 }
 
-function scheduleDeathLootArc(itemId, origin, at) {
+function scheduleDeathLootArc(itemId, origin, at, delayOffset) {
   const id = Number(itemId || 0) | 0;
   if (!(id > 0)) return;
-  const fx = _fxTime;
+  const fx = _fxTime + (Number(delayOffset) || 0);
   const fromX = Number(origin?.x);
   const fromY = Number(origin?.y);
   const toX = Number(at?.x);
@@ -2252,9 +2276,18 @@ function deathLootArcPos(itemId) {
   };
 }
 
-world.on("item:dropped", ({ itemId, source, origin, at }) => {
-  if (String(source || "") !== "death") return;
-  scheduleDeathLootArc(itemId, origin, at);
+world.on("item:dropped", ({ itemId, actor, source, origin, at, targetId }) => {
+  const src = String(source || "");
+  if (src === "death") {
+    const actorId = Number(actor || 0) | 0;
+    const delay = actorId > 0 ? (_pendingProjectileDelay.get(actorId) || 0) : 0;
+    scheduleDeathLootArc(itemId, origin, at, delay);
+  } else if (src === "chest") {
+    const chestId = Number(targetId || 0) | 0;
+    const chestPos = chestId > 0 ? world.get(chestId, Position) : null;
+    const o = origin || (chestPos ? { x: chestPos.x | 0, y: chestPos.y | 0 } : null);
+    if (o) scheduleDeathLootArc(itemId, o, at, 0);
+  }
 });
 
 world.on("chest:burst", ({ actor, targetId, origin, drops }) => {
@@ -3692,6 +3725,7 @@ world.on('dungeon:transitioned', () => {
   fx.pool.count = 0;
   _roofParticleStamp.clear();
   _roofSmokeParticleStamp.clear();
+  if (lightingEngine) lightingEngine.invalidateAll();
 });
 const getPosition = (id) => world.get(Number(id || 0), Position) || null;
 const isPetEntity = (id) => world.has(Number(id || 0), Pet);
@@ -3949,6 +3983,7 @@ const {
   cloudFx,
   surfaceAreaFx,
   ftext,
+  goreTick,
 } = displayRuntime;
 const flyingFx = createFlyingFxController(world);
 flyingFx.installListeners();
@@ -5807,6 +5842,30 @@ function render(worldView) {
     const _roofMask = worldView.isOverworld ? isRoofed : null;
     const _visionDef = getVisionDef();
     const _lightOpaque = worldView.isBlockedVision || isOpaque;
+
+    // Dirty-field: detect player movement / facing change → invalidate vision.
+    // Detect game-step advance → invalidate geometry (handles pickaxe, doors, etc.)
+    {
+      const pp = worldView.player?.pos;
+      const pf = worldView.playerFacing;
+      const px = pp ? pp.x : -1, py = pp ? pp.y : -1;
+      const fdx = pf ? pf.dx : 0, fdy = pf ? pf.dy : 0;
+      const step = world.step || 0;
+      if (px !== _prevLightPX || py !== _prevLightPY
+        || fdx !== _prevLightFDX || fdy !== _prevLightFDY) {
+        lightingEngine.invalidateVision();
+        _prevLightPX = px; _prevLightPY = py;
+        _prevLightFDX = fdx; _prevLightFDY = fdy;
+      }
+      // Any game step could change geometry (pickaxe, door, meteor) — invalidate
+      // the SDF once per step so we don't miss structural changes.
+      if (step !== _prevLightStep) {
+        lightingEngine.invalidateGeometry();
+        lightingEngine.invalidateSurface();
+        _prevLightStep = step;
+      }
+    }
+
     lightingEngine.render(
       bctx,
       _lights,
@@ -5964,7 +6023,7 @@ function frame(now) {
   // Advance display-only systems (fx.step moved below — needs worldView for emitter origins)
   updateCamera(cam, dtSec);
   updateShake(cam, dtSec);
-  tickDisplayEffects({ dtSec, boltFx, spellAreaFx, projectileFx, throwFx, cloudFx, ftext });
+  tickDisplayEffects({ dtSec, boltFx, spellAreaFx, projectileFx, throwFx, cloudFx, ftext, goreTick });
   delayedDeathFx.tick(dtSec);
   flyingFx.tick(dtSec);
   sceneRuntime.tick(dtSec);

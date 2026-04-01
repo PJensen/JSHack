@@ -1,13 +1,14 @@
 /**
  * Advance display-only effect lifetimes.
  */
-export function tickDisplayEffects({ dtSec, boltFx, spellAreaFx, projectileFx, throwFx, cloudFx, ftext }) {
+export function tickDisplayEffects({ dtSec, boltFx, spellAreaFx, projectileFx, throwFx, cloudFx, ftext, goreTick }) {
   boltFx.tick(dtSec);
   spellAreaFx.tick(dtSec);
   projectileFx.tick(dtSec);
   throwFx.tick(dtSec);
   cloudFx.tick(dtSec);
   ftext.step(dtSec);
+  if (goreTick) goreTick();
 }
 
 /**
