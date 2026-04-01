@@ -10,6 +10,19 @@ import { installPetUiBridge } from "./petUiBridge.js";
 
 const _installed = Symbol.for('jshack:display:floatTextWiring:installed');
 
+// ── Cooldown gate for non-damage float text ──────────────────────────
+// Prevents spammy repeated messages (e.g. "out of stamina" every failed swing).
+// Key = event tag, value = timestamp of last shown float.
+const _cooldowns = new Map();
+/** Returns true if the event should be shown (cooldown expired). */
+function _throttle(tag, cooldownMs = 3000) {
+  const now = Date.now();
+  const last = _cooldowns.get(tag) || 0;
+  if (now - last < cooldownMs) return false;
+  _cooldowns.set(tag, now);
+  return true;
+}
+
 const _staminaLines = [
   'Too exhausted!',
   'Your arms feel heavy...',
@@ -123,7 +136,8 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     const apos = getPosition(Number(actor || 0));
     const tpos = getPosition(Number(target || 0));
     if (!apos || !canShowAt(apos.x, apos.y)) return;
-    ftext.addStatus(apos.x, apos.y - 0.3, 'LIFESTEAL', { color: '#ff4040', life: 0.6 });
+    if (_throttle(`vampiric:${actor}`, 3000))
+      ftext.addStatus(apos.x, apos.y - 0.3, 'LIFESTEAL', { color: '#ff4040', life: 0.6 });
     if (tpos) {
       const dx = apos.x - tpos.x, dy = apos.y - tpos.y;
       const dist = Math.hypot(dx, dy) || 1;
@@ -146,7 +160,8 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
   world.on('proc:thorns', ({ actor, target }) => {
     const tpos = getPosition(Number(target || 0));
     if (!tpos || !canShowAt(tpos.x, tpos.y)) return;
-    ftext.addStatus(tpos.x, tpos.y - 0.3, 'THORNS', { color: '#78ff78', life: 0.6 });
+    if (_throttle(`thorns:${target}`, 3000))
+      ftext.addStatus(tpos.x, tpos.y - 0.3, 'THORNS', { color: '#78ff78', life: 0.6 });
     for (let i = 0; i < 5; i++) {
       const angle = Math.random() * Math.PI * 2;
       const spd = 0.8 + Math.random() * 0.6;
@@ -165,7 +180,8 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
   world.on('proc:burning', ({ actor, target }) => {
     const tpos = getPosition(Number(target || 0));
     if (!tpos || !canShowAt(tpos.x, tpos.y)) return;
-    ftext.addStatus(tpos.x, tpos.y - 0.3, 'BURNING', { color: '#ff6600', life: 0.6 });
+    if (_throttle(`burning:${target}`, 3000))
+      ftext.addStatus(tpos.x, tpos.y - 0.3, 'BURNING', { color: '#ff6600', life: 0.6 });
     for (let i = 0; i < 8; i++) {
       const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 0.6;
       const spd = 0.6 + Math.random() * 0.8;
@@ -298,11 +314,13 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
   // ── Combat text ─────────────────────────────────────────────────────
 
   world.on('ranged:no-ammo', ({ attacker }) => {
+    if (!_throttle('no-ammo', 4000)) return;
     const pos = getPosition(Number(attacker || 0));
     if (pos && canShowAt(pos.x, pos.y)) ftext.addStatus(pos.x, pos.y, 'NO AMMO', { style: 'status' });
   });
 
   world.on('attack:insufficient-stamina', ({ attacker }) => {
+    if (!_throttle('stamina', 4000)) return;
     const pos = getPosition(Number(attacker || 0));
     if (pos && canShowAt(pos.x, pos.y)) {
       const line = _staminaLines[Math.floor(Math.random() * _staminaLines.length)];
