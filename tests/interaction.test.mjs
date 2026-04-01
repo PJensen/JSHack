@@ -141,30 +141,48 @@ Deno.test("open chest spills items and emits chest:burst event", () => {
   }
 });
 
-Deno.test("chest remains interactable after opening", () => {
+Deno.test("burst chest is consumed after opening", () => {
   const world = new World({ seed: 1 });
 
   const actor = world.create();
   const chest = world.create();
   world.add(chest, Interactable, { action: "openChest", params: {} });
+  world.add(chest, Collider, { solid: true, blocksSight: false });
+  world.add(chest, Inventory, { capacity: 20 });
+  world.add(chest, Position, { x: 4, y: 9 });
+  const ci = world.create();
+  world.add(ci, ItemInfo, { type: "equip", count: 1 });
+  addToInventory(world, chest, ci);
+
+  world.add(actor, InteractIntent, { targetId: chest });
+  interactionSystem(world);
+
+  assertEquals(world.has(chest, Interactable), false, "burst chest should stop being interactable");
+  assertEquals(world.has(chest, Collider), false, "burst chest should stop blocking bump movement");
+});
+
+Deno.test("inventory chest mode keeps UI chest behavior", () => {
+  const world = new World({ seed: 1 });
+
+  const actor = world.create();
+  const chest = world.create();
+  world.add(chest, Interactable, { action: "openChest", params: { inventoryChest: true } });
+  world.add(chest, Collider, { solid: true, blocksSight: false });
   world.add(chest, Inventory, { capacity: 20 });
   world.add(chest, Position, { x: 4, y: 9 });
 
-  // Open chest twice
-  let emptyCount = 0;
-  world.on("chest:empty", () => {
-    emptyCount += 1;
-  });
-  world.add(actor, InteractIntent, { targetId: chest });
-  interactionSystem(world);
+  let openCount = 0;
+  let burstCount = 0;
+  world.on("chest:open", () => { openCount += 1; });
+  world.on("chest:burst", () => { burstCount += 1; });
+
   world.add(actor, InteractIntent, { targetId: chest });
   interactionSystem(world);
 
-  assert(
-    world.has(chest, Interactable),
-    "chest should still be interactable after multiple opens",
-  );
-  assertEquals(emptyCount, 2, "empty chest should report empty on interaction");
+  assertEquals(openCount, 1, "inventory chest should emit chest:open");
+  assertEquals(burstCount, 0, "inventory chest should not burst-spill");
+  assertEquals(world.has(chest, Interactable), true, "inventory chest should remain interactable");
+  assertEquals(world.has(chest, Collider), true, "inventory chest should remain collidable");
 });
 
 Deno.test("chest:burst event includes dropped ids and chest inventory empties", () => {

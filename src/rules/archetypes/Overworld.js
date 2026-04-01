@@ -25,7 +25,7 @@ export const HomeChest = defineArchetype(
   [Material, { kind: "wood" }],
   [Collider, { solid: true, blocksSight: false }],
   [Inventory, { capacity: 60 }],
-  [Interactable, { action: "openChest", params: null }],
+  [Interactable, { action: "openChest", params: { inventoryChest: true } }],
 );
 
 export const HomeSign = defineArchetype(
