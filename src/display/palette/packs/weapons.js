@@ -11,7 +11,15 @@ export const weapons = {
   bow_mirror:         { glyph:"}",  fg:"#d0d8e8", glow:"#a0a8b8" },
   longsword:          { glyph:"/",  fg:"#c8cce0", glow:"#9098b8" },
   iron_mace:          { glyph:")",  fg:"#9090a0", glow:"#707080" },
-  morningstar:        { glyph:")",  fg:"#b8b2c2", glow:"#8b8398" },
+  morningstar:        {
+    glyph: ")",
+    fg: "#c5bebe",
+    glow: "#aaaaaa",
+    layers: [
+      { glyph: ")", fg: "#4e2c2c", glow: "#aaaaaa", dx: 0.04, dy: 0.2 },
+      { glyph: "*", fg: "#c5bebe", glow: "#aaaaaa", dx: -0.04, dy: -0.02 },
+    ]
+  },
   warhammer:          { glyph:"T",  fg:"#a8a0b8", glow:"#706880" },
   flail:              { glyph:")",  fg:"#a59aa8", glow:"#746b80" },
   venomfang_dagger:   { glyph:")",  fg:"#98e070", glow:"#63c44c" },
