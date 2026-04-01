@@ -185,6 +185,25 @@ function holy(t, id) {
   return out(v, 0.02, 0.01, 0);
 }
 
+/**
+ * Void — slow, predatory hunger. Light-devouring darkness that breathes.
+ * Irregular rhythm with occasional deep gulps where the void swallows harder.
+ * Good for voidstone, shadow lich aura, dark artifacts, void spell scars.
+ * Range: 0.7 – 1.1 (applied to negative color, so higher = more darkness).
+ */
+function voidPattern(t, id) {
+  const p = id * 0.77;
+  const base = 0.85
+    + 0.10 * Math.sin(t * 0.7 + p)
+    + 0.06 * Math.sin(t * 1.3 + p * 1.5);
+  // Occasional deep gulp — the void inhales
+  const gulpCycle = (t * 0.18 + id * 0.43) % 1.0;
+  const gulp = gulpCycle > 0.88 ? (gulpCycle - 0.88) / 0.12 : 0;
+  const gulpShape = gulp * gulp * (3 - 2 * gulp);  // smoothstep
+  const v = base + gulpShape * 0.25;
+  return out(v, 0, 0, 0);
+}
+
 // ---- Registry -------------------------------------------------------------
 
 /** @type {Record<string, (t:number, id:number) => PatternResult>} */
@@ -199,6 +218,7 @@ const PATTERNS = {
   heartbeat,
   candle,
   holy,
+  void: voidPattern,
 };
 
 /**

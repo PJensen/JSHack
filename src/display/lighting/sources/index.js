@@ -87,6 +87,31 @@ function emitPatterned(out, pattern, t, id, x, y, baseRadius, baseColor, softnes
   });
 }
 
+/**
+ * Emit a void (negative) light — actively devours illumination.
+ * Color values are inverted: the engine accumulates them as subtractive.
+ * The 'void' temporal pattern drives the breathing darkness.
+ *
+ * @param {LightDef[]} out
+ * @param {number} t — fxTime
+ * @param {number} id — entity id
+ * @param {number} x @param {number} y
+ * @param {number} radius — how far the darkness reaches
+ * @param {number} strength — 0-1 how aggressively it eats light (1 = full black hole)
+ * @param {number} softness
+ */
+function emitVoid(out, t, id, x, y, radius, strength, softness) {
+  const p = evaluatePattern('void', t, id);
+  const s = strength * p.intensity;
+  // Negative RGB — the engine subtracts these from the light buffers
+  out.push({
+    x, y,
+    radius,
+    color: [-255 * s, -255 * s, -255 * s],
+    softness,
+  });
+}
+
 /** Legacy shim — delegates to the 'torch' temporal pattern.  */
 function torchFlicker(t, id) {
   return evaluatePattern('torch', t, id).intensity;
@@ -259,6 +284,7 @@ export function collectLightSources(view, opts = {}) {
         emitPatterned(out, 'pulse', t, e.id, ex, ey, 3, CAUSTIC_LIME, 6);
       } else if (tags.includes('agony')) {
         emitPatterned(out, 'occult', t, e.id, ex, ey, 3, SHADOW_PURPLE, 8);
+        emitVoid(out, t, e.id, ex, ey, 2.5, 0.35, 10);  // shadow magic drinks nearby light
       } else if (tags.includes('legendary_glowing')) {
         emitPatterned(out, 'pulse', t, e.id, ex, ey, 5, paletteGlow('legendary_chest') || LANTERN_GOLD, 10);
       } else if (tags.includes('glowing')) {
@@ -285,6 +311,12 @@ export function collectLightSources(view, opts = {}) {
       // Burning entities — fire light that reads as something on fire
       if (tags.includes('burning')) {
         emitPatterned(out, 'ember', t, e.id, ex, ey, 3.5, FIRE_RED, 12);
+      }
+      // Void aura — entities that actively devour light.
+      // shadow_glowing: shadow creatures, void weapons, dark artifacts
+      // The darkness has soft edges (softness 12) so it bleeds around corners.
+      if (tags.includes('shadow_glowing')) {
+        emitVoid(out, t, e.id, ex, ey, 3.5, 0.8, 12);
       }
 
       // Floating eye gaze beams — directional cone from eye toward player.
