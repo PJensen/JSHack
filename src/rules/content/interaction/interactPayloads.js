@@ -494,11 +494,20 @@ export const INTERACT_PAYLOADS = {
 
   openChest: {
     onInteract(ctx) {
-      const { world, actor, targetId } = ctx;
+      const { world, actor, targetId, params } = ctx;
       if (!world.has(targetId, Inventory)) return;
+      const useInventoryUi = !!(
+        params?.inventoryChest
+        || params?.legacyInventory
+        || String(params?.mode || "") === "inventory"
+      );
       const chestItems = inventoryItems(world, targetId);
-      if (!chestItems.length) {
-        world.emit?.("chest:empty", { actor, targetId });
+      if (useInventoryUi) {
+        world.emit?.("chest:open", {
+          actor,
+          targetId,
+          chestItems: chestItems.slice(),
+        });
         return;
       }
       const chestPos = world.get(targetId, Position);
@@ -509,6 +518,15 @@ export const INTERACT_PAYLOADS = {
           targetId,
           chestItems: chestItems.slice(),
         });
+        return;
+      }
+      const consumeChestShell = () => {
+        try { if (world.has(targetId, Interactable)) world.remove(targetId, Interactable); } catch {}
+        try { if (world.has(targetId, Collider)) world.remove(targetId, Collider); } catch {}
+      };
+      if (!chestItems.length) {
+        world.emit?.("chest:empty", { actor, targetId });
+        consumeChestShell();
         return;
       }
 
@@ -547,6 +565,7 @@ export const INTERACT_PAYLOADS = {
         origin: { x: chestPos.x | 0, y: chestPos.y | 0 },
         drops,
       });
+      consumeChestShell();
     },
   },
 

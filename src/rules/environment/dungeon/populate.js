@@ -1808,6 +1808,8 @@ export function materializeSpawn(world, spawn) {
     }
     case 'chest': {
       const id = createFrom(world, Chest, { x: spawn.x, y: spawn.y });
+      world.add(id, Collider, { solid: true, blocksSight: false });
+      world.add(id, Interactable, { action: "openChest", params: spawn.params?.interact ?? null });
       // Pre-populate chest inventory from loot table
       const lootTable = spawn.params.lootTable || 'chest:basic';
       // Set identity to reflect rarity tier so palette and glow effects can key off it
