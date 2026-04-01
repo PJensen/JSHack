@@ -4504,7 +4504,11 @@ function lootLabelColorFromTags(tags) {
   return "#cfd7e6";
 }
 
-function lootLabelFromKind(kind) {
+function lootLabelFromKind(kind, itemId = 0) {
+  if ((itemId | 0) > 0) {
+    const resolved = String(resolveItemDisplayName(world, itemId) || "").trim();
+    if (resolved) return resolved;
+  }
   const key = String(kind || "item").trim().toLowerCase();
   if (!key) return "Loot";
   if (key.includes("gold")) return "Gold";
@@ -5388,7 +5392,7 @@ function render(worldView) {
           id: itemRender.id,
           x: itemRender.pos.x,
           y: itemRender.pos.y,
-          text: lootLabelFromKind(itemRender.kind),
+          text: lootLabelFromKind(itemRender.kind, itemRender.id),
           color: lootLabelColorFromTags(itemRender.tags),
         });
       }
