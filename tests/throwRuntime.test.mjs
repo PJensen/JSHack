@@ -1,6 +1,8 @@
 import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";
+import { createFrom } from "../src/lib/ecs-js/archetype.js";
 import { buildCatalogItem } from "../src/rules/data/itemCatalogLoader.js";
+import { Bone } from "../src/rules/archetypes/Items.js";
 import { Inventory } from "../src/rules/components/Inventory.js";
 import { Faction } from "../src/rules/components/Faction.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
@@ -171,6 +173,48 @@ Deno.test("throw runtime weapon impacts hostile entity on landing tile", () => {
 
   const vit = world.get(target, Vitality);
   assert(vit.hp < 12, "thrown weapon should reduce target hp");
+});
+
+Deno.test("throw runtime bones impact hostile entity on landing tile", () => {
+  const world = new World({ seed: 7110 });
+  const actor = world.create();
+  world.add(actor, Inventory, { items: [], maxWeight: 999 });
+  world.add(actor, Position, { x: 10, y: 10 });
+  world.add(actor, Faction, { key: "player" });
+
+  const target = world.create();
+  world.add(target, Position, { x: 12, y: 10 });
+  world.add(target, Vitality, { hp: 12, maxHp: 12 });
+  world.add(target, Faction, { key: "enemy" });
+
+  const bone = createFrom(world, Bone, {});
+  addToInventory(world, actor, bone);
+
+  const impacts = [];
+  const damaged = [];
+  const results = [];
+  world.on("item:throw-impact", (ev) => impacts.push(ev));
+  world.on("damaged", (ev) => damaged.push(ev));
+  world.on("interaction:result", (ev) => results.push(ev));
+
+  world.add(actor, ThrowIntent, { itemId: bone, x: 12, y: 10 });
+  throwSystem(world);
+
+  assertEquals(results.length, 1);
+  assertEquals(results[0].verb, "throw");
+  assertEquals(results[0].ok, true);
+  assertEquals(results[0].metrics.impacted, true);
+  assert(results[0].metrics.impactDamage > 0, "bone impact damage should be recorded");
+
+  assertEquals(impacts.length, 1);
+  assertEquals(impacts[0].actor, actor);
+  assertEquals(impacts[0].itemId, bone);
+  assertEquals(impacts[0].targetId, target);
+  assert(impacts[0].damage > 0, "bone throw impact event should include positive damage");
+  assert((damaged[0]?.projectileDelay || 0) > 0, "thrown bone impact damage should carry projectileDelay");
+
+  const vit = world.get(target, Vitality);
+  assert(vit.hp < 12, "thrown bones should reduce target hp");
 });
 
 Deno.test("throw runtime invokes ScriptVerb.ItemThrow with throw context", () => {

@@ -117,8 +117,11 @@ function normalizeThrowSpec(input, actorPos, weight) {
 
 /**
  * @param {any} info
+ * @param {string} identity
  */
-function isThrowableWeapon(info) {
+function canDealThrowImpactDamage(info, identity) {
+  const normalizedIdentity = String(identity || "").toLowerCase();
+  if (normalizedIdentity === "bone") return true;
   return String(info?.type || "") === "equip" && String(info?.slot || "") === "weapon";
 }
 
@@ -299,7 +302,7 @@ export function throwPipeline(ctx) {
     const landing = normalizePoint(hookResult.at, throwSpec.to);
     let impact = null;
 
-    if (isThrowableWeapon(info)) {
+    if (canDealThrowImpactDamage(info, identity)) {
       const defender = resolveThrowImpactTarget(ctx, actor, targetId, landing);
       if (defender > 0) {
         const af = ctx.query.get(actor, Faction)?.key || "";

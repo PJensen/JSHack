@@ -169,6 +169,7 @@ export const Bone = defineArchetype(
     "Bone",
     [ItemInfo, {
         type: "misc",
+        damageDice: "1d4",
         description: "A bleached bone from an undead skeleton.",
         weight: 1,
         value: 3,
