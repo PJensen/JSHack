@@ -310,21 +310,56 @@ export function collectLightSources(view, opts = {}) {
       if (!visibleIds.has(eyeId)) _gazeBeams.delete(eyeId);
     }
   }
-  if (_gazeBeams.size > 0) {
+  if (view.player && _gazeBeams.size > 0) {
+    const px = view.player.pos.x + 0.5, py = view.player.pos.y + 0.5;
     for (const [, gb] of _gazeBeams) {
       const progress = Math.min(1, gb.charge / Math.max(1, gb.total));
-      // Radius grows with charge: 2 at start → 4 at full
-      const radius = 2 + progress * 2;
-      // Intensity builds with charge — occult pattern for unsettling rhythm
-      const p = evaluatePattern('occult', t, (gb.ex * 73 + gb.ey * 37) | 0);
-      const baseInt = 0.5 + progress * 0.5;
+      // Occult temporal pattern for unsettling rhythm
+      const pSeed = (gb.ex * 73 + gb.ey * 37) | 0;
+      const p = evaluatePattern('occult', t, pSeed);
+      const baseInt = 0.7 + progress * 0.5;
       const intensity = baseInt * p.intensity;
-      const col = [
-        Math.min(255, GAZE_VIOLET[0] * intensity),
-        Math.min(255, GAZE_VIOLET[1] * intensity),
-        Math.min(255, GAZE_VIOLET[2] * intensity),
+
+      // Hot source glow at the eye — grows with charge, overdriven
+      const eyeRadius = 1.5 + progress * 2.0;
+      const eyeCol = [
+        Math.min(255, GAZE_VIOLET[0] * intensity * 1.6),
+        Math.min(255, GAZE_VIOLET[1] * intensity * 1.6),
+        Math.min(255, GAZE_VIOLET[2] * intensity * 1.6),
       ];
-      out.push({ x: gb.ex, y: gb.ey, radius, color: col, softness: 6 });
+      out.push({ x: gb.ex, y: gb.ey, radius: eyeRadius, color: eyeCol, softness: 10 });
+
+      // Light beam — tight half-tile-wide beam, high intensity.
+      // Radius 0.5 tiles per sample, spaced every 0.5 tiles so they
+      // overlap into a continuous ~½ tile wide laser line.
+      const dx = px - gb.ex, dy = py - gb.ey;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < 0.5) continue;  // too close, skip beam
+      const nx = dx / dist, ny = dy / dist;
+      const spacing = 0.5;
+      const steps = Math.min(24, Math.floor(dist / spacing));
+      const beamRadius = 0.5;
+      for (let s = 1; s <= steps; s++) {
+        const frac = (s * spacing) / dist;
+        // Barely fades along length — stays hot all the way
+        const falloff = 1.0 - frac * 0.15;
+        const bInt = intensity * falloff * 1.4;
+        // Per-sample shimmer — offset the occult pattern per step
+        const sp = evaluatePattern('occult', t, pSeed + s * 17);
+        const shimmer = 0.88 + 0.12 * sp.intensity;
+        const bi = bInt * shimmer;
+        out.push({
+          x: gb.ex + nx * s * spacing,
+          y: gb.ey + ny * s * spacing,
+          radius: beamRadius,
+          color: [
+            Math.min(255, GAZE_VIOLET[0] * bi),
+            Math.min(255, GAZE_VIOLET[1] * bi),
+            Math.min(255, GAZE_VIOLET[2] * bi),
+          ],
+          softness: 4,
+        });
+      }
     }
   }
 
