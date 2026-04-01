@@ -50,7 +50,7 @@ import { shouldSuppressRecentPickupChipForEquippedDuplicate } from "./main/ui/qu
 import { createThrowFxController } from "./display/fx/throwFxController.js";
 import { createWeatherFxController } from "./display/fx/weatherFx.js";
 import { createLightingEngine } from "./display/lighting/engine.js";
-import { collectLightSources, collectFxLights, computeAmbient, getVisionDef } from "./display/lighting/sources/index.js";
+import { collectLightSources, collectFxLights, computeAmbient, getVisionDef, installLightEventListeners } from "./display/lighting/sources/index.js";
 import { drawProcStateBadges, getProcStateVisual, procBadgeWorldCenter } from "./display/fx/procStateGlyphs.js";
 import { readRuntimeConfig } from "./main/config/runtimeConfig.js";
 import { createMessageLog } from "./main/ui/messageLog.js";
@@ -3987,6 +3987,9 @@ const {
 } = displayRuntime;
 const flyingFx = createFlyingFxController(world);
 flyingFx.installListeners();
+
+// Wire transient lighting effects (gaze beams, chest blooms, etc.)
+installLightEventListeners(world, getPosition);
 
 // ---- Visual mappings (display contract) ------------------------------------
 const palette = buildPalette();

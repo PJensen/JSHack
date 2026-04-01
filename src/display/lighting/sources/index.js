@@ -45,6 +45,19 @@ const VENOM_GREEN  = [120, 255, 80];    // venom / poison glow
 const HOLY_GOLD    = [255, 240, 180];   // invulnerable / divine
 const CAUSTIC_LIME = [180, 255, 60];    // caustic effects
 const SHADOW_PURPLE = [160, 80, 220];   // shadow / agony magic
+const GAZE_VIOLET   = [220, 80, 255];  // floating eye gaze beam
+const CHEST_GOLD    = [255, 230, 140];  // chest reveal bloom
+
+// ---- Transient light state (event-driven) --------------------------------
+
+// Floating eye gaze beams — tracked per eye entity ID.
+// Each entry stores the eye position and charge progress (0–1).
+/** @type {Map<number, {ex:number, ey:number, charge:number, total:number}>} */
+const _gazeBeams = new Map();
+
+// Chest reveal blooms — brief one-shot flashes.
+/** @type {Array<{x:number, y:number, age:number, maxAge:number, color:[number,number,number]}>} */
+const _chestBlooms = [];
 
 /**
  * Apply a named temporal pattern to a light definition and push it.
@@ -145,12 +158,26 @@ export function collectLightSources(view, opts = {}) {
     }
 
     // ---- Torch light (warm, flickering) ----------------------------------
+    // Below 25% HP the torch shifts to a heartbeat rhythm and dims red.
+    // Below 10% HP the heartbeat slows further.
     if (Array.isArray(view.entities)) {
       for (let i = 0; i < view.entities.length; i++) {
         const e = view.entities[i];
         if ((Number(e.id || 0) | 0) !== playerId) continue;
         if (Array.isArray(e.tags) && e.tags.includes('torch')) {
-          emitPatterned(out, 'torch', t, playerId, px, py, base + 0.5, WARM_ORANGE, 16);
+          const hp = e.hp || 0, maxHp = e.maxHp || 1;
+          const hpRatio = hp / maxHp;
+          if (hpRatio <= 0.10) {
+            // Critical — slow heartbeat, deep red, dimmer
+            const CRIT_RED = [255, 60, 30];
+            emitPatterned(out, 'heartbeat', t * 0.6, playerId, px, py, base * 0.6, CRIT_RED, 12);
+          } else if (hpRatio <= 0.25) {
+            // Low HP — heartbeat, orange-red shift, slightly reduced radius
+            const LOW_RED = [255, 130, 60];
+            emitPatterned(out, 'heartbeat', t, playerId, px, py, base * 0.8, LOW_RED, 14);
+          } else {
+            emitPatterned(out, 'torch', t, playerId, px, py, base + 0.5, WARM_ORANGE, 16);
+          }
         }
         break;
       }
@@ -255,7 +282,68 @@ export function collectLightSources(view, opts = {}) {
         const col = paletteGlow(kind) || [200, 150, 255];
         emitPatterned(out, 'breathe', t, e.id, ex, ey, 3, col, 6);
       }
+      // Burning entities — fire light that reads as something on fire
+      if (tags.includes('burning')) {
+        emitPatterned(out, 'ember', t, e.id, ex, ey, 3.5, FIRE_RED, 12);
+      }
+
+      // Floating eye gaze beams — directional cone from eye toward player.
+      // Tightens as charge builds: wide idle scan → tight focused beam.
+      if (_gazeBeams.has((e.id | 0))) {
+        const gb = _gazeBeams.get(e.id | 0);
+        // Update eye position each frame (it may move)
+        gb.ex = ex; gb.ey = ey;
+      }
     }
+  }
+
+  // ---- Floating eye gaze cone lights ------------------------------------
+  // Prune beams for eyes no longer visible (dead, LOS broken, off-screen).
+  if (_gazeBeams.size > 0) {
+    const visibleIds = new Set();
+    if (Array.isArray(view.entities)) {
+      for (let i = 0; i < view.entities.length; i++) {
+        visibleIds.add(view.entities[i].id | 0);
+      }
+    }
+    for (const eyeId of _gazeBeams.keys()) {
+      if (!visibleIds.has(eyeId)) _gazeBeams.delete(eyeId);
+    }
+  }
+  if (_gazeBeams.size > 0) {
+    for (const [, gb] of _gazeBeams) {
+      const progress = Math.min(1, gb.charge / Math.max(1, gb.total));
+      // Radius grows with charge: 2 at start → 4 at full
+      const radius = 2 + progress * 2;
+      // Intensity builds with charge — occult pattern for unsettling rhythm
+      const p = evaluatePattern('occult', t, (gb.ex * 73 + gb.ey * 37) | 0);
+      const baseInt = 0.5 + progress * 0.5;
+      const intensity = baseInt * p.intensity;
+      const col = [
+        Math.min(255, GAZE_VIOLET[0] * intensity),
+        Math.min(255, GAZE_VIOLET[1] * intensity),
+        Math.min(255, GAZE_VIOLET[2] * intensity),
+      ];
+      out.push({ x: gb.ex, y: gb.ey, radius, color: col, softness: 6 });
+    }
+  }
+
+  // ---- Chest reveal blooms (one-shot fading flashes) --------------------
+  for (let i = _chestBlooms.length - 1; i >= 0; i--) {
+    const bl = _chestBlooms[i];
+    bl.age += dt;
+    if (bl.age >= bl.maxAge) {
+      _chestBlooms.splice(i, 1);
+      continue;
+    }
+    const life = 1 - bl.age / bl.maxAge;
+    const fade = life * life;  // quadratic fade-out
+    out.push({
+      x: bl.x, y: bl.y,
+      radius: 4 * fade + 1,
+      color: [bl.color[0] * fade, bl.color[1] * fade, bl.color[2] * fade],
+      softness: 10,
+    });
   }
 
   return out;
@@ -277,6 +365,60 @@ export function collectFxLights(out, fxSources) {
       for (let i = 0; i < active.length; i++) out.push(active[i]);
     }
   }
+}
+
+/**
+ * Install event listeners for transient lighting effects.
+ * Call once during display initialization, passing the world event bus
+ * and a getPosition callback for entity coordinate lookup.
+ *
+ * @param {object} world — world with .on() event method
+ * @param {(id:number) => {x:number,y:number}|null} getPosition
+ */
+export function installLightEventListeners(world, getPosition) {
+  // Floating eye gaze — track charge build-up per eye entity
+  world.on('proc:gaze:charged', ({ actor, target, chargeCount, total }) => {
+    const eyeId = Number(actor) | 0;
+    const pos = getPosition(eyeId);
+    if (!pos) return;
+    _gazeBeams.set(eyeId, {
+      ex: pos.x + 0.5, ey: pos.y + 0.5,
+      charge: chargeCount,
+      total: total || 8,
+    });
+  });
+
+  // Gaze stun fires — bright flash then clear the beam
+  world.on('proc:gaze:stun', ({ actor }) => {
+    const eyeId = Number(actor) | 0;
+    const gb = _gazeBeams.get(eyeId);
+    if (gb) {
+      // One-shot flash bloom at the eye position
+      _chestBlooms.push({
+        x: gb.ex, y: gb.ey, age: 0, maxAge: 0.3,
+        color: [220, 80, 255],
+      });
+    }
+    _gazeBeams.delete(eyeId);
+  });
+
+  // Clear gaze beams on level transition
+  world.on('dungeon:transitioned', () => {
+    _gazeBeams.clear();
+    _chestBlooms.length = 0;
+  });
+
+  // Chest reveal bloom — brief upward light flash on open
+  world.on('chest:open', ({ targetId }) => {
+    const pos = getPosition(Number(targetId) | 0);
+    if (!pos) return;
+    // Color based on chest kind — default warm gold
+    _chestBlooms.push({
+      x: pos.x + 0.5, y: pos.y + 0.5,
+      age: 0, maxAge: 0.45,
+      color: [CHEST_GOLD[0], CHEST_GOLD[1], CHEST_GOLD[2]],
+    });
+  });
 }
 
 // ---- Overworld positional sky lights (sun / moon) -----------------------
