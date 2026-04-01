@@ -263,6 +263,9 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     const label = masked ? kindLower.toUpperCase() || 'STATUS' : resolveStatusLabel(kind, effect);
     const opts = { style };
     if (kindLower === 'taunt' || kindLower === 'alert') opts.color = '#ffdd00';
+    // Throttle repetitive combat status labels (immune, resist, miss) per target
+    if ((kindLower === 'immune' || kindLower === 'resist' || kindLower === 'miss') &&
+        !_throttle(`status:${kindLower}:${id}`, 3000)) return;
     ftext.addStatus(pos.x, pos.y, label, opts);
   });
 
