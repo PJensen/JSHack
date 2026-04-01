@@ -1029,7 +1029,8 @@ export function createLightingEngine() {
       if (sdf[i] <= 0) {
         pixels[pi + 3] = DARK;
       } else {
-        const brightness = Math.min(1, (lightR[i] + lightG[i] + lightB[i]) * 0.5);
+        const lightSum = lightR[i] + lightG[i] + lightB[i];
+        const brightness = Math.min(1, lightSum * 0.5);
         const sight = vision[i];  // 0-1 vision mask
         // Vision lifts darkness to reveal what's there; light lifts further.
         // For below-grade surfaces we intentionally reduce this lift so the
@@ -1070,6 +1071,13 @@ export function createLightingEngine() {
           // Slight outside rim darkening helps the cut boundary read as "below grade".
           const rimD = lavaEdgeDist[i];
           if (rimD < 1.4) extraDark += 28 * (1 - rimD / 1.4);
+        }
+        // Void light: negative light values push darkness beyond the normal
+        // DARK cap, creating localized absolute black holes that eat light.
+        // The deeper the negative sum, the darker — up to full 255 alpha.
+        if (lightSum < 0) {
+          const voidDark = Math.min(1, -lightSum * 0.8);
+          extraDark += voidDark * (255 - DARK);
         }
         pixels[pi + 3] = Math.min(255, Math.max(0, (DARK * (1 - totalLift) + extraDark) | 0));
       }
