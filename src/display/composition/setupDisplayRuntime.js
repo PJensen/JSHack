@@ -61,7 +61,7 @@ export function setupDisplayRuntime({
   cloudFx.installListeners();
   const surfaceAreaFx = createSurfaceAreaFxController({ getFxTime, classifySurfaceTile, fx, PERF });
 
-  installFloatTextWiring({ world, ftext, fx, getPosition, isVisibleAt, isPet, isPlayer });
+  const { goreTick } = installFloatTextWiring({ world, ftext, fx, getPosition, isVisibleAt, isPet, isPlayer, getFxTime });
   installEventUiWiring({
     world,
     ftext,
@@ -74,5 +74,5 @@ export function setupDisplayRuntime({
     dispatchRulesAction,
   });
 
-  return { statusEmitterFx, statusPresentationDelayFx, boltFx, delayedDeathFx, projectileFx, spellAreaFx, cloudFx, surfaceAreaFx, ftext };
+  return { statusEmitterFx, statusPresentationDelayFx, boltFx, delayedDeathFx, projectileFx, spellAreaFx, cloudFx, surfaceAreaFx, ftext, goreTick };
 }

@@ -14,7 +14,7 @@ import { InteractIntent } from "../../rules/components/Intents/InteractIntent.js
 import { MeleeAttackIntent } from "../../rules/components/Intents/MeleeAttackIntent.js";
 import { Interactable } from "../../rules/components/Interactable.js";
 import { Mana } from "../../rules/components/Mana.js";
-import MessageLog from "../../rules/components/MessageLog.js";
+import { CombatLog as MessageLog } from "../../rules/components/MessageLog.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 import { Owner } from "../../rules/components/Owner.js";
 import { Pet } from "../../rules/components/Pet.js";
@@ -26,7 +26,7 @@ import { ShopInventory } from "../../rules/components/ShopInventory.js";
 import { Speed } from "../../rules/components/Speed.js";
 import { Spell } from "../../rules/components/Spell.js";
 import { Terrain } from "../../rules/components/Terrain.js";
-import Tombstone from "../../rules/components/Tombstone.js";
+import { Tombstone } from "../../rules/components/Tombstone.js";
 import { Trap } from "../../rules/components/Trap.js";
 import { Trigger } from "../../rules/components/Trigger.js";
 import { Parent, Sibling } from "../../lib/ecs-js/hierarchy.js";

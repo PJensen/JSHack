@@ -5,6 +5,7 @@
 /** @typedef {import('../engine.js').LightDef} LightDef */
 
 import { basePalette } from '../../palette/base.js';
+import { evaluatePattern } from './temporalPatterns.js';
 
 // Mirror of rules/data/calendar.TURNS_PER_DAY — display layer cannot import
 // rules directly.  The bridge (worldView) normalises time into turnInDay so
@@ -46,17 +47,36 @@ const CAUSTIC_LIME = [180, 255, 60];    // caustic effects
 const SHADOW_PURPLE = [160, 80, 220];   // shadow / agony magic
 
 /**
- * Torch flicker — deterministic per-entity wobble + random jitter.
- * @param {number} t  — current fxTime (seconds)
+ * Apply a named temporal pattern to a light definition and push it.
+ * Evaluates the pattern waveform, applies intensity to radius/flicker,
+ * and applies color shift to the base color.
+ *
+ * @param {LightDef[]} out — array to push into
+ * @param {string} pattern — temporal pattern name (e.g. 'torch', 'breathe')
+ * @param {number} t — fxTime in seconds
  * @param {number} id — entity id for phase offset
- * @returns {number}  — multiplier ≈ 0.75 – 1.15
+ * @param {number} x @param {number} y
+ * @param {number} baseRadius
+ * @param {[number,number,number]} baseColor
+ * @param {number} softness
  */
+function emitPatterned(out, pattern, t, id, x, y, baseRadius, baseColor, softness) {
+  const p = evaluatePattern(pattern, t, id);
+  const r = Math.max(0, Math.min(255, baseColor[0] * (1 + p.r)));
+  const g = Math.max(0, Math.min(255, baseColor[1] * (1 + p.g)));
+  const b = Math.max(0, Math.min(255, baseColor[2] * (1 + p.b)));
+  out.push({
+    x, y,
+    radius: baseRadius,
+    color: [r, g, b],
+    flicker: p.intensity,
+    softness,
+  });
+}
+
+/** Legacy shim — delegates to the 'torch' temporal pattern.  */
 function torchFlicker(t, id) {
-  return 1.0
-    + 0.10 * Math.sin(t * 1.4  + id)       // slow sway
-    + 0.06 * Math.sin(t * 3.1  + id * 0.7) // medium wobble
-    + 0.04 * Math.sin(t * 5.9)              // subtle shimmer
-    + 0.04 * (Math.random() - 0.5);         // gentle jitter
+  return evaluatePattern('torch', t, id).intensity;
 }
 
 /**
@@ -130,8 +150,7 @@ export function collectLightSources(view, opts = {}) {
         const e = view.entities[i];
         if ((Number(e.id || 0) | 0) !== playerId) continue;
         if (Array.isArray(e.tags) && e.tags.includes('torch')) {
-          const f = torchFlicker(t, playerId);
-          out.push({ x: px, y: py, radius: base * f + 0.5, color: WARM_ORANGE, flicker: f });
+          emitPatterned(out, 'torch', t, playerId, px, py, base + 0.5, WARM_ORANGE, 16);
         }
         break;
       }
@@ -154,39 +173,38 @@ export function collectLightSources(view, opts = {}) {
 
       // Placed torches — room features (layer 300) or ground items (layer 250)
       if (kind === 'torch') {
-        const f = torchFlicker(t, e.id);
-        out.push({ x: ex, y: ey, radius: 6 * f, color: WARM_ORANGE, flicker: f });
+        emitPatterned(out, 'torch', t, e.id, ex, ey, 6, WARM_ORANGE, 16);
         continue;
       }
 
       // Lit lantern posts (placed world objects)
       if (kind === 'lantern_post') {
-        const f = torchFlicker(t, e.id);
-        out.push({ x: ex, y: ey, radius: 7 * f, color: LANTERN_GOLD, flicker: f });
+        emitPatterned(out, 'candle', t, e.id, ex, ey, 7, LANTERN_GOLD, 20);
         continue;
       }
 
       // Dungeon furniture — palette-driven atmospheric lighting.
-      // Radius is hand-tuned per kind; colour comes from the glyph palette glow.
+      // Each kind gets a temporal pattern that matches its character.
       {
         const FURNITURE_LIGHT = {
-          fountain:    { radius: 2.5 },
-          altar:       { radius: 2 },
-          shrine:      { radius: 2 },
-          mushrooms:   { radius: 2 },
+          fountain:    { radius: 3.5, pattern: 'breathe' },
+          altar:       { radius: 4.5, pattern: 'breathe', softness: 8 },
+          shrine:      { radius: 4,   pattern: 'holy',   softness: 8 },
+          mushrooms:   { radius: 3,   pattern: 'biolum' },
         };
         const fl = FURNITURE_LIGHT[kind];
         if (fl) {
           const col = paletteGlow(kind) || [160, 170, 190];
-          out.push({ x: ex, y: ey, radius: fl.radius, color: col });
+          emitPatterned(out, fl.pattern, t, e.id, ex, ey, fl.radius, col, fl.softness || 12);
           continue;
         }
         // Fire-based furniture — flickering, palette-coloured
-        if (kind === 'cooking_fire' || kind === 'furnace') {
-          const r = kind === 'cooking_fire' ? 4 : 3;
-          const f = torchFlicker(t, e.id);
-          const col = paletteGlow(kind) || FIRE_RED;
-          out.push({ x: ex, y: ey, radius: r * f, color: col, flicker: f });
+        if (kind === 'cooking_fire') {
+          emitPatterned(out, 'torch', t, e.id, ex, ey, 4, paletteGlow(kind) || FIRE_RED, 16);
+          continue;
+        }
+        if (kind === 'furnace') {
+          emitPatterned(out, 'ember', t, e.id, ex, ey, 3, paletteGlow(kind) || FIRE_RED, 16);
           continue;
         }
       }
@@ -195,48 +213,47 @@ export function collectLightSources(view, opts = {}) {
 
       // Torch-bearing NPCs/monsters
       if (tags.includes('torch')) {
-        const f = torchFlicker(t, e.id);
-        out.push({ x: ex, y: ey, radius: 3 * f, color: WARM_ORANGE, flicker: f });
+        emitPatterned(out, 'torch', t, e.id, ex, ey, 3, WARM_ORANGE, 14);
         continue; // torch dominates — skip weaker tags
       }
 
-      // Tag-driven emissive lights (frost deliberately excluded — cold ≠ light)
+      // Tag-driven emissive lights — each magical school gets its own pattern.
       if (tags.includes('invulnerable')) {
-        out.push({ x: ex, y: ey, radius: 5, color: HOLY_GOLD });
+        emitPatterned(out, 'holy', t, e.id, ex, ey, 5, HOLY_GOLD, 10);
       } else if (tags.includes('storm_glowing')) {
-        out.push({ x: ex, y: ey, radius: 4, color: STORM_WHITE });
+        emitPatterned(out, 'storm', t, e.id, ex, ey, 4, STORM_WHITE, 6);
       } else if (tags.includes('soul_glowing')) {
-        out.push({ x: ex, y: ey, radius: 4, color: SOUL_GREEN });
+        emitPatterned(out, 'occult', t, e.id, ex, ey, 4, SOUL_GREEN, 8);
       } else if (tags.includes('blood_glowing')) {
-        out.push({ x: ex, y: ey, radius: 3, color: BLOOD_RED });
+        emitPatterned(out, 'heartbeat', t, e.id, ex, ey, 3, BLOOD_RED, 6);
       } else if (tags.includes('venom_glowing')) {
-        out.push({ x: ex, y: ey, radius: 3, color: VENOM_GREEN });
+        emitPatterned(out, 'biolum', t, e.id, ex, ey, 3, VENOM_GREEN, 6);
       } else if (tags.includes('caustic_glowing')) {
-        out.push({ x: ex, y: ey, radius: 3, color: CAUSTIC_LIME });
+        emitPatterned(out, 'pulse', t, e.id, ex, ey, 3, CAUSTIC_LIME, 6);
       } else if (tags.includes('agony')) {
-        out.push({ x: ex, y: ey, radius: 3, color: SHADOW_PURPLE });
+        emitPatterned(out, 'occult', t, e.id, ex, ey, 3, SHADOW_PURPLE, 8);
       } else if (tags.includes('legendary_glowing')) {
-        out.push({ x: ex, y: ey, radius: 3, color: paletteGlow('legendary_chest') || LANTERN_GOLD });
+        emitPatterned(out, 'pulse', t, e.id, ex, ey, 5, paletteGlow('legendary_chest') || LANTERN_GOLD, 10);
       } else if (tags.includes('glowing')) {
-        out.push({ x: ex, y: ey, radius: 3, color: LANTERN_GOLD });
+        emitPatterned(out, 'ember', t, e.id, ex, ey, 4, LANTERN_GOLD, 8);
       } else if (tags.includes('epic_glowing')) {
-        out.push({ x: ex, y: ey, radius: 2.5, color: paletteGlow('epic_chest') || [200, 100, 255] });
+        emitPatterned(out, 'breathe', t, e.id, ex, ey, 4, paletteGlow('epic_chest') || [200, 100, 255], 8);
       } else if (tags.includes('rare_glowing')) {
-        out.push({ x: ex, y: ey, radius: 1.5, color: paletteGlow('magic_chest') || [100, 160, 255] });
+        emitPatterned(out, 'breathe', t, e.id, ex, ey, 3, paletteGlow('magic_chest') || [100, 160, 255], 6);
       }
-      // Potion glow — very subtle shimmer, colour from the specific potion palette entry
+      // Potion glow — bioluminescent shimmer
       if (tags.includes('potion_glow')) {
         const col = paletteGlow(kind) || paletteGlow('potion') || [120, 220, 200];
-        out.push({ x: ex, y: ey, radius: 1.5, color: col });
+        emitPatterned(out, 'biolum', t, e.id, ex, ey, 2.5, col, 6);
       }
-      // Gold glow — very compact golden gleam
+      // Gold glow — gentle pulse
       if (tags.includes('gold_glow')) {
-        out.push({ x: ex, y: ey, radius: 0.75, color: [255, 210, 80] });
+        emitPatterned(out, 'candle', t, e.id, ex, ey, 1.5, [255, 210, 80], 4);
       }
-      // Gem glow — color driven by palette entry for specific gem kind
+      // Gem glow — slow breathe
       if (tags.includes('gem_glowing')) {
         const col = paletteGlow(kind) || [200, 150, 255];
-        out.push({ x: ex, y: ey, radius: 1.8, color: col });
+        emitPatterned(out, 'breathe', t, e.id, ex, ey, 3, col, 6);
       }
     }
   }

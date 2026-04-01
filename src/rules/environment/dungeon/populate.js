@@ -8,7 +8,7 @@ import { NamedIdentity } from '../../components/NamedIdentity.js';
 import { ItemInfo } from '../../components/ItemInfo.js';
 import { Interactable } from '../../components/Interactable.js';
 import { Collider } from '../../components/Collider.js';
-import TombstoneComponent from '../../components/Tombstone.js';
+import { Tombstone as TombstoneComponent } from '../../components/Tombstone.js';
 import { Material } from '../../components/Material.js';
 import { Polymorph } from '../../components/Polymorph.js';
 import { DoorKey } from '../../components/DoorKey.js';
