@@ -142,6 +142,32 @@ let _lastVisionDef = null;
 /** Return the current vision mask definition (built during collectLightSources). */
 export function getVisionDef() { return _lastVisionDef; }
 
+function computeBeamReachFraction(ex, ey, px, py, isBlockedVision) {
+  if (typeof isBlockedVision !== 'function') return 1;
+  const dx = px - ex;
+  const dy = py - ey;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist <= 0) return 1;
+  const invDist = 1 / dist;
+  const step = 0.25;
+  const sourceTX = Math.floor(ex);
+  const sourceTY = Math.floor(ey);
+  let lastTX = sourceTX;
+  let lastTY = sourceTY;
+  for (let t = step; t <= dist; t += step) {
+    const sx = ex + dx * invDist * t;
+    const sy = ey + dy * invDist * t;
+    const tx = Math.floor(sx);
+    const ty = Math.floor(sy);
+    if (tx === lastTX && ty === lastTY) continue;
+    lastTX = tx;
+    lastTY = ty;
+    if (tx === sourceTX && ty === sourceTY) continue;
+    if (isBlockedVision(tx, ty)) return Math.max(0, (t - step) * invDist);
+  }
+  return 1;
+}
+
 export function collectLightSources(view, opts = {}) {
   const q     = (opts.quality || 'auto').toLowerCase();
   const base  = q === 'low' ? 6 : (q === 'high' ? 10 : 8);
@@ -367,9 +393,12 @@ export function collectLightSources(view, opts = {}) {
       const dx = px - gb.ex, dy = py - gb.ey;
       const dist = Math.sqrt(dx * dx + dy * dy);
       if (dist < 0.5) continue;  // too close, skip beam
+      const beamReach = computeBeamReachFraction(gb.ex, gb.ey, px, py, view.isBlockedVision);
+      const clippedDist = dist * beamReach;
+      if (clippedDist < 0.5) continue;
       const nx = dx / dist, ny = dy / dist;
       const spacing = 0.5;
-      const steps = Math.min(24, Math.floor(dist / spacing));
+      const steps = Math.min(24, Math.floor(clippedDist / spacing));
       const beamRadius = 0.5;
       for (let s = 1; s <= steps; s++) {
         const frac = (s * spacing) / dist;
