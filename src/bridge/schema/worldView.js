@@ -53,6 +53,7 @@ import { readPlayerPerceptionState } from "../../rules/utils/perceptionState.js"
 import { chebyshevDistance, hasMindForEsp, isFixedDecorationEntity, isPerceptionMonster } from "../../rules/utils/perceptionChannels.js";
 import { PERCEPTION_TUNING } from "../../rules/environment/dungeon/perceptionTuning.js";
 import { BaseStats } from "../../rules/components/BaseStats.js";
+import { Physiology } from "../../rules/components/Physiology.js";
 import { resolveEquippedWeaponVfx } from "./weaponVfxResolver.js";
 import {
 	clearPerceptionMemory,
@@ -732,8 +733,9 @@ export function buildWorldView(world) {
 			/** @type {EntityView|null} */
 			const stackSeq = Number(world.get(id, GroundStackOrder)?.seq || 0) | 0;
 			let rec = /** @type any */ (_entityRecs.get(id) || null);
+			const physSizeClass = /** @type {string} */ (world.get(id, Physiology)?.sizeClass || '');
 			if (!rec) {
-				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer, hp: 0, maxHp: 0, isPet: false, showHealthBar: false, procStates: null, stackSeq, facing: null, weaponVfx: null };
+				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer, hp: 0, maxHp: 0, isPet: false, showHealthBar: false, procStates: null, stackSeq, facing: null, weaponVfx: null, sizeClass: physSizeClass };
 				_entityRecs.set(id, rec);
 			} else {
 				rec.kind = kind;
@@ -744,6 +746,7 @@ export function buildWorldView(world) {
 				rec.stackSeq = stackSeq;
 				rec.facing = null;
 				rec.weaponVfx = null;
+				rec.sizeClass = physSizeClass;
 			}
 
 			// Project select status types into tags for display-only logic.
@@ -814,10 +817,11 @@ export function buildWorldView(world) {
 			else if (isPlayer) layer = 400; // player on top
 
 			const stackSeq2 = Number(world.get(id, GroundStackOrder)?.seq || 0) | 0;
+			const physSizeClass2 = /** @type {string} */ (world.get(id, Physiology)?.sizeClass || '');
 			/** @type {EntityView|null} */
 			let rec = /** @type any */ (_entityRecs.get(id) || null);
 			if (!rec) {
-				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer, hp: 0, maxHp: 0, isPet: false, showHealthBar: false, procStates: null, stackSeq: stackSeq2, facing: null, weaponVfx: null };
+				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer, hp: 0, maxHp: 0, isPet: false, showHealthBar: false, procStates: null, stackSeq: stackSeq2, facing: null, weaponVfx: null, sizeClass: physSizeClass2 };
 				_entityRecs.set(id, rec);
 			} else {
 				rec.kind = kind;
@@ -828,6 +832,7 @@ export function buildWorldView(world) {
 				rec.stackSeq = stackSeq2;
 				rec.facing = null;
 				rec.weaponVfx = null;
+				rec.sizeClass = physSizeClass2;
 			}
 
 			// Project select status types into tags for display-only logic.
@@ -875,9 +880,10 @@ export function buildWorldView(world) {
 			/** @type {any} */ const col = /** @type any */ (world.get(id, Collider));
 			const kind = ident?.identity || ident?.name || "default";
 			const stackSeq = Number(world.get(id, GroundStackOrder)?.seq || 0) | 0;
+			const petPhysSizeClass = /** @type {string} */ (world.get(id, Physiology)?.sizeClass || '');
 			let rec = /** @type any */ (_entityRecs.get(id) || null);
 			if (!rec) {
-				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer: 300, hp: 0, maxHp: 0, isPet: false, showHealthBar: false, procStates: null, stackSeq, facing: null, weaponVfx: null };
+				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer: 300, hp: 0, maxHp: 0, isPet: false, showHealthBar: false, procStates: null, stackSeq, facing: null, weaponVfx: null, sizeClass: petPhysSizeClass };
 				_entityRecs.set(id, rec);
 			} else {
 				rec.kind = kind;
@@ -888,6 +894,7 @@ export function buildWorldView(world) {
 				rec.stackSeq = stackSeq;
 				rec.facing = null;
 				rec.weaponVfx = null;
+				rec.sizeClass = petPhysSizeClass;
 			}
 
 			projectDisplayTags(world, id, rec);

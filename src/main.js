@@ -49,6 +49,7 @@ import { installInventoryDataProvider } from "./main/ui/inventoryDataProvider.js
 import { shouldSuppressRecentPickupChipForEquippedDuplicate } from "./main/ui/quickChipPolicy.js";
 import { createThrowFxController } from "./display/fx/throwFxController.js";
 import { createWeatherFxController } from "./display/fx/weatherFx.js";
+import { createSlideFxController } from "./display/fx/slideFxController.js";
 import { createLightingEngine } from "./display/lighting/engine.js";
 import { collectLightSources, collectFxLights, computeAmbient, getVisionDef, installLightEventListeners } from "./display/lighting/sources/index.js";
 import { drawProcStateBadges, getProcStateVisual, procBadgeWorldCenter } from "./display/fx/procStateGlyphs.js";
@@ -4028,6 +4029,10 @@ const {
 } = displayRuntime;
 const flyingFx = createFlyingFxController(world);
 flyingFx.installListeners();
+const slideFx = createSlideFxController();
+
+// ── Size-class display scale map ────────────────────────────────────
+const SIZE_CLASS_SCALE = { XS: 0.55, S: 0.72, M: 0.88, L: 1.0, XL: 1.12 };
 
 // Wire transient lighting effects (gaze beams, chest blooms, etc.)
 installLightEventListeners(world, getPosition);
@@ -4637,7 +4642,9 @@ function drawMonsterLabels(ctx, labels, fxTime) {
   for (let i = 0; i < labels.length; i++) {
     const rec = labels[i];
     if (!rec) continue;
-    const y = rec.y - 0.52;
+    // Offset label Y based on creature scale so it sits above the glyph
+    const ss = rec.sizeScale || 1;
+    const y = rec.y - (0.30 + 0.22 * ss);
     ctx.strokeStyle = 'rgba(0,0,0,0.7)';
     ctx.lineWidth = 0.04;
     ctx.strokeText(rec.text, rec.x, y);
@@ -5235,9 +5242,10 @@ function drawEntityHealthBar(ctx, e) {
   const maxHp = Math.max(1, Number(e.maxHp) | 0);
   const hp = Math.max(0, Math.min(maxHp, Number(e.hp) | 0));
   const ratio = clamp01(hp / maxHp);
-  const width = 0.68;
+  const ss = e._sizeScale || 1;
+  const width = 0.68 * ss;
   const height = 0.06;
-  const y = e.pos.y + 0.43;
+  const y = e.pos.y + (0.22 + 0.21 * ss);
   const x = e.pos.x - (width * 0.5);
   const pad = 0.01;
   const innerW = Math.max(0, width - (pad * 2));
@@ -5406,6 +5414,7 @@ function render(worldView) {
   _groundLootLabels.length = 0;
   _monsterLabels.length = 0;
   flyingFx.syncWorldView(worldView);
+  slideFx.syncWorldView(worldView.entities || []);
   delayedDeathFx.syncWorldView(worldView);
   const renderEntities = delayedDeathFx.getRenderableEntities(worldView.entities);
   const stackMeta = _stackMeta;
@@ -5505,10 +5514,21 @@ function render(worldView) {
       continue;
     }
 
-    const flyingPresentation = flyingFx.getPresentation(e, _fxTime, cam.scale);
-    const renderEntity = flyingPresentation.progress > 0.001
-      ? { ...e, pos: { x: flyingPresentation.glyphX, y: flyingPresentation.glyphY } }
+    // Slide easing — smooth movement between tiles (skip player)
+    const isPlayer = (e.layer | 0) === 400;
+    const slidePos = isPlayer ? null : slideFx.getPosition(e.id, e.pos.x, e.pos.y);
+    const slidEntity = slidePos && slidePos.sliding
+      ? { ...e, pos: { x: slidePos.x, y: slidePos.y } }
       : e;
+
+    const flyingPresentation = flyingFx.getPresentation(slidEntity, _fxTime, cam.scale);
+    const renderEntity = flyingPresentation.progress > 0.001
+      ? { ...slidEntity, pos: { x: flyingPresentation.glyphX, y: flyingPresentation.glyphY } }
+      : slidEntity;
+
+    // Size-class scaling — small creatures render smaller, big ones bigger
+    const sizeScale = SIZE_CLASS_SCALE[e.sizeClass] || 1;
+    const entityScale = flyingPresentation.glyphScale * sizeScale;
 
     if (hasTag(renderEntity, 'thermal_sensed')) {
       drawThermalSensePing(bctx, renderEntity, _fxTime);
@@ -5516,7 +5536,7 @@ function render(worldView) {
     }
 
     drawFlyingShadow(bctx, flyingPresentation);
-    drawEntityGlyph(glyphAtlas, bctx, renderEntity, flyingPresentation.glyphScale);
+    drawEntityGlyph(glyphAtlas, bctx, renderEntity, entityScale);
     if (hasTag(renderEntity, 'esp_sensed')) {
       drawEspSenseHalo(bctx, renderEntity, _fxTime);
     }
@@ -5524,7 +5544,7 @@ function render(worldView) {
       drawFacingDot(bctx, renderEntity);
     }
     if (shouldShowHealthBar(renderEntity, _fxTime)) {
-      _healthBarsToDraw.push(renderEntity);
+      _healthBarsToDraw.push({ ...renderEntity, _sizeScale: sizeScale });
     }
 
     // Monster name labels — hostile actors only, visible and within range
@@ -5545,6 +5565,7 @@ function render(worldView) {
           y: renderEntity.pos.y,
           text: label,
           color: '#e8d4c0',
+          sizeScale,
         });
       }
     }
@@ -6021,13 +6042,16 @@ function render(worldView) {
       if (!_roofCoverKeys.has(roofCellKey(e.pos.x, e.pos.y))) continue;
 
       if (e.tags.includes('flying')) {
-        const flyingPresentation = flyingFx.getPresentation(e, _fxTime, cam.scale);
+        const slidePos2 = slideFx.getPosition(e.id, e.pos.x, e.pos.y);
+        const slidEntity2 = slidePos2.sliding ? { ...e, pos: { x: slidePos2.x, y: slidePos2.y } } : e;
+        const flyingPresentation = flyingFx.getPresentation(slidEntity2, _fxTime, cam.scale);
         const renderEntity = flyingPresentation.progress > 0.001
-          ? { ...e, pos: { x: flyingPresentation.glyphX, y: flyingPresentation.glyphY } }
-          : e;
+          ? { ...slidEntity2, pos: { x: flyingPresentation.glyphX, y: flyingPresentation.glyphY } }
+          : slidEntity2;
+        const roofSizeScale = SIZE_CLASS_SCALE[e.sizeClass] || 1;
 
         drawFlyingShadow(bctx, flyingPresentation);
-        drawEntityGlyph(glyphAtlas, bctx, renderEntity, flyingPresentation.glyphScale);
+        drawEntityGlyph(glyphAtlas, bctx, renderEntity, flyingPresentation.glyphScale * roofSizeScale);
         if (shouldShowHealthBar(renderEntity, _fxTime)) {
           drawEntityHealthBar(bctx, renderEntity);
         }
@@ -6121,6 +6145,7 @@ function frame(now) {
   tickDisplayEffects({ dtSec, boltFx, spellAreaFx, projectileFx, throwFx, cloudFx, spiritWispFx, ftext, goreTick });
   delayedDeathFx.tick(dtSec);
   flyingFx.tick(dtSec);
+  slideFx.tick(dtSec);
   sceneRuntime.tick(dtSec);
 
   // Update vitals HUD if changed (lightweight per-frame check)
