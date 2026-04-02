@@ -50,7 +50,15 @@ export function canQuickChipIdentify(it) {
   const identity = String(it?.identity || it?.details?.identity || '');
   if (identity === 'scroll_identify') return false;
   const identified = it?.details?.identified ?? it?.identified;
-  return identified === false && !!it?.hasScrollOfIdentify;
+  return identified === false;
+}
+
+/**
+ * @param {any} it
+ * @returns {boolean}
+ */
+export function hasScrollForIdentify(it) {
+  return !!it?.hasScrollOfIdentify;
 }
 
 /**
@@ -59,7 +67,7 @@ export function canQuickChipIdentify(it) {
  */
 export function getQuickChipPrimaryActionLabel(it) {
   const action = getQuickChipPrimaryAction(it);
-  if (action === 'apply') return 'Apply';
+  if (action === 'apply') return String(it?.type || '') === 'gem' ? 'Socket' : 'Apply';
   if (action === 'equip') return 'Equip';
   if (action === 'drink') return 'Drink';
   return 'Use';
@@ -3027,16 +3035,22 @@ function renderQuickChip(it, h) {
 
   let identifyBtn = null;
   if (canQuickChipIdentify(it)) {
+    const hasScroll = hasScrollForIdentify(it);
     identifyBtn = document.createElement('button');
     Object.assign(identifyBtn.style, {
-      padding: '6px 10px', background: '#101626', color: '#cfe8ff',
-      border: '1px solid #2d3b52', borderRadius: '6px', cursor: 'pointer'
+      padding: '6px 10px', background: '#101626',
+      color: hasScroll ? '#cfe8ff' : '#556',
+      border: '1px solid #2d3b52', borderRadius: '6px',
+      cursor: hasScroll ? 'pointer' : 'default',
+      opacity: hasScroll ? '1' : '0.45',
     });
-    identifyBtn.textContent = 'Identify';
-    identifyBtn.addEventListener('click', () => {
-      markInteracted();
-      window.dispatchEvent(new CustomEvent('ui:requestQuickChipIdentify', { detail: { targetItemId: it.id } }));
-    });
+    identifyBtn.textContent = hasScroll ? 'Identify' : 'Identify (no scroll)';
+    if (hasScroll) {
+      identifyBtn.addEventListener('click', () => {
+        markInteracted();
+        window.dispatchEvent(new CustomEvent('ui:requestQuickChipIdentify', { detail: { targetItemId: it.id } }));
+      });
+    }
   }
 
   let throwBtn = null;
