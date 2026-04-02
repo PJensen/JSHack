@@ -399,20 +399,26 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
       bctx.fill();
     }
 
-    // Core glow (outer halo) — fixed cyan-white ball of light
+    // Mood-tinted ball of light
+    const r = _r | 0, g = _g | 0, b = _b | 0;
+    const cr = Math.min(255, r * 0.5 + 128) | 0;
+    const cg = Math.min(255, g * 0.5 + 128) | 0;
+    const cb = Math.min(255, b * 0.5 + 128) | 0;
+
+    // Core glow (outer halo)
     const glowR = 0.22 + Math.sin(_fxTime * 3.2) * 0.04;
     const gradient = bctx.createRadialGradient(_x, _y, 0, _x, _y, glowR);
-    gradient.addColorStop(0, `rgba(${LIGHT_COLOR[0]}, ${LIGHT_COLOR[1]}, ${LIGHT_COLOR[2]}, ${(0.7 * dim).toFixed(3)})`);
-    gradient.addColorStop(0.4, `rgba(${LIGHT_COLOR[0]}, ${LIGHT_COLOR[1]}, ${LIGHT_COLOR[2]}, ${(0.3 * dim).toFixed(3)})`);
-    gradient.addColorStop(1, `rgba(${LIGHT_COLOR[0]}, ${LIGHT_COLOR[1]}, ${LIGHT_COLOR[2]}, 0)`);
+    gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${(0.7 * dim).toFixed(3)})`);
+    gradient.addColorStop(0.4, `rgba(${r}, ${g}, ${b}, ${(0.3 * dim).toFixed(3)})`);
+    gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
     bctx.fillStyle = gradient;
     bctx.beginPath();
     bctx.arc(_x, _y, glowR, 0, Math.PI * 2);
     bctx.fill();
 
-    // Bright core — fixed bright white
+    // Bright core — lightened mood color
     const coreR = 0.06 + Math.sin(_fxTime * 5.1) * 0.015;
-    bctx.fillStyle = `rgba(230, 245, 255, ${(0.9 * dim).toFixed(3)})`;
+    bctx.fillStyle = `rgba(${cr}, ${cg}, ${cb}, ${(0.9 * dim).toFixed(3)})`;
     bctx.beginPath();
     bctx.arc(_x, _y, coreR, 0, Math.PI * 2);
     bctx.fill();
