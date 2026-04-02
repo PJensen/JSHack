@@ -26,7 +26,7 @@ const SORROW_SPEED_DRAG = 0.6;     // orbit slows with sorrow
 const AMUSEMENT_SPEED_BOOST = 1.2; // orbit quickens with amusement
 
 // ── Anchor / easing ────────────────────────────────────────────────
-const ANCHOR_EASE = 2.5;
+const ANCHOR_EASE = 5.0;
 
 // ── Particles ──────────────────────────────────────────────────────
 const TRAIL_RATE = 18;
@@ -36,6 +36,7 @@ const TRAIL_LIFE = 0.35;
 const LIGHT_RADIUS = 3.0;
 const LIGHT_PULSE_AMP = 0.4;
 const LIGHT_PULSE_FREQ = 1.8;
+const LIGHT_COLOR = [140, 210, 255]; // cool cyan-white — the ball of light itself
 
 // ── Combat agitation ───────────────────────────────────────────────
 const COMBAT_DECAY = 2.0;
@@ -378,43 +379,40 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
   function draw(bctx) {
     if (!_active) return;
 
-    const r = _r | 0, g = _g | 0, b = _b | 0;
-    const cr = Math.min(255, r * 0.5 + 128) | 0;
-    const cg = Math.min(255, g * 0.5 + 128) | 0;
-    const cb = Math.min(255, b * 0.5 + 128) | 0;
     const dim = _betrayed ? BETRAYAL_DIM : 1;
 
     bctx.save();
 
-    // Miracle flare burst
+    // Miracle flare burst (mood-colored — it's a deity event)
     if (_flightState === FLIGHT_FLARE) {
+      const pr = _r | 0, pg = _g | 0, pb = _b | 0;
       const flareT = Math.min(1, _flightTimer / MIRACLE_FLARE_TIME);
       const flareR = 0.5 + flareT * 0.8;
       const flareA = (1 - flareT) * 0.6;
       const fg = bctx.createRadialGradient(_x, _y, 0, _x, _y, flareR);
       fg.addColorStop(0, `rgba(255,255,240,${flareA.toFixed(3)})`);
-      fg.addColorStop(0.3, `rgba(${cr},${cg},${cb},${(flareA * 0.6).toFixed(3)})`);
-      fg.addColorStop(1, `rgba(${r},${g},${b},0)`);
+      fg.addColorStop(0.3, `rgba(${pr},${pg},${pb},${(flareA * 0.6).toFixed(3)})`);
+      fg.addColorStop(1, `rgba(${pr},${pg},${pb},0)`);
       bctx.fillStyle = fg;
       bctx.beginPath();
       bctx.arc(_x, _y, flareR, 0, Math.PI * 2);
       bctx.fill();
     }
 
-    // Outer halo
+    // Core glow (outer halo) — fixed cyan-white ball of light
     const glowR = 0.22 + Math.sin(_fxTime * 3.2) * 0.04;
     const gradient = bctx.createRadialGradient(_x, _y, 0, _x, _y, glowR);
-    gradient.addColorStop(0, `rgba(${r},${g},${b},${(0.7 * dim).toFixed(3)})`);
-    gradient.addColorStop(0.4, `rgba(${r},${g},${b},${(0.3 * dim).toFixed(3)})`);
-    gradient.addColorStop(1, `rgba(${r},${g},${b},0)`);
+    gradient.addColorStop(0, `rgba(${LIGHT_COLOR[0]}, ${LIGHT_COLOR[1]}, ${LIGHT_COLOR[2]}, ${(0.7 * dim).toFixed(3)})`);
+    gradient.addColorStop(0.4, `rgba(${LIGHT_COLOR[0]}, ${LIGHT_COLOR[1]}, ${LIGHT_COLOR[2]}, ${(0.3 * dim).toFixed(3)})`);
+    gradient.addColorStop(1, `rgba(${LIGHT_COLOR[0]}, ${LIGHT_COLOR[1]}, ${LIGHT_COLOR[2]}, 0)`);
     bctx.fillStyle = gradient;
     bctx.beginPath();
     bctx.arc(_x, _y, glowR, 0, Math.PI * 2);
     bctx.fill();
 
-    // Bright core
+    // Bright core — fixed bright white
     const coreR = 0.06 + Math.sin(_fxTime * 5.1) * 0.015;
-    bctx.fillStyle = `rgba(${cr},${cg},${cb},${(0.9 * dim).toFixed(3)})`;
+    bctx.fillStyle = `rgba(230, 245, 255, ${(0.9 * dim).toFixed(3)})`;
     bctx.beginPath();
     bctx.arc(_x, _y, coreR, 0, Math.PI * 2);
     bctx.fill();
