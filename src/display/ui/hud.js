@@ -2,6 +2,7 @@
 // Minimal HUD with an Active Spell button.
 import { createConcentricGauge } from './concentricGauge.js';
 import { renderItemDetails } from './overlay.js';
+import { rarityStyle } from './overlayUtils.js';
 
 /**
  * @template T
@@ -2946,8 +2947,8 @@ function renderQuickChip(it, h) {
   const line1 = document.createElement('span');
   line1.textContent = bracketizeLabel(String(it.name || 'item'));
   Object.assign(line1.style, {
+    ...rarityStyle(String(it?.rarityName || it?.details?.rarityName || 'common')),
     fontSize: '12px',
-    fontWeight: '600',
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis',

@@ -7,6 +7,7 @@ import {
   getQuickChipPrimaryActionLabel,
   isQuickChipActionable,
 } from "../src/display/ui/hud.js";
+import { rarityStyle } from "../src/display/ui/overlayUtils.js";
 
 Deno.test("quick-slot stack peeks newest pickup first", () => {
   const stack = [];
@@ -55,4 +56,8 @@ Deno.test("quick-chip primary action uses apply for scroll of identify", () => {
 Deno.test("quick-chip treats gems as actionable stack items", () => {
   assertEquals(isQuickChipActionable({ type: "gem", count: 1 }), true);
   assertEquals(isQuickChipActionable({ type: "gem", count: 0 }), false);
+});
+
+Deno.test("quick-chip rarity style maps epic to purple", () => {
+  assertEquals(rarityStyle("epic"), { color: "#c47bff", fontWeight: "bold" });
 });
