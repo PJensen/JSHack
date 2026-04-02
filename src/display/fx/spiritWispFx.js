@@ -325,8 +325,10 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
     _prayerTimer = Math.max(0, _prayerTimer - dtSec);
 
     // Advance orbit (speed up during prayer spiral)
-    const prayerT = _prayerTimer / PRAYER_SPIRAL_DURATION; // 1→0 over duration
-    _phase += _orbitSpeed() * dtSec * (1 + prayerT * 3); // spin faster during spiral
+    const prayerRaw = _prayerTimer / PRAYER_SPIRAL_DURATION; // 1→0 over duration
+    // Ease-in: slow start, accelerates into the spiral (cubic)
+    const prayerT = prayerRaw * prayerRaw * prayerRaw;
+    _phase += _orbitSpeed() * dtSec * (1 + prayerT * 3);
 
     // Compute position — prayer shrinks orbit to zero (spiral inward)
     const orbitR = _orbitRadius() * (1 - prayerT * 0.9);
