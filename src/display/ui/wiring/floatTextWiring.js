@@ -272,6 +272,7 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
   // ── Monster abilities ───────────────────────────────────────────────
 
   world.on('monster:ability:windup', ({ actor, abilityName, at }) => {
+    if (!_throttle(`windup:${actor}`, 2000)) return;
     const pos = (at && Number.isFinite(at.x) && Number.isFinite(at.y))
       ? { x: Number(at.x), y: Number(at.y) }
       : getPosition(Number(actor || 0));
@@ -303,6 +304,7 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
   });
 
   world.on('monster:ability:cast', ({ actor, abilityName }) => {
+    if (!_throttle(`cast:${actor}`, 2000)) return;
     const pos = getPosition(Number(actor || 0));
     if (!pos || !canShowAt(pos.x, pos.y)) return;
     const label = String(abilityName || 'ABILITY').trim().toUpperCase();
