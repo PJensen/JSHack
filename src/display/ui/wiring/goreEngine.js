@@ -14,7 +14,7 @@ const GORE_KEYWORDS = Object.freeze({
 
 export function normalizedGoreType(goreType, targetKind) {
   const explicit = String(goreType || '').trim().toLowerCase();
-  if (explicit === 'blood' || explicit === 'ichor' || explicit === 'spark' || explicit === 'bone' || explicit === 'slime') return explicit;
+  if (explicit === 'blood' || explicit === 'ichor' || explicit === 'spark' || explicit === 'bone' || explicit === 'slime' || explicit === 'eyeburst') return explicit;
   const kind = String(targetKind || '').trim().toLowerCase();
   if (!kind) return explicit === 'none' ? 'none' : 'blood';
   for (let i = 0; i < GORE_KEYWORDS.none.length; i++) {
@@ -99,8 +99,26 @@ const GORE_STYLE = Object.freeze({
   }),
 });
 
+// Floating eye: cacodemon-style pressurized pop.
+// High velocity, big chunks, wide radial spread, low gravity so debris
+// hangs in the air a beat before falling. The thing was full of something.
+const EYEBURST_STYLE = Object.freeze({
+  splatBase: { r: 130, g: 65, b: 175 },   // vitreous — deep violet
+  splatVar:  { r: 45,  g: 35, b: 30 },
+  gib:       { r: 180, g: 50, b: 220 },   // flesh chunks — bright violet-pink
+  stain:     { r: 80,  g: 40, b: 120 },   // violet puddle
+  splatLifeMin: 0.22, splatLifeSpan: 0.35,
+  gibLifeMin: 0.55, gibLifeSpan: 0.60,
+  stainLifeMin: 18.0, stainLifeSpan: 14.0,
+  stainAlpha0: 0.60,
+  allowGib: true,
+  gravity: 0.02,      // very low — debris hangs in the air
+  gibGravity: 0.04,   // flesh chunks float before dropping
+});
+
 function pickGoreStyle(goreType) {
   const key = String(goreType || 'blood').toLowerCase();
+  if (key === 'eyeburst') return EYEBURST_STYLE;
   return GORE_STYLE[key] || GORE_STYLE.blood;
 }
 
@@ -540,6 +558,100 @@ function spawnDeathGore(pool, wx, wy, dx, dy, amount, goreType, damageType, crit
       a0: Math.min(0.86, style.stainAlpha0 + 0.2),
       a1: 0,
     }));
+  }
+
+  // ── Eyeburst special: cacodemon pop ─────────────────────────────
+  // Pressurized radial explosion. Everything flies outward from center.
+  if (goreType === 'eyeburst') {
+    const cx = wx + 0.5, cy = wy + 0.5;
+
+    // Heavy flesh chunks — big, slow spin, radial burst
+    // These are the "it popped" pieces — the deflated body
+    const fleshCount = 8 + (crit ? 4 : 0);
+    for (let i = 0; i < fleshCount; i++) {
+      const ang = Math.random() * Math.PI * 2;
+      const spd = 0.12 + Math.random() * 0.16;
+      pool.spawn(new Particle({
+        x: cx + (Math.random() - 0.5) * 0.12,
+        y: cy + (Math.random() - 0.5) * 0.10,
+        vx: Math.cos(ang) * spd,
+        vy: Math.sin(ang) * spd * 0.25 - 0.02,
+        ay: 0.6 + Math.random() * 0.4,
+        life: 0.7 + Math.random() * 0.8,
+        size0: 0.20 + Math.random() * 0.16,
+        size1: 0.06 + Math.random() * 0.04,
+        r: 150 + ((Math.random() * 50) | 0),
+        g: 40 + ((Math.random() * 30) | 0),
+        b: 80 + ((Math.random() * 40) | 0),
+        a0: 0.90,
+        a1: 0.08,
+        rotVel: (Math.random() - 0.5) * 5,
+      }));
+    }
+
+    // Psychic flash ring — fast sparks expanding outward
+    // The stored psychic energy releasing on death
+    const ringCount = 20 + (crit ? 10 : 0);
+    for (let i = 0; i < ringCount; i++) {
+      const ang = (i / ringCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
+      const spd = 0.55 + Math.random() * 0.55;
+      pool.spawn(new Particle({
+        x: cx + (Math.random() - 0.5) * 0.08,
+        y: cy + (Math.random() - 0.5) * 0.08,
+        vx: Math.cos(ang) * spd,
+        vy: Math.sin(ang) * spd * 0.28 - 0.04,
+        ay: 0.3,
+        life: 0.15 + Math.random() * 0.12,
+        size0: 0.05 + Math.random() * 0.04,
+        size1: 0.01,
+        r: 220 + ((Math.random() * 35) | 0),
+        g: 150 + ((Math.random() * 70) | 0),
+        b: 255,
+        a0: 0.95,
+        a1: 0,
+      }));
+    }
+
+    // Vitreous blobs — large translucent jelly, drift outward slowly
+    const blobCount = 5 + (crit ? 2 : 0);
+    for (let i = 0; i < blobCount; i++) {
+      const ang = Math.random() * Math.PI * 2;
+      const spd = 0.04 + Math.random() * 0.07;
+      pool.spawn(new Particle({
+        x: cx + (Math.random() - 0.5) * 0.15,
+        y: cy + (Math.random() - 0.5) * 0.12,
+        vx: Math.cos(ang) * spd,
+        vy: Math.sin(ang) * spd * 0.25 - 0.01,
+        ay: 0.12 + Math.random() * 0.08,
+        life: 1.0 + Math.random() * 0.8,
+        size0: 0.16 + Math.random() * 0.14,
+        size1: 0.03,
+        r: 110 + ((Math.random() * 30) | 0),
+        g: 65 + ((Math.random() * 25) | 0),
+        b: 175 + ((Math.random() * 35) | 0),
+        a0: 0.55,
+        a1: 0,
+        rotVel: (Math.random() - 0.5) * 1.5,
+      }));
+    }
+
+    // Center flash — the pop. Brief, bright, white-violet.
+    for (let i = 0; i < 4; i++) {
+      pool.spawn(new Particle({
+        x: cx + (Math.random() - 0.5) * 0.06,
+        y: cy + (Math.random() - 0.5) * 0.04,
+        vx: (Math.random() - 0.5) * 0.03,
+        vy: (Math.random() - 0.5) * 0.02,
+        life: 0.08 + Math.random() * 0.06,
+        size0: 0.26 + Math.random() * 0.12,
+        size1: 0.02,
+        r: 255,
+        g: 210,
+        b: 255,
+        a0: 0.92,
+        a1: 0,
+      }));
+    }
   }
 }
 
