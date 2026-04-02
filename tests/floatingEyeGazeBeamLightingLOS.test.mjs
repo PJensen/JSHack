@@ -22,11 +22,11 @@ function makeEventBus() {
   };
 }
 
-Deno.test("floating eye gaze beam lights only render on charged LOS turn", () => {
+Deno.test("floating eye gaze beam lights render while charging LOS turn is active", () => {
   const bus = makeEventBus();
   installLightEventListeners(bus, () => ({ x: 0, y: 0 }));
   bus.emit("dungeon:transitioned");
-  bus.emit("proc:gaze:charged", { actor: 2, target: 1, chargeCount: 4, total: 8, turn: 10 });
+  bus.emit("proc:gaze:charging", { actor: 2, target: 1, chargeCount: 4, total: 8, turn: 10 });
 
   const baseView = {
     player: { id: 1, pos: { x: 5, y: 0 } },
@@ -42,11 +42,11 @@ Deno.test("floating eye gaze beam lights only render on charged LOS turn", () =>
 
   const sameTurnLights = collectLightSources(baseView);
   const sameTurnBeamFar = sameTurnLights.some((light) => light.x > 3 && Math.abs(light.y - 0.5) < Y_TOLERANCE);
-  assert(sameTurnBeamFar, "expected gaze beam samples on the charged LOS turn");
+  assert(sameTurnBeamFar, "expected gaze beam samples on the charging LOS turn");
 
   const staleTurnLights = collectLightSources({ ...baseView, turn: 11 });
   const staleTurnBeamFar = staleTurnLights.some((light) => light.x > 3 && Math.abs(light.y - 0.5) < Y_TOLERANCE);
-  assert(!staleTurnBeamFar, "expected gaze beam samples to clear when no new LOS charge event arrives");
+  assert(!staleTurnBeamFar, "expected gaze beam samples to clear when no new LOS charging event arrives");
 
   bus.emit("dungeon:transitioned");
 });
