@@ -15,7 +15,7 @@ import {
   resolveApplyTargetName,
 } from "./itemCatalogHooks.js";
 import { requiresIdentification } from "./itemAppearances.js";
-import { isIdentified } from "./identification.js";
+import { isIdentified, identify } from "./identification.js";
 import { Beatitude } from "../components/Beatitude.js";
 import { Equipment, GEAR_SLOTS } from "../components/Equipment.js";
 import { ItemCooldown } from "../components/ItemCooldown.js";
