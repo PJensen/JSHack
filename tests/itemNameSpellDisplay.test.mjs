@@ -77,3 +77,26 @@ Deno.test("buildItemDisplayData includes proc-node summaries for gear items", ()
   assert(data.procNodes[0].qualifiers.includes("35%"), "chance gate should be represented in qualifiers");
   assert(data.procNodes[0].effects.some((line) => String(line).includes("+1-4 Fire Damage")), "effect summary should include damage range and type");
 });
+
+Deno.test("buildItemDisplayData preserves rarityName for unidentified items", () => {
+  resetIdentification();
+  const world = new World({ seed: 19 });
+  const wand = world.create();
+  world.add(wand, NamedIdentity, { identity: "wand_frost", name: "Wand of Frost" });
+  world.add(wand, ItemInfo, {
+    type: "wand",
+    slot: "ranged",
+    count: 1,
+    rarityName: "epic",
+    bonuses: { spellHit: 2 },
+    affixes: [{ id: "arcane_focus", tier: 1 }],
+    description: "A freezing focus",
+  });
+
+  const data = buildItemDisplayData(world, wand);
+  assert(data, "display data should exist");
+  assertEquals(data.identified, false, "wand should remain unidentified by default");
+  assertEquals(data.rarityName, "epic", "rarity should be preserved for UI chip coloring");
+  assertEquals(data.description, "", "unidentified items should still hide description");
+  assertEquals(data.affixes, [], "unidentified items should still hide affixes");
+});
