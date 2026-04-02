@@ -183,7 +183,7 @@ export class FloatText {
     // Therefore we choose a small fontPx in CSS to achieve ~0.8 world-units height (no extra tilePx factor!).
     const m = (typeof ctx.getTransform === 'function') ? ctx.getTransform() : { a: 1, d: 1, e: 0, f: 0 };
     const worldFontPx = 0.9; // ~0.9 world units tall
-    const smallFontPx = 0.52; // smaller for non-damage text
+    const smallFontPx = 0.32; // smaller for non-damage text
     for (const p of this.fct){
       if (p.delay > 0) continue; // still waiting
       const t = Math.max(0, Math.min(1, 1 - p.ttl / Math.max(1e-6, p.life)));
