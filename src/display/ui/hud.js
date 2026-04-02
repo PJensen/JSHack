@@ -2,6 +2,7 @@
 // Minimal HUD with an Active Spell button.
 import { createConcentricGauge } from './concentricGauge.js';
 import { renderItemDetails } from './overlay.js';
+import { rarityStyle } from './overlayUtils.js';
 
 /**
  * @template T
@@ -302,18 +303,6 @@ function bracketizeLabel(text) {
   const s = String(text || "");
   if (s.startsWith("[") && s.endsWith("]")) return s;
   return `[${s}]`;
-}
-
-/**
- * @param {string} rarityName
- * @returns {{ color: string, fontWeight: string }}
- */
-export function getQuickChipRarityStyle(rarityName) {
-  const rn = String(rarityName || 'common').toLowerCase();
-  if (rn === 'rare' || rn === 'magic') return { color: '#55aaff', fontWeight: 'bold' };
-  if (rn === 'epic') return { color: '#c47bff', fontWeight: 'bold' };
-  if (rn === 'legendary') return { color: '#ff9f3b', fontWeight: 'bold' };
-  return { color: '#ffffff', fontWeight: 'bold' };
 }
 
 export function initHUD() {
@@ -2958,7 +2947,7 @@ function renderQuickChip(it, h) {
   const line1 = document.createElement('span');
   line1.textContent = bracketizeLabel(String(it.name || 'item'));
   Object.assign(line1.style, {
-    ...getQuickChipRarityStyle(String(it?.rarityName || it?.details?.rarityName || 'common')),
+    ...rarityStyle(String(it?.rarityName || it?.details?.rarityName || 'common')),
     fontSize: '12px',
     whiteSpace: 'nowrap',
     overflow: 'hidden',
