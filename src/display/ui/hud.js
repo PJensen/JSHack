@@ -50,7 +50,7 @@ export function canQuickChipIdentify(it) {
   const identity = String(it?.identity || it?.details?.identity || '');
   if (identity === 'scroll_identify') return false;
   const identified = it?.details?.identified ?? it?.identified;
-  return identified === false && !!it?.hasScrollOfIdentify;
+  return identified === false;
 }
 
 /**
@@ -59,7 +59,7 @@ export function canQuickChipIdentify(it) {
  */
 export function getQuickChipPrimaryActionLabel(it) {
   const action = getQuickChipPrimaryAction(it);
-  if (action === 'apply') return 'Apply';
+  if (action === 'apply') return String(it?.type || '') === 'gem' ? 'Socket' : 'Apply';
   if (action === 'equip') return 'Equip';
   if (action === 'drink') return 'Drink';
   return 'Use';
