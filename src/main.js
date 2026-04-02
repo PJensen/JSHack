@@ -6197,6 +6197,10 @@ function frame(now) {
 // Savegames bypass char creation; new games show the selection screen first.
 if (_savegameLoaded) {
   _finalizeNewGame(null);
+} else if (runtimeConfig.params.get('test') === '1') {
+  // ?test=1 — skip char creation, auto-start as Outlaw "Debug Agent"
+  finishBoot();
+  _finalizeNewGame({ name: 'Debug Agent', classId: 'outlaw', seed: 0xC0FFEE, difficulty: 'easy' });
 } else {
   // Fade out the boot loader so the char creation panel is visible
   finishBoot();

@@ -41,6 +41,10 @@ const LIGHT_COLOR = [140, 210, 255]; // cool cyan-white — the ball of light it
 // ── Combat agitation ───────────────────────────────────────────────
 const COMBAT_DECAY = 2.0;
 
+// ── Ribbon trail (drawn, not particles) ────────────────────────────
+const RIBBON_MAX_POINTS = 14;
+const RIBBON_MIN_STEP = 0.05;
+
 // ── Color ──────────────────────────────────────────────────────────
 const COLOR_EASE_SPEED = 1.5;
 const MOOD_RGB = {
@@ -69,6 +73,11 @@ const BETRAYAL_STANDING_THRESHOLD = -0.3; // below this → betrayal mode
 const BETRAYAL_ORBIT_OFFSET = 2.5;       // drift further from player
 const BETRAYAL_DIM = 0.35;               // alpha multiplier
 
+// ── Orbiting motes ─────────────────────────────────────────────────
+const MOTE_BASE_COUNT = 2;
+const MOTE_MAX_COUNT = 4;
+const MOTE_RADIUS = 0.16;
+
 /**
  * @param {{
  *   world: import('../../lib/ecs-js/index.js').World,
@@ -94,6 +103,8 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
 
   // Particles
   let _trailAccum = 0;
+  /** @type {Array<{x:number,y:number}>} */
+  const _ribbonPoints = [];
 
   // Depth
   let _lastDepth = -1;
@@ -115,6 +126,7 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
   let _flightTargetX = 0, _flightTargetY = 0;
   let _flightTimer = 0;
   let _flightSavedX = 0, _flightSavedY = 0; // where wisp was before flying
+  let _flareBurstQueued = false;
 
   // Prayer spiral — wisp spirals inward, absorbs, then expands back
   let _prayerTimer = 0;
@@ -234,6 +246,7 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
         _x = _flightTargetX; _y = _flightTargetY;
         _flightState = FLIGHT_FLARE;
         _flightTimer = 0;
+        _flareBurstQueued = true;
       } else {
         const step = Math.min(dist, MIRACLE_FLY_SPEED * dtSec);
         _x += (dx / dist) * step;
@@ -269,6 +282,39 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
     return false;
   }
 
+  function _pushRibbonPoint() {
+    const n = _ribbonPoints.length;
+    if (n > 0) {
+      const last = _ribbonPoints[n - 1];
+      const dx = _x - last.x;
+      const dy = _y - last.y;
+      if ((dx * dx + dy * dy) < (RIBBON_MIN_STEP * RIBBON_MIN_STEP)) return;
+    }
+    _ribbonPoints.push({ x: _x, y: _y });
+    if (_ribbonPoints.length > RIBBON_MAX_POINTS) _ribbonPoints.shift();
+  }
+
+  function _spawnFlareBurst() {
+    if (!fx?.pool) return;
+    const pr = _r | 0, pg = _g | 0, pb = _b | 0;
+    const rays = 14;
+    for (let i = 0; i < rays; i++) {
+      const a = (i / rays) * Math.PI * 2 + (Math.random() - 0.5) * 0.2;
+      const sp = 1.8 + Math.random() * 1.4;
+      fx.pool.spawn(new Particle({
+        x: _x,
+        y: _y,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp - 0.2,
+        life: 0.26 + Math.random() * 0.18,
+        size0: 0.07 + Math.random() * 0.04,
+        size1: 0.01,
+        r: pr, g: pg, b: pb,
+        a0: _betrayed ? 0.22 : 0.6,
+      }));
+    }
+  }
+
   // ── Main tick ─────────────────────────────────────────────────────
 
   function tick(dtSec) {
@@ -286,6 +332,10 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
     if (!_active || !_anchored) {
       _anchorX = ppos.x; _anchorY = ppos.y;
       _anchored = true; _active = true;
+      _x = _anchorX;
+      _y = _anchorY;
+      _ribbonPoints.length = 0;
+      _pushRibbonPoint();
     }
 
     // Ease anchor
@@ -301,6 +351,7 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
       _x = _x + (_anchorX - _x) * t;
       _y = _y + (_anchorY - _y) * t;
       // Gentle fade of trail particles
+      _pushRibbonPoint();
       if (_deathLandT < 1) _spawnTrail(dtSec * (1 - _deathLandT));
       return;
     }
@@ -317,6 +368,11 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
 
     // Miracle flight overrides orbit
     if (_tickFlight(dtSec)) {
+      _pushRibbonPoint();
+      if (_flareBurstQueued) {
+        _flareBurstQueued = false;
+        _spawnFlareBurst();
+      }
       _spawnTrail(dtSec);
       return;
     }
@@ -357,6 +413,7 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
       _y += _dangerDy * pull;
     }
 
+    _pushRibbonPoint();
     _spawnTrail(dtSec);
   }
 
@@ -391,6 +448,26 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
     const dim = _betrayed ? BETRAYAL_DIM : 1;
 
     bctx.save();
+    bctx.globalCompositeOperation = 'lighter';
+
+    // Motion ribbon: tapered, mood-tinted comet tail
+    if (_ribbonPoints.length >= 2) {
+      const pr = _r | 0, pg = _g | 0, pb = _b | 0;
+      for (let i = 1; i < _ribbonPoints.length; i++) {
+        const t = i / (_ribbonPoints.length - 1); // 0 oldest .. 1 newest
+        const p0 = _ribbonPoints[i - 1];
+        const p1 = _ribbonPoints[i];
+        const alpha = (0.05 + t * 0.32) * dim;
+        const width = 0.01 + t * 0.06;
+        bctx.strokeStyle = `rgba(${pr},${pg},${pb},${alpha.toFixed(3)})`;
+        bctx.lineWidth = width;
+        bctx.lineCap = 'round';
+        bctx.beginPath();
+        bctx.moveTo(p0.x, p0.y);
+        bctx.lineTo(p1.x, p1.y);
+        bctx.stroke();
+      }
+    }
 
     // Miracle flare burst (mood-colored — it's a deity event)
     if (_flightState === FLIGHT_FLARE) {
@@ -406,6 +483,17 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
       bctx.beginPath();
       bctx.arc(_x, _y, flareR, 0, Math.PI * 2);
       bctx.fill();
+
+      // Sigil rings at miracle point
+      const ringA = (1 - flareT) * 0.45 * dim;
+      bctx.strokeStyle = `rgba(${pr},${pg},${pb},${ringA.toFixed(3)})`;
+      bctx.lineWidth = 0.02;
+      bctx.beginPath();
+      bctx.arc(_x, _y, 0.18 + flareT * 0.9, 0, Math.PI * 2);
+      bctx.stroke();
+      bctx.beginPath();
+      bctx.arc(_x, _y, 0.1 + flareT * 0.6, 0, Math.PI * 2);
+      bctx.stroke();
     }
 
     // Mood-tinted ball of light
@@ -432,6 +520,21 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
     bctx.arc(_x, _y, coreR, 0, Math.PI * 2);
     bctx.fill();
 
+    // Orbiting spirit motes around core
+    const moteCount = Math.min(MOTE_MAX_COUNT, MOTE_BASE_COUNT + ((_amusement + _chaos) > 0.75 ? 1 : 0) + (_flightState !== FLIGHT_IDLE ? 1 : 0));
+    for (let i = 0; i < moteCount; i++) {
+      const speed = 1.4 + i * 0.35 + _amusement * 1.2;
+      const ang = _phase * speed + i * 2.1 + Math.sin(_fxTime * (3.5 + i)) * 0.2;
+      const rr = MOTE_RADIUS + i * 0.045 + Math.sin(_fxTime * (2.7 + i * 0.4)) * 0.015;
+      const mx = _x + Math.cos(ang) * rr;
+      const my = _y + Math.sin(ang) * rr * 0.7;
+      const ma = (0.22 + 0.18 * Math.sin(_fxTime * (7.2 + i))) * dim;
+      bctx.fillStyle = `rgba(${cr}, ${cg}, ${cb}, ${Math.max(0.08, ma).toFixed(3)})`;
+      bctx.beginPath();
+      bctx.arc(mx, my, 0.017 + i * 0.004, 0, Math.PI * 2);
+      bctx.fill();
+    }
+
     // Danger sense pulse — faint ring when sensing hidden threats
     if (_dangerIntensity > 0.1 && _flightState === FLIGHT_IDLE) {
       const pulseR = 0.15 + Math.sin(_fxTime * 6) * 0.05;
@@ -440,6 +543,14 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
       bctx.lineWidth = 0.02;
       bctx.beginPath();
       bctx.arc(_x, _y, pulseR, 0, Math.PI * 2);
+      bctx.stroke();
+
+      // Needle points toward sensed danger
+      bctx.strokeStyle = `rgba(255,210,120,${(_dangerIntensity * 0.55).toFixed(3)})`;
+      bctx.lineWidth = 0.03;
+      bctx.beginPath();
+      bctx.moveTo(_x, _y);
+      bctx.lineTo(_x + _dangerDx * 0.35, _y + _dangerDy * 0.35);
       bctx.stroke();
     }
 
