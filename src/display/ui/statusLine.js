@@ -1,13 +1,6 @@
 // display/ui/statusLine.js
 // NetHack-style horizontal status line (bottom of screen, above action bar).
-// Two rows: calendar line (top) + stats line (bottom).
-
-const SEASON_COLORS = {
-  spring: '#7ec87a',
-  summer: '#f0c95a',
-  autumn: '#d4834a',
-  winter: '#8ab4d6',
-};
+// Single stats row (bottom of screen, above action bar).
 
 export function initStatusLine() {
   let root = document.getElementById('ui-root');
@@ -37,12 +30,7 @@ export function initStatusLine() {
   });
   root.appendChild(statsLine);
 
-  // Calendar line — sits directly above the stats line
-  const calLine = document.createElement('div');
-  Object.assign(calLine.style, lineBase, {
-    bottom: 'calc(var(--jshack-actionbar-height, 48px) + 28px + env(safe-area-inset-bottom, 0px))',
-  });
-  root.appendChild(calLine);
+  // Calendar line removed — date now shown at top of character sheet only.
 
   let depth = 1;
   let turn = 0;
@@ -54,9 +42,6 @@ export function initStatusLine() {
   let armorClass = 10;
   let critPct = 0;
 
-  let calFormatted = "";
-  let calSeason = "";
-  let calMoonEmoji = "";
 
   function colorForDelta(value) {
     const n = Number(value || 0);
@@ -113,14 +98,6 @@ export function initStatusLine() {
     }
   }
 
-  function renderCalendar() {
-    calLine.replaceChildren();
-    if (!calFormatted) return;
-    const span = document.createElement('span');
-    span.textContent = calMoonEmoji ? `${calMoonEmoji} ${calFormatted}` : calFormatted;
-    Object.assign(span.style, { color: SEASON_COLORS[calSeason] || '#cfd3dc' });
-    calLine.appendChild(span);
-  }
 
   window.addEventListener('ui:updateDepth', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
@@ -159,15 +136,5 @@ export function initStatusLine() {
     renderStats();
   });
 
-  window.addEventListener('ui:updateCalendar', (ev) => {
-    /** @type {CustomEvent} */ // @ts-ignore
-    const e = ev;
-    calFormatted = String(e?.detail?.formatted || "");
-    calSeason = String(e?.detail?.season || "");
-    calMoonEmoji = String(e?.detail?.moonEmoji || "");
-    renderCalendar();
-  });
-
   renderStats();
-  renderCalendar();
 }
