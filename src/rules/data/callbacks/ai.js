@@ -577,7 +577,7 @@ export function gazeOnLOS(stackLimit = 4, exposureTurns = 5, stunTurns = 5) {
     });
 
     if (rec.count < threshold) {
-      ctx.emit('proc:gaze:charged', {
+      ctx.emit('proc:gaze:charging', {
         actor: ctx.actor,
         target: ctx.target,
         chargeCount: rec.count,

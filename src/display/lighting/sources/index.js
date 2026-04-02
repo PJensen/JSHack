@@ -445,7 +445,7 @@ export function collectFxLights(out, fxSources) {
  */
 export function installLightEventListeners(world, getPosition) {
   // Floating eye gaze — track charge build-up per eye entity
-  world.on('proc:gaze:charged', ({ actor, target, chargeCount, total, turn }) => {
+  world.on('proc:gaze:charging', ({ actor, target, chargeCount, total, turn }) => {
     const eyeId = Number(actor) | 0;
     const pos = getPosition(eyeId);
     if (!pos) return;
