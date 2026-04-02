@@ -582,6 +582,7 @@ export function gazeOnLOS(stackLimit = 4, exposureTurns = 5, stunTurns = 5) {
         target: ctx.target,
         chargeCount: rec.count,
         total: threshold,
+        turn: now,
       });
       return;
     }

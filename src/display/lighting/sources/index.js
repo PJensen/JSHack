@@ -52,7 +52,7 @@ const CHEST_GOLD    = [255, 230, 140];  // chest reveal bloom
 
 // Floating eye gaze beams — tracked per eye entity ID.
 // Each entry stores the eye position and charge progress (0–1).
-/** @type {Map<number, {ex:number, ey:number, charge:number, total:number}>} */
+/** @type {Map<number, {ex:number, ey:number, charge:number, total:number, turn:number}>} */
 const _gazeBeams = new Map();
 
 // Chest reveal blooms — brief one-shot flashes.
@@ -141,32 +141,6 @@ let _lastVisionDef = null;
 
 /** Return the current vision mask definition (built during collectLightSources). */
 export function getVisionDef() { return _lastVisionDef; }
-
-function computeBeamReachFraction(ex, ey, px, py, isBlockedVision) {
-  if (typeof isBlockedVision !== 'function') return 1;
-  const dx = px - ex;
-  const dy = py - ey;
-  const dist = Math.sqrt(dx * dx + dy * dy);
-  if (dist <= 0) return 1;
-  const invDist = 1 / dist;
-  const step = 0.25;
-  const sourceTX = Math.floor(ex);
-  const sourceTY = Math.floor(ey);
-  let lastTX = sourceTX;
-  let lastTY = sourceTY;
-  for (let t = step; t <= dist; t += step) {
-    const sx = ex + dx * invDist * t;
-    const sy = ey + dy * invDist * t;
-    const tx = Math.floor(sx);
-    const ty = Math.floor(sy);
-    if (tx === lastTX && ty === lastTY) continue;
-    lastTX = tx;
-    lastTY = ty;
-    if (tx === sourceTX && ty === sourceTY) continue;
-    if (isBlockedVision(tx, ty)) return Math.max(0, (t - step) * invDist);
-  }
-  return 1;
-}
 
 export function collectLightSources(view, opts = {}) {
   const q     = (opts.quality || 'auto').toLowerCase();
@@ -358,14 +332,15 @@ export function collectLightSources(view, opts = {}) {
   // ---- Floating eye gaze cone lights ------------------------------------
   // Prune beams for eyes no longer visible (dead, LOS broken, off-screen).
   if (_gazeBeams.size > 0) {
+    const turn = Number.isFinite(view.turn) ? (view.turn | 0) : -1;
     const visibleIds = new Set();
     if (Array.isArray(view.entities)) {
       for (let i = 0; i < view.entities.length; i++) {
         visibleIds.add(view.entities[i].id | 0);
       }
     }
-    for (const eyeId of _gazeBeams.keys()) {
-      if (!visibleIds.has(eyeId)) _gazeBeams.delete(eyeId);
+    for (const [eyeId, gb] of _gazeBeams) {
+      if (!visibleIds.has(eyeId) || (turn >= 0 && (gb.turn | 0) !== turn)) _gazeBeams.delete(eyeId);
     }
   }
   if (view.player && _gazeBeams.size > 0) {
@@ -393,12 +368,9 @@ export function collectLightSources(view, opts = {}) {
       const dx = px - gb.ex, dy = py - gb.ey;
       const dist = Math.sqrt(dx * dx + dy * dy);
       if (dist < 0.5) continue;  // too close, skip beam
-      const beamReach = computeBeamReachFraction(gb.ex, gb.ey, px, py, view.isBlockedVision);
-      const clippedDist = dist * beamReach;
-      if (clippedDist < 0.5) continue;
       const nx = dx / dist, ny = dy / dist;
       const spacing = 0.5;
-      const steps = Math.min(24, Math.floor(clippedDist / spacing));
+      const steps = Math.min(24, Math.floor(dist / spacing));
       const beamRadius = 0.5;
       for (let s = 1; s <= steps; s++) {
         const frac = (s * spacing) / dist;
@@ -473,7 +445,7 @@ export function collectFxLights(out, fxSources) {
  */
 export function installLightEventListeners(world, getPosition) {
   // Floating eye gaze — track charge build-up per eye entity
-  world.on('proc:gaze:charged', ({ actor, target, chargeCount, total }) => {
+  world.on('proc:gaze:charged', ({ actor, target, chargeCount, total, turn }) => {
     const eyeId = Number(actor) | 0;
     const pos = getPosition(eyeId);
     if (!pos) return;
@@ -481,6 +453,7 @@ export function installLightEventListeners(world, getPosition) {
       ex: pos.x + 0.5, ey: pos.y + 0.5,
       charge: chargeCount,
       total: total || 8,
+      turn: Number.isFinite(turn) ? (turn | 0) : -1,
     });
   });
 
