@@ -473,7 +473,7 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
     world.on('castSpell', () => { _agitation = COMBAT_DECAY; });
 
     // Prayer — wisp spirals inward then eases back out
-    world.on('prayer', () => { _prayerTimer = PRAYER_SPIRAL_DURATION; });
+    world.on('prayer', () => { _prayerTimer = Math.max(_prayerTimer, PRAYER_SPIRAL_DURATION); });
 
     // Player death — wisp settles onto the player's tile
     world.on('died', ({ id }) => {
