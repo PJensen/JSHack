@@ -8,8 +8,8 @@
 // ── Size-class movement profiles ─────────────────────────────────────
 // duration = seconds for the slide; easing = curve shape
 const PROFILES = {
-  XS:  { duration: 0.060, easing: 'snap'    },   // dart / jitter
-  S:   { duration: 0.080, easing: 'outQuart' },   // scurry
+  XS:  { duration: 0.080, easing: 'snap'    },   // dart / jitter
+  S:   { duration: 0.090, easing: 'outQuart' },   // scurry
   M:   { duration: 0.105, easing: 'outCubic' },   // stride
   L:   { duration: 0.140, easing: 'outQuad'  },   // lumber
   XL:  { duration: 0.180, easing: 'outQuad'  },   // trudge
