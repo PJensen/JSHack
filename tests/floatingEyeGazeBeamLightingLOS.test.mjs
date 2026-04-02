@@ -22,11 +22,11 @@ function makeEventBus() {
   };
 }
 
-Deno.test("floating eye gaze beam lights stop at LOS blockers", () => {
+Deno.test("floating eye gaze beam lights only render on charged LOS turn", () => {
   const bus = makeEventBus();
   installLightEventListeners(bus, () => ({ x: 0, y: 0 }));
   bus.emit("dungeon:transitioned");
-  bus.emit("proc:gaze:charged", { actor: 2, target: 1, chargeCount: 4, total: 8 });
+  bus.emit("proc:gaze:charged", { actor: 2, target: 1, chargeCount: 4, total: 8, turn: 10 });
 
   const baseView = {
     player: { id: 1, pos: { x: 5, y: 0 } },
@@ -37,21 +37,16 @@ Deno.test("floating eye gaze beam lights stop at LOS blockers", () => {
     playerVisionRadius: 6,
     playerFacing: null,
     playerConeDegrees: 360,
+    turn: 10,
   };
 
-  const openLights = collectLightSources({
-    ...baseView,
-    isBlockedVision: () => false,
-  });
-  const openBeamFar = openLights.some((light) => light.x > 3 && Math.abs(light.y - 0.5) < Y_TOLERANCE);
-  assert(openBeamFar, "expected gaze beam samples to reach past x>3 with clear LOS");
+  const sameTurnLights = collectLightSources(baseView);
+  const sameTurnBeamFar = sameTurnLights.some((light) => light.x > 3 && Math.abs(light.y - 0.5) < Y_TOLERANCE);
+  assert(sameTurnBeamFar, "expected gaze beam samples on the charged LOS turn");
 
-  const blockedLights = collectLightSources({
-    ...baseView,
-    isBlockedVision: (x, y) => x === 2 && y === 0,
-  });
-  const blockedBeamFar = blockedLights.some((light) => light.x > 2.1 && Math.abs(light.y - 0.5) < Y_TOLERANCE);
-  assert(!blockedBeamFar, "expected gaze beam samples to stop before wall blocker");
+  const staleTurnLights = collectLightSources({ ...baseView, turn: 11 });
+  const staleTurnBeamFar = staleTurnLights.some((light) => light.x > 3 && Math.abs(light.y - 0.5) < Y_TOLERANCE);
+  assert(!staleTurnBeamFar, "expected gaze beam samples to clear when no new LOS charge event arrives");
 
   bus.emit("dungeon:transitioned");
 });
