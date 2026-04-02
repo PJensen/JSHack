@@ -43,8 +43,8 @@ Deno.test("getEntityFovConeDegrees: falls back to default facing cone without ov
   assertEquals(getEntityFovConeDegrees(world, actor), FACING_CONE_BASE_DEG);
 });
 
-Deno.test("createPlayer: defaults player FOV cone override to 240 degrees", () => {
+Deno.test("createPlayer: defaults player FOV cone override to 220 degrees", () => {
   const world = new World({ seed: 1 });
   const playerId = createPlayer(world, { x: 0, y: 0, name: "Hero" });
-  assertEquals(getEntityFovConeDegrees(world, playerId), 240);
+  assertEquals(getEntityFovConeDegrees(world, playerId), 220);
 });

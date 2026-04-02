@@ -168,3 +168,39 @@ export function forEachInRadius(world, x, y, r, cb) {
   const rr = Math.max(0, r | 0);
   forEachInRect(world, x - rr, y - rr, x + rr, y + rr, cb);
 }
+
+/**
+ * Return all entity IDs at an exact (x,y) world-space point.
+ * Uses the spatial index cell for O(1)-ish lookup instead of scanning all entities.
+ * Stale entries are cleaned lazily.
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ * @param {number} x
+ * @param {number} y
+ * @returns {number[]}
+ */
+export function entitiesAtPoint(world, x, y) {
+  const st = _state(world);
+  if (!st.seeded) rebuildSpatialIndex(world);
+
+  const { key } = _cell(x, y);
+  const set = st.byCell.get(key);
+  if (!set) return [];
+
+  const result = [];
+  for (const id of set) {
+    if (!world.isAlive(id)) {
+      _removeFromCell(st, key, id);
+      st.entityCell.delete(id);
+      continue;
+    }
+    const pos = world.get(id, Position);
+    if (!pos) {
+      _removeFromCell(st, key, id);
+      st.entityCell.delete(id);
+      continue;
+    }
+    _syncEntityCell(st, id, pos);
+    if (pos.x === x && pos.y === y) result.push(id);
+  }
+  return result;
+}

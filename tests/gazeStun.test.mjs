@@ -1,17 +1,23 @@
-// Floating eye gaze: 8 consecutive turns in LOS -> 3-turn stun + 1 mindwipe stack.
+// Floating eye gaze: channeled beam — 8 turns LOS → 3-turn stun + 1 mindwipe stack.
+// Gaze is now a proper channeled spell (gaze_beam) with breakOnNoLos/breakOnMove.
 
 import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";
 import { Position } from "../src/rules/components/Position.js";
 import { Player } from "../src/rules/components/Player.js";
+import { Vitality } from "../src/rules/components/Vitality.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { Faction } from "../src/rules/components/Faction.js";
 import { AggroState, AGGRO_LEVELS, SEARCH_TURNS_HUNTING_GRACE } from "../src/rules/components/AggroState.js";
 import { Speed } from "../src/rules/components/Speed.js";
 import { Brain } from "../src/rules/components/Brain.js";
 import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
+import { Channeling } from "../src/rules/components/Channeling.js";
 import { MoveIntent } from "../src/rules/components/Intents/MoveIntent.js";
+import { CastSpellIntent } from "../src/rules/components/Intents/CastSpellIntent.js";
 import { aiChaseSystem } from "../src/rules/systems/aiChaseSystem.js";
+import { channelingSystem } from "../src/rules/systems/channelingSystem.js";
+import { castSpellSystem } from "../src/rules/systems/castSpellSystem.js";
 import { clearAll, loadChunk, setTile } from "../src/rules/environment/dungeon/tileMap.js";
 import { CHUNK_SIZE, TILE_FLOOR, TILE_WALL } from "../src/rules/environment/dungeon/constants.js";
 
@@ -25,6 +31,7 @@ function placePlayer(world, x, y) {
   const id = world.create();
   world.add(id, Player);
   world.add(id, Position, { x, y });
+  world.add(id, Vitality, { maxHp: 30, hp: 30 });
   world.add(id, ActiveEffects, { effects: [] });
   return id;
 }
@@ -41,8 +48,8 @@ function placeEye(world, x, y) {
     searchTurnsLeft: SEARCH_TURNS_HUNTING_GRACE,
     retreating: false,
   });
-  // Floating eye speed=1 maps to actEvery=3 in the shared creature archetype.
-  world.add(id, Speed, { actEvery: 3 });
+  // Speed actEvery=1 to simplify testing (fires every tick)
+  world.add(id, Speed, { actEvery: 1 });
   world.add(id, Brain, { intelligence: 2, visionRange: 6 });
   return id;
 }
@@ -50,7 +57,11 @@ function placeEye(world, x, y) {
 function gazeTurn(world, eye) {
   world.step++;
   aiChaseSystem(world);
+  channelingSystem(world);
+  castSpellSystem(world);
+  // Clean up intents so they don't accumulate
   if (world.has(eye, MoveIntent)) world.remove(eye, MoveIntent);
+  if (world.has(eye, CastSpellIntent)) world.remove(eye, CastSpellIntent);
 }
 
 function getEffect(world, entityId, key) {
@@ -80,6 +91,8 @@ Deno.test("floating_eye: 7 turns in gaze is not enough", () => {
 
   assertEquals(getEffect(world, player, "stun"), null);
   assertEquals(getEffect(world, player, "mindwipe"), null);
+  // Eye should have an active channel
+  assert(world.has(eye, Channeling), "eye should be channeling gaze_beam after 7 turns");
 });
 
 Deno.test("floating_eye: losing LOS resets the gaze charge", () => {
@@ -87,15 +100,20 @@ Deno.test("floating_eye: losing LOS resets the gaze charge", () => {
   const player = placePlayer(world, 5, 5);
   const eye = placeEye(world, 8, 5);
 
-  for (let i = 0; i < 7; i++) gazeTurn(world, eye);
+  // Build up 5 turns of charge
+  for (let i = 0; i < 5; i++) gazeTurn(world, eye);
+  assert(world.has(eye, Channeling), "eye should be channeling after 5 turns");
 
+  // Block LOS — channelingSystem should cancel the channel (breakOnNoLos)
   setTile(7, 5, TILE_WALL);
   gazeTurn(world, eye);
-  setTile(7, 5, TILE_FLOOR);
+  assert(!world.has(eye, Channeling), "channel should be cancelled after LOS break");
 
+  // Restore LOS and continue — needs full 8 turns from scratch
+  setTile(7, 5, TILE_FLOOR);
   for (let i = 0; i < 7; i++) gazeTurn(world, eye);
 
-  assertEquals(getEffect(world, player, "stun"), null);
+  assertEquals(getEffect(world, player, "stun"), null, "7 turns after LOS break should not stun");
   assertEquals(getEffect(world, player, "mindwipe"), null);
 });
 
@@ -111,4 +129,29 @@ Deno.test("floating_eye: staying in gaze for 16 turns retriggers and adds a seco
   assert(stun && stun.turnsLeft >= 4, `expected refreshed 3-turn stun after 16 turns, got ${JSON.stringify(world.get(player, ActiveEffects)?.effects)}`);
   assert(mindwipe, "expected mindwipe after repeated gaze exposure");
   assertEquals(mindwipe.stacks, 2);
+});
+
+Deno.test("floating_eye: stunning the eye interrupts the gaze channel", () => {
+  const world = makeWorld(5);
+  const player = placePlayer(world, 5, 5);
+  const eye = placeEye(world, 8, 5);
+
+  // Build up 5 turns of charge
+  for (let i = 0; i < 5; i++) gazeTurn(world, eye);
+  assert(world.has(eye, Channeling), "eye should be channeling after 5 turns");
+
+  // Stun the eye
+  let ae = world.get(eye, ActiveEffects);
+  if (!ae) {
+    world.add(eye, ActiveEffects, { effects: [] });
+    ae = world.get(eye, ActiveEffects);
+  }
+  ae.effects.push({ key: 'stun', turnsLeft: 3, potency: 1, stacks: 1 });
+
+  // Next tick: channelingSystem should detect stun and cancel channel
+  gazeTurn(world, eye);
+  assert(!world.has(eye, Channeling), "stun should cancel the gaze channel");
+
+  // Player should NOT be stunned by gaze (only the eye is stunned)
+  assertEquals(getEffect(world, player, "stun"), null, "player should not be stunned — gaze was interrupted");
 });

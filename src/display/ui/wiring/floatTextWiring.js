@@ -601,5 +601,68 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     });
   });
 
+  // ── Wild Interactions float text ────────────────────────────────────
+
+  world.on('combat:banish', ({ defender }) => {
+    const pos = getPosition(Number(defender || 0));
+    if (!pos || !canShowAt(pos.x, pos.y)) return;
+    ftext.addStatus(pos.x, pos.y - 0.45, 'BANISHED!', {
+      color: '#ffd700',
+      life: 1.5,
+      scaleStart: 1.8,
+      scaleEnd: 1.0,
+    });
+  });
+
+  world.on('combat:shatter', ({ defender }) => {
+    const pos = getPosition(Number(defender || 0));
+    if (!pos || !canShowAt(pos.x, pos.y)) return;
+    ftext.addStatus(pos.x, pos.y - 0.45, 'SHATTER!', {
+      color: '#87ceeb',
+      life: 1.1,
+      scaleStart: 1.5,
+      scaleEnd: 1.0,
+    });
+  });
+
+  world.on('combat:blessed_strike', ({ defender }) => {
+    const pos = getPosition(Number(defender || 0));
+    if (!pos || !canShowAt(pos.x, pos.y)) return;
+    ftext.addStatus(pos.x, pos.y - 0.3, 'SMITE!', {
+      color: '#ffd700',
+      life: 0.9,
+    });
+  });
+
+  world.on('spell:heal:undead', ({ targetId, at }) => {
+    const pos = at || getPosition(Number(targetId || 0));
+    if (!pos || !canShowAt(pos.x, pos.y)) return;
+    ftext.addStatus(pos.x, pos.y - 0.45, 'SEARED!', {
+      color: '#ffd700',
+      life: 1.1,
+    });
+  });
+
+  world.on('trap:gas_explosion', ({ at }) => {
+    if (!at || !canShowAt(at.x, at.y)) return;
+    ftext.addStatus(at.x, at.y - 0.5, 'BOOM!', {
+      color: '#ff4500',
+      life: 1.5,
+      scaleStart: 2.0,
+      scaleEnd: 1.0,
+    });
+  });
+
+  world.on('hunger:choke', () => {
+    const pe = playerEntity(world);
+    if (!pe) return;
+    const pos = getPosition(pe.id);
+    if (!pos) return;
+    ftext.addStatus(pos.x, pos.y - 0.4, 'CHOKE!', {
+      color: '#ff6347',
+      life: 1.0,
+    });
+  });
+
   return { goreTick: goreCtrl.tick };
 }

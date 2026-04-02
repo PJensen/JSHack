@@ -8,6 +8,7 @@ import { Equipment, GEAR_SLOTS } from "../../components/Equipment.js";
 import { Inventory } from "../../components/Inventory.js";
 import { ItemInfo } from "../../components/ItemInfo.js";
 import { Material } from "../../components/Material.js";
+import { Beatitude } from "../../components/Beatitude.js";
 import { NamedIdentity } from "../../components/NamedIdentity.js";
 import { Player } from "../../components/Player.js";
 import { Position } from "../../components/Position.js";
@@ -426,6 +427,14 @@ export function corrodeEquipmentOnHit(chancePct, seedSalt) {
       // Skip corrosion-resistant materials (stainless steel, mithril, etc.)
       const mat = ctx.world.get(itemId, Material);
       if (mat && typeof mat.corrosionResist === 'number' && mat.corrosionResist >= 0.95) continue;
+      // Blessed metal resists rust — consumes the blessing as a one-time shield
+      const beat = ctx.world.get(itemId, Beatitude);
+      if (beat && beat.state === 'blessed') {
+        beat.state = 'uncursed';
+        const blessedName = ctx.world.get(itemId, NamedIdentity)?.name || 'equipment';
+        ctx.emit("proc:blessed_resist_rust", { target: ctx.defender, itemId, itemName: blessedName });
+        continue;
+      }
       const stacks = Number(info.corrosionStacks || 0) | 0;
       if (stacks >= MAX_CORROSION_STACKS) continue;
       candidates.push({ slot, itemId, info });

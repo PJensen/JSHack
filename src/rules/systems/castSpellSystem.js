@@ -293,6 +293,7 @@ export function castSpellSystem(world) {
     // Cast time: begin channeling instead of immediate cast
     const castTime = Number(resolvedSpell.castTime || 0) | 0;
     if (castTime > 0 && !fromChanneling) {
+      const casterPos = world.get(actor, Position);
       try {
         world.add(actor, Channeling, {
           mode: "cast",
@@ -303,6 +304,10 @@ export function castSpellSystem(world) {
           targetId: intent.targetId || actor,
           x: intent.x ?? null,
           y: intent.y ?? null,
+          breakOnNoLos: !!resolvedSpell.breakOnNoLos,
+          breakOnMove: !!resolvedSpell.breakOnMove,
+          anchorX: casterPos ? (casterPos.x | 0) : null,
+          anchorY: casterPos ? (casterPos.y | 0) : null,
         });
       } catch {}
       emitSafe(world, 'channeling:start', { actor, spellId: resolvedSpell.id, castTime });

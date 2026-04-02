@@ -638,7 +638,7 @@ export const MONSTERS = [
     },
     speed: 1,
     hooks: {
-      whileLOS: [gazeOnLOS(4, 8, 3)],
+      whileLOS: [gazeOnLOS(8)],
       onHit: [mindflayerBlastOnHit(10, 0xdead000e)],
     },
     description: 'A pulsing violet eye that drifts in silence. Gaze into it too long and your mind unravels.',

@@ -6,6 +6,8 @@ import { createEatOnUseHook, createMappingOnUseHook } from "../content/items/use
 import { requiresIdentification } from "./itemAppearances.js";
 import { isIdentified } from "./identification.js";
 import { Beatitude } from "../components/Beatitude.js";
+import { CreatureType } from "../components/CreatureType.js";
+import { Traits } from "../components/Traits.js";
 import { Equipment, GEAR_SLOTS } from "../components/Equipment.js";
 import { ItemCooldown } from "../components/ItemCooldown.js";
 import { Vitality } from "../components/Vitality.js";
@@ -42,6 +44,17 @@ export function createCastSpellFromIdentityHook(opts) {
   return (ctx, state) => {
     if (typeof ctx?.rules?.runSpell !== "function") return { consumed: false };
     const actor = Number(state?.actor || ctx.actor || 0) | 0;
+
+    // Reading a scroll while blinded wastes it — unless you have third_eye
+    const blindStr = ctx.query?.statusStrength?.(actor, "blinded") ?? 0;
+    if (blindStr > 0) {
+      const traits = ctx.query.get(actor, Traits);
+      if (!traits?.third_eye) {
+        ctx.io.emit("scroll:wasted_blind", { actor, itemId: state?.itemId || 0 });
+        return { consumed: true }; // scroll is consumed but does nothing
+      }
+    }
+
     const spellId = spellIdFromIdentity(state?.identity || "", identityPrefix);
     if (!spellId) return { consumed: false };
     const spell = getSpell(spellId);
@@ -384,6 +397,23 @@ export function createWaterPotionHooks() {
         at: { ...to },
         waterType,
       });
+
+      // Holy water thrown at undead: deals bonus holy damage
+      if (waterType === "holy") {
+        const hitIds = ctx.query.livingAt(to.x, to.y, {});
+        for (const hitId of (Array.isArray(hitIds) ? hitIds : [])) {
+          const ct = ctx.query.get(hitId, CreatureType);
+          if (ct && ct.type === "undead") {
+            ctx.rules.dealDamage({
+              target: hitId, amount: 15, source: actorId,
+              type: 'holy', cause: 'holy_water',
+              at: { x: to.x, y: to.y },
+            });
+            ctx.io.emit("holy_water:undead", { actor: actorId, target: hitId, at: { ...to }, damage: 15 });
+          }
+        }
+      }
+
       return { consumed: true, resultType: "water_splash", waterType };
     },
     on_dip: (ctx, state) => {

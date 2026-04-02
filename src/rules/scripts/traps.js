@@ -14,6 +14,10 @@ import { Faction } from "../components/Faction.js";
 import { ActiveEffects } from "../components/ActiveEffects.js";
 import { areFactionsHostile } from "../utils/factionHostility.js";
 import { spawnMonsterEntity } from "../utils/spawnMonsterEntity.js";
+import { spawnHazard } from "../utils/hazardSpawn.js";
+import { HazardArea } from "../components/HazardArea.js";
+import { emitSafe } from "../utils/emitSafe.js";
+import { forEachInRadius } from "../utils/spatialIndex.js";
 
 function clamp01(value, fallback) {
   const n = Number(value);
@@ -377,5 +381,71 @@ registerScript("trap_swarm", {
       count: spawned,
       at: { x: trapPos.x | 0, y: trapPos.y | 0 },
     });
+  },
+});
+
+// ── Gas trap: creates poison gas cloud. If victim is burning, EXPLODES. ──
+registerScript("trap_gas", {
+  [ScriptVerb.TrapTrigger]: (world, ctx) => {
+    const trapId = Number(ctx?.trapId || 0) | 0;
+    const targetId = Number(ctx?.targetId || 0) | 0;
+    if (!(trapId > 0)) return;
+    const trapPos = world.get(trapId, Position);
+    if (!trapPos) return;
+    const tx = trapPos.x | 0;
+    const ty = trapPos.y | 0;
+
+    // Check if the victim is burning — if so, the gas ignites into an explosion
+    let victimBurning = false;
+    if (targetId > 0) {
+      const ae = world.get(targetId, ActiveEffects);
+      if (ae && Array.isArray(ae.effects)) {
+        victimBurning = ae.effects.some(e => e.key === 'burn' || e.key === 'burning');
+      }
+    }
+    // Also check for nearby fire hazards
+    if (!victimBurning) {
+      for (const [, hpos, ha] of world.query(Position, HazardArea)) {
+        if (!ha || ha.kind !== 'fire') continue;
+        const dx = Math.abs((hpos.x | 0) - tx);
+        const dy = Math.abs((hpos.y | 0) - ty);
+        if (dx <= (ha.radius || 0) + 1 && dy <= (ha.radius || 0) + 1) {
+          victimBurning = true;
+          break;
+        }
+      }
+    }
+
+    if (victimBurning) {
+      // EXPLOSION — big AoE fire damage
+      const EXPLOSION_RADIUS = 3;
+      const EXPLOSION_DMG = 12;
+      forEachInRadius(world, tx, ty, EXPLOSION_RADIUS, (id) => {
+        const vit = world.get(id, Vitality);
+        if (!vit || (vit.hp | 0) <= 0) return;
+        dealDamage(world, {
+          target: id, amount: EXPLOSION_DMG, source: 0,
+          type: 'fire', cause: 'trap:gas_explosion',
+          at: { x: tx, y: ty },
+        });
+      });
+      // Spawn short-lived fire hazard at the explosion site
+      spawnHazard(world, {
+        x: tx, y: ty,
+        kind: 'fire', medium: 'floor',
+        radius: 1, tickDamage: 3, damageType: 'fire',
+        turnsLeft: 4, sourceId: 0,
+      });
+      emitSafe(world, 'trap:gas_explosion', { trapId, at: { x: tx, y: ty }, radius: EXPLOSION_RADIUS });
+    } else {
+      // Normal gas: spawn a poison gas cloud
+      spawnHazard(world, {
+        x: tx, y: ty,
+        kind: 'gas', medium: 'air',
+        radius: 2, tickDamage: 2, damageType: 'poison',
+        turnsLeft: 8, sourceId: 0,
+      });
+      emitSafe(world, 'trap:gas', { trapId, at: { x: tx, y: ty } });
+    }
   },
 });

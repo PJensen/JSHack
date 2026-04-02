@@ -5,6 +5,7 @@ import { startShake } from "../camera/shake.js";
 import { Particle } from "../passes/vfx/particles/particlePool.js";
 import { ArrowFx, ArrowSparkFx, RadialFx } from "./fxEntries.js";
 import { resolveDominantProjectileVfx } from "../../bridge/schema/weaponVfxResolver.js";
+import { setInputLock } from "../input/inputLock.js";
 
 /**
  * @param {{ world: import('../../lib/ecs-js/index.js').World, cam: object, fx: { pool: { spawn(o:object):void } }, getPosition: (id:number) => ({x:number,y:number}|null) }} deps
@@ -38,6 +39,15 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
   const _ricochetFx = [];
   /** @type {RadialFx[]} */
   const _ricochetImpact = [];
+
+  function _hasInflight() {
+    return _arrowFx.length > 0 || _sboltFx.length > 0 || _fireballFx.length > 0
+      || _frostboltFx.length > 0 || _ricochetFx.length > 0;
+  }
+
+  function _syncInputLock() {
+    try { setInputLock('projectileFx', _hasInflight()); } catch (e) { console.debug('[projectileFx] input lock sync failed:', e); }
+  }
 
   /** @param {number} dt */
   function tick(dt) {
@@ -386,6 +396,8 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
       _ricochetImpact[i].tick(dt);
       if (_ricochetImpact[i].expired) _ricochetImpact.splice(i, 1);
     }
+
+    _syncInputLock();
   }
 
   function spawnTransientProjectile({
@@ -411,23 +423,13 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
       style,
     });
 
-    if (style === 'shadow_bolt') {
-      _sboltFx.push(entry);
-      return;
-    }
-    if (style === 'fireball') {
-      _fireballFx.push(entry);
-      return;
-    }
-    if (style === 'frostbolt') {
-      _frostboltFx.push(entry);
-      return;
-    }
-    if (style === 'ricochet_theology') {
-      _ricochetFx.push(entry);
-      return;
-    }
-    _arrowFx.push(entry);
+    if (style === 'shadow_bolt') _sboltFx.push(entry);
+    else if (style === 'fireball') _fireballFx.push(entry);
+    else if (style === 'frostbolt') _frostboltFx.push(entry);
+    else if (style === 'ricochet_theology') _ricochetFx.push(entry);
+    else _arrowFx.push(entry);
+
+    _syncInputLock();
   }
 
   /** @param {CanvasRenderingContext2D} ctx */

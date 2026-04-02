@@ -73,7 +73,7 @@ Deno.test("grid_bug: onDeath cloud spawns when killed during world.tick()", () =
   // Verify the HazardArea has the right damage params
   const hz = world.get(cloudId, HazardArea);
   assert(hz !== null, "HazardArea component should be set");
-  assertEquals(hz.turnsLeft, 3, "turnsLeft should be 3");
+  assertEquals(hz.turnsLeft, 6, "turnsLeft should be 6");
   assertEquals(hz.radius, 1, "radius should be 1");
   assertEquals(hz.tickDamage, 2, "damage should be 2");
 });

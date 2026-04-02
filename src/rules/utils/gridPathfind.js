@@ -69,10 +69,11 @@ export function findNextCardinalStep(world, startX, startY, targetX, targetY, ac
   const goalRadius = Number.isFinite(options.goalRadius) ? options.goalRadius : 0;
   const isPassable = typeof options.isPassable === "function" ? options.isPassable : isWalkable;
   const allowStairs = options.allowStairs === true;
-  const minX = Math.min(startX, targetX) - 8;
-  const maxX = Math.max(startX, targetX) + 8;
-  const minY = Math.min(startY, targetY) - 8;
-  const maxY = Math.max(startY, targetY) + 8;
+  const searchPadding = Number.isFinite(options.searchPadding) ? options.searchPadding : 8;
+  const minX = Math.min(startX, targetX) - searchPadding;
+  const maxX = Math.max(startX, targetX) + searchPadding;
+  const minY = Math.min(startY, targetY) - searchPadding;
+  const maxY = Math.max(startY, targetY) + searchPadding;
   const blocked = buildBlockedSet(world, actorId, targetX, targetY, options);
 
   const startKey = key(startX, startY);

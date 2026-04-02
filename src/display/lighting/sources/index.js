@@ -425,7 +425,7 @@ export function collectLightSources(view, opts = {}) {
  */
 export function collectFxLights(out, fxSources) {
   // Query each FX controller for active light sources
-  const controllers = [fxSources.boltFx, fxSources.spellAreaFx, fxSources.projectileFx, fxSources.cloudFx, fxSources.surfaceAreaFx, fxSources.statusEmitterFx];
+  const controllers = [fxSources.boltFx, fxSources.spellAreaFx, fxSources.projectileFx, fxSources.cloudFx, fxSources.surfaceAreaFx, fxSources.statusEmitterFx, fxSources.spiritWispFx];
   for (let c = 0; c < controllers.length; c++) {
     const fx = controllers[c];
     if (fx && typeof fx.getActiveLights === 'function') {
@@ -469,6 +469,12 @@ export function installLightEventListeners(world, getPosition) {
       });
     }
     _gazeBeams.delete(eyeId);
+  });
+
+  // Gaze channel interrupted — clear the beam
+  world.on('channeling:cancelled', ({ actor, spellId }) => {
+    if (String(spellId || '') !== 'gaze_beam') return;
+    _gazeBeams.delete(Number(actor) | 0);
   });
 
   // Clear gaze beams on level transition

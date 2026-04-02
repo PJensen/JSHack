@@ -234,17 +234,6 @@ Deno.test("perception priority resolves as visible > memory > esp > thermal", ()
   world.add(memoryTarget, NamedIdentity, { name: "Orc", identity: "orc" });
   world.add(memoryTarget, Vitality, { hp: 8, maxHp: 8 });
 
-  const espTarget = world.create();
-  world.add(espTarget, Position, { x: 10, y: 14 });
-  world.add(espTarget, NamedIdentity, { name: "Goblin", identity: "goblin" });
-  world.add(espTarget, Vitality, { hp: 8, maxHp: 8 });
-
-  const thermalTarget = world.create();
-  world.add(thermalTarget, Position, { x: 10, y: 15 });
-  world.add(thermalTarget, NamedIdentity, { name: "Shade", identity: "shade" });
-  world.add(thermalTarget, Vitality, { hp: 8, maxHp: 8 });
-  world.add(thermalTarget, Traits, { mindless: true });
-
   const visibleTarget = world.create();
   world.add(visibleTarget, Position, { x: 12, y: 10 });
   world.add(visibleTarget, NamedIdentity, { name: "Front", identity: "bandit" });
@@ -255,6 +244,19 @@ Deno.test("perception priority resolves as visible > memory > esp > thermal", ()
   world.step = (world.step | 0) + 1;
   world.set(player, Facing, { dx: 1, dy: 0 }); // now looking east
   world.set(memoryTarget, Position, { x: 7, y: 10 }); // unseen movement after memory capture
+
+  // Create ESP and thermal targets AFTER the first buildWorldView so they have
+  // no perception memory — they must be detected purely via sense channels.
+  const espTarget = world.create();
+  world.add(espTarget, Position, { x: 3, y: 10 });
+  world.add(espTarget, NamedIdentity, { name: "Goblin", identity: "goblin" });
+  world.add(espTarget, Vitality, { hp: 8, maxHp: 8 });
+
+  const thermalTarget = world.create();
+  world.add(thermalTarget, Position, { x: 2, y: 10 });
+  world.add(thermalTarget, NamedIdentity, { name: "Shade", identity: "shade" });
+  world.add(thermalTarget, Vitality, { hp: 8, maxHp: 8 });
+  world.add(thermalTarget, Traits, { mindless: true });
 
   const view = buildWorldView(world);
   const mem = view.entities.find((e) => e.id === memoryTarget);

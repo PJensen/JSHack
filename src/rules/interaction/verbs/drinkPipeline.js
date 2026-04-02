@@ -1,5 +1,6 @@
 import { Potion } from "../../components/Potion.js";
 import { Vitality } from "../../components/Vitality.js";
+import { Beatitude, BUC_BLESSED } from "../../components/Beatitude.js";
 
 /**
  * @param {any} hookOwner
@@ -166,12 +167,25 @@ export function drinkPipeline(ctx) {
     metrics.queuedChannels += potion.channels.length;
   }
 
+  // Blessed potions get double duration and potency
+  const potionBeat = ctx.query.get(itemId, Beatitude);
+  const isBlessed = potionBeat && potionBeat.state === BUC_BLESSED;
+
   const effects = Array.isArray(potion.effects) ? potion.effects : [];
   for (let i = 0; i < effects.length; i++) {
     const normalized = normalizePotionEffect(effects[i], ctx, target, { route, name: potion.name, masked: !identified });
     if (!normalized.key || normalized.turnsLeft <= 0) continue;
+    if (isBlessed) {
+      normalized.turnsLeft = Math.floor(normalized.turnsLeft * 2);
+      if (normalized.potency > 0) normalized.potency = Math.floor(normalized.potency * 1.5);
+      if (normalized.onsetLeft > 0) normalized.onsetLeft = Math.floor(normalized.onsetLeft * 2);
+      if (normalized.peakLeft > 0) normalized.peakLeft = Math.floor(normalized.peakLeft * 2);
+    }
     ctx.mutate.upsertTimedEffect(target, normalized);
     metrics.queuedEffects += 1;
+  }
+  if (isBlessed && metrics.queuedEffects > 0) {
+    ctx.io.emit("potion:blessed_bonus", { actor, itemId, target });
   }
 
   const hangoverPotency = Number(potion?.toxicity?.hangover || 0);

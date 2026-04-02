@@ -40,6 +40,7 @@ import { shopkeeperSystem } from "../rules/systems/shopkeeperSystem.js";
 import { movementSystem, installSpiderWebListener, installMoveAutoPickupListener } from "../rules/systems/movementSystem.js";
 import { intentValidationSystem } from "../rules/systems/intentValidationSystem.js";
 import { combatSystem, installBumpAttackListener } from "../rules/systems/combatSystem.js";
+import { installCombatInteractions } from "../rules/data/combatInteractions.js";
 import { cleanupSystem } from "../rules/systems/cleanupSystem.js";
 import { trapSystem } from "../rules/systems/trapSystem.js";
 import { disarmTrapSystem } from "../rules/systems/disarmTrapSystem.js";
@@ -115,6 +116,8 @@ export function configureWorld(world) {
   installBumpInteractListener(world);
   // Install bump-attack listener for immediate melee-on-bump resolution
   installBumpAttackListener(world);
+  // Install data-driven combat interaction rules (blessed vs undead, frozen shatter, etc.)
+  installCombatInteractions(world);
   // Install monster death hooks once per world
   installMonsterDeathHooks(world);
   // Install taunt listeners once per world

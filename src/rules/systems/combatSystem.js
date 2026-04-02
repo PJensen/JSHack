@@ -264,7 +264,7 @@ function resolveHitRoll(world, {
 
     // Pre-hit hooks
     const procScratch = {};
-    const ctx = makeCombatFrame(world, { attacker: source, defender: target, weaponId: weaponId || 0, damage: dmg, world });
+    const ctx = makeCombatFrame(world, { attacker: source, defender: target, weaponId: weaponId || 0, damage: dmg, damageType, world });
     world.emit('beforeHit', ctx);
     let finalDmg = Math.max(0, Math.floor(ctx.damage));
     finalDmg = applyPendingDamageProcPhase(world, source, buildProcContext('onBeforeHit', {
@@ -275,7 +275,7 @@ function resolveHitRoll(world, {
     runLegacyMonsterHook(world, source, 'onBeforeHit', ctx);
     finalDmg = Math.max(0, Math.floor(ctx.damage));
 
-    const hitCtx = makeCombatFrame(world, { attacker: source, defender: target, weaponId: ctx.weaponId || 0, damage: finalDmg, world });
+    const hitCtx = makeCombatFrame(world, { attacker: source, defender: target, weaponId: ctx.weaponId || 0, damage: finalDmg, damageType, world });
     world.emit('hit', hitCtx);
     finalDmg = Math.max(0, Math.floor(hitCtx.damage));
     finalDmg = applyPendingDamageProcPhase(world, source, buildProcContext('onHit', {

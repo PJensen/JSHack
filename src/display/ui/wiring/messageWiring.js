@@ -617,9 +617,17 @@ export function installMessageWiring({
       }
       return;
     }
-    if (who === 'You') log(`You veil ${tgt}'s sight in darkness.`, 'combat');
-    else if (tgt === 'You') log(`${who} veils your sight in darkness!`, 'danger');
-    else log(`${who} blinds ${tgt}.`, 'combat');
+    if (who === 'You') {
+      log(`You veil ${tgt}'s sight in darkness.`, 'combat');
+      const tni = compGet(Number(targetId || 0), NamedIdentity);
+      if (String(tni?.identity || '') === 'floating_eye') {
+        log("The Floating Eye's gaze dims — its power broken!", 'combat');
+      }
+    } else if (tgt === 'You') {
+      log(`${who} veils your sight in darkness!`, 'danger');
+    } else {
+      log(`${who} blinds ${tgt}.`, 'combat');
+    }
   });
 
   world.on('spell:rampage', ({ actor }) => {
@@ -1841,6 +1849,20 @@ export function installMessageWiring({
   world.on('proc:gaze:stun', () => {
     log('The Floating Eye\'s gaze locks your mind — you are stunned!', 'danger');
   });
+  world.on('channeling:cancelled', ({ actor, spellId, reason }) => {
+    if (String(spellId || '') !== 'gaze_beam') return;
+    if (reason === 'los_break') {
+      log('The Floating Eye\'s gaze fades as it loses sight of you.', 'system');
+    } else if (reason === 'stunned') {
+      log('The Floating Eye\'s concentration shatters!', 'system');
+    } else if (reason === 'caster_moved') {
+      log('The Floating Eye breaks its gaze as it shifts position.', 'system');
+    } else if (reason === 'dead') {
+      // No message needed — the eye is dead.
+    } else {
+      log('The Floating Eye\'s gaze falters.', 'system');
+    }
+  });
 
   // === Mimic events ===
   world.on('mimic:revealed', ({ fromIdentity }) => {
@@ -2009,5 +2031,69 @@ export function installMessageWiring({
   });
   world.on('calendar:newYear', ({ next }) => {
     log(`A new year dawns — Year ${next}.`, 'system');
+  });
+
+  // === Wild Interactions ===
+
+  // Blessed weapon vs undead/demon
+  world.on('combat:blessed_strike', ({ creatureType }) => {
+    const label = creatureType === 'undead' ? 'undead' : 'demon';
+    log(`Your blessed weapon sears the ${label}!`, 'system');
+  });
+  world.on('combat:banish', () => {
+    log('Your blessed weapon banishes the demon back to the abyss!', 'danger');
+  });
+
+  // Frozen shatter combo
+  world.on('combat:shatter', ({ damageType, mult }) => {
+    if (damageType === 'blunt') {
+      log('The frozen enemy shatters under the blow!', 'system');
+    } else {
+      log('Your weapon pierces through the brittle ice!', 'system');
+    }
+  });
+
+  // Heal damages undead
+  world.on('spell:heal:undead', () => {
+    log('Healing energy sears through the undead!', 'system');
+  });
+
+  // Lightning backlash in water
+  world.on('spell:lightning:backlash', ({ damage }) => {
+    log(`The current surges through the water beneath you! (-${damage} HP)`, 'danger');
+  });
+
+  // Blessed potion bonus
+  world.on('potion:blessed_bonus', () => {
+    log('The blessed potion surges with amplified power!', 'system');
+  });
+
+  // Scroll wasted while blinded
+  world.on('scroll:wasted_blind', () => {
+    log('You fumble blindly at the scroll — the words blur and fade to nothing!', 'warning');
+  });
+
+  // Blessed metal resists rust
+  world.on('proc:blessed_resist_rust', ({ itemName }) => {
+    log(`The blessing on your ${bracketizeName(String(itemName || 'equipment'))} flares, repelling the corrosion!`, 'system');
+  });
+
+  // Holy water thrown at undead
+  world.on('holy_water:undead', ({ target }) => {
+    const tname = nameOfEntity(target) || 'undead';
+    log(`The holy water scalds ${tname}!`, 'system');
+  });
+
+  // Starving choke
+  world.on('hunger:choke', () => {
+    log('You wolf down the food so fast you choke! You are stunned!', 'warning');
+  });
+
+  // Gas trap explosion
+  world.on('trap:gas_explosion', () => {
+    log('The gas ignites — BOOM! A fiery explosion engulfs the area!', 'danger');
+  });
+  world.on('trap:gas', () => {
+    log('A cloud of noxious gas billows from the trap!', 'warning');
   });
 }

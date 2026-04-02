@@ -446,11 +446,13 @@ export function aiChaseSystem(world) {
       const nx = (pos.x | 0) + dx;
       const ny = (pos.y | 0) + dy;
       if (!isStepTraversable(world, id, nx, ny, targetX, targetY, canTraverseTile)) {
+        const intel = Number(brain?.intelligence ?? def?.intelligence ?? 10);
         const next = findNextCardinalStep(world, pos.x | 0, pos.y | 0, targetX, targetY, id, {
           goalRadius: 0,
           maxNodes: 256,
           isPassable: canTraverseTile,
           passThroughDoors: canOpenDoors,
+          searchPadding: Math.max(4, Math.min(intel, 16)),
         });
         if (next) {
           dx = next.dx | 0;
