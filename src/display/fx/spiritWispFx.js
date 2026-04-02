@@ -333,8 +333,15 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
     // Compute position — prayer shrinks orbit to zero (spiral inward)
     const orbitR = _orbitRadius() * (1 - prayerT * 0.9);
     const bob = Math.sin(_fxTime * BOB_FREQ * Math.PI * 2) * BOB_AMP * (1 - prayerT);
-    _x = _anchorX + Math.cos(_phase) * orbitR;
-    _y = _anchorY + Math.sin(_phase) * orbitR * 0.6 + bob;
+    // Blend smooth orbit toward angular/harsh motion with wrath
+    const smoothX = Math.cos(_phase);
+    const smoothY = Math.sin(_phase);
+    // Triangle wave: linear zig-zag, sharp direction reversals
+    const triX = (2 / Math.PI) * Math.asin(smoothX);
+    const triY = (2 / Math.PI) * Math.asin(smoothY);
+    const w = Math.min(1, _wrath * 1.5); // 0 = smooth, 1 = fully angular
+    _x = _anchorX + (smoothX + (triX - smoothX) * w) * orbitR;
+    _y = _anchorY + (smoothY + (triY - smoothY) * w) * orbitR * 0.6 + bob;
 
     // Chaos jitter
     if (_chaos > 0.05) {

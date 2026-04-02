@@ -1344,6 +1344,16 @@ const { buildGroundPickupDetailAt } = installInventoryDataProvider({
   tombstoneRepo,
 });
 
+// Camera zoom buttons on the vitals gauge
+addEventListener('ui:zoom', (e) => {
+  const f = Math.max(0.5, Math.min(1.5, Number(e.detail?.factor) || 1));
+  const minS = TILE_PX * 0.5;
+  const maxS = TILE_PX * 4.0;
+  const current = (cam.targetScale || cam.scale || TILE_PX);
+  const next = Math.max(minS, Math.min(maxS, current * f));
+  zoomTo(cam, next);
+});
+
 // Active spell button click → cast (or open spell picker if none active)
 addEventListener('ui:castActiveSpell', () => {
   if (isSimUiBlocked()) return;
