@@ -24,7 +24,7 @@ import { hasLOS } from "../../shared/math/gridLOS.js";
 import { bresenhamLine } from "../../shared/math/bresenham.js";
 import { dealDamage } from "../utils/dealDamage.js";
 import { findNearestValidTileAround } from "../utils/queries.js";
-import { combatSeed, hashString32, mulberry32 } from "../utils/rng.js";
+import { combatSeed, hashString32, mulberry32, rollDice, pct } from "../utils/rng.js";
 import { statusStrength } from "../utils/statusFacade.js";
 import { upsertTimedEffect } from "../utils/effectSemantics.js";
 import { emitSafe } from "../utils/emitSafe.js";
@@ -47,9 +47,25 @@ import { Channeling } from "../components/Channeling.js";
 import { KnockbackPending } from "../components/KnockbackPending.js";
 import { AggroState, AGGRO_LEVELS, SEARCH_TURNS_ALERTED } from "../components/AggroState.js";
 import { hasEquippedProcPackageInSlot } from "../utils/spellProcGear.js";
+import { resolveCombatSnapshot } from "../utils/resolveCombatSnapshot.js";
+import { CreatureType, CREATURE_TYPES } from "../components/CreatureType.js";
+import { getTile } from "../environment/dungeon/tileMap.js";
+import { TILE_WATER, TILE_SHALLOW_WATER, TILE_WATER_DEEP } from "../environment/dungeon/constants.js";
+import { WeatherState } from "../components/WeatherState.js";
+import {
+  calculateBlindedPhysicalDamage,
+  getBlindedCritChanceBonusPct,
+  getBlindedCritMultBonus,
+} from "../utils/blindnessExposure.js";
 import { Web } from "../archetypes/RoomFeatures.js";
 import { spawnWeb } from "../utils/spawnWeb.js";
 import { ALL_DIRS } from "../utils/directions.js";
+
+/** @returns {any|null} */
+function _getWeather(world) {
+  for (const [, ws] of world.query(WeatherState)) return ws;
+  return null;
+}
 
 const FLASH_HEAL_TUNING = Object.freeze({
   healFraction: 0.22,
@@ -391,6 +407,10 @@ REGISTRY['lightning'] = function lightningScript(world, actor, spell, intent) {
     chain.push(best);
   }
 
+  // Rain boosts lightning: +50% damage
+  const _ws = _getWeather(world);
+  const _rainMult = (_ws && (_ws.current === 'rain' || _ws.current === 'heavy_rain')) ? 1.5 : 1.0;
+
   // Apply damage along the chain and emit semantic bolt events for display
   for (let i=0; i<chain.length; i++) {
     const segFrom = (i === 0) ? { x: apos.x, y: apos.y } : { x: chain[i-1].x, y: chain[i-1].y };
@@ -398,10 +418,11 @@ REGISTRY['lightning'] = function lightningScript(world, actor, spell, intent) {
     const targetId = chain[i].id;
     emitSafe(world, 'spell:bolt', { actor, targetId, spellId: spell.id, from: segFrom, to: segTo, chainIndex: i });
 
-    // Damage model: base 7 → attenuate per chain
-    const base = (hasConductionLens && i >= CHAIN_MAX)
+    // Damage model: base 7 → attenuate per chain, boosted by rain
+    const rawBase = (hasConductionLens && i >= CHAIN_MAX)
       ? Math.max(1, Math.round(7 * 0.4))
       : Math.max(1, Math.round(7 * Math.pow(0.7, i)));
+    const base = Math.max(1, Math.round(rawBase * _rainMult));
     dealDamage(world, buildSpellDamageSpec(world, actor, targetId, {
       spell,
       baseAmount: base,
@@ -413,6 +434,27 @@ REGISTRY['lightning'] = function lightningScript(world, actor, spell, intent) {
   }
   if (hasConductionLens && chain.length > CHAIN_MAX) {
     emitSafe(world, "proc:conductionLens", { actor, spellId: spell.id, extraChains: chain.length - CHAIN_MAX });
+  }
+
+  // ── Rain bonus: +50% damage and +1 chain target in rain ──────────
+  // (applied above via damage model; here we just emit the semantic)
+  const ws = _getWeather(world);
+  const isRaining = ws && (ws.current === 'rain' || ws.current === 'heavy_rain');
+
+  // ── Lightning in water: caster takes backlash ────────────────────
+  const WATER_TILES_LIGHTNING = new Set([7, 15, 17]); // TILE_WATER, TILE_WATER_DEEP, TILE_SHALLOW_WATER
+  const casterTile = getTile(apos.x | 0, apos.y | 0);
+  if (WATER_TILES_LIGHTNING.has(casterTile) && chain.length > 0) {
+    const backlashDmg = Math.max(1, Math.round(7 * 0.5));
+    dealDamage(world, buildSpellDamageSpec(world, actor, actor, {
+      spell,
+      baseAmount: backlashDmg,
+      type: 'electric',
+      cause: 'spell:lightning:backlash',
+      at: { x: apos.x, y: apos.y },
+      salt: 0xBAC1,
+    }));
+    emitSafe(world, 'spell:lightning:backlash', { actor, damage: backlashDmg });
   }
 };
 
@@ -620,7 +662,6 @@ REGISTRY['phase_strike'] = function phaseStrikeScript(world, actor, spell, inten
   }
 
   // Walk the Bresenham line and collect hit enemies (no duplicates)
-  const STRIKE_DMG = 6;
   const STUN_TURNS = 3;
   /** @type {Array<{id:number, x:number, y:number}>} */
   const hits = [];
@@ -639,16 +680,54 @@ REGISTRY['phase_strike'] = function phaseStrikeScript(world, actor, spell, inten
   world.set(actor, Position, { x: landing.x | 0, y: landing.y | 0 });
   emitSafe(world, 'moved', { id: actor, from, to: { x: landing.x | 0, y: landing.y | 0 } });
 
+  // Resolve weapon + gear stats for damage pipeline
+  const atkEq = /** @type any */ (world.get(actor, Equipment));
+  const weaponId = atkEq?.weapon || 0;
+  const atkSnapshot = resolveCombatSnapshot(world, actor, { mode: 'melee' });
+
+  // Determine weapon dice and damage type
+  let baseDice = null;
+  let damageType = 'physical';
+  if (weaponId) {
+    const info = /** @type any */ (world.get(weaponId, ItemInfo));
+    baseDice = info?.damageDice ? String(info.damageDice) : null;
+    const rawType = String(info?.damageType || 'physical').toLowerCase();
+    if (rawType === 'blunt' || rawType === 'slash' || rawType === 'pierce') damageType = rawType;
+  }
+  if (!baseDice) baseDice = world.has(actor, Player) ? '1d2' : '1d8';
+
   // Apply damage and stun to each hit enemy
   for (const h of hits) {
-    dealDamage(world, buildSpellDamageSpec(world, actor, h.id, {
-      spell,
-      baseAmount: STRIKE_DMG,
-      type: 'physical',
-      cause: 'spell:phase_strike',
-      at: { x: h.x, y: h.y },
-      salt: h.id,
-    }));
+    const defSnapshot = resolveCombatSnapshot(world, h.id, { mode: 'melee' });
+    const blindExposure = Math.max(0, Number(defSnapshot?.status?.blinded || 0));
+    const hitSeed = combatSeed(world.seed, world.step, actor, h.id, 0xB11E7);
+    const r = mulberry32(hitSeed);
+
+    // Roll weapon damage + gear flat bonus
+    const damageRoll = rollDice(baseDice, r);
+    let dmg = Math.max(0, Math.floor(damageRoll + atkSnapshot.damageFlatBonus));
+
+    // Crit resolution (gear crit chance + blind bonus)
+    let isCrit = false;
+    const blindCritBonusPct = getBlindedCritChanceBonusPct(blindExposure);
+    const critPct = (atkSnapshot.critChance * 100) + (atkSnapshot.luck || 0) + blindCritBonusPct;
+    if (critPct > 0) isCrit = pct(r, critPct);
+    const blindCritMultBonus = getBlindedCritMultBonus(blindExposure);
+    const critMult = 2 + (atkSnapshot.critMult || 0) + blindCritMultBonus;
+    if (isCrit) dmg = Math.max(1, Math.floor(dmg * critMult));
+
+    // Blind physical damage bonus
+    dmg = calculateBlindedPhysicalDamage(dmg, blindExposure);
+
+    // Gear damage multiplier
+    if (atkSnapshot.damageMult > 1) dmg = Math.max(1, Math.floor(dmg * atkSnapshot.damageMult));
+
+    dealDamage(world, {
+      target: h.id, amount: Math.max(1, dmg), source: actor,
+      type: damageType, cause: 'spell:phase_strike',
+      critical: isCrit,
+    });
+
     // Apply stun via ActiveEffects
     let ae = /** @type any */ (world.get(h.id, ActiveEffects));
     if (!ae) {
@@ -1043,12 +1122,12 @@ REGISTRY['heal'] = function healScript(world, actor, spell, intent) {
     const maxRange = Math.max(1, Number.isFinite(spell?.range) ? (Number(spell.range) | 0) : 6);
     const dist = chebyshev(apos, { x: tx | 0, y: ty | 0 });
     if (dist <= maxRange) {
-      // Find entity at target position
+      // Find entity at target position — allow targeting undead enemies too
       for (const [id, p] of world.query(Position)) {
         if (p.x === (tx | 0) && p.y === (ty | 0)) {
           const fac = /** @type any */ (world.get(id, Faction));
-          // Can heal allies or self, not enemies
-          if (!fac || fac.key === 'ally' || id === actor) {
+          const ct = world.get(id, CreatureType);
+          if (!fac || fac.key === 'ally' || id === actor || ct?.type === CREATURE_TYPES.undead) {
             targetId = id;
             targetPos = { x: p.x, y: p.y };
             break;
@@ -1058,22 +1137,36 @@ REGISTRY['heal'] = function healScript(world, actor, spell, intent) {
     }
   }
 
-  // Check if target needs healing
-  const vit = /** @type any */ (world.get(targetId, Vitality));
-  const hpCap = effectiveMaxHp(world, targetId, vit);
-  if (!vit || (vit.hp | 0) >= hpCap) {
-    // No healing needed
-    emitSafe(world, 'spell:heal', { actor, targetId, at: targetPos, amount: 0, reason: 'full_health' });
-    return;
-  }
-
-  // Calculate heal amount: 20-35 based on intelligence (if available)
+  // Calculate heal/damage amount: 20-35 based on intelligence
   const brain = /** @type any */ (world.get(actor, Brain));
   const intBonus = brain?.intelligence ? Math.floor((brain.intelligence - 10) / 2) : 0;
   const healSalt = (((apos.x | 0) & 0xffff) << 16) ^ ((apos.y | 0) & 0xffff);
   const r = mulberry32(combatSeed(world.seed, world.step, actor, targetId, healSalt));
   const baseHeal = 20 + (r() * 16) | 0; // 20-35
   const amount = Math.max(1, baseHeal + intBonus);
+
+  // Heal damages undead — positive energy sears the dead
+  const targetCT = world.get(targetId, CreatureType);
+  if (targetCT?.type === CREATURE_TYPES.undead) {
+    dealDamage(world, buildSpellDamageSpec(world, actor, targetId, {
+      spell,
+      baseAmount: amount,
+      type: 'holy',
+      cause: 'spell:heal',
+      at: targetPos,
+      salt: 0x4EA1,
+    }));
+    emitSafe(world, 'spell:heal:undead', { actor, targetId, at: targetPos, amount });
+    return;
+  }
+
+  // Check if target needs healing
+  const vit = /** @type any */ (world.get(targetId, Vitality));
+  const hpCap = effectiveMaxHp(world, targetId, vit);
+  if (!vit || (vit.hp | 0) >= hpCap) {
+    emitSafe(world, 'spell:heal', { actor, targetId, at: targetPos, amount: 0, reason: 'full_health' });
+    return;
+  }
 
   // Apply healing
   const oldHp = vit.hp | 0;
@@ -2278,6 +2371,53 @@ REGISTRY['drain_life'] = function drainLifeScript(world, actor, spell, intent) {
     from: { x: apos.x | 0, y: apos.y | 0 },
     to: { x: targetPos.x | 0, y: targetPos.y | 0 },
     turnsLeft: null,
+  });
+};
+
+// Gaze Beam — floating eye channeled psychic attack.
+// On cast completion: stun + mindwipe stack. Configurable via spell tuning.
+REGISTRY['gaze_beam'] = function gazeBeamScript(world, actor, spell, intent) {
+  const targetId = Number(intent?.targetId || 0) | 0;
+  if (!(targetId > 0)) return;
+  const tVit = /** @type any */ (world.get(targetId, Vitality));
+  if (!tVit || (tVit.hp | 0) <= 0) return;
+
+  const stunDuration = Math.max(1, Number(spell?.stunTurns ?? 3) | 0);
+  const stackLimit = Math.max(1, Number(spell?.stackLimit ?? 4) | 0);
+  const stunTurnsLeft = stunDuration + 1; // effectSystem decrements on application tick
+
+  const ae = ensureActiveEffects(world, targetId);
+  if (!ae) return;
+
+  // Apply or extend stun
+  const existingStun = ae.effects.find(e => e.key === 'stun');
+  if (existingStun) {
+    existingStun.turnsLeft = Math.max(Number(existingStun.turnsLeft) || 0, stunTurnsLeft);
+    existingStun.potency = Math.max(Number(existingStun.potency) || 1, 1);
+    existingStun.stacks = Math.max(Number(existingStun.stacks) || 1, 1);
+  } else {
+    ae.effects.push({ key: 'stun', turnsLeft: stunTurnsLeft, potency: 1, stacks: 1 });
+  }
+
+  // Apply or increment mindwipe (up to limit)
+  const existingMW = ae.effects.find(e => e.key === 'mindwipe');
+  if (existingMW) {
+    const currentStacks = Math.max(1, Number(existingMW.stacks) || 1);
+    if (currentStacks < stackLimit) {
+      existingMW.stacks = currentStacks + 1;
+      existingMW.potency = existingMW.stacks;
+    }
+    existingMW.turnsLeft = Math.max(existingMW.turnsLeft, 3);
+  } else {
+    ae.effects.push({ key: 'mindwipe', turnsLeft: 3, potency: 1, stacks: 1 });
+  }
+  world.set(targetId, ActiveEffects, ae);
+
+  emitSafe(world, 'proc:gaze:stun', { actor, target: targetId, duration: stunDuration });
+  emitSafe(world, 'proc:gaze:mindwipe', {
+    actor,
+    target: targetId,
+    stacks: ae.effects.find(e => e.key === 'mindwipe')?.stacks ?? 1,
   });
 };
 

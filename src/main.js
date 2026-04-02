@@ -2755,6 +2755,7 @@ function queueDepthTransition(targetDepth, opts = {}) {
     targetPos,
     fragActorsAtTarget: opts?.fragActorsAtTarget === true,
     returnTicket,
+    homecomingLanding: opts?.homecomingLanding === true,
   };
 }
 
@@ -2792,31 +2793,39 @@ function destroyReturnPortals() {
   }
 }
 
-function spawnReturnPortal(ticket) {
+function spawnReturnPortal(ticket, atFountain = false) {
   const pe = playerEntity(world);
   if (!pe) return 0;
   destroyReturnPortals();
 
   /** @type {{ x:number, y:number }|null} */
+  let fountainPos = null;
+  /** @type {{ x:number, y:number }|null} */
   let bedPos = null;
   /** @type {{ x:number, y:number }|null} */
   let chestPos = null;
   for (const [, pos, ni] of world.query(Position, NamedIdentity)) {
-    if (ni?.identity === 'bed_home') {
+    if (ni?.identity === 'fountain') {
+      fountainPos = { x: pos.x | 0, y: pos.y | 0 };
+    } else if (ni?.identity === 'bed_home') {
       bedPos = { x: pos.x | 0, y: pos.y | 0 };
-      continue;
-    }
-    if (ni?.identity === 'chest') {
+    } else if (ni?.identity === 'chest') {
       chestPos = { x: pos.x | 0, y: pos.y | 0 };
     }
   }
 
-  const portalPos = (bedPos && chestPos)
-    ? {
+  let portalPos;
+  if (atFountain && fountainPos) {
+    // Place portal one tile south of the fountain so it's visible and accessible
+    portalPos = { x: fountainPos.x, y: fountainPos.y + 1 };
+  } else if (bedPos && chestPos) {
+    portalPos = {
       x: Math.floor((bedPos.x + chestPos.x) / 2),
       y: Math.floor((bedPos.y + chestPos.y) / 2),
-    }
-    : { x: pe.pos.x, y: pe.pos.y };
+    };
+  } else {
+    portalPos = { x: pe.pos.x, y: pe.pos.y };
+  }
 
   const portalId = world.create();
   world.add(portalId, Position, { x: portalPos.x, y: portalPos.y });
@@ -2903,8 +2912,28 @@ function flushPendingStairTransition() {
       transitionToDepth(world, newDepth, { x: 0, y: 0 }, { direction, stairPos: pending.stairPos || null, tombstoneRepo });
     }
 
+    // Homecoming landing: reposition player at the town fountain
+    if (newDepth === 0 && pending.homecomingLanding) {
+      let fountainPos = null;
+      for (const [, pos, ni] of world.query(Position, NamedIdentity)) {
+        if (ni?.identity === 'fountain') {
+          fountainPos = { x: pos.x | 0, y: pos.y | 0 };
+          break;
+        }
+      }
+      if (fountainPos) {
+        for (const [id] of world.query(Player)) {
+          world.set(id, Position, { x: fountainPos.x, y: fountainPos.y });
+          break;
+        }
+        for (const [id] of world.query(Pet, PetState)) {
+          world.set(id, Position, { x: fountainPos.x, y: fountainPos.y });
+        }
+      }
+    }
+
     if (newDepth === 0 && pending.returnTicket && pending.returnTicket.depth > 0) {
-      spawnReturnPortal(pending.returnTicket);
+      spawnReturnPortal(pending.returnTicket, pending.homecomingLanding);
     }
 
     // Invalidate cached world view
@@ -2933,8 +2962,10 @@ world.on('stair:traverse', ({ actor, direction, targetId }) => {
 });
 
 world.on('dungeon:teleport-depth', ({ targetDepth, source, returnTicket }) => {
+  const isHomecoming = String(source || '') === 'scroll_homecoming' || String(source || '') === 'hearthstone';
   queueDepthTransition(targetDepth, {
-    returnTicket: (String(source || '') === 'scroll_homecoming' || String(source || '') === 'hearthstone') ? returnTicket : null,
+    returnTicket: isHomecoming ? returnTicket : null,
+    homecomingLanding: isHomecoming,
   });
 });
 
@@ -3972,6 +4003,15 @@ const displayRuntime = setupDisplayRuntime({
     if (!lightingEngine || typeof lightingEngine.getFloorReliefState !== "function") return "__default__";
     return lightingEngine.getFloorReliefState()?.reliefKey ?? "__default__";
   },
+  sampleMood: () => {
+    const pe = playerEntity(world);
+    if (!pe) return null;
+    const dev = /** @type {any} */ (world.get(pe.id, Devotion));
+    if (!dev?.deityId) return null;
+    const deity = getDeityInstance(dev.deityId);
+    if (!deity) return null;
+    return deity._queryPrecise();
+  },
 });
 const {
   statusEmitterFx,
@@ -3982,6 +4022,7 @@ const {
   spellAreaFx,
   cloudFx,
   surfaceAreaFx,
+  spiritWispFx,
   ftext,
   goreTick,
 } = displayRuntime;
@@ -4020,6 +4061,7 @@ const _roofSmokeParticleStamp = new Map();
 /** @type {Array<{ id:number, pos:{x:number,y:number}, hp:number, maxHp:number, isPet?:boolean }>} */
 const _healthBarsToDraw = [];
 const _groundLootLabels = [];
+const _monsterLabels = [];
 const _memoryGlyphByKind = new Map();
 const HP_BAR_MEANINGFUL_RATIO_DELTA = 0.08;
 const HP_BAR_SHOW_SECONDS = 2.25;
@@ -4573,6 +4615,31 @@ function drawGroundLootLabels(ctx, labels, fxTime) {
     const y = rec.y - 0.55 + bob;
     ctx.strokeStyle = "rgba(0,0,0,0.75)";
     ctx.lineWidth = 0.06;
+    ctx.strokeText(rec.text, rec.x, y);
+    ctx.fillStyle = rec.color;
+    ctx.fillText(rec.text, rec.x, y);
+  }
+  ctx.restore();
+}
+
+function monsterLabelFromKind(kind) {
+  const key = String(kind || '').trim();
+  if (!key || key === 'default') return '';
+  return key.split('_').filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
+function drawMonsterLabels(ctx, labels, fxTime) {
+  if (!Array.isArray(labels) || labels.length <= 0) return;
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  ctx.font = '600 0.15px monospace';
+  for (let i = 0; i < labels.length; i++) {
+    const rec = labels[i];
+    if (!rec) continue;
+    const y = rec.y - 0.52;
+    ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+    ctx.lineWidth = 0.04;
     ctx.strokeText(rec.text, rec.x, y);
     ctx.fillStyle = rec.color;
     ctx.fillText(rec.text, rec.x, y);
@@ -5337,6 +5404,7 @@ function render(worldView) {
   _stackSeqMeta.clear(); // "x,y" -> best stackSeq seen
   _healthBarsToDraw.length = 0;
   _groundLootLabels.length = 0;
+  _monsterLabels.length = 0;
   flyingFx.syncWorldView(worldView);
   delayedDeathFx.syncWorldView(worldView);
   const renderEntities = delayedDeathFx.getRenderableEntities(worldView.entities);
@@ -5457,6 +5525,28 @@ function render(worldView) {
     }
     if (shouldShowHealthBar(renderEntity, _fxTime)) {
       _healthBarsToDraw.push(renderEntity);
+    }
+
+    // Monster name labels — hostile actors only, visible and within range
+    if (
+      (renderEntity.layer | 0) === 300
+      && renderEntity.showHealthBar
+      && !renderEntity.isPet
+      && !hasTag(renderEntity, 'memory_recent')
+      && !hasTag(renderEntity, 'esp_sensed')
+      && !hasTag(renderEntity, 'thermal_sensed')
+      && (!worldView?.isVisible || worldView.isVisible(renderEntity.pos.x, renderEntity.pos.y))
+    ) {
+      const label = monsterLabelFromKind(renderEntity.kind);
+      if (label) {
+        _monsterLabels.push({
+          id: renderEntity.id,
+          x: renderEntity.pos.x,
+          y: renderEntity.pos.y,
+          text: label,
+          color: '#e8d4c0',
+        });
+      }
     }
 
     // Glyph-FX: passive glow aura for entities tagged "glowing"
@@ -5829,6 +5919,7 @@ function render(worldView) {
 
 
   drawGroundLootLabels(bctx, _groundLootLabels, _fxTime);
+  drawMonsterLabels(bctx, _monsterLabels, _fxTime);
 
   for (let i = 0; i < _healthBarsToDraw.length; i++) {
     drawEntityHealthBar(bctx, _healthBarsToDraw[i]);
@@ -5840,7 +5931,7 @@ function render(worldView) {
   // of the darkness, while tiles + entities are properly darkened.
   if (PERF.quality !== 'low') {
     const _lights = collectLightSources(worldView, { quality: PERF.quality, fxTime: _fxTime, dt: _dtSec });
-    collectFxLights(_lights, { boltFx, spellAreaFx, projectileFx, cloudFx, surfaceAreaFx, statusEmitterFx });
+    collectFxLights(_lights, { boltFx, spellAreaFx, projectileFx, cloudFx, surfaceAreaFx, statusEmitterFx, spiritWispFx });
     const _ambient = computeAmbient(worldView);
     const _roofMask = worldView.isOverworld ? isRoofed : null;
     const _visionDef = getVisionDef();
@@ -5896,6 +5987,7 @@ function render(worldView) {
     projectileFx,
     throwFx,
     cloudFx,
+    spiritWispFx,
     fx,
     PERF,
   });
@@ -6026,7 +6118,7 @@ function frame(now) {
   // Advance display-only systems (fx.step moved below — needs worldView for emitter origins)
   updateCamera(cam, dtSec);
   updateShake(cam, dtSec);
-  tickDisplayEffects({ dtSec, boltFx, spellAreaFx, projectileFx, throwFx, cloudFx, ftext, goreTick });
+  tickDisplayEffects({ dtSec, boltFx, spellAreaFx, projectileFx, throwFx, cloudFx, spiritWispFx, ftext, goreTick });
   delayedDeathFx.tick(dtSec);
   flyingFx.tick(dtSec);
   sceneRuntime.tick(dtSec);
@@ -6048,6 +6140,9 @@ function frame(now) {
   if (view.player && !cam._detached) {
     followEntity(cam, view.player.pos, dtSec, 6.0);
   }
+
+  // Sync spirit wisp depth (dungeon only)
+  spiritWispFx.setDepth(view.currentDepth ?? 0);
 
   // Status particle emitter reconciliation + advance particles
   if (PERF.particleCapacity > 0) {

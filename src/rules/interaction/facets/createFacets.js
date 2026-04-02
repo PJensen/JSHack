@@ -376,6 +376,7 @@ export function createFacets(init) {
       const castTime = Number(spell?.castTime || 0) | 0;
       if (castTime > 0) {
         const safeIntent = (intent && typeof intent === "object") ? intent : {};
+        const casterPos = world.get(actorId | 0, Position);
         try {
           world.add(actorId | 0, Channeling, {
             turnsRemaining: castTime,
@@ -384,6 +385,10 @@ export function createFacets(init) {
             targetId: safeIntent.targetId ? (Number(safeIntent.targetId) | 0) : (actorId | 0),
             x: safeIntent.x != null ? (Number(safeIntent.x) | 0) : null,
             y: safeIntent.y != null ? (Number(safeIntent.y) | 0) : null,
+            breakOnNoLos: !!spell?.breakOnNoLos,
+            breakOnMove: !!spell?.breakOnMove,
+            anchorX: casterPos ? (casterPos.x | 0) : null,
+            anchorY: casterPos ? (casterPos.y | 0) : null,
           });
         } catch {}
         emitSafe(world, 'channeling:start', { actor: actorId | 0, spellId: spell.id, castTime });

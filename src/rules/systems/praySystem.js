@@ -10,7 +10,8 @@ import { Equipment, NON_AMMO_GEAR_SLOTS } from "../components/Equipment.js";
 import { Beatitude } from "../components/Beatitude.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { resolvePlayerActiveDeity } from "./deitySystem.js";
-import { hasStatus } from "../utils/statusFacade.js";
+import { hasStatus, statusStrength } from "../utils/statusFacade.js";
+import { ActiveEffects } from "../components/ActiveEffects.js";
 import { getHungerLevel } from "../data/food.js";
 import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { HealthPotion } from "../archetypes/Items.js";
@@ -111,6 +112,7 @@ function applyPrayerBoon(world, actorId, context) {
   const troubled = !!distress?.troubled;
 
   const candidates = [];
+  if (needs.includes('extinguish')) candidates.push('extinguish');
   if (desperate || hpRatio < 0.65 || needs.includes('healing')) candidates.push('renewal');
   if (mana && (manaRatio < 0.75 || needs.includes('cure'))) candidates.push('mana_surge');
   if (needs.includes('cure') || needs.includes('blessing')) candidates.push('cleanse');
@@ -121,6 +123,28 @@ function applyPrayerBoon(world, actorId, context) {
 
   const pickIndex = Math.floor(deterministicRoll(world, actorId, Number(world.step || 0) + candidates.length) * candidates.length);
   const boon = candidates[Math.max(0, Math.min(candidates.length - 1, pickIndex))] || 'fortune';
+
+  // Extinguish boon: deity puts out fire and heals a small amount
+  if (boon === 'extinguish') {
+    const ae = world.get(actorId, ActiveEffects);
+    if (ae && Array.isArray(ae.effects)) {
+      ae.effects = ae.effects.filter(e => e.key !== 'burn' && e.key !== 'burning');
+    }
+    if (vit) {
+      const cap = effectiveMaxHp(world, actorId, vit);
+      const heal = Math.max(2, Math.floor(cap * 0.1 * Math.max(0.75, prayerPower)));
+      const before = vit.hp;
+      vit.hp = Math.min(cap, vit.hp + heal);
+      const applied = Math.max(0, vit.hp - before);
+      if (applied > 0) emitSafe(world, 'healed', { id: actorId, amount: applied, source: 'divine' });
+    }
+    emitBoon(world, {
+      actor: actorId, deityId, deityName,
+      boon: 'extinguish',
+      message: `${deityName} douses the flames that consume you.`,
+    });
+    return true;
+  }
 
   if (boon === 'renewal' && vit) {
     const renewalCap = effectiveMaxHp(world, actorId, vit);
@@ -331,7 +355,10 @@ export function praySystem(world) {
           const distressBonus = distress.severity * 0.56;
           const pityBonus = Math.min(0.44, streak * 0.08);
           const droughtBonus = sinceBoon > 10 ? 0.12 : 0;
-          const chance = Math.min(0.92, baseChance + distressBonus + pityBonus + droughtBonus);
+          // Praying at 1 HP: even an unfavorable deity might answer
+          const playerVit = world.get(id, Vitality);
+          const deathsDoorBonus = (playerVit && (playerVit.hp | 0) <= 1) ? 0.35 : 0;
+          const chance = Math.min(0.95, baseChance + distressBonus + pityBonus + droughtBonus + deathsDoorBonus);
           const roll = deterministicRoll(world, id, streak + 17);
 
           if (roll < chance) {
@@ -412,6 +439,10 @@ function assessDistress(world, playerId) {
   if (hasStatus(world, playerId, 'bleeding')) {
     needs.push('healing');
     severity += 0.5;
+  }
+  if (statusStrength(world, playerId, 'burning') > 0 || statusStrength(world, playerId, 'burn') > 0) {
+    needs.push('extinguish');
+    severity += 0.6;
   }
 
   // Cap severity at 1.0

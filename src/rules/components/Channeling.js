@@ -10,6 +10,9 @@ import { defineComponent } from "../../lib/ecs-js/index.js";
  * spellId:        the spell being channeled.
  * targetId:       entity target (0 = self).
  * x, y:           optional tile target coordinates.
+ * breakOnNoLos:   if true, cancel the channel when caster loses LOS to targetId.
+ * breakOnMove:    if true, cancel the channel when caster moves from anchorX/anchorY.
+ * anchorX, anchorY: caster position when channel started (used by breakOnMove).
  */
 export const Channeling = defineComponent("Channeling", {
   mode: "cast",
@@ -20,4 +23,8 @@ export const Channeling = defineComponent("Channeling", {
   targetId: 0,
   x: null,
   y: null,
+  breakOnNoLos: false,
+  breakOnMove: false,
+  anchorX: null,
+  anchorY: null,
 });

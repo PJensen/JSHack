@@ -525,22 +525,17 @@ function findFireHazardAt(world, x, y) {
 }
 
 /**
- * Gaze aura: the monster must maintain LOS for `exposureTurns` consecutive turns.
- * On the threshold turn, the target is stunned and gains one stack of mindwipe.
- * Breaking LOS resets the exposure counter, and repeated exposure can retrigger.
- * Each turn in LOS emits an escalating `proc:gaze:message` event for UI wiring.
+ * Gaze aura: starts a channeled gaze_beam spell when the eye has LOS.
+ * The channeling system handles countdown, interruption (stun/silence/LOS break),
+ * and fires the gaze_beam script on completion (stun + mindwipe).
+ * Each turn in LOS emits escalating `proc:gaze:message` and `proc:gaze:charging`
+ * events for UI wiring.
  *
- * @param {number} [stackLimit=4]   - max mindwipe stacks after exposure is complete
- * @param {number} [exposureTurns=5] - consecutive LOS turns before mindwipe applies
- * @param {number} [stunTurns=5] - blocked turns granted by the gaze proc
+ * @param {number} [exposureTurns=8] - channel duration (turns before gaze fires)
  */
-export function gazeOnLOS(stackLimit = 4, exposureTurns = 5, stunTurns = 5) {
-  const limit = Math.max(1, Math.trunc(stackLimit));
-  const threshold = Math.max(1, Math.trunc(exposureTurns));
-  const stunDuration = Math.max(1, Math.trunc(stunTurns));
-  const stunTurnsLeft = stunDuration + 1;
+export function gazeOnLOS(exposureTurns = 8) {
+  const castTime = Math.max(1, Math.trunc(exposureTurns));
 
-  /** Escalating messages: indices 0...threshold-2 are warnings; index threshold-1 triggers the proc. */
   const MESSAGES = [
     "The Floating Eye's unblinking gaze washes over you.",
     "Your thoughts feel sluggish under its stare...",
@@ -551,74 +546,53 @@ export function gazeOnLOS(stackLimit = 4, exposureTurns = 5, stunTurns = 5) {
 
   return (ctx) => {
     if (!ctx || ctx.cancelled) return;
+    const world = ctx.world;
+    const actor = ctx.actor | 0;
+    const target = ctx.target | 0;
+    const now = (Number(world.step) || 0) | 0;
 
-    const now = (Number(ctx.world.step) || 0) | 0;
-    const store = ensureGazeExposureState(ctx.world);
-    const slot = `${ctx.actor | 0}:${ctx.target | 0}`;
-    const rec = store.get(slot) || { count: 0, lastTurn: -1e9 };
-
-    // whileLOS hooks now fire every world turn the eye has sight, so any gap
-    // longer than one turn means line of sight was broken and charge resets.
-    if (now - rec.lastTurn > 1) {
-      rec.count = 0;
-    }
-
-    rec.count++;
-    rec.lastTurn = now;
-    store.set(slot, rec);
-
-    // Emit escalating message (turn 1 through threshold, capped at last message)
-    const msgIdx = Math.min(rec.count - 1, MESSAGES.length - 1);
-    ctx.emit('proc:gaze:message', {
-      actor:   ctx.actor,
-      target:  ctx.target,
-      step:    rec.count,
-      message: MESSAGES[msgIdx],
-    });
-
-    if (rec.count < threshold) {
+    // If already channeling gaze_beam, emit progress events
+    const ch = world.has(actor, Channeling) ? world.get(actor, Channeling) : null;
+    if (ch && String(ch.spellId || '') === 'gaze_beam') {
+      const elapsed = Math.max(0, (ch.turnsTotal | 0) - (ch.turnsRemaining | 0));
+      const msgIdx = Math.min(elapsed, MESSAGES.length - 1);
+      ctx.emit('proc:gaze:message', {
+        actor, target, step: elapsed + 1, message: MESSAGES[msgIdx],
+      });
       ctx.emit('proc:gaze:charging', {
-        actor: ctx.actor,
-        target: ctx.target,
-        chargeCount: rec.count,
-        total: threshold,
-        turn: now,
+        actor, target, chargeCount: elapsed + 1, total: ch.turnsTotal | 0, turn: now,
       });
       return;
     }
 
-    rec.count = 0;
-    store.set(slot, rec);
+    // Don't start a new channel if already channeling something else
+    if (ch) return;
 
-    const ae = ensureActiveEffects(ctx.world, ctx.target);
-    if (!ae) return;
+    // Start gaze beam channel
+    const actorPos = ctx.actorPos;
+    try {
+      world.add(actor, Channeling, {
+        mode: 'cast',
+        turnsRemaining: castTime,
+        turnsTotal: castTime,
+        manaPerTick: 0,
+        spellId: 'gaze_beam',
+        targetId: target,
+        x: null,
+        y: null,
+        breakOnNoLos: true,
+        breakOnMove: true,
+        anchorX: actorPos ? (actorPos.x | 0) : null,
+        anchorY: actorPos ? (actorPos.y | 0) : null,
+      });
+    } catch { return; }
 
-    const existingStun = ae.effects.find(e => e.key === 'stun');
-    if (existingStun) {
-      existingStun.turnsLeft = Math.max(Number(existingStun.turnsLeft) || 0, stunTurnsLeft);
-      existingStun.potency = Math.max(Number(existingStun.potency) || 1, 1);
-      existingStun.stacks = Math.max(Number(existingStun.stacks) || 1, 1);
-    } else {
-      ae.effects.push({ key: 'stun', turnsLeft: stunTurnsLeft, potency: 1, stacks: 1 });
-    }
-
-    const existing = ae.effects.find(e => e.key === 'mindwipe');
-    if (existing) {
-      const currentStacks = Math.max(1, Number(existing.stacks) || 1);
-      if (currentStacks < limit) {
-        existing.stacks = currentStacks + 1;
-        existing.potency = existing.stacks;
-      }
-      existing.turnsLeft = Math.max(existing.turnsLeft, 3);
-    } else {
-      ae.effects.push({ key: 'mindwipe', turnsLeft: 3, potency: 1, stacks: 1 });
-    }
-    ctx.world.set(ctx.target, ActiveEffects, ae);
-    ctx.emit('proc:gaze:stun', { actor: ctx.actor, target: ctx.target, duration: stunDuration });
-    ctx.emit('proc:gaze:mindwipe', {
-      actor: ctx.actor,
-      target: ctx.target,
-      stacks: ae.effects.find(e => e.key === 'mindwipe')?.stacks ?? 1,
+    // First escalating message on channel start
+    ctx.emit('proc:gaze:message', {
+      actor, target, step: 1, message: MESSAGES[0],
+    });
+    ctx.emit('proc:gaze:charging', {
+      actor, target, chargeCount: 1, total: castTime, turn: now,
     });
   };
 }

@@ -34,6 +34,7 @@ import { ensureActiveEffects } from "../utils/effects.js";
 import { spawnHazard } from "../utils/hazardSpawn.js";
 import { spawnMonsterEntity } from "../utils/spawnMonsterEntity.js";
 import { Traits } from "../components/Traits.js";
+import { getHungerLevel } from "../data/food.js";
 import { effectiveMaxHp } from "../utils/passiveBonuses.js";
 import { emitSafe } from "../utils/emitSafe.js";
 
@@ -413,6 +414,15 @@ export function applyMutation(world, op, resolvers = {}) {
       if (!hc) return;
       const nutrition = Number(op.nutrition || 0);
       if (!Number.isFinite(nutrition) || nutrition === 0) return;
+      // Eating while starving/wasting: choke on food (1-turn stun), but still gain nutrition
+      const prevLevel = getHungerLevel(Number(hc.hunger || 0));
+      if ((prevLevel === 'starving' || prevLevel === 'wasting') && nutrition > 0) {
+        const ae = ensureActiveEffects(world, op.entityId);
+        if (ae) {
+          ae.effects.push({ key: 'stun', turnsLeft: 2, potency: 1, stacks: 1 });
+          emitSafe(world, 'hunger:choke', { id: op.entityId });
+        }
+      }
       const newHunger = Number(hc.hunger || 0) - nutrition;
       if (newHunger < 0) {
         hc.satiation = Math.min(Number(hc.satiation || 0) + Math.abs(newHunger), 200);

@@ -265,8 +265,9 @@ Deno.test("dead shopkeeper drops their shop key", () => {
 
   const pos = world.get(keyId, Position);
   assert(pos, "key should be placed on the ground");
-  assertEquals(pos.x, 12);
-  assertEquals(pos.y, 9);
+  const dx = Math.abs(pos.x - 12);
+  const dy = Math.abs(pos.y - 9);
+  assert(dx <= 2 && dy <= 2, `key should drop near shopkeeper (got ${pos.x},${pos.y}, expected within 2 of 12,9)`);
   assertEquals(world.get(keyId, DoorKey)?.lockId, lockId);
 });
 

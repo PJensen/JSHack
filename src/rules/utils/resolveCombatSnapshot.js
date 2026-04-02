@@ -97,6 +97,7 @@ export function resolveCombatSnapshot(world, entityId, context = {}) {
     fey_grace: statusStrength(world, id, "fey_grace"),
     blinded: statusStrength(world, id, "blinded"),
     staggered: statusStrength(world, id, "staggered"),
+    frozen: statusStrength(world, id, "frozen"),
   };
 
   const posture = world.get(id, CombatPosture);

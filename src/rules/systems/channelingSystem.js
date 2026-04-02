@@ -7,6 +7,7 @@ import { Channeling } from "../components/Channeling.js";
 import { ActiveEffects } from "../components/ActiveEffects.js";
 import { CastSpellIntent } from "../components/Intents/CastSpellIntent.js";
 import { Mana } from "../components/Mana.js";
+import { Position } from "../components/Position.js";
 import { Vitality } from "../components/Vitality.js";
 import { getSpell } from "../data/spells.js";
 import { MANA_REGEN_COOLDOWN } from "../data/regenConstants.js";
@@ -14,6 +15,8 @@ import { runSpellScript } from "../scripts/spells.js";
 import { effectiveMaxMana } from "../utils/passiveBonuses.js";
 import { getChannelInterruptionReason } from "../utils/channelInterruptionPolicy.js";
 import { emitSafe } from "../utils/emitSafe.js";
+import { hasLOS } from "../../shared/math/gridLOS.js";
+import { buildBlocksVisionMap, blockedCallback } from "../utils/vision.js";
 
 const DRAIN_LIFE_DAMAGE_INTERRUPT_INSTALLED = Symbol.for("jshack:channeling:drainLifeDamageInterrupt:installed");
 
@@ -59,6 +62,7 @@ export function installDrainLifeDamageInterruptListener(world) {
 
 /** @param {import('../../lib/ecs-js/index.js').World} world */
 export function channelingSystem(world) {
+  let _isBlocked = null; // lazily built for breakOnNoLos checks
   for (const [id, ch] of world.query(Channeling)) {
     // Dead actors lose their channel
     const vit = world.get(id, Vitality);
@@ -77,6 +81,38 @@ export function channelingSystem(world) {
         reason: interruption,
       });
       continue;
+    }
+
+    // breakOnMove: cancel if caster left anchor position
+    if (ch.breakOnMove && ch.anchorX != null && ch.anchorY != null) {
+      const cPos = world.get(id, Position);
+      if (cPos && ((cPos.x | 0) !== (ch.anchorX | 0) || (cPos.y | 0) !== (ch.anchorY | 0))) {
+        try { world.remove(id, Channeling); } catch {}
+        emitSafe(world, 'channeling:cancelled', {
+          actor: id,
+          spellId: ch.spellId,
+          reason: 'caster_moved',
+        });
+        continue;
+      }
+    }
+
+    // breakOnNoLos: cancel if caster no longer has LOS to target
+    if (ch.breakOnNoLos && ch.targetId) {
+      const cPos = world.get(id, Position);
+      const tPos = world.get(ch.targetId, Position);
+      if (cPos && tPos) {
+        if (!_isBlocked) _isBlocked = blockedCallback(buildBlocksVisionMap(world));
+        if (!hasLOS(cPos.x | 0, cPos.y | 0, tPos.x | 0, tPos.y | 0, _isBlocked)) {
+          try { world.remove(id, Channeling); } catch {}
+          emitSafe(world, 'channeling:cancelled', {
+            actor: id,
+            spellId: ch.spellId,
+            reason: 'los_break',
+          });
+          continue;
+        }
+      }
     }
 
     if (String(ch.mode || "cast") === "sustain") {

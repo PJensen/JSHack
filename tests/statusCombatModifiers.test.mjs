@@ -47,15 +47,16 @@ function runSingleMelee({
 }
 
 Deno.test("combatSystem: weakened attacker loses melee accuracy", () => {
+  // accuracyDerived lowered by 2 to compensate for +2 aggressive posture bonus
   const baseline = runSingleMelee({
     seed: 5,
-    accuracyDerived: 4,
+    accuracyDerived: 2,
     damagePowerDerived: 4,
     evadeDerived: 0,
   });
   const weakened = runSingleMelee({
     seed: 5,
-    accuracyDerived: 4,
+    accuracyDerived: 2,
     damagePowerDerived: 4,
     evadeDerived: 0,
     attackerStatuses: [{ type: "weakened", duration: 5, potency: 2, stacks: 1 }],
@@ -66,15 +67,16 @@ Deno.test("combatSystem: weakened attacker loses melee accuracy", () => {
 });
 
 Deno.test("combatSystem: cursed defender is easier to hit", () => {
+  // accuracyDerived lowered by 2 to compensate for +2 aggressive posture bonus
   const baseline = runSingleMelee({
     seed: 9,
-    accuracyDerived: 1,
+    accuracyDerived: -1,
     damagePowerDerived: 1,
     evadeDerived: 1,
   });
   const cursedDefender = runSingleMelee({
     seed: 9,
-    accuracyDerived: 1,
+    accuracyDerived: -1,
     damagePowerDerived: 1,
     evadeDerived: 1,
     defenderStatuses: [{ type: "cursed", duration: 5, potency: 1, stacks: 1 }],
@@ -85,15 +87,16 @@ Deno.test("combatSystem: cursed defender is easier to hit", () => {
 });
 
 Deno.test("combatSystem: blessed attacker gains melee accuracy", () => {
+  // accuracyDerived lowered by 2 to compensate for +2 aggressive posture bonus
   const baseline = runSingleMelee({
     seed: 9,
-    accuracyDerived: 1,
+    accuracyDerived: -1,
     damagePowerDerived: 1,
     evadeDerived: 1,
   });
   const blessedAttacker = runSingleMelee({
     seed: 9,
-    accuracyDerived: 1,
+    accuracyDerived: -1,
     damagePowerDerived: 1,
     evadeDerived: 1,
     attackerStatuses: [{ type: "blessed", duration: 5, potency: 1, stacks: 1 }],

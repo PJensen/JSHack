@@ -1,12 +1,13 @@
 /**
  * Advance display-only effect lifetimes.
  */
-export function tickDisplayEffects({ dtSec, boltFx, spellAreaFx, projectileFx, throwFx, cloudFx, ftext, goreTick }) {
+export function tickDisplayEffects({ dtSec, boltFx, spellAreaFx, projectileFx, throwFx, cloudFx, spiritWispFx, ftext, goreTick }) {
   boltFx.tick(dtSec);
   spellAreaFx.tick(dtSec);
   projectileFx.tick(dtSec);
   throwFx.tick(dtSec);
   cloudFx.tick(dtSec);
+  if (spiritWispFx) spiritWispFx.tick(dtSec);
   ftext.step(dtSec);
   if (goreTick) goreTick();
 }
@@ -14,7 +15,7 @@ export function tickDisplayEffects({ dtSec, boltFx, spellAreaFx, projectileFx, t
 /**
  * Draw world-space effects in the canonical pass order.
  */
-export function drawWorldEffects({ bctx, worldView, glyphAtlas, boltFx, spellAreaFx, projectileFx, throwFx, cloudFx, fx, PERF }) {
+export function drawWorldEffects({ bctx, worldView, glyphAtlas, boltFx, spellAreaFx, projectileFx, throwFx, cloudFx, spiritWispFx, fx, PERF }) {
   if (!bctx) return;
   throwFx.draw(bctx, worldView, glyphAtlas);
   boltFx.drawBolts(bctx);
@@ -40,6 +41,7 @@ export function drawWorldEffects({ bctx, worldView, glyphAtlas, boltFx, spellAre
     spellAreaFx.drawSearchPulse(bctx);
   }
   projectileFx.draw(bctx);
+  if (spiritWispFx) spiritWispFx.draw(bctx);
   if (typeof cloudFx.drawFire === "function") {
     cloudFx.drawFire(bctx);
   }

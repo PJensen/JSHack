@@ -507,6 +507,27 @@ export const SPELL_DEFS = {
       { kind: 'utility', note: 'Breaks if caster moves, target leaves range, or line of sight is blocked' },
     ],
   },
+  gaze_beam: {
+    id: 'gaze_beam',
+    name: 'Gaze Beam',
+    symbol: '\u{1F441}',   // 👁
+    schools: ['psychic'],
+    manaCost: 0,
+    channeling: true,
+    castTime: 8,
+    stunTurns: 3,
+    stackLimit: 4,
+    script: 'gaze_beam',
+    targeting: 'enemy',
+    monsterOnly: true,
+    breakOnNoLos: true,
+    breakOnMove: true,
+    description: 'The floating eye channels a psychic beam that stuns and mindwipes on completion.',
+    effects: [
+      { kind: 'status', status: 'stun', duration: '3 turns' },
+      { kind: 'status', status: 'mindwipe', note: '+1 stack (max 4)' },
+    ],
+  },
   verdant_ward: {
     id: 'verdant_ward',
     name: 'Verdant Ward',

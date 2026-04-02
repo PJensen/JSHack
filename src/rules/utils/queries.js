@@ -11,6 +11,7 @@ import { HazardArea } from "../components/HazardArea.js";
 import { Not } from "../../lib/ecs-js/core.js";
 import { isWalkable } from "../environment/dungeon/tileMap.js";
 import { manhattanScalar } from "./distance.js";
+import { entitiesAtPoint } from "./spatialIndex.js";
 
 // ── Shared defined-query registry ─────────────────────────────────────────────
 // WeakMap ensures each world instance gets its own set of handles, so tests
@@ -55,11 +56,10 @@ export function queryHazardAreas(world)     { return _q(world).hazardAreas(); }
 // ── Utility functions ──────────────────────────────────────────────────────────
 
 export function itemsAt(world, x, y) {
+  const ids = entitiesAtPoint(world, x, y);
   const rows = [];
-  // Mirror rendering access pattern: scan all Position holders, then filter by ItemInfo
   let idx = 0;
-  for (const [id, pos] of world.query(Position)) {
-    if (!pos || pos.x !== x || pos.y !== y) continue;
+  for (const id of ids) {
     if (!world.has(id, ItemInfo)) continue;
     const seq = Number(world.get(id, GroundStackOrder)?.seq || 0) | 0;
     rows.push({ id, seq, idx: idx++ });

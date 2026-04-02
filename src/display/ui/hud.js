@@ -95,12 +95,12 @@ export const QUICK_CHIP_DISMISS_LAYOUT = Object.freeze({
 export const MOBILE_ACTION_BAR_GRID_AREAS = Object.freeze({
   character: Object.freeze({ col: '1', row: '1' }),
   pet: Object.freeze({ col: '2', row: '1' }),
-  pray: Object.freeze({ col: '3', row: '1' }),
-  shoot: Object.freeze({ col: '1', row: '2' }),
-  quickInteract: Object.freeze({ col: '2', row: '2' }),
-  posture: Object.freeze({ col: '3', row: '2' }),
+  pray: Object.freeze({ col: '5', row: '1' }),
+  shoot: Object.freeze({ col: '6', row: '1' }),
+  quickInteract: Object.freeze({ col: '1', row: '2' }),
+  posture: Object.freeze({ col: '2', row: '2' }),
   wait: Object.freeze({ col: '6', row: '2' }),
-  pinnedQuickSlots: Object.freeze({ col: '4 / 6', row: '1 / 3' }),
+  pinnedQuickSlots: Object.freeze({ col: '3 / 5', row: '1 / 3' }),
 });
 
 const STARTER_PIN_PRIORITY = Object.freeze([
@@ -1350,15 +1350,15 @@ export function initHUD() {
   bar.appendChild(charBtn);
   bar.appendChild(bagBtn);
   bar.appendChild(petBtn);
-  bar.appendChild(pinSlots.el);
-  bar.appendChild(spellSlotsContainer);
   bar.appendChild(castBtn);
   bar.appendChild(spellSelectBtn);
-  bar.appendChild(shootBtn);
-  bar.appendChild(prayBtn);
   bar.appendChild(quickInteractBtn);
   bar.appendChild(postureBtn);
+  bar.appendChild(pinSlots.el);
+  bar.appendChild(spellSlotsContainer);
+  bar.appendChild(prayBtn);
   bar.appendChild(waitBtn);
+  bar.appendChild(shootBtn);
   root.appendChild(bar);
   root.appendChild(quick.el);
 
