@@ -359,7 +359,7 @@ export function buildItemDisplayData(world, itemId) {
     name: resolveItemDisplayName(world, itemId),
     slot: info.slot || '',
     count: info.count || 1,
-    rarityName: identified ? (info.rarityName || 'common') : 'common',
+    rarityName: info.rarityName || 'common',
     description,
     bonuses: identified && info.bonuses && typeof info.bonuses === 'object' ? { ...info.bonuses } : {},
     affixes: identified ? resolveAffixes(info.affixes) : [],

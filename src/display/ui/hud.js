@@ -304,6 +304,18 @@ function bracketizeLabel(text) {
   return `[${s}]`;
 }
 
+/**
+ * @param {string} rarityName
+ * @returns {{ color: string, fontWeight: string }}
+ */
+export function getQuickChipRarityStyle(rarityName) {
+  const rn = String(rarityName || 'common').toLowerCase();
+  if (rn === 'rare' || rn === 'magic') return { color: '#55aaff', fontWeight: 'bold' };
+  if (rn === 'epic') return { color: '#c47bff', fontWeight: 'bold' };
+  if (rn === 'legendary') return { color: '#ff9f3b', fontWeight: 'bold' };
+  return { color: '#ffffff', fontWeight: 'bold' };
+}
+
 export function initHUD() {
   const root = ensureRoot();
   const bar = document.createElement('div');
@@ -2946,8 +2958,8 @@ function renderQuickChip(it, h) {
   const line1 = document.createElement('span');
   line1.textContent = bracketizeLabel(String(it.name || 'item'));
   Object.assign(line1.style, {
+    ...getQuickChipRarityStyle(String(it?.rarityName || it?.details?.rarityName || 'common')),
     fontSize: '12px',
-    fontWeight: '600',
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
