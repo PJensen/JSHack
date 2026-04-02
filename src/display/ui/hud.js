@@ -357,6 +357,42 @@ export function initHUD() {
     staminaMax: 1,
   });
 
+  // Camera zoom buttons (+ / −) below the gauge
+  function makeZoomBtn(label, factor) {
+    const btn = document.createElement('button');
+    btn.textContent = label;
+    btn.title = factor > 1 ? 'Zoom in' : 'Zoom out';
+    Object.assign(btn.style, {
+      width: '22px', height: '22px',
+      padding: '0', margin: '0',
+      border: '1px solid rgba(255,255,255,0.18)',
+      borderRadius: '4px',
+      background: 'rgba(16,22,38,0.75)',
+      color: 'rgba(255,255,255,0.7)',
+      fontSize: '14px', lineHeight: '1',
+      cursor: 'pointer',
+      pointerEvents: 'auto',
+      display: 'grid', placeItems: 'center',
+      touchAction: 'manipulation',
+    });
+    btn.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      window.dispatchEvent(new CustomEvent('ui:zoom', { detail: { factor } }));
+    });
+    return btn;
+  }
+
+  const zoomBar = document.createElement('div');
+  Object.assign(zoomBar.style, {
+    display: 'flex', gap: '4px',
+    justifyContent: 'center',
+    marginTop: '4px',
+    pointerEvents: 'auto',
+  });
+  zoomBar.appendChild(makeZoomBtn('\u2212', 1 / 1.2)); // zoom out
+  zoomBar.appendChild(makeZoomBtn('+', 1.2));           // zoom in
+
   // Active effects HUD: vertical stack below the gauge on the right side.
   const effectsHud = document.createElement('div');
   Object.assign(effectsHud.style, {
@@ -378,6 +414,7 @@ export function initHUD() {
   effectsHud.appendChild(statusRow);
   effectsHud.appendChild(affixRow);
   topRightHud.appendChild(vitals);
+  topRightHud.appendChild(zoomBar);
   topRightHud.appendChild(effectsHud);
   root.appendChild(topRightHud);
   vitalsGauge.draw();
