@@ -9,22 +9,23 @@
 
 import { Particle } from "../passes/vfx/particles/particlePool.js";
 import { Position } from "../../rules/components/Position.js";
+import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 import { Trap } from "../../rules/components/Trap.js";
 
 const INSTALLED_KEY = Symbol.for("jshack:display:spiritWisp:installed");
 
 // ── Orbit geometry ──────────────────────────────────────────────────
 const BASE_ORBIT_RADIUS = 1.2;
-const BASE_ORBIT_SPEED = 1.4;      // rad/s
+const BASE_ORBIT_SPEED = 1.4; // rad/s
 const COMBAT_ORBIT_SPEED = 4.0;
 const BOB_AMP = 0.12;
 const BOB_FREQ = 2.2;
 
 // ── Mood → orbit modifiers ─────────────────────────────────────────
-const WRATH_RADIUS_SHRINK = 0.5;   // orbit tightens with wrath
-const SERENITY_RADIUS_GROW = 0.4;  // orbit widens with serenity
-const CHAOS_JITTER_AMP = 0.25;     // positional jitter from chaos
-const SORROW_SPEED_DRAG = 0.6;     // orbit slows with sorrow
+const WRATH_RADIUS_SHRINK = 0.5; // orbit tightens with wrath
+const SERENITY_RADIUS_GROW = 0.4; // orbit widens with serenity
+const CHAOS_JITTER_AMP = 0.25; // positional jitter from chaos
+const SORROW_SPEED_DRAG = 0.6; // orbit slows with sorrow
 const AMUSEMENT_SPEED_BOOST = 1.2; // orbit quickens with amusement
 
 // ── Anchor / easing ────────────────────────────────────────────────
@@ -50,30 +51,30 @@ const RIBBON_MIN_STEP = 0.05;
 // ── Color ──────────────────────────────────────────────────────────
 const COLOR_EASE_SPEED = 1.5;
 const MOOD_RGB = {
-  wrath:     [200, 30, 10],
-  serenity:  [180, 220, 255],
-  hunger:    [160, 120, 40],
+  wrath: [200, 30, 10],
+  serenity: [180, 220, 255],
+  hunger: [160, 120, 40],
   amusement: [255, 230, 100],
-  sorrow:    [60, 50, 120],
-  chaos:     [200, 180, 255],
+  sorrow: [60, 50, 120],
+  chaos: [200, 180, 255],
 };
 const MOOD_KEYS = Object.keys(MOOD_RGB);
 const NEUTRAL_COLOR = [140, 210, 255];
 
 // ── Danger sense ───────────────────────────────────────────────────
-const DANGER_SENSE_RADIUS = 4;     // tiles to scan for hidden traps / ambushers
+const DANGER_SENSE_RADIUS = 4; // tiles to scan for hidden traps / ambushers
 const DANGER_PULL_STRENGTH = 0.35; // how far wisp drifts toward danger (tiles)
-const DANGER_SCAN_INTERVAL = 0.5;  // seconds between scans (perf)
+const DANGER_SCAN_INTERVAL = 0.5; // seconds between scans (perf)
 
 // ── Miracle flight ─────────────────────────────────────────────────
-const MIRACLE_FLY_SPEED = 12;      // tiles/sec
-const MIRACLE_FLARE_TIME = 0.4;    // seconds at target before returning
+const MIRACLE_FLY_SPEED = 12; // tiles/sec
+const MIRACLE_FLARE_TIME = 0.4; // seconds at target before returning
 const MIRACLE_RETURN_SPEED = 8;
 
 // ── Betrayal ───────────────────────────────────────────────────────
 const BETRAYAL_STANDING_THRESHOLD = -0.3; // below this → betrayal mode
-const BETRAYAL_ORBIT_OFFSET = 2.5;       // drift further from player
-const BETRAYAL_DIM = 0.35;               // alpha multiplier
+const BETRAYAL_ORBIT_OFFSET = 2.5; // drift further from player
+const BETRAYAL_DIM = 0.35; // alpha multiplier
 
 // ── Orbiting motes ─────────────────────────────────────────────────
 const MOTE_BASE_COUNT = 2;
@@ -82,6 +83,13 @@ const MOTE_RADIUS = 0.16;
 const FORTUNE_MOTE_BOOST = 2;
 const ALTAR_ATTUNE_DURATION = 2.6;
 const MALEVOLENCE_COLOR = [255, 90, 70];
+const SACRED_ACK_SCAN_INTERVAL = 0.9;
+const SACRED_ACK_RADIUS = 4;
+const VANQUISH_CIRCLE_DURATION = 2.4;
+const VANQUISH_ORBIT_RADIUS = 0.84;
+const ITEM_FETCH_COOLDOWN = 1.15;
+const ITEM_FETCH_RADIUS = 7;
+const SACRED_IDENTITIES = new Set(["altar", "shrine", "church_altar"]);
 
 /**
  * @param {{
@@ -92,7 +100,9 @@ const MALEVOLENCE_COLOR = [255, 90, 70];
  *   sampleMood: () => ({wrath:number,serenity:number,hunger:number,amusement:number,sorrow:number,chaos:number}|null),
  * }} deps
  */
-export function createSpiritWispFxController({ world, fx, getPosition, getPlayerEntity, sampleMood }) {
+export function createSpiritWispFxController(
+  { world, fx, getPosition, getPlayerEntity, sampleMood },
+) {
   let _active = false;
   let _phase = Math.random() * Math.PI * 2;
   let _fxTime = 0;
@@ -122,7 +132,7 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
 
   // Danger sense state
   let _dangerDx = 0, _dangerDy = 0; // normalized pull direction
-  let _dangerIntensity = 0;          // 0 = no danger, 1 = max
+  let _dangerIntensity = 0; // 0 = no danger, 1 = max
   let _dangerScanTimer = 0;
   let _dangerSnapTimer = 0;
   let _trapHintTimer = 0;
@@ -142,8 +152,9 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
 
   // Death vigil — wisp descends onto player tile, holds still
   let _deathVigil = false;
-  let _deathLandT = 0;          // 0→1 eases wisp to player tile
+  let _deathLandT = 0; // 0→1 eases wisp to player tile
   const DEATH_LAND_DURATION = 3.5; // seconds to settle onto player
+  let _deathTargetX = 0, _deathTargetY = 0;
 
   // Betrayal
   let _standing = 0;
@@ -161,6 +172,11 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
   let _altarRejectTimer = 0;
   let _malevolenceTimer = 0;
   let _malevolenceX = 0, _malevolenceY = 0;
+  let _vanquishTimer = 0;
+  let _vanquishX = 0, _vanquishY = 0;
+  let _sacredScanTimer = 0;
+  let _itemFetchCooldownTimer = 0;
+  let _itemFetchReturnBurst = false;
 
   // ── Helpers ────────────────────────────────────────────────────────
 
@@ -184,7 +200,7 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
   function _updateMood(dtSec) {
     // Sample raw mood
     let tr = NEUTRAL_COLOR[0], tg = NEUTRAL_COLOR[1], tb = NEUTRAL_COLOR[2];
-    if (typeof sampleMood === 'function') {
+    if (typeof sampleMood === "function") {
       const mood = sampleMood();
       if (mood) {
         _wrath = Number(mood.wrath || 0);
@@ -194,16 +210,21 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
         _amusement = Number(mood.amusement || 0);
 
         // Blend color proportionally
-        tr = 0; tg = 0; tb = 0;
+        tr = 0;
+        tg = 0;
+        tb = 0;
         for (let i = 0; i < MOOD_KEYS.length; i++) {
           const k = MOOD_KEYS[i];
           const w = Number(mood[k] || 0);
           const c = MOOD_RGB[k];
-          tr += c[0] * w; tg += c[1] * w; tb += c[2] * w;
+          tr += c[0] * w;
+          tg += c[1] * w;
+          tb += c[2] * w;
         }
 
         // Compute standing for betrayal check
-        _standing = (_serenity * 1.7) - (_wrath * 2.2) - (Number(mood.hunger || 0) * 0.25) - (_sorrow * 0.1);
+        _standing = (_serenity * 1.7) - (_wrath * 2.2) -
+          (Number(mood.hunger || 0) * 0.25) - (_sorrow * 0.1);
         _betrayed = _standing < BETRAYAL_STANDING_THRESHOLD;
       }
     }
@@ -215,7 +236,10 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
 
   function _scanDangers(px, py) {
     // Only warn when in good standing
-    if (_betrayed) { _dangerIntensity = 0; return; }
+    if (_betrayed) {
+      _dangerIntensity = 0;
+      return;
+    }
 
     let closestDist = Infinity;
     let dx = 0, dy = 0;
@@ -227,7 +251,8 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
       if (dist > DANGER_SENSE_RADIUS || dist < 1) continue;
       if (dist < closestDist) {
         closestDist = dist;
-        dx = pos.x - px; dy = pos.y - py;
+        dx = pos.x - px;
+        dy = pos.y - py;
         found = true;
       }
     }
@@ -238,7 +263,10 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
       const prevDy = _dangerDy;
       _dangerDx = dx / len;
       _dangerDy = dy / len;
-      _dangerIntensity = Math.min(1, 1 - (closestDist - 1) / DANGER_SENSE_RADIUS);
+      _dangerIntensity = Math.min(
+        1,
+        1 - (closestDist - 1) / DANGER_SENSE_RADIUS,
+      );
       _trapHintX = px + dx;
       _trapHintY = py + dy;
       _trapHintTimer = Math.max(_trapHintTimer, 0.35 + _dangerIntensity * 0.45);
@@ -272,7 +300,8 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
       const dy = _flightTargetY - _y;
       const dist = Math.hypot(dx, dy);
       if (dist < 0.15) {
-        _x = _flightTargetX; _y = _flightTargetY;
+        _x = _flightTargetX;
+        _y = _flightTargetY;
         _flightState = FLIGHT_FLARE;
         _flightTimer = 0;
         _flareBurstQueued = true;
@@ -285,7 +314,8 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
     }
 
     if (_flightState === FLIGHT_FLARE) {
-      _x = _flightTargetX; _y = _flightTargetY;
+      _x = _flightTargetX;
+      _y = _flightTargetY;
       if (_flightTimer >= MIRACLE_FLARE_TIME) {
         _flightState = FLIGHT_BACK;
         _flightTimer = 0;
@@ -330,57 +360,116 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
     for (let i = 0; i < rays; i++) {
       const a = (i / rays) * Math.PI * 2 + (Math.random() - 0.5) * 0.2;
       const sp = 1.8 + Math.random() * 1.4;
-      fx.pool.spawn(new Particle({
-        x: _x,
-        y: _y,
-        vx: Math.cos(a) * sp,
-        vy: Math.sin(a) * sp - 0.2,
-        life: 0.26 + Math.random() * 0.18,
-        size0: 0.07 + Math.random() * 0.04,
-        size1: 0.01,
-        r: pr, g: pg, b: pb,
-        a0: _betrayed ? 0.22 : 0.6,
-      }));
+      fx.pool.spawn(
+        new Particle({
+          x: _x,
+          y: _y,
+          vx: Math.cos(a) * sp,
+          vy: Math.sin(a) * sp - 0.2,
+          life: 0.26 + Math.random() * 0.18,
+          size0: 0.07 + Math.random() * 0.04,
+          size1: 0.01,
+          r: pr,
+          g: pg,
+          b: pb,
+          a0: _betrayed ? 0.22 : 0.6,
+        }),
+      );
     }
   }
 
-  function _spawnRingBurst(x, y, color, count = 16, speedMin = 0.9, speedMax = 1.8, lifeMin = 0.25, lifeJitter = 0.2, alpha = 0.7) {
+  function _spawnRingBurst(
+    x,
+    y,
+    color,
+    count = 16,
+    speedMin = 0.9,
+    speedMax = 1.8,
+    lifeMin = 0.25,
+    lifeJitter = 0.2,
+    alpha = 0.7,
+  ) {
     if (!fx?.pool) return;
     const cr = color[0] | 0, cg = color[1] | 0, cb = color[2] | 0;
     for (let i = 0; i < count; i++) {
       const a = (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.2;
       const sp = speedMin + Math.random() * Math.max(0.01, speedMax - speedMin);
-      fx.pool.spawn(new Particle({
-        x, y,
-        vx: Math.cos(a) * sp,
-        vy: Math.sin(a) * sp - 0.08,
-        life: lifeMin + Math.random() * lifeJitter,
-        size0: 0.05 + Math.random() * 0.03,
-        size1: 0.01,
-        r: cr, g: cg, b: cb,
-        a0: alpha,
-      }));
+      fx.pool.spawn(
+        new Particle({
+          x,
+          y,
+          vx: Math.cos(a) * sp,
+          vy: Math.sin(a) * sp - 0.08,
+          life: lifeMin + Math.random() * lifeJitter,
+          size0: 0.05 + Math.random() * 0.03,
+          size1: 0.01,
+          r: cr,
+          g: cg,
+          b: cb,
+          a0: alpha,
+        }),
+      );
     }
   }
 
   function _triggerCleanseAt(x, y, intensity = 1) {
     _cleanseTimer = Math.max(_cleanseTimer, 1.2 + intensity * 0.4);
-    _spawnRingBurst(x, y, [150, 235, 255], 14 + ((intensity * 6) | 0), 0.8, 1.9, 0.28, 0.18, 0.65);
+    _spawnRingBurst(
+      x,
+      y,
+      [150, 235, 255],
+      14 + ((intensity * 6) | 0),
+      0.8,
+      1.9,
+      0.28,
+      0.18,
+      0.65,
+    );
   }
 
   function _triggerAegisAt(x, y, intensity = 1) {
     _aegisTimer = Math.max(_aegisTimer, 2.2 + intensity * 0.8);
-    _spawnRingBurst(x, y, [255, 230, 135], 12 + ((intensity * 8) | 0), 0.7, 1.2, 0.24, 0.2, 0.55);
+    _spawnRingBurst(
+      x,
+      y,
+      [255, 230, 135],
+      12 + ((intensity * 8) | 0),
+      0.7,
+      1.2,
+      0.24,
+      0.2,
+      0.55,
+    );
   }
 
   function _triggerFortuneAt(x, y, intensity = 1) {
     _fortuneTimer = Math.max(_fortuneTimer, 2.4 + intensity * 1.2);
-    _spawnRingBurst(x, y, [255, 220, 110], 10 + ((intensity * 8) | 0), 0.5, 1.0, 0.35, 0.25, 0.58);
+    _spawnRingBurst(
+      x,
+      y,
+      [255, 220, 110],
+      10 + ((intensity * 8) | 0),
+      0.5,
+      1.0,
+      0.35,
+      0.25,
+      0.58,
+    );
   }
 
   function _triggerCeremonyAt(x, y, intensity = 1) {
     _ceremonyTimer = Math.max(_ceremonyTimer, 1.7 + intensity * 0.7);
-    _spawnRingBurst(x, y, [225, 205, 255], 18 + ((intensity * 8) | 0), 1.1, 2.5, 0.32, 0.25, 0.62);
+    _spawnRingBurst(
+      x,
+      y,
+      [225, 205, 255],
+      18 + ((intensity * 8) | 0),
+      1.1,
+      2.5,
+      0.32,
+      0.25,
+      0.62,
+    );
   }
 
   function _setTargetCue(x, y, ttl = 1.4) {
@@ -390,7 +479,20 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
     _targetCueTimer = Math.max(_targetCueTimer, Math.max(0.2, ttl));
   }
 
-  function _attuneSacredSite(targetId, fallbackActorId = 0, ttl = ALTAR_ATTUNE_DURATION) {
+  function _attuneSacredPos(x, y, ttl = ALTAR_ATTUNE_DURATION) {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    _altarBeaconX = Number(x);
+    _altarBeaconY = Number(y);
+    _altarBeaconTimer = Math.max(_altarBeaconTimer, Math.max(0.35, ttl));
+    _setTargetCue(_altarBeaconX, _altarBeaconY, Math.min(1.8, ttl));
+    return { x: _altarBeaconX, y: _altarBeaconY };
+  }
+
+  function _attuneSacredSite(
+    targetId,
+    fallbackActorId = 0,
+    ttl = ALTAR_ATTUNE_DURATION,
+  ) {
     const tid = Number(targetId || 0) | 0;
     let pos = tid > 0 ? getPosition(tid) : null;
     if (!pos) {
@@ -398,11 +500,7 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
       pos = aid > 0 ? getPosition(aid) : null;
     }
     if (!pos) return null;
-    _altarBeaconX = Number(pos.x);
-    _altarBeaconY = Number(pos.y);
-    _altarBeaconTimer = Math.max(_altarBeaconTimer, Math.max(0.4, ttl));
-    _setTargetCue(_altarBeaconX, _altarBeaconY, Math.min(1.8, ttl));
-    return pos;
+    return _attuneSacredPos(pos.x, pos.y, ttl);
   }
 
   function _triggerMalevolenceAt(x, y, intensity = 1) {
@@ -410,8 +508,14 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
     const t = Math.max(0.6, Number(intensity || 1));
     _malevolenceX = x;
     _malevolenceY = y;
-    _malevolenceTimer = Math.max(_malevolenceTimer, 1.3 + Math.min(2.5, t) * 0.9);
-    _agitation = Math.max(_agitation, COMBAT_DECAY * (1.1 + Math.min(1.2, t * 0.35)));
+    _malevolenceTimer = Math.max(
+      _malevolenceTimer,
+      1.3 + Math.min(2.5, t) * 0.9,
+    );
+    _agitation = Math.max(
+      _agitation,
+      COMBAT_DECAY * (1.1 + Math.min(1.2, t * 0.35)),
+    );
     _spawnRingBurst(
       x,
       y,
@@ -421,8 +525,42 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
       2.2,
       0.24,
       0.24,
-      0.62
+      0.62,
     );
+  }
+
+  function _scanNearbySacredSite(px, py) {
+    if (_betrayed) return;
+    let best = null;
+    let bestDist = Infinity;
+    for (const [, pos, ident] of world.query(Position, NamedIdentity)) {
+      const key = String(ident?.identity || "").toLowerCase();
+      if (!SACRED_IDENTITIES.has(key)) continue;
+      const dist = Math.max(
+        Math.abs((pos.x | 0) - px),
+        Math.abs((pos.y | 0) - py),
+      );
+      if (dist < 1 || dist > SACRED_ACK_RADIUS) continue;
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = pos;
+      }
+    }
+    if (!best) return;
+    _attuneSacredPos(best.x, best.y, 0.95);
+    _omenTimer = Math.max(_omenTimer, 0.25);
+  }
+
+  function _queueItemFetch(x, y, cueTtl = 1.5) {
+    if (_deathVigil || _betrayed) return false;
+    if (_itemFetchCooldownTimer > 0) return false;
+    if (_flightState !== FLIGHT_IDLE) return false;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    _setTargetCue(x, y, cueTtl);
+    _startMiracleFlight(x, y);
+    _itemFetchCooldownTimer = ITEM_FETCH_COOLDOWN;
+    _itemFetchReturnBurst = true;
+    return true;
   }
 
   // ── Main tick ─────────────────────────────────────────────────────
@@ -432,16 +570,22 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
     _fxTime += dtSec;
 
     const pe = getPlayerEntity();
-    if (!pe) { _active = false; return; }
+    const ppos = pe ? getPosition(pe.id) : null;
+    if (!ppos && !_deathVigil) {
+      _active = false;
+      return;
+    }
 
-    const ppos = getPosition(pe.id);
-    if (!ppos) { _active = false; return; }
-
-    if (_lastDepth === 0) { _active = false; return; }
+    if (_lastDepth === 0) {
+      _active = false;
+      return;
+    }
 
     if (!_active || !_anchored) {
-      _anchorX = ppos.x; _anchorY = ppos.y;
-      _anchored = true; _active = true;
+      _anchorX = Number(ppos?.x ?? _deathTargetX);
+      _anchorY = Number(ppos?.y ?? _deathTargetY);
+      _anchored = true;
+      _active = true;
       _x = _anchorX;
       _y = _anchorY;
       _ribbonPoints.length = 0;
@@ -449,20 +593,32 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
     }
 
     // Ease anchor
-    const ease = Math.min(1, ANCHOR_EASE * dtSec);
-    _anchorX += (ppos.x - _anchorX) * ease;
-    _anchorY += (ppos.y - _anchorY) * ease;
+    if (ppos) {
+      const ease = Math.min(1, ANCHOR_EASE * dtSec);
+      _anchorX += (ppos.x - _anchorX) * ease;
+      _anchorY += (ppos.y - _anchorY) * ease;
+      if (!_deathVigil) {
+        _deathTargetX = ppos.x;
+        _deathTargetY = ppos.y;
+      }
+    } else if (_deathVigil) {
+      _anchorX = _deathTargetX;
+      _anchorY = _deathTargetY;
+    }
 
     // Death vigil — wisp gently descends onto the player's tile and holds
     if (_deathVigil) {
       _deathLandT = Math.min(1, _deathLandT + dtSec / DEATH_LAND_DURATION);
       // Smooth ease-out (decelerate into landing)
       const t = 1 - (1 - _deathLandT) * (1 - _deathLandT);
-      _x = _x + (_anchorX - _x) * t;
-      _y = _y + (_anchorY - _y) * t;
+      const sway = (1 - _deathLandT) * 0.07;
+      const targetX = _deathTargetX + Math.sin(_fxTime * 0.8) * sway;
+      const targetY = _deathTargetY + Math.cos(_fxTime * 0.6) * sway * 0.6;
+      _x = _x + (targetX - _x) * t;
+      _y = _y + (targetY - _y) * t;
       // Gentle fade of trail particles
       _pushRibbonPoint();
-      if (_deathLandT < 1) _spawnTrail(dtSec * (1 - _deathLandT));
+      if (_deathLandT < 1) _spawnTrail(dtSec * (1 - _deathLandT) * 0.85);
       return;
     }
 
@@ -479,12 +635,23 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
     _altarBeaconTimer = Math.max(0, _altarBeaconTimer - dtSec);
     _altarRejectTimer = Math.max(0, _altarRejectTimer - dtSec);
     _malevolenceTimer = Math.max(0, _malevolenceTimer - dtSec);
+    _vanquishTimer = Math.max(0, _vanquishTimer - dtSec);
+    _itemFetchCooldownTimer = Math.max(0, _itemFetchCooldownTimer - dtSec);
 
-    // Danger scan (throttled)
-    _dangerScanTimer -= dtSec;
-    if (_dangerScanTimer <= 0) {
-      _dangerScanTimer = DANGER_SCAN_INTERVAL;
-      _scanDangers(ppos.x | 0, ppos.y | 0);
+    if (ppos) {
+      // Danger scan (throttled)
+      _dangerScanTimer -= dtSec;
+      if (_dangerScanTimer <= 0) {
+        _dangerScanTimer = DANGER_SCAN_INTERVAL;
+        _scanDangers(ppos.x | 0, ppos.y | 0);
+      }
+
+      // Ambient sacred-site acknowledgment while roaming near altars/shrines.
+      _sacredScanTimer -= dtSec;
+      if (_sacredScanTimer <= 0) {
+        _sacredScanTimer = SACRED_ACK_SCAN_INTERVAL;
+        _scanNearbySacredSite(ppos.x | 0, ppos.y | 0);
+      }
     }
 
     // Miracle flight overrides orbit
@@ -493,6 +660,10 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
       if (_flareBurstQueued) {
         _flareBurstQueued = false;
         _spawnFlareBurst();
+      }
+      if (_itemFetchReturnBurst && _flightState === FLIGHT_IDLE) {
+        _itemFetchReturnBurst = false;
+        _triggerFortuneAt(_anchorX, _anchorY, 0.75);
       }
       _spawnTrail(dtSec);
       return;
@@ -509,7 +680,8 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
 
     // Compute position — prayer shrinks orbit to zero (spiral inward)
     const orbitR = _orbitRadius() * (1 - prayerT * 0.9);
-    const bob = Math.sin(_fxTime * BOB_FREQ * Math.PI * 2) * BOB_AMP * (1 - prayerT);
+    const bob = Math.sin(_fxTime * BOB_FREQ * Math.PI * 2) * BOB_AMP *
+      (1 - prayerT);
     // Blend smooth orbit toward angular/harsh motion with wrath
     const smoothX = Math.cos(_phase);
     const smoothY = Math.sin(_phase);
@@ -534,6 +706,18 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
       _y += _dangerDy * pull;
     }
 
+    // Circling vanquished foes (player kill acknowledgment).
+    if (_vanquishTimer > 0 && !_betrayed) {
+      const t = Math.min(1, _vanquishTimer / VANQUISH_CIRCLE_DURATION);
+      const angle = _phase * 1.35 + (1 - t) * Math.PI * 4;
+      const radius = VANQUISH_ORBIT_RADIUS + (1 - t) * 0.26;
+      const tx = _vanquishX + Math.cos(angle) * radius;
+      const ty = _vanquishY + Math.sin(angle) * radius * 0.72;
+      const blend = 0.22 + t * 0.56;
+      _x += (tx - _x) * blend;
+      _y += (ty - _y) * blend;
+    }
+
     _pushRibbonPoint();
     _spawnTrail(dtSec);
   }
@@ -547,17 +731,21 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
     _trailAccum += dtSec * rate;
     while (_trailAccum >= 1) {
       _trailAccum -= 1;
-      fx.pool.spawn(new Particle({
-        x: _x + (Math.random() - 0.5) * 0.06,
-        y: _y + (Math.random() - 0.5) * 0.06,
-        vx: (Math.random() - 0.5) * 0.3,
-        vy: -0.2 - Math.random() * 0.3,
-        life: TRAIL_LIFE + Math.random() * 0.15,
-        size0: 0.06 + Math.random() * 0.03,
-        size1: 0.01,
-        r: pr, g: pg, b: pb,
-        a0: alpha,
-      }));
+      fx.pool.spawn(
+        new Particle({
+          x: _x + (Math.random() - 0.5) * 0.06,
+          y: _y + (Math.random() - 0.5) * 0.06,
+          vx: (Math.random() - 0.5) * 0.3,
+          vy: -0.2 - Math.random() * 0.3,
+          life: TRAIL_LIFE + Math.random() * 0.15,
+          size0: 0.06 + Math.random() * 0.03,
+          size1: 0.01,
+          r: pr,
+          g: pg,
+          b: pb,
+          a0: alpha,
+        }),
+      );
     }
   }
 
@@ -569,7 +757,7 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
     const dim = _betrayed ? BETRAYAL_DIM : 1;
 
     bctx.save();
-    bctx.globalCompositeOperation = 'lighter';
+    bctx.globalCompositeOperation = "lighter";
 
     // Motion ribbon: tapered, mood-tinted comet tail
     if (_ribbonPoints.length >= 2) {
@@ -582,7 +770,7 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
         const width = 0.01 + t * 0.06;
         bctx.strokeStyle = `rgba(${pr},${pg},${pb},${alpha.toFixed(3)})`;
         bctx.lineWidth = width;
-        bctx.lineCap = 'round';
+        bctx.lineCap = "round";
         bctx.beginPath();
         bctx.moveTo(p0.x, p0.y);
         bctx.lineTo(p1.x, p1.y);
@@ -598,7 +786,10 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
       const flareA = (1 - flareT) * 0.6;
       const fg = bctx.createRadialGradient(_x, _y, 0, _x, _y, flareR);
       fg.addColorStop(0, `rgba(255,255,240,${flareA.toFixed(3)})`);
-      fg.addColorStop(0.3, `rgba(${pr},${pg},${pb},${(flareA * 0.6).toFixed(3)})`);
+      fg.addColorStop(
+        0.3,
+        `rgba(${pr},${pg},${pb},${(flareA * 0.6).toFixed(3)})`,
+      );
       fg.addColorStop(1, `rgba(${pr},${pg},${pb},0)`);
       bctx.fillStyle = fg;
       bctx.beginPath();
@@ -626,8 +817,14 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
     // Core glow (outer halo)
     const glowR = 0.22 + Math.sin(_fxTime * 3.2) * 0.04;
     const gradient = bctx.createRadialGradient(_x, _y, 0, _x, _y, glowR);
-    gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${(0.7 * dim).toFixed(3)})`);
-    gradient.addColorStop(0.4, `rgba(${r}, ${g}, ${b}, ${(0.3 * dim).toFixed(3)})`);
+    gradient.addColorStop(
+      0,
+      `rgba(${r}, ${g}, ${b}, ${(0.7 * dim).toFixed(3)})`,
+    );
+    gradient.addColorStop(
+      0.4,
+      `rgba(${r}, ${g}, ${b}, ${(0.3 * dim).toFixed(3)})`,
+    );
     gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
     bctx.fillStyle = gradient;
     bctx.beginPath();
@@ -644,19 +841,23 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
     // Orbiting spirit motes around core
     const moteCount = Math.min(
       MOTE_MAX_COUNT + FORTUNE_MOTE_BOOST,
-      MOTE_BASE_COUNT
-      + ((_amusement + _chaos) > 0.75 ? 1 : 0)
-      + (_flightState !== FLIGHT_IDLE ? 1 : 0)
-      + (_fortuneTimer > 0 ? FORTUNE_MOTE_BOOST : 0)
+      MOTE_BASE_COUNT +
+        ((_amusement + _chaos) > 0.75 ? 1 : 0) +
+        (_flightState !== FLIGHT_IDLE ? 1 : 0) +
+        (_fortuneTimer > 0 ? FORTUNE_MOTE_BOOST : 0),
     );
     for (let i = 0; i < moteCount; i++) {
       const speed = 1.4 + i * 0.35 + _amusement * 1.2;
-      const ang = _phase * speed + i * 2.1 + Math.sin(_fxTime * (3.5 + i)) * 0.2;
-      const rr = MOTE_RADIUS + i * 0.045 + Math.sin(_fxTime * (2.7 + i * 0.4)) * 0.015;
+      const ang = _phase * speed + i * 2.1 +
+        Math.sin(_fxTime * (3.5 + i)) * 0.2;
+      const rr = MOTE_RADIUS + i * 0.045 +
+        Math.sin(_fxTime * (2.7 + i * 0.4)) * 0.015;
       const mx = _x + Math.cos(ang) * rr;
       const my = _y + Math.sin(ang) * rr * 0.7;
       const ma = (0.22 + 0.18 * Math.sin(_fxTime * (7.2 + i))) * dim;
-      bctx.fillStyle = `rgba(${cr}, ${cg}, ${cb}, ${Math.max(0.08, ma).toFixed(3)})`;
+      bctx.fillStyle = `rgba(${cr}, ${cg}, ${cb}, ${
+        Math.max(0.08, ma).toFixed(3)
+      })`;
       bctx.beginPath();
       bctx.arc(mx, my, 0.017 + i * 0.004, 0, Math.PI * 2);
       bctx.fill();
@@ -684,25 +885,39 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
         const tipX = _x + nx * dirLen;
         const tipY = _y + ny * dirLen;
         const wing = 0.035 + _dangerIntensity * 0.03 + snapT * 0.02;
-        const alpha = Math.min(0.92, 0.42 + (_dangerIntensity * 0.38) + snapT * 0.18);
+        const alpha = Math.min(
+          0.92,
+          0.42 + (_dangerIntensity * 0.38) + snapT * 0.18,
+        );
 
         bctx.fillStyle = `rgba(255,232,150,${alpha.toFixed(3)})`;
         bctx.beginPath();
         bctx.arc(tipX, tipY, 0.02 + wing * 0.65, 0, Math.PI * 2);
         bctx.fill();
 
-        bctx.strokeStyle = `rgba(255,248,210,${Math.min(0.95, alpha + 0.12).toFixed(3)})`;
+        bctx.strokeStyle = `rgba(255,248,210,${
+          Math.min(0.95, alpha + 0.12).toFixed(3)
+        })`;
         bctx.lineWidth = 0.016 + _dangerIntensity * 0.01;
         bctx.beginPath();
-        bctx.moveTo(tipX - nx * (wing * 2.4) + lx * wing, tipY - ny * (wing * 2.4) + ly * wing);
+        bctx.moveTo(
+          tipX - nx * (wing * 2.4) + lx * wing,
+          tipY - ny * (wing * 2.4) + ly * wing,
+        );
         bctx.lineTo(tipX, tipY);
-        bctx.lineTo(tipX - nx * (wing * 2.4) - lx * wing, tipY - ny * (wing * 2.4) - ly * wing);
+        bctx.lineTo(
+          tipX - nx * (wing * 2.4) - lx * wing,
+          tipY - ny * (wing * 2.4) - ly * wing,
+        );
         bctx.stroke();
       }
     }
 
     // Trap hint ping: faint marker at inferred hidden trap position.
-    if (_trapHintTimer > 0 && _dangerIntensity > 0.18 && _flightState === FLIGHT_IDLE) {
+    if (
+      _trapHintTimer > 0 && _dangerIntensity > 0.18 &&
+      _flightState === FLIGHT_IDLE
+    ) {
       const tt = Math.min(1, _trapHintTimer / 0.8);
       const ring = 0.08 + (1 - tt) * 0.14;
       const alpha = Math.min(0.55, 0.14 + _dangerIntensity * 0.35) * tt;
@@ -769,6 +984,18 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
       bctx.stroke();
     }
 
+    // Vanquish mark: a brief honoring ring around defeated foes.
+    if (_vanquishTimer > 0) {
+      const t = Math.min(1, _vanquishTimer / VANQUISH_CIRCLE_DURATION);
+      const ring = 0.2 + (1 - t) * 0.18;
+      const a = (0.08 + t * 0.24) * dim;
+      bctx.strokeStyle = `rgba(255,214,150,${a.toFixed(3)})`;
+      bctx.lineWidth = 0.017;
+      bctx.beginPath();
+      bctx.arc(_vanquishX, _vanquishY, ring, 0, Math.PI * 2);
+      bctx.stroke();
+    }
+
     // Sacred-site attunement: the spirit marks altar/shrine tile when engaged.
     if (_altarBeaconTimer > 0) {
       const t = Math.min(1, _altarBeaconTimer / ALTAR_ATTUNE_DURATION);
@@ -800,7 +1027,13 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
       bctx.strokeStyle = `rgba(255,110,70,${(0.2 + t * 0.35).toFixed(3)})`;
       bctx.lineWidth = 0.022;
       bctx.beginPath();
-      bctx.arc(_altarBeaconX, _altarBeaconY, 0.18 + (1 - t) * 0.12, 0, Math.PI * 1.45);
+      bctx.arc(
+        _altarBeaconX,
+        _altarBeaconY,
+        0.18 + (1 - t) * 0.12,
+        0,
+        Math.PI * 1.45,
+      );
       bctx.stroke();
     }
 
@@ -833,7 +1066,8 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
   function getActiveLights() {
     if (!_active) return [];
     const dim = _betrayed ? BETRAYAL_DIM : 1;
-    const pulse = Math.sin(_fxTime * LIGHT_PULSE_FREQ * Math.PI * 2) * LIGHT_PULSE_AMP;
+    const pulse = Math.sin(_fxTime * LIGHT_PULSE_FREQ * Math.PI * 2) *
+      LIGHT_PULSE_AMP;
     // Miracle flare emits extra light
     const flareBonus = _flightState === FLIGHT_FLARE ? 3 : 0;
     return [{
@@ -845,7 +1079,9 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
     }];
   }
 
-  function setDepth(depth) { _lastDepth = depth | 0; }
+  function setDepth(depth) {
+    _lastDepth = depth | 0;
+  }
 
   /** Expose wisp world position for prayer proximity check. */
   function getWispPos() {
@@ -869,7 +1105,7 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
       const actor = Number(payload?.actor || 0) | 0;
       if (actor > 0) flyTo(actor);
 
-      const boon = String(payload?.boon || '').toLowerCase();
+      const boon = String(payload?.boon || "").toLowerCase();
       const actorPos = actor > 0 ? getPosition(actor) : null;
       const ax = Number(actorPos?.x || _anchorX);
       const ay = Number(actorPos?.y || _anchorY);
@@ -878,18 +1114,20 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
       const uncursed = Math.max(0, Number(payload?.uncursed || 0));
       const strength = 1 + Math.min(2, (amount + removed + uncursed) / 20);
 
-      if (boon === 'cleanse' || boon === 'extinguish') {
+      if (boon === "cleanse" || boon === "extinguish") {
         _triggerCleanseAt(ax, ay, strength);
-      } else if (boon === 'protection') {
+      } else if (boon === "protection") {
         _triggerAegisAt(ax, ay, strength);
-      } else if (boon === 'fortune') {
+      } else if (boon === "fortune") {
         _triggerFortuneAt(ax, ay, strength);
-      } else if (boon === 'supply_drop') {
+      } else if (boon === "supply_drop") {
         const itemId = Number(payload?.itemId || 0) | 0;
         const ip = itemId > 0 ? getPosition(itemId) : null;
-        if (ip) _setTargetCue(ip.x, ip.y, 1.8);
+        if (ip) _queueItemFetch(ip.x, ip.y, 1.8);
         _triggerFortuneAt(ip?.x ?? ax, ip?.y ?? ay, 1.2);
-      } else if (boon === 'renewal' || boon === 'mana_surge' || boon === 'sustain') {
+      } else if (
+        boon === "renewal" || boon === "mana_surge" || boon === "sustain"
+      ) {
         _triggerAegisAt(ax, ay, 0.7 + Math.min(1.2, amount / 30));
       }
     };
@@ -899,145 +1137,232 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
       const p = playerId > 0 ? flyTo(playerId) : null;
       const px = Number(p?.x || _anchorX);
       const py = Number(p?.y || _anchorY);
-      const effect = String(payload?.effect || '').toLowerCase();
-      if (effect === 'heal') _triggerAegisAt(px, py, 1.4);
-      else if (effect === 'cure' || effect === 'uncurse_equipment') _triggerCleanseAt(px, py, 1.3);
-      else if (effect === 'satiate') _triggerAegisAt(px, py, 1.0);
-      else if (effect === 'lucky_affix' || effect === 'lucky_buff') _triggerFortuneAt(px, py, 1.5);
-      else _triggerCeremonyAt(px, py, 0.9);
+      const effect = String(payload?.effect || "").toLowerCase();
+      if (effect === "heal") _triggerAegisAt(px, py, 1.4);
+      else if (effect === "cure" || effect === "uncurse_equipment") {
+        _triggerCleanseAt(px, py, 1.3);
+      } else if (effect === "satiate") _triggerAegisAt(px, py, 1.0);
+      else if (effect === "lucky_affix" || effect === "lucky_buff") {
+        _triggerFortuneAt(px, py, 1.5);
+      } else _triggerCeremonyAt(px, py, 0.9);
     };
 
     const onIntervention = (payload) => {
       const playerId = Number(payload?.playerId || 0) | 0;
       if (playerId > 0) flyTo(playerId);
-      const kind = String(payload?.kind || '').toLowerCase();
-      if (kind === 'wrath') {
+      const kind = String(payload?.kind || "").toLowerCase();
+      if (kind === "wrath") {
         _agitation = COMBAT_DECAY * 2;
-      } else if (kind === 'shrine_blessing') {
+      } else if (kind === "shrine_blessing") {
         _triggerAegisAt(_anchorX, _anchorY, 1.0);
-      } else if (kind === 'patron_shift') {
+      } else if (kind === "patron_shift") {
         _triggerCeremonyAt(_anchorX, _anchorY, 1.4);
-      } else if (kind === 'prayer_uncurse') {
+      } else if (kind === "prayer_uncurse") {
         _triggerCleanseAt(_anchorX, _anchorY, 1.1);
       }
     };
 
     // Combat agitation
-    world.on('damaged', () => { _agitation = COMBAT_DECAY; });
-    world.on('ranged:shot', () => { _agitation = COMBAT_DECAY; });
-    world.on('castSpell', () => { _agitation = COMBAT_DECAY; });
+    world.on("damaged", () => {
+      _agitation = COMBAT_DECAY;
+    });
+    world.on("ranged:shot", () => {
+      _agitation = COMBAT_DECAY;
+    });
+    world.on("castSpell", () => {
+      _agitation = COMBAT_DECAY;
+    });
 
     // Prayer — wisp spirals inward then eases back out
-    world.on('prayer', () => { _prayerTimer = Math.max(_prayerTimer, PRAYER_SPIRAL_DURATION); });
+    world.on("prayer", () => {
+      _prayerTimer = Math.max(_prayerTimer, PRAYER_SPIRAL_DURATION);
+    });
 
     // Player death — wisp settles onto the player's tile
-    world.on('died', ({ id }) => {
+    world.on("died", ({ id, killer }) => {
+      const deadId = Number(id || 0) | 0;
       const pe = getPlayerEntity();
-      if (pe && id === pe.id) { _deathVigil = true; _deathLandT = 0; }
+      const playerId = Number(pe?.id || 0) | 0;
+      if (playerId > 0 && deadId === playerId) {
+        _deathVigil = true;
+        _deathLandT = 0;
+        const pos = getPosition(deadId) || pe?.pos ||
+          { x: _anchorX, y: _anchorY };
+        _deathTargetX = Number(pos?.x ?? _anchorX);
+        _deathTargetY = Number(pos?.y ?? _anchorY);
+        _attuneSacredPos(_deathTargetX, _deathTargetY, 1.5);
+        return;
+      }
+      if (
+        playerId > 0 && (Number(killer || 0) | 0) === playerId &&
+        deadId !== playerId
+      ) {
+        const pos = getPosition(deadId);
+        if (!pos) return;
+        _vanquishX = Number(pos.x);
+        _vanquishY = Number(pos.y);
+        _vanquishTimer = Math.max(_vanquishTimer, VANQUISH_CIRCLE_DURATION);
+      }
+    });
+
+    world.on("item:dropped", ({ actor, itemId, at, source }) => {
+      if (_deathVigil || _betrayed) return;
+      const pe = getPlayerEntity();
+      if (!pe) return;
+      const playerId = Number(pe.id || 0) | 0;
+      if (!(playerId > 0)) return;
+      if ((Number(actor || 0) | 0) === playerId) return;
+
+      const dropSource = String(source || "").toLowerCase();
+      if (dropSource !== "death" && dropSource !== "boon") return;
+
+      const pos = Number.isFinite(at?.x) && Number.isFinite(at?.y)
+        ? { x: Number(at.x), y: Number(at.y) }
+        : (Number(itemId || 0) > 0 ? getPosition(Number(itemId) | 0) : null);
+      if (!pos) return;
+      const dist = Math.max(
+        Math.abs((pos.x | 0) - (_anchorX | 0)),
+        Math.abs((pos.y | 0) - (_anchorY | 0)),
+      );
+      if (dist > ITEM_FETCH_RADIUS) return;
+      _queueItemFetch(pos.x, pos.y, 1.5);
     });
 
     // Deity wrath — extra agitation
-    world.on('deity:wrath', ({ playerId, cursed, severityScale }) => {
+    world.on("deity:wrath", ({ playerId, cursed, severityScale }) => {
       const pe = getPlayerEntity();
       if (!pe || Number(playerId || 0) !== pe.id) return;
       _agitation = COMBAT_DECAY * 2;
       const scale = Math.max(1, Number(severityScale || 1));
       if (cursed || scale > 1.05) {
-        _triggerMalevolenceAt(_anchorX, _anchorY, 1.2 + Math.min(2.0, (scale - 1) * 2.5 + (cursed ? 0.8 : 0)));
+        _triggerMalevolenceAt(
+          _anchorX,
+          _anchorY,
+          1.2 + Math.min(2.0, (scale - 1) * 2.5 + (cursed ? 0.8 : 0)),
+        );
       }
     });
-    world.on('deity:omen', () => { _omenTimer = Math.max(_omenTimer, 1.4); });
-    world.on('deity:patronShift', ({ playerId }) => {
+    world.on("deity:omen", () => {
+      _omenTimer = Math.max(_omenTimer, 1.4);
+    });
+    world.on("deity:patronShift", ({ playerId }) => {
       const pe = getPlayerEntity();
       if (!pe || Number(playerId || 0) !== pe.id) return;
       _triggerCeremonyAt(_anchorX, _anchorY, 1.5);
     });
-    world.on('prayer:insight', ({ actor }) => {
+    world.on("prayer:insight", ({ actor }) => {
       const pe = getPlayerEntity();
       if (!pe || Number(actor || 0) !== pe.id) return;
       _omenTimer = Math.max(_omenTimer, 0.8);
     });
 
     // Altar/shrine interactions: sacred-site behavior keyed to target tile.
-    world.on('altar:pray', ({ actor, targetId }) => {
+    world.on("altar:pray", ({ actor, targetId }) => {
       const pe = getPlayerEntity();
       if (!pe || Number(actor || 0) !== pe.id) return;
       const pos = _attuneSacredSite(targetId, actor, 2.2);
       if (pos) _startMiracleFlight(pos.x, pos.y);
       _omenTimer = Math.max(_omenTimer, 0.9);
     });
-    world.on('altar:offered', ({ actor, targetId, value }) => {
+    world.on("altar:offered", ({ actor, targetId, value }) => {
       const pe = getPlayerEntity();
       if (!pe || Number(actor || 0) !== pe.id) return;
       const pos = _attuneSacredSite(targetId, actor, 2.8);
       const strength = 0.9 + Math.min(1.8, Number(value || 0) * 2.2);
       if (pos) _startMiracleFlight(pos.x, pos.y);
       _triggerCeremonyAt(_altarBeaconX, _altarBeaconY, strength);
-      _triggerFortuneAt(_altarBeaconX, _altarBeaconY, Math.max(0.7, strength * 0.8));
+      _triggerFortuneAt(
+        _altarBeaconX,
+        _altarBeaconY,
+        Math.max(0.7, strength * 0.8),
+      );
     });
-    world.on('altar:offerFailed', ({ actor, targetId }) => {
+    world.on("altar:offerFailed", ({ actor, targetId }) => {
       const pe = getPlayerEntity();
       if (!pe || Number(actor || 0) !== pe.id) return;
       _attuneSacredSite(targetId, actor, 1.2);
       _altarRejectTimer = Math.max(_altarRejectTimer, 1.0);
       _agitation = Math.max(_agitation, COMBAT_DECAY * 0.75);
     });
-    world.on('altar:offer', ({ actor, targetId, beatitudeState, value }) => {
+    world.on("altar:offer", ({ actor, targetId, beatitudeState, value }) => {
       const pe = getPlayerEntity();
       if (!pe || Number(actor || 0) !== pe.id) return;
       const pos = _attuneSacredSite(targetId, actor, 1.8);
-      const state = String(beatitudeState || '').toLowerCase();
-      if (state === 'cursed') {
+      const state = String(beatitudeState || "").toLowerCase();
+      if (state === "cursed") {
         _altarRejectTimer = Math.max(_altarRejectTimer, 1.4);
         _triggerMalevolenceAt(
           pos?.x ?? _altarBeaconX ?? _anchorX,
           pos?.y ?? _altarBeaconY ?? _anchorY,
-          1.1 + Math.min(1.5, Number(value || 0) * 2.0)
+          1.1 + Math.min(1.5, Number(value || 0) * 2.0),
         );
       }
     });
-    world.on('altar:resurrectionDenied', ({ actor, targetId }) => {
+    world.on("altar:resurrectionDenied", ({ actor, targetId }) => {
       const pe = getPlayerEntity();
       if (!pe || Number(actor || 0) !== pe.id) return;
       _attuneSacredSite(targetId, actor, 2.0);
       _altarRejectTimer = Math.max(_altarRejectTimer, 1.6);
-      _triggerMalevolenceAt(_altarBeaconX || _anchorX, _altarBeaconY || _anchorY, 1.9);
+      _triggerMalevolenceAt(
+        _altarBeaconX || _anchorX,
+        _altarBeaconY || _anchorY,
+        1.9,
+      );
     });
-    world.on('shrine:communion', ({ actor, targetId, effect }) => {
+    world.on("shrine:communion", ({ actor, targetId, effect }) => {
       const pe = getPlayerEntity();
       if (!pe || Number(actor || 0) !== pe.id) return;
       const pos = _attuneSacredSite(targetId, actor, 2.5);
       if (pos) _startMiracleFlight(pos.x, pos.y);
-      const e = String(effect || '').toLowerCase();
-      if (e === 'blessing') _triggerAegisAt(_altarBeaconX, _altarBeaconY, 1.3);
-      else if (e === 'cooldown') _omenTimer = Math.max(_omenTimer, 0.8);
+      const e = String(effect || "").toLowerCase();
+      if (e === "blessing") _triggerAegisAt(_altarBeaconX, _altarBeaconY, 1.3);
+      else if (e === "cooldown") _omenTimer = Math.max(_omenTimer, 0.8);
       else _triggerCeremonyAt(_altarBeaconX, _altarBeaconY, 0.8);
     });
-    world.on('deity:nicheEvent', ({ playerId, event }) => {
+    world.on("deity:nicheEvent", ({ playerId, event }) => {
       const pe = getPlayerEntity();
       if (!pe || Number(playerId || 0) !== pe.id) return;
-      const ev = String(event || '').toLowerCase();
-      if (ev === 'cursed_offering_angered') {
-        _triggerMalevolenceAt(_altarBeaconX || _anchorX, _altarBeaconY || _anchorY, 2.0);
-      } else if (ev === 'cursed_offering_amused') {
-        _triggerMalevolenceAt(_altarBeaconX || _anchorX, _altarBeaconY || _anchorY, 1.1);
-      } else if (ev === 'blessed_offering') {
-        _triggerCeremonyAt(_altarBeaconX || _anchorX, _altarBeaconY || _anchorY, 1.0);
+      const ev = String(event || "").toLowerCase();
+      if (ev === "cursed_offering_angered") {
+        _triggerMalevolenceAt(
+          _altarBeaconX || _anchorX,
+          _altarBeaconY || _anchorY,
+          2.0,
+        );
+      } else if (ev === "cursed_offering_amused") {
+        _triggerMalevolenceAt(
+          _altarBeaconX || _anchorX,
+          _altarBeaconY || _anchorY,
+          1.1,
+        );
+      } else if (ev === "blessed_offering") {
+        _triggerCeremonyAt(
+          _altarBeaconX || _anchorX,
+          _altarBeaconY || _anchorY,
+          1.0,
+        );
       }
     });
-    world.on('deity:offense', ({ playerId }) => {
+    world.on("deity:offense", ({ playerId }) => {
       const pe = getPlayerEntity();
       if (!pe || Number(playerId || 0) !== pe.id) return;
       _triggerMalevolenceAt(_anchorX, _anchorY, 1.4);
     });
 
     // Miracle / intervention — wisp flies to deliver it
-    world.on('deity:intervention', onIntervention);
-    world.on('deity:miracle', onMiracle);
+    world.on("deity:intervention", onIntervention);
+    world.on("deity:miracle", onMiracle);
 
     // Boon delivery — wisp flies to player
-    world.on('deity:boon', onDivineBoon);
+    world.on("deity:boon", onDivineBoon);
   }
 
-  return { tick, draw, getActiveLights, installListeners, setDepth, getWispPos };
+  return {
+    tick,
+    draw,
+    getActiveLights,
+    installListeners,
+    setDepth,
+    getWispPos,
+  };
 }
