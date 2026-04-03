@@ -4709,9 +4709,13 @@ function drawEntityGlyph(atlas, ctx, entity, scale = 1) {
   const espSensed = hasTag(entity, 'esp_sensed');
   if (!invisible && !shadowCloak && !phaseShift && !memoryRecent && !espSensed) {
     const tint = getHitTint(entity.id);
-    if (tint > 0.01) {
+    const redPulse = isPlayerGlyph ? deathVfx.getPlayerGlyphRedPulse(_fxTime) : 0;
+    if (tint > 0.01 || redPulse > 0.01) {
       ctx.save();
-      ctx.filter = `saturate(${1 - tint * 0.7}) sepia(${tint}) hue-rotate(-50deg) brightness(${1 + tint * 0.4})`;
+      // Combine hit tint and low-HP red pulse — red pulse shifts hue toward red + boosts brightness
+      const t = Math.max(tint, redPulse);
+      const hueShift = redPulse > tint ? -30 : -50; // closer to pure red for low-HP pulse
+      ctx.filter = `saturate(${1 - t * 0.5}) sepia(${t}) hue-rotate(${hueShift}deg) brightness(${1 + t * 0.4})`;
       drawKindScaled(atlas, ctx, kind, entity.pos.x, entity.pos.y, scale);
       ctx.restore();
     } else {
