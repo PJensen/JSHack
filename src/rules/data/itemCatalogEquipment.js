@@ -1043,6 +1043,7 @@ export const EQUIPMENT_ITEMS = {
     damageDice: "1d12",
     damageType: "pierce",
     staminaCost: 20,
+    weight: 4.0,
   },
   bow_short: {
     id: "bow_short",
@@ -1058,6 +1059,7 @@ export const EQUIPMENT_ITEMS = {
     damageDice: "1d6",
     range: 8,
     staminaCost: 6,
+    weight: 1.5,
   },
   bow_recurve: {
     id: "bow_recurve",

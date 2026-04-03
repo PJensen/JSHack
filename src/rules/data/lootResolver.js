@@ -414,7 +414,7 @@ function getPlayerKnownSpells(world) {
  * @param {Object} rng - createRng() instance
  * @param {number} depth
  * @param {{x:number, y:number}} pos
- * @param {{source?:string, origin?:{x:number,y:number}, impulse?:{dx:number,dy:number,force?:number,critical?:boolean}}|undefined} [meta]
+ * @param {{actor?:number, source?:string, origin?:{x:number,y:number}, impulse?:{dx:number,dy:number,force?:number,critical?:boolean}}|undefined} [meta]
  * @returns {number[]} entity IDs created
  */
 export function dropLoot(world, tableId, rng, depth, pos, meta) {
@@ -427,6 +427,7 @@ export function dropLoot(world, tableId, rng, depth, pos, meta) {
   const drops = resolveLootTable(tableId, rng, depth, 0, opts);
   const ids = [];
   const extra = {};
+  if (meta?.actor) extra.actor = meta.actor;
   if (meta?.source) extra.source = meta.source;
   if (meta?.origin) extra.origin = meta.origin;
   if (meta?.impulse) extra.impulse = meta.impulse;

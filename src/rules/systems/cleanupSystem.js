@@ -313,7 +313,7 @@ export function cleanupSystem(world) {
             }
             const deathOrigin = { x: pos.x | 0, y: pos.y | 0 };
             dropLoot(world, tableId, rng, depth, { x: pos.x, y: pos.y },
-              { source: "death", origin: deathOrigin, impulse });
+              { actor: id, source: "death", origin: deathOrigin, impulse });
           }
 
           // Drop a corpse for the killed monster or pet.
@@ -367,6 +367,7 @@ export function cleanupSystem(world) {
             try {
               world.emit &&
                 world.emit("item:dropped", {
+                  actor: id,
                   itemId: droppedId,
                   count: 1,
                   at: { x: pos.x, y: pos.y },
