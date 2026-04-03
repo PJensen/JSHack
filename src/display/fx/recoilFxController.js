@@ -161,28 +161,43 @@ export function createRecoilFxController() {
   function installListeners({ world, getPosition, isPlayer }) {
     world.on('damaged', ({
       source, target, amount, offhand, critical,
-      impactVector, projectileDelay,
+      cause, impactVector, projectileDelay,
     }) => {
-      // Ranged only — require an impact vector (projectile travel direction)
-      if (!impactVector || (!impactVector.dx && !impactVector.dy)) return;
+      // Skip melee — recoil is ranged/spell only
+      if (cause === 'melee') return;
 
       const tid = Number(target || 0) | 0;
       if (!(tid > 0)) return;
 
-      const dx = impactVector.dx;
-      const dy = impactVector.dy;
+      let dx = 0, dy = 0;
 
-      // Delay: ranged hits defer until projectile arrives visually
+      if (impactVector && (impactVector.dx || impactVector.dy)) {
+        // Arrow / projectile with explicit travel direction
+        dx = impactVector.dx;
+        dy = impactVector.dy;
+      } else {
+        // Spell: compute direction from caster → target
+        const sid = Number(source || 0) | 0;
+        if (!(sid > 0)) return;
+        const spos = getPosition(sid);
+        const tpos = getPosition(tid);
+        if (!spos || !tpos) return;
+        const rawDx = tpos.x - spos.x;
+        const rawDy = tpos.y - spos.y;
+        const mag = Math.hypot(rawDx, rawDy);
+        if (!(mag > 0)) return;
+        dx = rawDx / mag;
+        dy = rawDy / mag;
+      }
+
+      // Delay: projectile hits defer until visual arrival
       const delay = Number(projectileDelay) || 0;
 
-      // Offhand recoil: stagger after main-hand (match bumpFx 150ms gap)
-      const ohDelay = offhand ? 0.15 : 0;
-
       trigger(tid, dx, dy, {
-        offhand: !!offhand,
+        offhand: false,
         damage: amount,
         critical: !!critical,
-        delay: delay + ohDelay,
+        delay,
       });
     });
   }
