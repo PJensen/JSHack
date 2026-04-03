@@ -33,10 +33,10 @@ const CRIT_MULT = 1.35;
 
 // ── Mass modulation ────────────────────────────────────────────────
 // Lighter creatures recoil more, heavier ones less.
-// Reference mass = 80 kg (human-sized M). Multiplier = sqrt(ref / mass).
+// Reference mass = 80 kg (humanoid baseline). Multiplier = sqrt(ref / mass).
 const MASS_REF = 80;
-const MASS_MULT_MIN = 0.45;  // floor for XL / very heavy
-const MASS_MULT_MAX = 1.8;   // cap for XS / very light
+const MASS_MULT_MIN = 0.7;   // floor for XL / very heavy
+const MASS_MULT_MAX = 1.35;  // cap for XS / very light
 
 // Fallback: if only sizeClass is available (no massKg)
 const SIZE_CLASS_MASS = { XS: 3, S: 25, M: 80, L: 200, XL: 500 };
