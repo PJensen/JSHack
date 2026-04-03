@@ -10,7 +10,7 @@ import { Pet } from '../src/rules/components/Pet.js';
 import { Owner } from '../src/rules/components/Owner.js';
 import { equipmentSystem } from '../src/rules/systems/equipmentSystem.js';
 import { combatSystem } from '../src/rules/systems/combatSystem.js';
-import { cleanupSystem } from '../src/rules/systems/cleanupSystem.js';
+import { cleanupSystem, installDeathImpactTracker } from '../src/rules/systems/cleanupSystem.js';
 import { Position } from '../src/rules/components/Position.js';
 import { Inventory } from '../src/rules/components/Inventory.js';
 import { addToInventory } from '../src/rules/utils/inventoryFacade.js';
@@ -137,4 +137,57 @@ Deno.test("monster death burst places dropped gear in 1-2 tile radius and avoids
   const cheb = Math.max(dx, dy);
   assert(cheb >= 1 && cheb <= 2, `expected death burst in radius 1-2, got chebyshev ${cheb}`);
   assert(getTile(droppedPos.x, droppedPos.y) !== TILE_WALL, "death burst should avoid wall tiles when floor alternatives exist");
+});
+
+Deno.test("death loot impulse uses same-turn positive-impact only", () => {
+  clearAll();
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR);
+  loadChunk(0, 0, tiles);
+
+  const world = new World({ seed: 4242 });
+  installDeathImpactTracker(world);
+
+  const monster = world.create();
+  world.add(monster, NamedIdentity, { name: "Goblin", identity: "goblin" });
+  world.add(monster, Position, { x: 8, y: 8 });
+  world.add(monster, Vitality, { maxHp: 10, hp: 2 });
+  world.add(monster, Inventory, { capacity: 4 });
+
+  const item = world.create();
+  world.add(item, NamedIdentity, { name: "Test Ring", identity: "test_ring" });
+  world.add(item, ItemInfo, {
+    type: "equip",
+    slot: "ring",
+    weight: 1,
+    value: 1,
+    description: "",
+    count: 1,
+    bonuses: {},
+    rarity: 1,
+    rarityName: "common",
+    affixes: [],
+  });
+  addToInventory(world, monster, item);
+
+  const drops = [];
+  world.on("item:dropped", (evt) => drops.push(evt));
+
+  // Non-damaging hit must not seed death impulse.
+  world.emit("damaged", {
+    target: monster,
+    amount: 0,
+    rawAmount: 0,
+    impactVector: { dx: 1, dy: 0 },
+    critical: false,
+  });
+  // Advance turn so any prior impact data is stale by cleanup time.
+  world.step = (world.step | 0) + 1;
+  // Lethal without an impact payload this turn should produce no impulse.
+  const vit = world.get(monster, Vitality);
+  vit.hp = 0;
+  cleanupSystem(world);
+
+  const dropEvt = drops.find((evt) => Number(evt?.itemId || 0) === item);
+  assert(dropEvt, "expected dropped item event for dead monster inventory item");
+  assert(!dropEvt.impulse, "stale/non-damaging impacts should not drive loot impulse");
 });
