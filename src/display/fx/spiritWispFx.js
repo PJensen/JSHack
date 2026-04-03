@@ -123,6 +123,8 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
   let _dangerIntensity = 0;          // 0 = no danger, 1 = max
   let _dangerScanTimer = 0;
   let _dangerSnapTimer = 0;
+  let _trapHintTimer = 0;
+  let _trapHintX = 0, _trapHintY = 0;
 
   // Miracle flight state
   const FLIGHT_IDLE = 0, FLIGHT_TO = 1, FLIGHT_FLARE = 2, FLIGHT_BACK = 3;
@@ -230,6 +232,9 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
       _dangerDx = dx / len;
       _dangerDy = dy / len;
       _dangerIntensity = Math.min(1, 1 - (closestDist - 1) / DANGER_SENSE_RADIUS);
+      _trapHintX = px + dx;
+      _trapHintY = py + dy;
+      _trapHintTimer = Math.max(_trapHintTimer, 0.35 + _dangerIntensity * 0.45);
       // Snap emphasis when direction changes so the pointer reads stronger.
       const dot = (prevDx * _dangerDx) + (prevDy * _dangerDy);
       if (dot < 0.9) _dangerSnapTimer = 0.22;
@@ -428,6 +433,7 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
     _omenTimer = Math.max(0, _omenTimer - dtSec);
     _ceremonyTimer = Math.max(0, _ceremonyTimer - dtSec);
     _targetCueTimer = Math.max(0, _targetCueTimer - dtSec);
+    _trapHintTimer = Math.max(0, _trapHintTimer - dtSec);
 
     // Danger scan (throttled)
     _dangerScanTimer -= dtSec;
@@ -648,6 +654,18 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
         bctx.lineTo(tipX - nx * (wing * 2.4) - lx * wing, tipY - ny * (wing * 2.4) - ly * wing);
         bctx.stroke();
       }
+    }
+
+    // Trap hint ping: faint marker at inferred hidden trap position.
+    if (_trapHintTimer > 0 && _dangerIntensity > 0.18 && _flightState === FLIGHT_IDLE) {
+      const tt = Math.min(1, _trapHintTimer / 0.8);
+      const ring = 0.08 + (1 - tt) * 0.14;
+      const alpha = Math.min(0.55, 0.14 + _dangerIntensity * 0.35) * tt;
+      bctx.strokeStyle = `rgba(255,170,70,${alpha.toFixed(3)})`;
+      bctx.lineWidth = 0.015;
+      bctx.beginPath();
+      bctx.arc(_trapHintX, _trapHintY, ring, 0, Math.PI * 2);
+      bctx.stroke();
     }
 
     // Cleanse aura: rotating spiral ring around spirit
