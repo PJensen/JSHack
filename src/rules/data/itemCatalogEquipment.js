@@ -1391,6 +1391,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 2,
     rarityName: "magic",
     bonuses: { maxMana: 5, manaRegen: 0.08 },
+    weight: 0.06,
   },
   boots_leather: {
     id: "boots_leather",
@@ -1415,6 +1416,7 @@ export const EQUIPMENT_ITEMS = {
     rarityName: "common",
     bonuses: { defense: 1, maxStamina: 5, staminaRegen: 0.2 },
     description: "Quiet soles built for long marches and quick retreats.",
+    weight: 1.0,
   },
   sandals_hemp: {
     id: "sandals_hemp",
@@ -1426,6 +1428,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 1,
     rarityName: "common",
     bonuses: { maxStamina: 3, staminaRegen: 0.15 },
+    weight: 0.3,
   },
   shoes_cloth: {
     id: "shoes_cloth",
@@ -1437,6 +1440,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 1,
     rarityName: "common",
     bonuses: { maxMana: 4, manaRegen: 0.1 },
+    weight: 0.4,
   },
   plate_armor: {
     id: "plate_armor",
@@ -1448,6 +1452,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 3,
     rarityName: "rare",
     bonuses: { defense: 3 },
+    weight: 15.0,
   },
   // ── Body armor: epic ────────────────────────────────────────────
   armor_vanguard: {
@@ -1462,6 +1467,7 @@ export const EQUIPMENT_ITEMS = {
     bonuses: { defense: 4, maxHp: 15, bluntResist: 0.15, slashResist: 0.1 },
     description: "Forged in layers of folded steel, each plate interlocks to seal every gap.",
     affixes: ["shieldWall1"],
+    weight: 16.0,
   },
   armor_nightstalker: {
     id: "armor_nightstalker",
@@ -1475,6 +1481,7 @@ export const EQUIPMENT_ITEMS = {
     bonuses: { defense: 2, attack: 2, critChance: 0.05, maxStamina: 10 },
     description: "Blackened leather fitted with hidden pockets and reinforced seams for silent kills.",
     affixes: ["lucky1"],
+    weight: 4.5,
   },
   armor_arcanist: {
     id: "armor_arcanist",
@@ -1488,6 +1495,7 @@ export const EQUIPMENT_ITEMS = {
     bonuses: { defense: 1, maxMana: 18, manaRegen: 0.5, spellHit: 2 },
     description: "Woven from thread soaked in moonwell water, it hums with latent power.",
     affixes: ["poisonWard1"],
+    weight: 2.0,
   },
   // ── Body armor: legendary ───────────────────────────────────────
   armor_bulwark: {
@@ -1502,6 +1510,7 @@ export const EQUIPMENT_ITEMS = {
     bonuses: { defense: 5, maxHp: 25, bluntResist: 0.2, slashResist: 0.15, pierceResist: 0.1 },
     description: "A relic of a kingdom lost beneath the earth. Its bearer becomes an immovable wall.",
     affixes: ["shieldWall1", "kineticWard1"],
+    weight: 18.0,
   },
   armor_phantom: {
     id: "armor_phantom",
@@ -1515,6 +1524,7 @@ export const EQUIPMENT_ITEMS = {
     bonuses: { defense: 3, attack: 3, critChance: 0.08, maxStamina: 12, luck: 2 },
     description: "Stitched from the hides of shadow panthers, it shifts with the wearer like a second skin.",
     affixes: ["secondWind1"],
+    weight: 4.0,
   },
   boots_plate: {
     id: "boots_plate",
@@ -1526,6 +1536,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 2,
     rarityName: "magic",
     bonuses: { defense: 2 },
+    weight: 2.5,
   },
   // ── Feet: rare ──────────────────────────────────────────────────
   boots_ironshod: {
@@ -1539,6 +1550,7 @@ export const EQUIPMENT_ITEMS = {
     rarityName: "rare",
     bonuses: { defense: 3, maxHp: 5 },
     description: "Heavy boots with iron-capped toes. They make stealth impossible but survival likely.",
+    weight: 2.8,
   },
   boots_strider: {
     id: "boots_strider",
@@ -1551,6 +1563,7 @@ export const EQUIPMENT_ITEMS = {
     rarityName: "rare",
     bonuses: { defense: 1, dexterity: 2, maxStamina: 8, staminaRegen: 0.5, luck: 1 },
     description: "Soft-soled boots favored by rangers and thieves for their sure grip.",
+    weight: 1.0,
   },
   // ── Feet: epic ──────────────────────────────────────────────────
   boots_sentinel: {
@@ -1565,6 +1578,7 @@ export const EQUIPMENT_ITEMS = {
     bonuses: { defense: 3, maxHp: 10, bluntResist: 0.1, pierceResist: 0.1 },
     description: "Steel-plated boots with articulated ankles, built for warriors who hold the line.",
     affixes: ["kineticWard1"],
+    weight: 3.0,
   },
   boots_shadowstep: {
     id: "boots_shadowstep",
@@ -1578,6 +1592,7 @@ export const EQUIPMENT_ITEMS = {
     bonuses: { defense: 2, attack: 1, critChance: 0.04, maxStamina: 10, staminaRegen: 0.4 },
     description: "Each step bends light around the wearer, leaving only a blur.",
     affixes: ["lucky1"],
+    weight: 1.0,
   },
   boots_conduit: {
     id: "boots_conduit",
@@ -1591,6 +1606,7 @@ export const EQUIPMENT_ITEMS = {
     bonuses: { defense: 1, maxMana: 12, manaRegen: 0.4, spellHit: 1 },
     description: "Silk slippers that draw ambient mana upward through the soles.",
     affixes: ["life1"],
+    weight: 0.3,
   },
   // ── Feet: legendary ─────────────────────────────────────────────
   boots_earthbound: {
@@ -1605,6 +1621,7 @@ export const EQUIPMENT_ITEMS = {
     bonuses: { defense: 4, maxHp: 15, bluntResist: 0.15, pierceResist: 0.1 },
     description: "Forged from ore pulled from the deepest vein, they root the wearer to the earth itself.",
     affixes: ["shieldWall1"],
+    weight: 3.5,
   },
   boots_phantomstride: {
     id: "boots_phantomstride",
@@ -1618,6 +1635,7 @@ export const EQUIPMENT_ITEMS = {
     bonuses: { defense: 2, attack: 2, critChance: 0.06, maxStamina: 15, staminaRegen: 0.5, luck: 2 },
     description: "Worn by the last of the ghost rangers. Their footprints never touch the ground.",
     affixes: ["guard1"],
+    weight: 1.0,
   },
   shield_steel: {
     id: "shield_steel",
@@ -1629,6 +1647,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 2,
     rarityName: "magic",
     bonuses: { defense: 3 },
+    weight: 3.5,
   },
 
   // Early proc gear (tier 0-1)
@@ -1646,6 +1665,7 @@ export const EQUIPMENT_ITEMS = {
     staminaCost: 5,
     description: "A tarnished blade that crackles faintly when swung.",
     affixes: ["chainLightning1"],
+    weight: 0.5,
   },
   smoldering_club: {
     id: "smoldering_club",
@@ -1662,6 +1682,7 @@ export const EQUIPMENT_ITEMS = {
     staminaCost: 9,
     description: "The charred head still glows with fading embers.",
     affixes: ["firestorm1"],
+    weight: 2.5,
   },
   chipped_fang: {
     id: "chipped_fang",
@@ -1677,6 +1698,7 @@ export const EQUIPMENT_ITEMS = {
     staminaCost: 5,
     description: "A sharpened tooth pried from something large. It draws blood easily.",
     affixes: ["hemorrhage1"],
+    weight: 0.3,
   },
   leech_blade: {
     id: "leech_blade",
@@ -1692,6 +1714,7 @@ export const EQUIPMENT_ITEMS = {
     staminaCost: 8,
     description: "Dark stains run the length of the fuller. The grip feels oddly warm.",
     affixes: ["soulDrain1"],
+    weight: 1.2,
   },
   rusted_buckler: {
     id: "rusted_buckler",
@@ -1705,6 +1728,7 @@ export const EQUIPMENT_ITEMS = {
     bonuses: { defense: 1 },
     description: "Dented and pitted, but it still hardens when struck.",
     affixes: ["shieldWall1"],
+    weight: 1.5,
   },
   brawler_band: {
     id: "brawler_band",
@@ -1718,6 +1742,7 @@ export const EQUIPMENT_ITEMS = {
     bonuses: {},
     description: "A crude iron ring. Your blood runs hot when you wear it.",
     affixes: ["berserk1"],
+    weight: 0.05,
   },
 
   // Flaming weapon line (early / mid / late)
@@ -1735,6 +1760,7 @@ export const EQUIPMENT_ITEMS = {
     staminaCost: 5,
     description: "The blade radiates a faint heat. Even unsheathed it casts a dim orange glow.",
     affixes: ["flaming"],
+    weight: 0.5,
   },
   flametongue: {
     id: "flametongue",
@@ -1750,6 +1776,7 @@ export const EQUIPMENT_ITEMS = {
     staminaCost: 8,
     description: "Tongues of fire lick along the edge on every swing. They never go out.",
     affixes: ["flaming"],
+    weight: 1.3,
   },
   ashen_reaver: {
     id: "ashen_reaver",
@@ -1765,6 +1792,7 @@ export const EQUIPMENT_ITEMS = {
     staminaCost: 11,
     description: "Forged in a volcanic rift. The blade smoulders with a deep red glow that nothing can extinguish.",
     affixes: ["flaming"],
+    weight: 2.5,
   },
 
   // Epic proc gear (tier 2-3)
@@ -1783,6 +1811,7 @@ export const EQUIPMENT_ITEMS = {
     staminaCost: 10,
     description: "The head glows cherry-red, leaving scorch marks on everything it strikes.",
     affixes: ["firestorm1", "stunning1"],
+    weight: 3.5,
   },
   glacial_edge: {
     id: "glacial_edge",
@@ -1798,6 +1827,7 @@ export const EQUIPMENT_ITEMS = {
     staminaCost: 8,
     description: "A blade of pale blue steel that numbs flesh and opens veins.",
     affixes: ["frostbite1", "hemorrhage1"],
+    weight: 1.2,
   },
   ring_of_fury: {
     id: "ring_of_fury",
@@ -1811,6 +1841,7 @@ export const EQUIPMENT_ITEMS = {
     bonuses: { critChance: 0.05 },
     description: "A rough gold band etched with battle runes. It pulses warmly in combat.",
     affixes: ["berserk1", "manaSurge1"],
+    weight: 0.06,
   },
   witchfire_sword: {
     id: "witchfire_sword",
@@ -1826,6 +1857,7 @@ export const EQUIPMENT_ITEMS = {
     staminaCost: 9,
     description: "Green flame licks along the edge, draining warmth from the air.",
     affixes: ["firestorm1", "soulDrain1"],
+    weight: 2.0,
   },
   howling_maul: {
     id: "howling_maul",
@@ -1843,6 +1875,7 @@ export const EQUIPMENT_ITEMS = {
     staminaCost: 12,
     description: "The wind screams through holes bored in the hammerhead.",
     affixes: ["hemorrhage1", "berserk1", "stunning1"],
+    weight: 5.5,
   },
   wardkeeper_shield: {
     id: "wardkeeper_shield",
@@ -1856,6 +1889,7 @@ export const EQUIPMENT_ITEMS = {
     bonuses: { defense: 2, kineticDR: 1 },
     description: "Runes flare across its face when danger is near.",
     affixes: ["shieldWall1", "guard1"],
+    weight: 4.0,
   },
   serpent_ring: {
     id: "serpent_ring",
@@ -1869,6 +1903,7 @@ export const EQUIPMENT_ITEMS = {
     bonuses: { manaRegen: 0.15 },
     description: "A silver band shaped like a biting snake. Its eyes glint with cunning.",
     affixes: ["manaSurge1", "frostbite1"],
+    weight: 0.05,
   },
   // ── Rings: legendary ────────────────────────────────────────────
   ring_ironwill: {
@@ -1883,6 +1918,7 @@ export const EQUIPMENT_ITEMS = {
     bonuses: { maxHp: 15, defense: 2, bluntResist: 0.1, poisonResist: 0.1 },
     description: "A band of hardened gold inlaid with runes of fortitude. The wearer shrugs off what would fell lesser mortals.",
     affixes: ["life1"],
+    weight: 0.06,
   },
   ring_fateweaver: {
     id: "ring_fateweaver",
@@ -1896,6 +1932,7 @@ export const EQUIPMENT_ITEMS = {
     bonuses: { critChance: 0.08, critMult: 0.15, attack: 1, luck: 3 },
     description: "Fate bends around this ring like light around a star. Every strike finds its mark.",
     affixes: ["berserk1"],
+    weight: 0.06,
   },
   ring_voidchannel: {
     id: "ring_voidchannel",
@@ -1909,6 +1946,7 @@ export const EQUIPMENT_ITEMS = {
     bonuses: { maxMana: 15, manaRegen: 0.4, spellHit: 2, critChance: 0.04 },
     description: "The gem at its center is not a stone but a window into the void, from which raw mana pours.",
     affixes: ["manaSurge1"],
+    weight: 0.05,
   },
 
   // Legendary proc gear (tier 3+)
@@ -1926,6 +1964,7 @@ export const EQUIPMENT_ITEMS = {
     staminaCost: 9,
     description: "Arcs of lightning dance along the blade. Thunder rumbles with each swing.",
     affixes: ["chainLightning1", "capacitive1"],
+    weight: 1.8,
   },
   soulreaver_axe: {
     id: "soulreaver_axe",
@@ -1942,6 +1981,7 @@ export const EQUIPMENT_ITEMS = {
     staminaCost: 14,
     description: "A blackened axe that drinks deeply from the wounded.",
     affixes: ["soulDrain1", "executioner1"],
+    weight: 4.5,
   },
   aegis_of_the_ancient: {
     id: "aegis_of_the_ancient",
@@ -1955,6 +1995,7 @@ export const EQUIPMENT_ITEMS = {
     bonuses: { defense: 3, kineticDR: 2 },
     description: "A tower shield inscribed with forgotten wards. It hums when struck.",
     affixes: ["shieldWall1", "secondWind1"],
+    weight: 5.0,
   },
 
   // ── Proc-package weapons & rings (epic / legendary tier) ────────────────
@@ -1972,6 +2013,7 @@ export const EQUIPMENT_ITEMS = {
     staminaCost: 8,
     description: "Each strike reverberates. The blade remembers the last wound it dealt and echoes it back on the next swing.",
     procPackages: ["echoStrike"],
+    weight: 1.3,
   },
   tolling_blade: {
     id: "tolling_blade",
@@ -1987,6 +2029,7 @@ export const EQUIPMENT_ITEMS = {
     staminaCost: 10,
     description: "Three ticks. Then judgment. It counts each wound in shadow, and on the third toll, the reckoning arrives.",
     procPackages: ["doomClock"],
+    weight: 2.0,
   },
   debtbringer: {
     id: "debtbringer",
@@ -2002,6 +2045,7 @@ export const EQUIPMENT_ITEMS = {
     staminaCost: 9,
     description: "Obscene power up front, a debt accrued in silence. The reckoning comes later — and it comes for everything.",
     procPackages: ["soulMortgage"],
+    weight: 1.5,
   },
   cataclysm_axe: {
     id: "cataclysm_axe",
@@ -2018,6 +2062,7 @@ export const EQUIPMENT_ITEMS = {
     staminaCost: 14,
     description: "Crit kills split outward: a hazard spawns, a wave breaks, marks spread. The massacre cascades.",
     procPackages: ["cataclysmChain"],
+    weight: 5.0,
   },
   bloodward_signet: {
     id: "bloodward_signet",
@@ -2031,6 +2076,7 @@ export const EQUIPMENT_ITEMS = {
     bonuses: { attack: 1 },
     description: "A heavy gold ring caked with old blood. It banks a fraction of every wound you deal and pays it back when you bleed.",
     procPackages: ["bloodTithe"],
+    weight: 0.06,
   },
   jesters_stiletto: {
     id: "jesters_stiletto",
@@ -2046,6 +2092,7 @@ export const EQUIPMENT_ITEMS = {
     staminaCost: 6,
     description: "A slender blade for ridiculous situations. Spectacular misses bewilder everyone present — you included.",
     procPackages: ["foolsErrand"],
+    weight: 0.4,
   },
   plague_fang: {
     id: "plague_fang",
@@ -2061,6 +2108,7 @@ export const EQUIPMENT_ITEMS = {
     staminaCost: 8,
     description: "A hollow assassin's blade packed with virulent compounds. Three hits and the clock detonates in shadow, poison, and disease.",
     procPackages: ["venomClock"],
+    weight: 0.6,
   },
   hollow_greatsword: {
     id: "hollow_greatsword",
@@ -2077,6 +2125,7 @@ export const EQUIPMENT_ITEMS = {
     staminaCost: 12,
     description: "Etched with tidal runes that grow brighter as the wielder bleeds. The closer to death, the more ruinous each swing.",
     procPackages: ["hollowTide"],
+    weight: 4.0,
   },
   deathascendant_blade: {
     id: "deathascendant_blade",
@@ -2092,6 +2141,7 @@ export const EQUIPMENT_ITEMS = {
     staminaCost: 11,
     description: "Each kill detonates in invulnerability, berserk fury, and restored stamina. Death itself is the fuel.",
     procPackages: ["deathAscendant"],
+    weight: 1.8,
   },
   thundergod_maul: {
     id: "thundergod_maul",
@@ -2109,6 +2159,7 @@ export const EQUIPMENT_ITEMS = {
     staminaCost: 14,
     description: "Crits arc 3 electric damage and shock through every hostile nearby. A single critical blow speaks for the heavens.",
     procPackages: ["thunderGod"],
+    weight: 6.0,
   },
   blood_covenant_sword: {
     id: "blood_covenant_sword",
@@ -2124,6 +2175,7 @@ export const EQUIPMENT_ITEMS = {
     staminaCost: 10,
     description: "Each swing costs 8% of your maximum HP in exchange for a burst of fire. The blade drinks first. Always.",
     procPackages: ["bloodCovenant"],
+    weight: 2.0,
   },
   hunters_edge: {
     id: "hunters_edge",
@@ -2139,6 +2191,7 @@ export const EQUIPMENT_ITEMS = {
     staminaCost: 8,
     description: "Each consecutive hit stacks a predator's mark. Five stacks and your prey is simply prey.",
     procPackages: ["predatorMark"],
+    weight: 1.2,
   },
   soul_ascendant_scythe: {
     id: "soul_ascendant_scythe",
@@ -2155,6 +2208,7 @@ export const EQUIPMENT_ITEMS = {
     staminaCost: 13,
     description: "Kills heal 8 HP and leave the wielder wrapped in regen and stoneskin. Each soul consumed leaves you fuller and harder.",
     procPackages: ["soulAscendant"],
+    weight: 4.0,
   },
   hungering_cleaver: {
     id: "hungering_cleaver",
@@ -2170,6 +2224,7 @@ export const EQUIPMENT_ITEMS = {
     staminaCost: 10,
     description: "Each kill stacks the hunger. It never fully fades, and each swing hits harder for it. The hunger can never be sated.",
     procPackages: ["eternalHunger"],
+    weight: 2.2,
   },
   eclipse_maul: {
     id: "eclipse_maul",
@@ -2187,6 +2242,7 @@ export const EQUIPMENT_ITEMS = {
     staminaCost: 13,
     description: "Alternates between sun and moon on every hit, scattering fire and frost through adjacent enemies. Light and dark answer in turn.",
     procPackages: ["eclipseHammer"],
+    weight: 5.5,
   },
 
   // ── Proc-package armor (chest) ──────────────────────────────────────────
@@ -2202,6 +2258,7 @@ export const EQUIPMENT_ITEMS = {
     bonuses: { defense: 3, maxHp: 10 },
     description: "Every wound you deal is silently banked. When you bleed, the debt repays all at once.",
     procPackages: ["bloodTithe"],
+    weight: 12.0,
   },
   blood_covenant_plate: {
     id: "blood_covenant_plate",
@@ -2215,6 +2272,7 @@ export const EQUIPMENT_ITEMS = {
     bonuses: { defense: 4, maxHp: 12 },
     description: "The plate is warm to the touch — it's always drinking. Each swing costs 8% max HP and pays it back as fire.",
     procPackages: ["bloodCovenant"],
+    weight: 16.0,
   },
 
   // ── Proc-package helms (head) ────────────────────────────────────────────
@@ -2230,6 +2288,7 @@ export const EQUIPMENT_ITEMS = {
     bonuses: { defense: 2, bluntResist: 0.1 },
     description: "Three notches are scratched inside the brim. Each hit rings one. On the third toll, shadow falls.",
     procPackages: ["doomClock"],
+    weight: 3.0,
   },
   hollow_tide_helm: {
     id: "hollow_tide_helm",
@@ -2243,6 +2302,7 @@ export const EQUIPMENT_ITEMS = {
     bonuses: { defense: 2, maxHp: 8 },
     description: "Tidal runes circle the brow-plate, brightening as the wearer bleeds. The helmet knows your pain — and multiplies it outward.",
     procPackages: ["hollowTide"],
+    weight: 2.5,
   },
 
   // ── Proc-package amulets (neck) ──────────────────────────────────────────
@@ -2258,6 +2318,7 @@ export const EQUIPMENT_ITEMS = {
     bonuses: { attack: 1, critChance: 0.03 },
     description: "The gem pulses once for every wound dealt. It stores the memory of the last blow and echoes it into the next.",
     procPackages: ["echoStrike"],
+    weight: 0.2,
   },
   deathascendant_medallion: {
     id: "deathascendant_medallion",
@@ -2271,6 +2332,7 @@ export const EQUIPMENT_ITEMS = {
     bonuses: { attack: 2, maxHp: 10 },
     description: "A blackened disc etched with ascendant runes. Each kill detonates in invulnerability, berserk fury, and restored stamina.",
     procPackages: ["deathAscendant"],
+    weight: 0.3,
   },
 
   // ── Proc-package belts ───────────────────────────────────────────────────
@@ -2286,6 +2348,7 @@ export const EQUIPMENT_ITEMS = {
     bonuses: { luck: 2 },
     description: "A motley cord of bells and salvaged junk. Spectacular misses bewilder everyone in range — you included.",
     procPackages: ["foolsErrand"],
+    weight: 0.3,
   },
   hungering_girdle: {
     id: "hungering_girdle",
@@ -2299,6 +2362,7 @@ export const EQUIPMENT_ITEMS = {
     bonuses: { maxStamina: 12, staminaRegen: 0.4, attack: 1 },
     description: "The buckle is carved in the shape of a devouring maw. Kills stack the hunger; each swing hits harder for it.",
     procPackages: ["eternalHunger"],
+    weight: 0.5,
   },
 
   // ── Proc-package gauntlets (gloves) ─────────────────────────────────────
@@ -2314,6 +2378,7 @@ export const EQUIPMENT_ITEMS = {
     bonuses: { attack: 1, poisonResist: 0.1 },
     description: "Hollow needles run along each knuckle, coated in compound toxins. Three hits and the venom clock detonates.",
     procPackages: ["venomClock"],
+    weight: 0.8,
   },
   predator_wraps: {
     id: "predator_wraps",
@@ -2327,6 +2392,7 @@ export const EQUIPMENT_ITEMS = {
     bonuses: { attack: 2, critChance: 0.04 },
     description: "Strips of hide from creatures that were hunted, then stitched together by the hunter. Stacks the mark with every blow.",
     procPackages: ["predatorMark"],
+    weight: 0.3,
   },
 
   // ── Proc-package greaves (legs) ──────────────────────────────────────────
@@ -2342,6 +2408,7 @@ export const EQUIPMENT_ITEMS = {
     bonuses: { defense: 3, critChance: 0.04 },
     description: "Forged from the wreckage of something that used to be a battlefield. Crit kills fork into hazards, waves, and spreading marks.",
     procPackages: ["cataclysmChain"],
+    weight: 2.5,
   },
   soul_debt_greaves: {
     id: "soul_debt_greaves",
@@ -2355,6 +2422,7 @@ export const EQUIPMENT_ITEMS = {
     bonuses: { defense: 2, critChance: 0.08, critMult: 0.5 },
     description: "Every step accrues a debt in silence. The crit power is obscene. Something will come to collect.",
     procPackages: ["soulMortgage"],
+    weight: 2.0,
   },
 
   // ── Proc-package sabatons (feet) ─────────────────────────────────────────
@@ -2370,6 +2438,7 @@ export const EQUIPMENT_ITEMS = {
     bonuses: { defense: 2, fireResist: 0.1, poisonResist: 0.1 },
     description: "One boot is sun-gold, one is moon-silver. Hits alternate between fire and frost through adjacent enemies. Light and dark answer in turn.",
     procPackages: ["eclipseHammer"],
+    weight: 3.0,
   },
   thundergod_greaves: {
     id: "thundergod_greaves",
@@ -2383,6 +2452,7 @@ export const EQUIPMENT_ITEMS = {
     bonuses: { defense: 2, critChance: 0.04 },
     description: "Arcs of static discharge with every step. Crits send lightning through every hostile in radius 2.",
     procPackages: ["thunderGod"],
+    weight: 2.8,
   },
 
   // ── Proc-package shields (offhand) ───────────────────────────────────────
@@ -2398,6 +2468,7 @@ export const EQUIPMENT_ITEMS = {
     bonuses: { defense: 3, kineticDR: 1, maxHp: 10 },
     description: "The iron face is etched with harvested soul-glyphs. Each kill heals the bearer, applies regen, and hardens them against the next blow.",
     procPackages: ["soulAscendant"],
+    weight: 4.5,
   },
   predator_buckler: {
     id: "predator_buckler",
@@ -2411,6 +2482,7 @@ export const EQUIPMENT_ITEMS = {
     bonuses: { defense: 2, attack: 1 },
     description: "A light buckler inlaid with claw-marks. Each hit stacks the predator's mark, amplifying every subsequent blow on the same target.",
     procPackages: ["predatorMark"],
+    weight: 2.0,
   },
   glacier_sigil: {
     id: "glacier_sigil",
