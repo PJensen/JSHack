@@ -482,7 +482,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
   nameInput.addEventListener('blur', () => { nameInput.style.borderBottomColor = 'rgba(120,110,100,0.35)'; });
   box.appendChild(nameInput);
 
-  // ---- class carousel ----
+  // ---- class carousel (smooth-scrolling horizontal strip) ----
   const carouselWrap = document.createElement('div');
   Object.assign(carouselWrap.style, {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -499,7 +499,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
       cursor: 'pointer', padding: '8px 14px',
       transition: 'color 120ms, transform 120ms',
       lineHeight: '1', fontFamily: 'monospace',
-      touchAction: 'manipulation',
+      touchAction: 'manipulation', flexShrink: '0',
     });
     btn.addEventListener('pointerenter', () => { btn.style.color = UI.accent; });
     btn.addEventListener('pointerleave', () => { btn.style.color = UI.muted; });
@@ -513,51 +513,71 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
   const prevBtn = makeArrow('\u2039', -1);
   const nextBtn = makeArrow('\u203A', 1);
 
-  const classDisplay = document.createElement('div');
-  Object.assign(classDisplay.style, {
-    flex: '1', textAlign: 'center',
-    minWidth: '0', padding: '8px 0',
+  // Scroll viewport — shows one slide at a time, smooth scroll between them
+  const scrollViewport = document.createElement('div');
+  Object.assign(scrollViewport.style, {
+    flex: '1', minWidth: '0',
+    overflow: 'hidden',
   });
 
-  const classIcon = document.createElement('div');
-  Object.assign(classIcon.style, {
-    fontSize: '48px', lineHeight: '1.1',
-    marginBottom: '6px',
-    filter: 'saturate(0.85) brightness(0.92)',
-    transition: 'transform 180ms ease',
+  const scrollTrack = document.createElement('div');
+  Object.assign(scrollTrack.style, {
+    display: 'flex',
+    transition: 'transform 320ms cubic-bezier(0.25, 0.9, 0.3, 1)',
+    willChange: 'transform',
   });
 
-  const className = document.createElement('div');
-  Object.assign(className.style, {
-    fontSize: '18px', fontWeight: 'bold',
-    color: '#d7e3f1', letterSpacing: '0.08em',
-    textTransform: 'uppercase',
-    marginBottom: '6px',
-    transition: 'opacity 150ms',
-  });
+  const slides = [];
+  for (const cls of classes) {
+    const slide = document.createElement('div');
+    Object.assign(slide.style, {
+      flex: '0 0 100%', width: '100%',
+      textAlign: 'center', padding: '8px 0',
+      boxSizing: 'border-box',
+    });
 
-  const classDesc = document.createElement('div');
-  Object.assign(classDesc.style, {
-    fontSize: '12px', color: UI.muted,
-    lineHeight: '1.4', padding: '0 8px',
-    minHeight: '34px',
-    transition: 'opacity 150ms',
-  });
+    const icon = document.createElement('div');
+    Object.assign(icon.style, {
+      fontSize: '48px', lineHeight: '1.1',
+      marginBottom: '6px',
+      filter: 'saturate(0.85) brightness(0.92)',
+    });
+    icon.textContent = CLASS_ICONS[cls.id] ?? cls.name[0];
 
-  const classDeity = document.createElement('div');
-  Object.assign(classDeity.style, {
-    fontSize: '11px', color: UI.low,
-    fontStyle: 'italic', marginTop: '4px',
-    transition: 'opacity 150ms',
-  });
+    const name = document.createElement('div');
+    Object.assign(name.style, {
+      fontSize: '18px', fontWeight: 'bold',
+      color: '#d7e3f1', letterSpacing: '0.08em',
+      textTransform: 'uppercase', marginBottom: '6px',
+    });
+    name.textContent = cls.name;
 
-  classDisplay.appendChild(classIcon);
-  classDisplay.appendChild(className);
-  classDisplay.appendChild(classDesc);
-  classDisplay.appendChild(classDeity);
+    const desc = document.createElement('div');
+    Object.assign(desc.style, {
+      fontSize: '12px', color: UI.muted,
+      lineHeight: '1.4', padding: '0 8px',
+      minHeight: '34px',
+    });
+    desc.textContent = cls.description;
 
+    const deity = document.createElement('div');
+    Object.assign(deity.style, {
+      fontSize: '11px', color: UI.low,
+      fontStyle: 'italic', marginTop: '4px',
+    });
+    deity.textContent = `${cls.deityName} \u2022 ${cls.deityAlignment}`;
+
+    slide.appendChild(icon);
+    slide.appendChild(name);
+    slide.appendChild(desc);
+    slide.appendChild(deity);
+    scrollTrack.appendChild(slide);
+    slides.push(slide);
+  }
+
+  scrollViewport.appendChild(scrollTrack);
   carouselWrap.appendChild(prevBtn);
-  carouselWrap.appendChild(classDisplay);
+  carouselWrap.appendChild(scrollViewport);
   carouselWrap.appendChild(nextBtn);
   box.appendChild(carouselWrap);
 
@@ -576,47 +596,28 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
       transition: 'opacity 150ms, background 150ms, transform 150ms',
       cursor: 'pointer',
     });
-    dot.addEventListener('pointerdown', () => { classIndex = i; renderClass(); });
+    dot.addEventListener('pointerdown', () => { scrollTo(i); });
     dotsRow.appendChild(dot);
     dots.push(dot);
   }
   box.appendChild(dotsRow);
 
-  function renderClass() {
-    const cls = classes[classIndex];
-    const icon = CLASS_ICONS[cls.id] ?? cls.name[0];
-    classIcon.textContent = icon;
-    className.textContent = cls.name;
-    classDesc.textContent = cls.description;
-    classDeity.textContent = `${cls.deityName} \u2022 ${cls.deityAlignment}`;
+  function scrollTo(idx) {
+    classIndex = idx;
+    scrollTrack.style.transform = `translateX(-${classIndex * 100}%)`;
     refreshConfirmCta();
-
     for (let i = 0; i < dots.length; i++) {
       dots[i].style.opacity = i === classIndex ? '1' : '0.3';
       dots[i].style.background = i === classIndex ? UI.accent : UI.low;
       dots[i].style.transform = i === classIndex ? 'scale(1.3)' : 'scale(1)';
     }
-
-    // subtle entrance animation
-    try {
-      classIcon.animate(
-        [{ transform: 'scale(0.9)', opacity: 0.6 }, { transform: 'scale(1)', opacity: 1 }],
-        { duration: 160, easing: 'ease-out' },
-      );
-      className.animate(
-        [{ opacity: 0.4 }, { opacity: 1 }],
-        { duration: 140, easing: 'ease-out' },
-      );
-    } catch {}
   }
 
   prevBtn.addEventListener('pointerdown', () => {
-    classIndex = (classIndex - 1 + classes.length) % classes.length;
-    renderClass();
+    scrollTo((classIndex - 1 + classes.length) % classes.length);
   });
   nextBtn.addEventListener('pointerdown', () => {
-    classIndex = (classIndex + 1) % classes.length;
-    renderClass();
+    scrollTo((classIndex + 1) % classes.length);
   });
 
   // ---- hard mode checkbox ----
@@ -729,7 +730,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
     doConfirm();
   });
   box.appendChild(confirmBtn);
-  renderClass();
+  scrollTo(classIndex);
 
   // ---- seed (hidden, revealable) ----
   const seedToggle = document.createElement('div');
@@ -901,29 +902,26 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
       doConfirm();
     } else if (e.key === 'ArrowLeft') {
       e.preventDefault();
-      classIndex = (classIndex - 1 + classes.length) % classes.length;
-      renderClass();
+      scrollTo((classIndex - 1 + classes.length) % classes.length);
     } else if (e.key === 'ArrowRight') {
       e.preventDefault();
-      classIndex = (classIndex + 1) % classes.length;
-      renderClass();
+      scrollTo((classIndex + 1) % classes.length);
     }
   });
 
   // touch swipe support for carousel
   let touchStartX = 0;
   let touchStartY = 0;
-  classDisplay.addEventListener('touchstart', (e) => {
+  scrollViewport.addEventListener('touchstart', (e) => {
     touchStartX = e.touches[0].clientX;
     touchStartY = e.touches[0].clientY;
   }, { passive: true });
-  classDisplay.addEventListener('touchend', (e) => {
+  scrollViewport.addEventListener('touchend', (e) => {
     const dx = e.changedTouches[0].clientX - touchStartX;
     const dy = e.changedTouches[0].clientY - touchStartY;
     if (Math.abs(dx) > 30 && Math.abs(dx) > Math.abs(dy)) {
-      if (dx < 0) { classIndex = (classIndex + 1) % classes.length; }
-      else { classIndex = (classIndex - 1 + classes.length) % classes.length; }
-      renderClass();
+      if (dx < 0) scrollTo((classIndex + 1) % classes.length);
+      else scrollTo((classIndex - 1 + classes.length) % classes.length);
     }
   }, { passive: true });
 
