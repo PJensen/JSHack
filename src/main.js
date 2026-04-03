@@ -4883,7 +4883,7 @@ function drawMonsterLabels(ctx, labels, fxTime) {
   ctx.restore();
 }
 
-function drawEntityGlyph(atlas, ctx, entity, scale = 1) {
+function drawEntityGlyph(atlas, ctx, entity, scale = 1, rotation = 0) {
   if (hasTag(entity, 'thermal_sensed')) return;
 
   // Death VFX: player glyph blink (disappears on off-beats) + heartbeat scale
@@ -4910,10 +4910,10 @@ function drawEntityGlyph(atlas, ctx, entity, scale = 1) {
       const t = Math.max(tint, redPulse);
       const hueShift = redPulse > tint ? -30 : -50; // closer to pure red for low-HP pulse
       ctx.filter = `saturate(${1 - t * 0.5}) sepia(${t}) hue-rotate(${hueShift}deg) brightness(${1 + t * 0.4})`;
-      drawKindScaled(atlas, ctx, kind, entity.pos.x, entity.pos.y, scale);
+      drawKindScaled(atlas, ctx, kind, entity.pos.x, entity.pos.y, scale, rotation);
       ctx.restore();
     } else {
-      drawKindScaled(atlas, ctx, kind, entity.pos.x, entity.pos.y, scale);
+      drawKindScaled(atlas, ctx, kind, entity.pos.x, entity.pos.y, scale, rotation);
     }
     return;
   }
@@ -4934,7 +4934,7 @@ function drawEntityGlyph(atlas, ctx, entity, scale = 1) {
       );
     } else {
       ctx.globalAlpha *= 0.52;
-      drawKindScaled(atlas, ctx, kind, entity.pos.x, entity.pos.y, scale);
+      drawKindScaled(atlas, ctx, kind, entity.pos.x, entity.pos.y, scale, rotation);
     }
     ctx.restore();
     return;
@@ -4952,7 +4952,7 @@ function drawEntityGlyph(atlas, ctx, entity, scale = 1) {
     ctx.filter = 'brightness(0.86) saturate(0.95)';
     ctx.globalAlpha *= 0.94;
   }
-  drawKindScaled(atlas, ctx, kind, entity.pos.x + jx, entity.pos.y + jy, scale);
+  drawKindScaled(atlas, ctx, kind, entity.pos.x + jx, entity.pos.y + jy, scale, rotation);
   ctx.restore();
 }
 
@@ -5786,7 +5786,7 @@ function render(worldView) {
       ? { ...slidEntity, pos: { x: slidEntity.pos.x + bumpOff.dx, y: slidEntity.pos.y + bumpOff.dy } }
       : slidEntity;
 
-    // Recoil — defender jolts away from impact direction
+    // Recoil — defender jolts away from impact direction + rotation wince
     const recoilOff = recoilFx.getOffset(e.id);
     const recoilEntity = (recoilOff.dx || recoilOff.dy)
       ? { ...bumpEntity, pos: { x: bumpEntity.pos.x + recoilOff.dx, y: bumpEntity.pos.y + recoilOff.dy } }
@@ -5800,6 +5800,7 @@ function render(worldView) {
     // Size-class scaling — small creatures render smaller, big ones bigger
     const sizeScale = SIZE_CLASS_SCALE[e.sizeClass] || 1;
     const entityScale = flyingPresentation.glyphScale * sizeScale;
+    const entityRotation = recoilOff.rotation || 0;
 
     if (hasTag(renderEntity, 'thermal_sensed')) {
       drawThermalSensePing(bctx, renderEntity, _fxTime);
@@ -5807,7 +5808,7 @@ function render(worldView) {
     }
 
     drawFlyingShadow(bctx, flyingPresentation);
-    drawEntityGlyph(glyphAtlas, bctx, renderEntity, entityScale);
+    drawEntityGlyph(glyphAtlas, bctx, renderEntity, entityScale, entityRotation);
     if (hasTag(renderEntity, 'esp_sensed')) {
       drawEspSenseHalo(bctx, renderEntity, _fxTime);
     }
@@ -6364,8 +6365,9 @@ function render(worldView) {
           : recoilEntity2;
         const roofSizeScale = SIZE_CLASS_SCALE[e.sizeClass] || 1;
 
+        const roofRotation = recoilOff2.rotation || 0;
         drawFlyingShadow(bctx, flyingPresentation);
-        drawEntityGlyph(glyphAtlas, bctx, renderEntity, flyingPresentation.glyphScale * roofSizeScale);
+        drawEntityGlyph(glyphAtlas, bctx, renderEntity, flyingPresentation.glyphScale * roofSizeScale, roofRotation);
         if (shouldShowHealthBar(renderEntity, _fxTime)) {
           drawEntityHealthBar(bctx, renderEntity);
         }
