@@ -9,6 +9,7 @@ import { createSurfaceAreaFxController } from "../fx/surfaceAreaFx.js";
 import { createSpiritWispFxController } from "../fx/spiritWispFx.js";
 import { createStatusPresentationDelayController } from "../fx/statusPresentationDelayController.js";
 import { createBumpFxController } from "../fx/bumpFxController.js";
+import { createRecoilFxController } from "../fx/recoilFxController.js";
 import { installFloatTextWiring } from "../ui/wiring/floatTextWiring.js";
 import { installEventUiWiring } from "../ui/wiring/eventUiWiring.js";
 
@@ -70,6 +71,9 @@ export function setupDisplayRuntime({
   const bumpFx = createBumpFxController();
   bumpFx.installListeners({ world, getPosition, isPlayer });
 
+  const recoilFx = createRecoilFxController();
+  recoilFx.installListeners({ world, getPosition, isPlayer });
+
   const { goreTick } = installFloatTextWiring({ world, ftext, fx, getPosition, isVisibleAt, isPet, isPlayer, getFxTime });
   installEventUiWiring({
     world,
@@ -83,5 +87,5 @@ export function setupDisplayRuntime({
     dispatchRulesAction,
   });
 
-  return { statusEmitterFx, statusPresentationDelayFx, boltFx, delayedDeathFx, projectileFx, spellAreaFx, cloudFx, surfaceAreaFx, spiritWispFx, bumpFx, ftext, goreTick };
+  return { statusEmitterFx, statusPresentationDelayFx, boltFx, delayedDeathFx, projectileFx, spellAreaFx, cloudFx, surfaceAreaFx, spiritWispFx, bumpFx, recoilFx, ftext, goreTick };
 }
