@@ -13,6 +13,7 @@ import { FOV_CONE_DISABLED_KEY, getEntityFacingConeDegrees, getNormalizedEntityF
 // display/ camera + director utilities (pure display resources)
 import { createCamera, updateCamera, applyCamera, worldToScreen, clientToWorld as cameraClientToWorld } from "./display/camera/controller.js";
 import { updateShake } from "./display/camera/shake.js";
+import { startZoomPunch, updateZoomPunch, getZoomPunchScale } from "./display/camera/zoomPunch.js";
 import { zoomTo } from "./display/camera/utils.js";
 import {
   setupDisplayRuntime,
@@ -5551,7 +5552,10 @@ function render(worldView) {
 
   // Camera transform for world-space draws
   bctx.save();
+  const _zpOff = getZoomPunchScale(cam);
+  if (_zpOff) cam.scale += _zpOff;
   applyCamera(bctx, cam, back);
+  if (_zpOff) cam.scale -= _zpOff;
 
   // Compute view bounds in world units for culling
   const viewHalfW = W * 0.5 / (cam.scale || 1);
@@ -6466,6 +6470,7 @@ function frame(now) {
   // Advance display-only systems (fx.step moved below — needs worldView for emitter origins)
   updateCamera(cam, dtSec);
   updateShake(cam, dtSec);
+  updateZoomPunch(cam, dtSec);
   tickDisplayEffects({ dtSec, boltFx, spellAreaFx, projectileFx, throwFx, pickupFx, cloudFx, spiritWispFx, ftext, goreTick });
   delayedDeathFx.tick(dtSec);
   flyingFx.tick(dtSec);

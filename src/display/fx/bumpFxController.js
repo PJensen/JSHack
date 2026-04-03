@@ -5,19 +5,25 @@
 // Dual-wield: main-hand gets a full lunge, off-hand gets a shorter follow-up.
 // Damage modulation: heavier hits lunge slightly further.
 
-/** @typedef {{ dx:number, dy:number, elapsed:number, delay:number, duration:number, dist:number }} BumpState */
+/** @typedef {{ dx:number, dy:number, elapsed:number, delay:number, duration:number, dist:number, whiff?:boolean }} BumpState */
 
 // ── Timing (seconds) ────────────────────────────────────────────────
 const LUNGE_OUT   = 0.030;   // snap toward target — almost instant
-const LUNGE_HOLD  = 0.055;   // hold at apex so the brain registers contact
+const LUNGE_OVER  = 0.020;   // push-through overshoot past contact point
+const LUNGE_HOLD  = 0.045;   // hold at apex so the brain registers contact
 const LUNGE_BACK  = 0.095;   // slow withdrawal sells weight
-const TOTAL       = LUNGE_OUT + LUNGE_HOLD + LUNGE_BACK;
+const TOTAL       = LUNGE_OUT + LUNGE_OVER + LUNGE_HOLD + LUNGE_BACK;
 
-// Offhand: quicker, snappier follow-up
+// Overshoot: how far past 1.0 the lunge pushes (fraction of dist)
+const OVERSHOOT_FRAC = 0.12;
+
+// Offhand: quicker, snappier follow-up (lighter overshoot)
 const OH_LUNGE_OUT  = 0.025;
-const OH_LUNGE_HOLD = 0.040;
+const OH_LUNGE_OVER = 0.015;
+const OH_LUNGE_HOLD = 0.035;
 const OH_LUNGE_BACK = 0.070;
-const OH_TOTAL      = OH_LUNGE_OUT + OH_LUNGE_HOLD + OH_LUNGE_BACK;
+const OH_TOTAL      = OH_LUNGE_OUT + OH_LUNGE_OVER + OH_LUNGE_HOLD + OH_LUNGE_BACK;
+const OH_OVERSHOOT_FRAC = 0.08;
 
 const LUNGE_DIST_BASE = 0.30;  // base tiles toward target at apex (main hand)
 const LUNGE_DIST_OH   = 0.20;  // shorter offhand lunge
@@ -27,6 +33,15 @@ const LUNGE_DIST_OH   = 0.20;  // shorter offhand lunge
 const DMG_SCALE_MIN = 1.0;
 const DMG_SCALE_MAX = 1.4;
 const DMG_SCALE_CAP = 10;      // damage at which scaling maxes out
+
+// Whiff: miss/dodge/parry — shorter reach, more overshoot (weapon swings through air)
+const WHIFF_OUT   = 0.025;
+const WHIFF_OVER  = 0.030;   // longer overshoot — no contact to arrest momentum
+const WHIFF_HOLD  = 0.010;   // barely any hold — nothing to hit
+const WHIFF_BACK  = 0.110;   // slow recovery sells the stumble
+const WHIFF_TOTAL = WHIFF_OUT + WHIFF_OVER + WHIFF_HOLD + WHIFF_BACK;
+const WHIFF_DIST  = 0.22;    // shorter reach than a connected hit
+const WHIFF_OVERSHOOT = 0.20; // 20% overshoot — big swing through empty air
 
 // Stagger: monster lunges start this many seconds after the player's
 const MONSTER_DELAY    = 0.10;
@@ -39,34 +54,75 @@ function easeOutQuad(t)  { return 1 - (1 - t) * (1 - t); }
 function easeInQuad(t)   { return t * t; }
 
 /**
- * Compute the fractional offset (0..1) for a main-hand lunge.
- * easeIn on strike (accelerates into target), easeOut on return (decelerates home).
+ * Compute the fractional offset for a main-hand lunge.
+ * Phases: snap out → overshoot past contact → settle to apex → hold → ease back.
+ * Returns >1.0 during overshoot for that push-through weight.
  */
 function lungeProgress(elapsed) {
   if (elapsed < 0) return 0;
+  // Phase 1: accelerate toward target (0 → 1.0)
   if (elapsed < LUNGE_OUT) {
     return easeInQuad(elapsed / LUNGE_OUT);
   }
-  if (elapsed < LUNGE_OUT + LUNGE_HOLD) {
+  // Phase 2: push through past contact (1.0 → 1+overshoot → 1.0)
+  const t2 = elapsed - LUNGE_OUT;
+  if (t2 < LUNGE_OVER) {
+    const k = t2 / LUNGE_OVER;
+    // sine bump: 0→1→0 mapped to 1.0→1+overshoot→1.0
+    return 1 + OVERSHOOT_FRAC * Math.sin(k * Math.PI);
+  }
+  // Phase 3: hold at apex
+  const t3 = t2 - LUNGE_OVER;
+  if (t3 < LUNGE_HOLD) {
     return 1;
   }
-  const retT = (elapsed - LUNGE_OUT - LUNGE_HOLD) / LUNGE_BACK;
+  // Phase 4: ease back to origin
+  const retT = (t3 - LUNGE_HOLD) / LUNGE_BACK;
   if (retT >= 1) return 0;
   return 1 - easeOutQuad(retT);
 }
 
 /**
- * Compute the fractional offset (0..1) for an off-hand lunge (faster snap).
+ * Compute the fractional offset for an off-hand lunge (faster, lighter overshoot).
  */
 function offhandLungeProgress(elapsed) {
   if (elapsed < 0) return 0;
   if (elapsed < OH_LUNGE_OUT) {
     return easeInQuad(elapsed / OH_LUNGE_OUT);
   }
-  if (elapsed < OH_LUNGE_OUT + OH_LUNGE_HOLD) {
+  const t2 = elapsed - OH_LUNGE_OUT;
+  if (t2 < OH_LUNGE_OVER) {
+    const k = t2 / OH_LUNGE_OVER;
+    return 1 + OH_OVERSHOOT_FRAC * Math.sin(k * Math.PI);
+  }
+  const t3 = t2 - OH_LUNGE_OVER;
+  if (t3 < OH_LUNGE_HOLD) {
     return 1;
   }
-  const retT = (elapsed - OH_LUNGE_OUT - OH_LUNGE_HOLD) / OH_LUNGE_BACK;
+  const retT = (t3 - OH_LUNGE_HOLD) / OH_LUNGE_BACK;
+  if (retT >= 1) return 0;
+  return 1 - easeOutQuad(retT);
+}
+
+/**
+ * Whiff lunge: shorter reach, exaggerated overshoot, slow recovery.
+ * Sells the "swing through air" feel of a miss.
+ */
+function whiffProgress(elapsed) {
+  if (elapsed < 0) return 0;
+  if (elapsed < WHIFF_OUT) {
+    return easeInQuad(elapsed / WHIFF_OUT);
+  }
+  const t2 = elapsed - WHIFF_OUT;
+  if (t2 < WHIFF_OVER) {
+    const k = t2 / WHIFF_OVER;
+    return 1 + WHIFF_OVERSHOOT * Math.sin(k * Math.PI);
+  }
+  const t3 = t2 - WHIFF_OVER;
+  if (t3 < WHIFF_HOLD) {
+    return 1;
+  }
+  const retT = (t3 - WHIFF_HOLD) / WHIFF_BACK;
   if (retT >= 1) return 0;
   return 1 - easeOutQuad(retT);
 }
@@ -164,7 +220,7 @@ export function createBumpFxController() {
     for (let i = 0; i < queue.length; i++) {
       const b = queue[i];
       const t = b.elapsed - b.delay;
-      const progressFn = b.offhand ? offhandLungeProgress : lungeProgress;
+      const progressFn = b.whiff ? whiffProgress : (b.offhand ? offhandLungeProgress : lungeProgress);
       const p = progressFn(t) * b.dist;
       ox += b.dx * p;
       oy += b.dy * p;
@@ -183,9 +239,32 @@ export function createBumpFxController() {
   }
 
   /**
+   * Convert the active main-hand lunge for `attackerId` into a whiff animation.
+   * Called when the attack misses, is dodged, or is parried — replaces the
+   * normal lunge with a shorter, faster animation that overshoots through air.
+   * @param {number} attackerId
+   */
+  function convertToWhiff(attackerId) {
+    const queue = active.get(attackerId | 0);
+    if (!queue) return;
+    for (let i = queue.length - 1; i >= 0; i--) {
+      const b = queue[i];
+      if (!b.offhand && !b.whiff) {
+        b.whiff = true;
+        b.dist = WHIFF_DIST;
+        b.duration = WHIFF_TOTAL;
+        // Reset elapsed to replay from start with new timing
+        b.elapsed = b.delay;
+        break;
+      }
+    }
+  }
+
+  /**
    * Wire up world event listeners.
    * Listens to 'bump:attack' for main-hand melee lunges.
    * Listens to 'damaged' with offhand flag for off-hand follow-up lunges.
+   * Listens to miss/dodge/parry to convert lunges into whiff animations.
    * Damage amount modulates lunge distance for both.
    * @param {{ world:any, getPosition:(id:number)=>({x:number,y:number}|null), isPlayer:(id:number)=>boolean }} deps
    */
@@ -231,6 +310,17 @@ export function createBumpFxController() {
         }
       }
     });
+
+    // Miss / dodge / parry → convert attacker's lunge into a whiff
+    world.on('status', (ev) => {
+      if (ev && ev.kind === 'miss' && ev.source) convertToWhiff(Number(ev.source) | 0);
+    });
+    world.on('combat:dodge', ({ attacker }) => {
+      if (attacker) convertToWhiff(Number(attacker) | 0);
+    });
+    world.on('combat:parry', ({ attacker }) => {
+      if (attacker) convertToWhiff(Number(attacker) | 0);
+    });
   }
 
   /** Remove tracking for a dead / despawned entity. */
@@ -238,7 +328,7 @@ export function createBumpFxController() {
     active.delete(id);
   }
 
-  return { trigger, tick, getOffset, isActive, installListeners, remove };
+  return { trigger, convertToWhiff, tick, getOffset, isActive, installListeners, remove };
 }
 
 const _ZERO = Object.freeze({ dx: 0, dy: 0 });
