@@ -153,7 +153,7 @@ export const SPELL_DEFS = {
   blizzard: {
     id: 'blizzard',
     name: 'Blizzard',
-    symbol: '\u{1F300}', // 🌀
+    symbol: '\u2738', // ✸
     schools: ['destruction'],
     manaCost: 3,
     manaPerTick: 3,
