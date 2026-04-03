@@ -4043,6 +4043,7 @@ const {
   surfaceAreaFx,
   spiritWispFx,
   bumpFx,
+  recoilFx,
   ftext,
   goreTick,
 } = displayRuntime;
@@ -5574,10 +5575,16 @@ function render(worldView) {
       ? { ...slidEntity, pos: { x: slidEntity.pos.x + bumpOff.dx, y: slidEntity.pos.y + bumpOff.dy } }
       : slidEntity;
 
-    const flyingPresentation = flyingFx.getPresentation(bumpEntity, _fxTime, cam.scale);
-    const renderEntity = flyingPresentation.progress > 0.001
-      ? { ...bumpEntity, pos: { x: flyingPresentation.glyphX, y: flyingPresentation.glyphY } }
+    // Recoil — defender jolts away from impact direction
+    const recoilOff = recoilFx.getOffset(e.id);
+    const recoilEntity = (recoilOff.dx || recoilOff.dy)
+      ? { ...bumpEntity, pos: { x: bumpEntity.pos.x + recoilOff.dx, y: bumpEntity.pos.y + recoilOff.dy } }
       : bumpEntity;
+
+    const flyingPresentation = flyingFx.getPresentation(recoilEntity, _fxTime, cam.scale);
+    const renderEntity = flyingPresentation.progress > 0.001
+      ? { ...recoilEntity, pos: { x: flyingPresentation.glyphX, y: flyingPresentation.glyphY } }
+      : recoilEntity;
 
     // Size-class scaling — small creatures render smaller, big ones bigger
     const sizeScale = SIZE_CLASS_SCALE[e.sizeClass] || 1;
@@ -6135,10 +6142,14 @@ function render(worldView) {
         const bumpEntity2 = (bumpOff2.dx || bumpOff2.dy)
           ? { ...slidEntity2, pos: { x: slidEntity2.pos.x + bumpOff2.dx, y: slidEntity2.pos.y + bumpOff2.dy } }
           : slidEntity2;
-        const flyingPresentation = flyingFx.getPresentation(bumpEntity2, _fxTime, cam.scale);
-        const renderEntity = flyingPresentation.progress > 0.001
-          ? { ...bumpEntity2, pos: { x: flyingPresentation.glyphX, y: flyingPresentation.glyphY } }
+        const recoilOff2 = recoilFx.getOffset(e.id);
+        const recoilEntity2 = (recoilOff2.dx || recoilOff2.dy)
+          ? { ...bumpEntity2, pos: { x: bumpEntity2.pos.x + recoilOff2.dx, y: bumpEntity2.pos.y + recoilOff2.dy } }
           : bumpEntity2;
+        const flyingPresentation = flyingFx.getPresentation(recoilEntity2, _fxTime, cam.scale);
+        const renderEntity = flyingPresentation.progress > 0.001
+          ? { ...recoilEntity2, pos: { x: flyingPresentation.glyphX, y: flyingPresentation.glyphY } }
+          : recoilEntity2;
         const roofSizeScale = SIZE_CLASS_SCALE[e.sizeClass] || 1;
 
         drawFlyingShadow(bctx, flyingPresentation);
@@ -6239,6 +6250,7 @@ function frame(now) {
   flyingFx.tick(dtSec);
   slideFx.tick(dtSec);
   bumpFx.tick(dtSec);
+  recoilFx.tick(dtSec);
   tickHitTints(dtSec);
   sceneRuntime.tick(dtSec);
 
