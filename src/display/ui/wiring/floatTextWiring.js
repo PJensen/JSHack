@@ -316,6 +316,143 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     });
   });
 
+  // ── Shield / dodge / parry combat feedback ──────────────────────────
+
+  world.on('shield:guarded', ({ id, stacks, broken, at }) => {
+    const pos = at || getPosition(Number(id || 0));
+    if (!pos || !canShowAt(pos.x, pos.y)) return;
+    ftext.addStatus(pos.x, pos.y - 0.3, broken ? 'SHIELD BREAK!' : 'BLOCKED', {
+      color: broken ? '#ff9955' : '#78d0ff',
+      life: broken ? 1.2 : 0.8,
+      scaleStart: broken ? 1.5 : 1.2,
+      scaleEnd: 1.0,
+    });
+    // Spark burst for blocked hits
+    const sparkColor = broken
+      ? { r: 255, g: 150, b: 85 }
+      : { r: 120, g: 208, b: 255 };
+    for (let i = 0; i < 8; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 0.5 + Math.random() * 0.8;
+      fx.pool.spawn(new Particle({
+        x: pos.x + (Math.random() - 0.5) * 0.15,
+        y: pos.y + (Math.random() - 0.5) * 0.15,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 0.2,
+        life: 0.2 + Math.random() * 0.15,
+        size0: 0.09 + Math.random() * 0.05,
+        size1: 0.02,
+        r: sparkColor.r,
+        g: sparkColor.g,
+        b: sparkColor.b,
+        a0: 0.9,
+        a1: 0.0,
+      }));
+    }
+  });
+
+  world.on('shield:chip', ({ id, stacks, at }) => {
+    const pos = at || getPosition(Number(id || 0));
+    if (!pos || !canShowAt(pos.x, pos.y)) return;
+    // Small metallic sparks for chip
+    for (let i = 0; i < 4; i++) {
+      const angle = -Math.PI * 0.5 + (Math.random() - 0.5) * Math.PI * 0.8;
+      const speed = 0.4 + Math.random() * 0.5;
+      fx.pool.spawn(new Particle({
+        x: pos.x + (Math.random() - 0.5) * 0.1,
+        y: pos.y + (Math.random() - 0.5) * 0.1,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        ay: 1.0,
+        life: 0.15 + Math.random() * 0.1,
+        size0: 0.06,
+        size1: 0.01,
+        r: 200, g: 220, b: 255,
+        a0: 0.85,
+        a1: 0.0,
+      }));
+    }
+  });
+
+  world.on('shield:broken', ({ id, at }) => {
+    const pos = at || getPosition(Number(id || 0));
+    if (!pos || !canShowAt(pos.x, pos.y)) return;
+    // Shatter burst — many sparks flying outward
+    for (let i = 0; i < 14; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 0.8 + Math.random() * 1.4;
+      fx.pool.spawn(new Particle({
+        x: pos.x + (Math.random() - 0.5) * 0.2,
+        y: pos.y + (Math.random() - 0.5) * 0.2,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 0.3,
+        ay: 1.2,
+        life: 0.25 + Math.random() * 0.2,
+        size0: 0.08 + Math.random() * 0.06,
+        size1: 0.02,
+        r: 255, g: 180, b: 80,
+        a0: 0.95,
+        a1: 0.0,
+      }));
+    }
+  });
+
+  world.on('combat:dodge', ({ defender, at }) => {
+    const pos = at || getPosition(Number(defender || 0));
+    if (!pos || !canShowAt(pos.x, pos.y)) return;
+    ftext.addStatus(pos.x, pos.y - 0.35, 'DODGE', {
+      color: '#40e0d0',
+      life: 0.9,
+      scaleStart: 1.3,
+      scaleEnd: 1.0,
+    });
+    // Quick sidestep blur — directional streak particles
+    for (let i = 0; i < 5; i++) {
+      const dx = (Math.random() - 0.5) * 2;
+      fx.pool.spawn(new Particle({
+        x: pos.x + dx * 0.15,
+        y: pos.y + (Math.random() - 0.5) * 0.1,
+        vx: dx * 1.5,
+        vy: -0.1 + Math.random() * 0.2,
+        life: 0.12 + Math.random() * 0.1,
+        size0: 0.10,
+        size1: 0.03,
+        r: 64, g: 224, b: 208,
+        a0: 0.7,
+        a1: 0.0,
+      }));
+    }
+  });
+
+  world.on('combat:parry', ({ defender, at }) => {
+    const pos = at || getPosition(Number(defender || 0));
+    if (!pos || !canShowAt(pos.x, pos.y)) return;
+    ftext.addStatus(pos.x, pos.y - 0.35, 'PARRY!', {
+      color: '#ffd700',
+      life: 1.0,
+      scaleStart: 1.4,
+      scaleEnd: 1.0,
+    });
+    // Metallic clash sparks — bright yellow/white
+    for (let i = 0; i < 10; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 0.6 + Math.random() * 1.0;
+      fx.pool.spawn(new Particle({
+        x: pos.x + (Math.random() - 0.5) * 0.12,
+        y: pos.y + (Math.random() - 0.5) * 0.12,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 0.2,
+        ay: 0.8,
+        life: 0.15 + Math.random() * 0.12,
+        size0: 0.07 + Math.random() * 0.04,
+        size1: 0.01,
+        r: 255, g: 235, b: 130,
+        a0: 0.95,
+        a1: 0.0,
+      }));
+    }
+  });
+
   // ── Combat text ─────────────────────────────────────────────────────
 
   world.on('ranged:no-ammo', ({ attacker }) => {

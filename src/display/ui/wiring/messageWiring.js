@@ -892,6 +892,43 @@ export function installMessageWiring({
     if (hit) log(`${who} bashes ${tgt} aside.`, 'combat');
   });
 
+  // ── Shield / dodge / parry combat messages ──────────────────────────
+
+  world.on('shield:guarded', ({ id, source, stacks, broken }) => {
+    const who = nameOfEntity(id);
+    const attacker = nameOfEntity(source);
+    if (who === 'You') {
+      log(broken
+        ? `You block ${attacker}'s attack but your shield shatters!`
+        : `You block ${attacker}'s attack with your shield. (${stacks} guard left)`, broken ? 'danger' : 'combat');
+    } else {
+      log(broken
+        ? `${who} blocks your attack — the shield breaks!`
+        : `${who} blocks with a shield.`, 'combat');
+    }
+  });
+
+  world.on('combat:dodge', ({ defender, attacker }) => {
+    const who = nameOfEntity(defender);
+    const atk = nameOfEntity(attacker);
+    if (who === 'You') {
+      log(`You dodge ${atk}'s attack!`, 'combat');
+    } else {
+      log(`${who} dodges your attack!`, 'combat');
+    }
+  });
+
+  world.on('combat:parry', ({ defender, attacker, weaponName }) => {
+    const who = nameOfEntity(defender);
+    const atk = nameOfEntity(attacker);
+    const wName = String(weaponName || 'weapon');
+    if (who === 'You') {
+      log(`You parry ${atk}'s strike with your ${wName}!`, 'combat');
+    } else {
+      log(`${who} parries your attack!`, 'combat');
+    }
+  });
+
   world.on('spell:acid_spit', ({ actor, targetId, hit }) => {
     const who = nameOfEntity(actor);
     const tgt = nameOfEntity(targetId);
