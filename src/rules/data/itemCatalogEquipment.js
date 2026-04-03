@@ -1075,6 +1075,7 @@ export const EQUIPMENT_ITEMS = {
     damageDice: "1d6",
     range: 8,
     staminaCost: 5,
+    weight: 1.8,
     description: "A field bow with a tight draw and efficient release.",
   },
   goblin_barbed_shortbow: {
@@ -1092,6 +1093,7 @@ export const EQUIPMENT_ITEMS = {
     range: 8,
     staminaCost: 6,
     value: 3,
+    weight: 1.7,
     description: "A crude shortbow tuned for barbed shafts and dirty kills.",
     affixes: ["hemorrhage1"],
   },
@@ -1109,6 +1111,7 @@ export const EQUIPMENT_ITEMS = {
     damageDice: "1d6",
     range: 8,
     staminaCost: 6,
+    weight: 1.8,
     description: "A polished bow that throws wall-side impacts into nearby hostiles.",
     procPackages: ["ricochetTheology"],
   },
@@ -1125,6 +1128,7 @@ export const EQUIPMENT_ITEMS = {
     bonuses: { attack: 2 },
     damageDice: "1d8",
     range: 10,
+    weight: 2.0,
     staminaCost: 8,
   },
   bow_flaming: {
@@ -1141,6 +1145,7 @@ export const EQUIPMENT_ITEMS = {
     damageDice: "1d8",
     range: 9,
     staminaCost: 7,
+    weight: 1.9,
     description: "Its string hums like a forge draft. Shots land hot enough to ignite flesh.",
     affixes: ["flaming"],
   },
@@ -1158,6 +1163,7 @@ export const EQUIPMENT_ITEMS = {
     damageDice: "1d10",
     range: 10,
     staminaCost: 7,
+    weight: 2.1,
   },
   bow_shadow: {
     id: "bow_shadow",
@@ -1173,6 +1179,7 @@ export const EQUIPMENT_ITEMS = {
     damageDice: "1d10",
     range: 12,
     staminaCost: 6,
+    weight: 2.1,
   },
   warhammer: {
     id: "warhammer",
