@@ -82,9 +82,14 @@ export class FloatText {
     // Velocities (world units/sec)
     let vx = 0, vy = 0;
     if (isDamage){
-      vy = -0.8 - Math.random()*0.3;
-      // angle spread
-      vx = (Math.random()*0.6 - 0.3);
+      // Crits: big pop with wide spread. Normal: tight, compact, localized.
+      if (crit) {
+        vy = -0.9 - Math.random() * 0.4;
+        vx = (Math.random() * 0.7 - 0.35);
+      } else {
+        vy = -0.45 - Math.random() * 0.2;
+        vx = (Math.random() * 0.3 - 0.15);
+      }
     } else if (isGold) {
       vy = -0.6;
       vx = 0;
