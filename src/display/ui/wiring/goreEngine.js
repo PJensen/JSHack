@@ -5,6 +5,46 @@
 import { Particle } from "../../passes/vfx/particles/particlePool.js";
 import { impactTracker } from "../../fx/projectileImpactTracker.js";
 
+// ── Damage type → float text color ───────────────────────────────────
+const DAMAGE_TYPE_COLORS = Object.freeze({
+  physical: '#ffd966',
+  blunt:    '#ffd966',
+  slash:    '#ffd966',
+  pierce:   '#ffd966',
+  fire:     '#ff6a20',
+  electric: '#66ccff',
+  lightning:'#66ccff',
+  plasma:   '#88aaff',
+  poison:   '#7de87d',
+  acid:     '#aadd44',
+  radiation:'#ccff44',
+  shadow:   '#b088e8',
+  cold:     '#aaeeff',
+  ice:      '#aaeeff',
+});
+const DAMAGE_TYPE_RESISTED_COLORS = Object.freeze({
+  physical: '#b0a060',
+  blunt:    '#b0a060',
+  slash:    '#b0a060',
+  pierce:   '#b0a060',
+  fire:     '#c47030',
+  electric: '#5090a0',
+  lightning:'#5090a0',
+  plasma:   '#607090',
+  poison:   '#5a8a5a',
+  acid:     '#708830',
+  radiation:'#889930',
+  shadow:   '#7a5aa0',
+  cold:     '#7090a0',
+  ice:      '#7090a0',
+});
+
+function _damageTypeColor(type, resisted) {
+  const key = type.toLowerCase();
+  if (resisted) return DAMAGE_TYPE_RESISTED_COLORS[key] || '#b0a060';
+  return DAMAGE_TYPE_COLORS[key] || '#ffd966';
+}
+
 // ── Gore type classification ──────────────────────────────────────────
 
 const GORE_KEYWORDS = Object.freeze({
@@ -682,18 +722,26 @@ export function installGoreWiring({ world, ftext, fx, getPosition, canShowAt, is
     const pos = (at && typeof at.x === 'number' && typeof at.y === 'number') ? at : getPosition(t);
     const hitIsPlayer = typeof isPlayer === 'function' ? !!isPlayer(t) : false;
     if (pos && canShowAt(pos.x, pos.y) && Number.isFinite(amount)) {
+      const isCrit = !!(critical || crit);
       const resisted = Number.isFinite(rawAmount) && rawAmount > amount;
-      const col = hitIsPlayer ? '#ff6060' : (resisted ? '#b0a060' : '#ffd966');
+      const col = hitIsPlayer
+        ? '#ff6060'
+        : _damageTypeColor(String(type || 'physical'), resisted);
       const delay = Number(projectileDelay) || (offhand ? 0.15 : 0);
-      // Offset damage text toward the attacker (impact point) for "closer to the action" feel
+      // Offset damage text toward the attacker (impact point) — closer to the action
       let fx = pos.x, fy = pos.y;
       const iv = impactVector;
       if (iv && Number.isFinite(iv.dx) && Number.isFinite(iv.dy)) {
-        // impactVector points attacker→defender; offset 0.3 tiles back toward attacker
-        fx -= iv.dx * 0.3;
-        fy -= iv.dy * 0.3;
+        fx -= iv.dx * 0.35;
+        fy -= iv.dy * 0.35;
       }
-      ftext.addDamage(fx, fy, amount, { dmg: amount, color: col, crit: !!(critical || crit), delay });
+      ftext.addDamage(fx, fy, amount, {
+        dmg: amount, color: col, crit: isCrit, delay,
+        // Tighter, more compact: shorter life, less vertical drift for non-crits
+        life: isCrit ? 0.9 : 0.55,
+        scaleStart: isCrit ? undefined : 0.85,
+        scaleEnd: isCrit ? undefined : 0.60,
+      });
     }
     const resolvedGoreType = normalizedGoreType(goreType, targetKind);
 
