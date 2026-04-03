@@ -15,6 +15,7 @@ import { Collider } from "../src/rules/components/Collider.js";
 import { Material } from "../src/rules/components/Material.js";
 import { HazardArea } from "../src/rules/components/HazardArea.js";
 import { Burned } from "../src/rules/components/Burned.js";
+import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
 import { DungeonState } from "../src/rules/components/DungeonState.js";
 import { movementSystem, installSpiderWebListener } from "../src/rules/systems/movementSystem.js";
 import { installBumpInteractListener } from "../src/rules/systems/interactionSystem.js";
@@ -350,13 +351,12 @@ Deno.test("movementSystem: wall bump does not trigger hostile melee from stale t
   } finally { clearAll(); }
 });
 
-// ── spider web listener ─────────────────────────────────────────────
+// ── spider/web behavior ─────────────────────────────────────────────
 
-Deno.test("movementSystem: spider web listener spawns web on departure", () => {
+Deno.test("movementSystem: spider movement does not spawn webs", () => {
   loadFloorChunk();
   try {
     const world = new World({ seed: 42 });
-    installSpiderWebListener(world);
 
     const spider = world.create();
     world.add(spider, Position, { x: 5, y: 5 });
@@ -367,17 +367,17 @@ Deno.test("movementSystem: spider web listener spawns web on departure", () => {
 
     // Check that a web was spawned at the spider's old position
     let webFound = false;
-    for (const [id, ni, pos] of world.query(NamedIdentity, Position)) {
+    for (const [, ni, pos] of world.query(NamedIdentity, Position)) {
       if (ni.identity === "web" && pos.x === 5 && pos.y === 5) {
         webFound = true;
         break;
       }
     }
-    assert(webFound, "spider should leave a web at its departure tile");
+    assertEquals(webFound, false, "spiders should not leave passive movement webs");
   } finally { clearAll(); }
 });
 
-Deno.test("movementSystem: spider web listener tracks spawned webs on current floor", () => {
+Deno.test("movementSystem: installSpiderWebListener is a no-op", () => {
   loadFloorChunk();
   try {
     const world = new World({ seed: 42 });
@@ -406,64 +406,9 @@ Deno.test("movementSystem: spider web listener tracks spawned webs on current fl
         break;
       }
     }
-    assert(webId > 0, "spider should leave a web at its departure tile");
+    assertEquals(webId, 0, "listener should not create movement-trail webs");
     const ds = world.get(dungeon, DungeonState);
-    assert(ds.floorEntityIds.includes(webId), "spawned web should be tracked in floorEntityIds");
-  } finally { clearAll(); }
-});
-
-Deno.test("movementSystem: player bump clears runtime-spawned spider web", () => {
-  loadFloorChunk();
-  try {
-    const world = new World({ seed: 42 });
-    installSpiderWebListener(world);
-    installBumpInteractListener(world);
-
-    const spider = world.create();
-    world.add(spider, Position, { x: 5, y: 5 });
-    world.add(spider, NamedIdentity, { name: "Spider", identity: "spider" });
-
-    const player = world.create();
-    world.add(player, Position, { x: 4, y: 5 });
-    world.add(player, NamedIdentity, { name: "Player", identity: "player" });
-    world.add(player, Player);
-
-    const dungeon = world.create();
-    world.add(dungeon, DungeonState, {
-      worldSeed: world.seed >>> 0,
-      currentDepth: 1,
-      floorEntityIds: [spider, player],
-      downStairPositions: [],
-      destroyedTiles: {},
-    });
-
-    world.add(spider, MoveIntent, { dx: 1, dy: 0 });
-    movementSystem(world);
-
-    // Advance world step so tile query snapshots refresh for next action.
-    world.setScheduler(() => {});
-    world.tick(0);
-
-    world.add(player, MoveIntent, { dx: 1, dy: 0 });
-    movementSystem(world);
-
-    // world.destroy() is deferred; flush command queue to apply web removal.
-    world.tick(0);
-
-    let webStillAtTile = false;
-    for (const [, ni, pos] of world.query(NamedIdentity, Position)) {
-      if (ni.identity === "web" && pos.x === 5 && pos.y === 5) {
-        webStillAtTile = true;
-        break;
-      }
-    }
-    assertEquals(webStillAtTile, false, "bumping spawned web should clear it");
-
-    world.add(player, MoveIntent, { dx: 1, dy: 0 });
-    movementSystem(world);
-    const p = world.get(player, Position);
-    assertEquals(p.x, 5, "after clear, player should be able to step onto former web tile");
-    assertEquals(p.y, 5, "after clear, player should keep y position");
+    assertEquals(ds.floorEntityIds.length, 1, "no web should be tracked on the floor");
   } finally { clearAll(); }
 });
 
@@ -594,7 +539,6 @@ Deno.test("movementSystem: non-spider does not spawn web", () => {
   loadFloorChunk();
   try {
     const world = new World({ seed: 42 });
-    installSpiderWebListener(world);
 
     const goblin = world.create();
     world.add(goblin, Position, { x: 5, y: 5 });
@@ -611,6 +555,31 @@ Deno.test("movementSystem: non-spider does not spawn web", () => {
       }
     }
     assertEquals(webFound, false, "goblin should not leave a web");
+  } finally { clearAll(); }
+});
+
+Deno.test("movementSystem: slowed status reduces movement cadence", () => {
+  loadFloorChunk();
+  try {
+    const world = new World({ seed: 42 });
+    const player = world.create();
+    world.add(player, Position, { x: 5, y: 5 });
+    world.add(player, Player);
+    world.add(player, ActiveEffects, {
+      effects: [{ key: "slowed", turnsLeft: 3, potency: 1, stacks: 1, startedAtTurn: 0 }],
+    });
+
+    world.add(player, MoveIntent, { dx: 1, dy: 0 });
+    movementSystem(world);
+    let pos = world.get(player, Position);
+    assertEquals(pos.x, 5, "slowed actor should skip this cadence turn");
+
+    world.setScheduler(() => {});
+    world.tick(1);
+    world.add(player, MoveIntent, { dx: 1, dy: 0 });
+    movementSystem(world);
+    pos = world.get(player, Position);
+    assertEquals(pos.x, 6, "slowed actor should move on allowed cadence turn");
   } finally { clearAll(); }
 });
 

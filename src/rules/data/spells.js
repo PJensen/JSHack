@@ -366,11 +366,14 @@ export const SPELL_DEFS = {
     manaCost: 0,
     minIntelligence: 0,
     range: 6,
+    slowTurns: 2,
+    slowPotency: 1,
     script: 'web_spit',
     targeting: 'enemy',
-    description: 'Hurls a sticky silk clump that creates a fresh web at impact.',
+    description: 'Hurls sticky silk that webs the tile and slows the struck target.',
     effects: [
       { kind: 'utility', note: 'Spawns a web tile at the target location' },
+      { kind: 'status', status: 'slowed', duration: '2 turns on hit' },
     ],
   },
   wolf_howl: {

@@ -1068,11 +1068,23 @@ export const MONSTERS = [
     massKg: 15,
     resistances: { kinetic: { DR: 0 }, chemical: { toxMult: 0 } },
     speed: 3,
+    learnedSpellIds: ['web_spit'],
     hooks: {
       onSeen: [selfThrowNearTargetOnSeen({ searchRadius: 1, fallbackSearchRadius: 2, cooldownTurns: 3, chance: 0.25 })],
+      whileLOS: [
+        castSpellOnLOS({
+          spellId: 'web_spit',
+          abilityId: 'web_spit',
+          abilityName: 'Web Spit',
+          minRange: 2,
+          maxRange: 6,
+          cooldownTurns: 6,
+          chance: 0.45,
+        }),
+      ],
       onHit: [statusEffectOnHit(15, 0xdead0002, { key: "poison", turnsLeft: 3, potency: 1 }, "proc:poisoned")],
     },
-    specials: ["Throws web (25%)", "Poison 15%"],
+    specials: ["Web spit", "Poison 15%"],
     description: 'A dog-sized arachnid with venomous fangs.',
   },
 

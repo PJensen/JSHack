@@ -1454,6 +1454,7 @@ function ensureEffectsStack(container) {
     deafened:     { name: 'Deafened',  glyph: '\u{1F507}',       hue: 230 },
     electrocuted: { name: 'Electrocuted', glyph: '\u26A1',       hue: 45  },
     frozen:       { name: 'Frozen',    glyph: '\u2744\uFE0F',    hue: 200 },
+    slowed:       { name: 'Slowed',    glyph: '\u{1F40C}',       hue: 195 },
     confused:     { name: 'Confused',     glyph: '\u{1F635}',       hue: 280 },
     hallucinating: { name: 'Hallucinating', glyph: '\u{1F300}',      hue: 210 },
     weakened:     { name: 'Weakened',  glyph: '\u{1FAB6}',       hue: 40  },

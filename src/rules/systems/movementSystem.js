@@ -6,7 +6,7 @@
 //   2. Collision detection and bump dispatch (via bumpResolvers)
 //   3. Position update and blocking reservation
 //
-// Side effects like spider webs and auto-pickup are handled by listeners
+// Side effects like auto-pickup are handled by listeners
 // on the "moved" event and by autoPickupPostMoveSystem respectively.
 
 import { Position } from "../components/Position.js";
@@ -26,7 +26,6 @@ import { statusStrength } from "../utils/statusFacade.js";
 import { addToInventory, hasCapacityForItem } from "../utils/inventoryFacade.js";
 import { resolveBump } from "../data/bumpResolvers.js";
 import { CentipedeSegment } from "../components/CentipedeSegment.js";
-import { spawnWeb } from "../utils/spawnWeb.js";
 import { Encumbrance } from "../components/Encumbrance.js";
 import { Player } from "../components/Player.js";
 import { DungeonState } from "../components/DungeonState.js";
@@ -68,29 +67,20 @@ function isBlockedOnlyByWebs(world, tiles, x, y) {
 
 const MISSTEP_DIRS = ALL_DIRS;
 
-// ── Spider web departure listener ───────────────────────────────────
+// ── Spider web listener (retired) ──────────────────────────────────
 
 const SPIDER_WEB_INSTALLED = Symbol.for("jshack:spiderWeb:installed");
 
 /**
- * Install a listener that spawns webs when spiders depart a tile.
- * Must be called once per world in configureWorld().
+ * Deprecated no-op.
+ * Kept for backwards compatibility with existing imports/tests.
+ * Spiders now create webs only via explicit abilities (e.g. web spit),
+ * never as a passive "leave web on move" trail.
  * @param {import('../../lib/ecs-js/index.js').World} world
  */
 export function installSpiderWebListener(world) {
   if (!world || world[SPIDER_WEB_INSTALLED]) return;
   world[SPIDER_WEB_INSTALLED] = true;
-
-  world.on("moved", ({ id, from }) => {
-    try {
-      const ni = world.get(id, NamedIdentity);
-      if (ni?.identity === "spider") {
-        spawnWeb(world, from.x, from.y);
-      }
-    } catch (e) {
-      console.debug("[movementSystem] spider web spawn failed:", e);
-    }
-  });
 }
 
 // ── Auto-pickup on arrival listener ─────────────────────────────────
@@ -185,6 +175,15 @@ export function movementSystem(world) {
         const enc = /** @type {any} */ (world.get(actor, Encumbrance));
         if (enc?.overloaded) {
           if (Math.abs(intendedDx) >= Math.abs(intendedDy)) { mdy = 0; } else { mdx = 0; }
+        }
+      }
+
+      // "Slowed" reduces move cadence for any mover (player and AI alike).
+      const slowedStacks = Math.min(3, statusStrength(world, actor, "slowed"));
+      if (slowedStacks > 0) {
+        const actEvery = 1 + slowedStacks;
+        if (((world.step + actor) % actEvery) !== 0) {
+          continue;
         }
       }
 

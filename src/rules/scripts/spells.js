@@ -1693,7 +1693,7 @@ REGISTRY["bat_shriek"] = function batShriekScript(world, actor, spell, _intent) 
   });
 };
 
-// Web Spit — places a web tile at the chosen target tile.
+// Web Spit — places a web tile at impact and slows the target.
 REGISTRY["web_spit"] = function webSpitScript(world, actor, spell, intent) {
   const targetId = Number(intent?.targetId || 0) | 0;
   const targetPos = targetId > 0 ? world.get(targetId, Position) : null;
@@ -1713,11 +1713,32 @@ REGISTRY["web_spit"] = function webSpitScript(world, actor, spell, intent) {
     spawned = spawnWeb(world, tx, ty) > 0;
   } catch {}
 
+  let slowed = false;
+  if (targetId > 0) {
+    const vit = /** @type any */ (world.get(targetId, Vitality));
+    if (vit && (vit.hp | 0) > 0) {
+      const ae = ensureActiveEffects(world, targetId);
+      const slowTurns = Math.max(1, Number(spell?.slowTurns || 2) | 0);
+      const slowPotency = Math.max(1, Number(spell?.slowPotency || 1) | 0);
+      upsertTimedEffect(ae.effects, {
+        key: "slowed",
+        turnsLeft: slowTurns,
+        potency: slowPotency,
+        stacks: 1,
+        startedAtTurn: world.step,
+        sourceId: actor,
+      });
+      try { world.set(targetId, ActiveEffects, ae); } catch {}
+      slowed = true;
+    }
+  }
+
   emitSafe(world, "spell:web_spit", {
     actor,
     targetId,
     at: { x: tx, y: ty },
     spawned,
+    slowed,
     radius: Number(spell?.radius || 0) | 0,
   });
 };

@@ -37,7 +37,7 @@ import { petCommandSystem } from "../rules/systems/petCommandSystem.js";
 import { petBehaviorSystem } from "../rules/systems/petBehaviorSystem.js";
 import { summonedBehaviorSystem } from "../rules/systems/summonedBehaviorSystem.js";
 import { shopkeeperSystem } from "../rules/systems/shopkeeperSystem.js";
-import { movementSystem, installSpiderWebListener, installMoveAutoPickupListener } from "../rules/systems/movementSystem.js";
+import { movementSystem, installMoveAutoPickupListener } from "../rules/systems/movementSystem.js";
 import { intentValidationSystem } from "../rules/systems/intentValidationSystem.js";
 import { combatSystem, installBumpAttackListener } from "../rules/systems/combatSystem.js";
 import { installCombatInteractions } from "../rules/data/combatInteractions.js";
@@ -124,8 +124,6 @@ export function configureWorld(world) {
   installTauntListener(world);
   // Award monster maxHp to player score on kill
   installScoreListener(world);
-  // Spiders leave webs on departure (reacts to "moved" event)
-  installSpiderWebListener(world);
   // Auto-pickup currency etc. when any actor moves onto a tile (reacts to "moved" event)
   installMoveAutoPickupListener(world);
   // Tile step effects: ice slides, lava scorch, water extinguish (reacts to "moved" event)

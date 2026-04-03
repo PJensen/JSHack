@@ -233,12 +233,14 @@ Deno.test("early tier-0 enemies expose active ability kits", () => {
   const rat = getMonster("rat");
   const goblin = getMonster("goblin");
   const snake = getMonster("snake");
-  const spider = getMonster("cave_spider");
+  const spider = getMonster("spider");
+  const caveSpider = getMonster("cave_spider");
 
   assert(Array.isArray(rat?.learnedSpellIds) && rat.learnedSpellIds.includes("rat_gnaw"), "rat should know rat_gnaw");
   assert(Array.isArray(goblin?.learnedSpellIds) && goblin.learnedSpellIds.includes("goblin_dirty_trick"), "goblin should know goblin_dirty_trick");
   assert(Array.isArray(snake?.learnedSpellIds) && snake.learnedSpellIds.includes("snake_fang"), "snake should know snake_fang");
-  assert(Array.isArray(spider?.learnedSpellIds) && spider.learnedSpellIds.includes("spider_lunge"), "cave_spider should know spider_lunge");
+  assert(Array.isArray(spider?.learnedSpellIds) && spider.learnedSpellIds.includes("web_spit"), "spider should know web_spit");
+  assert(Array.isArray(caveSpider?.learnedSpellIds) && caveSpider.learnedSpellIds.includes("spider_lunge"), "cave_spider should know spider_lunge");
 });
 
 Deno.test("bat_shriek confuses nearby hostiles and alerts nearby allies", () => {
@@ -279,7 +281,7 @@ Deno.test("bat_shriek confuses nearby hostiles and alerts nearby allies", () => 
   }
 });
 
-Deno.test("web_spit creates a web at the target tile", () => {
+Deno.test("web_spit creates a web and applies slowed to the target", () => {
   loadFlatFloor();
   try {
     const world = new World({ seed: 0x5e8 });
@@ -305,6 +307,11 @@ Deno.test("web_spit creates a web at the target tile", () => {
       }
     }
     assert(hasWeb, "web_spit should place a web on target tile");
+    const effects = world.get(player, ActiveEffects)?.effects || [];
+    assert(
+      effects.some((e) => String(e?.key || "") === "slowed" && Number(e?.turnsLeft || 0) >= 1),
+      "web_spit should apply slowed to the struck target",
+    );
   } finally {
     clearAll();
   }
