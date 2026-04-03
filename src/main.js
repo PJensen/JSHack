@@ -4034,6 +4034,7 @@ const {
   cloudFx,
   surfaceAreaFx,
   spiritWispFx,
+  bumpFx,
   ftext,
   goreTick,
 } = displayRuntime;
@@ -5531,10 +5532,16 @@ function render(worldView) {
       ? { ...e, pos: { x: slidePos.x, y: slidePos.y } }
       : e;
 
-    const flyingPresentation = flyingFx.getPresentation(slidEntity, _fxTime, cam.scale);
-    const renderEntity = flyingPresentation.progress > 0.001
-      ? { ...slidEntity, pos: { x: flyingPresentation.glyphX, y: flyingPresentation.glyphY } }
+    // Bump lunge — attacker glyphs lurch toward their target (player + monsters)
+    const bumpOff = bumpFx.getOffset(e.id);
+    const bumpEntity = (bumpOff.dx || bumpOff.dy)
+      ? { ...slidEntity, pos: { x: slidEntity.pos.x + bumpOff.dx, y: slidEntity.pos.y + bumpOff.dy } }
       : slidEntity;
+
+    const flyingPresentation = flyingFx.getPresentation(bumpEntity, _fxTime, cam.scale);
+    const renderEntity = flyingPresentation.progress > 0.001
+      ? { ...bumpEntity, pos: { x: flyingPresentation.glyphX, y: flyingPresentation.glyphY } }
+      : bumpEntity;
 
     // Size-class scaling — small creatures render smaller, big ones bigger
     const sizeScale = SIZE_CLASS_SCALE[e.sizeClass] || 1;
@@ -6071,10 +6078,14 @@ function render(worldView) {
       if (e.tags.includes('flying')) {
         const slidePos2 = slideFx.getPosition(e.id, e.pos.x, e.pos.y);
         const slidEntity2 = slidePos2.sliding ? { ...e, pos: { x: slidePos2.x, y: slidePos2.y } } : e;
-        const flyingPresentation = flyingFx.getPresentation(slidEntity2, _fxTime, cam.scale);
-        const renderEntity = flyingPresentation.progress > 0.001
-          ? { ...slidEntity2, pos: { x: flyingPresentation.glyphX, y: flyingPresentation.glyphY } }
+        const bumpOff2 = bumpFx.getOffset(e.id);
+        const bumpEntity2 = (bumpOff2.dx || bumpOff2.dy)
+          ? { ...slidEntity2, pos: { x: slidEntity2.pos.x + bumpOff2.dx, y: slidEntity2.pos.y + bumpOff2.dy } }
           : slidEntity2;
+        const flyingPresentation = flyingFx.getPresentation(bumpEntity2, _fxTime, cam.scale);
+        const renderEntity = flyingPresentation.progress > 0.001
+          ? { ...bumpEntity2, pos: { x: flyingPresentation.glyphX, y: flyingPresentation.glyphY } }
+          : bumpEntity2;
         const roofSizeScale = SIZE_CLASS_SCALE[e.sizeClass] || 1;
 
         drawFlyingShadow(bctx, flyingPresentation);
@@ -6173,6 +6184,7 @@ function frame(now) {
   delayedDeathFx.tick(dtSec);
   flyingFx.tick(dtSec);
   slideFx.tick(dtSec);
+  bumpFx.tick(dtSec);
   sceneRuntime.tick(dtSec);
 
   // Update vitals HUD if changed (lightweight per-frame check)
