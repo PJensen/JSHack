@@ -5579,6 +5579,24 @@ function render(worldView) {
       }
     }
 
+    // Spawner (nest) labels — show "Rat Nest" etc. when visible
+    if (
+      renderEntity.kind === 'spawner'
+      && (!worldView?.isVisible || worldView.isVisible(renderEntity.pos.x, renderEntity.pos.y))
+    ) {
+      const ni = world.get(renderEntity.id, NamedIdentity);
+      if (ni?.name) {
+        _monsterLabels.push({
+          id: renderEntity.id,
+          x: renderEntity.pos.x,
+          y: renderEntity.pos.y,
+          text: ni.name,
+          color: '#8b4513',
+          sizeScale,
+        });
+      }
+    }
+
     // Glyph-FX: passive glow aura for entities tagged "glowing"
     if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && renderEntity.tags.includes('glowing')) {
       drawGlowingTagAura(bctx, renderEntity, _fxTime);
