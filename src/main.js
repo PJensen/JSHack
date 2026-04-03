@@ -49,6 +49,7 @@ import { installInventoryDataProvider } from "./main/ui/inventoryDataProvider.js
 import { shouldSuppressRecentPickupChipForEquippedDuplicate } from "./main/ui/quickChipPolicy.js";
 import { impactTracker } from "./display/fx/projectileImpactTracker.js";
 import { createThrowFxController } from "./display/fx/throwFxController.js";
+import { createPickupFxController } from "./display/fx/pickupFxController.js";
 import { createWeatherFxController } from "./display/fx/weatherFx.js";
 import { createSlideFxController } from "./display/fx/slideFxController.js";
 import { createLightingEngine } from "./display/lighting/engine.js";
@@ -646,6 +647,14 @@ const throwFx = createThrowFxController({
   },
 });
 
+const pickupFx = createPickupFxController({
+  world,
+  resolveItemMeta: (itemId) => {
+    const ident = world.get(itemId, NamedIdentity);
+    return { identity: String(ident?.identity || "") };
+  },
+  getPosition: (id) => world.get(Number(id || 0), Position) || null,
+});
 const weatherFx = createWeatherFxController();
 const lightingEngine = createLightingEngine();
 
@@ -2209,6 +2218,7 @@ world.on('item:identified', ({ actor, identity }) => {
 });
 
 throwFx.installListeners();
+pickupFx.installListeners();
 
 world.on('item:pickup', ({ actor, itemId, count }) => {
   const info = world.get(itemId, ItemInfo);
@@ -6118,6 +6128,7 @@ function render(worldView) {
     spellAreaFx,
     projectileFx,
     throwFx,
+    pickupFx,
     cloudFx,
     spiritWispFx,
     fx,
@@ -6269,7 +6280,7 @@ function frame(now) {
   // Advance display-only systems (fx.step moved below — needs worldView for emitter origins)
   updateCamera(cam, dtSec);
   updateShake(cam, dtSec);
-  tickDisplayEffects({ dtSec, boltFx, spellAreaFx, projectileFx, throwFx, cloudFx, spiritWispFx, ftext, goreTick });
+  tickDisplayEffects({ dtSec, boltFx, spellAreaFx, projectileFx, throwFx, pickupFx, cloudFx, spiritWispFx, ftext, goreTick });
   delayedDeathFx.tick(dtSec);
   flyingFx.tick(dtSec);
   slideFx.tick(dtSec);

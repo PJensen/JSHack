@@ -117,7 +117,7 @@ export function installMoveAutoPickupListener(world) {
         if (ignoreCapacity || hasCapacityForItem(world, actor, itemId)) {
           addToInventory(world, actor, itemId);
         }
-        emitSafe(world, "item:pickup", { actor, itemId, count });
+        emitSafe(world, "item:pickup", { actor, itemId, count, itemX: to.x, itemY: to.y });
       });
     } catch (e) {
       console.debug("[movementSystem] auto-pickup failed:", e);
