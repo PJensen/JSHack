@@ -6,23 +6,35 @@
 // Ranged hits defer recoil until the projectile visually arrives.
 // Offhand hits produce a lighter, delayed follow-up recoil.
 
-/** @typedef {{ dx:number, dy:number, elapsed:number, delay:number, outDur:number, holdDur:number, backDur:number, dist:number }} RecoilState */
+/** @typedef {{ dx:number, dy:number, elapsed:number, delay:number, outDur:number, holdDur:number, backDur:number, dist:number, rot:number }} RecoilState */
 
 // ── Timing (seconds) ────────────────────────────────────────────────
-const RECOIL_OUT  = 0.035;   // snap away from impact (fast)
-const RECOIL_HOLD = 0.020;   // hold at peak displacement
-const RECOIL_BACK = 0.110;   // slow settle back to origin
+const RECOIL_OUT  = 0.030;   // snap away from impact (fast)
+const RECOIL_HOLD = 0.045;   // hold at peak — let the brain register the wince
+const RECOIL_BACK = 0.120;   // slow settle back to origin
 
 // Offhand: lighter follow-up
 const OH_RECOIL_OUT  = 0.025;
-const OH_RECOIL_HOLD = 0.015;
-const OH_RECOIL_BACK = 0.080;
+const OH_RECOIL_HOLD = 0.030;
+const OH_RECOIL_BACK = 0.090;
+
+// Melee: tighter, punchier — keeps cadence with the attacker's lunge
+const MELEE_RECOIL_OUT  = 0.025;
+const MELEE_RECOIL_HOLD = 0.050;
+const MELEE_RECOIL_BACK = 0.100;
 
 // ── Distance (tiles) ───────────────────────────────────────────────
 const RECOIL_DIST_BASE  = 0.12;  // baseline recoil (1 damage)
 const RECOIL_DIST_OH    = 0.08;  // offhand baseline
 const RECOIL_DIST_MAX   = 0.28;  // cap for huge hits
 const RECOIL_DIST_OH_MAX = 0.18;
+const MELEE_RECOIL_DIST_BASE = 0.10;
+const MELEE_RECOIL_DIST_MAX  = 0.22;
+
+// ── Rotation (radians) — glyph tilts away from impact ──────────────
+const ROT_BASE      = 0.06;   // baseline tilt (~3.4°)
+const ROT_MAX       = 0.18;   // cap for huge hits (~10.3°)
+const ROT_CRIT_MULT = 1.5;
 
 // Damage scaling: logarithmic so 1dmg is noticeable, 20+ is big, 50+ caps
 const DMG_LOG_BASE = 1.0;
@@ -84,18 +96,22 @@ export function createRecoilFxController() {
    * @param {number} targetId
    * @param {number} dx  Impact direction X (normalized, attacker→target or projectile travel dir)
    * @param {number} dy  Impact direction Y (normalized)
-   * @param {{ offhand?:boolean, damage?:number, critical?:boolean, delay?:number, massKg?:number, sizeClass?:string }} [opts]
+   * @param {{ offhand?:boolean, melee?:boolean, damage?:number, critical?:boolean, delay?:number, massKg?:number, sizeClass?:string }} [opts]
    */
   function trigger(targetId, dx, dy, opts) {
     const offhand  = !!(opts && opts.offhand);
+    const melee    = !!(opts && opts.melee);
     const damage   = Number(opts && opts.damage) || 0;
     const critical = !!(opts && opts.critical);
     const delay    = Number(opts && opts.delay) || 0;
 
     const base = offhand ? RECOIL_DIST_OH  : RECOIL_DIST_BASE;
     const max  = offhand ? RECOIL_DIST_OH_MAX : RECOIL_DIST_MAX;
-    let dist = damageScale(damage, base, max);
-    if (critical) dist *= CRIT_MULT;
+    // Melee: skip positional recoil — both combatants lunge at each other
+    // simultaneously, so positional recoil fights the attacker's own lunge.
+    // Rotation-only wince reads cleanly on a separate visual channel.
+    let dist = melee ? 0 : damageScale(damage, base, max);
+    if (!melee && critical) dist *= CRIT_MULT;
 
     // Mass modulation: light creatures recoil more, heavy ones less
     const rawMass = Number(opts && opts.massKg) || 0;
@@ -103,11 +119,25 @@ export function createRecoilFxController() {
     const massMult = Math.max(MASS_MULT_MIN, Math.min(MASS_MULT_MAX, Math.sqrt(MASS_REF / mass)));
     dist *= massMult;
 
-    const outDur  = offhand ? OH_RECOIL_OUT  : RECOIL_OUT;
-    const holdDur = offhand ? OH_RECOIL_HOLD : RECOIL_HOLD;
-    const backDur = offhand ? OH_RECOIL_BACK : RECOIL_BACK;
+    // Rotation: tilt away from impact — cross product sign gives direction
+    // dx,dy is impact direction; rotation tilts perpendicular to it
+    let rot = damageScale(damage, ROT_BASE, ROT_MAX);
+    if (critical) rot *= ROT_CRIT_MULT;
+    rot *= massMult;
+    // Tilt direction: use cross product of impact with "up" (0,-1) → sign = dx
+    // Positive dx → tilt clockwise; negative dx → tilt counter-clockwise
+    // For vertical hits, use a small fixed direction so it doesn't look dead
+    if (Math.abs(dx) > 0.01) {
+      rot *= Math.sign(dx);
+    } else {
+      rot *= (dy > 0 ? 1 : -1);
+    }
 
-    const entry = { dx, dy, elapsed: 0, delay, outDur, holdDur, backDur, dist };
+    const outDur  = melee ? MELEE_RECOIL_OUT  : (offhand ? OH_RECOIL_OUT  : RECOIL_OUT);
+    const holdDur = melee ? MELEE_RECOIL_HOLD : (offhand ? OH_RECOIL_HOLD : RECOIL_HOLD);
+    const backDur = melee ? MELEE_RECOIL_BACK : (offhand ? OH_RECOIL_BACK : RECOIL_BACK);
+
+    const entry = { dx, dy, elapsed: 0, delay, outDur, holdDur, backDur, dist, rot };
     const queue = active.get(targetId);
     if (queue) {
       queue.push(entry);
@@ -138,25 +168,27 @@ export function createRecoilFxController() {
   }
 
   /**
-   * Get the current visual offset for an entity (additive to its tile pos).
-   * Returns { dx:0, dy:0 } when no recoil is active.
+   * Get the current visual offset + rotation for an entity.
+   * Returns { dx:0, dy:0, rotation:0 } when no recoil is active.
    * @param {number} id
-   * @returns {{ dx:number, dy:number }}
+   * @returns {{ dx:number, dy:number, rotation:number }}
    */
   function getOffset(id) {
     const queue = active.get(id);
     if (!queue || queue.length === 0) return _ZERO;
 
-    let ox = 0, oy = 0;
+    let ox = 0, oy = 0, orot = 0;
     for (let i = 0; i < queue.length; i++) {
       const r = queue[i];
       const t = r.elapsed - r.delay;
-      const p = recoilProgress(t, r.outDur, r.holdDur, r.backDur) * r.dist;
-      // Recoil pushes AWAY from impact — same direction as impact vector
-      ox += r.dx * p;
-      oy += r.dy * p;
+      const p = recoilProgress(t, r.outDur, r.holdDur, r.backDur);
+      // Positional recoil pushes AWAY from impact
+      ox += r.dx * p * r.dist;
+      oy += r.dy * p * r.dist;
+      // Rotation wince
+      orot += p * r.rot;
     }
-    return { dx: ox, dy: oy };
+    return { dx: ox, dy: oy, rotation: orot };
   }
 
   /**
@@ -180,16 +212,37 @@ export function createRecoilFxController() {
       cause, impactVector, projectileDelay,
       sizeClass, massKg,
     }) => {
-      // Skip melee entirely
-      if (cause === 'melee') return;
-
       const tid = Number(target || 0) | 0;
       if (!(tid > 0)) return;
 
+      const isMelee = cause === 'melee';
       const delay = Number(projectileDelay) || 0;
       const isProjectile = delay > 0;
 
-      // Full recoil: projectile spells / arrows only (frost bolt, shadow bolt, arrows)
+      // Melee: rotation-only wince (no positional recoil — both sides lunge)
+      if (isMelee) {
+        const sid = Number(source || 0) | 0;
+        if (!(sid > 0)) return;
+        const spos = getPosition(sid);
+        const tpos = getPosition(tid);
+        if (!spos || !tpos) return;
+        const rawDx = tpos.x - spos.x;
+        const rawDy = tpos.y - spos.y;
+        const mag = Math.hypot(rawDx, rawDy);
+        if (!(mag > 0)) return;
+        trigger(tid, rawDx / mag, rawDy / mag, {
+          melee: true,
+          offhand: !!offhand,
+          damage: amount,
+          critical: !!critical,
+          delay: 0,
+          massKg,
+          sizeClass,
+        });
+        return;
+      }
+
+      // Full recoil + rotation: projectile spells / arrows
       if (isProjectile) {
         let dx = 0, dy = 0;
         if (impactVector && (impactVector.dx || impactVector.dy)) {
@@ -220,11 +273,10 @@ export function createRecoilFxController() {
       }
 
       // Small flinch: non-melee non-projectile (DoTs, AoE, instant spells)
-      // Random direction, capped at flinch distance
       const angle = Math.random() * Math.PI * 2;
       trigger(tid, Math.cos(angle), Math.sin(angle), {
         offhand: false,
-        damage: Math.min(amount, 3), // cap so flinch stays small
+        damage: Math.min(amount, 3),
         critical: false,
         delay: 0,
         massKg,
@@ -241,4 +293,4 @@ export function createRecoilFxController() {
   return { trigger, tick, getOffset, isActive, installListeners, remove };
 }
 
-const _ZERO = Object.freeze({ dx: 0, dy: 0 });
+const _ZERO = Object.freeze({ dx: 0, dy: 0, rotation: 0 });
