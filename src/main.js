@@ -554,14 +554,14 @@ function layoutBubbleDialog() {
 // Post-mortem: keep the simulation ticking after the player dies so the world
 // continues to evolve (fires spread, monsters roam, etc.) for a fixed number
 // of ticks, then stop and signal that the post-mortem phase is complete.
-const POST_MORTEM_TICKS = 6;
-const POST_MORTEM_INTERVAL_MS = 111;
+const POST_MORTEM_TICKS = 10;
+const POST_MORTEM_INTERVAL_MS = 500;
 let _postMortemInterval = 0;
 let _postMortemTicksLeft = 0;
 world.on("died", ({ id }) => {
   if (!world.has(id, Player)) return;
   if (_postMortemInterval) return;
-  // Dim the lights: ramp vision to 0 over the post-mortem ticks
+  // Dim the lights: ramp vision to 0 over 10 half-second ticks (5s fade)
   blind(world, id, 0, POST_MORTEM_TICKS, 0, 0);
   _postMortemTicksLeft = POST_MORTEM_TICKS;
   _postMortemInterval = setInterval(() => {
