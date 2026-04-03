@@ -44,14 +44,20 @@ export function getDecayStage(turnsHeld, shelfLife) {
   return { stage: last.name, nutritionMult: last.nutritionMult, sicknessChance: last.sicknessChance };
 }
 
-/** Corpse weight by sizeClass (for ItemInfo.weight). */
-export const CORPSE_WEIGHT = {
-  XS: 1,
-  S:  2,
-  M:  4,
-  L:  8,
-  XL: 15,
-};
+/**
+ * Corpse weight derived from monster massKg.
+ * Carry capacity = maxStamina (default 100), so a 350 kg cave_bear
+ * corpse at weight 44 means two of them nearly cap you out.
+ * Fallback to sizeClass-based default when massKg is missing.
+ */
+const CORPSE_WEIGHT_FALLBACK = { XS: 1, S: 4, M: 8, L: 30, XL: 100 };
+
+export function corpseWeight(monsterDef) {
+  if (monsterDef.massKg > 0) {
+    return Math.max(1, Math.round(monsterDef.massKg / 8));
+  }
+  return CORPSE_WEIGHT_FALLBACK[monsterDef.sizeClass] || 4;
+}
 
 // ── Hunger severity constants ─────────────────────────────────────
 // Single source of truth for level names, thresholds, and penalties.

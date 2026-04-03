@@ -53,7 +53,7 @@ export function createGlyphAtlas(palette, opts = {}) {
         g.fillStyle = lFg;
         g.fillText(lGlyph, cx, cy);
       }
-      atlas.set(kind, { canvas: cnv });
+      atlas.set(kind, { canvas: cnv, baseScale: (typeof look.baseScale === 'number') ? look.baseScale : 1 });
       continue;
     }
 
@@ -85,7 +85,7 @@ export function createGlyphAtlas(palette, opts = {}) {
     g.fillStyle = fg;
     g.fillText(glyph, sizePx * 0.5, sizePx * 0.5);
 
-    atlas.set(kind, { canvas: cnv });
+    atlas.set(kind, { canvas: cnv, baseScale: (typeof look.baseScale === 'number') ? look.baseScale : 1 });
   }
 
   // Ensure a default entry exists
@@ -99,7 +99,7 @@ export function createGlyphAtlas(palette, opts = {}) {
     g.font = `900 ${fontPx}px monospace`;
     g.fillStyle = '#fff';
     g.fillText('?', sizePx * 0.5, sizePx * 0.5);
-    atlas.set('default', { canvas: cnv });
+    atlas.set('default', { canvas: cnv, baseScale: 1 });
   }
 
   return atlas;
@@ -112,17 +112,19 @@ export function drawKind(atlas, ctx, kind, x, y) {
   ctx.drawImage(entry.canvas, x - 0.5, y - 0.5, 1, 1);
 }
 
-export function drawKindScaled(atlas, ctx, kind, x, y, scale = 1) {
+export function drawKindScaled(atlas, ctx, kind, x, y, scale = 1, rotation = 0) {
   const entry = atlas.get(kind) || atlas.get('default');
   if (!entry || !entry.canvas) return;
   const s = Number(scale || 1);
-  if (Math.abs(s - 1) <= 0.001) {
+  const r = Number(rotation || 0);
+  if (Math.abs(s - 1) <= 0.001 && Math.abs(r) <= 0.001) {
     ctx.drawImage(entry.canvas, x - 0.5, y - 0.5, 1, 1);
     return;
   }
   ctx.save();
   ctx.translate(x, y);
-  ctx.scale(s, s);
+  if (Math.abs(r) > 0.001) ctx.rotate(r);
+  if (Math.abs(s - 1) > 0.001) ctx.scale(s, s);
   ctx.drawImage(entry.canvas, -0.5, -0.5, 1, 1);
   ctx.restore();
 }
