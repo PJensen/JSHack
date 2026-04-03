@@ -13,6 +13,7 @@ import { createRecoilFxController } from "../fx/recoilFxController.js";
 import { createHitstopController } from "../fx/hitstopController.js";
 import { installFloatTextWiring } from "../ui/wiring/floatTextWiring.js";
 import { installEventUiWiring } from "../ui/wiring/eventUiWiring.js";
+import { createDeathVfxController } from "../fx/deathVfxController.js";
 
 /**
  * Configure display-owned runtime controllers and event wiring.
@@ -78,6 +79,8 @@ export function setupDisplayRuntime({
   const hitstopFx = createHitstopController();
   hitstopFx.installListeners({ world, isPlayer });
 
+  const deathVfx = createDeathVfxController();
+
   const { goreTick } = installFloatTextWiring({ world, ftext, fx, getPosition, isVisibleAt, isPet, isPlayer, getFxTime });
   installEventUiWiring({
     world,
@@ -91,5 +94,5 @@ export function setupDisplayRuntime({
     dispatchRulesAction,
   });
 
-  return { statusEmitterFx, statusPresentationDelayFx, boltFx, delayedDeathFx, projectileFx, spellAreaFx, cloudFx, surfaceAreaFx, spiritWispFx, bumpFx, recoilFx, hitstopFx, ftext, goreTick };
+  return { statusEmitterFx, statusPresentationDelayFx, boltFx, delayedDeathFx, projectileFx, spellAreaFx, cloudFx, surfaceAreaFx, spiritWispFx, bumpFx, recoilFx, hitstopFx, deathVfx, ftext, goreTick };
 }
