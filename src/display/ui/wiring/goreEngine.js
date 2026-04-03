@@ -873,17 +873,18 @@ export function installGoreWiring({ world, ftext, fx, getPosition, canShowAt, is
         ? '#ff6060'
         : _damageTypeColor(String(type || 'physical'), resisted);
       const delay = Number(projectileDelay) || (offhand ? 0.15 : 0);
-      // Offset damage text toward the attacker (impact point) — closer to the action
-      let fx = pos.x, fy = pos.y;
+      // Offset damage text to the side of the target so it doesn't obscure the action
+      let fx = pos.x + 0.5, fy = pos.y - 0.3;
       const iv = impactVector;
       if (iv && Number.isFinite(iv.dx) && Number.isFinite(iv.dy)) {
-        fx -= iv.dx * 0.35;
-        fy -= iv.dy * 0.35;
+        // Nudge perpendicular to the attack vector so text stays out of the way
+        fx += iv.dy * 0.25;
+        fy -= Math.abs(iv.dx) * 0.15;
       }
       ftext.addDamage(fx, fy, amount, {
         dmg: amount, color: col, crit: isCrit, delay,
-        // Non-crits: short pop-and-vanish. Crits: linger for impact.
-        life: isCrit ? 0.9 : 0.38,
+        // Non-crits: readable pop. Crits: linger for impact.
+        life: isCrit ? 1.1 : 0.65,
         scaleStart: isCrit ? undefined : 0.85,
         scaleEnd: isCrit ? undefined : 0.55,
       });

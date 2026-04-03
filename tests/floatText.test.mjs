@@ -58,8 +58,8 @@ Deno.test("floatText wiring restores damage number emission with crit and delay"
   });
 
   assertEquals(calls.length, 1);
-  assertEquals(calls[0].x, 3);
-  assertEquals(calls[0].y, 4);
+  assertEquals(calls[0].x, 3.5);
+  assertEquals(calls[0].y, 3.7);
   assertEquals(calls[0].amount, 12);
   assertEquals(calls[0].opts?.crit, true);
   assertEquals(calls[0].opts?.delay, 0.25);
