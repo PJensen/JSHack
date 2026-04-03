@@ -25,7 +25,7 @@ import { Pet } from '../../rules/components/Pet.js';
 import { PetState } from '../../rules/components/PetState.js';
 import { areFactionsHostile } from '../../rules/utils/factionHostility.js';
 import { effectiveMaxHp } from '../../rules/utils/passiveBonuses.js';
-import { getMonsterTags } from '../../rules/data/monsters.js';
+import { getMonsterTags, getMonster } from '../../rules/data/monsters.js';
 import { Flying } from '../../rules/components/Flying.js';
 import { hasOverworldAerialLOS } from '../../rules/utils/flyingEligibility.js';
 import { DungeonState } from "../../rules/components/DungeonState.js";
@@ -63,7 +63,7 @@ import {
 } from "../../rules/environment/dungeon/perceptionMemory.js";
 
 // Reuse view/record objects across frames to reduce allocations/GC churn.
-/** @typedef {{ id:number, kind:string, pos:{x:number,y:number}, tags:string[], layer:number, hp:number, maxHp:number, isPet:boolean, showHealthBar:boolean, facing:{dx:number,dy:number}|null, weaponVfx:any[]|null }} EntityView */
+/** @typedef {{ id:number, kind:string, pos:{x:number,y:number}, tags:string[], layer:number, hp:number, maxHp:number, isPet:boolean, showHealthBar:boolean, facing:{dx:number,dy:number}|null, weaponVfx:any[]|null, itemScale:number, rotation:number, visualOff:{dx:number,dy:number} }} EntityView */
 /** @typedef {{ id:number, x:number, y:number }} SolidView */
 /** @typedef {{ x:number, y:number, kind:string, alpha:number, burning?:boolean, smoking?:boolean }} RoofTileView */
 /** @typedef {{ turn:number, seed:number, player: { id:number, pos:{x:number,y:number} } | null, entities: EntityView[], solids: SolidView[], emissives: any[], roofs: RoofTileView[], tileGrid: any, isVisible: ((x:number,y:number)=>boolean)|null, isExplored: ((x:number,y:number)=>boolean)|null, currentDepth?: number }} WorldView */
@@ -75,6 +75,7 @@ const _view = { turn: 0, seed: 0, player: null, entities: [], solids: [], emissi
 let _lastPerceptionWorld = null;
 /** @type {Map<number, EntityView>} */
 const _entityRecs = new Map();   // id -> { id, kind, pos:{x,y}, tags:[] }
+const _zeroOff = Object.freeze({ dx: 0, dy: 0 });
 const _questGiverIds = new Set(); // entity IDs that are active quest givers
 /** @type {Map<number, SolidView>} */
 const _solidRecs = new Map();    // id -> { id, x, y }
@@ -410,6 +411,64 @@ function projectMonsterDefTags(kind, rec) {
 	}
 }
 
+// ── Item visual presentation (scale + offset) ─────────────────────────
+// Gold scale tiers based on coin count.
+const GOLD_SCALE_TIERS = [
+	[10,  0.55],
+	[30,  0.65],
+	[60,  0.78],
+	[100, 0.88],
+];
+const GOLD_SCALE_DEFAULT = 1.0;
+
+// Corpse scale derived from monster size class.
+const CORPSE_SIZE_SCALE = { XS: 0.55, S: 0.72, M: 0.88, L: 1.0, XL: 1.12 };
+const _corpseSizeCache = new Map(); // monsterKind -> scale
+
+function corpseScaleForKind(kind) {
+	if (!kind || !kind.startsWith('corpse_')) return 1;
+	const monsterKind = kind.slice(7); // strip "corpse_"
+	let s = _corpseSizeCache.get(monsterKind);
+	if (s !== undefined) return s;
+	const def = getMonster(monsterKind);
+	s = (def && CORPSE_SIZE_SCALE[def.sizeClass]) || 0.88;
+	_corpseSizeCache.set(monsterKind, s);
+	return s;
+}
+
+/**
+ * Compute display scale for an item entity.
+ * Gold scales by count; corpses scale by monster size; others default to 1.
+ * @param {any} itemInfo
+ * @param {string} kind
+ * @returns {number}
+ */
+function computeItemScale(itemInfo, kind) {
+	if (!itemInfo) return 1;
+	if (String(itemInfo.type || '').toLowerCase() === 'currency') {
+		const count = (itemInfo.count | 0) || 1;
+		for (let i = 0; i < GOLD_SCALE_TIERS.length; i++) {
+			if (count <= GOLD_SCALE_TIERS[i][0]) return GOLD_SCALE_TIERS[i][1];
+		}
+		return GOLD_SCALE_DEFAULT;
+	}
+	if (kind && kind.startsWith('corpse_')) return corpseScaleForKind(kind);
+	return 1;
+}
+
+/**
+ * Deterministic visual sub-tile offset for ground items.
+ * Uses entity ID to produce a stable jitter so items don't sit dead-centre.
+ * @param {number} id
+ * @returns {{ dx: number, dy: number }}
+ */
+function computeVisualOffset(id) {
+	// Simple hash from entity ID — produces values in [-0.15, +0.15]
+	const h1 = ((id * 2654435761) >>> 0) / 0xFFFFFFFF;
+	const h2 = ((id * 340573321)  >>> 0) / 0xFFFFFFFF;
+	return { dx: (h1 - 0.5) * 0.3, dy: (h2 - 0.5) * 0.3 };
+}
+
 /**
  * @param {string} kind
  * @param {any} itemInfo
@@ -738,8 +797,10 @@ export function buildWorldView(world) {
 			const stackSeq = Number(world.get(id, GroundStackOrder)?.seq || 0) | 0;
 			let rec = /** @type any */ (_entityRecs.get(id) || null);
 			const physSizeClass = /** @type {string} */ (world.get(id, Physiology)?.sizeClass || '');
+			const iScale = itemInfo ? computeItemScale(itemInfo, kind) : 1;
+			const vOff = itemInfo ? computeVisualOffset(id) : _zeroOff;
 			if (!rec) {
-				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer, hp: 0, maxHp: 0, isPet: false, showHealthBar: false, procStates: null, stackSeq, facing: null, weaponVfx: null, sizeClass: physSizeClass };
+				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer, hp: 0, maxHp: 0, isPet: false, showHealthBar: false, procStates: null, stackSeq, facing: null, weaponVfx: null, sizeClass: physSizeClass, itemScale: iScale, rotation: 0, visualOff: vOff };
 				_entityRecs.set(id, rec);
 			} else {
 				rec.kind = kind;
@@ -751,6 +812,9 @@ export function buildWorldView(world) {
 				rec.facing = null;
 				rec.weaponVfx = null;
 				rec.sizeClass = physSizeClass;
+				rec.itemScale = iScale;
+				rec.rotation = 0;
+				rec.visualOff = vOff;
 			}
 
 			// Project select status types into tags for display-only logic.
@@ -822,10 +886,12 @@ export function buildWorldView(world) {
 
 			const stackSeq2 = Number(world.get(id, GroundStackOrder)?.seq || 0) | 0;
 			const physSizeClass2 = /** @type {string} */ (world.get(id, Physiology)?.sizeClass || '');
+			const iScale2 = itemInfo ? computeItemScale(itemInfo, kind) : 1;
+			const vOff2 = itemInfo ? computeVisualOffset(id) : _zeroOff;
 			/** @type {EntityView|null} */
 			let rec = /** @type any */ (_entityRecs.get(id) || null);
 			if (!rec) {
-				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer, hp: 0, maxHp: 0, isPet: false, showHealthBar: false, procStates: null, stackSeq: stackSeq2, facing: null, weaponVfx: null, sizeClass: physSizeClass2 };
+				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer, hp: 0, maxHp: 0, isPet: false, showHealthBar: false, procStates: null, stackSeq: stackSeq2, facing: null, weaponVfx: null, sizeClass: physSizeClass2, itemScale: iScale2, rotation: 0, visualOff: vOff2 };
 				_entityRecs.set(id, rec);
 			} else {
 				rec.kind = kind;
@@ -837,6 +903,9 @@ export function buildWorldView(world) {
 				rec.facing = null;
 				rec.weaponVfx = null;
 				rec.sizeClass = physSizeClass2;
+				rec.itemScale = iScale2;
+				rec.rotation = 0;
+				rec.visualOff = vOff2;
 			}
 
 			// Project select status types into tags for display-only logic.
@@ -887,7 +956,7 @@ export function buildWorldView(world) {
 			const petPhysSizeClass = /** @type {string} */ (world.get(id, Physiology)?.sizeClass || '');
 			let rec = /** @type any */ (_entityRecs.get(id) || null);
 			if (!rec) {
-				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer: 300, hp: 0, maxHp: 0, isPet: false, showHealthBar: false, procStates: null, stackSeq, facing: null, weaponVfx: null, sizeClass: petPhysSizeClass };
+				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer: 300, hp: 0, maxHp: 0, isPet: false, showHealthBar: false, procStates: null, stackSeq, facing: null, weaponVfx: null, sizeClass: petPhysSizeClass, itemScale: 1, rotation: 0, visualOff: _zeroOff };
 				_entityRecs.set(id, rec);
 			} else {
 				rec.kind = kind;
@@ -899,6 +968,9 @@ export function buildWorldView(world) {
 				rec.facing = null;
 				rec.weaponVfx = null;
 				rec.sizeClass = petPhysSizeClass;
+				rec.itemScale = 1;
+				rec.rotation = 0;
+				rec.visualOff = _zeroOff;
 			}
 
 			projectDisplayTags(world, id, rec);

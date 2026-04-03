@@ -95,7 +95,7 @@ import { getSpell, describeSpellDetailLines, describeSpellTargetEffects } from "
 import { getSpellCooldown } from "./rules/utils/spellCooldowns.js";
 import { buildPalette } from "./display/palette/index.js";
 import { itemsAt } from "./rules/utils/queries.js";
-import { createGlyphAtlas, drawKind } from "./display/passes/glyphs/atlas.js";
+import { createGlyphAtlas, drawKind, drawKindScaled } from "./display/passes/glyphs/atlas.js";
 import { aegisWard as drawAegisWardGlyphFx } from "./display/passes/vfx/glyph/effects/aegisWard.js";
 import { Settings } from "./rules/components/Settings.js";
 import { Vitality } from "./rules/components/Vitality.js";
@@ -2253,10 +2253,10 @@ function scheduleDeathLootArc(itemId, origin, at, delayOffset) {
   const toY = Number(at?.y);
   if (![fromX, fromY, toX, toY].every(Number.isFinite)) return;
   const cheb = Math.max(Math.abs((toX | 0) - (fromX | 0)), Math.abs((toY | 0) - (fromY | 0)));
-  if (cheb < 1 || cheb > 2) return;
+  if (cheb > 2) return;
   const jitter = seededUnit(id ^ (world.step | 0));
-  const duration = 0.28 + cheb * 0.10 + jitter * 0.07;
-  const peak = 0.30 + cheb * 0.22 + jitter * 0.10;
+  const duration = 0.22 + cheb * 0.10 + jitter * 0.07;
+  const peak = 0.20 + cheb * 0.22 + jitter * 0.10;
   _deathLootArcs.set(id, {
     fromX,
     fromY,
@@ -4044,6 +4044,7 @@ const slideFx = createSlideFxController();
 
 // ── Size-class display scale map ────────────────────────────────────
 const SIZE_CLASS_SCALE = { XS: 0.55, S: 0.72, M: 0.88, L: 1.0, XL: 1.12 };
+const _itemZeroOff = { dx: 0, dy: 0 };
 
 // Wire transient lighting effects (gaze beams, chest blooms, etc.)
 installLightEventListeners(world, getPosition);
@@ -4091,11 +4092,11 @@ const PET_CRITICAL_RATIO = 0.35;
  * @param {{ id:number, pos:{x:number,y:number}, tags?:string[] }} e
  * @param {number} fxTime
  */
-function drawGlowingTagAura(ctx, e, fxTime) {
+function drawGlowingTagAura(ctx, e, fxTime, scale = 1) {
   const cx = e.pos.x, cy = e.pos.y;
   const pulse = 0.5 + 0.5 * Math.sin(fxTime * 4.2 + e.id * 0.37);
-  const rOuter = 0.58 + 0.06 * pulse;
-  const rInner = 0.27 + 0.03 * pulse;
+  const rOuter = (0.58 + 0.06 * pulse) * scale;
+  const rInner = (0.27 + 0.03 * pulse) * scale;
 
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
@@ -4126,14 +4127,14 @@ function drawGlowingTagAura(ctx, e, fxTime) {
  * @param {{ id:number, pos:{x:number,y:number} }} e
  * @param {number} fxTime
  */
-function drawLegendaryChestAura(ctx, e, fxTime) {
+function drawLegendaryChestAura(ctx, e, fxTime, scale = 1) {
   const cx = e.pos.x, cy = e.pos.y;
   const pulse = 0.5 + 0.5 * Math.sin(fxTime * 2.8 + e.id * 1.3);
 
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
 
-  const rOuter = 0.62 + 0.08 * pulse;
+  const rOuter = (0.62 + 0.08 * pulse) * scale;
   const outerGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rOuter);
   const outerA = 0.30 + 0.15 * pulse;
   outerGrad.addColorStop(0,   `rgba(255,190,20,${outerA.toFixed(3)})`);
@@ -4144,7 +4145,7 @@ function drawLegendaryChestAura(ctx, e, fxTime) {
   ctx.arc(cx, cy, rOuter, 0, Math.PI * 2);
   ctx.fill();
 
-  const rInner = 0.30 + 0.05 * pulse;
+  const rInner = (0.30 + 0.05 * pulse) * scale;
   const innerGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rInner);
   const innerA = 0.35 + 0.20 * pulse;
   innerGrad.addColorStop(0, `rgba(255,230,100,${innerA.toFixed(3)})`);
@@ -4163,14 +4164,14 @@ function drawLegendaryChestAura(ctx, e, fxTime) {
  * @param {{ id:number, pos:{x:number,y:number} }} e
  * @param {number} fxTime
  */
-function drawEpicChestAura(ctx, e, fxTime) {
+function drawEpicChestAura(ctx, e, fxTime, scale = 1) {
   const cx = e.pos.x, cy = e.pos.y;
   const pulse = 0.5 + 0.5 * Math.sin(fxTime * 3.0 + e.id * 1.3);
 
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
 
-  const rOuter = 0.62 + 0.08 * pulse;
+  const rOuter = (0.62 + 0.08 * pulse) * scale;
   const outerGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rOuter);
   const outerA = 0.28 + 0.14 * pulse;
   outerGrad.addColorStop(0,   `rgba(180,60,255,${outerA.toFixed(3)})`);
@@ -4181,7 +4182,7 @@ function drawEpicChestAura(ctx, e, fxTime) {
   ctx.arc(cx, cy, rOuter, 0, Math.PI * 2);
   ctx.fill();
 
-  const rInner = 0.30 + 0.05 * pulse;
+  const rInner = (0.30 + 0.05 * pulse) * scale;
   const innerGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rInner);
   const innerA = 0.32 + 0.18 * pulse;
   innerGrad.addColorStop(0, `rgba(210,120,255,${innerA.toFixed(3)})`);
@@ -4200,14 +4201,14 @@ function drawEpicChestAura(ctx, e, fxTime) {
  * @param {{ id:number, pos:{x:number,y:number} }} e
  * @param {number} fxTime
  */
-function drawRareGlowAura(ctx, e, fxTime) {
+function drawRareGlowAura(ctx, e, fxTime, scale = 1) {
   const cx = e.pos.x, cy = e.pos.y;
   const pulse = 0.5 + 0.5 * Math.sin(fxTime * 2.6 + e.id * 1.3);
 
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
 
-  const rOuter = 0.58 + 0.07 * pulse;
+  const rOuter = (0.58 + 0.07 * pulse) * scale;
   const outerGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rOuter);
   const outerA = 0.22 + 0.12 * pulse;
   outerGrad.addColorStop(0,   `rgba(85,170,255,${outerA.toFixed(3)})`);
@@ -4218,7 +4219,7 @@ function drawRareGlowAura(ctx, e, fxTime) {
   ctx.arc(cx, cy, rOuter, 0, Math.PI * 2);
   ctx.fill();
 
-  const rInner = 0.28 + 0.04 * pulse;
+  const rInner = (0.28 + 0.04 * pulse) * scale;
   const innerGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rInner);
   const innerA = 0.28 + 0.16 * pulse;
   innerGrad.addColorStop(0, `rgba(140,200,255,${innerA.toFixed(3)})`);
@@ -4238,7 +4239,7 @@ function drawRareGlowAura(ctx, e, fxTime) {
  * @param {{ id:number, pos:{x:number,y:number} }} e
  * @param {number} fxTime
  */
-function drawVenomTagAura(ctx, e, fxTime) {
+function drawVenomTagAura(ctx, e, fxTime, scale = 1) {
   const cx = e.pos.x, cy = e.pos.y;
   const pulse = 0.5 + 0.5 * Math.sin(fxTime * 3.5 + e.id * 1.3);
 
@@ -4246,7 +4247,7 @@ function drawVenomTagAura(ctx, e, fxTime) {
   ctx.globalCompositeOperation = 'lighter';
 
   // Outer soft glow — same palette as poisoned-weapon ground glow
-  const rOuter = 0.62 + 0.08 * pulse;
+  const rOuter = (0.62 + 0.08 * pulse) * scale;
   const outerGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rOuter);
   const outerA = 0.30 + 0.15 * pulse;
   outerGrad.addColorStop(0,   `rgba(50,220,70,${outerA.toFixed(3)})`);
@@ -4258,7 +4259,7 @@ function drawVenomTagAura(ctx, e, fxTime) {
   ctx.fill();
 
   // Inner bright core
-  const rInner = 0.30 + 0.05 * pulse;
+  const rInner = (0.30 + 0.05 * pulse) * scale;
   const innerGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rInner);
   const innerA = 0.35 + 0.20 * pulse;
   innerGrad.addColorStop(0, `rgba(100,255,120,${innerA.toFixed(3)})`);
@@ -4278,14 +4279,14 @@ function drawVenomTagAura(ctx, e, fxTime) {
  * @param {{ id:number, pos:{x:number,y:number} }} e
  * @param {number} fxTime
  */
-function drawFrostTagAura(ctx, e, fxTime) {
+function drawFrostTagAura(ctx, e, fxTime, scale = 1) {
   const cx = e.pos.x, cy = e.pos.y;
   const pulse = 0.5 + 0.5 * Math.sin(fxTime * 2.5 + e.id * 1.3);
 
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
 
-  const rOuter = 0.62 + 0.08 * pulse;
+  const rOuter = (0.62 + 0.08 * pulse) * scale;
   const outerGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rOuter);
   const outerA = 0.26 + 0.14 * pulse;
   outerGrad.addColorStop(0,   `rgba(100,190,255,${outerA.toFixed(3)})`);
@@ -4296,7 +4297,7 @@ function drawFrostTagAura(ctx, e, fxTime) {
   ctx.arc(cx, cy, rOuter, 0, Math.PI * 2);
   ctx.fill();
 
-  const rInner = 0.30 + 0.05 * pulse;
+  const rInner = (0.30 + 0.05 * pulse) * scale;
   const innerGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rInner);
   const innerA = 0.32 + 0.20 * pulse;
   innerGrad.addColorStop(0, `rgba(180,230,255,${innerA.toFixed(3)})`);
@@ -4316,7 +4317,7 @@ function drawFrostTagAura(ctx, e, fxTime) {
  * @param {{ id:number, pos:{x:number,y:number} }} e
  * @param {number} fxTime
  */
-function drawStormTagAura(ctx, e, fxTime) {
+function drawStormTagAura(ctx, e, fxTime, scale = 1) {
   const cx = e.pos.x, cy = e.pos.y;
   const pulse = 0.5 + 0.5 * Math.sin(fxTime * 5.0 + e.id * 0.91);
   // Flicker: occasional sharp brightness spikes
@@ -4325,7 +4326,7 @@ function drawStormTagAura(ctx, e, fxTime) {
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
 
-  const rOuter = 0.60 + 0.10 * pulse;
+  const rOuter = (0.60 + 0.10 * pulse) * scale;
   const outerGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rOuter);
   const outerA = 0.22 + 0.16 * pulse + flicker;
   outerGrad.addColorStop(0,   `rgba(120,170,255,${outerA.toFixed(3)})`);
@@ -4336,7 +4337,7 @@ function drawStormTagAura(ctx, e, fxTime) {
   ctx.arc(cx, cy, rOuter, 0, Math.PI * 2);
   ctx.fill();
 
-  const rInner = 0.28 + 0.06 * pulse;
+  const rInner = (0.28 + 0.06 * pulse) * scale;
   const innerGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rInner);
   const innerA = 0.30 + 0.25 * pulse + flicker;
   innerGrad.addColorStop(0, `rgba(210,230,255,${innerA.toFixed(3)})`);
@@ -4356,14 +4357,14 @@ function drawStormTagAura(ctx, e, fxTime) {
  * @param {{ id:number, pos:{x:number,y:number} }} e
  * @param {number} fxTime
  */
-function drawSoulTagAura(ctx, e, fxTime) {
+function drawSoulTagAura(ctx, e, fxTime, scale = 1) {
   const cx = e.pos.x, cy = e.pos.y;
   const pulse = 0.5 + 0.5 * Math.sin(fxTime * 3.0 + e.id * 1.7);
 
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
 
-  const rOuter = 0.60 + 0.08 * pulse;
+  const rOuter = (0.60 + 0.08 * pulse) * scale;
   const outerGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rOuter);
   const outerA = 0.24 + 0.14 * pulse;
   outerGrad.addColorStop(0,   `rgba(180,40,110,${outerA.toFixed(3)})`);
@@ -4374,7 +4375,7 @@ function drawSoulTagAura(ctx, e, fxTime) {
   ctx.arc(cx, cy, rOuter, 0, Math.PI * 2);
   ctx.fill();
 
-  const rInner = 0.28 + 0.05 * pulse;
+  const rInner = (0.28 + 0.05 * pulse) * scale;
   const innerGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rInner);
   const innerA = 0.30 + 0.20 * pulse;
   innerGrad.addColorStop(0, `rgba(220,80,170,${innerA.toFixed(3)})`);
@@ -4394,14 +4395,14 @@ function drawSoulTagAura(ctx, e, fxTime) {
  * @param {{ id:number, pos:{x:number,y:number} }} e
  * @param {number} fxTime
  */
-function drawBloodTagAura(ctx, e, fxTime) {
+function drawBloodTagAura(ctx, e, fxTime, scale = 1) {
   const cx = e.pos.x, cy = e.pos.y;
   const pulse = 0.5 + 0.5 * Math.sin(fxTime * 2.2 + e.id * 1.1);
 
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
 
-  const rOuter = 0.60 + 0.08 * pulse;
+  const rOuter = (0.60 + 0.08 * pulse) * scale;
   const outerGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rOuter);
   const outerA = 0.24 + 0.14 * pulse;
   outerGrad.addColorStop(0,   `rgba(200,30,30,${outerA.toFixed(3)})`);
@@ -4412,7 +4413,7 @@ function drawBloodTagAura(ctx, e, fxTime) {
   ctx.arc(cx, cy, rOuter, 0, Math.PI * 2);
   ctx.fill();
 
-  const rInner = 0.28 + 0.05 * pulse;
+  const rInner = (0.28 + 0.05 * pulse) * scale;
   const innerGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rInner);
   const innerA = 0.30 + 0.20 * pulse;
   innerGrad.addColorStop(0, `rgba(255,80,60,${innerA.toFixed(3)})`);
@@ -4431,14 +4432,14 @@ function drawBloodTagAura(ctx, e, fxTime) {
  * @param {{ id:number, pos:{x:number,y:number} }} e
  * @param {number} fxTime
  */
-function drawCausticTagAura(ctx, e, fxTime) {
+function drawCausticTagAura(ctx, e, fxTime, scale = 1) {
   const cx = e.pos.x, cy = e.pos.y;
   const pulse = 0.5 + 0.5 * Math.sin(fxTime * 3.2 + e.id * 1.5);
 
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
 
-  const rOuter = 0.60 + 0.08 * pulse;
+  const rOuter = (0.60 + 0.08 * pulse) * scale;
   const outerGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rOuter);
   const outerA = 0.26 + 0.14 * pulse;
   outerGrad.addColorStop(0,   `rgba(190,210,30,${outerA.toFixed(3)})`);
@@ -4449,7 +4450,7 @@ function drawCausticTagAura(ctx, e, fxTime) {
   ctx.arc(cx, cy, rOuter, 0, Math.PI * 2);
   ctx.fill();
 
-  const rInner = 0.28 + 0.05 * pulse;
+  const rInner = (0.28 + 0.05 * pulse) * scale;
   const innerGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rInner);
   const innerA = 0.30 + 0.20 * pulse;
   innerGrad.addColorStop(0, `rgba(230,250,80,${innerA.toFixed(3)})`);
@@ -4473,7 +4474,7 @@ function drawCausticTagAura(ctx, e, fxTime) {
 const POTION_SHIMMER_SPEED = 2.6;   // pulse frequency (lower = lazier glow)
 const POTION_SHIMMER_DEPTH = 0.18;  // how much alpha swings (0 = static, 1 = full throb)
 
-function drawPotionGlyphAura(ctx, e, fxTime) {
+function drawPotionGlyphAura(ctx, e, fxTime, scale = 1) {
   const cx = e.pos.x;
   const cy = e.pos.y;
   const look = palette[e.kind] || palette.potion || palette.default;
@@ -4485,7 +4486,7 @@ function drawPotionGlyphAura(ctx, e, fxTime) {
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
 
-  const r = 0.42 + 0.06 * pulse;
+  const r = (0.42 + 0.06 * pulse) * scale;
   const squeeze = 0.43; // sides 40% narrower than top/bottom — hugs the "!"
   const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
   grad.addColorStop(0,   `${fgHex}${Math.round(baseA * 255).toString(16).padStart(2,'0')}`);
@@ -4556,27 +4557,7 @@ function drawMemoryGlyph(ctx, kind, x, y, alpha = 0.7) {
   ctx.restore();
 }
 
-/**
- * Draw a glyph atlas entry with a display-only scale transform.
- * @param {Map<string, { canvas: HTMLCanvasElement }>} atlas
- * @param {CanvasRenderingContext2D} ctx
- * @param {string} kind
- * @param {number} x
- * @param {number} y
- * @param {number} scale
- */
-function drawKindScaled(atlas, ctx, kind, x, y, scale = 1) {
-  const s = Number(scale || 1);
-  if (Math.abs(s - 1) <= 0.001) {
-    drawKind(atlas, ctx, kind, x, y);
-    return;
-  }
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(s, s);
-  drawKind(atlas, ctx, kind, 0, 0);
-  ctx.restore();
-}
+// drawKindScaled is imported from atlas.js (supports scale + rotation)
 
 function hasTag(entity, tag) {
   return Array.isArray(entity?.tags) && entity.tags.includes(tag);
@@ -5082,23 +5063,24 @@ function drawFlyingShadow(ctx, presentation) {
  * @param {{ id:number, pos:{x:number,y:number} }} e
  * @param {number} fxTime
  */
-function drawRareStar(ctx, e, fxTime) {
+function drawRareStar(ctx, e, fxTime, scale = 1) {
   const cx = e.pos.x;
-  const cy = e.pos.y - 0.65; // directly above the glyph (glyph spans y-0.5 to y+0.5)
-  const R = 0.09;  // outer point radius
-  const r = 0.035; // inner point radius
+  const cy = e.pos.y - 0.65 * scale; // directly above the glyph (glyph spans y-0.5 to y+0.5)
+  const R = 0.09 * scale;  // outer point radius
+  const r = 0.035 * scale; // inner point radius
   const POINTS = 4;
 
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
 
   // Soft glow halo behind the star
-  const halo = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 2.0);
+  const haloR = R * 2.0;
+  const halo = ctx.createRadialGradient(cx, cy, 0, cx, cy, haloR);
   halo.addColorStop(0, 'rgba(255,255,200,0.20)');
   halo.addColorStop(1, 'rgba(255,240,120,0)');
   ctx.fillStyle = halo;
   ctx.beginPath();
-  ctx.arc(cx, cy, R * 2.0, 0, Math.PI * 2);
+  ctx.arc(cx, cy, haloR, 0, Math.PI * 2);
   ctx.fill();
 
   // 4-pointed star shape
@@ -5122,9 +5104,9 @@ function drawRareStar(ctx, e, fxTime) {
  * @param {{ id:number, pos:{x:number,y:number} }} e
  * @param {number} fxTime
  */
-function drawBlindEye(ctx, e, fxTime) {
+function drawBlindEye(ctx, e, fxTime, scale = 1) {
   const cx = e.pos.x;
-  const cy = e.pos.y - 0.72;
+  const cy = e.pos.y - 0.72 * scale;
 
   // Gentle pulse
   const pulse = 0.85 + Math.sin(fxTime * 2.5) * 0.15;
@@ -5134,12 +5116,13 @@ function drawBlindEye(ctx, e, fxTime) {
   ctx.globalCompositeOperation = 'lighter';
 
   // Soft violet glow halo
-  const halo = ctx.createRadialGradient(cx, dy, 0, cx, dy, 0.2);
+  const haloR = 0.2 * scale;
+  const halo = ctx.createRadialGradient(cx, dy, 0, cx, dy, haloR);
   halo.addColorStop(0, `rgba(120,60,200,${(0.25 * pulse).toFixed(2)})`);
   halo.addColorStop(1, 'rgba(100,50,180,0)');
   ctx.fillStyle = halo;
   ctx.beginPath();
-  ctx.arc(cx, dy, 0.2, 0, Math.PI * 2);
+  ctx.arc(cx, dy, haloR, 0, Math.PI * 2);
   ctx.fill();
 
   // Eye glyph
@@ -5147,7 +5130,7 @@ function drawBlindEye(ctx, e, fxTime) {
   ctx.globalAlpha = 0.9 * pulse;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.font = '0.32px sans-serif';
+  ctx.font = `${0.32 * scale}px sans-serif`;
   ctx.fillText('\u{1F441}\u{FE0F}', cx, dy);
 
   ctx.restore();
@@ -5159,9 +5142,9 @@ function drawBlindEye(ctx, e, fxTime) {
  * @param {{ id:number, pos:{x:number,y:number} }} e
  * @param {number} fxTime
  */
-function drawQuestBang(ctx, e, fxTime) {
+function drawQuestBang(ctx, e, fxTime, scale = 1) {
   const cx = e.pos.x;
-  const cy = e.pos.y - 0.72;
+  const cy = e.pos.y - 0.72 * scale;
 
   // Gentle bob
   const bob = Math.sin(fxTime * 2.0) * 0.03;
@@ -5171,12 +5154,13 @@ function drawQuestBang(ctx, e, fxTime) {
   ctx.globalCompositeOperation = 'lighter';
 
   // Soft yellow glow halo
-  const halo = ctx.createRadialGradient(cx, dy, 0, cx, dy, 0.18);
+  const haloR = 0.18 * scale;
+  const halo = ctx.createRadialGradient(cx, dy, 0, cx, dy, haloR);
   halo.addColorStop(0, 'rgba(255,220,40,0.25)');
   halo.addColorStop(1, 'rgba(255,200,0,0)');
   ctx.fillStyle = halo;
   ctx.beginPath();
-  ctx.arc(cx, dy, 0.18, 0, Math.PI * 2);
+  ctx.arc(cx, dy, haloR, 0, Math.PI * 2);
   ctx.fill();
 
   // "!" glyph
@@ -5184,7 +5168,7 @@ function drawQuestBang(ctx, e, fxTime) {
   ctx.fillStyle = 'rgba(255,220,40,0.95)';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.font = 'bold 0.32px sans-serif';
+  ctx.font = `bold ${0.32 * scale}px sans-serif`;
   ctx.fillText('!', cx, dy);
 
   ctx.restore();
@@ -5458,68 +5442,70 @@ function render(worldView) {
 
     if (layer === 250) {
       if (throwFx.isItemHidden(e.id) || delayedDeathFx.isItemHidden(e.id)) continue;
-      const topItemId = stackMeta.get(`${e.pos.x},${e.pos.y}`) || 0;
-      if (topItemId !== e.id) continue;
       const arcPos = deathLootArcPos(e.id);
+      const vOff = e.visualOff || _itemZeroOff;
       const itemRender = arcPos
         ? { ...e, pos: { x: arcPos.x, y: arcPos.y } }
-        : e;
-      drawKind(glyphAtlas, bctx, resolveRenderableKind(glyphAtlas, itemRender), itemRender.pos.x, itemRender.pos.y);
+        : (vOff.dx || vOff.dy) ? { ...e, pos: { x: e.pos.x + vOff.dx, y: e.pos.y + vOff.dy } } : e;
+      const itemKind = resolveRenderableKind(glyphAtlas, itemRender);
+      const paletteBase = (glyphAtlas.get(itemKind) || glyphAtlas.get('default') || {}).baseScale || 1;
+      const finalItemScale = (e.itemScale || 1) * paletteBase;
+      drawKindScaled(glyphAtlas, bctx, itemKind, itemRender.pos.x, itemRender.pos.y, finalItemScale, e.rotation || 0);
       if (PERF.quality !== 'low' && Array.isArray(itemRender.tags) && itemRender.tags.includes('glowing')) {
-        drawGlowingTagAura(bctx, itemRender, _fxTime);
+        drawGlowingTagAura(bctx, itemRender, _fxTime, finalItemScale);
       }
       if (Array.isArray(itemRender.tags) && itemRender.tags.includes('venom_glowing')) {
-        drawVenomTagAura(bctx, itemRender, _fxTime);
+        drawVenomTagAura(bctx, itemRender, _fxTime, finalItemScale);
       }
       if (PERF.quality !== 'low' && Array.isArray(itemRender.tags) && itemRender.tags.includes('frost_glowing')) {
-        drawFrostTagAura(bctx, itemRender, _fxTime);
+        drawFrostTagAura(bctx, itemRender, _fxTime, finalItemScale);
       }
       if (PERF.quality !== 'low' && Array.isArray(itemRender.tags) && itemRender.tags.includes('storm_glowing')) {
-        drawStormTagAura(bctx, itemRender, _fxTime);
+        drawStormTagAura(bctx, itemRender, _fxTime, finalItemScale);
       }
       if (PERF.quality !== 'low' && Array.isArray(itemRender.tags) && itemRender.tags.includes('soul_glowing')) {
-        drawSoulTagAura(bctx, itemRender, _fxTime);
+        drawSoulTagAura(bctx, itemRender, _fxTime, finalItemScale);
       }
       if (PERF.quality !== 'low' && Array.isArray(itemRender.tags) && itemRender.tags.includes('blood_glowing')) {
-        drawBloodTagAura(bctx, itemRender, _fxTime);
+        drawBloodTagAura(bctx, itemRender, _fxTime, finalItemScale);
       }
       if (PERF.quality !== 'low' && Array.isArray(itemRender.tags) && itemRender.tags.includes('caustic_glowing')) {
-        drawCausticTagAura(bctx, itemRender, _fxTime);
+        drawCausticTagAura(bctx, itemRender, _fxTime, finalItemScale);
       }
       if (Array.isArray(itemRender.tags) && itemRender.tags.includes('legendary_glowing')) {
-        drawLegendaryChestAura(bctx, itemRender, _fxTime);
+        drawLegendaryChestAura(bctx, itemRender, _fxTime, finalItemScale);
       }
       if (Array.isArray(itemRender.tags) && itemRender.tags.includes('epic_glowing')) {
-        drawEpicChestAura(bctx, itemRender, _fxTime);
+        drawEpicChestAura(bctx, itemRender, _fxTime, finalItemScale);
       }
       if (Array.isArray(itemRender.tags) && itemRender.tags.includes('rare_glowing')) {
-        drawRareGlowAura(bctx, itemRender, _fxTime);
+        drawRareGlowAura(bctx, itemRender, _fxTime, finalItemScale);
       }
       if (Array.isArray(itemRender.tags) && itemRender.tags.includes('potion_glow')) {
-        drawPotionGlyphAura(bctx, itemRender, _fxTime);
+        drawPotionGlyphAura(bctx, itemRender, _fxTime, finalItemScale);
       }
       if (PERF.quality !== 'low' && Array.isArray(itemRender.tags) && itemRender.tags.includes('rare')) {
-        drawRareStar(bctx, itemRender, _fxTime);
+        drawRareStar(bctx, itemRender, _fxTime, finalItemScale);
       }
       if (PERF.quality !== 'low' && Array.isArray(itemRender.tags) && itemRender.tags.includes('quest_giver')) {
-        drawQuestBang(bctx, itemRender, _fxTime);
+        drawQuestBang(bctx, itemRender, _fxTime, finalItemScale);
       }
       if (PERF.quality !== 'low' && Array.isArray(itemRender.tags) && itemRender.tags.includes('blinded')) {
-        drawBlindEye(bctx, itemRender, _fxTime);
+        drawBlindEye(bctx, itemRender, _fxTime, finalItemScale);
       }
       const playerPos = worldView?.player?.pos;
       if (
         !arcPos
         && playerPos
-        && (!worldView?.isVisible || worldView.isVisible(itemRender.pos.x, itemRender.pos.y))
-        && chebyshevScalar(playerPos.x | 0, playerPos.y | 0, itemRender.pos.x | 0, itemRender.pos.y | 0) <= 3
+        && (!worldView?.isVisible || worldView.isVisible(e.pos.x, e.pos.y))
+        && chebyshevScalar(playerPos.x | 0, playerPos.y | 0, e.pos.x | 0, e.pos.y | 0) <= 3
       ) {
         _groundLootLabels.push({
-          id: itemRender.id,
+          id: e.id,
           x: itemRender.pos.x,
           y: itemRender.pos.y,
-          text: lootLabelFromKind(itemRender.kind, itemRender.id),
-          color: lootLabelColorFromTags(itemRender.tags),
+          text: lootLabelFromKind(e.kind, e.id),
+          color: lootLabelColorFromTags(e.tags),
         });
       }
       continue;

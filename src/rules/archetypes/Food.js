@@ -9,7 +9,7 @@ import {
   IRON_RATION_NUTRITION,
   SHELF_LIFE_RATION,
   SHELF_LIFE_CORPSE,
-  CORPSE_WEIGHT,
+  corpseWeight,
 } from "../data/food.js";
 import {
   computeCorpseNutrition,
@@ -272,7 +272,7 @@ export function createCorpse(world, monsterDef, pos) {
   const corpseIdentity = `corpse_${String(monsterDef.id || "").toLowerCase()}`;
   const onEat = getCorpseEatHooks(corpseIdentity);
   const hasSpecialProc = onEat.length > 0;
-  const weight = CORPSE_WEIGHT[monsterDef.sizeClass] || 3;
+  const weight = corpseWeight(monsterDef);
 
   const id = world.create();
 
