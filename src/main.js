@@ -171,7 +171,7 @@ const PERF = runtimeConfig.perf;
 const chosenDeityId = runtimeConfig.chosenDeityId;
 const TILE_PX = 28;
 const CAMERA_START_SCALE_DESKTOP = TILE_PX * (1.2 ** 5);
-const CAMERA_START_SCALE_MOBILE = TILE_PX * 1.2;
+const CAMERA_START_SCALE_MOBILE = TILE_PX * (1.2 ** 3);
 const CAMERA_START_SCALE = (() => {
   if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
     return CAMERA_START_SCALE_DESKTOP;
