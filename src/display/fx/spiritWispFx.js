@@ -81,6 +81,7 @@ const MOTE_MAX_COUNT = 4;
 const MOTE_RADIUS = 0.16;
 const FORTUNE_MOTE_BOOST = 2;
 const ALTAR_ATTUNE_DURATION = 2.6;
+const MALEVOLENCE_COLOR = [255, 90, 70];
 
 /**
  * @param {{
@@ -158,6 +159,8 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
   let _altarBeaconTimer = 0;
   let _altarBeaconX = 0, _altarBeaconY = 0;
   let _altarRejectTimer = 0;
+  let _malevolenceTimer = 0;
+  let _malevolenceX = 0, _malevolenceY = 0;
 
   // ── Helpers ────────────────────────────────────────────────────────
 
@@ -402,6 +405,26 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
     return pos;
   }
 
+  function _triggerMalevolenceAt(x, y, intensity = 1) {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    const t = Math.max(0.6, Number(intensity || 1));
+    _malevolenceX = x;
+    _malevolenceY = y;
+    _malevolenceTimer = Math.max(_malevolenceTimer, 1.3 + Math.min(2.5, t) * 0.9);
+    _agitation = Math.max(_agitation, COMBAT_DECAY * (1.1 + Math.min(1.2, t * 0.35)));
+    _spawnRingBurst(
+      x,
+      y,
+      MALEVOLENCE_COLOR,
+      14 + ((t * 8) | 0),
+      0.9,
+      2.2,
+      0.24,
+      0.24,
+      0.62
+    );
+  }
+
   // ── Main tick ─────────────────────────────────────────────────────
 
   function tick(dtSec) {
@@ -455,6 +478,7 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
     _trapHintTimer = Math.max(0, _trapHintTimer - dtSec);
     _altarBeaconTimer = Math.max(0, _altarBeaconTimer - dtSec);
     _altarRejectTimer = Math.max(0, _altarRejectTimer - dtSec);
+    _malevolenceTimer = Math.max(0, _malevolenceTimer - dtSec);
 
     // Danger scan (throttled)
     _dangerScanTimer -= dtSec;
@@ -780,6 +804,27 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
       bctx.stroke();
     }
 
+    // Malevolence surge: cursed offerings/offenses/wrath leave a hostile scar.
+    if (_malevolenceTimer > 0) {
+      const mt = Math.min(1, _malevolenceTimer / 2.4);
+      const pulse = 0.18 + (1 - mt) * 0.22 + Math.sin(_fxTime * 9.2) * 0.02;
+      const a = 0.12 + mt * 0.34;
+      bctx.strokeStyle = `rgba(255,95,65,${a.toFixed(3)})`;
+      bctx.lineWidth = 0.02;
+      bctx.beginPath();
+      bctx.arc(_malevolenceX, _malevolenceY, pulse, 0, Math.PI * 2);
+      bctx.stroke();
+
+      bctx.strokeStyle = `rgba(210,55,40,${Math.min(0.5, a + 0.1).toFixed(3)})`;
+      bctx.lineWidth = 0.014;
+      bctx.beginPath();
+      bctx.moveTo(_malevolenceX - 0.11, _malevolenceY - 0.11);
+      bctx.lineTo(_malevolenceX + 0.11, _malevolenceY + 0.11);
+      bctx.moveTo(_malevolenceX + 0.11, _malevolenceY - 0.11);
+      bctx.lineTo(_malevolenceX - 0.11, _malevolenceY + 0.11);
+      bctx.stroke();
+    }
+
     bctx.restore();
   }
 
@@ -892,7 +937,15 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
     });
 
     // Deity wrath — extra agitation
-    world.on('deity:wrath', () => { _agitation = COMBAT_DECAY * 2; });
+    world.on('deity:wrath', ({ playerId, cursed, severityScale }) => {
+      const pe = getPlayerEntity();
+      if (!pe || Number(playerId || 0) !== pe.id) return;
+      _agitation = COMBAT_DECAY * 2;
+      const scale = Math.max(1, Number(severityScale || 1));
+      if (cursed || scale > 1.05) {
+        _triggerMalevolenceAt(_anchorX, _anchorY, 1.2 + Math.min(2.0, (scale - 1) * 2.5 + (cursed ? 0.8 : 0)));
+      }
+    });
     world.on('deity:omen', () => { _omenTimer = Math.max(_omenTimer, 1.4); });
     world.on('deity:patronShift', ({ playerId }) => {
       const pe = getPlayerEntity();
@@ -929,6 +982,27 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
       _altarRejectTimer = Math.max(_altarRejectTimer, 1.0);
       _agitation = Math.max(_agitation, COMBAT_DECAY * 0.75);
     });
+    world.on('altar:offer', ({ actor, targetId, beatitudeState, value }) => {
+      const pe = getPlayerEntity();
+      if (!pe || Number(actor || 0) !== pe.id) return;
+      const pos = _attuneSacredSite(targetId, actor, 1.8);
+      const state = String(beatitudeState || '').toLowerCase();
+      if (state === 'cursed') {
+        _altarRejectTimer = Math.max(_altarRejectTimer, 1.4);
+        _triggerMalevolenceAt(
+          pos?.x ?? _altarBeaconX ?? _anchorX,
+          pos?.y ?? _altarBeaconY ?? _anchorY,
+          1.1 + Math.min(1.5, Number(value || 0) * 2.0)
+        );
+      }
+    });
+    world.on('altar:resurrectionDenied', ({ actor, targetId }) => {
+      const pe = getPlayerEntity();
+      if (!pe || Number(actor || 0) !== pe.id) return;
+      _attuneSacredSite(targetId, actor, 2.0);
+      _altarRejectTimer = Math.max(_altarRejectTimer, 1.6);
+      _triggerMalevolenceAt(_altarBeaconX || _anchorX, _altarBeaconY || _anchorY, 1.9);
+    });
     world.on('shrine:communion', ({ actor, targetId, effect }) => {
       const pe = getPlayerEntity();
       if (!pe || Number(actor || 0) !== pe.id) return;
@@ -938,6 +1012,23 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
       if (e === 'blessing') _triggerAegisAt(_altarBeaconX, _altarBeaconY, 1.3);
       else if (e === 'cooldown') _omenTimer = Math.max(_omenTimer, 0.8);
       else _triggerCeremonyAt(_altarBeaconX, _altarBeaconY, 0.8);
+    });
+    world.on('deity:nicheEvent', ({ playerId, event }) => {
+      const pe = getPlayerEntity();
+      if (!pe || Number(playerId || 0) !== pe.id) return;
+      const ev = String(event || '').toLowerCase();
+      if (ev === 'cursed_offering_angered') {
+        _triggerMalevolenceAt(_altarBeaconX || _anchorX, _altarBeaconY || _anchorY, 2.0);
+      } else if (ev === 'cursed_offering_amused') {
+        _triggerMalevolenceAt(_altarBeaconX || _anchorX, _altarBeaconY || _anchorY, 1.1);
+      } else if (ev === 'blessed_offering') {
+        _triggerCeremonyAt(_altarBeaconX || _anchorX, _altarBeaconY || _anchorY, 1.0);
+      }
+    });
+    world.on('deity:offense', ({ playerId }) => {
+      const pe = getPlayerEntity();
+      if (!pe || Number(playerId || 0) !== pe.id) return;
+      _triggerMalevolenceAt(_anchorX, _anchorY, 1.4);
     });
 
     // Miracle / intervention — wisp flies to deliver it

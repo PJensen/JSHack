@@ -548,6 +548,7 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
   const SOLID_PREFAB_KINDS = new Set([
     'statue', 'urn', 'pillar', 'sarcophagus', 'fountain', 'altar', 'shrine',
   ]);
+  const SACRED_FEATURE_KINDS = new Set(['altar', 'shrine', 'church_altar']);
 
   for (const room of chunk.rooms) {
     // Prefab rooms use their own spawn list — skip normal population entirely.
@@ -571,6 +572,7 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
     // Place a room feature (~50% of non-entry rooms get one)
     const isEntryRoom = room === entryRoom;
     let roomHasWeaponRack = false;
+    let roomIsSacred = false;
     const featureRate = floorPlan.profile?.doorFeatureRate ?? 0.50;
     if (!isEntryRoom && rng.next() < featureRate) {
       const featureKind = _pickFeature(rng, floorPlan.profile?.featurePool ?? null);
@@ -600,6 +602,7 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
       if (!skipFeature && !isSolid(cx, cy)) {
         spawns.push({ x: cx, y: cy, kind: featureKind, params: { depth: floorPlan.depth } });
         if (featureKind === 'weapon_rack') roomHasWeaponRack = true;
+        if (SACRED_FEATURE_KINDS.has(featureKind)) roomIsSacred = true;
         markSolid(cx, cy);
 
         // Sacred rooms (altar or shrine) only sometimes get a single anchor torch.
@@ -689,7 +692,7 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
     // Monster density: ~1 per 12-18 floor tiles, scaled by depth
     const totalMonsterBudget = Math.max(0, Math.floor(area / rng.int(12, 18) * diff));
     const spawnerChance = Math.min(0.60, totalMonsterBudget * SPAWNER_CHANCE_PER_MONSTER);
-    const spawnerBudget = totalMonsterBudget > 0 && rng.next() < spawnerChance ? 1 : 0;
+    const spawnerBudget = (!roomIsSacred && totalMonsterBudget > 0 && rng.next() < spawnerChance) ? 1 : 0;
     const monsterBudget = Math.max(0, totalMonsterBudget - spawnerBudget);
 
     // Place spawners (create monster packs)
@@ -937,7 +940,10 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
   // and two mixed vermin/humanoid nests to preserve rat fodder and variety.
   // Only inject into the origin chunk so they appear once per floor.
   if (floorPlan.depth === 1 && chunk.chunkX === 0 && chunk.chunkY === 0) {
-    const nonEntryRooms = chunk.rooms.filter(r => r !== entryRoom);
+    const nonEntryRooms = chunk.rooms.filter((r) => (
+      r !== entryRoom
+      && !roomHasSpawnKind(spawns, r, SACRED_FEATURE_KINDS)
+    ));
     if (nonEntryRooms.length >= 1) {
       let roomIdx = 0;
       const nextRoom = () => nonEntryRooms[roomIdx++ % nonEntryRooms.length];
@@ -1305,6 +1311,17 @@ function removeRoomSpawns(spawns, room, predicate) {
     if (!isPointInRoom(spawn.x, spawn.y, room)) continue;
     if (predicate(spawn)) spawns.splice(i, 1);
   }
+}
+
+function roomHasSpawnKind(spawns, room, kinds) {
+  const kindSet = kinds instanceof Set ? kinds : new Set(kinds || []);
+  if (kindSet.size <= 0) return false;
+  for (let i = 0; i < spawns.length; i++) {
+    const s = spawns[i];
+    if (!isPointInRoom(s.x, s.y, room)) continue;
+    if (kindSet.has(String(s.kind || ''))) return true;
+  }
+  return false;
 }
 
 function pickRoomInteriorSpot(room, rng, isBlocked, reserved = new Set(), tries = 16) {
