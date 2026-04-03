@@ -56,6 +56,7 @@ export const MAGIC_ITEMS = {
     value: 20,
     coating_color: "#66dd66",
     description: "A toxic brew that can be used to coat a weapon.",
+    weight: 0.5, // glass potion
     potion: {
       route: "oral",
       doses: 1,
@@ -90,6 +91,7 @@ export const MAGIC_ITEMS = {
     rarityName: "common",
     value: 12,
     description: "Clear water in a fragile vial. Useful for quenching, blessing, and splashing.",
+    weight: 0.5, // glass potion
     potion: {
       route: "oral",
       doses: 1,
@@ -112,6 +114,7 @@ export const MAGIC_ITEMS = {
     rarityName: "magic",
     value: 30,
     description: "Consecrated water that purges flame and carries a blessing.",
+    weight: 0.5, // glass potion
     potion: {
       route: "oral",
       doses: 1,
@@ -134,6 +137,7 @@ export const MAGIC_ITEMS = {
     rarityName: "magic",
     value: 60,
     description: "Turns skin to granite, can harden gear, and can shatter into a taunting statue.",
+    weight: 0.5, // glass potion
     potion: {
       route: "oral",
       doses: 1,
@@ -254,6 +258,7 @@ export const MAGIC_ITEMS = {
     rarityName: "magic",
     value: 40,
     description: "A crimson draught that mends wounds in a single heartbeat.",
+    weight: 0.5, // glass potion
     potion: {
       route: "oral",
       doses: 1,
@@ -284,6 +289,7 @@ export const MAGIC_ITEMS = {
     rarityName: "magic",
     value: 45,
     description: "A jolt of pure energy that instantly restores all stamina.",
+    weight: 0.5, // glass potion
     potion: {
       route: "oral",
       doses: 1,
@@ -317,6 +323,7 @@ export const MAGIC_ITEMS = {
     identified: true,
     value: 50,
     description: "A shimmering azure elixir that instantly restores all mana.",
+    weight: 0.5, // glass potion
     potion: {
       route: "oral",
       doses: 1,
@@ -349,6 +356,7 @@ export const MAGIC_ITEMS = {
     rarityName: "magic",
     value: 35,
     description: "Liquid lightning that floods the muscles with stamina.",
+    weight: 0.5, // glass potion
     potion: {
       route: "oral",
       doses: 1,
@@ -372,6 +380,7 @@ export const MAGIC_ITEMS = {
     rarityName: "magic",
     value: 50,
     description: "A cool teal elixir that quickens stamina recovery for several turns.",
+    weight: 0.5, // glass potion
     potion: {
       route: "oral",
       doses: 1,
@@ -395,6 +404,7 @@ export const MAGIC_ITEMS = {
     rarityName: "magic",
     value: 55,
     description: "An icy draught that coats the drinker in a shimmering heat ward.",
+    weight: 0.5, // glass potion
     potion: {
       route: "oral",
       doses: 1,
@@ -433,6 +443,7 @@ export const MAGIC_ITEMS = {
     rarityName: "magic",
     value: 55,
     description: "A bitter emerald tonic that fortifies the body against toxins.",
+    weight: 0.5, // glass potion
     potion: {
       route: "oral",
       doses: 1,
@@ -471,6 +482,7 @@ export const MAGIC_ITEMS = {
     rarityName: "magic",
     value: 40,
     description: "A milky white serum that instantly neutralises all poisons in the body.",
+    weight: 0.5, // glass potion
     potion: {
       route: "oral",
       doses: 1,
@@ -503,6 +515,7 @@ export const MAGIC_ITEMS = {
     rarityName: "magic",
     value: 55,
     description: "A crackling blue elixir that grounds the drinker against electrical surges.",
+    weight: 0.5, // glass potion
     potion: {
       route: "oral",
       doses: 1,
@@ -541,6 +554,7 @@ export const MAGIC_ITEMS = {
     rarityName: "magic",
     value: 55,
     description: "A thick amber syrup that shields the skin from corrosive burns.",
+    weight: 0.5, // glass potion
     potion: {
       route: "oral",
       doses: 1,
@@ -578,6 +592,7 @@ export const MAGIC_ITEMS = {
     rarity: 3,
     rarityName: "rare",
     description: "Grants the ability to cast a lightning spell.",
+    weight: 0.7, // spellbook
     hooks: {
       on_use: createLearnSpellFromIdentityHook({
         identityPrefix: "book_",
@@ -595,6 +610,7 @@ export const MAGIC_ITEMS = {
     rarity: 4,
     rarityName: "epic",
     description: "Grants the ability to cast a meteor spell.",
+    weight: 0.7, // spellbook
     hooks: {
       on_use: createLearnSpellFromIdentityHook({
         identityPrefix: "book_",
@@ -612,6 +628,7 @@ export const MAGIC_ITEMS = {
     rarity: 2,
     rarityName: "magic",
     description: "Grants the ability to cast a blast wave spell.",
+    weight: 0.7, // spellbook
     hooks: {
       on_use: createLearnSpellFromIdentityHook({
         identityPrefix: "book_",
@@ -629,6 +646,7 @@ export const MAGIC_ITEMS = {
     rarity: 2,
     rarityName: "magic",
     description: "Grants the ability to cast Earthshatter, cracking the ground to stun nearby foes.",
+    weight: 0.7, // spellbook
     hooks: {
       on_use: createLearnSpellFromIdentityHook({
         identityPrefix: "book_",
@@ -646,6 +664,7 @@ export const MAGIC_ITEMS = {
     rarity: 2,
     rarityName: "magic",
     description: "Grants the ability to cast Blink.",
+    weight: 0.7, // spellbook
     hooks: {
       on_use: createLearnSpellFromIdentityHook({
         identityPrefix: "book_",
@@ -663,6 +682,7 @@ export const MAGIC_ITEMS = {
     rarity: 2,
     rarityName: "magic",
     description: "Grants the ability to cast Frost.",
+    weight: 0.7, // spellbook
     hooks: {
       on_use: createLearnSpellFromIdentityHook({
         identityPrefix: "book_",
@@ -680,6 +700,7 @@ export const MAGIC_ITEMS = {
     rarity: 3,
     rarityName: "rare",
     description: "Grants the ability to cast Blizzard.",
+    weight: 0.7, // spellbook
     hooks: {
       on_use: createLearnSpellFromIdentityHook({
         identityPrefix: "book_",
@@ -697,6 +718,7 @@ export const MAGIC_ITEMS = {
     rarity: 3,
     rarityName: "rare",
     description: "Grants the ability to cast Firestorm.",
+    weight: 0.7, // spellbook
     hooks: {
       on_use: createLearnSpellFromIdentityHook({
         identityPrefix: "book_",
@@ -714,6 +736,7 @@ export const MAGIC_ITEMS = {
     rarity: 2,
     rarityName: "magic",
     description: "Grants the ability to cast a healing spell.",
+    weight: 0.7, // spellbook
     hooks: {
       on_use: createLearnSpellFromIdentityHook({
         identityPrefix: "book_",
@@ -731,6 +754,7 @@ export const MAGIC_ITEMS = {
     rarity: 3,
     rarityName: "rare",
     description: "Grants the ability to cast a blinding spell.",
+    weight: 0.7, // spellbook
     hooks: {
       on_use: createLearnSpellFromIdentityHook({
         identityPrefix: "book_",
@@ -748,6 +772,7 @@ export const MAGIC_ITEMS = {
     rarity: 3,
     rarityName: "rare",
     description: "Grants the ability to cast Verdant Ward.",
+    weight: 0.7, // spellbook
     hooks: {
       on_use: createLearnSpellFromIdentityHook({
         identityPrefix: "book_",
@@ -765,6 +790,7 @@ export const MAGIC_ITEMS = {
     rarity: 3,
     rarityName: "rare",
     description: "Grants the ability to cast Harmony Ward.",
+    weight: 0.7, // spellbook
     hooks: {
       on_use: createLearnSpellFromIdentityHook({
         identityPrefix: "book_",
@@ -782,6 +808,7 @@ export const MAGIC_ITEMS = {
     rarity: 3,
     rarityName: "rare",
     description: "Grants the ability to cast Shadow Veil.",
+    weight: 0.7, // spellbook
     hooks: {
       on_use: createLearnSpellFromIdentityHook({
         identityPrefix: "book_",
@@ -799,6 +826,7 @@ export const MAGIC_ITEMS = {
     rarity: 3,
     rarityName: "rare",
     description: "Grants the ability to cast Flash Heal.",
+    weight: 0.7, // spellbook
     hooks: {
       on_use: createLearnSpellFromIdentityHook({
         identityPrefix: "book_",
@@ -816,6 +844,7 @@ export const MAGIC_ITEMS = {
     rarity: 2,
     rarityName: "magic",
     description: "Grants the ability to call down holy judgment on enemies.",
+    weight: 0.7, // spellbook
     hooks: {
       on_use: createLearnSpellFromIdentityHook({
         identityPrefix: "book_",
@@ -833,6 +862,7 @@ export const MAGIC_ITEMS = {
     rarity: 4,
     rarityName: "epic",
     description: "Grants the ability to rip a skeleton from the earth to fight at your side.",
+    weight: 0.7, // spellbook
     hooks: {
       on_use: createLearnSpellFromIdentityHook({
         identityPrefix: "book_",
@@ -850,6 +880,7 @@ export const MAGIC_ITEMS = {
     rarity: 4,
     rarityName: "epic",
     description: "Grants the ability to hurl a devastating bolt of pure shadow.",
+    weight: 0.7, // spellbook
     hooks: {
       on_use: createLearnSpellFromIdentityHook({
         identityPrefix: "book_",
@@ -867,6 +898,7 @@ export const MAGIC_ITEMS = {
     rarity: 3,
     rarityName: "rare",
     description: "Grants the ability to weave shadow into a curse that gnaws at life force.",
+    weight: 0.7, // spellbook
     hooks: {
       on_use: createLearnSpellFromIdentityHook({
         identityPrefix: "book_",
@@ -884,6 +916,7 @@ export const MAGIC_ITEMS = {
     rarity: 3,
     rarityName: "rare",
     description: "Grants the ability to spend mana for a long, savage battle fury.",
+    weight: 0.7, // spellbook
     hooks: {
       on_use: createLearnSpellFromIdentityHook({
         identityPrefix: "book_",
@@ -901,6 +934,7 @@ export const MAGIC_ITEMS = {
     rarity: 3,
     rarityName: "rare",
     description: "Grants the ability to slip between moments and cut everything on your line.",
+    weight: 0.7, // spellbook
     hooks: {
       on_use: createLearnSpellFromIdentityHook({
         identityPrefix: "book_",
@@ -918,6 +952,7 @@ export const MAGIC_ITEMS = {
     rarity: 2,
     rarityName: "magic",
     description: "Grants the ability to sear a target with fire and leave them vulnerable to further burning.",
+    weight: 0.7, // spellbook
     hooks: {
       on_use: createLearnSpellFromIdentityHook({
         identityPrefix: "book_",
@@ -935,6 +970,7 @@ export const MAGIC_ITEMS = {
     rarity: 2,
     rarityName: "magic",
     description: "Grants the ability to instantly return to the surface.",
+    weight: 0.7, // spellbook
     hooks: {
       on_use: createLearnSpellFromIdentityHook({
         identityPrefix: "book_",
@@ -952,6 +988,7 @@ export const MAGIC_ITEMS = {
     rarity: 3,
     rarityName: "rare",
     description: "Grants the ability to channel your will homeward and be pulled back to safety.",
+    weight: 0.7, // spellbook
     hooks: {
       on_use: createLearnSpellFromIdentityHook({
         identityPrefix: "book_",
@@ -969,6 +1006,7 @@ export const MAGIC_ITEMS = {
     rarity: 3,
     rarityName: "legendary",
     description: "An ancient tome bound in pale leather. It records the fate of every hero who came before.",
+    weight: 1.2, // legendary tome
     hooks: {
       on_use: (ctx, state) => {
         const actor = Number(state?.actor || ctx.actor || 0) | 0;
@@ -987,6 +1025,7 @@ export const MAGIC_ITEMS = {
     rarity: 1,
     rarityName: "common",
     description: "A slim volume with claw marks on the cover.",
+    weight: 0.3, // small book
     flavorText: "Your kitty will follow you, fetch items, and flee when injured. It will also drop things at your feet unprompted. Do not question why. This is simply what cats do.",
     hooks: {
       on_use: createOpenFlavorBookHook(
@@ -1005,6 +1044,7 @@ export const MAGIC_ITEMS = {
     rarity: 1,
     rarityName: "common",
     description: "Smells faintly of venom.",
+    weight: 0.3, // small book
     flavorText: "The snake trap releases a cluster of serpents when triggered. Venomous fangs, 25% poison chance. They appear from nowhere. Do not ask where they were hiding.",
     hooks: {
       on_use: createOpenFlavorBookHook(
@@ -1023,6 +1063,7 @@ export const MAGIC_ITEMS = {
     rarity: 1,
     rarityName: "common",
     description: "A trade publication for trap enthusiasts.",
+    weight: 0.3, // small book
     flavorText: "This season's models deliver a clean 35% of max HP in damage. Reader question: 'Can adventurers see them?' Editor's response: 'Not until it's too late.'",
     hooks: {
       on_use: createOpenFlavorBookHook(
@@ -1041,6 +1082,7 @@ export const MAGIC_ITEMS = {
     rarity: 1,
     rarityName: "common",
     description: "Dog-eared and well-thumbed.",
+    weight: 0.3, // small book
     flavorText: "Rub the stone across the touchstone. A hard white streak means value. A dull scratch means you've been carrying glass through fifteen floors of dungeon.",
     hooks: {
       on_use: createOpenFlavorBookHook(
@@ -1059,6 +1101,7 @@ export const MAGIC_ITEMS = {
     rarity: 1,
     rarityName: "common",
     description: "Several pages are stained with something unidentifiable.",
+    weight: 0.3, // small book
     flavorText: "Rat corpse: disease. Snake corpse: poison. Spider corpse: also poison. Floating eye corpse: you forget who you are. There is a pattern here. Please notice it.",
     hooks: {
       on_use: createOpenFlavorBookHook(
@@ -1077,6 +1120,7 @@ export const MAGIC_ITEMS = {
     rarity: 1,
     rarityName: "common",
     description: "Illustrated with tiny diagrams of cardinal directions.",
+    weight: 0.3, // small book
     flavorText: "The grid bug moves only along cardinal axes. Nobody knows why. One theory suggests they are bound by an ancient curse. Another theory: they are just very stubborn.",
     hooks: {
       on_use: createOpenFlavorBookHook(
@@ -1095,6 +1139,7 @@ export const MAGIC_ITEMS = {
     rarity: 2,
     rarityName: "magic",
     description: "Casts Blast Wave without learning it.",
+    weight: 0.1, // scroll
     hooks: {
       on_use: createCastSpellFromIdentityHook({
         identityPrefix: "scroll_",
@@ -1114,6 +1159,7 @@ export const MAGIC_ITEMS = {
     rarity: 3,
     rarityName: "unique",
     description: "A warm stone that remembers the way home. Channel your will to return to the surface.",
+    weight: 0.5, // hearthstone
     hooks: (() => {
       const _castHook = createCastSpellFromIdentityHook({
         identityPrefix: "",
@@ -1146,6 +1192,7 @@ export const MAGIC_ITEMS = {
     rarity: 2,
     rarityName: "magic",
     description: "Returns you to the surface (dungeon level 0).",
+    weight: 0.1, // scroll
     hooks: {
       on_use: createCastSpellFromIdentityHook({
         identityPrefix: "scroll_",
@@ -1168,6 +1215,7 @@ export const MAGIC_ITEMS = {
     rarity: 1,
     rarityName: "common",
     description: "Casts a healing spell on yourself or an ally.",
+    weight: 0.1, // scroll
     hooks: {
       on_use: createCastSpellFromIdentityHook({
         identityPrefix: "scroll_",
@@ -1186,6 +1234,7 @@ export const MAGIC_ITEMS = {
     rarity: 2,
     rarityName: "magic",
     description: "Rip a skeleton from the earth to fight at your side.",
+    weight: 0.1, // scroll
     hooks: {
       on_use: createCastSpellFromIdentityHook({
         identityPrefix: "scroll_",
@@ -1206,6 +1255,7 @@ export const MAGIC_ITEMS = {
     weight: 0.1,
     value: 100,
     description: "Reveals the entire dungeon map.",
+    weight: 0.1, // scroll
     hooks: {
       on_use: MAPPING_ON_USE,
     },
@@ -1221,6 +1271,7 @@ export const MAGIC_ITEMS = {
     rarity: 3,
     rarityName: "rare",
     description: "Zaps a bolt of chain lightning. 3 charges.",
+    weight: 0.4, // wand
     hooks: {
       on_use: createCastSpellFromIdentityHook({
         identityPrefix: "wand_",
@@ -1241,6 +1292,7 @@ export const MAGIC_ITEMS = {
     rarity: 4,
     rarityName: "epic",
     description: "Calls down a meteor. 2 charges.",
+    weight: 0.4, // wand
     hooks: {
       on_use: createCastSpellFromIdentityHook({
         identityPrefix: "wand_",
@@ -1261,6 +1313,7 @@ export const MAGIC_ITEMS = {
     rarity: 2,
     rarityName: "magic",
     description: "Encases an enemy in frost, slowing them. Lighter foes freeze longer. 10 charges.",
+    weight: 0.4, // wand
     hooks: {
       on_use: createCastSpellFromIdentityHook({
         identityPrefix: "wand_",
@@ -1281,6 +1334,7 @@ export const MAGIC_ITEMS = {
     rarity: 2,
     rarityName: "magic",
     description: "Restores health to yourself or an ally. 8 charges.",
+    weight: 0.4, // wand
     hooks: {
       on_use: createCastSpellFromIdentityHook({
         identityPrefix: "wand_",
@@ -1619,6 +1673,7 @@ export const MAGIC_ITEMS = {
     bonuses: { hungerRate: 2 },
     beatitude: "cursed",
     description: "A dull iron band that gnaws at your stomach. You feel ravenous.",
+    weight: 0.06, // iron ring
   },
   ring_fumbling: {
     id: "ring_fumbling",
@@ -1632,6 +1687,7 @@ export const MAGIC_ITEMS = {
     bonuses: { attack: -3 },
     beatitude: "cursed",
     description: "A tarnished copper ring. Your hands feel clumsy.",
+    weight: 0.05, // copper ring
   },
   ring_weakness: {
     id: "ring_weakness",
@@ -1645,6 +1701,7 @@ export const MAGIC_ITEMS = {
     bonuses: { maxHp: -5 },
     beatitude: "cursed",
     description: "A heavy leaden ring. It saps your vitality.",
+    weight: 0.09, // lead ring
   },
   ring_blindness: {
     id: "ring_blindness",
@@ -1658,6 +1715,7 @@ export const MAGIC_ITEMS = {
     bonuses: { visionRange: -4 },
     beatitude: "cursed",
     description: "A ring of polished obsidian. Shadows creep at the edge of your vision.",
+    weight: 0.07, // obsidian ring
   },
   ring_teleportation: {
     id: "ring_teleportation",
@@ -1671,6 +1729,7 @@ export const MAGIC_ITEMS = {
     bonuses: { luck: -5, visionRange: -2 },
     beatitude: "cursed",
     description: "A shimmering silver ring. Reality warps and shifts around you.",
+    weight: 0.05, // silver ring
   },
 
   // ── Bad Scrolls ───────────────────────────────────────────────────
