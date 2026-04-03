@@ -71,6 +71,18 @@ function describeItem(world, itemId) {
  */
 export function registerBuiltinCommands(console, { world, messageLog, lightingEngine }) {
 
+  function applyEffectToPlayer(rawKey, rawTurns) {
+    const key = String(rawKey || "").trim().toLowerCase();
+    if (!key) return "Usage: effect <key> [turns]";
+    const turnsLeft = parseInt(String(rawTurns ?? "5"), 10) || 5;
+    const pe = playerEntity(world);
+    if (!pe) return "No player entity found.";
+    const ae = ensureActiveEffects(world, pe.id);
+    if (!ae) return "Could not create ActiveEffects component.";
+    ae.effects.push({ key, turnsLeft, potency: 1, stacks: 1 });
+    return `Applied ${key} for ${turnsLeft} turn(s)`;
+  }
+
   // ---- give <item_id> [count] ----
   console.registerCommand('give', 'give <item_id> [count] — spawn item in inventory', (argsStr) => {
     const parts = argsStr.split(/\s+/).filter(Boolean);
@@ -92,16 +104,22 @@ export function registerBuiltinCommands(console, { world, messageLog, lightingEn
   // ---- effect <key> [turns] ----
   console.registerCommand('effect', 'effect <key> [turns] — apply status effect', (argsStr) => {
     const parts = argsStr.split(/\s+/).filter(Boolean);
-    if (!parts.length) return 'Usage: effect <key> [turns]';
-    const key = parts[0].toLowerCase();
-    const turnsLeft = parseInt(parts[1] || '5', 10) || 5;
+    if (!parts.length) return "Usage: effect <key> [turns]";
+    return applyEffectToPlayer(parts[0], parts[1] || "5");
+  });
 
-    const pe = playerEntity(world);
-    if (!pe) return 'No player entity found.';
-    const ae = ensureActiveEffects(world, pe.id);
-    if (!ae) return 'Could not create ActiveEffects component.';
-    ae.effects.push({ key, turnsLeft, potency: 1, stacks: 1 });
-    return `Applied ${key} for ${turnsLeft} turn(s)`;
+  // ---- slowed [turns] ----
+  console.registerCommand("slowed", "slowed [turns] — apply slowed effect to player", (argsStr) => {
+    const parts = String(argsStr || "").split(/\s+/).filter(Boolean);
+    const turns = parts[0] || "5";
+    return applyEffectToPlayer("slowed", turns);
+  });
+
+  // ---- slow [turns] ----
+  console.registerCommand("slow", "slow [turns] — alias for slowed", (argsStr) => {
+    const parts = String(argsStr || "").split(/\s+/).filter(Boolean);
+    const turns = parts[0] || "5";
+    return applyEffectToPlayer("slowed", turns);
   });
 
   // ---- heal ----
