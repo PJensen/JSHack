@@ -1418,6 +1418,17 @@ export const INTERACT_PAYLOADS = {
         });
         for (let i = 0; i < dropEntities.length; i++) {
           world.add(dropEntities[i], GroundStackOrder, { seq: i + 1 });
+          const dp = world.get(dropEntities[i], Position);
+          if (dp) {
+            world.emit?.("item:dropped", {
+              itemId: dropEntities[i],
+              actor,
+              source: "urn",
+              origin: { x: pos.x, y: pos.y },
+              at: { x: dp.x, y: dp.y },
+              targetId,
+            });
+          }
         }
       }
       world.emit?.("urn:broken", { actor, targetId });
