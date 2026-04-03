@@ -1294,6 +1294,7 @@ export const EQUIPMENT_ITEMS = {
     material: "leather",
     rarity: 2,
     rarityName: "magic",
+    weight: 0.8, // boots of vigor
     bonuses: { staminaRegen: 1.0 },
   },
   shield_spiked_pavise: {
@@ -1304,6 +1305,7 @@ export const EQUIPMENT_ITEMS = {
     slot: "offhand",
     material: "iron",
     rarity: 2,
+    weight: 4.5, // spiked pavise
     rarityName: "magic",
     bonuses: { defense: 2, pierceResist: 0.2, bluntResist: 0.15 },
   },
@@ -1320,6 +1322,7 @@ export const EQUIPMENT_ITEMS = {
     damageDice: "1d4",
     staminaCost: 4,
     affixes: ["caustic1"],
+    weight: 0.666,
   },
   stormtouched_mace: {
     id: "stormtouched_mace",
@@ -1335,6 +1338,7 @@ export const EQUIPMENT_ITEMS = {
     damageType: "blunt",
     staminaCost: 8,
     affixes: ["capacitive1", "stunning1"],
+    weight: 2.5,
   },
   grounded_buckler: {
     id: "grounded_buckler",
@@ -1347,6 +1351,7 @@ export const EQUIPMENT_ITEMS = {
     rarityName: "rare",
     bonuses: { defense: 1 },
     affixes: ["insulated1"],
+    weight: 2.45,
   },
   warhammer_of_fury: {
     id: "warhammer_of_fury",
@@ -1362,6 +1367,7 @@ export const EQUIPMENT_ITEMS = {
     damageType: "blunt",
     staminaCost: 7,
     affixes: ["fierce", "stunning1"],
+    weight: 5.0, // warhammer of fury 
   },
   ring_sorcery: {
     id: "ring_sorcery",
@@ -1373,6 +1379,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 2,
     rarityName: "magic",
     bonuses: { maxMana: 10 },
+    weight: 0.06, // silver ring of sorcery
   },
   ring_channeling: {
     id: "ring_channeling",
@@ -1394,6 +1401,7 @@ export const EQUIPMENT_ITEMS = {
     material: "leather",
     rarity: 1,
     rarityName: "common",
+    weight: 1.3,
     bonuses: { maxStamina: 6, staminaRegen: 0.2 },
   },
   trail_boots: {
