@@ -1,4 +1,4 @@
-import { assert } from "jsr:@std/assert";
+import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from '../src/lib/ecs-js/index.js';
 import { AttackIntent } from '../src/rules/components/Intents/AttackIntent.js';
 import { Equipment } from '../src/rules/components/Equipment.js';
@@ -14,8 +14,8 @@ import { cleanupSystem, installDeathImpactTracker } from '../src/rules/systems/c
 import { Position } from '../src/rules/components/Position.js';
 import { Inventory } from '../src/rules/components/Inventory.js';
 import { addToInventory } from '../src/rules/utils/inventoryFacade.js';
-import { clearAll, getTile, loadChunk } from '../src/rules/environment/dungeon/tileMap.js';
-import { CHUNK_SIZE, TILE_FLOOR, TILE_WALL } from '../src/rules/environment/dungeon/constants.js';
+import { clearAll, loadChunk } from '../src/rules/environment/dungeon/tileMap.js';
+import { CHUNK_SIZE, TILE_FLOOR } from '../src/rules/environment/dungeon/constants.js';
 
 function makeActor(world, name, eq, hp = 10) {
   const id = world.create();
@@ -99,10 +99,9 @@ Deno.test("non-burning dead pets still drop corpses", () => {
   assert(identities.includes('corpse_kitty'), 'non-burning pet death should still drop corpse');
 });
 
-Deno.test("monster death burst places dropped gear in 1-2 tile radius and avoids wall tiles when possible", () => {
+Deno.test("monster death drops all items on the death tile", () => {
   clearAll();
   const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR);
-  tiles[3 * CHUNK_SIZE + 5] = TILE_WALL; // one candidate ring tile around (3,3)
   loadChunk(0, 0, tiles);
 
   const world = new World({ seed: 31337 });
@@ -132,11 +131,8 @@ Deno.test("monster death burst places dropped gear in 1-2 tile radius and avoids
 
   const droppedPos = world.get(item, Position);
   assert(droppedPos, "monster item should be dropped to ground");
-  const dx = Math.abs((droppedPos.x | 0) - 3);
-  const dy = Math.abs((droppedPos.y | 0) - 3);
-  const cheb = Math.max(dx, dy);
-  assert(cheb >= 1 && cheb <= 2, `expected death burst in radius 1-2, got chebyshev ${cheb}`);
-  assert(getTile(droppedPos.x, droppedPos.y) !== TILE_WALL, "death burst should avoid wall tiles when floor alternatives exist");
+  assertEquals(droppedPos.x | 0, 3, "item should drop at death x");
+  assertEquals(droppedPos.y | 0, 3, "item should drop at death y");
 });
 
 Deno.test("death loot impulse uses same-turn positive-impact only", () => {
