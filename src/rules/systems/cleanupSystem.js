@@ -47,17 +47,16 @@ export function installDeathImpactTracker(world) {
   if (world[DEATH_IMPACT_INSTALLED_KEY]) return;
   world[DEATH_IMPACT_INSTALLED_KEY] = true;
   world[DEATH_IMPACT_KEY] = new Map();
-  world.on("damaged", ({ target, impactVector, critical, amount, rawAmount }) => {
+  world.on("damaged", ({ target, impactVector, critical, amount, rawAmount, cause }) => {
     if (!(Number(target) > 0)) return;
-    if (!impactVector) return;
     const dealt = Number(amount || rawAmount || 0);
     if (!(dealt > 0)) return;
-    const dx = Number(impactVector.dx || 0);
-    const dy = Number(impactVector.dy || 0);
-    if (!dx && !dy) return;
+    const dx = Number(impactVector?.dx || 0);
+    const dy = Number(impactVector?.dy || 0);
     world[DEATH_IMPACT_KEY].set(Number(target) | 0, {
       dx, dy,
       critical: !!critical,
+      cause: String(cause || ''),
       amount: Number(amount || 0) | 0,
       rawAmount: Number(rawAmount || 0) | 0,
       step: world.step | 0,
@@ -166,7 +165,8 @@ export function cleanupSystem(world) {
         : 1;
       const impulse = deathImpact
         ? { dx: deathImpact.dx * impactForce, dy: deathImpact.dy * impactForce,
-            critical: deathImpact.critical, force: impactForce }
+            critical: deathImpact.critical, force: impactForce,
+            cause: deathImpact.cause }
         : null;
 
       if (pos) {

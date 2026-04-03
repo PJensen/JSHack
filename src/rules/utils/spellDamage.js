@@ -1,5 +1,6 @@
 import { Brain } from "../components/Brain.js";
 import { Faction } from "../components/Faction.js";
+import { Position } from "../components/Position.js";
 import { combatSeed, hashString32, mulberry32 } from "./rng.js";
 import { createStatusEvent } from "../../shared/events/statusEvent.js";
 import { areFactionsHostile } from "./factionHostility.js";
@@ -217,6 +218,7 @@ export function buildSpellDamageSpecFromContext(world, targetId, context, option
     bypassInvuln: !!options?.bypassInvuln,
     bypassResist: !!options?.bypassResist,
     projectileDelay: options?.projectileDelay || 0,
+    impactVector: options?.impactVector || undefined,
   };
 }
 
@@ -247,11 +249,26 @@ export function buildSpellDamageSpec(world, casterId, targetId, options) {
   const powerScale = Number.isFinite(powerScaleRaw) ? Math.max(0, powerScaleRaw) : 1;
   const scaled = scaleSpellDamageFromBonus(Number(options?.baseAmount || 0), context.intelligenceBonus);
   const scaledWithPower = scaled <= 0 ? 0 : Math.max(1, Math.round(scaled * powerScale));
+
+  // Auto-derive caster→target impactVector for spells unless caller overrides.
+  let impactVector = options?.impactVector;
+  if (!impactVector) {
+    const cPos = (casterId > 0 && world.isAlive(casterId)) ? world.get(casterId, Position) : null;
+    const tPos = (targetId > 0 && world.isAlive(targetId)) ? world.get(targetId, Position) : null;
+    if (cPos && tPos) {
+      const ddx = Number(tPos.x || 0) - Number(cPos.x || 0);
+      const ddy = Number(tPos.y || 0) - Number(cPos.y || 0);
+      const mag = Math.hypot(ddx, ddy);
+      if (mag > 0) impactVector = { dx: ddx / mag, dy: ddy / mag };
+    }
+  }
+
   return buildSpellDamageSpecFromContext(world, targetId, context, {
     ...options,
     baseAmount: scaledWithPower,
     hitChancePct,
     missed,
     spellId: context.spellId,
+    impactVector,
   });
 }

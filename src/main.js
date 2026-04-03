@@ -2221,6 +2221,8 @@ throwFx.installListeners();
 pickupFx.installListeners();
 
 world.on('item:pickup', ({ actor, itemId, count }) => {
+  const id = Number(itemId || 0) | 0;
+  if (id > 0) { _deathLootArcs.delete(id); _deathLootRestPos.delete(id); }
   const info = world.get(itemId, ItemInfo);
   if (!info || info.type !== 'currency') return;
   const pos = world.get(actor, Position);
@@ -2244,6 +2246,8 @@ function lootRarityColorHex(itemInfo) {
 
 /** @type {Map<number, {fromX:number,fromY:number,toX:number,toY:number,start:number,duration:number,peak:number}>} */
 const _deathLootArcs = new Map();
+/** @type {Map<number, {x:number,y:number}>} Persistent visual rest positions after arc completes */
+const _deathLootRestPos = new Map();
 world.on("damaged", ({ target, amount, projectileDelay }) => {
   const tid = Number(target || 0) | 0;
   const d = Number(projectileDelay || 0);
@@ -2281,27 +2285,76 @@ function scheduleDeathLootArc(itemId, origin, at, delayOffset, impulse) {
   const weight = Math.max(0, Number(itemInfo?.weight || 0));
   const weightMul = 1 / (1 + weight * 0.3);
 
-  // Visual scatter: items are bound to their rules tile but the arc
-  // landing point is purely screen-space. Impulse biases the direction,
-  // overkill / crit force widens the spread, weight damps everything.
+  // Visual scatter: items stay on the rules tile but the arc landing is
+  // purely screen-space. Cause determines the scatter flavor; impulse
+  // direction + force + weight modulate magnitude.
   const idx = Number(impulse?.dx || 0);
   const idy = Number(impulse?.dy || 0);
   const force = Math.max(0, Math.min(3, Number(impulse?.force || 0)));
-  if (idx || idy || force > 0) {
-    // Directional push along impulse vector
-    const push = (0.25 + 0.20 * force) * weightMul;
+  const cause = String(impulse?.cause || '');
+
+  // Scatter profile per cause family
+  let pushMul = 0.25;   // directional push base
+  let pushForce = 0.20;  // per-force push bonus
+  let spreadMul = 0.40;  // perpendicular fan base
+  let spreadForce = 0.25; // per-force fan bonus
+  let baseDrift = 0.15;  // random scatter when no impulse
+
+  if (cause === 'melee' || cause === 'retaliation') {
+    // Melee: strong directional push, wide fan on crits
+    pushMul = 0.30; pushForce = 0.28;
+    spreadMul = 0.50; spreadForce = 0.35;
+  } else if (cause === 'ranged') {
+    // Arrows: tight cone, high velocity
+    pushMul = 0.40; pushForce = 0.30;
+    spreadMul = 0.20; spreadForce = 0.12;
+  } else if (cause === 'spell:phase_strike') {
+    // Phase strike: explosive, high impulse
+    pushMul = 0.50; pushForce = 0.35;
+    spreadMul = 0.55; spreadForce = 0.40;
+  } else if (cause === 'spell:smite' || cause === 'spell:meteor') {
+    // From above: radial outward burst, ignore directional vector
+    const angle = (j1 * 2 - 1) * Math.PI;
+    const radial = (0.35 + 0.30 * force) * weightMul;
+    toX += Math.cos(angle) * radial;
+    toY += Math.sin(angle) * radial;
+    pushMul = 0; pushForce = 0; spreadMul = 0; spreadForce = 0;
+  } else if (cause === 'spell:agony' || cause === 'spell:drain_life:tick') {
+    // Agony/drain: slow, minimal scatter
+    pushMul = 0.08; pushForce = 0.05;
+    spreadMul = 0.12; spreadForce = 0.06;
+    baseDrift = 0.08;
+  } else if (cause.startsWith('spell:')) {
+    // Generic spell (frost, shadow_bolt, lightning, scorch, blastwave, etc.)
+    pushMul = 0.35; pushForce = 0.25;
+    spreadMul = 0.45; spreadForce = 0.30;
+  } else if (!cause || cause === 'starvation') {
+    // No cause / starvation / unknown: gentle crumple
+    pushMul = 0; pushForce = 0;
+    spreadMul = 0; spreadForce = 0;
+    baseDrift = 0.10;
+  }
+
+  // Burn-type causes: very low crumple regardless of prefix
+  if (cause.includes('burn') || cause === 'spike_trap' || cause === 'shock_trap') {
+    pushMul = 0.06; pushForce = 0.03;
+    spreadMul = 0.10; spreadForce = 0.04;
+    baseDrift = 0.08;
+  }
+
+  if ((idx || idy) && (pushMul > 0 || spreadMul > 0)) {
+    const push = (pushMul + pushForce * force) * weightMul;
     toX += idx * push;
     toY += idy * push;
-    // Perpendicular scatter so items fan out, not stack on a line
     const perpX = -idy;
     const perpY = idx;
-    const spread = (j1 - 0.5) * (0.4 + 0.25 * force) * weightMul;
+    const spread = (j1 - 0.5) * (spreadMul + spreadForce * force) * weightMul;
     toX += perpX * spread;
     toY += perpY * spread;
   }
-  // Small random scatter even without impulse (e.g. urn/chest loot)
-  toX += (j1 - 0.5) * 0.15 * weightMul;
-  toY += (j2 - 0.5) * 0.15 * weightMul;
+  // Base random drift (urn/chest loot, or gentle crumple)
+  toX += (j1 - 0.5) * baseDrift * weightMul;
+  toY += (j2 - 0.5) * baseDrift * weightMul;
 
   // Clamp visual landing to walkable tiles — pull back toward origin if
   // the rounded landing cell is a wall. Pure display concern.
@@ -2324,8 +2377,29 @@ function scheduleDeathLootArc(itemId, origin, at, delayOffset, impulse) {
   const fdy = toY - fromY;
   const dist = Math.sqrt(fdx * fdx + fdy * fdy);
   if (dist > 3.5) return;
-  const duration = 0.24 + dist * 0.10 + j1 * 0.07 + force * 0.04;
-  const peak = (0.22 + dist * 0.18 + j2 * 0.10 + force * 0.08) * weightMul;
+
+  // Arc timing varies by cause: phase strike is snappy, agony is sluggish
+  let durationBase = 0.24, durationDist = 0.10, durationForce = 0.04;
+  let peakBase = 0.22, peakDist = 0.18, peakForce = 0.08;
+  if (cause === 'spell:phase_strike') {
+    durationBase = 0.14; durationDist = 0.06; durationForce = 0.02;
+    peakBase = 0.30; peakDist = 0.25; peakForce = 0.15;
+  } else if (cause === 'spell:smite' || cause === 'spell:meteor') {
+    durationBase = 0.20; durationDist = 0.08; durationForce = 0.03;
+    peakBase = 0.35; peakDist = 0.28; peakForce = 0.12;
+  } else if (cause === 'spell:agony' || cause === 'spell:drain_life:tick') {
+    durationBase = 0.40; durationDist = 0.15; durationForce = 0.06;
+    peakBase = 0.10; peakDist = 0.08; peakForce = 0.03;
+  } else if (cause.includes('burn')) {
+    durationBase = 0.35; durationDist = 0.12; durationForce = 0.04;
+    peakBase = 0.08; peakDist = 0.06; peakForce = 0.02;
+  } else if (cause === 'ranged') {
+    durationBase = 0.16; durationDist = 0.07; durationForce = 0.03;
+    peakBase = 0.18; peakDist = 0.14; peakForce = 0.06;
+  }
+
+  const duration = durationBase + dist * durationDist + j1 * 0.07 + force * durationForce;
+  const peak = (peakBase + dist * peakDist + j2 * 0.10 + force * peakForce) * weightMul;
   _deathLootArcs.set(id, {
     fromX,
     fromY,
@@ -2341,11 +2415,15 @@ function deathLootArcPos(itemId) {
   const id = Number(itemId || 0) | 0;
   if (!(id > 0)) return null;
   const rec = _deathLootArcs.get(id);
-  if (!rec) return null;
+  if (!rec) {
+    const rest = _deathLootRestPos.get(id);
+    return rest ? { x: rest.x, y: rest.y, airborne: false } : null;
+  }
   const t = (Math.max(0, _fxTime - rec.start)) / Math.max(0.001, rec.duration);
   if (t >= 1) {
     _deathLootArcs.delete(id);
-    return null;
+    _deathLootRestPos.set(id, { x: rec.toX, y: rec.toY });
+    return { x: rec.toX, y: rec.toY, airborne: false };
   }
   const ease = 1 - Math.pow(1 - t, 3);
   const lift = 4 * rec.peak * ease * (1 - ease);
@@ -3018,9 +3096,11 @@ function flushPendingStairTransition() {
       spawnReturnPortal(pending.returnTicket, pending.homecomingLanding);
     }
 
-    // Invalidate cached world view
+    // Invalidate cached world view and display-only death loot positions
     _cachedView = null;
     _cachedStep = -1;
+    _deathLootArcs.clear();
+    _deathLootRestPos.clear();
   } finally {
     _stairTransitionInFlight = false;
     armStairTransitionCooldown();

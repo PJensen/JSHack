@@ -722,10 +722,14 @@ REGISTRY['phase_strike'] = function phaseStrikeScript(world, actor, spell, inten
     // Gear damage multiplier
     if (atkSnapshot.damageMult > 1) dmg = Math.max(1, Math.floor(dmg * atkSnapshot.damageMult));
 
+    const _phDx = Number(h.x || 0) - Number(from.x || 0);
+    const _phDy = Number(h.y || 0) - Number(from.y || 0);
+    const _phMag = Math.hypot(_phDx, _phDy) || 1;
     dealDamage(world, {
       target: h.id, amount: Math.max(1, dmg), source: actor,
       type: damageType, cause: 'spell:phase_strike',
       critical: isCrit,
+      impactVector: { dx: _phDx / _phMag, dy: _phDy / _phMag },
     });
 
     // Apply stun via ActiveEffects
@@ -2542,6 +2546,9 @@ REGISTRY['scorch'] = function scorchScript(world, actor, spell, intent) {
   let amount = baseAmount;
   if (critical) amount = Math.max(1, Math.floor(amount * ctx.critMult));
 
+  const _scDx = Number(tpos.x || 0) - Number(apos.x || 0);
+  const _scDy = Number(tpos.y || 0) - Number(apos.y || 0);
+  const _scMag = Math.hypot(_scDx, _scDy) || 1;
   const result = dealDamage(world, {
     target: targetId,
     amount,
@@ -2552,6 +2559,7 @@ REGISTRY['scorch'] = function scorchScript(world, actor, spell, intent) {
     critical,
     hitChancePct,
     spellId: 'scorch',
+    impactVector: { dx: _scDx / _scMag, dy: _scDy / _scMag },
   });
 
   // Apply fire vulnerability (negative resist_fire) for 15 turns
