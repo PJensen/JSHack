@@ -21,12 +21,15 @@ export function itemPickupSystem(world) {
         const info = world.get(itemId, ItemInfo);
         if (!itemPos || !info) { world.remove(actor, PickupIntent); continue; }
 
-        // must be within pickup range (default 0 = same tile)
+        // Must be within pickup range. Death-scattered loot stays on the
+        // death tile in ECS but is visually flung outward, so we allow a
+        // generous base radius (Chebyshev 3) for any ground item.
         const set = world.get(actor, Settings);
-        const maxRange = Math.max(0, Number(set?.pickupRange ?? 0));
+        const extraRange = Math.max(0, Number(set?.pickupRange ?? 0));
         const dx = Math.abs((itemPos.x|0) - (pos.x|0));
         const dy = Math.abs((itemPos.y|0) - (pos.y|0));
-        const dist = dx + dy; // Manhattan distance on grid
+        const dist = Math.max(dx, dy); // Chebyshev distance
+        const maxRange = Math.max(3, extraRange);
         if (dist > maxRange) {
             emitSafe(world, 'item:pickup-denied', { actor, itemId, reason: 'range', need: maxRange, at: { x: pos.x, y: pos.y }, itemAt: { x: itemPos.x, y: itemPos.y } });
             world.remove(actor, PickupIntent);
