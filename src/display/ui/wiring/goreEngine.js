@@ -442,11 +442,11 @@ function spawnMeleeImpactGore(pool, wx, wy, dx, dy, dmg, isCrit, goreType, damag
   const gibColor = tintForDamage(style.gib, damageType);
   const stainColor = tintForDamage(style.stain, damageType);
   const isSpark = style === GORE_STYLE.spark;
-  const fx = Number(impactProfile?.facingVector?.dx);
-  const fy = Number(impactProfile?.facingVector?.dy);
-  const fMag = Math.hypot(fx, fy);
-  const fwdx = fMag > 0 ? (fx / fMag) : dx;
-  const fwdy = fMag > 0 ? (fy / fMag) : dy;
+  const _fx = Number(impactProfile?.facingVector?.dx);
+  const _fy = Number(impactProfile?.facingVector?.dy);
+  const fMag = Math.hypot(_fx, _fy);
+  const fwdx = fMag > 0 ? (_fx / fMag) : dx;
+  const fwdy = fMag > 0 ? (_fy / fMag) : dy;
   const sidex = -fwdy;
   const sidey = fwdx;
 
@@ -455,10 +455,15 @@ function spawnMeleeImpactGore(pool, wx, wy, dx, dy, dmg, isCrit, goreType, damag
   const ox = wx + 0.5 + fwdx * view.originForward + sidex * sideOffset;
   const oy = wy + 0.5 + fwdy * view.originForward + sidey * sideOffset;
 
-  const splatCount = Math.min(36, Math.max(5, Math.floor((7 + dmg * 1.5 + (isCrit ? 7 : 0)) * view.splatScale)));
+  // ── Damage intensity tier: bigger hits = more gore ──
+  const isHeavy = dmg >= 12;
+  const isBrutal = dmg >= 20 || (isCrit && dmg >= 10);
+  const dmgBoost = isBrutal ? 1.5 : (isHeavy ? 1.2 : 1.0);
+
+  const splatCount = Math.min(48, Math.max(5, Math.floor((8 + dmg * 1.8 + (isCrit ? 10 : 0) + (isBrutal ? 8 : 0)) * view.splatScale)));
   for (let i = 0; i < splatCount; i++) {
-    const sideThrow = (Math.random() - 0.5) * view.fan + (view.sideSign * 0.08 * view.signature.slash);
-    const speed = view.baseSpeed + Math.random() * view.speedSpan;
+    const sideThrow = (Math.random() - 0.5) * view.fan * dmgBoost + (view.sideSign * 0.08 * view.signature.slash);
+    const speed = (view.baseSpeed + Math.random() * view.speedSpan) * dmgBoost;
     const backward = Math.random() * view.backwardBias;
     const travel = speed * (1 - backward * (1.1 + Math.random() * 0.6));
     pool.spawn(new Particle({
@@ -468,23 +473,26 @@ function spawnMeleeImpactGore(pool, wx, wy, dx, dy, dmg, isCrit, goreType, damag
       vy: fwdy * travel + sidey * sideThrow,
       ax: 0,
       ay: style.gravity,
-      life: (style.splatLifeMin + Math.random() * style.splatLifeSpan) * view.lifeScale,
-      size0: isSpark ? (0.05 + Math.random() * 0.03) : (0.08 + Math.random() * 0.06),
+      life: (style.splatLifeMin + Math.random() * style.splatLifeSpan) * view.lifeScale * dmgBoost,
+      size0: isSpark ? (0.05 + Math.random() * 0.03) : (0.08 + Math.random() * 0.07 + (isBrutal ? 0.03 : 0)),
       size1: isSpark ? 0.01 : 0.02,
       r: Math.min(255, splatColor.r + ((Math.random() * style.splatVar.r) | 0)),
       g: Math.min(255, splatColor.g + ((Math.random() * style.splatVar.g) | 0)),
       b: Math.min(255, splatColor.b + ((Math.random() * style.splatVar.b) | 0)),
-      a0: isSpark ? 0.95 : 0.85,
+      a0: isSpark ? 0.95 : 0.88,
       a1: 0,
     }));
   }
 
-  if (style.allowGib && (isCrit || dmg >= 8)) {
-    const gibCountBase = isCrit ? 8 + ((Math.random() * 5) | 0) : 3 + ((Math.random() * 2) | 0);
-    const gibCount = Math.max(1, Math.min(14, Math.floor(gibCountBase * view.gibScale)));
+  // ── Gibs: chunks of flesh/bone/material ──
+  if (style.allowGib && (isCrit || dmg >= 6)) {
+    const gibCountBase = isCrit
+      ? (isBrutal ? 14 : 10) + ((Math.random() * 6) | 0)
+      : (isHeavy ? 6 : 3) + ((Math.random() * 3) | 0);
+    const gibCount = Math.max(1, Math.min(20, Math.floor(gibCountBase * view.gibScale)));
     for (let i = 0; i < gibCount; i++) {
-      const sideThrow = (Math.random() - 0.5) * (0.40 + view.signature.slash * 0.20);
-      const speed = 0.55 + Math.random() * (0.9 + view.signature.pierce * 0.3 + view.signature.blunt * 0.15);
+      const sideThrow = (Math.random() - 0.5) * (0.45 + view.signature.slash * 0.25) * dmgBoost;
+      const speed = (0.6 + Math.random() * (1.1 + view.signature.pierce * 0.3 + view.signature.blunt * 0.15)) * dmgBoost;
       const travel = speed * (1 - Math.random() * view.backwardBias);
       pool.spawn(new Particle({
         x: ox,
@@ -493,63 +501,108 @@ function spawnMeleeImpactGore(pool, wx, wy, dx, dy, dmg, isCrit, goreType, damag
         vy: fwdy * travel + sidey * sideThrow - 0.5,
         ax: 0,
         ay: style.gibGravity,
-        life: (style.gibLifeMin + Math.random() * style.gibLifeSpan) * view.lifeScale,
-        size0: 0.11 + Math.random() * 0.10,
+        life: (style.gibLifeMin + Math.random() * style.gibLifeSpan) * view.lifeScale * dmgBoost,
+        size0: 0.11 + Math.random() * (0.12 + (isBrutal ? 0.06 : 0)),
         size1: 0.04,
         r: gibColor.r,
         g: gibColor.g,
         b: gibColor.b,
-        a0: 0.9,
+        a0: 0.92,
         a1: 0.1,
-        rotVel: (Math.random() - 0.5) * 8,
+        rotVel: (Math.random() - 0.5) * (10 + (isBrutal ? 6 : 0)),
+      }));
+    }
+  }
+
+  // ── Crushing blow: blunt damage gets backward splatter + ground-pound ring ──
+  if (view.signature.blunt > 0.35 && dmg >= 5) {
+    const crushCount = Math.min(16, 4 + ((dmg * 0.6) | 0) + (isCrit ? 6 : 0));
+    for (let i = 0; i < crushCount; i++) {
+      // Backward splatter — stuff flies AWAY from the impact in all directions
+      const ang = Math.random() * Math.PI * 2;
+      const spd = 0.4 + Math.random() * 0.8 * dmgBoost;
+      pool.spawn(new Particle({
+        x: ox, y: oy,
+        vx: -fwdx * spd * 0.5 + Math.cos(ang) * spd * 0.6,
+        vy: -fwdy * spd * 0.5 + Math.sin(ang) * spd * 0.6,
+        ax: 0, ay: style.gravity * 1.5,
+        life: 0.20 + Math.random() * 0.25,
+        size0: 0.09 + Math.random() * 0.08,
+        size1: 0.02,
+        r: Math.min(255, splatColor.r + ((Math.random() * style.splatVar.r * 1.3) | 0)),
+        g: Math.min(255, splatColor.g + ((Math.random() * style.splatVar.g) | 0)),
+        b: Math.min(255, splatColor.b + ((Math.random() * style.splatVar.b) | 0)),
+        a0: 0.90, a1: 0,
+      }));
+    }
+    // Ground-pound stain ring around impact
+    const ringCount = Math.min(12, 3 + ((dmg * 0.3) | 0) + (isCrit ? 4 : 0));
+    for (let i = 0; i < ringCount; i++) {
+      const rAng = (i / ringCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+      const rDist = 0.18 + Math.random() * 0.24;
+      pool.spawn(new Particle({
+        x: wx + 0.5 + Math.cos(rAng) * rDist,
+        y: wy + 0.5 + Math.sin(rAng) * rDist,
+        vx: 0, vy: 0,
+        life: style.stainLifeMin + 6 + Math.random() * style.stainLifeSpan,
+        size0: 0.06 + Math.random() * 0.06,
+        size1: 0.20 + Math.random() * 0.14,
+        r: stainColor.r, g: stainColor.g, b: stainColor.b,
+        a0: Math.min(0.9, style.stainAlpha0 + 0.22), a1: 0,
       }));
     }
   }
 
   const stainCountBase = view.signature.blunt > 0.45
-    ? (dmg >= 5 ? 9 : 4)
-    : (dmg >= 5 ? 7 : 3);
-  const stainCount = Math.max(2, Math.min(14, Math.floor(stainCountBase * view.stainScale)));
+    ? (dmg >= 5 ? 11 : 5)
+    : (dmg >= 5 ? 8 : 3);
+  const stainCount = Math.max(2, Math.min(18, Math.floor(stainCountBase * view.stainScale * dmgBoost)));
   for (let i = 0; i < stainCount; i++) {
-    const forward = 0.05 + Math.random() * (0.22 + view.signature.pierce * 0.16);
-    const side = (Math.random() - 0.5) * (0.22 + view.signature.slash * 0.10);
+    const forward = 0.05 + Math.random() * (0.26 + view.signature.pierce * 0.16);
+    const side = (Math.random() - 0.5) * (0.26 + view.signature.slash * 0.12);
     pool.spawn(new Particle({
       x: wx + 0.5 + fwdx * forward + sidex * side,
       y: wy + 0.5 + fwdy * forward + sidey * side,
       vx: 0,
       vy: 0,
       life: style.stainLifeMin + 4 + Math.random() * (style.stainLifeSpan + 8),
-      size0: 0.05 + Math.random() * 0.07,
-      size1: 0.16 + Math.random() * 0.16,
+      size0: 0.05 + Math.random() * 0.08,
+      size1: 0.18 + Math.random() * 0.18,
       r: stainColor.r,
       g: stainColor.g,
       b: stainColor.b,
-      a0: Math.min(0.9, style.stainAlpha0 + 0.18),
+      a0: Math.min(0.9, style.stainAlpha0 + 0.20),
       a1: 0,
     }));
   }
 }
 
-function spawnDeathGore(pool, wx, wy, dx, dy, amount, goreType, damageType, critical) {
+function spawnDeathGore(pool, wx, wy, dx, dy, amount, goreType, damageType, critical, sizeClass) {
   const style = pickGoreStyle(goreType);
   const d = Math.max(4, Number(amount) || 4);
   const crit = !!critical;
-  const burstScale = crit ? 1.35 : 1.0;
+
+  // Size-class scaling: bigger creatures = bigger death bursts
+  const sizeScale = sizeClass === 'XL' ? 1.8 : (sizeClass === 'L' ? 1.4 : (sizeClass === 'S' ? 0.75 : (sizeClass === 'XS' ? 0.5 : 1.0)));
+  const burstScale = (crit ? 1.5 : 1.0) * sizeScale;
+  const dmgFlags = classifyDamage(damageType);
+
+  // ── Directional spray — the killing blow's exit wound ──
   const sprayColor = tintForDamage(style.splatBase, damageType);
-  const baseSpray = Math.min(54, 10 + ((d * 1.15) | 0) + (crit ? 6 : 0));
+  const baseSpray = Math.min(72, Math.floor((14 + d * 1.6 + (crit ? 12 : 0)) * sizeScale));
   for (let i = 0; i < baseSpray; i++) {
-    const bias = 0.10 + Math.random() * 0.32;
-    const side = (Math.random() - 0.5) * 0.22;
+    const bias = 0.14 + Math.random() * 0.40;
+    const side = (Math.random() - 0.5) * 0.32;
     const vx = dx * (bias * burstScale) + (-dy * side);
-    const vy = (dy * (bias * 0.26 * burstScale)) + (dx * side * 0.18) + (Math.random() * 0.18);
+    const vy = (dy * (bias * 0.32 * burstScale)) + (dx * side * 0.22) + (Math.random() * 0.22);
     pool.spawn(new Particle({
-      x: wx + 0.5 + (Math.random() - 0.5) * 0.22,
-      y: wy + 0.5 + (Math.random() - 0.5) * 0.22,
+      x: wx + 0.5 + (Math.random() - 0.5) * 0.26,
+      y: wy + 0.5 + (Math.random() - 0.5) * 0.26,
       vx,
       vy,
-      ay: 2.4 + Math.random() * 1.0,
-      life: 0.10 + Math.random() * 0.16,
-      size0: 0.09 + Math.random() * 0.08,
+      ay: 2.0 + Math.random() * 1.2,
+      life: 0.14 + Math.random() * 0.22,
+      size0: (0.09 + Math.random() * 0.09) * Math.max(1, sizeScale * 0.8),
       size1: 0.01,
       r: Math.min(255, sprayColor.r + ((Math.random() * style.splatVar.r) | 0)),
       g: Math.min(255, sprayColor.g + ((Math.random() * style.splatVar.g) | 0)),
@@ -559,44 +612,93 @@ function spawnDeathGore(pool, wx, wy, dx, dy, amount, goreType, damageType, crit
     }));
   }
 
+  // ── Radial burst — the body giving up its contents in all directions ──
+  const radialCount = Math.min(40, Math.floor((6 + d * 0.8 + (crit ? 8 : 0)) * sizeScale));
+  for (let i = 0; i < radialCount; i++) {
+    const ang = Math.random() * Math.PI * 2;
+    const spd = (0.15 + Math.random() * 0.45) * burstScale;
+    pool.spawn(new Particle({
+      x: wx + 0.5 + (Math.random() - 0.5) * 0.18,
+      y: wy + 0.5 + (Math.random() - 0.5) * 0.18,
+      vx: Math.cos(ang) * spd,
+      vy: Math.sin(ang) * spd * 0.35 + Math.random() * 0.12,
+      ay: 1.6 + Math.random() * 1.0,
+      life: 0.12 + Math.random() * 0.20,
+      size0: (0.07 + Math.random() * 0.07) * Math.max(1, sizeScale * 0.7),
+      size1: 0.01,
+      r: Math.min(255, sprayColor.r + ((Math.random() * style.splatVar.r * 1.2) | 0)),
+      g: Math.min(255, sprayColor.g + ((Math.random() * style.splatVar.g) | 0)),
+      b: Math.min(255, sprayColor.b + ((Math.random() * style.splatVar.b) | 0)),
+      a0: 0.90,
+      a1: 0,
+    }));
+  }
+
+  // ── Guts / gibs — big chunks that tumble and spin ──
   const gutsColor = tintForDamage(style.gib, damageType);
-  const gutsCount = Math.min(18, 4 + ((d * 0.55) | 0) + (crit ? 3 : 0));
+  const gutsCount = Math.min(28, Math.floor((6 + d * 0.7 + (crit ? 6 : 0)) * sizeScale));
   for (let i = 0; i < gutsCount; i++) {
     const ang = Math.random() * Math.PI * 2;
-    const spd = 0.04 + Math.random() * 0.18;
+    // Mix directional + radial: gibs fly mostly in impact direction but scatter
+    const radial = 0.06 + Math.random() * 0.22;
+    const directed = 0.04 + Math.random() * 0.12;
     pool.spawn(new Particle({
-      x: wx + 0.5 + (Math.random() - 0.5) * 0.16,
-      y: wy + 0.5 + (Math.random() - 0.5) * 0.12,
-      vx: Math.cos(ang) * spd,
-      vy: Math.sin(ang) * spd * 0.12 + (Math.random() * 0.06),
-      ay: 1.8 + Math.random() * 0.8,
-      life: 0.30 + Math.random() * 0.55,
-      size0: 0.12 + Math.random() * 0.12,
+      x: wx + 0.5 + (Math.random() - 0.5) * 0.20,
+      y: wy + 0.5 + (Math.random() - 0.5) * 0.16,
+      vx: Math.cos(ang) * radial + dx * directed * burstScale,
+      vy: Math.sin(ang) * radial * 0.18 + dy * directed * burstScale * 0.3 + (Math.random() * 0.08),
+      ay: 1.4 + Math.random() * 1.0,
+      life: 0.35 + Math.random() * 0.65,
+      size0: (0.13 + Math.random() * 0.14) * Math.max(1, sizeScale * 0.7),
       size1: 0.03 + Math.random() * 0.03,
       r: gutsColor.r,
       g: gutsColor.g,
       b: gutsColor.b,
       a0: 0.94,
       a1: 0.05,
-      rotVel: (Math.random() - 0.5) * 4,
+      rotVel: (Math.random() - 0.5) * (8 + (crit ? 6 : 0)),
     }));
   }
 
+  // ── Crushing death bonus: blunt kills get a ground-pound shockwave ──
+  if (dmgFlags.bluntLike && d >= 6) {
+    const smashCount = Math.min(20, Math.floor((5 + d * 0.5) * sizeScale));
+    for (let i = 0; i < smashCount; i++) {
+      const ang = (i / smashCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
+      const spd = (0.3 + Math.random() * 0.5) * burstScale;
+      pool.spawn(new Particle({
+        x: wx + 0.5, y: wy + 0.5,
+        vx: Math.cos(ang) * spd,
+        vy: Math.sin(ang) * spd * 0.20,
+        ay: 2.8 + Math.random() * 1.2,
+        life: 0.10 + Math.random() * 0.14,
+        size0: 0.10 + Math.random() * 0.08,
+        size1: 0.02,
+        r: Math.min(255, sprayColor.r + 20),
+        g: Math.min(255, sprayColor.g + 10),
+        b: Math.min(255, sprayColor.b + 5),
+        a0: 0.92, a1: 0,
+      }));
+    }
+  }
+
+  // ── Blood pool / puddles — the aftermath ──
   const poolColor = tintForDamage(style.stain, damageType);
-  const puddles = Math.min(28, 10 + ((d * 0.8) | 0) + (crit ? 5 : 0));
+  const puddles = Math.min(36, Math.floor((12 + d * 0.9 + (crit ? 8 : 0)) * sizeScale));
   for (let i = 0; i < puddles; i++) {
+    const spread = 0.3 + sizeScale * 0.15;
     pool.spawn(new Particle({
-      x: wx + 0.22 + Math.random() * 0.56,
-      y: wy + 0.46 + Math.random() * 0.34,
+      x: wx + 0.5 - spread + Math.random() * spread * 2,
+      y: wy + 0.5 - spread * 0.6 + Math.random() * spread * 1.2,
       vx: 0,
       vy: 0,
-      life: 18 + Math.random() * 24,
-      size0: 0.05 + Math.random() * 0.08,
-      size1: 0.18 + Math.random() * 0.18,
+      life: 20 + Math.random() * 28,
+      size0: 0.05 + Math.random() * 0.09,
+      size1: 0.20 + Math.random() * 0.20,
       r: poolColor.r,
       g: poolColor.g,
       b: poolColor.b,
-      a0: Math.min(0.86, style.stainAlpha0 + 0.2),
+      a0: Math.min(0.90, style.stainAlpha0 + 0.24),
       a1: 0,
     }));
   }
@@ -717,7 +819,7 @@ export function installGoreWiring({ world, ftext, fx, getPosition, canShowAt, is
   const pendingGore = [];
   const now = () => Math.max(0, Number(getFxTime?.() || 0));
 
-  world.on('damaged', ({ target, source, amount, rawAmount, type, cause, critical, crit, at, offhand, projectileDelay, impactVector, projectileKind, impactProfile, targetKind, goreType }) => {
+  world.on('damaged', ({ target, source, amount, rawAmount, type, cause, critical, crit, at, offhand, projectileDelay, impactVector, projectileKind, impactProfile, targetKind, goreType, sizeClass }) => {
     const t = Number(target || 0) || 0;
     const pos = (at && typeof at.x === 'number' && typeof at.y === 'number') ? at : getPosition(t);
     const hitIsPlayer = typeof isPlayer === 'function' ? !!isPlayer(t) : false;
@@ -792,6 +894,7 @@ export function installGoreWiring({ world, ftext, fx, getPosition, canShowAt, is
         critical: critHit,
         dx,
         dy,
+        sizeClass: String(sizeClass || 'M'),
       });
     } else if (t > 0) {
       lastImpactByTarget.delete(t);
@@ -818,6 +921,7 @@ export function installGoreWiring({ world, ftext, fx, getPosition, canShowAt, is
         rec.goreType,
         rec.damageType,
         rec.critical,
+        rec.sizeClass || 'M',
       );
     };
     if (deathFireAt > now()) {
