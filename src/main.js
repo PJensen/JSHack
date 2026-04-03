@@ -2299,6 +2299,8 @@ world.on("item:dropped", ({ itemId, actor, source, origin, at, targetId }) => {
     const actorId = Number(actor || 0) | 0;
     const delay = actorId > 0 ? impactTracker.delayFor(actorId, _fxTime) : 0;
     scheduleDeathLootArc(itemId, origin, at, delay);
+  } else if (src === "urn") {
+    scheduleDeathLootArc(itemId, origin, at, 0);
   } else if (src === "chest") {
     const chestId = Number(targetId || 0) | 0;
     const chestPos = chestId > 0 ? world.get(chestId, Position) : null;
