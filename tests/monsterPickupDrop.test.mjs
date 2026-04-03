@@ -43,8 +43,5 @@ Deno.test("monster picks up gold and drops it on death", () => {
   assert(!world.isAlive(mid), 'monster still alive after hp=0');
   const groundPos = world.get(goldId, Position);
   assert(groundPos, 'gold should be on the ground after monster death');
-  const dx = Math.abs((groundPos.x | 0) - 1);
-  const dy = Math.abs((groundPos.y | 0) - 0);
-  const cheb = Math.max(dx, dy);
-  assert(cheb >= 1 && cheb <= 2, `gold should burst 1-2 tiles from death site, got chebyshev ${cheb}`);
+  assert(groundPos.x === 1 && groundPos.y === 0, `gold should drop at death tile (1,0), got (${groundPos.x},${groundPos.y})`);
 });

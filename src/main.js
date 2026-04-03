@@ -2303,6 +2303,23 @@ function scheduleDeathLootArc(itemId, origin, at, delayOffset, impulse) {
   toX += (j1 - 0.5) * 0.15 * weightMul;
   toY += (j2 - 0.5) * 0.15 * weightMul;
 
+  // Clamp visual landing to walkable tiles — pull back toward origin if
+  // the rounded landing cell is a wall. Pure display concern.
+  const landTileX = Math.round(toX);
+  const landTileY = Math.round(toY);
+  if (!isWalkable(landTileX, landTileY)) {
+    // Binary search along the arc to find the last walkable point
+    let lo = 0, hi = 1;
+    for (let step = 0; step < 6; step++) {
+      const mid = (lo + hi) * 0.5;
+      const mx = Math.round(fromX + (toX - fromX) * mid);
+      const my = Math.round(fromY + (toY - fromY) * mid);
+      if (isWalkable(mx, my)) lo = mid; else hi = mid;
+    }
+    toX = fromX + (toX - fromX) * lo;
+    toY = fromY + (toY - fromY) * lo;
+  }
+
   const fdx = toX - fromX;
   const fdy = toY - fromY;
   const dist = Math.sqrt(fdx * fdx + fdy * fdy);
