@@ -18,6 +18,11 @@ export function createActiveSpellController(world) {
   /** @type {(string|null)[]} */
   const _actionBarSlots = new Array(MAX_SLOTS).fill(null);
 
+  // Pinned spell slots (mobile spell dock — mini-radials above action bar)
+  const MAX_PINNED = 4;
+  /** @type {(string|null)[]} */
+  const _pinnedSpellSlots = new Array(MAX_PINNED).fill(null);
+
   function knownSpellIds() {
     const spells = learnedSpells();
     const ids = [];
@@ -132,6 +137,35 @@ export function createActiveSpellController(world) {
     }
   }
 
+  function getPinnedSpellSlots() {
+    return _pinnedSpellSlots.slice();
+  }
+
+  function setPinnedSlot(index, spellId) {
+    if (index < 0 || index >= MAX_PINNED) return;
+    if (spellId && !getSpell(spellId)) return;
+    _pinnedSpellSlots[index] = spellId || null;
+  }
+
+  function clearPinnedSlot(index) {
+    if (index < 0 || index >= MAX_PINNED) return;
+    _pinnedSpellSlots[index] = null;
+  }
+
+  /** Restore pinned spell slots from savegame data. */
+  function restorePinnedSlots(savedSlots) {
+    for (let i = 0; i < MAX_PINNED; i++) {
+      _pinnedSpellSlots[i] = null;
+    }
+    if (!Array.isArray(savedSlots)) return;
+    for (let i = 0; i < Math.min(savedSlots.length, MAX_PINNED); i++) {
+      const id = savedSlots[i];
+      if (typeof id === "string" && id.length && getSpell(id)) {
+        _pinnedSpellSlots[i] = id;
+      }
+    }
+  }
+
   return {
     learnedSpells,
     knownSpellIds,
@@ -145,5 +179,9 @@ export function createActiveSpellController(world) {
     clearSlot,
     autoAssignSlot,
     restoreSlots,
+    getPinnedSpellSlots,
+    setPinnedSlot,
+    clearPinnedSlot,
+    restorePinnedSlots,
   };
 }

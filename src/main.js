@@ -723,6 +723,7 @@ const hudFeeds = createHudFeeds(world, {
   updateActiveSpellLabel: () => spellCtrl.updateActiveSpellLabel(),
   knownSpellIds: () => spellCtrl.knownSpellIds(),
   getActionBarSlots: () => spellCtrl.getActionBarSlots(),
+  getPinnedSpellSlots: () => spellCtrl.getPinnedSpellSlots(),
   autoAssignSlot: (id) => spellCtrl.autoAssignSlot(id),
   getFxTime: () => _fxTime,
 });
@@ -864,13 +865,15 @@ if (_pendingSavegame) {
     if (typeof savedSpell === "string" && savedSpell.length > 0) { _activeSpellId = savedSpell; spellCtrl.setActiveSpell(savedSpell); }
     const savedSlots = _pendingSavegame?.app?.actionBarSlots;
     if (Array.isArray(savedSlots)) spellCtrl.restoreSlots(savedSlots);
+    const savedPinned = _pendingSavegame?.app?.pinnedSpellSlots;
+    if (Array.isArray(savedPinned)) spellCtrl.restorePinnedSlots(savedPinned);
     _savegameLoaded = true;
     _proofWiring.resetForLoad();
     updateBootProgress("Loaded save snapshot", _bootDoneUnits);
   } catch (err) {
     console.error("[SAVE] Failed to apply snapshot, continuing as new game.", err);
     clearSavegamePayload();
-    _activeSpellId = null; spellCtrl.setActiveSpell(null); spellCtrl.restoreSlots([]);
+    _activeSpellId = null; spellCtrl.setActiveSpell(null); spellCtrl.restoreSlots([]); spellCtrl.restorePinnedSlots([]);
     resetIdentification();
     identify('stone_touchstone');
     initGemPricing(createRng(world.seed ^ 0x6E45));
@@ -2100,6 +2103,31 @@ addEventListener('ui:castSpellSlot', (ev) => {
   window.dispatchEvent(new CustomEvent('ui:castActiveSpell'));
 });
 
+// Pinned spell dock: set a spell into a pinned slot
+addEventListener('ui:setPinnedSpell', (ev) => {
+  /** @type {CustomEvent} */ // @ts-ignore
+  const e = ev;
+  const slot = Number(e?.detail?.slot);
+  const spellId = e?.detail?.spellId;
+  if (!(slot >= 0 && slot < 4)) return;
+  if (typeof spellId === 'string' && spellId.length) {
+    spellCtrl.setPinnedSlot(slot, spellId);
+  }
+});
+
+// Pinned spell dock: cast a pinned spell
+addEventListener('ui:castPinnedSpell', (ev) => {
+  /** @type {CustomEvent} */ // @ts-ignore
+  const e = ev;
+  const slot = Number(e?.detail?.slot);
+  if (!(slot >= 0 && slot < 4)) return;
+  const slots = spellCtrl.getPinnedSpellSlots();
+  const spellId = slots[slot];
+  if (!spellId) return;
+  setActiveSpell(spellId);
+  window.dispatchEvent(new CustomEvent('ui:castActiveSpell'));
+});
+
 // Basic app-side message log collector (bridge-free for now)
 const messageLog = createMessageLog({
   maxEntries: 50,
@@ -3294,6 +3322,7 @@ installSavegameWiring({
   playerEntity,
   getActiveSpellId: () => _activeSpellId,
   getActionBarSlots: () => spellCtrl.getActionBarSlots(),
+  getPinnedSpellSlots: () => spellCtrl.getPinnedSpellSlots(),
   log: (msg) => messageLog.log({ text: msg, type: 'system' }),
 });
 bootAdvance("Installed world/UI wiring");
