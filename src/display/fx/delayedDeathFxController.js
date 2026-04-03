@@ -17,6 +17,8 @@ function cellKey(x, y) {
 export function createDelayedDeathFxController({ world, getFxTime, getPosition }) {
   /** @type {Map<number, number>} */
   const delayedImpactUntilByTarget = new Map();
+  /** @type {Map<number, number>} */
+  const delayedDeathUntilByActor = new Map();
   /** @type {Map<string, { until:number, startedAt:number }>} */
   const delayedDeathCells = new Map();
   /** @type {Map<number, number>} */
@@ -38,6 +40,9 @@ export function createDelayedDeathFxController({ world, getFxTime, getPosition }
     const t = now();
     for (const [targetId, until] of delayedImpactUntilByTarget) {
       if (!(until > t)) delayedImpactUntilByTarget.delete(targetId);
+    }
+    for (const [actorId, until] of delayedDeathUntilByActor) {
+      if (!(until > t)) delayedDeathUntilByActor.delete(actorId);
     }
     for (const [key, rec] of delayedDeathCells) {
       if (!(Number(rec?.until || 0) > t)) delayedDeathCells.delete(key);
@@ -68,6 +73,7 @@ export function createDelayedDeathFxController({ world, getFxTime, getPosition }
       if (!(targetId > 0)) return;
       const until = Number(delayedImpactUntilByTarget.get(targetId) || 0);
       if (!(until > now())) return;
+      delayedDeathUntilByActor.set(targetId, until);
       const pos = getPosition ? getPosition(targetId) : null;
       if (!pos) return;
       delayedDeathCells.set(cellKey(pos.x, pos.y), { until, startedAt: now() });
@@ -84,16 +90,31 @@ export function createDelayedDeathFxController({ world, getFxTime, getPosition }
       }
     });
 
-    world.on("item:dropped", ({ itemId, at }) => {
+    world.on("item:dropped", ({ itemId, at, actor, source, origin }) => {
       const droppedId = Number(itemId || 0) | 0;
-      if (!(droppedId > 0) || !at) return;
-      const x = Number(at.x);
-      const y = Number(at.y);
-      if (!Number.isFinite(x) || !Number.isFinite(y)) return;
-      const rec = delayedDeathCells.get(cellKey(x, y));
-      if (!rec) return;
-      if (!(Number(rec.until || 0) > now())) return;
-      hiddenItems.set(droppedId, Number(rec.until));
+      if (!(droppedId > 0)) return;
+
+      let until = 0;
+
+      if (String(source || "") === "death") {
+        const actorId = Number(actor || 0) | 0;
+        if (actorId > 0) {
+          until = Math.max(until, Number(delayedDeathUntilByActor.get(actorId) || 0));
+        }
+      }
+
+      if (origin && Number.isFinite(Number(origin.x)) && Number.isFinite(Number(origin.y))) {
+        const rec = delayedDeathCells.get(cellKey(Number(origin.x), Number(origin.y)));
+        if (rec) until = Math.max(until, Number(rec.until || 0));
+      }
+
+      if (at && Number.isFinite(Number(at.x)) && Number.isFinite(Number(at.y))) {
+        const rec = delayedDeathCells.get(cellKey(Number(at.x), Number(at.y)));
+        if (rec) until = Math.max(until, Number(rec.until || 0));
+      }
+
+      if (!(until > now())) return;
+      hiddenItems.set(droppedId, until);
     });
   }
 
