@@ -21,14 +21,15 @@ import { getPassiveBonuses, effectiveMaxHp, effectiveMaxMana } from "../../rules
 import { resolveCanonicalStats } from "../../rules/utils/canonicalStats.js";
 import { getSpell } from "../../rules/data/spells.js";
 import { getSpellCooldown } from "../../rules/utils/spellCooldowns.js";
+import { impactTracker } from "../../display/fx/projectileImpactTracker.js";
 
 /**
  * Provides HUD feed updaters that cache the last dispatched values.
  * @param {import('../../lib/ecs-js/index.js').World} world
- * @param {{ getPlayerMana: () => { mana: number, maxMana: number }, ensureActiveSpell: () => string|null, updateActiveSpellLabel: () => void, knownSpellIds?: () => string[], getActionBarSlots?: () => (string|null)[], autoAssignSlot?: (id: string) => number }} deps
+ * @param {{ getPlayerMana: () => { mana: number, maxMana: number }, ensureActiveSpell: () => string|null, updateActiveSpellLabel: () => void, knownSpellIds?: () => string[], getActionBarSlots?: () => (string|null)[], autoAssignSlot?: (id: string) => number, getFxTime?: () => number }} deps
  */
 export function createHudFeeds(world, deps) {
-  const { getPlayerMana, ensureActiveSpell, updateActiveSpellLabel } = deps;
+  const { getPlayerMana, ensureActiveSpell, updateActiveSpellLabel, getFxTime } = deps;
 
   let lastVitals = { hp: -1, maxHp: -1, mana: -1, maxMana: -1, stamina: -1, maxStamina: -1 };
   let lastCombatHud = {
@@ -78,8 +79,10 @@ export function createHudFeeds(world, deps) {
     const stam = /** @type any */ (world.get(pe.id, Stamina));
     const passive = getPassiveBonuses(world, pe.id);
 
-    const hp = Number(vit?.hp ?? 0);
+    const rawHp = Number(vit?.hp ?? 0);
     const maxHp = vit ? effectiveMaxHp(world, pe.id, vit) : 0;
+    const fxT = typeof getFxTime === 'function' ? getFxTime() : 0;
+    const hp = impactTracker.visualHp(pe.id, rawHp, maxHp, fxT);
     const stamina = Number(stam?.stamina ?? 0);
     const maxStaminaBonus = Number(passive?.maxStaminaDerived ?? 0);
     const maxStamina = Number(stam?.maxStamina ?? 100) + maxStaminaBonus;

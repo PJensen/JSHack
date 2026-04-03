@@ -412,8 +412,8 @@ function projectEquipmentDisplayTags(world, id, rec) {
 		if (offInfo && !offInfo.damageDice) {
 			shieldIdentity = offIdentity || null;
 		} else if (offInfo?.damageDice) {
-			// Dual-wield: show offhand weapon as a second weapon badge (reuse shieldIdentity slot for now)
-			if (!weaponIdentity) weaponIdentity = offIdentity || null;
+			// Dual-wield: show offhand weapon in the left badge slot
+			shieldIdentity = offIdentity || null;
 		}
 	}
 	if (weaponIdentity || shieldIdentity) {

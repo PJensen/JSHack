@@ -251,8 +251,15 @@ function resolveHitRoll(world, {
         if (defWeaponId > 0 && world.isAlive(defWeaponId) && !hasOffhandShield(world, target)) {
             const defWeaponInfo = world.get(defWeaponId, ItemInfo);
             if (defWeaponInfo?.damageDice) {
-                // Parry chance: 8% base + 1% per defender evade, capped at 25%
-                const parryChance = Math.min(0.25, 0.08 + defSnapshot.evade * 0.01);
+                // Dual-wield bonus: +5% parry when offhand also has a weapon
+                const offhandId = Number(defEq?.offhand || 0) | 0;
+                let dualWieldBonus = 0;
+                if (offhandId > 0 && world.isAlive(offhandId)) {
+                    const offInfo = world.get(offhandId, ItemInfo);
+                    if (offInfo?.damageDice) dualWieldBonus = 0.05;
+                }
+                // Parry chance: 8% base + 1% per defender evade + 5% dual-wield, capped at 30%
+                const parryChance = Math.min(0.30, 0.08 + defSnapshot.evade * 0.01 + dualWieldBonus);
                 const parryRoll = r();
                 if (parryRoll < parryChance) {
                     const dpos = world.get(target, Position);
@@ -262,6 +269,7 @@ function resolveHitRoll(world, {
                         weaponId: defWeaponId,
                         weaponName: world.get(defWeaponId, NamedIdentity)?.name || 'weapon',
                         at: dpos ? { x: dpos.x, y: dpos.y } : undefined,
+                        dualWield: dualWieldBonus > 0,
                     });
                     applyPendingDamageProcPhase(world, source, buildProcContext('onMiss', {
                         source, target, item: weaponId || 0, damage: 0,
