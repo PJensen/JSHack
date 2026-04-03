@@ -968,8 +968,8 @@ export function initHUD() {
     bagBtn.style.display = isMobile ? 'none' : 'grid';
     castBtn.style.display = isMobile ? 'none' : 'grid';
     spellSelectBtn.style.display = isMobile ? 'none' : 'grid';
-    // Show mobile radial + pinned spell dock on mobile, hide on desktop
-    if (_mobileRadialEl) _mobileRadialEl.style.display = isMobile ? 'block' : 'none';
+    // Hide main radial — pinned spell dock replaces it
+    if (_mobileRadialEl) _mobileRadialEl.style.display = 'none';
     if (_pinnedSpellDockEl) _pinnedSpellDockEl.style.display = isMobile ? 'flex' : 'none';
     if (_pinnedSpellDockFanEl) _pinnedSpellDockFanEl.style.display = isMobile ? '' : 'none';
 
@@ -2600,7 +2600,7 @@ function createMobileSpellRadial(mobileLayoutMq) {
   Object.assign(el.style, {
     position: 'fixed',
     right: 'calc(12px + env(safe-area-inset-right, 0px))',
-    bottom: 'calc(var(--jshack-actionbar-height, 48px) + 16px + env(safe-area-inset-bottom, 0px))',
+    bottom: 'calc(var(--jshack-actionbar-height, 48px) + 28px + env(safe-area-inset-bottom, 0px))',
     display: 'none',
     pointerEvents: 'auto',
     zIndex: '920',
@@ -2971,8 +2971,9 @@ function createPinnedSpellDock(mobileLayoutMq) {
   const el = document.createElement('div');
   Object.assign(el.style, {
     position: 'fixed',
-    right: 'calc(76px + env(safe-area-inset-right, 0px))',
-    bottom: 'calc(var(--jshack-actionbar-height, 48px) + 22px + env(safe-area-inset-bottom, 0px))',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    bottom: 'calc(var(--jshack-actionbar-height, 48px) + 26px + env(safe-area-inset-bottom, 0px))',
     display: 'none',
     flexDirection: 'row',
     gap: '6px',
