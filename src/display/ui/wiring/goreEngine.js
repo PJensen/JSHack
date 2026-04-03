@@ -737,10 +737,10 @@ export function installGoreWiring({ world, ftext, fx, getPosition, canShowAt, is
       }
       ftext.addDamage(fx, fy, amount, {
         dmg: amount, color: col, crit: isCrit, delay,
-        // Tighter, more compact: shorter life, less vertical drift for non-crits
-        life: isCrit ? 0.9 : 0.55,
+        // Non-crits: short pop-and-vanish. Crits: linger for impact.
+        life: isCrit ? 0.9 : 0.38,
         scaleStart: isCrit ? undefined : 0.85,
-        scaleEnd: isCrit ? undefined : 0.60,
+        scaleEnd: isCrit ? undefined : 0.55,
       });
     }
     const resolvedGoreType = normalizedGoreType(goreType, targetKind);
