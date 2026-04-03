@@ -124,7 +124,7 @@ function makeBurstFallbackOffsets() {
 
 const DEATH_BURST_OFFSETS = Object.freeze(makeBurstFallbackOffsets());
 
-function buildDeathBurstTargets(world, deadId, deathPos, count, impulse) {
+function buildDeathBurstTargets(world, deadId, deathPos, count) {
   const n = Math.max(0, Number(count || 0) | 0);
   if (n <= 0) return [];
   const cx = deathPos.x | 0;
@@ -170,29 +170,8 @@ function buildDeathBurstTargets(world, deadId, deathPos, count, impulse) {
   }
   if (!candidates.length) return [];
 
-  // Bias candidates toward impulse direction when available.
-  // Each candidate gets a dot-product score with the impulse vector;
-  // higher dot = more aligned with the hit direction.
-  const idx = Number(impulse?.dx || 0);
-  const idy = Number(impulse?.dy || 0);
-  const hasImpulse = (idx !== 0 || idy !== 0);
-  if (hasImpulse && candidates.length > 1) {
-    for (let i = 0; i < candidates.length; i++) {
-      const c = candidates[i];
-      const offX = (c.x | 0) - cx;
-      const offY = (c.y | 0) - cy;
-      // dot product with impulse direction — higher = more aligned
-      c._dot = offX * idx + offY * idy;
-    }
-    // Sort: highest dot first, break ties by distance then position
-    candidates.sort((a, b) => (b._dot - a._dot) || (a.d - b.d) || (a.x - b.x) || (a.y - b.y));
-  }
-
   const base = ((world.seed >>> 0) ^ ((Number(deadId || 0) * 0x517cc1b7) >>> 0) ^ ((world.step | 0) >>> 0)) >>> 0;
-  // With impulse bias the sort already favours the right direction,
-  // so use a small jitter window instead of the full candidate range.
-  const jitterRange = hasImpulse ? Math.max(1, Math.min(3, candidates.length)) : candidates.length;
-  const start = Math.abs(base | 0) % jitterRange;
+  const start = Math.abs(base | 0) % candidates.length;
   const out = [];
   for (let i = 0; i < n; i++) {
     const p = candidates[(start + i) % candidates.length];
@@ -285,7 +264,7 @@ export function cleanupSystem(world) {
       if (pos) {
         const items = collectDropItemIds(world, id);
         const shouldBurst = !world.has(id, Player) && items.length > 0;
-        const targets = shouldBurst ? buildDeathBurstTargets(world, id, pos, items.length, impulse) : [];
+        const targets = shouldBurst ? buildDeathBurstTargets(world, id, pos, items.length) : [];
         for (let i = 0; i < items.length; i++) {
           const itemId = items[i];
           const info = world.get(itemId, ItemInfo);
@@ -391,6 +370,9 @@ export function cleanupSystem(world) {
                   itemId: droppedId,
                   count: 1,
                   at: { x: pos.x, y: pos.y },
+                  source: "death",
+                  origin: { x: pos.x | 0, y: pos.y | 0 },
+                  impulse,
                 });
             } catch { /* */ }
           }

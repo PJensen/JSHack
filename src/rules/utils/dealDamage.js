@@ -18,6 +18,7 @@ import { clamp } from "../../shared/math/math.js";
 import { getShieldArcMultiplier } from "./combatPositioning.js";
 import { consumeShieldGuardStack, refreshShieldGuard } from "./shieldGuard.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
+import { Physiology } from "../components/Physiology.js";
 import { getMonster } from "../data/monsters.js";
 import { emitSafe } from "./emitSafe.js";
 
@@ -336,6 +337,7 @@ export function dealDamage(world, spec) {
   }
 
   // Step 5: Emit 'damaged'
+  const _phys = world.get(target, Physiology);
   emitSafe(world, 'damaged', {
     target,
     amount: finalAmount,
@@ -353,6 +355,8 @@ export function dealDamage(world, spec) {
     impactProfile: spec.impactProfile || undefined,
     targetKind: String(world.get(target, NamedIdentity)?.identity || ''),
     goreType: String(getMonster(String(world.get(target, NamedIdentity)?.identity || ''))?.goreType || 'blood'),
+    sizeClass: String(_phys?.sizeClass || 'M'),
+    massKg: Number(_phys?.massKg) || 80,
   });
 
   if (!spec.noTrigger) {
