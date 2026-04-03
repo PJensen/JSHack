@@ -58,23 +58,25 @@ export class FloatText {
   const crit = !!(opts.crit);
     const scaleBase = (opts.scaleBase || base.scaleBase || 1.0) * (crit ? 1.3 : 1.0);
   const dmg = Number((opts.dmg) || 0);
-    const magScale = dmg ? Math.min(2.2, 0.7 + Math.abs(dmg) / 10) : 1;
+    const magScale = dmg ? Math.min(2.2, 0.9 + Math.abs(dmg) / 12) : 1;
     const scaleStart = Number(opts.scaleStart || (isDamage ? (scaleBase * magScale) : (scaleBase * 1.0)));
     const scaleEnd = Number(opts.scaleEnd || (isDamage ? (0.75 * scaleBase) : (0.9 * scaleBase)));
 
-    // Batching of numeric values at same tile and same sign within the same frame
+    // Batching of numeric values at same tile and same sign within a 150ms window
     const isNumber = /^[-+]?\d+$/.test(String(text));
     if (isNumber){
       const sign = String(text).trim().startsWith('-') ? -1 : 1;
-      const existing = this.fct.find(p=>p.batch && p.x0===x && p.y0===y && p.sign===sign && p.justSpawned);
+      const existing = this.fct.find(p=>p.batch && p.x0===x && p.y0===y && p.sign===sign && (p.justSpawned || (p.life - p.ttl) < 0.15));
       if (existing){
         const val = parseInt(String(text),10) | 0;
         existing.value = (existing.value || 0) + val;
         existing.text = (sign>0?'+':'') + String(existing.value);
-        // Recompute scaling with new magnitude
+        // Recompute scaling with new magnitude — re-pop effect
         const ndmg = Math.abs(existing.value|0);
-        const nMagScale = Math.min(2.2, 0.7 + ndmg / 10);
+        const nMagScale = Math.min(2.2, 0.9 + ndmg / 12);
         existing.scaleStart = Math.max(existing.scaleStart, scaleBase * nMagScale);
+        // Re-pop: reset lifetime so the combined number gets a fresh punch
+        existing.ttl = existing.life;
         return existing;
       }
     }
@@ -82,13 +84,13 @@ export class FloatText {
     // Velocities (world units/sec)
     let vx = 0, vy = 0;
     if (isDamage){
-      // Crits: big pop with wide spread. Normal: tight, compact, localized.
+      // Crits: big pop with wide spread. Normal: punchy burst with hard brake.
       if (crit) {
-        vy = -0.9 - Math.random() * 0.4;
-        vx = (Math.random() * 0.7 - 0.35);
+        vy = -1.1 - Math.random() * 0.5;
+        vx = (Math.random() * 0.9 - 0.45);
       } else {
-        vy = -0.45 - Math.random() * 0.2;
-        vx = (Math.random() * 0.3 - 0.15);
+        vy = -0.8 - Math.random() * 0.3;
+        vx = (Math.random() * 0.5 - 0.25);
       }
     } else if (isGold) {
       vy = -0.6;
@@ -138,8 +140,8 @@ export class FloatText {
   /** @param {number} x @param {number} y @param {number} amount @param {FTOptions} [opts] */
   addHeal(x,y,amount, opts={}){
     const text = '+' + Math.max(0, Math.floor(Math.abs(amount)||0));
-    // gentle pop: small scale delta
-    const o = /** @type {FTOptions} */({ flavor:'heal', color: ((opts && opts.color) || '#7BFF7B'), scaleStart: 1.06, scaleEnd: 0.98 });
+    // proportional to damage — no longer oversized
+    const o = /** @type {FTOptions} */({ flavor:'heal', color: ((opts && opts.color) || '#7BFF7B'), scaleStart: 0.78, scaleEnd: 0.65 });
     return this.add(x,y,text, /** @type {FTOptions} */({ ...opts, ...o }));
   }
   /** Add a status/miss/immune style text
@@ -171,9 +173,9 @@ export class FloatText {
       // motion
       p.x += p.vx * dt;
       p.y += p.vy * dt;
-      // drag for damage flavor to settle a bit
+      // drag for damage flavor — punch up then brake hard
       if (p.flavor === 'damage'){
-        p.vx *= 0.96; p.vy *= 0.98;
+        p.vx *= 0.92; p.vy *= 0.94;
       }
     }
     for (let i=this.fct.length-1;i>=0;i--){ const it = this.fct[i]; if (!it || it.ttl <= 0) this.fct.splice(i,1); }
