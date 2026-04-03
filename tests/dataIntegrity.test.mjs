@@ -28,6 +28,17 @@ Deno.test("item catalog definitions are valid", () => {
     assert(typeof item.type === 'string', `item ${id} must have type`);
     assert(typeof item.catalogKind === 'string' && item.catalogKind.length > 0, `item ${id} must have catalogKind`);
     assert(typeof item.material === 'string' && item.material.length > 0, `item ${id} must have material`);
+
+    // Items that are inventory objects and not purely metadata (e.g. scripts) must declare weight.
+    const shouldHaveWeight = [
+      'equip', 'weapon', 'armor', 'potion', 'scroll', 'learn', 'book', 'wand',
+      'tool', 'food', 'material', 'seed', 'ingredient', 'ring', 'neck', 'belt',
+      'gloves', 'legs', 'head', 'offhand', 'ammo', 'currency'
+    ].includes(item.type) || ['magic', 'equipment', 'food', 'material', 'seed', 'ingredient'].includes(item.catalogKind);
+
+    if (shouldHaveWeight) {
+      assert(typeof item.weight === 'number' && item.weight > 0, `item ${id} should have positive numeric weight`);
+    }
   }
 
   assert(getCatalogItem('book_lightning') !== null, 'getCatalogItem should find book_lightning');
