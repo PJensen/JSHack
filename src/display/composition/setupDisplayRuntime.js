@@ -11,6 +11,7 @@ import { createStatusPresentationDelayController } from "../fx/statusPresentatio
 import { createBumpFxController } from "../fx/bumpFxController.js";
 import { createRecoilFxController } from "../fx/recoilFxController.js";
 import { createHitstopController } from "../fx/hitstopController.js";
+import { startShake } from "../camera/shake.js";
 import { installFloatTextWiring } from "../ui/wiring/floatTextWiring.js";
 import { installEventUiWiring } from "../ui/wiring/eventUiWiring.js";
 import { createDeathVfxController } from "../fx/deathVfxController.js";
@@ -80,6 +81,19 @@ export function setupDisplayRuntime({
   hitstopFx.installListeners({ world, isPlayer });
 
   const deathVfx = createDeathVfxController();
+
+  // ── Melee camera shake — scales with damage ───────────────────────
+  world.on('damaged', ({ cause, amount, critical }) => {
+    if (cause !== 'melee') return;
+    const dmg = Number(amount) || 0;
+    if (dmg < 1) return;
+    // Amplitude: 1.0 at 1dmg, ramps to ~5 at 15+dmg, crits get 1.4x
+    const base = 1.0 + Math.min(4.0, Math.log(1 + dmg / 2.5) * 2.2);
+    const amp = critical ? base * 1.4 : base;
+    // Duration: 0.06s baseline, scales gently with damage
+    const dur = 0.06 + Math.min(0.10, dmg * 0.004);
+    startShake(cam, amp, dur);
+  });
 
   const { goreTick } = installFloatTextWiring({ world, ftext, fx, getPosition, isVisibleAt, isPet, isPlayer, getFxTime });
   installEventUiWiring({

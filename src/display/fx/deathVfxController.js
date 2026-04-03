@@ -247,6 +247,21 @@ export function createDeathVfxController() {
   }
 
   /**
+   * Returns 0..1 red-pulse intensity for the player glyph at low HP.
+   * Synced with the heartbeat rhythm — sharp spike then smooth decay.
+   */
+  function getPlayerGlyphRedPulse(fxTime) {
+    if (_dead) return 0.6; // hold a steady red cast while dying
+    if (_playerHpRatio >= LOW_HP_THRESHOLD) return 0;
+    const danger = 1 - (_playerHpRatio / LOW_HP_THRESHOLD); // 0→1
+    const phase = fxTime * HEARTBEAT_HZ * Math.PI * 2;
+    const beat = Math.sin(phase);
+    // Sharp attack, slower release (asymmetric pulse)
+    const pulse = beat > 0 ? beat * beat : beat * beat * 0.3;
+    return danger * (0.25 + 0.75 * pulse);
+  }
+
+  /**
    * Reset state (e.g. on new game).
    */
   function reset() {
@@ -266,6 +281,7 @@ export function createDeathVfxController() {
     getPlayerGlyphScale,
     drawLowHpVignette,
     drawDeathFlash,
+    getPlayerGlyphRedPulse,
     drawDesaturation,
     reset,
   };
