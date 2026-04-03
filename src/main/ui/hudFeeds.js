@@ -26,7 +26,7 @@ import { impactTracker } from "../../display/fx/projectileImpactTracker.js";
 /**
  * Provides HUD feed updaters that cache the last dispatched values.
  * @param {import('../../lib/ecs-js/index.js').World} world
- * @param {{ getPlayerMana: () => { mana: number, maxMana: number }, ensureActiveSpell: () => string|null, updateActiveSpellLabel: () => void, knownSpellIds?: () => string[], getActionBarSlots?: () => (string|null)[], autoAssignSlot?: (id: string) => number, getFxTime?: () => number }} deps
+ * @param {{ getPlayerMana: () => { mana: number, maxMana: number }, ensureActiveSpell: () => string|null, updateActiveSpellLabel: () => void, knownSpellIds?: () => string[], getActionBarSlots?: () => (string|null)[], getPinnedSpellSlots?: () => (string|null)[], autoAssignSlot?: (id: string) => number, getFxTime?: () => number }} deps
  */
 export function createHudFeeds(world, deps) {
   const { getPlayerMana, ensureActiveSpell, updateActiveSpellLabel, getFxTime } = deps;
@@ -55,6 +55,7 @@ export function createHudFeeds(world, deps) {
   let lastSpellMana = -1;
   let lastCalendarDay = -1;
   let _lastSpellBarSig = '';
+  let _lastPinnedSpellBarSig = '';
   /** @type {Set<string>} */
   let _prevKnownSpells = new Set();
 
@@ -327,6 +328,37 @@ export function createHudFeeds(world, deps) {
             detail: { slots: resolved, activeSpellId: activeId, mana }
           }));
         } catch (e) { console.debug('[hudFeeds] dispatch ui:updateSpellBar:', e); }
+      }
+    }
+
+    // Dispatch pinned spell bar state for mobile spell dock
+    if (typeof deps.getPinnedSpellSlots === 'function') {
+      const pSlots = deps.getPinnedSpellSlots();
+      const pCdParts = [];
+      for (let i = 0; i < pSlots.length; i++) {
+        const cd = pSlots[i] ? getSpellCooldown(world, pSlots[i]) : null;
+        pCdParts.push(cd ? cd.remaining : 0);
+      }
+      const hasSpells = typeof deps.knownSpellIds === 'function' && deps.knownSpellIds().length > 0;
+      const pSig = pSlots.join(',') + '|' + mana + '|' + pCdParts.join(',') + '|' + hasSpells;
+      if (pSig !== _lastPinnedSpellBarSig) {
+        _lastPinnedSpellBarSig = pSig;
+        const resolved = pSlots.map(id => {
+          if (!id) return null;
+          const def = getSpell(id);
+          if (!def) return null;
+          const cd = getSpellCooldown(world, id);
+          return {
+            id, name: def.name, symbol: def.symbol, cost: def.manaCost,
+            cdRemaining: cd ? cd.remaining : 0,
+            cdMax: cd ? cd.max : 0,
+          };
+        });
+        try {
+          window.dispatchEvent(new CustomEvent('ui:updatePinnedSpellBar', {
+            detail: { pinnedSlots: resolved, mana, hasLearnedSpells: hasSpells }
+          }));
+        } catch (e) { console.debug('[hudFeeds] dispatch ui:updatePinnedSpellBar:', e); }
       }
     }
   }

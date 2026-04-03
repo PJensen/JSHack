@@ -12,6 +12,12 @@ import { effectSystem } from "../src/rules/systems/effectSystem.js";
 import { blind, getEffectiveVisionRange } from "../src/rules/utils/blind.js";
 import { deafen } from "../src/rules/utils/deafen.js";
 import { applyElectrocuted } from "../src/rules/utils/electrocute.js";
+import { installElectrocuteOnDamage } from "../src/rules/utils/electrocute.js";
+import { dealDamage } from "../src/rules/utils/dealDamage.js";
+import { trapSystem } from "../src/rules/systems/trapSystem.js";
+import { Trap } from "../src/rules/components/Trap.js";
+import { Position } from "../src/rules/components/Position.js";
+import "../src/rules/scripts/traps.js";
 
 function scheduler(world) {
   try { effectSystem(world); } catch (e) { console.error("effectSystem error:", e); }
@@ -223,4 +229,47 @@ Deno.test("sensory overload: no permanent vision or hearing damage after recover
     !st?.statuses?.some((s) => s.type === 'deafened'),
     "deafened status should be gone after full recovery"
   );
+});
+
+Deno.test("lightning damage blinds immediately (effective sight is 0 before tick)", () => {
+  const world = new World({ seed: 12 });
+  const player = createPlayer(world, { name: "Hero" });
+  const brain = world.get(player, Brain);
+  brain.visionRange = 8;
+  installElectrocuteOnDamage(world);
+
+  dealDamage(world, {
+    target: player,
+    amount: 5,
+    type: "lightning",
+    cause: "test:lightning",
+  });
+
+  const vNow = getEffectiveVisionRange(world, player);
+  assertEquals(vNow, 0, `lightning damage should blind immediately; got ${vNow}`);
+});
+
+Deno.test("shock trap blinds immediately (effective sight is 0 on trigger)", () => {
+  const world = new World({ seed: 13 });
+  const player = createPlayer(world, { name: "Hero" });
+  const brain = world.get(player, Brain);
+  brain.visionRange = 8;
+  world.set(player, Position, { x: 4, y: 4 });
+  installElectrocuteOnDamage(world);
+
+  const trap = world.create();
+  world.add(trap, Position, { x: 4, y: 4 });
+  world.add(trap, Trap, {
+    type: "shock",
+    armed: true,
+    revealed: false,
+    script: "trap_shock",
+    params: { percent: 0.15 },
+    difficulty: 21,
+  });
+
+  trapSystem(world);
+
+  const vNow = getEffectiveVisionRange(world, player);
+  assertEquals(vNow, 0, `shock trap should blind immediately; got ${vNow}`);
 });
