@@ -31,6 +31,16 @@ const DMG_LOG_SCALE = 8.0;  // higher = slower ramp
 // Critical hits get a multiplier
 const CRIT_MULT = 1.35;
 
+// ── Mass modulation ────────────────────────────────────────────────
+// Lighter creatures recoil more, heavier ones less.
+// Reference mass = 80 kg (human-sized M). Multiplier = sqrt(ref / mass).
+const MASS_REF = 80;
+const MASS_MULT_MIN = 0.45;  // floor for XL / very heavy
+const MASS_MULT_MAX = 1.8;   // cap for XS / very light
+
+// Fallback: if only sizeClass is available (no massKg)
+const SIZE_CLASS_MASS = { XS: 3, S: 25, M: 80, L: 200, XL: 500 };
+
 // ── Easing ──────────────────────────────────────────────────────────
 function easeOutCubic(t) { return 1 - (1 - t) * (1 - t) * (1 - t); }
 function easeInQuad(t)   { return t * t; }
@@ -74,7 +84,7 @@ export function createRecoilFxController() {
    * @param {number} targetId
    * @param {number} dx  Impact direction X (normalized, attacker→target or projectile travel dir)
    * @param {number} dy  Impact direction Y (normalized)
-   * @param {{ offhand?:boolean, damage?:number, critical?:boolean, delay?:number }} [opts]
+   * @param {{ offhand?:boolean, damage?:number, critical?:boolean, delay?:number, massKg?:number, sizeClass?:string }} [opts]
    */
   function trigger(targetId, dx, dy, opts) {
     const offhand  = !!(opts && opts.offhand);
@@ -86,6 +96,12 @@ export function createRecoilFxController() {
     const max  = offhand ? RECOIL_DIST_OH_MAX : RECOIL_DIST_MAX;
     let dist = damageScale(damage, base, max);
     if (critical) dist *= CRIT_MULT;
+
+    // Mass modulation: light creatures recoil more, heavy ones less
+    const rawMass = Number(opts && opts.massKg) || 0;
+    const mass = rawMass > 0 ? rawMass : (SIZE_CLASS_MASS[opts && opts.sizeClass] || MASS_REF);
+    const massMult = Math.max(MASS_MULT_MIN, Math.min(MASS_MULT_MAX, Math.sqrt(MASS_REF / mass)));
+    dist *= massMult;
 
     const outDur  = offhand ? OH_RECOIL_OUT  : RECOIL_OUT;
     const holdDur = offhand ? OH_RECOIL_HOLD : RECOIL_HOLD;
@@ -162,6 +178,7 @@ export function createRecoilFxController() {
     world.on('damaged', ({
       source, target, amount, offhand, critical,
       cause, impactVector, projectileDelay,
+      sizeClass, massKg,
     }) => {
       // Skip melee entirely
       if (cause === 'melee') return;
@@ -196,6 +213,8 @@ export function createRecoilFxController() {
           damage: amount,
           critical: !!critical,
           delay,
+          massKg,
+          sizeClass,
         });
         return;
       }
@@ -208,6 +227,8 @@ export function createRecoilFxController() {
         damage: Math.min(amount, 3), // cap so flinch stays small
         critical: false,
         delay: 0,
+        massKg,
+        sizeClass,
       });
     });
   }
