@@ -163,41 +163,51 @@ export function createRecoilFxController() {
       source, target, amount, offhand, critical,
       cause, impactVector, projectileDelay,
     }) => {
-      // Skip melee — recoil is ranged/spell only
+      // Skip melee entirely
       if (cause === 'melee') return;
 
       const tid = Number(target || 0) | 0;
       if (!(tid > 0)) return;
 
-      let dx = 0, dy = 0;
+      const delay = Number(projectileDelay) || 0;
+      const isProjectile = delay > 0;
 
-      if (impactVector && (impactVector.dx || impactVector.dy)) {
-        // Arrow / projectile with explicit travel direction
-        dx = impactVector.dx;
-        dy = impactVector.dy;
-      } else {
-        // Spell: compute direction from caster → target
-        const sid = Number(source || 0) | 0;
-        if (!(sid > 0)) return;
-        const spos = getPosition(sid);
-        const tpos = getPosition(tid);
-        if (!spos || !tpos) return;
-        const rawDx = tpos.x - spos.x;
-        const rawDy = tpos.y - spos.y;
-        const mag = Math.hypot(rawDx, rawDy);
-        if (!(mag > 0)) return;
-        dx = rawDx / mag;
-        dy = rawDy / mag;
+      // Full recoil: projectile spells / arrows only (frost bolt, shadow bolt, arrows)
+      if (isProjectile) {
+        let dx = 0, dy = 0;
+        if (impactVector && (impactVector.dx || impactVector.dy)) {
+          dx = impactVector.dx;
+          dy = impactVector.dy;
+        } else {
+          const sid = Number(source || 0) | 0;
+          if (!(sid > 0)) return;
+          const spos = getPosition(sid);
+          const tpos = getPosition(tid);
+          if (!spos || !tpos) return;
+          const rawDx = tpos.x - spos.x;
+          const rawDy = tpos.y - spos.y;
+          const mag = Math.hypot(rawDx, rawDy);
+          if (!(mag > 0)) return;
+          dx = rawDx / mag;
+          dy = rawDy / mag;
+        }
+        trigger(tid, dx, dy, {
+          offhand: false,
+          damage: amount,
+          critical: !!critical,
+          delay,
+        });
+        return;
       }
 
-      // Delay: projectile hits defer until visual arrival
-      const delay = Number(projectileDelay) || 0;
-
-      trigger(tid, dx, dy, {
+      // Small flinch: non-melee non-projectile (DoTs, AoE, instant spells)
+      // Random direction, capped at flinch distance
+      const angle = Math.random() * Math.PI * 2;
+      trigger(tid, Math.cos(angle), Math.sin(angle), {
         offhand: false,
-        damage: amount,
-        critical: !!critical,
-        delay,
+        damage: Math.min(amount, 3), // cap so flinch stays small
+        critical: false,
+        delay: 0,
       });
     });
   }
