@@ -53,6 +53,7 @@ import { createSlideFxController } from "./display/fx/slideFxController.js";
 import { createLightingEngine } from "./display/lighting/engine.js";
 import { collectLightSources, collectFxLights, computeAmbient, getVisionDef, installLightEventListeners } from "./display/lighting/sources/index.js";
 import { drawProcStateBadges, getProcStateVisual, procBadgeWorldCenter } from "./display/fx/procStateGlyphs.js";
+import { drawEquipmentBadges } from "./display/fx/equipBadges.js";
 import { readRuntimeConfig } from "./main/config/runtimeConfig.js";
 import { createMessageLog } from "./main/ui/messageLog.js";
 import { installDeityUiWiring } from "./display/ui/wiring/deityUiWiring.js";
@@ -5954,6 +5955,23 @@ function render(worldView) {
     // Glyph-FX: proc state badges (doom_clock, cataclysm_mark, etc.) — above-right of entity
     if (renderEntity.procStates) {
       drawProcStateBadges(bctx, renderEntity.pos.x, renderEntity.pos.y, renderEntity.procStates, _fxTime, renderEntity.id);
+    }
+
+    // Equipment corner badges — weapon (bottom-right) and shield (bottom-left) icons
+    if (renderEntity.equipBadges) {
+      const eb = renderEntity.equipBadges;
+      const resolved = {};
+      if (eb.weaponIdentity) {
+        const pe = palette[eb.weaponIdentity];
+        if (pe) { resolved.weaponGlyph = pe.glyph; resolved.weaponColor = pe.fg; }
+        else { resolved.weaponGlyph = ')'; resolved.weaponColor = '#bbbbbb'; }
+      }
+      if (eb.shieldIdentity) {
+        const pe = palette[eb.shieldIdentity];
+        if (pe) { resolved.shieldGlyph = pe.glyph; resolved.shieldColor = pe.fg; }
+        else { resolved.shieldGlyph = '['; resolved.shieldColor = '#88bbdd'; }
+      }
+      drawEquipmentBadges(bctx, renderEntity.pos.x, renderEntity.pos.y, resolved, _fxTime, renderEntity.id);
     }
   }
 

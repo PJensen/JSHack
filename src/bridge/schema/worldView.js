@@ -385,6 +385,7 @@ function projectDisplayTags(world, id, rec) {
  */
 function projectEquipmentDisplayTags(world, id, rec) {
 	rec.weaponVfx = null;
+	rec.equipBadges = null;
 	/** @type {any} */ const eq = /** @type any */ (world.get(id, Equipment));
 	if (!eq) return;
 	const offhandId = Number(eq.offhand || 0) | 0;
@@ -396,6 +397,28 @@ function projectEquipmentDisplayTags(world, id, rec) {
 	}
 	const resolved = resolveEquippedWeaponVfx(world, id, { slots: ["weapon", "offhand"] });
 	if (resolved.length > 0) rec.weaponVfx = resolved;
+
+	// Equipment corner badges — weapon identity + offhand identity for display layer glyph lookup
+	const weaponId = Number(eq.weapon || 0) | 0;
+	let weaponIdentity = null;
+	let shieldIdentity = null;
+	if (weaponId > 0 && world.isAlive(weaponId)) {
+		weaponIdentity = String(world.get(weaponId, NamedIdentity)?.identity || "").toLowerCase() || null;
+	}
+	if (offhandId > 0 && world.isAlive(offhandId)) {
+		const offInfo = /** @type any */ (world.get(offhandId, ItemInfo));
+		const offIdentity = String(world.get(offhandId, NamedIdentity)?.identity || "").toLowerCase();
+		// Shield: no damageDice in offhand. Weapon offhand: has damageDice (dual-wield).
+		if (offInfo && !offInfo.damageDice) {
+			shieldIdentity = offIdentity || null;
+		} else if (offInfo?.damageDice) {
+			// Dual-wield: show offhand weapon as a second weapon badge (reuse shieldIdentity slot for now)
+			if (!weaponIdentity) weaponIdentity = offIdentity || null;
+		}
+	}
+	if (weaponIdentity || shieldIdentity) {
+		rec.equipBadges = { weaponIdentity, shieldIdentity };
+	}
 }
 
 /**
@@ -800,7 +823,7 @@ export function buildWorldView(world) {
 			const iScale = itemInfo ? computeItemScale(itemInfo, kind) : 1;
 			const vOff = itemInfo ? computeVisualOffset(id) : _zeroOff;
 			if (!rec) {
-				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer, hp: 0, maxHp: 0, isPet: false, showHealthBar: false, procStates: null, stackSeq, facing: null, weaponVfx: null, sizeClass: physSizeClass, itemScale: iScale, rotation: 0, visualOff: vOff };
+				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer, hp: 0, maxHp: 0, isPet: false, showHealthBar: false, procStates: null, equipBadges: null, stackSeq, facing: null, weaponVfx: null, sizeClass: physSizeClass, itemScale: iScale, rotation: 0, visualOff: vOff };
 				_entityRecs.set(id, rec);
 			} else {
 				rec.kind = kind;
@@ -808,6 +831,7 @@ export function buildWorldView(world) {
 				rec.pos.x = pos.x; rec.pos.y = pos.y;
 				rec.tags.length = 0;
 				rec.procStates = null;
+				rec.equipBadges = null;
 				rec.stackSeq = stackSeq;
 				rec.facing = null;
 				rec.weaponVfx = null;
@@ -899,6 +923,7 @@ export function buildWorldView(world) {
 				rec.pos.x = pos.x; rec.pos.y = pos.y;
 				rec.tags.length = 0;
 				rec.procStates = null;
+				rec.equipBadges = null;
 				rec.stackSeq = stackSeq2;
 				rec.facing = null;
 				rec.weaponVfx = null;
@@ -956,7 +981,7 @@ export function buildWorldView(world) {
 			const petPhysSizeClass = /** @type {string} */ (world.get(id, Physiology)?.sizeClass || '');
 			let rec = /** @type any */ (_entityRecs.get(id) || null);
 			if (!rec) {
-				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer: 300, hp: 0, maxHp: 0, isPet: false, showHealthBar: false, procStates: null, stackSeq, facing: null, weaponVfx: null, sizeClass: petPhysSizeClass, itemScale: 1, rotation: 0, visualOff: _zeroOff };
+				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer: 300, hp: 0, maxHp: 0, isPet: false, showHealthBar: false, procStates: null, equipBadges: null, stackSeq, facing: null, weaponVfx: null, sizeClass: petPhysSizeClass, itemScale: 1, rotation: 0, visualOff: _zeroOff };
 				_entityRecs.set(id, rec);
 			} else {
 				rec.kind = kind;
@@ -964,6 +989,7 @@ export function buildWorldView(world) {
 				rec.pos.x = pos.x; rec.pos.y = pos.y;
 				rec.tags.length = 0;
 				rec.procStates = null;
+				rec.equipBadges = null;
 				rec.stackSeq = stackSeq;
 				rec.facing = null;
 				rec.weaponVfx = null;

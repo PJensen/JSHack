@@ -34,7 +34,7 @@ import {
     getBlindedCritMultBonus,
 } from '../utils/blindnessExposure.js';
 import { getEntityFacingConeDegrees, getNormalizedEntityFacing, isPointInFacingCone } from '../utils/facing.js';
-import { getPositionalAttackBonus } from '../utils/combatPositioning.js';
+import { getPositionalAttackBonus, hasOffhandShield } from '../utils/combatPositioning.js';
 import { setCombatPosture } from '../utils/posture.js';
 import { upsertTimedEffect } from '../utils/effectSemantics.js';
 import { emitSafe } from '../utils/emitSafe.js';
@@ -222,6 +222,55 @@ function resolveHitRoll(world, {
             damageType: 'physical', crit: false, tags: actionTags, scratch: {}, offhand,
         }), () => r());
         return true;
+    }
+
+    // ── Dodge check: defender's evade stat grants a chance to avoid the hit entirely ──
+    if (!isCrit && defSnapshot.evade > 0) {
+        // Dodge chance: evade / (evade + 20) — diminishing returns, caps ~71% at evade=50
+        const dodgeChance = defSnapshot.evade / (defSnapshot.evade + 20);
+        const dodgeRoll = r();
+        if (dodgeRoll < dodgeChance) {
+            const dpos = world.get(target, Position);
+            emitSafe(world, 'combat:dodge', {
+                defender: target,
+                attacker: source,
+                at: dpos ? { x: dpos.x, y: dpos.y } : undefined,
+            });
+            applyPendingDamageProcPhase(world, source, buildProcContext('onMiss', {
+                source, target, item: weaponId || 0, damage: 0,
+                damageType: 'physical', crit: false, tags: [...actionTags, 'dodged'], scratch: {}, offhand,
+            }), () => r());
+            return true;
+        }
+    }
+
+    // ── Parry check: defender with a weapon (not shield) in hand can deflect attacks ──
+    if (!isCrit) {
+        const defEq = world.get(target, Equipment);
+        const defWeaponId = Number(defEq?.weapon || 0) | 0;
+        if (defWeaponId > 0 && world.isAlive(defWeaponId) && !hasOffhandShield(world, target)) {
+            const defWeaponInfo = world.get(defWeaponId, ItemInfo);
+            if (defWeaponInfo?.damageDice) {
+                // Parry chance: 8% base + 1% per defender evade, capped at 25%
+                const parryChance = Math.min(0.25, 0.08 + defSnapshot.evade * 0.01);
+                const parryRoll = r();
+                if (parryRoll < parryChance) {
+                    const dpos = world.get(target, Position);
+                    emitSafe(world, 'combat:parry', {
+                        defender: target,
+                        attacker: source,
+                        weaponId: defWeaponId,
+                        weaponName: world.get(defWeaponId, NamedIdentity)?.name || 'weapon',
+                        at: dpos ? { x: dpos.x, y: dpos.y } : undefined,
+                    });
+                    applyPendingDamageProcPhase(world, source, buildProcContext('onMiss', {
+                        source, target, item: weaponId || 0, damage: 0,
+                        damageType: 'physical', crit: false, tags: [...actionTags, 'parried'], scratch: {}, offhand,
+                    }), () => r());
+                    return true;
+                }
+            }
+        }
     }
 
     // Base damage from weapon dice (or fallback)
