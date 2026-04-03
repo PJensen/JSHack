@@ -87,6 +87,8 @@ const SACRED_ACK_SCAN_INTERVAL = 0.9;
 const SACRED_ACK_RADIUS = 4;
 const VANQUISH_CIRCLE_DURATION = 2.4;
 const VANQUISH_ORBIT_RADIUS = 0.84;
+const PET_REBIRTH_CIRCLE_DURATION = 3.4;
+const PET_REBIRTH_ORBIT_RADIUS = 0.96;
 const ITEM_FETCH_COOLDOWN = 1.15;
 const ITEM_FETCH_RADIUS = 7;
 const SACRED_IDENTITIES = new Set(["altar", "shrine", "church_altar"]);
@@ -180,6 +182,8 @@ export function createSpiritWispFxController(
   let _malevolenceX = 0, _malevolenceY = 0;
   let _vanquishTimer = 0;
   let _vanquishX = 0, _vanquishY = 0;
+  let _petRebirthTimer = 0;
+  let _petRebirthX = 0, _petRebirthY = 0;
   let _sacredScanTimer = 0;
   let _itemFetchCooldownTimer = 0;
   let _itemFetchReturnBurst = false;
@@ -478,6 +482,43 @@ export function createSpiritWispFxController(
     );
   }
 
+  function _triggerPetRebirthAt(x, y, intensity = 1) {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    const t = Math.max(0.8, Number(intensity || 1));
+    _petRebirthX = Number(x);
+    _petRebirthY = Number(y);
+    _petRebirthTimer = Math.max(
+      _petRebirthTimer,
+      PET_REBIRTH_CIRCLE_DURATION + Math.min(1.8, t * 0.5),
+    );
+    _setTargetCue(_petRebirthX, _petRebirthY, 1.8);
+    _attuneSacredPos(_petRebirthX, _petRebirthY, 2.8);
+    _spawnRingBurst(
+      _petRebirthX,
+      _petRebirthY,
+      [215, 245, 255],
+      20 + ((t * 10) | 0),
+      1.1,
+      2.8,
+      0.32,
+      0.28,
+      0.74,
+    );
+    _spawnRingBurst(
+      _petRebirthX,
+      _petRebirthY,
+      [255, 232, 165],
+      14 + ((t * 8) | 0),
+      0.9,
+      2.2,
+      0.28,
+      0.26,
+      0.66,
+    );
+    _triggerCeremonyAt(_petRebirthX, _petRebirthY, 1.1 + t * 0.5);
+    _startMiracleFlight(_petRebirthX, _petRebirthY);
+  }
+
   function _setTargetCue(x, y, ttl = 1.4) {
     if (!Number.isFinite(x) || !Number.isFinite(y)) return;
     _targetCueX = x;
@@ -661,6 +702,7 @@ export function createSpiritWispFxController(
     _altarRejectTimer = Math.max(0, _altarRejectTimer - dtSec);
     _malevolenceTimer = Math.max(0, _malevolenceTimer - dtSec);
     _vanquishTimer = Math.max(0, _vanquishTimer - dtSec);
+    _petRebirthTimer = Math.max(0, _petRebirthTimer - dtSec);
     _itemFetchCooldownTimer = Math.max(0, _itemFetchCooldownTimer - dtSec);
 
     if (ppos) {
@@ -739,6 +781,16 @@ export function createSpiritWispFxController(
       const tx = _vanquishX + Math.cos(angle) * radius;
       const ty = _vanquishY + Math.sin(angle) * radius * 0.72;
       const blend = 0.22 + t * 0.56;
+      _x += (tx - _x) * blend;
+      _y += (ty - _y) * blend;
+    }
+    if (_petRebirthTimer > 0 && !_betrayed) {
+      const t = Math.min(1, _petRebirthTimer / PET_REBIRTH_CIRCLE_DURATION);
+      const angle = _phase * 1.55 + (1 - t) * Math.PI * 6.4;
+      const radius = PET_REBIRTH_ORBIT_RADIUS + (1 - t) * 0.32;
+      const tx = _petRebirthX + Math.cos(angle) * radius;
+      const ty = _petRebirthY + Math.sin(angle) * radius * 0.68;
+      const blend = 0.24 + t * 0.62;
       _x += (tx - _x) * blend;
       _y += (ty - _y) * blend;
     }
@@ -1018,6 +1070,22 @@ export function createSpiritWispFxController(
       bctx.lineWidth = 0.017;
       bctx.beginPath();
       bctx.arc(_vanquishX, _vanquishY, ring, 0, Math.PI * 2);
+      bctx.stroke();
+    }
+    if (_petRebirthTimer > 0) {
+      const t = Math.min(1, _petRebirthTimer / PET_REBIRTH_CIRCLE_DURATION);
+      const ringA = (0.14 + t * 0.3) * dim;
+      const r1 = 0.26 + (1 - t) * 0.22;
+      const r2 = 0.14 + (1 - t) * 0.14;
+      bctx.strokeStyle = `rgba(205,245,255,${ringA.toFixed(3)})`;
+      bctx.lineWidth = 0.02;
+      bctx.beginPath();
+      bctx.arc(_petRebirthX, _petRebirthY, r1, 0, Math.PI * 2);
+      bctx.stroke();
+      bctx.strokeStyle = `rgba(255,228,160,${(ringA * 0.92).toFixed(3)})`;
+      bctx.lineWidth = 0.016;
+      bctx.beginPath();
+      bctx.arc(_petRebirthX, _petRebirthY, r2, 0, Math.PI * 2);
       bctx.stroke();
     }
 
@@ -1348,6 +1416,16 @@ export function createSpiritWispFxController(
         _altarBeaconY || _anchorY,
         1.9,
       );
+    });
+    world.on("pet:resurrected", ({ actor, petId, at }) => {
+      const pe = getPlayerEntity();
+      if (!pe || Number(actor || 0) !== pe.id) return;
+      const pid = Number(petId || 0) | 0;
+      const pos = Number.isFinite(at?.x) && Number.isFinite(at?.y)
+        ? { x: Number(at.x), y: Number(at.y) }
+        : (pid > 0 ? getPosition(pid) : null);
+      if (!pos) return;
+      _triggerPetRebirthAt(pos.x, pos.y, 1.35);
     });
     world.on("shrine:communion", ({ actor, targetId, effect }) => {
       const pe = getPlayerEntity();

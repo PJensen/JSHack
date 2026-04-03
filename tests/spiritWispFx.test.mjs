@@ -153,3 +153,30 @@ Deno.test("spirit passively acknowledges nearby sacred sites", () => {
   const wisp = controller.getWispPos();
   assert(wisp, "wisp should remain active near sacred sites");
 });
+
+Deno.test("spirit circles revived pet tile after miracle resurrection", () => {
+  const { world, controller, playerId } = setupHarness({
+    playerStart: { x: 1, y: 1 },
+  });
+  const petId = world.create();
+  world.add(petId, Position, { x: 8, y: 1 });
+  world.add(petId, NamedIdentity, { name: "Kitty", identity: "cat" });
+
+  controller.tick(0.1);
+  const before = controller.getWispPos();
+  world.emit("pet:resurrected", {
+    actor: playerId,
+    petId,
+    at: { x: 8, y: 1 },
+  });
+
+  for (let i = 0; i < 6; i++) controller.tick(0.1);
+  const after = controller.getWispPos();
+  const petPos = { x: 8, y: 1 };
+
+  assert(before && after, "wisp should remain active after pet resurrection");
+  assert(
+    distance(after, petPos) < distance(before, petPos),
+    "wisp should move toward the resurrected pet tile to circle it",
+  );
+});
