@@ -154,9 +154,13 @@ export function createSpiritWispFxController(
   let _deathVigil = false;
   let _deathLandT = 0; // 0→1 eases wisp to player tile
   const DEATH_LAND_DURATION = 6.2; // seconds to settle onto player
+  const DEATH_CIRCLE_DURATION = 2.2;
+  const DEATH_CIRCLE_RADIUS = 0.95;
   let _deathTargetX = 0, _deathTargetY = 0;
   let _deathStartX = 0, _deathStartY = 0;
   let _deathHasStart = false;
+  let _deathCircleTimer = 0;
+  let _deathCirclePhase = 0;
 
   // Betrayal
   let _standing = 0;
@@ -615,6 +619,20 @@ export function createSpiritWispFxController(
 
     // Death vigil — wisp gently descends onto the player's tile and holds
     if (_deathVigil) {
+      if (_deathCircleTimer > 0) {
+        _deathCircleTimer = Math.max(0, _deathCircleTimer - dtSec);
+        const circleT = 1 - (_deathCircleTimer / DEATH_CIRCLE_DURATION); // 0→1
+        const angle = _deathCirclePhase + circleT * Math.PI * 4.2;
+        const radius = DEATH_CIRCLE_RADIUS * (1 - circleT * 0.45);
+        const targetX = _deathTargetX + Math.cos(angle) * radius;
+        const targetY = _deathTargetY + Math.sin(angle) * radius * 0.65;
+        const pull = 0.18 + circleT * 0.34;
+        _x += (targetX - _x) * pull;
+        _y += (targetY - _y) * pull;
+        _pushRibbonPoint();
+        _spawnTrail(dtSec * 0.55);
+        return;
+      }
       _deathLandT = Math.min(1, _deathLandT + dtSec / DEATH_LAND_DURATION);
       // Smooth ease-out (decelerate into landing)
       const t = 1 - (1 - _deathLandT) * (1 - _deathLandT);
@@ -1193,6 +1211,7 @@ export function createSpiritWispFxController(
       if (playerId > 0 && deadId === playerId) {
         _deathVigil = true;
         _deathLandT = 0;
+        _deathCircleTimer = DEATH_CIRCLE_DURATION;
         const pos = getPosition(deadId) || pe?.pos ||
           { x: _anchorX, y: _anchorY };
         _deathTargetX = Number(pos?.x ?? _anchorX);
@@ -1206,6 +1225,11 @@ export function createSpiritWispFxController(
           _deathStartY = _deathTargetY - 0.8;
           _deathHasStart = true;
         }
+        const dx = _deathStartX - _deathTargetX;
+        const dy = (_deathStartY - _deathTargetY) / 0.65;
+        _deathCirclePhase = (Math.abs(dx) + Math.abs(dy)) > 0.01
+          ? Math.atan2(dy, dx)
+          : _phase;
         _attuneSacredPos(_deathTargetX, _deathTargetY, 1.5);
         return;
       }

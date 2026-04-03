@@ -45,16 +45,16 @@ Deno.test("spirit circles recently vanquished foes when player lands the kill", 
   world.add(foeId, Position, { x: 9, y: 2 });
 
   controller.tick(0.08);
+  const before = controller.getWispPos();
   world.emit("died", { id: foeId, killer: playerId });
 
   for (let i = 0; i < 8; i++) controller.tick(0.1);
 
   const wisp = controller.getWispPos();
-  assert(wisp, "wisp should remain active after foe death");
+  assert(before && wisp, "wisp should remain active after foe death");
   const foePos = { x: 9, y: 2 };
-  const playerPos = { x: 2, y: 2 };
   assert(
-    distance(wisp, foePos) < distance(wisp, playerPos),
+    distance(wisp, foePos) < distance(before, foePos),
     "wisp should bias toward the vanquished foe while circling",
   );
 });
@@ -111,6 +111,33 @@ Deno.test("spirit death vigil keeps settling on death tile even if player positi
   assert(
     distance(after, deathTile) < distance(before, deathTile),
     "wisp should continue settling toward the recorded death tile",
+  );
+});
+
+Deno.test("spirit circles the corpse before settling onto it", () => {
+  const { world, controller, playerId } = setupHarness({
+    playerStart: { x: 6, y: 6 },
+  });
+  controller.tick(0.08);
+
+  world.emit("died", { id: playerId, killer: 0 });
+  world.remove(playerId, Position);
+  const deathTile = { x: 6, y: 6 };
+
+  controller.tick(0.5);
+  const duringCircle = controller.getWispPos();
+  assert(duringCircle, "wisp should remain active during corpse circle");
+  assert(
+    distance(duringCircle, deathTile) > 0.35,
+    "wisp should still be circling before final settle",
+  );
+
+  for (let i = 0; i < 48; i++) controller.tick(0.2);
+  const settled = controller.getWispPos();
+  assert(settled, "wisp should remain active after settling");
+  assert(
+    distance(settled, deathTile) < 0.35,
+    "wisp should eventually settle onto the corpse tile",
   );
 });
 
