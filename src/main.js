@@ -2271,22 +2271,44 @@ function scheduleDeathLootArc(itemId, origin, at, delayOffset, impulse) {
   let toY = Number(at?.y);
   if (![fromX, fromY, toX, toY].every(Number.isFinite)) return;
 
-  // Impulse: bias the landing point slightly in the impact direction.
-  // force (1..3) scales the nudge; crits push a bit further.
+  // Per-item deterministic jitter (two independent axes)
+  const j1 = seededUnit(id ^ (world.step | 0));
+  const j2 = seededUnit((id * 0x9e3779b9) ^ (world.step | 0));
+
+  // Weight governs how far an item scatters: light items fly, heavy items thud.
+  // weightMul: 1.0 for weightless/light, ~0.15 for a heavy corpse (weight ~20).
+  const itemInfo = world.get(id, ItemInfo);
+  const weight = Math.max(0, Number(itemInfo?.weight || 0));
+  const weightMul = 1 / (1 + weight * 0.3);
+
+  // Visual scatter: items are bound to their rules tile but the arc
+  // landing point is purely screen-space. Impulse biases the direction,
+  // overkill / crit force widens the spread, weight damps everything.
   const idx = Number(impulse?.dx || 0);
   const idy = Number(impulse?.dy || 0);
   const force = Math.max(0, Math.min(3, Number(impulse?.force || 0)));
-  if ((idx || idy) && force > 0) {
-    const nudge = 0.15 * force;
-    toX += idx * nudge;
-    toY += idy * nudge;
+  if (idx || idy || force > 0) {
+    // Directional push along impulse vector
+    const push = (0.25 + 0.20 * force) * weightMul;
+    toX += idx * push;
+    toY += idy * push;
+    // Perpendicular scatter so items fan out, not stack on a line
+    const perpX = -idy;
+    const perpY = idx;
+    const spread = (j1 - 0.5) * (0.4 + 0.25 * force) * weightMul;
+    toX += perpX * spread;
+    toY += perpY * spread;
   }
+  // Small random scatter even without impulse (e.g. urn/chest loot)
+  toX += (j1 - 0.5) * 0.15 * weightMul;
+  toY += (j2 - 0.5) * 0.15 * weightMul;
 
-  const cheb = Math.max(Math.abs((toX | 0) - (fromX | 0)), Math.abs((toY | 0) - (fromY | 0)));
-  if (cheb > 3) return;  // widen slightly for impulse-biased arcs
-  const jitter = seededUnit(id ^ (world.step | 0));
-  const duration = 0.22 + cheb * 0.10 + jitter * 0.07;
-  const peak = 0.20 + cheb * 0.22 + jitter * 0.10 + force * 0.06;
+  const fdx = toX - fromX;
+  const fdy = toY - fromY;
+  const dist = Math.sqrt(fdx * fdx + fdy * fdy);
+  if (dist > 3.5) return;
+  const duration = 0.24 + dist * 0.10 + j1 * 0.07 + force * 0.04;
+  const peak = (0.22 + dist * 0.18 + j2 * 0.10 + force * 0.08) * weightMul;
   _deathLootArcs.set(id, {
     fromX,
     fromY,
