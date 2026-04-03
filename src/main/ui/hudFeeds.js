@@ -26,7 +26,7 @@ import { impactTracker } from "../../display/fx/projectileImpactTracker.js";
 /**
  * Provides HUD feed updaters that cache the last dispatched values.
  * @param {import('../../lib/ecs-js/index.js').World} world
- * @param {{ getPlayerMana: () => { mana: number, maxMana: number }, ensureActiveSpell: () => string|null, updateActiveSpellLabel: () => void, knownSpellIds?: () => string[], getActionBarSlots?: () => (string|null)[], getPinnedSpellSlots?: () => (string|null)[], autoAssignSlot?: (id: string) => number, getFxTime?: () => number }} deps
+ * @param {{ getPlayerMana: () => { mana: number, maxMana: number }, ensureActiveSpell: () => string|null, updateActiveSpellLabel: () => void, knownSpellIds?: () => string[], getActionBarSlots?: () => (string|null)[], getPinnedSpellSlots?: () => (string|null)[], autoAssignSlot?: (id: string) => number, autoAssignPinnedSlot?: (id: string) => number, getFxTime?: () => number }} deps
  */
 export function createHudFeeds(world, deps) {
   const { getPlayerMana, ensureActiveSpell, updateActiveSpellLabel, getFxTime } = deps;
@@ -291,11 +291,14 @@ export function createHudFeeds(world, deps) {
       updateActiveSpellLabel();
     }
 
-    // Auto-assign newly learned spells to empty action bar slots
+    // Auto-assign newly learned spells to empty action bar + pinned slots
     if (typeof deps.knownSpellIds === 'function' && typeof deps.autoAssignSlot === 'function') {
       const ids = deps.knownSpellIds();
       for (const id of ids) {
-        if (!_prevKnownSpells.has(id)) deps.autoAssignSlot(id);
+        if (!_prevKnownSpells.has(id)) {
+          deps.autoAssignSlot(id);
+          if (typeof deps.autoAssignPinnedSlot === 'function') deps.autoAssignPinnedSlot(id);
+        }
       }
       _prevKnownSpells = new Set(ids);
     }
