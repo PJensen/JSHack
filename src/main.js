@@ -2261,20 +2261,32 @@ function seededUnit(seed) {
   return (s & 0xffff) / 0xffff;
 }
 
-function scheduleDeathLootArc(itemId, origin, at, delayOffset) {
+function scheduleDeathLootArc(itemId, origin, at, delayOffset, impulse) {
   const id = Number(itemId || 0) | 0;
   if (!(id > 0)) return;
   const fx = _fxTime + (Number(delayOffset) || 0);
   const fromX = Number(origin?.x);
   const fromY = Number(origin?.y);
-  const toX = Number(at?.x);
-  const toY = Number(at?.y);
+  let toX = Number(at?.x);
+  let toY = Number(at?.y);
   if (![fromX, fromY, toX, toY].every(Number.isFinite)) return;
+
+  // Impulse: bias the landing point slightly in the impact direction.
+  // force (1..3) scales the nudge; crits push a bit further.
+  const idx = Number(impulse?.dx || 0);
+  const idy = Number(impulse?.dy || 0);
+  const force = Math.max(0, Math.min(3, Number(impulse?.force || 0)));
+  if ((idx || idy) && force > 0) {
+    const nudge = 0.15 * force;
+    toX += idx * nudge;
+    toY += idy * nudge;
+  }
+
   const cheb = Math.max(Math.abs((toX | 0) - (fromX | 0)), Math.abs((toY | 0) - (fromY | 0)));
-  if (cheb > 2) return;
+  if (cheb > 3) return;  // widen slightly for impulse-biased arcs
   const jitter = seededUnit(id ^ (world.step | 0));
   const duration = 0.22 + cheb * 0.10 + jitter * 0.07;
-  const peak = 0.20 + cheb * 0.22 + jitter * 0.10;
+  const peak = 0.20 + cheb * 0.22 + jitter * 0.10 + force * 0.06;
   _deathLootArcs.set(id, {
     fromX,
     fromY,
@@ -2305,12 +2317,12 @@ function deathLootArcPos(itemId) {
   };
 }
 
-world.on("item:dropped", ({ itemId, actor, source, origin, at, targetId }) => {
+world.on("item:dropped", ({ itemId, actor, source, origin, at, targetId, impulse }) => {
   const src = String(source || "");
   if (src === "death") {
     const actorId = Number(actor || 0) | 0;
     const delay = actorId > 0 ? impactTracker.delayFor(actorId, _fxTime) : 0;
-    scheduleDeathLootArc(itemId, origin, at, delay);
+    scheduleDeathLootArc(itemId, origin, at, delay, impulse || null);
   } else if (src === "urn") {
     scheduleDeathLootArc(itemId, origin, at, 0);
   } else if (src === "chest") {

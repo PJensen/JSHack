@@ -414,9 +414,10 @@ function getPlayerKnownSpells(world) {
  * @param {Object} rng - createRng() instance
  * @param {number} depth
  * @param {{x:number, y:number}} pos
+ * @param {{source?:string, origin?:{x:number,y:number}, impulse?:{dx:number,dy:number,force?:number,critical?:boolean}}|undefined} [meta]
  * @returns {number[]} entity IDs created
  */
-export function dropLoot(world, tableId, rng, depth, pos) {
+export function dropLoot(world, tableId, rng, depth, pos, meta) {
   const knownSpells = getPlayerKnownSpells(world);
   const playerItemIds = getPlayerItemIdentities(world);
   const opts = (knownSpells || playerItemIds) ? {
@@ -425,11 +426,15 @@ export function dropLoot(world, tableId, rng, depth, pos) {
   } : undefined;
   const drops = resolveLootTable(tableId, rng, depth, 0, opts);
   const ids = [];
+  const extra = {};
+  if (meta?.source) extra.source = meta.source;
+  if (meta?.origin) extra.origin = meta.origin;
+  if (meta?.impulse) extra.impulse = meta.impulse;
   for (const drop of drops) {
     const eid = materializeDrop(world, drop, pos);
     if (eid != null) {
       ids.push(eid);
-      emitSafe(world, 'item:dropped', { itemId: eid, count: 1, at: { x: pos.x, y: pos.y } });
+      emitSafe(world, 'item:dropped', { itemId: eid, count: 1, at: { x: pos.x, y: pos.y }, ...extra });
     }
   }
   return ids;
