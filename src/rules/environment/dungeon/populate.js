@@ -571,6 +571,7 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
 
     // Place a room feature (~50% of non-entry rooms get one)
     const isEntryRoom = room === entryRoom;
+    const roomIsStarting = roomContainsStairUpTile(room, chunk);
     let roomHasWeaponRack = false;
     let roomIsSacred = false;
     const featureRate = floorPlan.profile?.doorFeatureRate ?? 0.50;
@@ -692,7 +693,7 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
     // Monster density: ~1 per 12-18 floor tiles, scaled by depth
     const totalMonsterBudget = Math.max(0, Math.floor(area / rng.int(12, 18) * diff));
     const spawnerChance = Math.min(0.60, totalMonsterBudget * SPAWNER_CHANCE_PER_MONSTER);
-    const spawnerBudget = (!roomIsSacred && totalMonsterBudget > 0 && rng.next() < spawnerChance) ? 1 : 0;
+    const spawnerBudget = (!roomIsSacred && !roomIsStarting && totalMonsterBudget > 0 && rng.next() < spawnerChance) ? 1 : 0;
     const monsterBudget = Math.max(0, totalMonsterBudget - spawnerBudget);
 
     // Place spawners (create monster packs)
@@ -791,7 +792,8 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
     }
 
     // Trap density: ~33% of rooms get a trap (infrequent enough to lull players)
-    if (rng.next() < 0.33) {
+    // Stair-up rooms are safe — no traps near arrival points.
+    if (!roomIsStarting && rng.next() < 0.33) {
       const trapBudget = area >= 64 ? rng.int(1, 2) : 1;
       for (let i = 0; i < trapBudget; i++) {
         let tx, ty, attempts = 0;
@@ -1279,6 +1281,20 @@ function roomContainsStairTile(room, chunk) {
     for (let x = 0; x < rw; x++) {
       const tile = chunk.tiles[(ry + y) * CHUNK_SIZE + (rx + x)];
       if (tile === TILE_STAIR_DOWN || tile === TILE_STAIR_UP) return true;
+    }
+  }
+  return false;
+}
+
+function roomContainsStairUpTile(room, chunk) {
+  const ox = chunk.chunkX * CHUNK_SIZE;
+  const oy = chunk.chunkY * CHUNK_SIZE;
+  const rx = room.x - ox;
+  const ry = room.y - oy;
+
+  for (let y = 0; y < room.h; y++) {
+    for (let x = 0; x < room.w; x++) {
+      if (chunk.tiles[(ry + y) * CHUNK_SIZE + (rx + x)] === TILE_STAIR_UP) return true;
     }
   }
   return false;
