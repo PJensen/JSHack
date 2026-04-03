@@ -2238,6 +2238,9 @@ world.on("damaged", ({ target, amount, projectileDelay }) => {
   const dmg = Math.max(0, Number(amount) || 0);
   if (tid > 0 && d > 0 && dmg > 0) {
     impactTracker.record(tid, dmg, _fxTime + d);
+    _pendingHitTints.push({ fireAt: _fxTime + d, id: tid });
+  } else if (tid > 0 && dmg > 0) {
+    triggerHitTint(tid);
   }
 });
 
@@ -4086,6 +4089,36 @@ const _memoryGlyphByKind = new Map();
 const HP_BAR_MEANINGFUL_RATIO_DELTA = 0.08;
 const HP_BAR_SHOW_SECONDS = 2.25;
 const PET_HP_BAR_SHOW_SECONDS = 3.5;
+
+// ── Hit tint: brief red shift on the entity glyph on successful damage ──
+const HIT_TINT_DURATION = 0.18;
+/** @type {Map<number, number>} entityId → elapsed seconds since tint started */
+const _hitTints = new Map();
+/** @type {Array<{ fireAt:number, id:number }>} deferred tints waiting for projectile impact */
+const _pendingHitTints = [];
+
+function triggerHitTint(id) { _hitTints.set(id | 0, 0); }
+function tickHitTints(dt) {
+  for (const [id, t] of _hitTints) {
+    const next = t + dt;
+    if (next >= HIT_TINT_DURATION) _hitTints.delete(id);
+    else _hitTints.set(id, next);
+  }
+  for (let i = _pendingHitTints.length - 1; i >= 0; i--) {
+    if (_fxTime >= _pendingHitTints[i].fireAt) {
+      triggerHitTint(_pendingHitTints[i].id);
+      _pendingHitTints.splice(i, 1);
+    }
+  }
+}
+/** Returns 0..1 tint intensity (0 = no tint). */
+function getHitTint(id) {
+  const t = _hitTints.get(id | 0);
+  if (t === undefined) return 0;
+  const k = t / HIT_TINT_DURATION;
+  // fast peak at 15%, then smooth decay
+  return k < 0.15 ? k / 0.15 : 1 - ((k - 0.15) / 0.85);
+}
 const PET_CRITICAL_RATIO = 0.35;
 
 /**
@@ -4659,7 +4692,15 @@ function drawEntityGlyph(atlas, ctx, entity, scale = 1) {
   const memoryTampered = hasTag(entity, 'memory_tampered');
   const espSensed = hasTag(entity, 'esp_sensed');
   if (!invisible && !shadowCloak && !phaseShift && !memoryRecent && !espSensed) {
-    drawKindScaled(atlas, ctx, kind, entity.pos.x, entity.pos.y, scale);
+    const tint = getHitTint(entity.id);
+    if (tint > 0.01) {
+      ctx.save();
+      ctx.filter = `saturate(${1 - tint * 0.7}) sepia(${tint}) hue-rotate(-50deg) brightness(${1 + tint * 0.4})`;
+      drawKindScaled(atlas, ctx, kind, entity.pos.x, entity.pos.y, scale);
+      ctx.restore();
+    } else {
+      drawKindScaled(atlas, ctx, kind, entity.pos.x, entity.pos.y, scale);
+    }
     return;
   }
   // Memory/ESP can affect many entities at once; avoid costly canvas filter path.
@@ -6195,6 +6236,7 @@ function frame(now) {
   flyingFx.tick(dtSec);
   slideFx.tick(dtSec);
   bumpFx.tick(dtSec);
+  tickHitTints(dtSec);
   sceneRuntime.tick(dtSec);
 
   // Update vitals HUD if changed (lightweight per-frame check)
