@@ -153,8 +153,10 @@ export function createSpiritWispFxController(
   // Death vigil — wisp descends onto player tile, holds still
   let _deathVigil = false;
   let _deathLandT = 0; // 0→1 eases wisp to player tile
-  const DEATH_LAND_DURATION = 3.5; // seconds to settle onto player
+  const DEATH_LAND_DURATION = 6.2; // seconds to settle onto player
   let _deathTargetX = 0, _deathTargetY = 0;
+  let _deathStartX = 0, _deathStartY = 0;
+  let _deathHasStart = false;
 
   // Betrayal
   let _standing = 0;
@@ -586,8 +588,13 @@ export function createSpiritWispFxController(
       _anchorY = Number(ppos?.y ?? _deathTargetY);
       _anchored = true;
       _active = true;
-      _x = _anchorX;
-      _y = _anchorY;
+      if (_deathVigil && _deathHasStart) {
+        _x = _deathStartX;
+        _y = _deathStartY;
+      } else {
+        _x = _anchorX;
+        _y = _anchorY;
+      }
       _ribbonPoints.length = 0;
       _pushRibbonPoint();
     }
@@ -1190,6 +1197,15 @@ export function createSpiritWispFxController(
           { x: _anchorX, y: _anchorY };
         _deathTargetX = Number(pos?.x ?? _anchorX);
         _deathTargetY = Number(pos?.y ?? _anchorY);
+        if (_active) {
+          _deathStartX = _x;
+          _deathStartY = _y;
+          _deathHasStart = true;
+        } else {
+          _deathStartX = _deathTargetX + 1.2;
+          _deathStartY = _deathTargetY - 0.8;
+          _deathHasStart = true;
+        }
         _attuneSacredPos(_deathTargetX, _deathTargetY, 1.5);
         return;
       }
