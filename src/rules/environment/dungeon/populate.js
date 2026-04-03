@@ -691,7 +691,8 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
     }
 
     // Monster density: ~1 per 12-18 floor tiles, scaled by depth
-    const totalMonsterBudget = Math.max(0, Math.floor(area / rng.int(12, 18) * diff));
+    // Stair-up rooms are safe — no monsters near arrival points.
+    const totalMonsterBudget = roomIsStarting ? (rng.int(12, 18), 0) : Math.max(0, Math.floor(area / rng.int(12, 18) * diff));
     const spawnerChance = Math.min(0.60, totalMonsterBudget * SPAWNER_CHANCE_PER_MONSTER);
     const spawnerBudget = (!roomIsSacred && !roomIsStarting && totalMonsterBudget > 0 && rng.next() < spawnerChance) ? 1 : 0;
     const monsterBudget = Math.max(0, totalMonsterBudget - spawnerBudget);
