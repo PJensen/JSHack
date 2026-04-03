@@ -26,6 +26,7 @@ import { CorpseAdaptation } from "../../rules/components/CorpseAdaptation.js";
 import { ProcPackageNode } from "../../rules/components/ProcPackageNode.js";
 import { getParent } from "../../lib/ecs-js/hierarchy.js";
 import { setTile, getTile } from "../../rules/environment/dungeon/tileMap.js";
+import { dealDamage } from "../../rules/utils/dealDamage.js";
 import {
   TILE_FLOOR,
   TILE_WALL,
@@ -560,6 +561,38 @@ export function registerBuiltinCommands(console, { world, messageLog, lightingEn
     }
 
     return lines.join('\n');
+  });
+
+  // ---- kill self / kill <entity-id> ----
+  console.registerCommand('kill', 'kill self | kill <entity-id> — instantly kill player or entity', (argsStr) => {
+    const arg = argsStr.trim().toLowerCase();
+    if (arg === 'self' || arg === 'me' || arg === 'player') {
+      const pe = playerEntity(world);
+      if (!pe) return 'No player entity found.';
+      const vit = world.get(pe.id, Vitality);
+      if (!vit) return 'Player has no Vitality.';
+      dealDamage(world, {
+        target: pe.id,
+        amount: vit.maxHp * 10,
+        type: 'physical',
+        cause: 'debug kill',
+        bypassInvuln: true,
+      });
+      return 'Player killed.';
+    }
+    const targetId = parseInt(arg, 10);
+    if (!Number.isFinite(targetId) || targetId <= 0) return 'Usage: kill self | kill <entity-id>';
+    if (!world.isAlive(targetId)) return `Entity #${targetId} does not exist.`;
+    const vit = world.get(targetId, Vitality);
+    if (!vit) return `Entity #${targetId} has no Vitality.`;
+    dealDamage(world, {
+      target: targetId,
+      amount: vit.maxHp * 10,
+      type: 'physical',
+      cause: 'debug kill',
+      bypassInvuln: true,
+    });
+    return `Killed entity #${targetId}.`;
   });
 }
 

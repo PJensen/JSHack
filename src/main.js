@@ -563,6 +563,8 @@ let _postMortemTicksLeft = 0;
 world.on("died", ({ id }) => {
   if (!world.has(id, Player)) return;
   if (_postMortemInterval) return;
+  // Death VFX: extended hitstop, shake, flash, jingle, blink sequence
+  deathVfx.triggerDeath({ cam, hitstopFx });
   // Dim the lights: ramp vision to 0 over 10 half-second ticks (5s fade)
   blind(world, id, 0, POST_MORTEM_TICKS, 0, 0);
   _postMortemTicksLeft = POST_MORTEM_TICKS;
@@ -4045,6 +4047,7 @@ const {
   bumpFx,
   recoilFx,
   hitstopFx,
+  deathVfx,
   ftext,
   goreTick,
 } = displayRuntime;
@@ -4688,6 +4691,15 @@ function drawMonsterLabels(ctx, labels, fxTime) {
 
 function drawEntityGlyph(atlas, ctx, entity, scale = 1) {
   if (hasTag(entity, 'thermal_sensed')) return;
+
+  // Death VFX: player glyph blink (disappears on off-beats) + heartbeat scale
+  const isPlayerGlyph = (entity.layer | 0) === 400;
+  if (isPlayerGlyph) {
+    const blinkAlpha = deathVfx.getPlayerGlyphAlpha(_fxTime);
+    if (blinkAlpha < 0.01) return; // blink off-beat — don't draw
+    scale *= deathVfx.getPlayerGlyphScale(_fxTime);
+  }
+
   const kind = resolveRenderableKind(atlas, entity);
   const invisible = hasTag(entity, 'invisible');
   const shadowCloak = hasTag(entity, 'shadow_cloak');
@@ -6216,6 +6228,11 @@ function render(worldView) {
     }
   }
 
+  // Death VFX screen overlays: desaturation, vignette, flash
+  deathVfx.drawDesaturation(ctx, W, H);
+  deathVfx.drawLowHpVignette(ctx, W, H, _fxTime);
+  deathVfx.drawDeathFlash(ctx, W, H);
+
   // Screen-space wrath flash drawn after world present so lethal hits still read.
   drawScreenEffects({ ctx, W, H, boltFx });
   sceneRuntime.drawSpeechBubble(ctx);
@@ -6255,6 +6272,7 @@ function frame(now) {
   bumpFx.tick(dtSec);
   recoilFx.tick(dtSec);
   tickHitTints(dtSec);
+  deathVfx.tick(dtSec);
   sceneRuntime.tick(dtSec);
 
   // Update vitals HUD if changed (lightweight per-frame check)
@@ -6273,6 +6291,12 @@ function frame(now) {
   const view = statusPresentationDelayFx.filterWorldView(rawView, _fxTime);
   if (view.player && !cam._detached) {
     followEntity(cam, view.player.pos, dtSec, 6.0);
+  }
+
+  // Feed player HP ratio to death VFX (low-HP heartbeat warning)
+  if (view.player) {
+    const pe = view.entities.find(e => e.id === view.player.id);
+    if (pe && pe.maxHp > 0) deathVfx.setPlayerHpRatio(pe.hp / pe.maxHp);
   }
 
   // Sync spirit wisp depth (dungeon only)
