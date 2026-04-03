@@ -1637,7 +1637,7 @@ function createQuickSlot(opts = {}) {
     alignItems: 'flex-end',
     gap: '8px',
     pointerEvents: 'auto',
-    zIndex: 901,
+    zIndex: 925,
   });
 
   /** @type {Array<{id:number, identity?:string, type:string, slot?:string, name:string, count:number, rarityName?:string, glyph?:string, glyphColor?:string, hasScrollOfIdentify?:boolean, details?:any, interacted?:boolean, addedAt:number}>} */
