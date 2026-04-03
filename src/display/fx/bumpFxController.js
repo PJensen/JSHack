@@ -8,15 +8,15 @@
 /** @typedef {{ dx:number, dy:number, elapsed:number, delay:number, duration:number, dist:number }} BumpState */
 
 // ── Timing (seconds) ────────────────────────────────────────────────
-const LUNGE_OUT   = 0.055;   // slide toward target
-const LUNGE_HOLD  = 0.025;   // brief pause at apex
-const LUNGE_BACK  = 0.070;   // snap back to origin
+const LUNGE_OUT   = 0.030;   // snap toward target — almost instant
+const LUNGE_HOLD  = 0.055;   // hold at apex so the brain registers contact
+const LUNGE_BACK  = 0.095;   // slow withdrawal sells weight
 const TOTAL       = LUNGE_OUT + LUNGE_HOLD + LUNGE_BACK;
 
 // Offhand: quicker, snappier follow-up
-const OH_LUNGE_OUT  = 0.040;
-const OH_LUNGE_HOLD = 0.015;
-const OH_LUNGE_BACK = 0.055;
+const OH_LUNGE_OUT  = 0.025;
+const OH_LUNGE_HOLD = 0.040;
+const OH_LUNGE_BACK = 0.070;
 const OH_TOTAL      = OH_LUNGE_OUT + OH_LUNGE_HOLD + OH_LUNGE_BACK;
 
 const LUNGE_DIST_BASE = 0.30;  // base tiles toward target at apex (main hand)
@@ -34,23 +34,25 @@ const MONSTER_DELAY    = 0.10;
 const OFFHAND_DELAY    = 0.15;
 
 // ── Easing ──────────────────────────────────────────────────────────
+// Strike: accelerate INTO the target (easeIn). Return: decelerate out (easeOut).
 function easeOutQuad(t)  { return 1 - (1 - t) * (1 - t); }
 function easeInQuad(t)   { return t * t; }
 
 /**
  * Compute the fractional offset (0..1) for a main-hand lunge.
+ * easeIn on strike (accelerates into target), easeOut on return (decelerates home).
  */
 function lungeProgress(elapsed) {
   if (elapsed < 0) return 0;
   if (elapsed < LUNGE_OUT) {
-    return easeOutQuad(elapsed / LUNGE_OUT);
+    return easeInQuad(elapsed / LUNGE_OUT);
   }
   if (elapsed < LUNGE_OUT + LUNGE_HOLD) {
     return 1;
   }
   const retT = (elapsed - LUNGE_OUT - LUNGE_HOLD) / LUNGE_BACK;
   if (retT >= 1) return 0;
-  return 1 - easeInQuad(retT);
+  return 1 - easeOutQuad(retT);
 }
 
 /**
@@ -59,14 +61,14 @@ function lungeProgress(elapsed) {
 function offhandLungeProgress(elapsed) {
   if (elapsed < 0) return 0;
   if (elapsed < OH_LUNGE_OUT) {
-    return easeOutQuad(elapsed / OH_LUNGE_OUT);
+    return easeInQuad(elapsed / OH_LUNGE_OUT);
   }
   if (elapsed < OH_LUNGE_OUT + OH_LUNGE_HOLD) {
     return 1;
   }
   const retT = (elapsed - OH_LUNGE_OUT - OH_LUNGE_HOLD) / OH_LUNGE_BACK;
   if (retT >= 1) return 0;
-  return 1 - easeInQuad(retT);
+  return 1 - easeOutQuad(retT);
 }
 
 /**
