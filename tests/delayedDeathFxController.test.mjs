@@ -105,3 +105,62 @@ Deno.test("delayed death fx preserves the victim render record until impact", ()
   renderables = fx.getRenderableEntities([]);
   assertEquals(renderables.length, 0);
 });
+
+Deno.test("delayed death fx hides scattered death drops by death actor metadata", () => {
+  const world = new World({ seed: 1 });
+  const victim = world.create();
+  const scatteredLoot = world.create();
+  world.add(victim, Position, { x: 6, y: 6 });
+
+  const harness = createFxHarness();
+  const fx = createDelayedDeathFxController({
+    world,
+    getFxTime: harness.getFxTime,
+    getPosition: (id) => { const p = world.get(id, Position); return p ? { x: p.x, y: p.y } : null; },
+  });
+  fx.installListeners();
+
+  world.emit("damaged", { target: victim, projectileDelay: 0.45 });
+  world.emit("died", { id: victim });
+  world.emit("item:dropped", {
+    itemId: scatteredLoot,
+    actor: victim,
+    source: "death",
+    origin: { x: 6, y: 6 },
+    at: { x: 7, y: 6 },
+  });
+
+  assertEquals(fx.isItemHidden(scatteredLoot), true);
+  harness.advance(0.46);
+  fx.tick(0.46);
+  assertEquals(fx.isItemHidden(scatteredLoot), false);
+});
+
+Deno.test("delayed death fx hides scattered death drops by death origin fallback", () => {
+  const world = new World({ seed: 1 });
+  const victim = world.create();
+  const scatteredLoot = world.create();
+  world.add(victim, Position, { x: 10, y: 3 });
+
+  const harness = createFxHarness();
+  const fx = createDelayedDeathFxController({
+    world,
+    getFxTime: harness.getFxTime,
+    getPosition: (id) => { const p = world.get(id, Position); return p ? { x: p.x, y: p.y } : null; },
+  });
+  fx.installListeners();
+
+  world.emit("damaged", { target: victim, projectileDelay: 0.35 });
+  world.emit("died", { id: victim });
+  world.emit("item:dropped", {
+    itemId: scatteredLoot,
+    source: "death",
+    origin: { x: 10, y: 3 },
+    at: { x: 9, y: 3 },
+  });
+
+  assertEquals(fx.isItemHidden(scatteredLoot), true);
+  harness.advance(0.36);
+  fx.tick(0.36);
+  assertEquals(fx.isItemHidden(scatteredLoot), false);
+});
