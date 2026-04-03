@@ -1189,10 +1189,23 @@ const inputDisposers = [];
         const p = playerEntity(world);
         if (!p) break;
 
-        // Gather items at player's position and pick the top-most item.
-        const ids = itemsAt(world, p.pos.x, p.pos.y);
-        if (ids.length > 0) {
-          const top = ids[0];
+        // Gather items at player's position, then nearby tiles (death scatter).
+        // Pickup radius of 3 lets the player hoover a death pile from adjacent.
+        let _pickupIds = itemsAt(world, p.pos.x, p.pos.y);
+        if (_pickupIds.length === 0) {
+          const _PICKUP_SCAN = 3;
+          for (let _pr = 1; _pr <= _PICKUP_SCAN && _pickupIds.length === 0; _pr++) {
+            for (let _pdy = -_pr; _pdy <= _pr; _pdy++) {
+              for (let _pdx = -_pr; _pdx <= _pr; _pdx++) {
+                if (Math.abs(_pdx) !== _pr && Math.abs(_pdy) !== _pr) continue;
+                const nearby = itemsAt(world, (p.pos.x | 0) + _pdx, (p.pos.y | 0) + _pdy);
+                for (const nid of nearby) _pickupIds.push(nid);
+              }
+            }
+          }
+        }
+        if (_pickupIds.length > 0) {
+          const top = _pickupIds[0];
           if (top > 0) {
             rulesHandler({ type: 'rules.pickupItem', payload: { itemId: top } });
           }
@@ -2279,91 +2292,115 @@ function scheduleDeathLootArc(itemId, origin, at, delayOffset, impulse) {
   const j1 = seededUnit(id ^ (world.step | 0));
   const j2 = seededUnit((id * 0x9e3779b9) ^ (world.step | 0));
 
-  // Weight governs how far an item scatters: light items fly, heavy items thud.
-  // weightMul: 1.0 for weightless/light, ~0.15 for a heavy corpse (weight ~20).
+  // ── Weight physics ──────────────────────────────────────────────
+  // Steep curve: coins/scrolls SAIL, swords slide, corpses crater.
+  // Feather items (< 0.3) get a boost so they feel airborne.
   const itemInfo = world.get(id, ItemInfo);
   const weight = Math.max(0, Number(itemInfo?.weight || 0));
-  const weightMul = 1 / (1 + weight * 0.3);
+  const wRaw = 1 / (1 + weight * 0.7);             // steeper falloff
+  const feather = weight < 0.3 ? 1.3 - weight : 1; // light = extra floaty
+  const wt = Math.min(1.5, wRaw * feather);         // cap at 1.5
 
-  // Visual scatter: items stay on the rules tile but the arc landing is
-  // purely screen-space. Cause determines the scatter flavor; impulse
-  // direction + force + weight modulate magnitude.
+  // Separate multipliers for different physics aspects:
+  // wScatter  — how far it travels horizontally
+  // wLift     — how high the arc peaks (feathers get extra hangtime)
+  // wHang     — how long the flight lasts (feathers linger)
+  //
+  // Crits HAMMER everything — bigger scatter, taller arcs, more hang.
+  // Even heavy armor gets launched on a crit. Coins go orbital.
+  const crit = !!(impulse?.critical);
+  const critAmp = crit ? 1.55 : 1;            // raw distance/spread boost
+  const critLift = crit ? 1.7 : 1;            // arcs POP higher
+  const critHang = crit ? 1.35 : 1;           // linger in the air longer
+  const wScatter = wt * critAmp;
+  const wLift    = Math.min(2.8, wt * (weight < 0.5 ? 1.4 : 1.0) * critLift);
+  const wHang    = Math.min(2.2, wt * (weight < 0.5 ? 1.3 : weight > 5 ? 0.7 : 1.0) * critHang);
+
+  // ── Impulse ────────────────────────────────────────────────────
   const idx = Number(impulse?.dx || 0);
   const idy = Number(impulse?.dy || 0);
   const force = Math.max(0, Math.min(3, Number(impulse?.force || 0)));
   const cause = String(impulse?.cause || '');
 
-  // Scatter profile per cause family
-  let pushMul = 0.25;   // directional push base
-  let pushForce = 0.20;  // per-force push bonus
-  let spreadMul = 0.40;  // perpendicular fan base
-  let spreadForce = 0.25; // per-force fan bonus
-  let baseDrift = 0.15;  // random scatter when no impulse
+  // ── Scatter profiles ───────────────────────────────────────────
+  // push     = directional travel along impulse vector
+  // fan      = perpendicular spread (items don't stack on a line)
+  // drift    = random scatter when there's no directional impulse
+  // All values are BASE + PER_FORCE * force, then * wScatter.
+  // Tuned HOT: a frost bolt on a coin should send it 2+ tiles.
+  let pushBase = 0.60, pushPerF = 0.45;
+  let fanBase  = 0.80, fanPerF  = 0.55;
+  let drift    = 0.25;
 
   if (cause === 'melee' || cause === 'retaliation') {
-    // Melee: strong directional push, wide fan on crits
-    pushMul = 0.30; pushForce = 0.28;
-    spreadMul = 0.50; spreadForce = 0.35;
+    // Melee: beefy directional whack, wide fan on crits
+    pushBase = 0.70; pushPerF = 0.55;
+    fanBase  = 1.00; fanPerF  = 0.70;
   } else if (cause === 'ranged') {
-    // Arrows: tight cone, high velocity
-    pushMul = 0.40; pushForce = 0.30;
-    spreadMul = 0.20; spreadForce = 0.12;
+    // Arrow: TIGHT cone, punches hard forward, minimal fan
+    pushBase = 1.00; pushPerF = 0.65;
+    fanBase  = 0.35; fanPerF  = 0.20;
   } else if (cause === 'spell:phase_strike') {
-    // Phase strike: explosive, high impulse
-    pushMul = 0.50; pushForce = 0.35;
-    spreadMul = 0.55; spreadForce = 0.40;
+    // Phase strike: EXPLOSIVE. Everything flies. Arcade mode.
+    pushBase = 1.20; pushPerF = 0.80;
+    fanBase  = 1.30; fanPerF  = 0.90;
   } else if (cause === 'spell:smite' || cause === 'spell:meteor') {
-    // From above: radial outward burst, ignore directional vector
+    // From above: radial starburst, no directional bias
     const angle = (j1 * 2 - 1) * Math.PI;
-    const radial = (0.35 + 0.30 * force) * weightMul;
+    const radial = (0.80 + 0.70 * force) * wScatter;
     toX += Math.cos(angle) * radial;
     toY += Math.sin(angle) * radial;
-    pushMul = 0; pushForce = 0; spreadMul = 0; spreadForce = 0;
+    // Extra random wobble so items don't form a perfect ring
+    toX += (j2 - 0.5) * 0.4 * wScatter;
+    toY += (j1 - 0.5) * 0.4 * wScatter;
+    pushBase = 0; pushPerF = 0; fanBase = 0; fanPerF = 0;
   } else if (cause === 'spell:agony' || cause === 'spell:drain_life:tick') {
-    // Agony/drain: slow, minimal scatter
-    pushMul = 0.08; pushForce = 0.05;
-    spreadMul = 0.12; spreadForce = 0.06;
-    baseDrift = 0.08;
+    // Agony: slow ooze, items barely shift
+    pushBase = 0.15; pushPerF = 0.08;
+    fanBase  = 0.20; fanPerF  = 0.10;
+    drift = 0.12;
   } else if (cause.startsWith('spell:')) {
-    // Generic spell (frost, shadow_bolt, lightning, scorch, blastwave, etc.)
-    pushMul = 0.35; pushForce = 0.25;
-    spreadMul = 0.45; spreadForce = 0.30;
+    // Generic spell (frost, shadow_bolt, lightning, scorch, blastwave)
+    // Strong directional blast — frost bolt sends coins flying
+    pushBase = 0.85; pushPerF = 0.60;
+    fanBase  = 0.90; fanPerF  = 0.60;
   } else if (!cause || cause === 'starvation') {
-    // No cause / starvation / unknown: gentle crumple
-    pushMul = 0; pushForce = 0;
-    spreadMul = 0; spreadForce = 0;
-    baseDrift = 0.10;
+    // Crumple: items just... fall out
+    pushBase = 0; pushPerF = 0;
+    fanBase  = 0; fanPerF  = 0;
+    drift = 0.15;
   }
 
-  // Burn-type causes: very low crumple regardless of prefix
+  // Burn/trap: very low, items slump
   if (cause.includes('burn') || cause === 'spike_trap' || cause === 'shock_trap') {
-    pushMul = 0.06; pushForce = 0.03;
-    spreadMul = 0.10; spreadForce = 0.04;
-    baseDrift = 0.08;
+    pushBase = 0.10; pushPerF = 0.05;
+    fanBase  = 0.15; fanPerF  = 0.08;
+    drift = 0.10;
   }
 
-  if ((idx || idy) && (pushMul > 0 || spreadMul > 0)) {
-    const push = (pushMul + pushForce * force) * weightMul;
+  // Apply directional scatter
+  if ((idx || idy) && (pushBase > 0 || fanBase > 0)) {
+    const push = (pushBase + pushPerF * force) * wScatter;
     toX += idx * push;
     toY += idy * push;
+    // Perpendicular fan: both sides of the impulse line
     const perpX = -idy;
     const perpY = idx;
-    const spread = (j1 - 0.5) * (spreadMul + spreadForce * force) * weightMul;
-    toX += perpX * spread;
-    toY += perpY * spread;
+    const fan = (j1 - 0.5) * (fanBase + fanPerF * force) * wScatter;
+    toX += perpX * fan;
+    toY += perpY * fan;
   }
-  // Base random drift (urn/chest loot, or gentle crumple)
-  toX += (j1 - 0.5) * baseDrift * weightMul;
-  toY += (j2 - 0.5) * baseDrift * weightMul;
+  // Random drift (always applied — gives urn/chest loot some spread too)
+  toX += (j1 - 0.5) * drift * wScatter;
+  toY += (j2 - 0.5) * drift * wScatter;
 
-  // Clamp visual landing to walkable tiles — pull back toward origin if
-  // the rounded landing cell is a wall. Pure display concern.
+  // ── Wall clamping ──────────────────────────────────────────────
+  // Binary search along the flight path to find last walkable point.
   const landTileX = Math.round(toX);
   const landTileY = Math.round(toY);
   if (!isWalkable(landTileX, landTileY)) {
-    // Binary search along the arc to find the last walkable point
     let lo = 0, hi = 1;
-    for (let step = 0; step < 6; step++) {
+    for (let step = 0; step < 8; step++) {
       const mid = (lo + hi) * 0.5;
       const mx = Math.round(fromX + (toX - fromX) * mid);
       const my = Math.round(fromY + (toY - fromY) * mid);
@@ -2376,30 +2413,46 @@ function scheduleDeathLootArc(itemId, origin, at, delayOffset, impulse) {
   const fdx = toX - fromX;
   const fdy = toY - fromY;
   const dist = Math.sqrt(fdx * fdx + fdy * fdy);
-  if (dist > 3.5) return;
+  if (dist > 5) return; // raised cap for big scatter
 
-  // Arc timing varies by cause: phase strike is snappy, agony is sluggish
-  let durationBase = 0.24, durationDist = 0.10, durationForce = 0.04;
-  let peakBase = 0.22, peakDist = 0.18, peakForce = 0.08;
+  // ── Arc timing ─────────────────────────────────────────────────
+  // Duration = how long the item is in the air (wHang makes feathers linger)
+  // Peak     = max height of the parabola (wLift makes feathers soar)
+  let durBase = 0.30, durDist = 0.12, durForce = 0.05;
+  let pkBase  = 0.30, pkDist  = 0.25, pkForce  = 0.12;
+
   if (cause === 'spell:phase_strike') {
-    durationBase = 0.14; durationDist = 0.06; durationForce = 0.02;
-    peakBase = 0.30; peakDist = 0.25; peakForce = 0.15;
+    // Snappy launch, huge peak — items POP upward
+    durBase = 0.22; durDist = 0.08; durForce = 0.03;
+    pkBase  = 0.50; pkDist  = 0.35; pkForce  = 0.20;
   } else if (cause === 'spell:smite' || cause === 'spell:meteor') {
-    durationBase = 0.20; durationDist = 0.08; durationForce = 0.03;
-    peakBase = 0.35; peakDist = 0.28; peakForce = 0.12;
+    // Dramatic eruption: tall arcs, moderate duration
+    durBase = 0.28; durDist = 0.10; durForce = 0.04;
+    pkBase  = 0.55; pkDist  = 0.40; pkForce  = 0.18;
   } else if (cause === 'spell:agony' || cause === 'spell:drain_life:tick') {
-    durationBase = 0.40; durationDist = 0.15; durationForce = 0.06;
-    peakBase = 0.10; peakDist = 0.08; peakForce = 0.03;
+    // Slow, heavy, low arcs — items ooze out
+    durBase = 0.55; durDist = 0.18; durForce = 0.08;
+    pkBase  = 0.12; pkDist  = 0.08; pkForce  = 0.04;
   } else if (cause.includes('burn')) {
-    durationBase = 0.35; durationDist = 0.12; durationForce = 0.04;
-    peakBase = 0.08; peakDist = 0.06; peakForce = 0.02;
+    // Crumble: barely lifts, slow settle
+    durBase = 0.45; durDist = 0.14; durForce = 0.05;
+    pkBase  = 0.10; pkDist  = 0.06; pkForce  = 0.03;
   } else if (cause === 'ranged') {
-    durationBase = 0.16; durationDist = 0.07; durationForce = 0.03;
-    peakBase = 0.18; peakDist = 0.14; peakForce = 0.06;
+    // Arrow: FAST, flat trajectory — items punch forward low
+    durBase = 0.18; durDist = 0.07; durForce = 0.03;
+    pkBase  = 0.20; pkDist  = 0.15; pkForce  = 0.06;
+  } else if (cause === 'melee' || cause === 'retaliation') {
+    // Melee: satisfying medium arc
+    durBase = 0.28; durDist = 0.10; durForce = 0.04;
+    pkBase  = 0.35; pkDist  = 0.28; pkForce  = 0.14;
+  } else if (cause.startsWith('spell:')) {
+    // Generic spell: generous arcs
+    durBase = 0.30; durDist = 0.10; durForce = 0.04;
+    pkBase  = 0.40; pkDist  = 0.30; pkForce  = 0.14;
   }
 
-  const duration = durationBase + dist * durationDist + j1 * 0.07 + force * durationForce;
-  const peak = (peakBase + dist * peakDist + j2 * 0.10 + force * peakForce) * weightMul;
+  const duration = (durBase + dist * durDist + j1 * 0.08 + force * durForce) * wHang;
+  const peak = (pkBase + dist * pkDist + j2 * 0.12 + force * pkForce) * wLift;
   _deathLootArcs.set(id, {
     fromX,
     fromY,
@@ -3864,7 +3917,7 @@ canvas.addEventListener('pointerdown', (ev) => {
   const ty = worldToTile(wy);
 
   const set = world.get(pe.id, Settings);
-  const pickupRange = Math.max(0, Number(set?.pickupRange ?? 0));
+  const pickupRange = Math.max(3, Number(set?.pickupRange ?? 0));
   const nearbyOffsets = [
     { x: 0, y: 0 },
     { x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 },
@@ -3874,7 +3927,7 @@ canvas.addEventListener('pointerdown', (ev) => {
   const hasTapPickup = nearbyOffsets.some((off) => {
     const cx = (tx | 0) + (off.x | 0);
     const cy = (ty | 0) + (off.y | 0);
-    const dist = Math.abs((pe.pos.x | 0) - cx) + Math.abs((pe.pos.y | 0) - cy);
+    const dist = Math.max(Math.abs((pe.pos.x | 0) - cx), Math.abs((pe.pos.y | 0) - cy));
     return dist <= pickupRange && itemsAt(world, cx, cy).length > 0;
   });
 
