@@ -12,6 +12,7 @@ import { createBumpFxController } from "../fx/bumpFxController.js";
 import { createRecoilFxController } from "../fx/recoilFxController.js";
 import { createHitstopController } from "../fx/hitstopController.js";
 import { startShake } from "../camera/shake.js";
+import { startZoomPunch } from "../camera/zoomPunch.js";
 import { installFloatTextWiring } from "../ui/wiring/floatTextWiring.js";
 import { installEventUiWiring } from "../ui/wiring/eventUiWiring.js";
 import { createDeathVfxController } from "../fx/deathVfxController.js";
@@ -93,6 +94,8 @@ export function setupDisplayRuntime({
     // Duration: 0.06s baseline, scales gently with damage
     const dur = 0.06 + Math.min(0.10, dmg * 0.004);
     startShake(cam, amp, dur);
+    // Crit zoom-punch: brief scale pulse that sells the weight of a big hit
+    if (critical) startZoomPunch(cam, 0.025, 0.14);
   });
 
   const { goreTick } = installFloatTextWiring({ world, ftext, fx, getPosition, isVisibleAt, isPet, isPlayer, getFxTime });
