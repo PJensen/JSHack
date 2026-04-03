@@ -178,13 +178,10 @@ export function movementSystem(world) {
         }
       }
 
-      // "Slowed" reduces move cadence for any mover (player and AI alike).
+      // "Slowed" prevents movement attempts while active.
       const slowedStacks = Math.min(3, statusStrength(world, actor, "slowed"));
       if (slowedStacks > 0) {
-        const actEvery = 1 + slowedStacks;
-        if (((world.step + actor) % actEvery) !== 0) {
-          continue;
-        }
+        continue;
       }
 
       const nx = pos.x + mdx;

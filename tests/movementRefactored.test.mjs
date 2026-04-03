@@ -18,6 +18,7 @@ import { Burned } from "../src/rules/components/Burned.js";
 import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
 import { DungeonState } from "../src/rules/components/DungeonState.js";
 import { movementSystem, installSpiderWebListener } from "../src/rules/systems/movementSystem.js";
+import { effectSystem } from "../src/rules/systems/effectSystem.js";
 import { installBumpInteractListener } from "../src/rules/systems/interactionSystem.js";
 import { hazardSystem } from "../src/rules/systems/hazardSystem.js";
 import { setFacingTurnCostEnabled } from "../src/rules/utils/facing.js";
@@ -558,7 +559,7 @@ Deno.test("movementSystem: non-spider does not spawn web", () => {
   } finally { clearAll(); }
 });
 
-Deno.test("movementSystem: slowed status reduces movement cadence", () => {
+Deno.test("movementSystem: slowed status prevents movement while active", () => {
   loadFloorChunk();
   try {
     const world = new World({ seed: 42 });
@@ -566,20 +567,26 @@ Deno.test("movementSystem: slowed status reduces movement cadence", () => {
     world.add(player, Position, { x: 5, y: 5 });
     world.add(player, Player);
     world.add(player, ActiveEffects, {
-      effects: [{ key: "slowed", turnsLeft: 3, potency: 1, stacks: 1, startedAtTurn: 0 }],
+      effects: [{ key: "slowed", turnsLeft: 2, potency: 1, stacks: 1, startedAtTurn: 0 }],
     });
 
     world.add(player, MoveIntent, { dx: 1, dy: 0 });
     movementSystem(world);
     let pos = world.get(player, Position);
-    assertEquals(pos.x, 5, "slowed actor should skip this cadence turn");
+    assertEquals(pos.x, 5, "slowed actor should not move on first attempt");
+    effectSystem(world);
 
-    world.setScheduler(() => {});
-    world.tick(1);
     world.add(player, MoveIntent, { dx: 1, dy: 0 });
     movementSystem(world);
     pos = world.get(player, Position);
-    assertEquals(pos.x, 6, "slowed actor should move on allowed cadence turn");
+    assertEquals(pos.x, 5, "slowed actor should remain immobile while status is active");
+    effectSystem(world);
+    effectSystem(world);
+
+    world.add(player, MoveIntent, { dx: 1, dy: 0 });
+    movementSystem(world);
+    pos = world.get(player, Position);
+    assertEquals(pos.x, 6, "actor should move once slowed expires");
   } finally { clearAll(); }
 });
 
