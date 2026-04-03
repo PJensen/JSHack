@@ -18,6 +18,7 @@ export const EQUIPMENT_ITEMS = {
     staminaCost: 7,
     maxSockets: 1,
     description: "A sturdy staff of ancient oak. Channels natural energies.",
+    weight: 2.5, // wood staff
   },
   longsword: {
     id: "longsword",
@@ -35,6 +36,7 @@ export const EQUIPMENT_ITEMS = {
     damageType: "slash",
     staminaCost: 12,
     description: "A long steel blade wielded with both hands.",
+    weight: 2.8, // steel longsword
   },
   sword_plain: {
     id: "sword_plain",
@@ -51,6 +53,7 @@ export const EQUIPMENT_ITEMS = {
     staminaCost: 8,
     maxSockets: 1,
     description: "A trusty short blade. Quick to draw and easy to wield.",
+    weight: 1.2, // steel short sword
   },
   dagger_quick: {
     id: "dagger_quick",
@@ -67,6 +70,7 @@ export const EQUIPMENT_ITEMS = {
     staminaCost: 5,
     maxSockets: 1,
     description: "A slim steel blade, light enough to strike in a blink.",
+    weight: 0.5, // steel dagger
   },
   goblin_shiv: {
     id: "goblin_shiv",
@@ -83,6 +87,7 @@ export const EQUIPMENT_ITEMS = {
     staminaCost: 5,
     value: 1,
     description: "A chipped goblin knife. Cheap, mean, and disposable.",
+    weight: 0.4, // iron shiv
   },
   goblin_jagged_shiv: {
     id: "goblin_jagged_shiv",
@@ -99,6 +104,7 @@ export const EQUIPMENT_ITEMS = {
     staminaCost: 5,
     value: 2,
     description: "A serrated shiv with burrs that tear flesh on the way out.",
+    weight: 0.5, // iron jagged shiv
     affixes: ["hemorrhage1"],
   },
   hobgoblin_warblade: {
@@ -116,6 +122,7 @@ export const EQUIPMENT_ITEMS = {
     staminaCost: 9,
     value: 8,
     description: "A disciplined infantry blade balanced for drill-yard brutality.",
+    weight: 2.5, // steel warblade
   },
   hobgoblin_serrated_warblade: {
     id: "hobgoblin_serrated_warblade",
@@ -132,6 +139,7 @@ export const EQUIPMENT_ITEMS = {
     staminaCost: 9,
     value: 9,
     description: "Saw-backed iron made to leave ugly, lasting wounds.",
+    weight: 2.6, // steel serrated warblade
     affixes: ["hemorrhage1"],
   },
   ogre_crushing_club: {
@@ -149,6 +157,7 @@ export const EQUIPMENT_ITEMS = {
     staminaCost: 13,
     value: 6,
     description: "A tree limb with iron bands and dried blood at the knots.",
+    weight: 4.5, // wood/iron ogre club
     affixes: ["stunning1"],
   },
   orc_warchief_maul: {
@@ -167,6 +176,7 @@ export const EQUIPMENT_ITEMS = {
     maxSockets: 1,
     value: 14,
     description: "A commander's maul that ends arguments in one swing.",
+    weight: 5.0, // iron maul
     affixes: ["stunning1"],
   },
   axe_heavy: {
@@ -185,6 +195,7 @@ export const EQUIPMENT_ITEMS = {
     maxSockets: 1,
     maxSockets: 1,
     description: "A broad-headed axe that cleaves through armor and timber alike.",
+    weight: 3.0, // steel axe
   },
   iron_mace: {
     id: "iron_mace",
@@ -201,6 +212,7 @@ export const EQUIPMENT_ITEMS = {
     staminaCost: 11,
     maxSockets: 1,
     description: "A heavy iron head on a wooden haft. Favored by the faithful.",
+    weight: 3.2, // iron mace
     affixes: ["stunning1"],
   },
   morningstar: {
@@ -218,6 +230,7 @@ export const EQUIPMENT_ITEMS = {
     staminaCost: 10,
     maxSockets: 1,
     description: "A spiked iron mace built to crush through guards and punch through mail.",
+    weight: 3.0, // iron morningstar
   },
   leather_armor: {
     id: "leather_armor",
@@ -229,6 +242,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 1,
     rarityName: "common",
     bonuses: { defense: 1, maxHp: 4, maxStamina: 4 },
+    weight: 5.0, // leather armor
   },
   scavenger_jerkin: {
     id: "scavenger_jerkin",
@@ -240,6 +254,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 1,
     rarityName: "common",
     bonuses: { defense: 1, maxHp: 6, maxStamina: 3, staminaRegen: 0.15 },
+    weight: 5.5, // scavenger jerkin
     description: "Patchwork leather stitched from road-finds. Ugly, tough, and practical.",
   },
   chain_armor: {
@@ -252,6 +267,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 2,
     rarityName: "magic",
     bonuses: { defense: 2 },
+    weight: 10.0, // iron chainmail
   },
   helm_iron: {
     id: "helm_iron",
@@ -263,6 +279,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 1,
     rarityName: "common",
     bonuses: { defense: 1, maxHp: 2 },
+    weight: 2.0, // iron helm
   },
   scout_hood: {
     id: "scout_hood",
@@ -274,6 +291,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 1,
     rarityName: "common",
     bonuses: { defense: 1, critChance: 0.02, maxStamina: 4 },
+    weight: 0.7, // leather scout hood
     description: "A light hood with a reinforced brow seam for skirmishers.",
   },
   // ── Head: early-mid ──────────────────────────────────────────────
@@ -287,6 +305,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 2,
     rarityName: "magic",
     bonuses: { defense: 2, bluntResist: 0.05 },
+    weight: 2.2, // steel helm
     description: "A sturdy helm with a nose guard and padded lining.",
   },
   // ── Head: mid-game ───────────────────────────────────────────────
@@ -300,6 +319,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 3,
     rarityName: "rare",
     bonuses: { defense: 2, attack: 1, bluntResist: 0.1 },
+    weight: 2.5, // horned iron helm
     description: "Curved iron horns crown this battle-scarred helm.",
   },
   helm_mage: {
@@ -312,6 +332,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 3,
     rarityName: "rare",
     bonuses: { maxMana: 12, manaRegen: 0.3 },
+    weight: 0.3, // silver circlet
     description: "A thin silver band that clears the fog of thought.",
     affixes: ["helmAttuned1"],
   },
@@ -326,6 +347,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 4,
     rarityName: "epic",
     bonuses: { defense: 3, maxHp: 10, bluntResist: 0.15, slashResist: 0.1 },
+    weight: 3.0, // steel warhelm
     description: "A full-faced helm forged for the front lines. Vision is limited, but so is incoming steel.",
     affixes: ["helmGuard1"],
   },
@@ -339,6 +361,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 4,
     rarityName: "epic",
     bonuses: { maxMana: 18, manaRegen: 0.5, critChance: 0.04 },
+    weight: 0.4, // gold visionary crown
     description: "Amethyst shards orbit the crown, whispering arcane secrets.",
     affixes: ["helmAttuned1"],
   },
@@ -353,6 +376,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 5,
     rarityName: "legendary",
     bonuses: { defense: 4, maxHp: 15, bluntResist: 0.2, slashResist: 0.15, pierceResist: 0.1 },
+    weight: 3.5, // steel dreadnought helm
     description: "An unyielding fortress of riveted steel. Those who wear it fear nothing.",
     affixes: ["helmGuard1"],
   },
@@ -366,6 +390,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 5,
     rarityName: "legendary",
     bonuses: { maxMana: 25, manaRegen: 0.7, critChance: 0.06, luck: 2 },
+    weight: 0.5, // gold all-seeing crown
     description: "A third eye opens in the wearer's mind, bending fate to their will.",
     affixes: ["helmAttuned1"],
   },
@@ -379,6 +404,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 1,
     rarityName: "common",
     bonuses: { defense: 1, maxHp: 3 },
+    weight: 0.2, // silver guarded amulet
   },
   amulet_hearthwire: {
     id: "amulet_hearthwire",
@@ -390,6 +416,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 1,
     rarityName: "common",
     bonuses: { maxHp: 4, staminaRegen: 0.15 },
+    weight: 0.2, // copper hearthwire charm
     description: "A warm copper charm that keeps weary muscles moving.",
   },
   pendant_lucky: {
@@ -402,6 +429,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 2,
     rarityName: "magic",
     bonuses: { luck: 1 },
+    weight: 0.1, // gold lucky pendant
     description: "A battered charm that has outlived every owner who wore it.",
   },
   amulet_vigor: {
@@ -414,6 +442,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 2,
     rarityName: "magic",
     bonuses: { maxStamina: 10, staminaRegen: 0.3 },
+    weight: 0.2, // gold amulet of vigor
   },
   // ── Neck: mid-game ───────────────────────────────────────────────
   amulet_warding: {
@@ -426,6 +455,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 3,
     rarityName: "rare",
     bonuses: { defense: 2, poisonResist: 0.15 },
+    weight: 0.2, // silver warding amulet
     description: "Runes etched into the silver hum faintly, turning aside blight.",
   },
   amulet_focus: {
@@ -438,6 +468,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 3,
     rarityName: "rare",
     bonuses: { maxMana: 15, manaRegen: 0.4, spellHit: 1 },
+    weight: 0.2, // gold amulet of focus
     description: "A pale sapphire set in gold that sharpens the mind.",
   },
   // ── Neck: late-game ──────────────────────────────────────────────
@@ -451,6 +482,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 4,
     rarityName: "epic",
     bonuses: { maxHp: 20, defense: 1, fireResist: 0.15 },
+    weight: 0.3, // gold soulkeeper pendant
     description: "A warm ember pulses inside the gem, anchoring the wearer's life force.",
   },
   pendant_stormward: {
@@ -463,6 +495,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 4,
     rarityName: "epic",
     bonuses: { defense: 2, electricOhms: 200, acidResist: 0.15 },
+    weight: 0.3, // silver stormward pendant
     description: "Crackling filaments ground lightning before it can reach the heart.",
   },
   // ── Neck: endgame ────────────────────────────────────────────────
@@ -476,6 +509,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 5,
     rarityName: "legendary",
     bonuses: { maxHp: 25, defense: 1, staminaRegen: 0.5 },
+    weight: 0.3, // gold amulet of lifeblood
     description: "Warm to the touch, it quickens the blood and knits wounds shut between blows.",
     affixes: ["secondWind1"],
   },
@@ -489,6 +523,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 5,
     rarityName: "legendary",
     bonuses: { maxMana: 30, manaRegen: 0.8, critChance: 0.05, spellHit: 3 },
+    weight: 0.3, // gold arcanum pendant
     description: "An ancient conduit that draws mana from the ether itself.",
   },
   belt_leather: {
@@ -501,6 +536,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 1,
     rarityName: "common",
     bonuses: { defense: 1, maxStamina: 6 },
+    weight: 0.3, // leather belt
   },
   belt_girded: {
     id: "belt_girded",
@@ -512,6 +548,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 2,
     rarityName: "magic",
     bonuses: { maxStamina: 12, staminaRegen: 0.4 },
+    weight: 0.4, // leather girded belt
   },
   // ── Belt: mid-game ───────────────────────────────────────────────
   belt_chain: {
@@ -524,6 +561,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 3,
     rarityName: "rare",
     bonuses: { defense: 2, maxHp: 8 },
+    weight: 1.2, // iron chain belt
     description: "Interlocking iron rings cinched tight around the waist.",
   },
   belt_ranger: {
@@ -536,6 +574,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 3,
     rarityName: "rare",
     bonuses: { attack: 1, maxStamina: 10, staminaRegen: 0.3 },
+    weight: 0.4, // leather ranger's belt
     description: "A worn utility belt with loops for blades and pouches for herbs.",
   },
   // ── Belt: late-game ──────────────────────────────────────────────
@@ -549,6 +588,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 4,
     rarityName: "epic",
     bonuses: { defense: 3, bluntResist: 0.15, slashResist: 0.1 },
+    weight: 2.0, // ironhide girdle
     description: "Thick plates of hammered iron overlap like dragon scales.",
   },
   belt_vitality: {
@@ -561,6 +601,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 4,
     rarityName: "epic",
     bonuses: { maxHp: 20, maxStamina: 12, staminaRegen: 0.4 },
+    weight: 0.5, // belt of vitality
     description: "Threaded with sinew of cave trolls, it lends their stubborn endurance.",
   },
   // ── Belt: endgame ────────────────────────────────────────────────
@@ -574,6 +615,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 5,
     rarityName: "legendary",
     bonuses: { defense: 3, maxHp: 20, maxStamina: 15, staminaRegen: 0.5, bluntResist: 0.1 },
+    weight: 2.5, // titan's girdle
     description: "Forged from the belt buckle of a fallen giant. Its weight is immense, its strength greater.",
   },
   belt_serpent: {
@@ -586,6 +628,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 5,
     rarityName: "legendary",
     bonuses: { attack: 2, poisonResist: 0.25, luck: 2 },
+    weight: 0.3, // serpent's coil
     description: "A living snakeskin that slithers tighter in battle, sharpening the wearer's instincts.",
   },
   gloves_leather: {
@@ -598,6 +641,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 1,
     rarityName: "common",
     bonuses: { defense: 1, maxStamina: 4 },
+    weight: 0.2, // leather gloves
   },
   tanner_bracers: {
     id: "tanner_bracers",
@@ -609,6 +653,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 1,
     rarityName: "common",
     bonuses: { defense: 1, maxHp: 2, maxStamina: 3 },
+    weight: 0.2, // tanner bracers
     description: "Workman's bracers with reinforced stitching along the wrist.",
   },
   gauntlets_iron: {
@@ -621,6 +666,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 2,
     rarityName: "magic",
     bonuses: { defense: 2, attack: 1 },
+    weight: 0.7, // iron gauntlets
   },
   // ── Gloves: mid-game ─────────────────────────────────────────────
   gauntlets_steel: {
@@ -633,6 +679,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 3,
     rarityName: "rare",
     bonuses: { defense: 3, attack: 1 },
+    weight: 0.8, // steel gauntlets
     description: "Polished steel plates riveted over hardened leather.",
   },
   gloves_thieves: {
@@ -645,6 +692,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 3,
     rarityName: "rare",
     bonuses: { attack: 2, dexterity: 2, critChance: 0.05, luck: 1 },
+    weight: 0.2, // thief's gloves
     description: "Supple black leather with grip-pads sewn into every finger.",
   },
   // ── Gloves: late-game ────────────────────────────────────────────
@@ -658,6 +706,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 4,
     rarityName: "epic",
     bonuses: { defense: 2, attack: 2 },
+    weight: 0.8, // spiked gauntlets
     description: "Iron spikes jut from the knuckles, punishing anyone who strikes the wearer.",
     affixes: ["thorns1"],
   },
@@ -671,6 +720,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 4,
     rarityName: "epic",
     bonuses: { defense: 1, maxMana: 12, manaRegen: 0.5, critChance: 0.03, spellHit: 2 },
+    weight: 0.1, // arcane handwraps
     description: "Silk wraps stitched with silver thread that steady hostile spellwork and hum with residual magic.",
   },
   // ── Gloves: endgame ──────────────────────────────────────────────
@@ -684,6 +734,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 5,
     rarityName: "legendary",
     bonuses: { defense: 4, attack: 2, fireResist: 0.2, slashResist: 0.15 },
+    weight: 1.0, // dragonscale gauntlets
     description: "Overlapping crimson scales shed heat like water off stone.",
   },
   gloves_shadow: {
@@ -696,6 +747,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 5,
     rarityName: "legendary",
     bonuses: { attack: 3, critChance: 0.1, luck: 2 },
+    weight: 0.2, // shadowgrasp gloves
     description: "Woven from umbral thread, they guide the hand to every weakness.",
   },
   leggings_leather: {
@@ -708,6 +760,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 1,
     rarityName: "common",
     bonuses: { defense: 1, maxStamina: 5 },
+    weight: 0.7, // leather leggings
   },
   greaves_steel: {
     id: "greaves_steel",
@@ -719,6 +772,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 2,
     rarityName: "magic",
     bonuses: { defense: 2, bluntResist: 0.15 },
+    weight: 2.0, // steel cuisses
   },
   // ── Legs: rare ──────────────────────────────────────────────────
   legguards_plated: {
@@ -731,6 +785,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 3,
     rarityName: "rare",
     bonuses: { defense: 3, maxHp: 8 },
+    weight: 2.5, // plated legguards
     description: "Overlapping iron plates secured with heavy rivets protect from knee to thigh.",
   },
   leggings_scout: {
@@ -743,6 +798,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 3,
     rarityName: "rare",
     bonuses: { defense: 1, attack: 1, dexterity: 2, maxStamina: 10, staminaRegen: 0.3 },
+    weight: 0.8, // scout's leggings
     description: "Supple hide trousers with reinforced knees for long marches and quick sprints.",
   },
   // ── Legs: epic ──────────────────────────────────────────────────
@@ -756,6 +812,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 4,
     rarityName: "epic",
     bonuses: { defense: 3, maxHp: 12, bluntResist: 0.15, slashResist: 0.1 },
+    weight: 3.0, // fortress greaves
     description: "Steel leg-plates shaped to deflect blows downward, anchoring the wearer like a tower.",
     affixes: ["kineticWard1"],
   },
@@ -769,6 +826,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 4,
     rarityName: "epic",
     bonuses: { defense: 2, attack: 1, critChance: 0.04, maxStamina: 12, staminaRegen: 0.3 },
+    weight: 0.9, // prowler's breeches
     description: "Fitted with silent-step soles and hidden blade sheaths along each thigh.",
     affixes: ["guard1"],
   },
@@ -782,6 +840,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 4,
     rarityName: "epic",
     bonuses: { defense: 1, maxMana: 15, manaRegen: 0.4, spellHit: 1 },
+    weight: 0.2, // mystic breeches
     description: "Embroidered with sigils of containment that keep volatile mana from leaking.",
     affixes: ["life1"],
   },
@@ -796,6 +855,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 5,
     rarityName: "legendary",
     bonuses: { defense: 4, maxHp: 20, bluntResist: 0.2, slashResist: 0.15, pierceResist: 0.1 },
+    weight: 3.5, // colossus legguards
     description: "Scaled in titan-forged steel, each step shakes the ground.",
     affixes: ["shieldWall1"],
   },
@@ -809,6 +869,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 5,
     rarityName: "legendary",
     bonuses: { defense: 2, attack: 2, critChance: 0.08, maxStamina: 15, staminaRegen: 0.4, luck: 1 },
+    weight: 0.7, // wraithweave leggings
     description: "Woven from fibers that absorb light, the wearer's footfalls make no sound.",
     affixes: ["guard1"],
   },
@@ -823,6 +884,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 1,
     rarityName: "common",
     bonuses: { defense: 1 },
+    weight: 0.05, // copper ring
     description: "A simple hammered copper band, green with patina.",
   },
   ring_bone: {
@@ -835,6 +897,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 1,
     rarityName: "common",
     bonuses: { maxHp: 3 },
+    weight: 0.03, // bone ring
     description: "Carved from a knuckle bone. It carries a faint warmth.",
   },
   ring_health: {
@@ -847,6 +910,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 2,
     rarityName: "magic",
     bonuses: { maxHp: 5 },
+    weight: 0.06, // gold ring of health
   },
   ring_precision: {
     id: "ring_precision",
@@ -858,6 +922,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 2,
     rarityName: "magic",
     bonuses: { dexterity: 1, critChance: 0.08 },
+    weight: 0.05, // silver ring of precision
   },
   ring_arcana: {
     id: "ring_arcana",
@@ -869,6 +934,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 3,
     rarityName: "rare",
     bonuses: { manaRegen: 0.5, spellHit: 1 },
+    weight: 0.05, // silver ring of arcana
   },
   ring_fire_resist: {
     id: "ring_fire_resist",
@@ -880,6 +946,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 2,
     rarityName: "magic",
     bonuses: { fireResist: 0.3 },
+    weight: 0.06, // gold ring of fire resist
   },
   ring_poison_resist: {
     id: "ring_poison_resist",
@@ -891,6 +958,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 2,
     rarityName: "magic",
     bonuses: { poisonResist: 0.3 },
+    weight: 0.05, // silver ring of poison resist
   },
   shield_fireward: {
     id: "shield_fireward",
@@ -902,6 +970,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 3,
     rarityName: "rare",
     bonuses: { defense: 1, fireResist: 0.2 },
+    weight: 2.5, // iron fireward shield
   },
   shield_wood: {
     id: "shield_wood",
@@ -913,6 +982,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 1,
     rarityName: "common",
     bonuses: { defense: 1, maxHp: 3 },
+    weight: 1.5, // wood shield
   },
   shield_iron: {
     id: "shield_iron",
@@ -924,6 +994,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 2,
     rarityName: "magic",
     bonuses: { defense: 2 },
+    weight: 3.0, // iron shield
   },
   lantern: {
     id: "lantern",
@@ -935,6 +1006,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 2,
     rarityName: "magic",
     bonuses: { visionRange: 3 },
+    weight: 1.0, // iron lantern
     description: "A sturdy hooded lantern that casts a warm glow, illuminating the darkness ahead.",
   },
   torch: {
