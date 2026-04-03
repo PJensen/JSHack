@@ -48,6 +48,14 @@ const MONSTER_DELAY    = 0.10;
 // Offhand attacks lunge again after a short gap (matches gore engine 150ms)
 const OFFHAND_DELAY    = 0.15;
 
+// Struggle: short jerk toward intended direction, elastic snap-back.
+// Sells "I tried to move but something is holding me."
+const STRUGGLE_OUT  = 0.035;   // quick jerk
+const STRUGGLE_HOLD = 0.015;   // brief hold at peak
+const STRUGGLE_BACK = 0.120;   // slow elastic return
+const STRUGGLE_TOTAL = STRUGGLE_OUT + STRUGGLE_HOLD + STRUGGLE_BACK;
+const STRUGGLE_DIST  = 0.16;   // smaller than a real lunge — player barely budges
+
 // ── Easing ──────────────────────────────────────────────────────────
 // Strike: accelerate INTO the target (easeIn). Return: decelerate out (easeOut).
 function easeOutQuad(t)  { return 1 - (1 - t) * (1 - t); }
@@ -125,6 +133,26 @@ function whiffProgress(elapsed) {
   const retT = (t3 - WHIFF_HOLD) / WHIFF_BACK;
   if (retT >= 1) return 0;
   return 1 - easeOutQuad(retT);
+}
+
+/**
+ * Struggle jerk: quick snap out, tiny hold, slow elastic recoil.
+ * Returns 0→1→0 with an overshoot on the return (rubber-band snap).
+ */
+function struggleProgress(elapsed) {
+  if (elapsed < 0) return 0;
+  if (elapsed < STRUGGLE_OUT) {
+    return easeInQuad(elapsed / STRUGGLE_OUT);
+  }
+  const t2 = elapsed - STRUGGLE_OUT;
+  if (t2 < STRUGGLE_HOLD) {
+    return 1;
+  }
+  const retT = (t2 - STRUGGLE_HOLD) / STRUGGLE_BACK;
+  if (retT >= 1) return 0;
+  // Elastic overshoot on return: snaps past zero then settles
+  const r = 1 - retT;
+  return r * Math.cos(retT * Math.PI * 2.5) * (retT < 0.6 ? 1 : (1 - (retT - 0.6) / 0.4));
 }
 
 /**
@@ -220,7 +248,7 @@ export function createBumpFxController() {
     for (let i = 0; i < queue.length; i++) {
       const b = queue[i];
       const t = b.elapsed - b.delay;
-      const progressFn = b.whiff ? whiffProgress : (b.offhand ? offhandLungeProgress : lungeProgress);
+      const progressFn = b.struggle ? struggleProgress : (b.whiff ? whiffProgress : (b.offhand ? offhandLungeProgress : lungeProgress));
       const p = progressFn(t) * b.dist;
       ox += b.dx * p;
       oy += b.dy * p;
@@ -320,6 +348,31 @@ export function createBumpFxController() {
     });
     world.on('combat:parry', ({ attacker }) => {
       if (attacker) convertToWhiff(Number(attacker) | 0);
+    });
+
+    // Struggle jerk when slowed actor tries to move
+    world.on('movement:slowed', ({ actor, x, y, dx, dy }) => {
+      const a = Number(actor || 0) | 0;
+      if (!(a > 0)) return;
+      const mag = Math.hypot(dx, dy);
+      if (!(mag > 0)) return;
+      const ndx = dx / mag;
+      const ndy = dy / mag;
+
+      const queue = active.get(a);
+      const entry = {
+        dx: ndx, dy: ndy,
+        elapsed: 0,
+        delay: 0,
+        duration: STRUGGLE_TOTAL,
+        dist: STRUGGLE_DIST,
+        struggle: true,
+      };
+      if (queue) {
+        queue.push(entry);
+      } else {
+        active.set(a, [entry]);
+      }
     });
   }
 

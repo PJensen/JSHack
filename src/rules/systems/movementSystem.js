@@ -181,6 +181,7 @@ export function movementSystem(world) {
       // "Slowed" prevents movement attempts while active.
       const slowedStacks = Math.min(3, statusStrength(world, actor, "slowed"));
       if (slowedStacks > 0) {
+        world.emit("movement:slowed", { actor, stacks: slowedStacks, x: pos.x, y: pos.y, dx: mdx, dy: mdy });
         continue;
       }
 
