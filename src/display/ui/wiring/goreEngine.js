@@ -685,7 +685,15 @@ export function installGoreWiring({ world, ftext, fx, getPosition, canShowAt, is
       const resisted = Number.isFinite(rawAmount) && rawAmount > amount;
       const col = hitIsPlayer ? '#ff6060' : (resisted ? '#b0a060' : '#ffd966');
       const delay = Number(projectileDelay) || (offhand ? 0.15 : 0);
-      ftext.addDamage(pos.x, pos.y, amount, { dmg: amount, color: col, crit: !!(critical || crit), delay });
+      // Offset damage text toward the attacker (impact point) for "closer to the action" feel
+      let fx = pos.x, fy = pos.y;
+      const iv = impactVector;
+      if (iv && Number.isFinite(iv.dx) && Number.isFinite(iv.dy)) {
+        // impactVector points attacker→defender; offset 0.3 tiles back toward attacker
+        fx -= iv.dx * 0.3;
+        fy -= iv.dy * 0.3;
+      }
+      ftext.addDamage(fx, fy, amount, { dmg: amount, color: col, crit: !!(critical || crit), delay });
     }
     const resolvedGoreType = normalizedGoreType(goreType, targetKind);
 

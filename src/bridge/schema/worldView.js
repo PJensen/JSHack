@@ -400,10 +400,15 @@ function projectEquipmentDisplayTags(world, id, rec) {
 
 	// Equipment corner badges — weapon identity + offhand identity for display layer glyph lookup
 	const weaponId = Number(eq.weapon || 0) | 0;
+	const rangedId = Number(eq.ranged || 0) | 0;
 	let weaponIdentity = null;
 	let shieldIdentity = null;
 	if (weaponId > 0 && world.isAlive(weaponId)) {
 		weaponIdentity = String(world.get(weaponId, NamedIdentity)?.identity || "").toLowerCase() || null;
+	}
+	// Ranged weapon: show in weapon badge when no melee weapon equipped
+	if (!weaponIdentity && rangedId > 0 && world.isAlive(rangedId)) {
+		weaponIdentity = String(world.get(rangedId, NamedIdentity)?.identity || "").toLowerCase() || null;
 	}
 	if (offhandId > 0 && world.isAlive(offhandId)) {
 		const offInfo = /** @type any */ (world.get(offhandId, ItemInfo));
