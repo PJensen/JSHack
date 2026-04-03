@@ -1901,6 +1901,30 @@ export function installMessageWiring({
     }
   });
 
+  // === Web Spit events ===
+  world.on('spell:web_spit', ({ actor, slowed }) => {
+    const ni = NamedIdentity ? world.get(actor, NamedIdentity) : null;
+    const name = bracketizeName(String(ni?.name || 'Something'));
+    if (slowed) {
+      log(`${name} spits a web at you — you're stuck!`, 'danger');
+    } else {
+      log(`${name} spits a glob of web!`, 'warning');
+    }
+  });
+
+  world.on('movement:slowed', ({ actor }) => {
+    if (!Player || !world.has(actor, Player)) return;
+    const lines = [
+      'You struggle against the sticky web!',
+      'You wriggle but the web holds fast!',
+      'The web clings to you — you can\'t move!',
+      'You strain against the webbing!',
+      'Sticky silk binds your limbs!',
+    ];
+    const pick = lines[(world.step || 0) % lines.length];
+    log(pick, 'warning');
+  });
+
   // === Mimic events ===
   world.on('mimic:revealed', ({ fromIdentity }) => {
     const label = String(fromIdentity || 'chest').replace(/_/g, ' ');

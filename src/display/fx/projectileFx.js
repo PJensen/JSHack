@@ -40,9 +40,15 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
   /** @type {RadialFx[]} */
   const _ricochetImpact = [];
 
+  // --- Web Spit projectile state ---
+  /** @type {ArrowFx[]} */
+  const _webSpitFx = [];
+  /** @type {RadialFx[]} */
+  const _webSpitImpact = [];
+
   function _hasInflight() {
     return _arrowFx.length > 0 || _sboltFx.length > 0 || _fireballFx.length > 0
-      || _frostboltFx.length > 0 || _ricochetFx.length > 0;
+      || _frostboltFx.length > 0 || _ricochetFx.length > 0 || _webSpitFx.length > 0;
   }
 
   function _syncInputLock() {
@@ -397,6 +403,87 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
       if (_ricochetImpact[i].expired) _ricochetImpact.splice(i, 1);
     }
 
+    // Web Spit projectiles — trailing silk strands
+    for (let i = _webSpitFx.length - 1; i >= 0; i--) {
+      const ws = _webSpitFx[i];
+
+      // Spawn trailing silk particles during flight
+      if (fx?.pool && ws.progress < 1) {
+        const hx = ws.from.x + (ws.to.x - ws.from.x) * ws.progress;
+        const hy = ws.from.y + (ws.to.y - ws.from.y) * ws.progress;
+        const count = Math.max(1, Math.ceil(dt * 55));
+        for (let j = 0; j < count; j++) {
+          fx.pool.spawn(new Particle({
+            x: hx + (Math.random() - 0.5) * 0.06,
+            y: hy + (Math.random() - 0.5) * 0.06,
+            vx: -ws.dx * 0.6 + (Math.random() - 0.5) * 0.4,
+            vy: -ws.dy * 0.6 + (Math.random() - 0.5) * 0.4 + 0.15,
+            ay: 0.3,
+            life: 0.20 + Math.random() * 0.18,
+            size0: 0.04 + Math.random() * 0.03,
+            size1: 0.01,
+            r: 200 + (Math.random() * 40 | 0),
+            g: 200 + (Math.random() * 40 | 0),
+            b: 200 + (Math.random() * 40 | 0),
+            a0: 0.55,
+          }));
+        }
+      }
+
+      ws.tick(dt);
+
+      if (ws.arrived) {
+        // Impact: sticky web radial + particle burst
+        _webSpitImpact.push(new RadialFx({ x: ws.to.x, y: ws.to.y, radius: 0.8, ttl: 0.55 }));
+        startShake(cam, 3, 0.10);
+
+        if (fx?.pool) {
+          // Silk strands radiating outward
+          for (let k = 0; k < 16; k++) {
+            const angle = (k / 16) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
+            const spd = 0.4 + Math.random() * 1.2;
+            fx.pool.spawn(new Particle({
+              x: ws.to.x + (Math.random() - 0.5) * 0.2,
+              y: ws.to.y + (Math.random() - 0.5) * 0.2,
+              vx: Math.cos(angle) * spd,
+              vy: Math.sin(angle) * spd + 0.1,
+              ay: 0.4,
+              life: 0.35 + Math.random() * 0.30,
+              size0: 0.10 + Math.random() * 0.08,
+              size1: 0.02,
+              r: 220 + (Math.random() * 30 | 0),
+              g: 220 + (Math.random() * 30 | 0),
+              b: 220 + (Math.random() * 30 | 0),
+              a0: 0.85,
+              rotVel: (Math.random() - 0.5) * 3,
+            }));
+          }
+          // Sticky drip motes (slow-falling, lingering)
+          for (let k = 0; k < 8; k++) {
+            fx.pool.spawn(new Particle({
+              x: ws.to.x + (Math.random() - 0.5) * 0.6,
+              y: ws.to.y + (Math.random() - 0.5) * 0.4,
+              vx: (Math.random() - 0.5) * 0.2,
+              vy: 0.15 + Math.random() * 0.25,
+              ay: 0.1,
+              life: 0.6 + Math.random() * 0.5,
+              size0: 0.05 + Math.random() * 0.04,
+              size1: 0.01,
+              r: 190, g: 190, b: 200,
+              a0: 0.50,
+              rotVel: (Math.random() - 0.5) * 1.5,
+            }));
+          }
+        }
+        _webSpitFx.splice(i, 1);
+      }
+    }
+    // Web spit impacts
+    for (let i = _webSpitImpact.length - 1; i >= 0; i--) {
+      _webSpitImpact[i].tick(dt);
+      if (_webSpitImpact[i].expired) _webSpitImpact.splice(i, 1);
+    }
+
     _syncInputLock();
   }
 
@@ -427,6 +514,7 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
     else if (style === 'fireball') _fireballFx.push(entry);
     else if (style === 'frostbolt') _frostboltFx.push(entry);
     else if (style === 'ricochet_theology') _ricochetFx.push(entry);
+    else if (style === 'web_spit') _webSpitFx.push(entry);
     else _arrowFx.push(entry);
 
     _syncInputLock();
@@ -439,7 +527,8 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
     const hasFireball = _fireballFx.length || _fireballImpact.length;
     const hasFrostbolt = _frostboltFx.length || _frostboltImpact.length;
     const hasRicochet = _ricochetFx.length || _ricochetImpact.length;
-    if (!hasArrows && !hasSbolt && !hasFireball && !hasFrostbolt && !hasRicochet) return;
+    const hasWebSpit = _webSpitFx.length || _webSpitImpact.length;
+    if (!hasArrows && !hasSbolt && !hasFireball && !hasFrostbolt && !hasRicochet && !hasWebSpit) return;
     ctx.save();
 
     // Draw flying arrows
@@ -839,6 +928,60 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
       ctx.restore();
     }
 
+    // --- Web Spit projectile ---
+    if (_webSpitFx.length) {
+      for (const ws of _webSpitFx) {
+        const progress = ws.progress;
+        const hx = ws.from.x + (ws.to.x - ws.from.x) * progress;
+        const hy = ws.from.y + (ws.to.y - ws.from.y) * progress;
+        // Scale up as it flies: starts small, arrives at full size
+        const scale = 0.3 + 0.7 * progress;
+
+        // Outer silk glow (soft white halo)
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.fillStyle = `rgba(210,210,220,${(0.20 + 0.10 * progress).toFixed(3)})`;
+        ctx.beginPath(); ctx.arc(hx, hy, 0.28 * scale, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+
+        // Web glyph rendered as scaled text in world-space
+        ctx.save();
+        ctx.translate(hx, hy);
+        ctx.scale(scale, scale);
+        // Slight spin during flight
+        ctx.rotate(progress * Math.PI * 1.5);
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = '900 0.85px monospace';
+        ctx.shadowColor = 'rgba(220,220,230,0.7)';
+        ctx.shadowBlur = 4 + 6 * progress;
+        ctx.fillStyle = `rgba(230,230,240,${(0.7 + 0.3 * progress).toFixed(3)})`;
+        ctx.fillText('\u{1F578}', 0, 0);
+        ctx.shadowBlur = 0;
+        ctx.restore();
+      }
+    }
+    // Web spit impacts — expanding sticky ring
+    if (_webSpitImpact.length) {
+      ctx.save();
+      for (const imp of _webSpitImpact) {
+        const t = imp.progress;
+        const alpha = imp.alpha;
+        const ringR = imp.radius * (0.3 + t * 0.7);
+        // Outer sticky ring
+        ctx.strokeStyle = `rgba(210,210,220,${(0.5 * alpha).toFixed(3)})`;
+        ctx.lineWidth = 0.10 * (1 - t * 0.4);
+        ctx.beginPath(); ctx.arc(imp.x, imp.y, ringR, 0, Math.PI * 2); ctx.stroke();
+        // Inner web disc
+        if (t < 0.5) {
+          const discA = 0.28 * (1 - t / 0.5);
+          ctx.fillStyle = `rgba(200,200,210,${discA.toFixed(3)})`;
+          ctx.beginPath(); ctx.arc(imp.x, imp.y, ringR * 0.6, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+      ctx.restore();
+    }
+
     ctx.restore();
   }
 
@@ -931,6 +1074,49 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
       });
     });
 
+    // Web Spit: silk ball projectile from spider to target
+    world.on('spell:web_spit', ({ actor, at }) => {
+      const from = getPosition(Number(actor || 0));
+      if (!from || !at) return;
+      spawnTransientProjectile({
+        from,
+        to: at,
+        style: 'web_spit',
+        speed: 7,
+        minDuration: 0.12,
+        maxDuration: 0.5,
+      });
+    });
+
+    // Web struggle: silk strands burst when stuck actor tries to move
+    world.on('movement:slowed', ({ x, y, dx, dy }) => {
+      if (!fx?.pool) return;
+      const wx = Number(x || 0);
+      const wy = Number(y || 0);
+      const mdx = Number(dx || 0);
+      const mdy = Number(dy || 0);
+      // Burst of silk strands in the attempted direction
+      for (let k = 0; k < 6; k++) {
+        const angle = Math.atan2(mdy, mdx) + (Math.random() - 0.5) * 1.6;
+        const spd = 0.3 + Math.random() * 0.8;
+        fx.pool.spawn(new Particle({
+          x: wx + (Math.random() - 0.5) * 0.3,
+          y: wy + (Math.random() - 0.5) * 0.3,
+          vx: Math.cos(angle) * spd,
+          vy: Math.sin(angle) * spd + 0.05,
+          ay: 0.3,
+          life: 0.18 + Math.random() * 0.15,
+          size0: 0.06 + Math.random() * 0.04,
+          size1: 0.01,
+          r: 210 + (Math.random() * 30 | 0),
+          g: 210 + (Math.random() * 30 | 0),
+          b: 215 + (Math.random() * 30 | 0),
+          a0: 0.6,
+          rotVel: (Math.random() - 0.5) * 3,
+        }));
+      }
+    });
+
     world.on('projectile:spawn', ({ style, from, to, sourceId, targetId, speed }) => {
       const start = from || getPosition(Number(sourceId || 0));
       const end = to || getPosition(Number(targetId || 0));
@@ -1020,6 +1206,20 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
     for (let i = 0; i < _frostboltImpact.length; i++) {
       const imp = _frostboltImpact[i];
       out.push({ x: imp.x, y: imp.y, radius: 3 * imp.alpha, color: [140, 200, 255] });
+    }
+    // Web spit — faint cool white glow
+    for (let i = 0; i < _webSpitFx.length; i++) {
+      const ws = _webSpitFx[i];
+      const u = ws.progress;
+      out.push({
+        x: ws.from.x + (ws.to.x - ws.from.x) * u,
+        y: ws.from.y + (ws.to.y - ws.from.y) * u,
+        radius: 2.5, color: [200, 200, 220],
+      });
+    }
+    for (let i = 0; i < _webSpitImpact.length; i++) {
+      const imp = _webSpitImpact[i];
+      out.push({ x: imp.x, y: imp.y, radius: 2 * imp.alpha, color: [200, 200, 220] });
     }
     // Elemental arrow impacts — brief flare
     for (let i = 0; i < _arrowSparks.length; i++) {
