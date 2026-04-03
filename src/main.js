@@ -5540,9 +5540,10 @@ function render(worldView) {
       if (PERF.quality !== 'low' && Array.isArray(itemRender.tags) && itemRender.tags.includes('blinded')) {
         drawBlindEye(bctx, itemRender, _fxTime, finalItemScale);
       }
+      const topItemId = stackMeta.get(`${e.pos.x},${e.pos.y}`) || 0;
       const playerPos = worldView?.player?.pos;
       if (
-        !arcPos
+        (arcPos || topItemId === e.id)
         && playerPos
         && (!worldView?.isVisible || worldView.isVisible(e.pos.x, e.pos.y))
         && chebyshevScalar(playerPos.x | 0, playerPos.y | 0, e.pos.x | 0, e.pos.y | 0) <= 3
