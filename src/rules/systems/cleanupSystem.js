@@ -37,6 +37,40 @@ import { Ashes, Bone } from "../archetypes/Items.js";
 import { isWalkable } from "../environment/dungeon/tileMap.js";
 
 const GROUND_STACK_SEQ_KEY = Symbol.for("jshack:groundStack:seq");
+const DEATH_IMPACT_KEY = Symbol.for("jshack:deathImpact:map");
+const DEATH_IMPACT_INSTALLED_KEY = Symbol.for("jshack:deathImpact:installed");
+
+/**
+ * Install a `damaged` listener that records the last impactVector + critical
+ * flag per target entity.  cleanupSystem reads this when building loot scatter.
+ */
+export function installDeathImpactTracker(world) {
+  if (world[DEATH_IMPACT_INSTALLED_KEY]) return;
+  world[DEATH_IMPACT_INSTALLED_KEY] = true;
+  world[DEATH_IMPACT_KEY] = new Map();
+  world.on("damaged", ({ target, impactVector, critical, amount, rawAmount }) => {
+    if (!(Number(target) > 0)) return;
+    if (!impactVector) return;
+    const dx = Number(impactVector.dx || 0);
+    const dy = Number(impactVector.dy || 0);
+    if (!dx && !dy) return;
+    world[DEATH_IMPACT_KEY].set(Number(target) | 0, {
+      dx, dy,
+      critical: !!critical,
+      amount: Number(amount || 0) | 0,
+      rawAmount: Number(rawAmount || 0) | 0,
+    });
+  });
+}
+
+function getDeathImpact(world, entityId) {
+  const map = world[DEATH_IMPACT_KEY];
+  if (!map) return null;
+  const id = Number(entityId) | 0;
+  const info = map.get(id);
+  if (info) map.delete(id);
+  return info || null;
+}
 
 function nextGroundStackSeq(world) {
   const current = Number((/** @type {any} */ (world))[GROUND_STACK_SEQ_KEY] || 0) | 0;
@@ -84,7 +118,7 @@ function makeBurstFallbackOffsets() {
 
 const DEATH_BURST_OFFSETS = Object.freeze(makeBurstFallbackOffsets());
 
-function buildDeathBurstTargets(world, deadId, deathPos, count) {
+function buildDeathBurstTargets(world, deadId, deathPos, count, impulse) {
   const n = Math.max(0, Number(count || 0) | 0);
   if (n <= 0) return [];
   const cx = deathPos.x | 0;
@@ -130,8 +164,29 @@ function buildDeathBurstTargets(world, deadId, deathPos, count) {
   }
   if (!candidates.length) return [];
 
+  // Bias candidates toward impulse direction when available.
+  // Each candidate gets a dot-product score with the impulse vector;
+  // higher dot = more aligned with the hit direction.
+  const idx = Number(impulse?.dx || 0);
+  const idy = Number(impulse?.dy || 0);
+  const hasImpulse = (idx !== 0 || idy !== 0);
+  if (hasImpulse && candidates.length > 1) {
+    for (let i = 0; i < candidates.length; i++) {
+      const c = candidates[i];
+      const offX = (c.x | 0) - cx;
+      const offY = (c.y | 0) - cy;
+      // dot product with impulse direction — higher = more aligned
+      c._dot = offX * idx + offY * idy;
+    }
+    // Sort: highest dot first, break ties by distance then position
+    candidates.sort((a, b) => (b._dot - a._dot) || (a.d - b.d) || (a.x - b.x) || (a.y - b.y));
+  }
+
   const base = ((world.seed >>> 0) ^ ((Number(deadId || 0) * 0x517cc1b7) >>> 0) ^ ((world.step | 0) >>> 0)) >>> 0;
-  const start = Math.abs(base | 0) % candidates.length;
+  // With impulse bias the sort already favours the right direction,
+  // so use a small jitter window instead of the full candidate range.
+  const jitterRange = hasImpulse ? Math.max(1, Math.min(3, candidates.length)) : candidates.length;
+  const start = Math.abs(base | 0) % jitterRange;
   const out = [];
   for (let i = 0; i < n; i++) {
     const p = candidates[(start + i) % candidates.length];
@@ -207,10 +262,24 @@ export function cleanupSystem(world) {
 
       // Drop all inventory items at the entity's current position before destroying
       const pos = world.get(id, Position);
+      // Retrieve the killing blow's impact vector (direction + magnitude).
+      const deathImpact = pos ? getDeathImpact(world, id) : null;
+      // Compute overkill: how far past 0 the killing blow went.
+      // Combine with rawAmount for a "force" scalar that modulates scatter.
+      const overkill = Math.max(0, -(vit.hp | 0));
+      const impactForce = deathImpact
+        ? Math.min(3, 1 + (overkill / Math.max(1, deathImpact.amount || 1))
+          + (deathImpact.critical ? 0.5 : 0))
+        : 1;
+      const impulse = deathImpact
+        ? { dx: deathImpact.dx * impactForce, dy: deathImpact.dy * impactForce,
+            critical: deathImpact.critical, force: impactForce }
+        : null;
+
       if (pos) {
         const items = collectDropItemIds(world, id);
         const shouldBurst = !world.has(id, Player) && items.length > 0;
-        const targets = shouldBurst ? buildDeathBurstTargets(world, id, pos, items.length) : [];
+        const targets = shouldBurst ? buildDeathBurstTargets(world, id, pos, items.length, impulse) : [];
         for (let i = 0; i < items.length; i++) {
           const itemId = items[i];
           const info = world.get(itemId, ItemInfo);
@@ -234,6 +303,7 @@ export function cleanupSystem(world) {
                 at,
                 source: "death",
                 origin: { x: pos.x | 0, y: pos.y | 0 },
+                impulse,
               });
           } catch (e) {
             console.debug("[cleanupSystem] emit item:dropped failed:", e);
@@ -256,7 +326,9 @@ export function cleanupSystem(world) {
               depth = ds.currentDepth || 1;
               break;
             }
-            dropLoot(world, tableId, rng, depth, { x: pos.x, y: pos.y });
+            const deathOrigin = { x: pos.x | 0, y: pos.y | 0 };
+            dropLoot(world, tableId, rng, depth, { x: pos.x, y: pos.y },
+              { source: "death", origin: deathOrigin, impulse });
           }
 
           // Drop a corpse for the killed monster or pet.

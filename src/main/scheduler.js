@@ -41,7 +41,7 @@ import { movementSystem, installMoveAutoPickupListener } from "../rules/systems/
 import { intentValidationSystem } from "../rules/systems/intentValidationSystem.js";
 import { combatSystem, installBumpAttackListener } from "../rules/systems/combatSystem.js";
 import { installCombatInteractions } from "../rules/data/combatInteractions.js";
-import { cleanupSystem } from "../rules/systems/cleanupSystem.js";
+import { cleanupSystem, installDeathImpactTracker } from "../rules/systems/cleanupSystem.js";
 import { trapSystem } from "../rules/systems/trapSystem.js";
 import { disarmTrapSystem } from "../rules/systems/disarmTrapSystem.js";
 import { manaRegenerationSystem } from "../rules/systems/manaRegenerationSystem.js";
@@ -120,6 +120,8 @@ export function configureWorld(world) {
   installCombatInteractions(world);
   // Install monster death hooks once per world
   installMonsterDeathHooks(world);
+  // Track killing-blow impact vectors so loot scatter is directional
+  installDeathImpactTracker(world);
   // Install taunt listeners once per world
   installTauntListener(world);
   // Award monster maxHp to player score on kill
