@@ -1210,6 +1210,7 @@ export const EQUIPMENT_ITEMS = {
     damageDice: "1d8",
     damageType: "blunt",
     staminaCost: 9,
+    weight: 3.2,
     maxSockets: 1,
     description: "A chained iron head that swings unpredictably and lands with brutal force.",
     affixes: ["stunning1"],
@@ -1226,6 +1227,8 @@ export const EQUIPMENT_ITEMS = {
     bonuses: { attack: 1, critChance: 0.05 },
     damageDice: "1d4",
     staminaCost: 5,
+    weight: 0.5,
+    description: "A razor-sharp blade with a hollow groove along its length that drips with acid.",
   },
   nightfang_dagger: {
     id: "nightfang_dagger",
@@ -1239,6 +1242,7 @@ export const EQUIPMENT_ITEMS = {
     bonuses: { attack: 2, critChance: 0.08 },
     damageDice: "1d6",
     staminaCost: 5,
+    weight: 0.6,
     description: "A blackened blade that weeps venom from its edge.",
     affixes: ["venomous1"],
   },
@@ -1254,6 +1258,7 @@ export const EQUIPMENT_ITEMS = {
     bonuses: { attack: 1, maxMana: 20, manaRegen: 0.5, spellHit: 3, critChance: 0.06 },
     damageDice: "1d4",
     staminaCost: 5,
+    weight: 0.5,
     description: "A ritual blade etched with spiralling glyphs that drink in ambient mana. Casters prize it above any sword.",
   },
   leadweave_mantle: {
@@ -1266,6 +1271,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 3,
     rarityName: "rare",
     bonuses: { defense: 1, slashResist: 0.2, electricOhms: 150, acidResist: 0.15 },
+    weight: 6.5,
   },
   ring_endurance: {
     id: "ring_endurance",
@@ -1277,6 +1283,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 2,
     rarityName: "magic",
     bonuses: { maxStamina: 15, staminaRegen: 0.5 },
+    weight: 0.06, // gold ring of endurance
   },
   boots_of_vigor: {
     id: "boots_of_vigor",
