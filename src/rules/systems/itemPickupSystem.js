@@ -43,6 +43,7 @@ export function itemPickupSystem(world) {
         }
 
         // perform pickup
+        const ix = itemPos.x, iy = itemPos.y; // snapshot before addToInventory removes Position
         if (takeCount < (info.count || 1)) {
             // leave residual on ground; move a split-off copy into inventory
             const copy = splitItemStack(world, itemId, takeCount);
@@ -51,11 +52,11 @@ export function itemPickupSystem(world) {
                 continue;
             }
             addToInventory(world, actor, copy);
-            emitSafe(world, 'item:pickup', { actor, itemId: copy, count: takeCount });
+            emitSafe(world, 'item:pickup', { actor, itemId: copy, count: takeCount, itemX: ix, itemY: iy });
         } else {
             // whole stack — just attach to inventory (entity persists as-is)
             addToInventory(world, actor, itemId);
-            emitSafe(world, 'item:pickup', { actor, itemId, count: takeCount });
+            emitSafe(world, 'item:pickup', { actor, itemId, count: takeCount, itemX: ix, itemY: iy });
         }
 
         world.remove(actor, PickupIntent);
@@ -77,7 +78,7 @@ export function autoPickupPostMoveSystem(world) {
             if (!info || !info.type || !kinds.includes(info.type)) return;
             const takeCount = info.count || 1;
             addToInventory(world, id, itemId);
-            emitSafe(world, 'item:pickup', { actor: id, itemId, count: takeCount });
+            emitSafe(world, 'item:pickup', { actor: id, itemId, count: takeCount, itemX: pos.x, itemY: pos.y });
         });
     }
 }

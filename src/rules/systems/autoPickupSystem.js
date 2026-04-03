@@ -32,7 +32,7 @@ export function autoPickupSystem(world) {
       const takeCount = info.count || 1;
       addToInventory(world, actor, itemId);
 
-      emitSafe(world, 'item:pickup', { actor, itemId, count: takeCount });
+      emitSafe(world, 'item:pickup', { actor, itemId, count: takeCount, itemX: pos.x, itemY: pos.y });
     }
   }
 }
