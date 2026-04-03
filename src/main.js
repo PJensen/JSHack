@@ -725,6 +725,7 @@ const hudFeeds = createHudFeeds(world, {
   getActionBarSlots: () => spellCtrl.getActionBarSlots(),
   getPinnedSpellSlots: () => spellCtrl.getPinnedSpellSlots(),
   autoAssignSlot: (id) => spellCtrl.autoAssignSlot(id),
+  autoAssignPinnedSlot: (id) => spellCtrl.autoAssignPinnedSlot(id),
   getFxTime: () => _fxTime,
 });
 

@@ -152,6 +152,19 @@ export function createActiveSpellController(world) {
     _pinnedSpellSlots[index] = null;
   }
 
+  /** Auto-assign a spell to the first empty pinned slot. Returns the slot index or -1. */
+  function autoAssignPinnedSlot(spellId) {
+    if (!spellId || !getSpell(spellId)) return -1;
+    if (_pinnedSpellSlots.includes(spellId)) return _pinnedSpellSlots.indexOf(spellId);
+    for (let i = 0; i < MAX_PINNED; i++) {
+      if (_pinnedSpellSlots[i] === null) {
+        _pinnedSpellSlots[i] = spellId;
+        return i;
+      }
+    }
+    return -1;
+  }
+
   /** Restore pinned spell slots from savegame data. */
   function restorePinnedSlots(savedSlots) {
     for (let i = 0; i < MAX_PINNED; i++) {
@@ -182,6 +195,7 @@ export function createActiveSpellController(world) {
     getPinnedSpellSlots,
     setPinnedSlot,
     clearPinnedSlot,
+    autoAssignPinnedSlot,
     restorePinnedSlots,
   };
 }
