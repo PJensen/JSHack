@@ -3,6 +3,7 @@
 // impacts, arrow impacts, death bursts, and floor stains.
 
 import { Particle } from "../../passes/vfx/particles/particlePool.js";
+import { impactTracker } from "../../fx/projectileImpactTracker.js";
 
 // ── Gore type classification ──────────────────────────────────────────
 
@@ -672,8 +673,6 @@ function spawnDeathGore(pool, wx, wy, dx, dy, amount, goreType, damageType, crit
 export function installGoreWiring({ world, ftext, fx, getPosition, canShowAt, isPlayer, getFxTime }) {
   /** @type {Map<number, { goreType:string, damageType:string, amount:number, critical:boolean, dx:number, dy:number }>} */
   const lastImpactByTarget = new Map();
-  /** @type {Map<number, number>} target → fxTime when impact gore should fire */
-  const deferredImpactTime = new Map();
   /** @type {Array<{ fireAt:number, fn:()=>void }>} */
   const pendingGore = [];
   const now = () => Math.max(0, Number(getFxTime?.() || 0));
@@ -727,10 +726,8 @@ export function installGoreWiring({ world, ftext, fx, getPosition, canShowAt, is
       if (goreDelay > 0) {
         const fireAt = now() + goreDelay;
         pendingGore.push({ fireAt, fn: doSpawn });
-        deferredImpactTime.set(t, fireAt);
       } else {
         doSpawn();
-        deferredImpactTime.delete(t);
       }
       lastImpactByTarget.set(t, {
         goreType: resolvedGoreType,
@@ -752,8 +749,8 @@ export function installGoreWiring({ world, ftext, fx, getPosition, canShowAt, is
     const rec = lastImpactByTarget.get(deadId);
     lastImpactByTarget.delete(deadId);
     if (!pos || !canShowAt(pos.x, pos.y) || !rec || rec.goreType === 'none') return;
-    const deathFireAt = deferredImpactTime.get(deadId) || 0;
-    deferredImpactTime.delete(deadId);
+    const deathFireAt = impactTracker.impactTimeFor(deadId, now());
+    impactTracker.clear(deadId);
     const doDeathGore = () => {
       spawnDeathGore(
         fx.pool,

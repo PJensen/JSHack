@@ -47,6 +47,7 @@ import { registerBuiltinCommands } from "./main/debug/consoleCommands.js";
 import { createCanvasSetup } from "./main/bootstrap/canvasSetup.js";
 import { installInventoryDataProvider } from "./main/ui/inventoryDataProvider.js";
 import { shouldSuppressRecentPickupChipForEquippedDuplicate } from "./main/ui/quickChipPolicy.js";
+import { impactTracker } from "./display/fx/projectileImpactTracker.js";
 import { createThrowFxController } from "./display/fx/throwFxController.js";
 import { createWeatherFxController } from "./display/fx/weatherFx.js";
 import { createSlideFxController } from "./display/fx/slideFxController.js";
@@ -711,6 +712,7 @@ const hudFeeds = createHudFeeds(world, {
   knownSpellIds: () => spellCtrl.knownSpellIds(),
   getActionBarSlots: () => spellCtrl.getActionBarSlots(),
   autoAssignSlot: (id) => spellCtrl.autoAssignSlot(id),
+  getFxTime: () => _fxTime,
 });
 
 function ensureActiveSpell() {
@@ -2230,13 +2232,13 @@ function lootRarityColorHex(itemInfo) {
 
 /** @type {Map<number, {fromX:number,fromY:number,toX:number,toY:number,start:number,duration:number,peak:number}>} */
 const _deathLootArcs = new Map();
-/** @type {Map<number, number>} target entity → projectile delay (seconds) for loot arc offset */
-const _pendingProjectileDelay = new Map();
-world.on("damaged", ({ target, projectileDelay }) => {
+world.on("damaged", ({ target, amount, projectileDelay }) => {
   const tid = Number(target || 0) | 0;
   const d = Number(projectileDelay || 0);
-  if (tid > 0 && d > 0) _pendingProjectileDelay.set(tid, d);
-  else if (tid > 0) _pendingProjectileDelay.delete(tid);
+  const dmg = Math.max(0, Number(amount) || 0);
+  if (tid > 0 && d > 0 && dmg > 0) {
+    impactTracker.record(tid, dmg, _fxTime + d);
+  }
 });
 
 function seededUnit(seed) {
@@ -2292,7 +2294,7 @@ world.on("item:dropped", ({ itemId, actor, source, origin, at, targetId }) => {
   const src = String(source || "");
   if (src === "death") {
     const actorId = Number(actor || 0) | 0;
-    const delay = actorId > 0 ? (_pendingProjectileDelay.get(actorId) || 0) : 0;
+    const delay = actorId > 0 ? impactTracker.delayFor(actorId, _fxTime) : 0;
     scheduleDeathLootArc(itemId, origin, at, delay);
   } else if (src === "chest") {
     const chestId = Number(targetId || 0) | 0;
@@ -5195,7 +5197,9 @@ function clamp01(n) {
 function shouldShowHealthBar(e, now) {
   if (!e || !e.showHealthBar) return false;
   const maxHp = Math.max(1, Number(e.maxHp) | 0);
-  const hp = Math.max(0, Math.min(maxHp, Number(e.hp) | 0));
+  const rawHp = Math.max(0, Math.min(maxHp, Number(e.hp) | 0));
+  // Use visual HP — add back damage whose projectile hasn't arrived yet
+  const hp = impactTracker.visualHp(e.id, rawHp, maxHp, now);
   if (hp <= 0) {
     _healthBarState.delete(e.id);
     return false;
@@ -5236,7 +5240,8 @@ function pruneHealthBarState() {
  */
 function drawEntityHealthBar(ctx, e) {
   const maxHp = Math.max(1, Number(e.maxHp) | 0);
-  const hp = Math.max(0, Math.min(maxHp, Number(e.hp) | 0));
+  const rawHp = Math.max(0, Math.min(maxHp, Number(e.hp) | 0));
+  const hp = impactTracker.visualHp(e.id, rawHp, maxHp, _fxTime);
   const ratio = clamp01(hp / maxHp);
   const ss = e._sizeScale || 1;
   const width = 0.68 * ss;
@@ -6176,6 +6181,7 @@ function frame(now) {
   _fpsEMA = _fpsEMA ? (_fpsEMA * 0.9 + instFps * 0.1) : instFps;
   _fxTime += dtSec;
   _dtSec = dtSec;
+  impactTracker.flush(_fxTime);
 
   // Sim step is scene-controlled; keep paused (no tick) unless a scene/input advances it.
   stepSim(0);
