@@ -3175,12 +3175,39 @@ function createPinnedSpellDock(mobileLayoutMq) {
 
       // Click to select
       item.addEventListener('click', () => {
+        applyLocalSelection(slotIndex, spell);
         window.dispatchEvent(new CustomEvent('ui:setPinnedSpell', {
           detail: { slot: slotIndex, spellId: spell.id }
         }));
         closeFan();
       });
     }
+  }
+
+  /** Immediately apply a spell selection to a slot (before the hudFeeds round-trip). */
+  function applyLocalSelection(slotIndex, spell) {
+    const s = slots[slotIndex];
+    if (!spell) return;
+    s.spellId = spell.id;
+    s.glyphSpan.textContent = spell.symbol || '\u2726';
+    s.glyphSpan.style.opacity = '1';
+    s.btn.style.opacity = '1';
+    s.btn.style.borderColor = '#2d3b52';
+    s.btn.title = spell.name || spell.id;
+    const cost = Number(spell.cost || spell.manaCost || 0);
+    s.manaBadge.textContent = cost > 0 ? String(cost) : '';
+    s.manaBadge.style.display = cost > 0 ? 'block' : 'none';
+    s.cdOverlay.style.display = 'none';
+    s.cdLabel.style.display = 'none';
+  }
+
+  /** Find spell data from cached spells by id. */
+  function findCachedSpell(spellId) {
+    if (!_cachedSpells) return null;
+    for (const sp of _cachedSpells) {
+      if (sp.id === spellId) return sp;
+    }
+    return null;
   }
 
   // Build slot buttons
@@ -3255,6 +3282,8 @@ function createPinnedSpellDock(mobileLayoutMq) {
           selectedId = item?.dataset?.spellId || null;
         }
         if (selectedId) {
+          const sp = findCachedSpell(selectedId);
+          if (sp) applyLocalSelection(i, sp);
           window.dispatchEvent(new CustomEvent('ui:setPinnedSpell', {
             detail: { slot: i, spellId: selectedId }
           }));
@@ -3339,7 +3368,7 @@ function createPinnedSpellDock(mobileLayoutMq) {
       }
     }
     // Show dock if at least one spell is pinned or player knows any spells
-    const hasSpells = Array.isArray(detail?.hasLearnedSpells) ? detail.hasLearnedSpells : anyAssigned;
+    const hasSpells = (detail?.hasLearnedSpells != null) ? !!detail.hasLearnedSpells : anyAssigned;
     el.style.display = (mobileLayoutMq.matches && hasSpells) ? 'flex' : 'none';
   }
 
