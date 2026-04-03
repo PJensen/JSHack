@@ -80,6 +80,7 @@ const MOTE_BASE_COUNT = 2;
 const MOTE_MAX_COUNT = 4;
 const MOTE_RADIUS = 0.16;
 const FORTUNE_MOTE_BOOST = 2;
+const ALTAR_ATTUNE_DURATION = 2.6;
 
 /**
  * @param {{
@@ -141,7 +142,7 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
   // Death vigil — wisp descends onto player tile, holds still
   let _deathVigil = false;
   let _deathLandT = 0;          // 0→1 eases wisp to player tile
-  const DEATH_LAND_DURATION = 1.5; // seconds to settle
+  const DEATH_LAND_DURATION = 3.5; // seconds to settle onto player
 
   // Betrayal
   let _standing = 0;
@@ -154,6 +155,9 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
   let _omenTimer = 0;
   let _ceremonyTimer = 0;
   let _targetCueX = 0, _targetCueY = 0, _targetCueTimer = 0;
+  let _altarBeaconTimer = 0;
+  let _altarBeaconX = 0, _altarBeaconY = 0;
+  let _altarRejectTimer = 0;
 
   // ── Helpers ────────────────────────────────────────────────────────
 
@@ -383,6 +387,21 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
     _targetCueTimer = Math.max(_targetCueTimer, Math.max(0.2, ttl));
   }
 
+  function _attuneSacredSite(targetId, fallbackActorId = 0, ttl = ALTAR_ATTUNE_DURATION) {
+    const tid = Number(targetId || 0) | 0;
+    let pos = tid > 0 ? getPosition(tid) : null;
+    if (!pos) {
+      const aid = Number(fallbackActorId || 0) | 0;
+      pos = aid > 0 ? getPosition(aid) : null;
+    }
+    if (!pos) return null;
+    _altarBeaconX = Number(pos.x);
+    _altarBeaconY = Number(pos.y);
+    _altarBeaconTimer = Math.max(_altarBeaconTimer, Math.max(0.4, ttl));
+    _setTargetCue(_altarBeaconX, _altarBeaconY, Math.min(1.8, ttl));
+    return pos;
+  }
+
   // ── Main tick ─────────────────────────────────────────────────────
 
   function tick(dtSec) {
@@ -434,6 +453,8 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
     _ceremonyTimer = Math.max(0, _ceremonyTimer - dtSec);
     _targetCueTimer = Math.max(0, _targetCueTimer - dtSec);
     _trapHintTimer = Math.max(0, _trapHintTimer - dtSec);
+    _altarBeaconTimer = Math.max(0, _altarBeaconTimer - dtSec);
+    _altarRejectTimer = Math.max(0, _altarRejectTimer - dtSec);
 
     // Danger scan (throttled)
     _dangerScanTimer -= dtSec;
@@ -724,6 +745,41 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
       bctx.stroke();
     }
 
+    // Sacred-site attunement: the spirit marks altar/shrine tile when engaged.
+    if (_altarBeaconTimer > 0) {
+      const t = Math.min(1, _altarBeaconTimer / ALTAR_ATTUNE_DURATION);
+      const ringA = 0.16 + t * 0.34;
+      const r1 = 0.22 + (1 - t) * 0.25;
+      const r2 = 0.12 + (1 - t) * 0.16;
+      bctx.strokeStyle = `rgba(208,170,255,${ringA.toFixed(3)})`;
+      bctx.lineWidth = 0.018;
+      bctx.beginPath();
+      bctx.arc(_altarBeaconX, _altarBeaconY, r1, 0, Math.PI * 2);
+      bctx.stroke();
+      bctx.beginPath();
+      bctx.arc(_altarBeaconX, _altarBeaconY, r2, 0, Math.PI * 2);
+      bctx.stroke();
+
+      // Light tether from spirit to sacred site for communion feel.
+      const tetherA = (0.05 + t * 0.18) * (_betrayed ? 0.5 : 1);
+      bctx.strokeStyle = `rgba(235,210,255,${tetherA.toFixed(3)})`;
+      bctx.lineWidth = 0.012;
+      bctx.beginPath();
+      bctx.moveTo(_x, _y);
+      bctx.lineTo(_altarBeaconX, _altarBeaconY);
+      bctx.stroke();
+    }
+
+    // Rejection response: cracked ember ring when offering fails.
+    if (_altarRejectTimer > 0 && _altarBeaconTimer > 0) {
+      const t = Math.min(1, _altarRejectTimer / 1.0);
+      bctx.strokeStyle = `rgba(255,110,70,${(0.2 + t * 0.35).toFixed(3)})`;
+      bctx.lineWidth = 0.022;
+      bctx.beginPath();
+      bctx.arc(_altarBeaconX, _altarBeaconY, 0.18 + (1 - t) * 0.12, 0, Math.PI * 1.45);
+      bctx.stroke();
+    }
+
     bctx.restore();
   }
 
@@ -847,6 +903,41 @@ export function createSpiritWispFxController({ world, fx, getPosition, getPlayer
       const pe = getPlayerEntity();
       if (!pe || Number(actor || 0) !== pe.id) return;
       _omenTimer = Math.max(_omenTimer, 0.8);
+    });
+
+    // Altar/shrine interactions: sacred-site behavior keyed to target tile.
+    world.on('altar:pray', ({ actor, targetId }) => {
+      const pe = getPlayerEntity();
+      if (!pe || Number(actor || 0) !== pe.id) return;
+      const pos = _attuneSacredSite(targetId, actor, 2.2);
+      if (pos) _startMiracleFlight(pos.x, pos.y);
+      _omenTimer = Math.max(_omenTimer, 0.9);
+    });
+    world.on('altar:offered', ({ actor, targetId, value }) => {
+      const pe = getPlayerEntity();
+      if (!pe || Number(actor || 0) !== pe.id) return;
+      const pos = _attuneSacredSite(targetId, actor, 2.8);
+      const strength = 0.9 + Math.min(1.8, Number(value || 0) * 2.2);
+      if (pos) _startMiracleFlight(pos.x, pos.y);
+      _triggerCeremonyAt(_altarBeaconX, _altarBeaconY, strength);
+      _triggerFortuneAt(_altarBeaconX, _altarBeaconY, Math.max(0.7, strength * 0.8));
+    });
+    world.on('altar:offerFailed', ({ actor, targetId }) => {
+      const pe = getPlayerEntity();
+      if (!pe || Number(actor || 0) !== pe.id) return;
+      _attuneSacredSite(targetId, actor, 1.2);
+      _altarRejectTimer = Math.max(_altarRejectTimer, 1.0);
+      _agitation = Math.max(_agitation, COMBAT_DECAY * 0.75);
+    });
+    world.on('shrine:communion', ({ actor, targetId, effect }) => {
+      const pe = getPlayerEntity();
+      if (!pe || Number(actor || 0) !== pe.id) return;
+      const pos = _attuneSacredSite(targetId, actor, 2.5);
+      if (pos) _startMiracleFlight(pos.x, pos.y);
+      const e = String(effect || '').toLowerCase();
+      if (e === 'blessing') _triggerAegisAt(_altarBeaconX, _altarBeaconY, 1.3);
+      else if (e === 'cooldown') _omenTimer = Math.max(_omenTimer, 0.8);
+      else _triggerCeremonyAt(_altarBeaconX, _altarBeaconY, 0.8);
     });
 
     // Miracle / intervention — wisp flies to deliver it
