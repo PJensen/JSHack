@@ -309,8 +309,8 @@ function spawnGore(pool, wx, wy, dx, dy, dmg, isCrit, goreType, damageType) {
     const speed = (slashLike ? 1.25 : 0.95) + Math.random() * (slashLike ? 2.0 : 1.8) + (isCrit ? 0.45 : 0);
     // Symmetric vx/vy: impact direction + perpendicular spread
     pool.spawn(new Particle({
-      x: wx + 0.5 + (Math.random() - 0.5) * 0.3,
-      y: wy + 0.5 + (Math.random() - 0.5) * 0.3,
+      x: wx + (Math.random() - 0.5) * 0.3,
+      y: wy + (Math.random() - 0.5) * 0.3,
       vx: dx * speed + perpx * sideSpread,
       vy: dy * speed + perpy * sideSpread,
       ax: 0, ay: style.gravity * 0.5,
@@ -331,8 +331,8 @@ function spawnGore(pool, wx, wy, dx, dy, dmg, isCrit, goreType, damageType) {
       const ang = Math.random() * Math.PI * 2;
       const spd = 0.6 + Math.random() * 1.2;
       pool.spawn(new Particle({
-        x: wx + 0.5 + (Math.random() - 0.5) * 0.2,
-        y: wy + 0.5 + (Math.random() - 0.5) * 0.2,
+        x: wx + (Math.random() - 0.5) * 0.2,
+        y: wy + (Math.random() - 0.5) * 0.2,
         vx: Math.cos(ang) * spd,
         vy: Math.sin(ang) * spd,
         ax: 0, ay: style.gibGravity * 0.5,
@@ -352,8 +352,8 @@ function spawnGore(pool, wx, wy, dx, dy, dmg, isCrit, goreType, damageType) {
     const fwd = (Math.random() - 0.5) * 0.7;
     const side = (Math.random() - 0.5) * 0.7;
     pool.spawn(new Particle({
-      x: wx + 0.5 + dx * fwd + perpx * side,
-      y: wy + 0.5 + dy * fwd + perpy * side,
+      x: wx + dx * fwd + perpx * side,
+      y: wy + dy * fwd + perpy * side,
       vx: 0, vy: 0,
       life: style.stainLifeMin + 4 + Math.random() * (style.stainLifeSpan + 8),
       size0: 0.05 + Math.random() * 0.07,
@@ -380,8 +380,8 @@ function spawnArrowImpactGore(pool, wx, wy, dx, dy, dmg, isCrit, goreType, damag
     const drift = (Math.random() - 0.5) * (slashLike ? 0.28 : 0.38);
     const speed = 1.0 + Math.random() * 1.9 + (isCrit ? 0.3 : 0);
     pool.spawn(new Particle({
-      x: wx + 0.5 + dx * forward - dy * side + (Math.random() - 0.5) * 0.15,
-      y: wy + 0.5 + dy * forward + dx * side + (Math.random() - 0.5) * 0.15,
+      x: wx + dx * forward - dy * side + (Math.random() - 0.5) * 0.15,
+      y: wy + dy * forward + dx * side + (Math.random() - 0.5) * 0.15,
       vx: dx * speed - dy * drift,
       vy: dy * speed + dx * drift,
       ax: 0,
@@ -403,8 +403,8 @@ function spawnArrowImpactGore(pool, wx, wy, dx, dy, dmg, isCrit, goreType, damag
       const side = (Math.random() - 0.5) * 0.40;
       const speed = 0.7 + Math.random() * 1.1;
       pool.spawn(new Particle({
-        x: wx + 0.5 + dx * 0.2 + (Math.random() - 0.5) * 0.15,
-        y: wy + 0.5 + dy * 0.2 + (Math.random() - 0.5) * 0.15,
+        x: wx + dx * 0.2 + (Math.random() - 0.5) * 0.15,
+        y: wy + dy * 0.2 + (Math.random() - 0.5) * 0.15,
         vx: dx * speed - dy * side,
         vy: dy * speed + dx * side,
         ax: 0,
@@ -427,8 +427,8 @@ function spawnArrowImpactGore(pool, wx, wy, dx, dy, dmg, isCrit, goreType, damag
     const forward = (Math.random() - 0.3) * 0.55;
     const side = (Math.random() - 0.5) * 0.50;
     pool.spawn(new Particle({
-      x: wx + 0.5 + dx * forward - dy * side,
-      y: wy + 0.5 + dy * forward + dx * side,
+      x: wx + dx * forward - dy * side,
+      y: wy + dy * forward + dx * side,
       vx: 0,
       vy: 0,
       life: style.stainLifeMin + 3 + Math.random() * (style.stainLifeSpan + 6),
@@ -460,8 +460,8 @@ function spawnMeleeImpactGore(pool, wx, wy, dx, dy, dmg, isCrit, goreType, damag
 
   const jitter = (Math.random() - 0.5) * (0.06 + view.signature.slash * 0.04);
   const sideOffset = view.sideSign * view.sideShift + jitter;
-  const ox = wx + 0.5 + fwdx * view.originForward + sidex * sideOffset;
-  const oy = wy + 0.5 + fwdy * view.originForward + sidey * sideOffset;
+  const ox = wx + fwdx * view.originForward + sidex * sideOffset;
+  const oy = wy + fwdy * view.originForward + sidey * sideOffset;
 
   // ── Damage intensity tier: bigger hits = more gore ──
   const isHeavy = dmg >= 12;
@@ -578,8 +578,8 @@ function spawnMeleeImpactGore(pool, wx, wy, dx, dy, dmg, isCrit, goreType, damag
       const rAng = (i / ringCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
       const rDist = 0.28 + Math.random() * 0.45;
       pool.spawn(new Particle({
-        x: wx + 0.5 + Math.cos(rAng) * rDist,
-        y: wy + 0.5 + Math.sin(rAng) * rDist,
+        x: wx + Math.cos(rAng) * rDist,
+        y: wy + Math.sin(rAng) * rDist,
         vx: 0, vy: 0,
         life: style.stainLifeMin + 6 + Math.random() * style.stainLifeSpan,
         size0: 0.06 + Math.random() * 0.06,
@@ -601,8 +601,8 @@ function spawnMeleeImpactGore(pool, wx, wy, dx, dy, dmg, isCrit, goreType, damag
     // Side spread: reaches into adjacent tiles
     const side = (Math.random() - 0.5) * (0.60 + view.signature.slash * 0.20);
     pool.spawn(new Particle({
-      x: wx + 0.5 + fwdx * forward + sidex * side,
-      y: wy + 0.5 + fwdy * forward + sidey * side,
+      x: wx + fwdx * forward + sidex * side,
+      y: wy + fwdy * forward + sidey * side,
       vx: 0,
       vy: 0,
       life: style.stainLifeMin + 4 + Math.random() * (style.stainLifeSpan + 8),
@@ -638,8 +638,8 @@ function spawnDeathGore(pool, wx, wy, dx, dy, amount, goreType, damageType, crit
     const forward = (0.14 + Math.random() * 0.44) * burstScale;
     const side = (Math.random() - 0.5) * 0.50 * burstScale;
     pool.spawn(new Particle({
-      x: wx + 0.5 + (Math.random() - 0.5) * 0.30,
-      y: wy + 0.5 + (Math.random() - 0.5) * 0.30,
+      x: wx + (Math.random() - 0.5) * 0.30,
+      y: wy + (Math.random() - 0.5) * 0.30,
       vx: dx * forward + perpx * side,
       vy: dy * forward + perpy * side,
       ay: style.gravity * 0.4,
@@ -661,8 +661,8 @@ function spawnDeathGore(pool, wx, wy, dx, dy, amount, goreType, damageType, crit
     const ang = Math.random() * Math.PI * 2;
     const spd = (0.18 + Math.random() * 0.55) * burstScale;
     pool.spawn(new Particle({
-      x: wx + 0.5 + (Math.random() - 0.5) * 0.22,
-      y: wy + 0.5 + (Math.random() - 0.5) * 0.22,
+      x: wx + (Math.random() - 0.5) * 0.22,
+      y: wy + (Math.random() - 0.5) * 0.22,
       vx: Math.cos(ang) * spd,
       vy: Math.sin(ang) * spd,
       ay: style.gravity * 0.3,
@@ -685,8 +685,8 @@ function spawnDeathGore(pool, wx, wy, dx, dy, amount, goreType, damageType, crit
     const radial = (0.08 + Math.random() * 0.28) * burstScale;
     const directed = (0.04 + Math.random() * 0.14) * burstScale;
     pool.spawn(new Particle({
-      x: wx + 0.5 + (Math.random() - 0.5) * 0.24,
-      y: wy + 0.5 + (Math.random() - 0.5) * 0.24,
+      x: wx + (Math.random() - 0.5) * 0.24,
+      y: wy + (Math.random() - 0.5) * 0.24,
       vx: Math.cos(ang) * radial + dx * directed,
       vy: Math.sin(ang) * radial + dy * directed,
       ay: style.gibGravity * 0.35,
@@ -709,8 +709,8 @@ function spawnDeathGore(pool, wx, wy, dx, dy, amount, goreType, damageType, crit
       const ang = (i / smashCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
       const spd = (0.35 + Math.random() * 0.55) * burstScale;
       pool.spawn(new Particle({
-        x: wx + 0.5 + (Math.random() - 0.5) * 0.12,
-        y: wy + 0.5 + (Math.random() - 0.5) * 0.12,
+        x: wx + (Math.random() - 0.5) * 0.12,
+        y: wy + (Math.random() - 0.5) * 0.12,
         vx: Math.cos(ang) * spd,
         vy: Math.sin(ang) * spd,
         ay: style.gravity * 0.5,
@@ -731,8 +731,8 @@ function spawnDeathGore(pool, wx, wy, dx, dy, amount, goreType, damageType, crit
   for (let i = 0; i < puddles; i++) {
     const spread = 0.35 + sizeScale * 0.20;
     pool.spawn(new Particle({
-      x: wx + 0.5 + (Math.random() - 0.5) * spread * 2,
-      y: wy + 0.5 + (Math.random() - 0.5) * spread * 2,
+      x: wx + (Math.random() - 0.5) * spread * 2,
+      y: wy + (Math.random() - 0.5) * spread * 2,
       vx: 0,
       vy: 0,
       life: 20 + Math.random() * 28,
@@ -749,7 +749,7 @@ function spawnDeathGore(pool, wx, wy, dx, dy, amount, goreType, damageType, crit
   // ── Eyeburst special: cacodemon pop ─────────────────────────────
   // Pressurized radial explosion. Everything flies outward from center.
   if (goreType === 'eyeburst') {
-    const cx = wx + 0.5, cy = wy + 0.5;
+    const cx = wx, cy = wy;
 
     // Heavy flesh chunks — big, slow spin, radial burst
     // These are the "it popped" pieces — the deflated body
