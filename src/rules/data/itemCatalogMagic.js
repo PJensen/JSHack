@@ -1886,6 +1886,7 @@ export const MAGIC_ITEMS = {
     rarityName: "common",
     value: 5,
     description: "A foul brew that turns your stomach.",
+    weight: 0.5, // glass potion
     potion: {
       route: "oral",
       doses: 1,
@@ -1917,6 +1918,7 @@ export const MAGIC_ITEMS = {
     rarityName: "common",
     value: 5,
     description: "A thick, syrupy liquid that locks every muscle in place.",
+    weight: 0.5, // glass potion
     potion: {
       route: "oral",
       doses: 1,
@@ -1945,6 +1947,7 @@ export const MAGIC_ITEMS = {
     rarityName: "common",
     value: 5,
     description: "A swirling iridescent brew. The walls are breathing.",
+    weight: 0.5, // glass potion
     potion: {
       route: "oral",
       doses: 1,
@@ -1973,6 +1976,7 @@ export const MAGIC_ITEMS = {
     rarityName: "common",
     value: 5,
     description: "A pitch-black draught that steals the light from your eyes.",
+    weight: 0.5, // glass potion
     potion: {
       route: "oral",
       doses: 1,
@@ -2015,6 +2019,7 @@ export const MAGIC_ITEMS = {
     rarityName: "magic",
     value: 5,
     description: "A thin grey liquid that drains your life force.",
+    weight: 0.5, // glass potion
     potion: {
       route: "oral",
       doses: 1,
@@ -2053,6 +2058,7 @@ export const MAGIC_ITEMS = {
     rarityName: "common",
     value: 5,
     description: "A fizzing, disorienting concoction.",
+    weight: 0.5, // glass potion
     potion: {
       route: "oral",
       doses: 1,
@@ -2161,6 +2167,7 @@ export const MAGIC_ITEMS = {
     bonuses: { maxHp: -3 },
     beatitude: "cursed",
     description: "The chain tightens around your throat. You can feel it constricting.",
+    weight: 0.2, // iron amulet
   },
   amulet_aggravation: {
     id: "amulet_aggravation",
@@ -2174,6 +2181,7 @@ export const MAGIC_ITEMS = {
     bonuses: { defense: -1 },
     beatitude: "cursed",
     description: "A crude fetish of yellowed bone. Everything in the dungeon knows exactly where you are.",
+    weight: 0.1, // bone amulet
   },
 
   // ── Cursed Rings (new) ─────────────────────────────────────────────
@@ -2190,6 +2198,7 @@ export const MAGIC_ITEMS = {
     bonuses: { defense: -3, bluntResist: -0.15, slashResist: -0.15 },
     beatitude: "cursed",
     description: "A brittle glass ring. Your skin feels paper-thin.",
+    weight: 0.03, // glass ring
   },
   ring_mana_drain: {
     id: "ring_mana_drain",
@@ -2203,6 +2212,7 @@ export const MAGIC_ITEMS = {
     bonuses: { manaRegen: -1.0, maxMana: -10 },
     beatitude: "cursed",
     description: "A dull leaden band that devours arcane energy. Your spells wither on your tongue.",
+    weight: 0.09, // lead ring
   },
 
   food_mushrooms: {
