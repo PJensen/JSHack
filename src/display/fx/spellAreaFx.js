@@ -1,7 +1,7 @@
 // src/display/fx/spellAreaFx.js
 // Blink, meteor, blastwave spell VFX (world-space; display-only).
 
-import { startShake } from "../camera/shake.js";
+import { startShake, startSlamShake } from "../camera/shake.js";
 import { pathPolyline, jitterLine } from "./fxGeom.js";
 import { Particle } from "../passes/vfx/particles/particlePool.js";
 import { RadialFx, BlinkFx, PhaseStrikeFx, SearchPulseFx } from "./fxEntries.js";
@@ -966,7 +966,7 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
         }
         spawnMeteorProjectile(origin);
         _meteorFx.push(new RadialFx({ x: origin.x, y: origin.y, radius: radius || 2, ttl: 0.45 }));
-        startShake(cam, 7, 0.30);
+        startSlamShake(cam, 14, 0.55);
         // Fire particle burst
         const N = 30;
         for (let i = 0; i < N; i++) {
