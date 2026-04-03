@@ -41,8 +41,9 @@ const DEATH_IMPACT_KEY = Symbol.for("jshack:deathImpact:map");
 const DEATH_IMPACT_INSTALLED_KEY = Symbol.for("jshack:deathImpact:installed");
 
 /**
- * Install a `damaged` listener that records the last impactVector + critical
- * flag per target entity.  cleanupSystem reads this when building loot scatter.
+ * Install a `damaged` listener that records the latest same-turn, positive-damage
+ * impactVector + critical flag per target entity. cleanupSystem reads this when
+ * building loot scatter.
  */
 export function installDeathImpactTracker(world) {
   if (world[DEATH_IMPACT_INSTALLED_KEY]) return;
@@ -51,6 +52,8 @@ export function installDeathImpactTracker(world) {
   world.on("damaged", ({ target, impactVector, critical, amount, rawAmount }) => {
     if (!(Number(target) > 0)) return;
     if (!impactVector) return;
+    const dealt = Number(amount || rawAmount || 0);
+    if (!(dealt > 0)) return;
     const dx = Number(impactVector.dx || 0);
     const dy = Number(impactVector.dy || 0);
     if (!dx && !dy) return;
@@ -59,6 +62,7 @@ export function installDeathImpactTracker(world) {
       critical: !!critical,
       amount: Number(amount || 0) | 0,
       rawAmount: Number(rawAmount || 0) | 0,
+      step: world.step | 0,
     });
   });
 }
@@ -68,8 +72,10 @@ function getDeathImpact(world, entityId) {
   if (!map) return null;
   const id = Number(entityId) | 0;
   const info = map.get(id);
-  if (info) map.delete(id);
-  return info || null;
+  if (!info) return null;
+  map.delete(id);
+  if ((info.step | 0) !== (world.step | 0)) return null;
+  return info;
 }
 
 function nextGroundStackSeq(world) {
