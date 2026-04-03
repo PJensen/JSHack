@@ -1194,6 +1194,7 @@ export const EQUIPMENT_ITEMS = {
     damageDice: "1d8",
     damageType: "blunt",
     staminaCost: 10,
+    weight: 3.4,
     affixes: ["stunning1"],
   },
   flail: {
