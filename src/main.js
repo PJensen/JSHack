@@ -5557,11 +5557,10 @@ function render(worldView) {
       _healthBarsToDraw.push({ ...renderEntity, _sizeScale: sizeScale });
     }
 
-    // Monster name labels — hostile actors only, visible and within range
+    // Actor name labels — hostile actors + pets, visible and within range
     if (
       (renderEntity.layer | 0) === 300
       && renderEntity.showHealthBar
-      && !renderEntity.isPet
       && !hasTag(renderEntity, 'memory_recent')
       && !hasTag(renderEntity, 'esp_sensed')
       && !hasTag(renderEntity, 'thermal_sensed')
