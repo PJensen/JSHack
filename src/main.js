@@ -4044,6 +4044,7 @@ const {
   spiritWispFx,
   bumpFx,
   recoilFx,
+  hitstopFx,
   ftext,
   goreTick,
 } = displayRuntime;
@@ -6234,8 +6235,10 @@ function frame(now) {
   // Update FX FPS (exponential moving average for stability)
   const instFps = dtSec > 0 ? (1 / dtSec) : 0;
   _fpsEMA = _fpsEMA ? (_fpsEMA * 0.9 + instFps * 0.1) : instFps;
-  _fxTime += dtSec;
-  _dtSec = dtSec;
+  // Hitstop: scale display dt (gore, bumps, particles all slow in unison)
+  const displayDt = hitstopFx.scale(dtSec);
+  _fxTime += displayDt;
+  _dtSec = displayDt;
   impactTracker.flush(_fxTime);
 
   // Sim step is scene-controlled; keep paused (no tick) unless a scene/input advances it.
