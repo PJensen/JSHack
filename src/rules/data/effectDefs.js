@@ -363,4 +363,10 @@ export const EFFECT_DEFS = [
     operation: "none",
     statuses: ["fey_grace"],
   },
+  {
+    id: "bloodthirst",
+    keys: ["bloodthirst"],
+    operation: "none",
+    statuses: ["bloodthirst"],
+  },
 ];

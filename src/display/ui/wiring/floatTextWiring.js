@@ -505,6 +505,103 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     });
   });
 
+  // ── Warden ability floats ──
+
+  world.on('spell:war_cry', ({ at }) => {
+    if (!at || !canShowAt(at.x, at.y)) return;
+    ftext.addStatus(at.x, at.y - 0.45, 'WAR CRY!', {
+      color: '#ff4422',
+      life: 1.3,
+      scaleStart: 1.5,
+      scaleEnd: 1.0,
+    });
+  });
+
+  world.on('spell:cleave', ({ at, hits }) => {
+    if (!at || !canShowAt(at.x, at.y)) return;
+    if (hits && hits.length > 0) {
+      ftext.addStatus(at.x, at.y - 0.45, 'CLEAVE!', {
+        color: '#cc3300',
+        life: 1.2,
+        scaleStart: 1.4,
+        scaleEnd: 1.0,
+      });
+    }
+  });
+
+  world.on('spell:bloodthirst', ({ at }) => {
+    if (!at || !canShowAt(at.x, at.y)) return;
+    ftext.addStatus(at.x, at.y - 0.45, 'BLOODTHIRST', {
+      color: '#aa0022',
+      life: 1.3,
+      scaleStart: 1.3,
+      scaleEnd: 1.0,
+    });
+  });
+
+  world.on('proc:bloodthirst', ({ actor, healed }) => {
+    const pos = getPosition(Number(actor || 0));
+    if (!pos || !canShowAt(pos.x, pos.y)) return;
+    ftext.addHeal(pos.x, pos.y - 0.3, `+${healed}`, { color: '#aa0022' });
+  });
+
+  // ── Cleric ability floats ──
+
+  world.on('spell:purify', ({ at, removed }) => {
+    if (!at || !canShowAt(at.x, at.y)) return;
+    if (removed > 0) {
+      ftext.addStatus(at.x, at.y - 0.45, 'PURIFIED', {
+        color: '#ffffaa',
+        life: 1.2,
+        scaleStart: 1.3,
+        scaleEnd: 1.0,
+      });
+    }
+  });
+
+  world.on('spell:divine_shield', ({ at }) => {
+    if (!at || !canShowAt(at.x, at.y)) return;
+    ftext.addStatus(at.x, at.y - 0.45, 'DIVINE SHIELD', {
+      color: '#ffdd66',
+      life: 1.4,
+      scaleStart: 1.4,
+      scaleEnd: 1.0,
+    });
+  });
+
+  world.on('spell:consecrate', ({ at }) => {
+    if (!at || !canShowAt(at.x, at.y)) return;
+    ftext.addStatus(at.x, at.y - 0.45, 'CONSECRATE', {
+      color: '#ffcc33',
+      life: 1.3,
+      scaleStart: 1.4,
+      scaleEnd: 1.0,
+    });
+  });
+
+  // ── Outlaw ability floats ──
+
+  world.on('spell:smoke_bomb', ({ at }) => {
+    if (!at || !canShowAt(at.x, at.y)) return;
+    ftext.addStatus(at.x, at.y - 0.45, 'SMOKE!', {
+      color: '#888888',
+      life: 1.3,
+      scaleStart: 1.5,
+      scaleEnd: 0.8,
+    });
+  });
+
+  world.on('spell:poison_blade', ({ at, fizzle }) => {
+    if (fizzle) return;
+    if (!at || !canShowAt(at.x, at.y)) return;
+    ftext.addStatus(at.x, at.y - 0.45, 'ENVENOMED', {
+      color: '#44cc44',
+      life: 1.2,
+      scaleStart: 1.2,
+      scaleEnd: 1.0,
+    });
+  });
+
   // ── Gaze stun ───────────────────────────────────────────────────────
 
   world.on('proc:gaze:stun', ({ target }) => {

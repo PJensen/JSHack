@@ -29,7 +29,7 @@ export const CLASS_DEFS = {
       { itemId: 'potion_mana', count: 3 },
       { itemId: 'scroll_identify', count: 4 },
     ],
-    startingSpells: ['rampage', 'earthshatter'],
+    startingSpells: ['rampage', 'earthshatter', 'war_cry', 'cleave', 'bloodthirst'],
   },
 
   druid: {
@@ -97,7 +97,7 @@ export const CLASS_DEFS = {
       { itemId: 'ammo_blunt_arrows', count: 1 },
       { itemId: 'ammo_fire_arrows', count: 1 }
     ],
-    startingSpells: ['phase_strike', 'blind', 'shadow_veil'],
+    startingSpells: ['phase_strike', 'blind', 'shadow_veil', 'smoke_bomb', 'poison_blade'],
   },
 
   archeologist: {
@@ -192,7 +192,7 @@ export const CLASS_DEFS = {
       { itemId: 'potion_holy_water', count: 1 },
       { itemId: 'scroll_identify', count: 4 },
     ],
-    startingSpells: ['smite', 'flash_heal'],
+    startingSpells: ['smite', 'flash_heal', 'purify', 'divine_shield', 'consecrate'],
   },
 };
 

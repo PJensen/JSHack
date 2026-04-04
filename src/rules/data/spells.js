@@ -701,6 +701,142 @@ export const SPELL_DEFS = {
       { kind: 'status', status: 'poisoned', duration: '4 turns (30% chance)' },
     ],
   },
+
+  // ── Warden abilities ──────────────────────────────────────────────────────
+  war_cry: {
+    id: 'war_cry',
+    name: 'War Cry',
+    symbol: '\u{1F4E3}',    // 📣
+    schools: ['alteration', 'martial'],
+    manaCost: 6,
+    minIntelligence: 0,
+    cooldown: 14,
+    script: 'war_cry',
+    targeting: 'self',
+    radius: 3,
+    description: 'A thundering bellow that rattles the nerve of every creature close enough to hear it.',
+    effects: [
+      { kind: 'status', status: 'weakened', duration: '6 turns to nearby hostiles' },
+      { kind: 'utility', note: 'Breaks enemy aggro within radius, resetting them to alerted' },
+    ],
+  },
+  cleave: {
+    id: 'cleave',
+    name: 'Cleave',
+    symbol: '\u{1FA93}',    // 🪓
+    schools: ['destruction', 'martial'],
+    manaCost: 4,
+    minIntelligence: 0,
+    cooldown: 5,
+    script: 'cleave',
+    targeting: 'self',
+    radius: 1,
+    description: 'A brutal horizontal sweep that carves through everything within arm\'s reach.',
+    effects: [
+      { kind: 'damage', element: 'physical', amount: '5 base, INT-scaled; hits all adjacent hostiles' },
+    ],
+  },
+  bloodthirst: {
+    id: 'bloodthirst',
+    name: 'Bloodthirst',
+    symbol: '\u{1FA78}',    // 🩸
+    schools: ['alteration', 'darkness'],
+    manaCost: 10,
+    minIntelligence: 0,
+    cooldown: 18,
+    script: 'bloodthirst',
+    targeting: 'self',
+    description: 'Offer your rage to Molkhar and feast on the pain you deal.',
+    effects: [
+      { kind: 'status', status: 'bloodthirst', duration: '30 turns; melee hits heal for 25% of damage dealt' },
+    ],
+  },
+
+  // ── Cleric abilities ──────────────────────────────────────────────────────
+  purify: {
+    id: 'purify',
+    name: 'Purify',
+    symbol: '\u2721',        // ✡
+    schools: ['restoration', 'holy'],
+    clearMindedCasting: true,
+    manaCost: 10,
+    minIntelligence: 0,
+    cooldown: 10,
+    script: 'purify',
+    targeting: 'self',
+    description: 'Invoke Seraphine\'s mercy to burn corruption from your body.',
+    effects: [
+      { kind: 'utility', note: 'Removes all negative status effects (poison, burn, bleed, curse, stun, etc.)' },
+    ],
+  },
+  divine_shield: {
+    id: 'divine_shield',
+    name: 'Divine Shield',
+    symbol: '\u{1F6E1}',    // 🛡
+    schools: ['holy', 'alteration'],
+    manaCost: 14,
+    minIntelligence: 0,
+    cooldown: 16,
+    script: 'divine_shield',
+    targeting: 'self',
+    description: 'Wrap yourself in Seraphine\'s light — a holy shell that absorbs blows before shattering.',
+    effects: [
+      { kind: 'status', status: 'stoneskin', duration: '20 turns' },
+      { kind: 'status', status: 'shield_guard', duration: '20 turns' },
+      { kind: 'status', status: 'blessed', duration: '20 turns' },
+    ],
+  },
+  consecrate: {
+    id: 'consecrate',
+    name: 'Consecrate',
+    symbol: '\u2626',        // ☦
+    schools: ['holy', 'destruction'],
+    manaCost: 12,
+    minIntelligence: 0,
+    cooldown: 12,
+    script: 'consecrate',
+    targeting: 'self',
+    radius: 2,
+    description: 'Sanctify the ground beneath your feet. Holy fire scorches the wicked and mends the faithful.',
+    effects: [
+      { kind: 'damage', element: 'holy', amount: '3 per tick to hostiles in radius; INT-scaled' },
+      { kind: 'utility', note: 'Grants caster regen for the duration' },
+    ],
+  },
+
+  // ── Outlaw abilities ──────────────────────────────────────────────────────
+  smoke_bomb: {
+    id: 'smoke_bomb',
+    name: 'Smoke Bomb',
+    symbol: '\u{1F4A8}',    // 💨
+    schools: ['trickery'],
+    manaCost: 8,
+    minIntelligence: 0,
+    cooldown: 12,
+    script: 'smoke_bomb',
+    targeting: 'self',
+    radius: 3,
+    description: 'Pop a flash of Loki\'s powder — blinding nearby foes and vanishing from their memory.',
+    effects: [
+      { kind: 'status', status: 'blinded', duration: '5 turns to nearby hostiles' },
+      { kind: 'utility', note: 'Resets enemy aggro to unaware within radius' },
+    ],
+  },
+  poison_blade: {
+    id: 'poison_blade',
+    name: 'Poison Blade',
+    symbol: '\u2620',        // ☠
+    schools: ['trickery', 'chemical'],
+    manaCost: 6,
+    minIntelligence: 0,
+    cooldown: 8,
+    script: 'poison_blade',
+    targeting: 'self',
+    description: 'Conjure a slick of venom and drag your blade through it.',
+    effects: [
+      { kind: 'utility', note: 'Coats equipped weapon with 8 charges of poison (75% proc chance per hit)' },
+    ],
+  },
 };
 
 /**

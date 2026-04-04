@@ -1,0 +1,374 @@
+// tests/classAbilities.test.mjs
+// Tests for the 8 new class abilities: war_cry, cleave, bloodthirst,
+// purify, divine_shield, consecrate, smoke_bomb, poison_blade.
+
+import { assert, assertEquals } from "jsr:@std/assert";
+import { World } from "../src/lib/ecs-js/index.js";
+import { SPELL_DEFS } from "../src/rules/data/spells.js";
+import { runSpellScript } from "../src/rules/scripts/spells.js";
+import { Position } from "../src/rules/components/Position.js";
+import { Brain } from "../src/rules/components/Brain.js";
+import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
+import { Faction } from "../src/rules/components/Faction.js";
+import { Vitality } from "../src/rules/components/Vitality.js";
+import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
+import { Equipment } from "../src/rules/components/Equipment.js";
+import { ItemInfo } from "../src/rules/components/ItemInfo.js";
+import { AggroState, AGGRO_LEVELS } from "../src/rules/components/AggroState.js";
+import { getEffectiveVisionRange } from "../src/rules/utils/blind.js";
+import { HazardArea } from "../src/rules/components/HazardArea.js";
+import { DungeonState } from "../src/rules/components/DungeonState.js";
+import { clearAll, loadChunk } from "../src/rules/environment/dungeon/tileMap.js";
+import { CHUNK_SIZE, TILE_FLOOR } from "../src/rules/environment/dungeon/constants.js";
+
+function makeWorld(seed = 0xBEEF) {
+  clearAll();
+  loadChunk(0, 0, new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR));
+  const world = new World({ seed });
+  // DungeonState needed for hazard floor attachment
+  const ds = world.create();
+  world.add(ds, DungeonState, {
+    currentDepth: 1, worldSeed: seed, floorEntityIds: [],
+    profileType: 'dungeon',
+  });
+  return world;
+}
+
+function makeCaster(world, x = 5, y = 5, faction = 'player') {
+  const id = world.create();
+  world.add(id, Position, { x, y });
+  world.add(id, Brain, { visionRange: 8, intelligence: 10, learnedSpellIds: [] });
+  world.add(id, Faction, { key: faction });
+  world.add(id, Vitality, { maxHp: 30, hp: 30 });
+  return id;
+}
+
+function makeEnemy(world, x, y, hp = 20) {
+  const id = world.create();
+  world.add(id, Position, { x, y });
+  world.add(id, Faction, { key: 'enemy' });
+  world.add(id, Vitality, { maxHp: hp, hp });
+  world.add(id, Brain, { visionRange: 6, intelligence: 5, learnedSpellIds: [] });
+  world.add(id, NamedIdentity, { name: 'Goblin', identity: 'goblin' });
+  world.add(id, AggroState, {
+    alertLevel: AGGRO_LEVELS.hunting,
+    lastKnownX: 5, lastKnownY: 5,
+    searchTurnsLeft: 10, retreating: false,
+  });
+  return id;
+}
+
+function effectKeys(world, id) {
+  const ae = world.get(id, ActiveEffects);
+  const list = Array.isArray(ae?.effects) ? ae.effects : [];
+  return list.map((e) => String(e?.key || ""));
+}
+
+// ─── War Cry ────────────────────────────────────────────────────────────────
+
+Deno.test("war_cry weakens enemies within radius", () => {
+  const world = makeWorld();
+  const caster = makeCaster(world, 5, 5);
+  const near = makeEnemy(world, 7, 5);   // distance 2, within radius 3
+  const far = makeEnemy(world, 12, 5);   // distance 7, outside radius 3
+
+  runSpellScript(world, caster, SPELL_DEFS.war_cry, {});
+
+  assert(effectKeys(world, near).includes('weaken'), 'near enemy should be weakened');
+  assert(!effectKeys(world, far).includes('weaken'), 'far enemy should not be weakened');
+});
+
+Deno.test("war_cry resets hunting enemies to alerted", () => {
+  const world = makeWorld();
+  const caster = makeCaster(world, 5, 5);
+  const enemy = makeEnemy(world, 6, 5);
+
+  assertEquals(world.get(enemy, AggroState).alertLevel, AGGRO_LEVELS.hunting);
+  runSpellScript(world, caster, SPELL_DEFS.war_cry, {});
+  assertEquals(world.get(enemy, AggroState).alertLevel, AGGRO_LEVELS.alerted);
+});
+
+Deno.test("war_cry emits event with affected count", () => {
+  const world = makeWorld();
+  const caster = makeCaster(world, 5, 5);
+  makeEnemy(world, 6, 5);
+  makeEnemy(world, 6, 6);
+
+  const events = [];
+  world.on('spell:war_cry', (ev) => events.push(ev));
+  runSpellScript(world, caster, SPELL_DEFS.war_cry, {});
+
+  assertEquals(events.length, 1);
+  assertEquals(events[0].affected, 2);
+});
+
+// ─── Cleave ─────────────────────────────────────────────────────────────────
+
+Deno.test("cleave damages all adjacent hostiles", () => {
+  const world = makeWorld();
+  const caster = makeCaster(world, 5, 5);
+  const adj1 = makeEnemy(world, 6, 5);
+  const adj2 = makeEnemy(world, 5, 6);
+  const far = makeEnemy(world, 8, 5);   // distance 3, not adjacent
+
+  runSpellScript(world, caster, SPELL_DEFS.cleave, {});
+
+  assert(world.get(adj1, Vitality).hp < 20, 'adjacent enemy 1 should be damaged');
+  assert(world.get(adj2, Vitality).hp < 20, 'adjacent enemy 2 should be damaged');
+  assertEquals(world.get(far, Vitality).hp, 20, 'non-adjacent enemy should be unharmed');
+});
+
+Deno.test("cleave emits event with hit list", () => {
+  const world = makeWorld();
+  const caster = makeCaster(world, 5, 5);
+  makeEnemy(world, 6, 5);
+  makeEnemy(world, 4, 5);
+
+  const events = [];
+  world.on('spell:cleave', (ev) => events.push(ev));
+  runSpellScript(world, caster, SPELL_DEFS.cleave, {});
+
+  assertEquals(events.length, 1);
+  assertEquals(events[0].hits.length, 2);
+});
+
+// ─── Bloodthirst ────────────────────────────────────────────────────────────
+
+Deno.test("bloodthirst applies self-buff for 30 turns", () => {
+  const world = makeWorld();
+  const caster = makeCaster(world, 5, 5);
+
+  runSpellScript(world, caster, SPELL_DEFS.bloodthirst, {});
+
+  const keys = effectKeys(world, caster);
+  assert(keys.includes('bloodthirst'), 'caster should have bloodthirst buff');
+
+  const ae = world.get(caster, ActiveEffects);
+  const bt = ae.effects.find((e) => e?.key === 'bloodthirst');
+  assertEquals(bt.turnsLeft, 31); // +1 for effectSystem tick
+});
+
+Deno.test("bloodthirst emits spell event", () => {
+  const world = makeWorld();
+  const caster = makeCaster(world, 5, 5);
+
+  const events = [];
+  world.on('spell:bloodthirst', (ev) => events.push(ev));
+  runSpellScript(world, caster, SPELL_DEFS.bloodthirst, {});
+
+  assertEquals(events.length, 1);
+  assertEquals(events[0].duration, 30);
+});
+
+// ─── Purify ─────────────────────────────────────────────────────────────────
+
+Deno.test("purify removes negative effects but keeps positive ones", () => {
+  const world = makeWorld();
+  const caster = makeCaster(world, 5, 5);
+  world.add(caster, ActiveEffects, { effects: [
+    { key: 'poison', turnsLeft: 5, potency: 2, stacks: 1 },
+    { key: 'burn', turnsLeft: 3, potency: 1, stacks: 1 },
+    { key: 'regen', turnsLeft: 10, potency: 1, stacks: 1 },
+    { key: 'stun', turnsLeft: 2, potency: 1, stacks: 1 },
+    { key: 'berserk', turnsLeft: 50, potency: 1, stacks: 1 },
+  ]});
+
+  runSpellScript(world, caster, SPELL_DEFS.purify, {});
+
+  const keys = effectKeys(world, caster);
+  assert(!keys.includes('poison'), 'poison should be removed');
+  assert(!keys.includes('burn'), 'burn should be removed');
+  assert(!keys.includes('stun'), 'stun should be removed');
+  assert(keys.includes('regen'), 'regen should be kept');
+  assert(keys.includes('berserk'), 'berserk should be kept');
+});
+
+Deno.test("purify emits removed count", () => {
+  const world = makeWorld();
+  const caster = makeCaster(world, 5, 5);
+  world.add(caster, ActiveEffects, { effects: [
+    { key: 'poison', turnsLeft: 5, potency: 2, stacks: 1 },
+    { key: 'curse', turnsLeft: 3, potency: 1, stacks: 1 },
+  ]});
+
+  const events = [];
+  world.on('spell:purify', (ev) => events.push(ev));
+  runSpellScript(world, caster, SPELL_DEFS.purify, {});
+
+  assertEquals(events.length, 1);
+  assertEquals(events[0].removed, 2);
+});
+
+Deno.test("purify with no negative effects removes nothing", () => {
+  const world = makeWorld();
+  const caster = makeCaster(world, 5, 5);
+  world.add(caster, ActiveEffects, { effects: [
+    { key: 'regen', turnsLeft: 10, potency: 1, stacks: 1 },
+  ]});
+
+  const events = [];
+  world.on('spell:purify', (ev) => events.push(ev));
+  runSpellScript(world, caster, SPELL_DEFS.purify, {});
+
+  assertEquals(events[0].removed, 0);
+  assertEquals(effectKeys(world, caster).length, 1);
+});
+
+// ─── Divine Shield ──────────────────────────────────────────────────────────
+
+Deno.test("divine_shield applies stoneskin, shield_guard, and blessed", () => {
+  const world = makeWorld();
+  const caster = makeCaster(world, 5, 5);
+
+  runSpellScript(world, caster, SPELL_DEFS.divine_shield, {});
+
+  const keys = effectKeys(world, caster);
+  assert(keys.includes('stoneskin'), 'should apply stoneskin');
+  assert(keys.includes('shield_guard'), 'should apply shield_guard');
+  assert(keys.includes('bless'), 'should apply blessed');
+
+  const ae = world.get(caster, ActiveEffects);
+  const skin = ae.effects.find((e) => e?.key === 'stoneskin');
+  assertEquals(skin.turnsLeft, 20);
+  assertEquals(skin.potency, 3, 'divine_shield stoneskin should be potency 3');
+});
+
+// ─── Consecrate ─────────────────────────────────────────────────────────────
+
+Deno.test("consecrate spawns a holy hazard and grants caster regen", () => {
+  const world = makeWorld();
+  const caster = makeCaster(world, 5, 5);
+
+  runSpellScript(world, caster, SPELL_DEFS.consecrate, {});
+
+  // Check hazard was spawned
+  let hazardFound = false;
+  for (const [, h] of world.query(HazardArea)) {
+    if (h.kind === 'holy') { hazardFound = true; break; }
+  }
+  assert(hazardFound, 'consecrate should spawn a holy hazard');
+
+  // Check regen on caster
+  const keys = effectKeys(world, caster);
+  assert(keys.includes('regen'), 'caster should gain regen');
+});
+
+Deno.test("consecrate hazard has correct damage type", () => {
+  const world = makeWorld();
+  const caster = makeCaster(world, 5, 5);
+
+  runSpellScript(world, caster, SPELL_DEFS.consecrate, {});
+
+  for (const [, h] of world.query(HazardArea)) {
+    if (h.kind === 'holy') {
+      assertEquals(h.damageType, 'holy');
+      assert(h.tickDamage > 0, 'tick damage should be positive');
+      assertEquals(h.radius, 2);
+      break;
+    }
+  }
+});
+
+// ─── Smoke Bomb ─────────────────────────────────────────────────────────────
+
+Deno.test("smoke_bomb blinds and resets aggro on nearby enemies", () => {
+  const world = makeWorld();
+  const caster = makeCaster(world, 5, 5);
+  const near = makeEnemy(world, 7, 5);   // distance 2
+  const far = makeEnemy(world, 12, 5);   // distance 7, outside radius 3
+
+  runSpellScript(world, caster, SPELL_DEFS.smoke_bomb, {});
+
+  // Near enemy should have lost vision
+  const nearVision = getEffectiveVisionRange(world, near);
+  assert(nearVision < 6, 'near enemy should have reduced vision from blind');
+
+  // Near enemy should be unaware
+  assertEquals(world.get(near, AggroState).alertLevel, AGGRO_LEVELS.unaware);
+
+  // Far enemy should still be hunting
+  assertEquals(world.get(far, AggroState).alertLevel, AGGRO_LEVELS.hunting);
+});
+
+Deno.test("smoke_bomb emits affected count", () => {
+  const world = makeWorld();
+  const caster = makeCaster(world, 5, 5);
+  makeEnemy(world, 6, 5);
+
+  const events = [];
+  world.on('spell:smoke_bomb', (ev) => events.push(ev));
+  runSpellScript(world, caster, SPELL_DEFS.smoke_bomb, {});
+
+  assertEquals(events.length, 1);
+  assertEquals(events[0].affected, 1);
+});
+
+// ─── Poison Blade ───────────────────────────────────────────────────────────
+
+Deno.test("poison_blade coats equipped weapon with 8 poison charges", () => {
+  const world = makeWorld();
+  const caster = makeCaster(world, 5, 5);
+
+  const weapon = world.create();
+  world.add(weapon, ItemInfo, { id: 'dagger_quick', damageDice: '1d4' });
+  world.add(weapon, NamedIdentity, { name: 'Quick Dagger', identity: 'dagger_quick' });
+  world.add(caster, Equipment, { weapon, offhand: 0, armor: 0, feet: 0 });
+
+  runSpellScript(world, caster, SPELL_DEFS.poison_blade, {});
+
+  const info = world.get(weapon, ItemInfo);
+  assert(info.coating, 'weapon should have a coating');
+  assertEquals(info.coating.kind, 'poison');
+  assertEquals(info.coating.charges, 8);
+});
+
+Deno.test("poison_blade stacks on existing coating charges", () => {
+  const world = makeWorld();
+  const caster = makeCaster(world, 5, 5);
+
+  const weapon = world.create();
+  world.add(weapon, ItemInfo, { id: 'dagger_quick', damageDice: '1d4', coating: { kind: 'poison', charges: 3 } });
+  world.add(weapon, NamedIdentity, { name: 'Quick Dagger', identity: 'dagger_quick' });
+  world.add(caster, Equipment, { weapon, offhand: 0, armor: 0, feet: 0 });
+
+  runSpellScript(world, caster, SPELL_DEFS.poison_blade, {});
+
+  assertEquals(world.get(weapon, ItemInfo).coating.charges, 11); // 3 + 8
+});
+
+Deno.test("poison_blade fizzles with no weapon equipped", () => {
+  const world = makeWorld();
+  const caster = makeCaster(world, 5, 5);
+  world.add(caster, Equipment, { weapon: 0, offhand: 0, armor: 0, feet: 0 });
+
+  const events = [];
+  world.on('spell:poison_blade', (ev) => events.push(ev));
+  runSpellScript(world, caster, SPELL_DEFS.poison_blade, {});
+
+  assertEquals(events.length, 1);
+  assert(events[0].fizzle, 'should fizzle with no weapon');
+});
+
+// ─── Class spell assignments ────────────────────────────────────────────────
+
+import { CLASS_DEFS } from "../src/rules/data/classes.js";
+
+Deno.test("warden has war_cry, cleave, and bloodthirst", () => {
+  const spells = CLASS_DEFS.warden.startingSpells;
+  assert(spells.includes('war_cry'));
+  assert(spells.includes('cleave'));
+  assert(spells.includes('bloodthirst'));
+});
+
+Deno.test("cleric has purify, divine_shield, and consecrate", () => {
+  const spells = CLASS_DEFS.cleric.startingSpells;
+  assert(spells.includes('purify'));
+  assert(spells.includes('divine_shield'));
+  assert(spells.includes('consecrate'));
+});
+
+Deno.test("outlaw has smoke_bomb and poison_blade", () => {
+  const spells = CLASS_DEFS.outlaw.startingSpells;
+  assert(spells.includes('smoke_bomb'));
+  assert(spells.includes('poison_blade'));
+});

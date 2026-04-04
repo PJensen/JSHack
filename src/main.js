@@ -70,6 +70,8 @@ import { installCookingWiring } from "./main/wiring/cookingWiring.js";
 import { installDigWiring } from "./main/wiring/digWiring.js";
 import { installDialogWiring } from "./main/wiring/dialogWiring.js";
 import { installSpeechBubbleWiring } from "./main/wiring/speechBubbleWiring.js";
+import { installSpiritGuideWiring } from "./main/wiring/spiritGuideWiring.js";
+import { readSeenTips, GUIDANCE_TIPS } from "./shared/data/spiritGuidance.js";
 import { installSavegameWiring } from "./main/wiring/savegameWiring.js";
 import {
   hasSavegame,
@@ -4279,6 +4281,20 @@ const {
 const flyingFx = createFlyingFxController(world);
 flyingFx.installListeners();
 const slideFx = createSlideFxController();
+
+// Spirit guide tutorial — only on new games, only when tips remain unseen.
+if (!_savegameLoaded) {
+  const seenTips = readSeenTips();
+  const hasUnseen = GUIDANCE_TIPS.some((t) => !seenTips.has(t.id));
+  if (hasUnseen) {
+    installSpiritGuideWiring({
+      world,
+      sceneRuntime,
+      getPlayerEntity: () => playerEntity(world),
+      spiritWispFx,
+    });
+  }
+}
 
 // ── Size-class display scale map ────────────────────────────────────
 const SIZE_CLASS_SCALE = { XS: 0.55, S: 0.72, M: 0.88, L: 1.0, XL: 1.12 };
