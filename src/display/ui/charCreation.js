@@ -682,11 +682,12 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
   });
   const tutInput = document.createElement('input');
   tutInput.type = 'checkbox';
-  // Default on if player has never completed the tutorial.
+  // Default on if any tips remain unseen (partially complete resumes).
   try {
     const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('jshack:spiritGuide:seen:v1') : null;
-    const arr = raw ? JSON.parse(raw) : [];
-    tutInput.checked = !Array.isArray(arr) || arr.length < 10;
+    const seen = raw ? JSON.parse(raw) : [];
+    const total = typeof opts?.tutorialTipCount === 'number' ? opts.tutorialTipCount : 15;
+    tutInput.checked = !Array.isArray(seen) || seen.length < total;
   } catch { tutInput.checked = true; }
   Object.assign(tutInput.style, { position: 'absolute', opacity: '0', pointerEvents: 'none' });
 

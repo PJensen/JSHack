@@ -903,10 +903,10 @@ if (_pendingSavegame) {
 function _finalizeNewGame(classData) {
   const classDef = classData ? getClass(classData.classId) : null;
 
-  // Apply tutorial preference from character creation
-  if (classData && classData.tutorial === true) {
-    try { localStorage.removeItem(GUIDE_STORAGE_KEY); } catch {}
-  } else if (classData && classData.tutorial === false) {
+  // Apply tutorial preference from character creation.
+  // ON:  leave localStorage alone — guide resumes from wherever the player left off.
+  // OFF: mark every tip as seen so the guide never activates.
+  if (classData && classData.tutorial === false) {
     try { localStorage.setItem(GUIDE_STORAGE_KEY, JSON.stringify(GUIDANCE_TIPS.map(t => t.id))); } catch {}
   }
 
@@ -6624,6 +6624,7 @@ if (_savegameLoaded) {
   showCharCreation({
     classes: classDisplayData,
     defaultSeed: _bootSeed,
+    tutorialTipCount: GUIDANCE_TIPS.length,
     onConfirm: (result) => _finalizeNewGame(result),
   });
 }
