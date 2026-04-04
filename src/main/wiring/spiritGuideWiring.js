@@ -14,6 +14,7 @@ import { Position } from "../../rules/components/Position.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 import { Player } from "../../rules/components/Player.js";
 import { Vitality } from "../../rules/components/Vitality.js";
+import { DungeonState } from "../../rules/components/DungeonState.js";
 
 const INSTALLED = Symbol.for("jshack:main:spiritGuideWiring:installed");
 
@@ -246,9 +247,12 @@ export function installSpiritGuideWiring({
     fire("first_stair");
   });
 
-  // ── First NPC dialogue ───────────────────────────────────────────────
+  // ── First NPC dialogue (overworld only — townfolk don't exist in the dungeon) ──
 
   world.on("npc:dialogue", () => {
+    for (const [, ds] of world.query(DungeonState)) {
+      if ((ds.currentDepth | 0) !== 0) return;
+    }
     fire("first_npc");
   });
 

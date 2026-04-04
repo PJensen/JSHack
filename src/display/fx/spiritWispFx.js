@@ -1478,6 +1478,17 @@ export function createSpiritWispFxController(
       _agitation = COMBAT_DECAY;
     });
 
+    // Spirit spell boost — wisp surges to the spell target
+    world.on("spirit:spellBoost", ({ targetId }) => {
+      if (_betrayed || _deathVigil) return;
+      const tid = Number(targetId || 0) | 0;
+      const pos = tid > 0 ? getPosition(tid) : null;
+      if (pos) {
+        _startMiracleFlight(pos.x, pos.y);
+        _agitation = COMBAT_DECAY * 2.5;
+      }
+    });
+
     // Prayer — wisp spirals inward then eases back out
     world.on("prayer", () => {
       _prayerTimer = Math.max(_prayerTimer, PRAYER_SPIRAL_DURATION);
