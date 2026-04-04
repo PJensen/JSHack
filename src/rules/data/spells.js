@@ -789,7 +789,7 @@ export const SPELL_DEFS = {
   consecrate: {
     id: 'consecrate',
     name: 'Consecrate',
-    symbol: '\u2626',        // ☦
+    symbol: '\u271D',        // ✝
     schools: ['holy', 'destruction'],
     manaCost: 12,
     minIntelligence: 0,
@@ -799,8 +799,8 @@ export const SPELL_DEFS = {
     radius: 2,
     description: 'Sanctify the ground beneath your feet. Holy fire scorches the wicked and mends the faithful.',
     effects: [
-      { kind: 'damage', element: 'holy', amount: '3 per tick to hostiles in radius; INT-scaled' },
-      { kind: 'utility', note: 'Grants caster regen for the duration' },
+      { kind: 'damage', element: 'holy', amount: '3 per tick to hostiles in radius; INT-scaled', duration: '20 turns' },
+      { kind: 'utility', note: 'Grants caster regen for the duration', duration: '20 turns' },
     ],
   },
 
