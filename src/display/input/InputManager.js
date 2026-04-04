@@ -16,6 +16,8 @@ const GESTURE_CLEAR_DELAY_MS = 180;
 const JOYSTICK_LEFT_ZONE_RATIO = 0.5;
 const JOYSTICK_DEADZONE_PX = 12;
 const JOYSTICK_MAX_RADIUS_PX = 46;
+const SWIPE_MIN_DIST_PX = 50;
+const SWIPE_MAX_MS = 400;
 
 export class InputManager {
   constructor(targetEl, options = {}) {
@@ -35,6 +37,7 @@ export class InputManager {
       moved: false,
     };
     this._pointerInteraction = 'none'; // 'none' | 'walk' | 'gesture' | 'joystick'
+    this._swipeStart = { x: 0, y: 0, t: 0 };
     this._joystick = {
       active: false,
       baseX: 0,
@@ -329,6 +332,7 @@ export class InputManager {
     if (typeof e.isPrimary === "boolean" && !e.isPrimary) return;
 
     e.preventDefault();
+    this._swipeStart = { x: Number(e.clientX), y: Number(e.clientY), t: Date.now() };
 
     if (this._mode === 'walk') {
       // Walk-repeat mode: emit one step immediately, then repeat at _walkInterval.
@@ -452,6 +456,11 @@ export class InputManager {
     if (this._pointerInteraction === 'walk') {
       this._cancelWalkRepeat();
       this._repeatPoint = null;
+      if (this._detectSwipeRight(e)) {
+        this._resetGestureState();
+        this._emit(makeAction(Actions.OpenInventory));
+        return;
+      }
       this._resetGestureState();
       return;
     }
@@ -459,6 +468,12 @@ export class InputManager {
     if (this._pointerInteraction === 'joystick') {
       this._cancelWalkRepeat();
       this._repeatPoint = null;
+      if (this._detectSwipeRight(e)) {
+        this._emitUi("ui:joystickProgress", { active: false });
+        this._resetGestureState();
+        this._emit(makeAction(Actions.OpenInventory));
+        return;
+      }
       if (!this._joystick.moved) {
         const rect = this._gesture.rect;
         if (rect) {
@@ -492,6 +507,13 @@ export class InputManager {
         this._emitUi("ui:gestureProgress", { points: [], active: false, recognized: null });
         this._gestureClearTimer = 0;
       }, GESTURE_CLEAR_DELAY_MS);
+      return;
+    }
+
+    if (this._detectSwipeRight(e)) {
+      this._emitUi("ui:gestureProgress", { points: [], active: false, recognized: null });
+      this._resetGestureState();
+      this._emit(makeAction(Actions.OpenInventory));
       return;
     }
 
@@ -689,6 +711,13 @@ export class InputManager {
       },
       radius: this._joystick.radius,
     };
+  }
+
+  _detectSwipeRight(e) {
+    const dx = Number(e.clientX) - this._swipeStart.x;
+    const dy = Number(e.clientY) - this._swipeStart.y;
+    const dt = Date.now() - this._swipeStart.t;
+    return dx > SWIPE_MIN_DIST_PX && Math.abs(dx) > 2 * Math.abs(dy) && dt < SWIPE_MAX_MS;
   }
 
   _emitUi(name, detail) {
