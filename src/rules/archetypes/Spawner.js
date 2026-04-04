@@ -5,6 +5,7 @@ import { Vitality } from "../components/Vitality.js";
 import { Collider } from "../components/Collider.js";
 import { MonsterSpawner } from "../components/MonsterSpawner.js";
 import { EffectImmunities } from "../components/EffectImmunities.js";
+import { Faction } from "../components/Faction.js";
 
 export const Spawner = defineArchetype(
   "Spawner",
@@ -23,5 +24,6 @@ export const Spawner = defineArchetype(
     spawnRadius: p.spawnRadius ?? 1,
     isActive: p.isActive ?? true,
   })],
-  [EffectImmunities, () => ({ immuneTo: ["stun"] })]
+  [EffectImmunities, () => ({ immuneTo: ["stun"] })],
+  [Faction, (p) => ({ key: p.faction ?? "enemy" })]
 );
