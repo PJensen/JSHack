@@ -338,6 +338,7 @@ export function initHUD() {
 
   // Top-right concentric vitals gauge (HP/Mana/Stamina)
   const vitals = document.createElement('div');
+  vitals.id = 'hud-vitals';
   Object.assign(vitals.style, {
     position: 'relative',
     width: 'min(188px, 22vw)',
@@ -1835,6 +1836,7 @@ function createPinnedItemSlots() {
   const SLOT_COUNT = 4;
   const HOLD_TOOLTIP_MS = 450;
   const el = document.createElement('div');
+  el.id = 'hud-pinned-items';
   Object.assign(el.style, {
     display: 'grid',
     gridTemplateColumns: 'repeat(2, 44px)',

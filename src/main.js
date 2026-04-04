@@ -71,6 +71,7 @@ import { installDigWiring } from "./main/wiring/digWiring.js";
 import { installDialogWiring } from "./main/wiring/dialogWiring.js";
 import { installSpeechBubbleWiring } from "./main/wiring/speechBubbleWiring.js";
 import { installSpiritGuideWiring } from "./main/wiring/spiritGuideWiring.js";
+import { createSpiritPointerFx } from "./display/fx/spiritPointerFx.js";
 import { readSeenTips, GUIDANCE_TIPS } from "./shared/data/spiritGuidance.js";
 import { installSavegameWiring } from "./main/wiring/savegameWiring.js";
 import {
@@ -4290,11 +4291,21 @@ if (!_savegameLoaded) {
   const seenTips = readSeenTips();
   const hasUnseen = GUIDANCE_TIPS.some((t) => !seenTips.has(t.id));
   if (hasUnseen) {
+    const spiritPointerFx = createSpiritPointerFx({
+      getWispScreenPos() {
+        const wp = spiritWispFx.getWispPos();
+        if (!wp) return null;
+        const [sx, sy] = worldToScreen(cam, wp.x, wp.y, canvas);
+        const dpr = Math.max(1, canvas.width / Math.max(1, canvas.offsetWidth || canvas.width));
+        return { x: sx / dpr, y: sy / dpr };
+      },
+    });
     installSpiritGuideWiring({
       world,
       sceneRuntime,
       getPlayerEntity: () => playerEntity(world),
       spiritWispFx,
+      spiritPointerFx,
     });
   }
 }
