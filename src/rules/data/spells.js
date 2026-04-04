@@ -756,7 +756,7 @@ export const SPELL_DEFS = {
   purify: {
     id: 'purify',
     name: 'Purify',
-    symbol: '\u2721',        // ✡
+    symbol: '\u2726',        // ✦
     schools: ['restoration', 'holy'],
     clearMindedCasting: true,
     manaCost: 10,
