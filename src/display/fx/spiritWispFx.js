@@ -93,6 +93,11 @@ const ITEM_FETCH_COOLDOWN = 1.15;
 const ITEM_FETCH_RADIUS = 7;
 const SACRED_IDENTITIES = new Set(["altar", "shrine", "church_altar"]);
 
+// ── Guidance pulse (tutorial mode) ────────────────────────────────
+const GUIDANCE_PULSE_DURATION = 2.0;
+const GUIDANCE_COLOR = [160, 230, 255]; // soft cyan
+const GUIDANCE_FLY_SPEED = 10;
+
 /**
  * @param {{
  *   world: import('../../lib/ecs-js/index.js').World,
@@ -187,6 +192,10 @@ export function createSpiritWispFxController(
   let _sacredScanTimer = 0;
   let _itemFetchCooldownTimer = 0;
   let _itemFetchReturnBurst = false;
+
+  // Guide mode — allows wisp on overworld (depth 0) for tutorials.
+  let _guideMode = false;
+  let _guidancePulseTimer = 0;
 
   // ── Helpers ────────────────────────────────────────────────────────
 
@@ -623,7 +632,7 @@ export function createSpiritWispFxController(
       return;
     }
 
-    if (_lastDepth === 0) {
+    if (_lastDepth === 0 && !_guideMode) {
       _active = false;
       return;
     }
@@ -704,6 +713,7 @@ export function createSpiritWispFxController(
     _vanquishTimer = Math.max(0, _vanquishTimer - dtSec);
     _petRebirthTimer = Math.max(0, _petRebirthTimer - dtSec);
     _itemFetchCooldownTimer = Math.max(0, _itemFetchCooldownTimer - dtSec);
+    _guidancePulseTimer = Math.max(0, _guidancePulseTimer - dtSec);
 
     if (ppos) {
       // Danger scan (throttled)
@@ -1025,6 +1035,25 @@ export function createSpiritWispFxController(
       bctx.lineWidth = 0.028;
       bctx.beginPath();
       bctx.arc(_x, _y, pulse, 0, Math.PI * 2);
+      bctx.stroke();
+    }
+
+    // Guidance pulse: gentle expanding ring when delivering a tutorial tip.
+    if (_guidancePulseTimer > 0) {
+      const gt = Math.min(1, _guidancePulseTimer / GUIDANCE_PULSE_DURATION);
+      const gr = 0.18 + (1 - gt) * 0.35;
+      const ga = (0.15 + gt * 0.35) * dim;
+      bctx.strokeStyle = `rgba(${GUIDANCE_COLOR[0]},${GUIDANCE_COLOR[1]},${GUIDANCE_COLOR[2]},${ga.toFixed(3)})`;
+      bctx.lineWidth = 0.022;
+      bctx.beginPath();
+      bctx.arc(_x, _y, gr, 0, Math.PI * 2);
+      bctx.stroke();
+      // Inner sparkle ring.
+      const ir = 0.10 + (1 - gt) * 0.18;
+      bctx.strokeStyle = `rgba(220,245,255,${(ga * 0.7).toFixed(3)})`;
+      bctx.lineWidth = 0.014;
+      bctx.beginPath();
+      bctx.arc(_x, _y, ir, _phase, _phase + Math.PI * 1.6);
       bctx.stroke();
     }
 
@@ -1473,6 +1502,20 @@ export function createSpiritWispFxController(
 
     // Boon delivery — wisp flies to player
     world.on("deity:boon", onDivineBoon);
+
+    // Tutorial guidance — pulse and optional flight to feature.
+    world.on("guidance:pulse", () => {
+      _guidancePulseTimer = Math.max(_guidancePulseTimer, GUIDANCE_PULSE_DURATION);
+    });
+    world.on("guidance:flyTo", ({ x, y }) => {
+      if (Number.isFinite(x) && Number.isFinite(y)) {
+        _startMiracleFlight(Number(x), Number(y));
+      }
+    });
+  }
+
+  function setGuideMode(v) {
+    _guideMode = !!v;
   }
 
   return {
@@ -1481,6 +1524,7 @@ export function createSpiritWispFxController(
     getActiveLights,
     installListeners,
     setDepth,
+    setGuideMode,
     getWispPos,
   };
 }

@@ -381,6 +381,18 @@ function resolveHitRoll(world, {
                 appliedDamage: result.amount,
                 critical: isCrit,
             });
+            // Bloodthirst: heal attacker for 25% of melee damage dealt
+            const _btAe = world.get(source, ActiveEffects);
+            const _hasBt = _btAe && Array.isArray(_btAe.effects) && _btAe.effects.some(e => e && e.key === 'bloodthirst' && (e.turnsLeft | 0) > 0);
+            if (result.amount > 0 && _hasBt) {
+                const healAmt = Math.max(1, Math.floor(result.amount * 0.25));
+                const srcVit = world.get(source, Vitality);
+                if (srcVit) {
+                    const maxHp = Number(srcVit.maxHp || srcVit.hp) | 0;
+                    srcVit.hp = Math.min(maxHp, (srcVit.hp | 0) + healAmt);
+                    world.emit?.('proc:bloodthirst', { actor: source, target, healed: healAmt });
+                }
+            }
         }
         if (!result.applied && result.reason !== 'invulnerable' && result.reason !== 'resisted') {
             world.emit?.('status', createStatusEvent({ id: target, kind: 'miss', source }));

@@ -679,6 +679,74 @@ export function installMessageWiring({
     }
   });
 
+  // ── Warden ability messages ──
+  world.on('spell:war_cry', ({ actor, affected }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    if (affected > 0) {
+      log(`You unleash a thundering war cry — ${affected} ${affected === 1 ? 'enemy cowers' : 'enemies cower'}!`, 'combat');
+    } else {
+      log('You bellow a war cry, but nothing is close enough to hear.', 'system');
+    }
+  });
+
+  world.on('spell:cleave', ({ actor, hits }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    if (hits && hits.length > 0) {
+      log(`You cleave through ${hits.length} ${hits.length === 1 ? 'foe' : 'foes'}!`, 'combat');
+    } else {
+      log('You sweep your weapon, but nothing is in reach.', 'system');
+    }
+  });
+
+  world.on('spell:bloodthirst', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('Blood-hunger surges through you — your strikes will mend your wounds.', 'combat');
+  });
+
+  world.on('proc:bloodthirst', ({ actor, healed }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log(`You drain ${healed} HP from the wound.`, 'heal');
+  });
+
+  // ── Cleric ability messages ──
+  world.on('spell:purify', ({ actor, removed }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    if (removed > 0) {
+      log(`Holy light burns away ${removed} ${removed === 1 ? 'affliction' : 'afflictions'}.`, 'heal');
+    } else {
+      log('You invoke purification, but your body is already clean.', 'system');
+    }
+  });
+
+  world.on('spell:divine_shield', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('A shell of divine light hardens around you.', 'system');
+  });
+
+  world.on('spell:consecrate', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('Holy fire sanctifies the ground beneath you.', 'system');
+  });
+
+  // ── Outlaw ability messages ──
+  world.on('spell:smoke_bomb', ({ actor, affected }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    if (affected > 0) {
+      log(`You vanish in a puff of smoke — ${affected} ${affected === 1 ? 'enemy loses' : 'enemies lose'} sight of you!`, 'combat');
+    } else {
+      log('You toss a smoke bomb, but nobody is around to see it.', 'system');
+    }
+  });
+
+  world.on('spell:poison_blade', ({ actor, fizzle, weaponName, charges }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    if (fizzle) {
+      log('You have no weapon to coat.', 'system');
+    } else {
+      log(`You drag venom across your ${weaponName} (${charges} charges).`, 'combat');
+    }
+  });
+
   world.on('spell:scorch', ({ actor, fizzle, missed, critical }) => {
     if (nameOfEntity(actor) !== 'You') return;
     if (fizzle) { log('Scorch finds no target.', 'system'); return; }

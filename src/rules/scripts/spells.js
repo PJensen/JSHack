@@ -3008,6 +3008,252 @@ REGISTRY['thorn_burst'] = function thornBurstScript(world, actor, spell, intent)
   });
 };
 
+// ─── Warden abilities ──────────────────────────────────────────────────────
+
+REGISTRY['war_cry'] = function warCryScript(world, actor, spell, _intent) {
+  const apos = /** @type any */ (world.get(actor, Position));
+  if (!apos) return;
+  const actorFaction = String(world.get(actor, Faction)?.key || 'player');
+  const RADIUS = Number(spell?.radius || 3) | 0;
+  const WEAKEN_TURNS = 6;
+
+  let affected = 0;
+  for (const [id, pos] of world.query(Position)) {
+    if (id === actor) continue;
+    const fac = /** @type any */ (world.get(id, Faction));
+    if (!fac || !areFactionsHostile(actorFaction, fac.key)) continue;
+    const vit = /** @type any */ (world.get(id, Vitality));
+    if (!vit || (vit.hp | 0) <= 0) continue;
+    const dx = Math.abs((pos.x | 0) - (apos.x | 0));
+    const dy = Math.abs((pos.y | 0) - (apos.y | 0));
+    if (Math.max(dx, dy) > RADIUS) continue;
+
+    // Apply weaken
+    const ae = ensureActiveEffectList(world, id);
+    if (ae) {
+      upsertTimedEffect(ae.effects, {
+        key: 'weaken', turnsLeft: WEAKEN_TURNS, potency: 1, stacks: 1, sourceId: actor,
+      });
+    }
+    // Reset aggro to alerted (they heard you, but lost focus)
+    const aggro = world.get(id, AggroState);
+    if (aggro && aggro.alertLevel === AGGRO_LEVELS.hunting) {
+      aggro.alertLevel = AGGRO_LEVELS.alerted;
+      aggro.searchTurnsLeft = SEARCH_TURNS_ALERTED;
+    }
+    affected++;
+  }
+
+  emitSafe(world, 'spell:war_cry', { actor, at: { x: apos.x, y: apos.y }, affected });
+};
+
+REGISTRY['cleave'] = function cleaveScript(world, actor, spell, _intent) {
+  const apos = /** @type any */ (world.get(actor, Position));
+  if (!apos) return;
+  const actorFaction = String(world.get(actor, Faction)?.key || 'player');
+  const BASE_DMG = 5;
+
+  const hits = [];
+  for (const [id, pos] of world.query(Position)) {
+    if (id === actor) continue;
+    const fac = /** @type any */ (world.get(id, Faction));
+    if (!fac || !areFactionsHostile(actorFaction, fac.key)) continue;
+    const vit = /** @type any */ (world.get(id, Vitality));
+    if (!vit || (vit.hp | 0) <= 0) continue;
+    const dx = Math.abs((pos.x | 0) - (apos.x | 0));
+    const dy = Math.abs((pos.y | 0) - (apos.y | 0));
+    if (Math.max(dx, dy) > 1) continue;
+
+    const result = dealDamage(world, buildSpellDamageSpec(world, actor, id, {
+      spell,
+      baseAmount: BASE_DMG,
+      type: 'physical',
+      cause: 'spell:cleave',
+      at: { x: pos.x, y: pos.y },
+      salt: id,
+    }));
+    hits.push({ id, x: pos.x, y: pos.y, amount: result.amount || 0 });
+  }
+
+  emitSafe(world, 'spell:cleave', {
+    actor,
+    at: { x: apos.x, y: apos.y },
+    hits,
+  });
+};
+
+REGISTRY['bloodthirst'] = function bloodthirstScript(world, actor, _spell, _intent) {
+  const pos = world.get(actor, Position);
+  if (!pos) return;
+
+  const ae = ensureActiveEffectList(world, actor);
+  if (!ae) return;
+
+  const DURATION = 30;
+  upsertTimedEffect(ae.effects, {
+    key: 'bloodthirst', turnsLeft: DURATION + 1, potency: 1, stacks: 1, sourceId: actor,
+  });
+
+  emitSafe(world, 'spell:bloodthirst', { actor, at: { x: pos.x, y: pos.y }, duration: DURATION });
+};
+
+// ─── Cleric abilities ──────────────────────────────────────────────────────
+
+/** Negative effect keys that purify removes. */
+const PURIFY_NEGATIVE_KEYS = new Set([
+  'poison', 'poisoned', 'burn', 'burning', 'bleed', 'bleeding',
+  'stun', 'stunned', 'stagger', 'staggered', 'curse', 'cursed',
+  'weaken', 'weakened', 'confuse', 'confused', 'shock', 'shocked',
+  'slowed', 'slow', 'blinded', 'blind', 'agony', 'frost', 'frozen',
+  'hallucinating', 'hallucination', 'disease', 'diseased',
+  'deafened', 'deaf', 'mindwipe', 'mindwiped',
+]);
+
+REGISTRY['purify'] = function purifyScript(world, actor, _spell, _intent) {
+  const pos = /** @type any */ (world.get(actor, Position));
+  if (!pos) return;
+  const ae = /** @type any */ (world.get(actor, ActiveEffects));
+  let removed = 0;
+  if (ae && Array.isArray(ae.effects)) {
+    const before = ae.effects.length;
+    ae.effects = ae.effects.filter(e => !PURIFY_NEGATIVE_KEYS.has(String(e?.key || '')));
+    removed = before - ae.effects.length;
+  }
+  emitSafe(world, 'spell:purify', { actor, at: { x: pos.x, y: pos.y }, removed });
+};
+
+REGISTRY['divine_shield'] = function divineShieldScript(world, actor, _spell, _intent) {
+  const pos = /** @type any */ (world.get(actor, Position));
+  if (!pos) return;
+  const ae = ensureActiveEffectList(world, actor);
+  if (!ae) return;
+
+  const DURATION = 20;
+  upsertTimedEffect(ae.effects, {
+    key: 'stoneskin', turnsLeft: DURATION, potency: 3, stacks: 1, sourceId: actor,
+  });
+  upsertTimedEffect(ae.effects, {
+    key: 'shield_guard', turnsLeft: DURATION, potency: 1, stacks: 1, sourceId: actor,
+  });
+  upsertTimedEffect(ae.effects, {
+    key: 'bless', turnsLeft: DURATION, potency: 1, stacks: 1, sourceId: actor,
+  });
+
+  emitSafe(world, 'spell:divine_shield', { actor, at: { x: pos.x, y: pos.y }, duration: DURATION });
+};
+
+REGISTRY['consecrate'] = function consecrateScript(world, actor, spell, _intent) {
+  const apos = /** @type any */ (world.get(actor, Position));
+  if (!apos) return;
+
+  const RADIUS = Number(spell?.radius || 2) | 0;
+  const TURNS = 6;
+  const BASE_TICK = 3;
+  const scaledDmg = scaleSpellDamage(world, actor, BASE_TICK);
+
+  // Holy ground hazard — damages hostiles
+  spawnHazard(world, {
+    x: apos.x,
+    y: apos.y,
+    kind: 'holy',
+    medium: 'floor',
+    turnsLeft: TURNS,
+    radius: RADIUS,
+    tickDamage: scaledDmg,
+    damageType: 'holy',
+    cause: 'spell:consecrate',
+    sourceId: actor,
+    sourceKind: 'consecrate',
+    identity: 'consecrate_ground',
+    name: 'Consecrated Ground',
+    meta: { casterOnly: true },
+  });
+
+  // Regen buff on caster for the duration
+  const ae = ensureActiveEffectList(world, actor);
+  if (ae) {
+    upsertTimedEffect(ae.effects, {
+      key: 'regen', turnsLeft: TURNS, potency: 2, stacks: 1, sourceId: actor,
+    });
+  }
+
+  emitSafe(world, 'spell:consecrate', {
+    actor,
+    at: { x: apos.x, y: apos.y },
+    radius: RADIUS,
+  });
+};
+
+// ─── Outlaw abilities ──────────────────────────────────────────────────────
+
+REGISTRY['smoke_bomb'] = function smokeBombScript(world, actor, spell, _intent) {
+  const apos = /** @type any */ (world.get(actor, Position));
+  if (!apos) return;
+  const actorFaction = String(world.get(actor, Faction)?.key || 'player');
+  const RADIUS = Number(spell?.radius || 3) | 0;
+  const BLIND_TURNS = 5;
+
+  let affected = 0;
+  for (const [id, pos] of world.query(Position)) {
+    if (id === actor) continue;
+    const fac = /** @type any */ (world.get(id, Faction));
+    if (!fac || !areFactionsHostile(actorFaction, fac.key)) continue;
+    const vit = /** @type any */ (world.get(id, Vitality));
+    if (!vit || (vit.hp | 0) <= 0) continue;
+    const dx = Math.abs((pos.x | 0) - (apos.x | 0));
+    const dy = Math.abs((pos.y | 0) - (apos.y | 0));
+    if (Math.max(dx, dy) > RADIUS) continue;
+
+    // Blind the enemy
+    blind(world, id, 0, BLIND_TURNS, 0, 2);
+
+    // Reset aggro to unaware — they lost you
+    const aggro = world.get(id, AggroState);
+    if (aggro) {
+      aggro.alertLevel = AGGRO_LEVELS.unaware;
+      aggro.searchTurnsLeft = 0;
+      aggro.lastKnownX = 0;
+      aggro.lastKnownY = 0;
+    }
+    affected++;
+  }
+
+  emitSafe(world, 'spell:smoke_bomb', { actor, at: { x: apos.x, y: apos.y }, affected });
+};
+
+REGISTRY['poison_blade'] = function poisonBladeScript(world, actor, _spell, _intent) {
+  const pos = /** @type any */ (world.get(actor, Position));
+  if (!pos) return;
+
+  // Find the equipped weapon
+  const equip = /** @type any */ (world.get(actor, Equipment));
+  const weaponId = equip ? (equip.weapon || equip.offhand || 0) : 0;
+  if (!(weaponId > 0)) {
+    emitSafe(world, 'spell:poison_blade', { actor, at: { x: pos.x, y: pos.y }, fizzle: true, reason: 'no_weapon' });
+    return;
+  }
+
+  const weaponInfo = /** @type any */ (world.get(weaponId, ItemInfo));
+  if (!weaponInfo) {
+    emitSafe(world, 'spell:poison_blade', { actor, at: { x: pos.x, y: pos.y }, fizzle: true, reason: 'no_weapon' });
+    return;
+  }
+
+  const CHARGES = 8;
+  const currentCharges = Math.max(0, Number(weaponInfo.coating?.charges || 0) | 0);
+  const nextCharges = currentCharges + CHARGES;
+  weaponInfo.coating = { kind: 'poison', charges: nextCharges };
+
+  const weaponName = String(/** @type any */ (world.get(weaponId, NamedIdentity))?.name || 'weapon');
+  emitSafe(world, 'spell:poison_blade', {
+    actor,
+    at: { x: pos.x, y: pos.y },
+    weaponId,
+    weaponName,
+    charges: nextCharges,
+  });
+};
+
 /**
  * Execute a spell script if present.
  * @param {World} world
