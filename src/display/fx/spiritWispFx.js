@@ -676,8 +676,16 @@ export function createSpiritWispFxController(
       o.pullStrength = Math.min(4.0, pullStrength + dtSec * 0.6);
       const speed = 0.3 + o.pullStrength * (1.0 + 1.5 / Math.max(0.5, dist));
       const step = Math.min(dist, speed * dtSec);
-      o.x += (dx / dist) * step;
-      o.y += (dy / dist) * step;
+      const mx = (dx / dist) * step;
+      const my = (dy / dist) * step;
+      // Move the underlying coords so deathEssence draw() picks them up
+      // (draw recalculates o.x/o.y from fromX/fromY/toX/toY each frame)
+      o.fromX += mx;
+      o.fromY += my;
+      o.toX += mx;
+      o.toY += my;
+      o.x += mx;
+      o.y += my;
       // Shrink orb as it approaches
       const shrink = Math.min(1, dist / 2.0);
       o.radius = (o.baseRadius || o.radius) * (0.3 + 0.7 * shrink);
