@@ -10,6 +10,7 @@
  * @property {number}  [durationSec] — bubble display time (default 5)
  * @property {number}  [delaySec]  — pause before showing (default 0.6)
  * @property {string}  [flyTo]     — "item"|"stair"|"altar"|"npc"|"enemy" — wisp flies to relevant entity first
+ * @property {string}  [pointTo]   — CSS selector of a UI button the wisp orb flies to in screen-space
  */
 
 /** @type {GuidanceTip[]} */
@@ -38,23 +39,26 @@ export const GUIDANCE_TIPS = [
     text: "Swipe right or press \u201cI\u201d to open your inventory. Equip weapons and armor from there.",
     durationSec: 5.5,
     delaySec: 0.6,
+    pointTo: "#btn-bag",
   },
   {
     id: "first_combat",
-    text: "An enemy! Walk into it to attack. Watch your HP on the status bar below.",
+    text: "An enemy! Walk into it to attack. Watch your HP in the top-right gauge.",
     durationSec: 5,
     delaySec: 0.3,
     flyTo: "enemy",
+    pointTo: "#hud-vitals",
   },
   {
     id: "low_hp",
-    text: "You're wounded! Use a potion from your quick-bar, or retreat to safety.",
+    text: "You're wounded! Use a potion from your pinned items, or retreat to safety.",
     durationSec: 5,
     delaySec: 0.3,
+    pointTo: "#hud-pinned-items",
   },
   {
     id: "first_stair",
-    text: "Stairs lead deeper into the dungeon. Step on them and use the stair button to descend.",
+    text: "Stairs lead deeper into the dungeon. Step on them and tap the tooltip to descend.",
     durationSec: 5.5,
     delaySec: 0.5,
     flyTo: "stair",
@@ -72,12 +76,14 @@ export const GUIDANCE_TIPS = [
     durationSec: 5,
     delaySec: 0.5,
     flyTo: "altar",
+    pointTo: "#btn-pray",
   },
   {
     id: "first_spell",
     text: "A new spell! Tap the spell button or press \u201cF\u201d to cast your active spell.",
     durationSec: 5,
     delaySec: 0.6,
+    pointTo: "#active-spell",
   },
 ];
 

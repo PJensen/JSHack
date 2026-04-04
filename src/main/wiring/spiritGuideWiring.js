@@ -22,7 +22,8 @@ const INSTALLED = Symbol.for("jshack:main:spiritGuideWiring:installed");
  *   world: import("../../lib/ecs-js/index.js").World,
  *   sceneRuntime: { queueSpeechBubble: Function },
  *   getPlayerEntity: () => ({ id: number } | null),
- *   spiritWispFx: { setGuideMode: (v:boolean) => void },
+ *   spiritWispFx: { setGuideMode: (v:boolean) => void, getWispPos?: () => ({x:number,y:number}|null) },
+ *   spiritPointerFx?: { flyTo: (selector:string) => void } | null,
  * }} opts
  */
 export function installSpiritGuideWiring({
@@ -30,6 +31,7 @@ export function installSpiritGuideWiring({
   sceneRuntime,
   getPlayerEntity,
   spiritWispFx,
+  spiritPointerFx = null,
 }) {
   if (!world || world[INSTALLED]) return;
   world[INSTALLED] = true;
@@ -79,6 +81,12 @@ export function installSpiritGuideWiring({
       if (target) {
         world.emit?.("guidance:flyTo", { x: target.x, y: target.y });
       }
+    }
+
+    // Screen-space pointer: wisp orb flies from canvas to a UI button.
+    if (tip.pointTo && spiritPointerFx) {
+      const delay = ((tip.delaySec ?? 0.6) + 1.2) * 1000;
+      setTimeout(() => spiritPointerFx.flyTo(tip.pointTo), delay);
     }
 
     // Disable guide mode once all tips are exhausted.
