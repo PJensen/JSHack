@@ -207,6 +207,8 @@ export function createSpiritWispFxController(
   let _harvestDowntimeAccum = 0; // how long we've been calm
   let _harvestAbsorbBurstTimer = 0; // VFX burst after absorption
   let _harvestBurstR = 0, _harvestBurstG = 0, _harvestBurstB = 0;
+  let _harvestFlareTimer = 0; // wisp reaction glow on absorb (0→decays)
+  const HARVEST_FLARE_DURATION = 0.55; // seconds of wisp glow reaction
 
   // ── Helpers ────────────────────────────────────────────────────────
 
@@ -657,15 +659,43 @@ export function createSpiritWispFxController(
       const dy = _y - o.y;
       const dist = Math.hypot(dx, dy);
       if (dist < 0.2) {
-        // Absorbed! Burst VFX at wisp position
+        // Absorbed — wisp reacts!
         _harvestBurstR = o.r;
         _harvestBurstG = o.g;
         _harvestBurstB = o.b;
         _harvestAbsorbBurstTimer = 0.6;
+        _harvestFlareTimer = HARVEST_FLARE_DURATION;
+        // Brief color bleed: wisp color shifts toward essence color momentarily
+        _r = _r * 0.6 + o.r * 0.4;
+        _g = _g * 0.6 + o.g * 0.4;
+        _b = _b * 0.6 + o.b * 0.4;
+        // Inward implosion particles (essence color sucked into wisp core)
+        if (fx?.pool) {
+          for (let j = 0; j < 10; j++) {
+            const a = (j / 10) * Math.PI * 2 + Math.random() * 0.3;
+            const spawnR = 0.18 + Math.random() * 0.12;
+            fx.pool.spawn(
+              new Particle({
+                x: _x + Math.cos(a) * spawnR,
+                y: _y + Math.sin(a) * spawnR,
+                vx: -Math.cos(a) * (1.2 + Math.random() * 0.8),
+                vy: -Math.sin(a) * (1.2 + Math.random() * 0.8),
+                life: 0.18 + Math.random() * 0.12,
+                size0: 0.04 + Math.random() * 0.025,
+                size1: 0.005,
+                r: o.r,
+                g: o.g,
+                b: o.b,
+                a0: 0.7,
+              }),
+            );
+          }
+        }
+        // Tiny outward exhale (wisp color — the "satisfied pulse")
         _spawnRingBurst(
           _x, _y,
-          [o.r, o.g, o.b],
-          8, 0.4, 0.9, 0.2, 0.15, 0.5,
+          [_r | 0, _g | 0, _b | 0],
+          6, 0.3, 0.7, 0.18, 0.12, 0.4,
         );
         deathEssenceFx.consumeOrbAt(i);
         continue;
@@ -819,6 +849,7 @@ export function createSpiritWispFxController(
     _itemFetchCooldownTimer = Math.max(0, _itemFetchCooldownTimer - dtSec);
     _guidancePulseTimer = Math.max(0, _guidancePulseTimer - dtSec);
     _harvestAbsorbBurstTimer = Math.max(0, _harvestAbsorbBurstTimer - dtSec);
+    _harvestFlareTimer = Math.max(0, _harvestFlareTimer - dtSec);
 
     if (ppos) {
       // Danger scan (throttled)
@@ -1016,16 +1047,20 @@ export function createSpiritWispFxController(
     const cg = Math.min(255, g * 0.5 + 128) | 0;
     const cb = Math.min(255, b * 0.5 + 128) | 0;
 
-    // Core glow (outer halo)
-    const glowR = 0.22 + Math.sin(_fxTime * 3.2) * 0.04;
+    // Core glow (outer halo) — flares on essence absorption
+    const harvestFlareT = _harvestFlareTimer > 0
+      ? Math.min(1, _harvestFlareTimer / HARVEST_FLARE_DURATION)
+      : 0;
+    const glowR = 0.22 + Math.sin(_fxTime * 3.2) * 0.04 + harvestFlareT * 0.12;
+    const glowAlphaBoost = harvestFlareT * 0.25; // brighter on absorb
     const gradient = bctx.createRadialGradient(_x, _y, 0, _x, _y, glowR);
     gradient.addColorStop(
       0,
-      `rgba(${r}, ${g}, ${b}, ${(0.7 * dim).toFixed(3)})`,
+      `rgba(${r}, ${g}, ${b}, ${Math.min(1, (0.7 + glowAlphaBoost) * dim).toFixed(3)})`,
     );
     gradient.addColorStop(
       0.4,
-      `rgba(${r}, ${g}, ${b}, ${(0.3 * dim).toFixed(3)})`,
+      `rgba(${r}, ${g}, ${b}, ${Math.min(1, (0.3 + glowAlphaBoost * 0.5) * dim).toFixed(3)})`,
     );
     gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
     bctx.fillStyle = gradient;
@@ -1033,8 +1068,8 @@ export function createSpiritWispFxController(
     bctx.arc(_x, _y, glowR, 0, Math.PI * 2);
     bctx.fill();
 
-    // Bright core — lightened mood color
-    const coreR = 0.06 + Math.sin(_fxTime * 5.1) * 0.015;
+    // Bright core — lightened mood color, swells on essence absorb
+    const coreR = 0.06 + Math.sin(_fxTime * 5.1) * 0.015 + harvestFlareT * 0.03;
     bctx.fillStyle = `rgba(${cr}, ${cg}, ${cb}, ${(0.9 * dim).toFixed(3)})`;
     bctx.beginPath();
     bctx.arc(_x, _y, coreR, 0, Math.PI * 2);
@@ -1339,8 +1374,11 @@ export function createSpiritWispFxController(
     const dim = _betrayed ? BETRAYAL_DIM : 1;
     const pulse = Math.sin(_fxTime * LIGHT_PULSE_FREQ * Math.PI * 2) *
       LIGHT_PULSE_AMP;
-    // Miracle flare emits extra light
-    const flareBonus = _flightState === FLIGHT_FLARE ? 3 : 0;
+    // Miracle flare / essence absorption emit extra light
+    const harvestGlow = _harvestFlareTimer > 0
+      ? Math.min(1, _harvestFlareTimer / HARVEST_FLARE_DURATION) * 1.2
+      : 0;
+    const flareBonus = (_flightState === FLIGHT_FLARE ? 3 : 0) + harvestGlow;
     return [{
       x: _x,
       y: _y,
