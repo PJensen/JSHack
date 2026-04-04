@@ -66,6 +66,22 @@ export const GUIDANCE_TIPS = [
     pointTo: "#btn-character-sheet",
   },
 
+  // ── Gems & spellbooks ─────────────────────────────────────────────
+  {
+    id: "first_gem",
+    text: "A gemstone! Socket it into a weapon from your inventory for bonus effects.",
+    durationSec: 5.5,
+    delaySec: 0.6,
+    pointTo: "#btn-bag",
+  },
+  {
+    id: "first_spellbook",
+    text: "A spellbook! Use it from your inventory to learn the spell permanently.",
+    durationSec: 5.5,
+    delaySec: 0.6,
+    pointTo: "#btn-bag",
+  },
+
   // ── Combat ────────────────────────────────────────────────────────
   {
     id: "first_combat",
