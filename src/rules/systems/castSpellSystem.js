@@ -16,7 +16,21 @@ import { isTargetHiddenByInvisibility } from "../utils/spellTargeting.js";
 import { getChannelInterruptionReason } from "../utils/channelInterruptionPolicy.js";
 import { hasEquippedProcPackageInSlot } from "../utils/spellProcGear.js";
 import { emitSafe } from "../utils/emitSafe.js";
+import { Vitality } from "../components/Vitality.js";
+import { Devotion } from "../components/Devotion.js";
+import { effectiveMaxHp } from "../utils/passiveBonuses.js";
+import { getDeityInstance } from "./deitySystem.js";
 /** @typedef {import('../../lib/ecs-js/index.js').World} World */
+
+// ── Spirit wisp spell boost ───────────────────────────────────────
+// The deity's spirit conduit sometimes surges alongside ranged spells
+// and amplifies their damage when the player is hurting.
+// Requires an active deity patron with non-wrathful standing.
+const SPIRIT_BOOST_HP_THRESHOLD = 0.5;  // HP% below which boost can proc
+const SPIRIT_BOOST_MIN_CHANCE = 0.20;   // chance at exactly the threshold
+const SPIRIT_BOOST_MAX_CHANCE = 0.40;   // chance when near death
+const SPIRIT_BOOST_POWER_MULT = 1.3;    // 30% extra damage
+const SPIRIT_BOOST_WRATH_GATE = 0.3;    // deity wrath must be below this
 
 /**
  * Accept both raw ids ("flash_heal") and item-style ids ("spell:flash_heal").
@@ -249,7 +263,7 @@ export function castSpellSystem(world) {
     const echoState = hasEchoGrimoire ? readEchoGrimoireState(world, actor) : null;
     const isSustainedChannel = !!resolvedSpell?.channeling;
     const echoRepeat = !!(!isSustainedChannel && echoState && echoState.turnsLeft > 0 && echoState.spellId && echoState.spellId === resolvedSpell.id);
-    const spellPowerScale = echoRepeat ? 0.8 : 1;
+    let spellPowerScale = echoRepeat ? 0.8 : 1;
     const baseManaCost = isSustainedChannel
       ? Number(resolvedSpell.manaPerTick ?? resolvedSpell.manaCost ?? 0)
       : Number(resolvedSpell.manaCost || 0);
@@ -338,6 +352,37 @@ export function castSpellSystem(world) {
       continue;
     }
 
+    // Spirit wisp spell boost — deity-mediated, non-self spells, when player is hurting
+    let spiritBoosted = false;
+    if (world.has(actor, Player) && resolvedSpell.targeting !== 'self') {
+      const devotion = world.get(actor, Devotion);
+      const deityId = devotion?.deityId;
+      const deity = deityId ? getDeityInstance(deityId) : null;
+      if (deity) {
+        const precise = deity._queryPrecise?.() || null;
+        const wrath = Number(precise?.wrath || 0);
+        if (wrath < SPIRIT_BOOST_WRATH_GATE) {
+          const vit = world.get(actor, Vitality);
+          if (vit) {
+            const maxHp = effectiveMaxHp(world, actor, vit) || (vit.maxHp | 0);
+            const hpPct = maxHp > 0 ? (vit.hp | 0) / maxHp : 1;
+            if (hpPct < SPIRIT_BOOST_HP_THRESHOLD && hpPct > 0) {
+              // Chance scales linearly: lower HP → higher chance
+              // Serenity further boosts chance (deity is protective)
+              const serenity = Number(precise?.serenity || 0);
+              const t = 1 - (hpPct / SPIRIT_BOOST_HP_THRESHOLD); // 0 at threshold, 1 at 0 HP
+              const baseChance = SPIRIT_BOOST_MIN_CHANCE + (SPIRIT_BOOST_MAX_CHANCE - SPIRIT_BOOST_MIN_CHANCE) * t;
+              const chance = Math.min(0.6, baseChance + serenity * 0.1);
+              if (world.rand() < chance) {
+                spellPowerScale *= SPIRIT_BOOST_POWER_MULT;
+                spiritBoosted = true;
+              }
+            }
+          }
+        }
+      }
+    }
+
     // Run scripted behavior (pure rules)
     const runtimeSpell = (echoRepeat || spellPowerScale !== 1)
       ? { ...resolvedSpell, powerScale: spellPowerScale }
@@ -359,7 +404,16 @@ export function castSpellSystem(world) {
       intendedSpellId: confusion.kind === "miscast" ? spell.id : undefined,
       powerScale: spellPowerScale,
       echoRepeat,
+      spiritBoosted,
     });
+    if (spiritBoosted) {
+      emitSafe(world, 'spirit:spellBoost', {
+        actor,
+        spellId: resolvedSpell.id,
+        targetId: intent.targetId || actor,
+        powerScale: spellPowerScale,
+      });
+    }
     if (hasEchoGrimoire && resolvedSpell.id) {
       upsertEchoGrimoireState(world, actor, resolvedSpell.id);
       if (echoRepeat) {

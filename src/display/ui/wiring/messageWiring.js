@@ -385,6 +385,10 @@ export function installMessageWiring({
     else log(`${who} casts ${label} on ${tgt}.`, 'system');
   });
 
+  world.on('spirit:spellBoost', () => {
+    log('The spirit wisp surges alongside your spell!', 'deity');
+  });
+
   world.on('spell:not-known', ({ actor, spellId }) => {
     const who = nameOfEntity(actor);
     if (who === 'You') {
