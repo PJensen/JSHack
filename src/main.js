@@ -72,7 +72,7 @@ import { installDialogWiring } from "./main/wiring/dialogWiring.js";
 import { installSpeechBubbleWiring } from "./main/wiring/speechBubbleWiring.js";
 import { installSpiritGuideWiring } from "./main/wiring/spiritGuideWiring.js";
 import { createSpiritPointerFx } from "./display/fx/spiritPointerFx.js";
-import { readSeenTips, GUIDANCE_TIPS } from "./shared/data/spiritGuidance.js";
+import { readSeenTips, GUIDANCE_TIPS, GUIDE_STORAGE_KEY } from "./shared/data/spiritGuidance.js";
 import { installSavegameWiring } from "./main/wiring/savegameWiring.js";
 import {
   hasSavegame,
@@ -902,6 +902,13 @@ if (_pendingSavegame) {
 // initializes deity, then starts the simulation and render loop.
 function _finalizeNewGame(classData) {
   const classDef = classData ? getClass(classData.classId) : null;
+
+  // Apply tutorial preference from character creation
+  if (classData && classData.tutorial === true) {
+    try { localStorage.removeItem(GUIDE_STORAGE_KEY); } catch {}
+  } else if (classData && classData.tutorial === false) {
+    try { localStorage.setItem(GUIDE_STORAGE_KEY, JSON.stringify(GUIDANCE_TIPS.map(t => t.id))); } catch {}
+  }
 
   // Apply difficulty settings from character creation
   if (classData && classData.difficulty === 'hard') {
