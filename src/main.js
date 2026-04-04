@@ -4230,6 +4230,8 @@ const displayRuntime = setupDisplayRuntime({
   getActiveSpellId: () => _activeSpellId,
   setActiveSpell,
   getPosition,
+  getEntityIdentity: (id) => String(world.get(Number(id || 0) | 0, NamedIdentity)?.identity || ""),
+  getEntityVitality: (id) => world.get(Number(id || 0) | 0, Vitality) || null,
   isVisibleAt,
   isPet: isPetEntity,
   isPlayer: isPlayerEntity,
@@ -4274,6 +4276,7 @@ const {
   bumpFx,
   recoilFx,
   hitstopFx,
+  deathEssenceFx,
   deathVfx,
   ftext,
   goreTick,
@@ -6366,6 +6369,7 @@ function render(worldView) {
     pickupFx,
     cloudFx,
     spiritWispFx,
+    deathEssenceFx,
     fx,
     PERF,
   });
@@ -6517,7 +6521,7 @@ function frame(now) {
   updateCamera(cam, dtSec);
   updateShake(cam, dtSec);
   updateZoomPunch(cam, dtSec);
-  tickDisplayEffects({ dtSec, boltFx, spellAreaFx, projectileFx, throwFx, pickupFx, cloudFx, spiritWispFx, ftext, goreTick });
+  tickDisplayEffects({ dtSec, boltFx, spellAreaFx, projectileFx, throwFx, pickupFx, cloudFx, spiritWispFx, deathEssenceFx, ftext, goreTick });
   delayedDeathFx.tick(dtSec);
   flyingFx.tick(dtSec);
   slideFx.tick(dtSec);
