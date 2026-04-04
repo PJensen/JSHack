@@ -93,6 +93,11 @@ const ITEM_FETCH_COOLDOWN = 1.15;
 const ITEM_FETCH_RADIUS = 7;
 const SACRED_IDENTITIES = new Set(["altar", "shrine", "church_altar"]);
 
+// ── Essence harvest (passive soul-pull aura) ─────────────────────
+const HARVEST_DOWNTIME_THRESHOLD = 0.15; // agitation must be below this
+const HARVEST_LINGER_DELAY = 1.8; // seconds of calm before pull activates
+const HARVEST_ABSORB_COLOR = [200, 240, 255]; // absorption burst color
+
 // ── Guidance pulse (tutorial mode) ────────────────────────────────
 const GUIDANCE_PULSE_DURATION = 2.0;
 const GUIDANCE_COLOR = [160, 230, 255]; // soft cyan
@@ -105,10 +110,11 @@ const GUIDANCE_FLY_SPEED = 10;
  *   getPosition: (id:number) => ({x:number,y:number}|null),
  *   getPlayerEntity: () => ({id:number, pos:{x:number,y:number}}|null),
  *   sampleMood: () => ({wrath:number,serenity:number,hunger:number,amusement:number,sorrow:number,chaos:number}|null),
+ *   deathEssenceFx?: { peekOrbs():Array, consumeOrbAt(i:number):object|null },
  * }} deps
  */
 export function createSpiritWispFxController(
-  { world, fx, getPosition, getPlayerEntity, sampleMood },
+  { world, fx, getPosition, getPlayerEntity, sampleMood, deathEssenceFx },
 ) {
   let _active = false;
   let _phase = Math.random() * Math.PI * 2;
@@ -196,6 +202,11 @@ export function createSpiritWispFxController(
   // Guide mode — allows wisp on overworld (depth 0) for tutorials.
   let _guideMode = false;
   let _guidancePulseTimer = 0;
+
+  // Essence harvest — passive gravity well that pulls essences to wisp.
+  let _harvestDowntimeAccum = 0; // how long we've been calm
+  let _harvestAbsorbBurstTimer = 0; // VFX burst after absorption
+  let _harvestBurstR = 0, _harvestBurstG = 0, _harvestBurstB = 0;
 
   // ── Helpers ────────────────────────────────────────────────────────
 
@@ -619,6 +630,91 @@ export function createSpiritWispFxController(
     return true;
   }
 
+  // ── Essence harvest helpers (gravity well — pull essences to wisp) ─
+
+  function _isHarvestDowntime() {
+    if (_betrayed) return false;
+    if (_deathVigil) return false;
+    if (_flightState !== FLIGHT_IDLE) return false;
+    if (_prayerTimer > 0) return false;
+    if (_vanquishTimer > 0) return false;
+    if (_petRebirthTimer > 0) return false;
+    if (_agitation > HARVEST_DOWNTIME_THRESHOLD) return false;
+    return true;
+  }
+
+  /** Drive the gravity well: pull all essences toward the wisp. */
+  function _tickEssencePull(dtSec) {
+    if (!deathEssenceFx) return;
+    const orbs = deathEssenceFx.peekOrbs();
+    if (!orbs || orbs.length === 0) return;
+
+    // Absorb any that arrived — iterate backwards so splice indices stay valid
+    for (let i = orbs.length - 1; i >= 0; i--) {
+      const o = orbs[i];
+      if (!o.pulling) continue;
+      const dx = _x - o.x;
+      const dy = _y - o.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist < 0.2) {
+        // Absorbed! Burst VFX at wisp position
+        _harvestBurstR = o.r;
+        _harvestBurstG = o.g;
+        _harvestBurstB = o.b;
+        _harvestAbsorbBurstTimer = 0.6;
+        _spawnRingBurst(
+          _x, _y,
+          [o.r, o.g, o.b],
+          8, 0.4, 0.9, 0.2, 0.15, 0.5,
+        );
+        deathEssenceFx.consumeOrbAt(i);
+        continue;
+      }
+      // Pull toward wisp — accelerates as it gets closer (gravity)
+      const pullStrength = o.pullStrength || 0;
+      // Ramp pull over time: gentle start, then accelerating
+      o.pullStrength = Math.min(4.0, pullStrength + dtSec * 0.6);
+      const speed = 0.3 + o.pullStrength * (1.0 + 1.5 / Math.max(0.5, dist));
+      const step = Math.min(dist, speed * dtSec);
+      o.x += (dx / dist) * step;
+      o.y += (dy / dist) * step;
+      // Shrink orb as it approaches
+      const shrink = Math.min(1, dist / 2.0);
+      o.radius = (o.baseRadius || o.radius) * (0.3 + 0.7 * shrink);
+      o.glowRadius = (o.baseGlowRadius || o.glowRadius) * (0.2 + 0.8 * shrink);
+    }
+
+    // Mark nearby orbs as pulling (activate gravity well)
+    if (_harvestDowntimeAccum < HARVEST_LINGER_DELAY) return;
+    for (let i = 0; i < orbs.length; i++) {
+      const o = orbs[i];
+      if (o.pulling) continue;
+      const dx = _x - o.x;
+      const dy = _y - o.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist > 7 || dist < 0.2) continue;
+      // Activate pull — save base sizes for shrink calc
+      o.pulling = true;
+      o.pullStrength = 0;
+      o.baseRadius = o.radius;
+      o.baseGlowRadius = o.glowRadius;
+    }
+  }
+
+  /** Stop pulling all orbs (wisp got busy). */
+  function _releaseEssencePull() {
+    if (!deathEssenceFx) return;
+    const orbs = deathEssenceFx.peekOrbs();
+    for (let i = 0; i < orbs.length; i++) {
+      const o = orbs[i];
+      if (!o.pulling) continue;
+      o.pulling = false;
+      // Restore original sizes
+      if (o.baseRadius) o.radius = o.baseRadius;
+      if (o.baseGlowRadius) o.glowRadius = o.baseGlowRadius;
+    }
+  }
+
   // ── Main tick ─────────────────────────────────────────────────────
 
   function tick(dtSec) {
@@ -714,6 +810,7 @@ export function createSpiritWispFxController(
     _petRebirthTimer = Math.max(0, _petRebirthTimer - dtSec);
     _itemFetchCooldownTimer = Math.max(0, _itemFetchCooldownTimer - dtSec);
     _guidancePulseTimer = Math.max(0, _guidancePulseTimer - dtSec);
+    _harvestAbsorbBurstTimer = Math.max(0, _harvestAbsorbBurstTimer - dtSec);
 
     if (ppos) {
       // Danger scan (throttled)
@@ -733,6 +830,7 @@ export function createSpiritWispFxController(
 
     // Miracle flight overrides orbit
     if (_tickFlight(dtSec)) {
+      _releaseEssencePull(); // miracle takes priority — drop the gravity well
       _pushRibbonPoint();
       if (_flareBurstQueued) {
         _flareBurstQueued = false;
@@ -744,6 +842,15 @@ export function createSpiritWispFxController(
       }
       _spawnTrail(dtSec);
       return;
+    }
+
+    // Essence harvest — passive gravity well pulls essences to wisp
+    if (_isHarvestDowntime()) {
+      _harvestDowntimeAccum += dtSec;
+      _tickEssencePull(dtSec);
+    } else {
+      if (_harvestDowntimeAccum > 0) _releaseEssencePull();
+      _harvestDowntimeAccum = 0;
     }
 
     // Decay prayer spiral
@@ -1116,6 +1223,40 @@ export function createSpiritWispFxController(
       bctx.beginPath();
       bctx.arc(_petRebirthX, _petRebirthY, r2, 0, Math.PI * 2);
       bctx.stroke();
+    }
+
+    // Essence harvest VFX: tether lines to pulling orbs + absorption burst.
+    if (_harvestDowntimeAccum >= HARVEST_LINGER_DELAY && deathEssenceFx) {
+      const orbs = deathEssenceFx.peekOrbs();
+      for (let i = 0; i < orbs.length; i++) {
+        const o = orbs[i];
+        if (!o.pulling) continue;
+        // Faint tether from wisp to each pulling essence
+        const dist = Math.hypot(_x - o.x, _y - o.y);
+        const tetherA = Math.min(0.22, 0.04 + (o.pullStrength || 0) * 0.04) *
+          (1 - Math.min(1, dist / 5)) * dim;
+        if (tetherA < 0.01) continue;
+        bctx.strokeStyle = `rgba(${HARVEST_ABSORB_COLOR[0]},${HARVEST_ABSORB_COLOR[1]},${HARVEST_ABSORB_COLOR[2]},${tetherA.toFixed(3)})`;
+        bctx.lineWidth = 0.010;
+        bctx.beginPath();
+        bctx.moveTo(_x, _y);
+        bctx.lineTo(o.x, o.y);
+        bctx.stroke();
+      }
+    }
+    if (_harvestAbsorbBurstTimer > 0) {
+      // Post-absorption glow: brief color bloom at wisp location
+      const bt = Math.min(1, _harvestAbsorbBurstTimer / 0.6);
+      const burstR = 0.08 + (1 - bt) * 0.16;
+      const burstA = bt * 0.35 * dim;
+      const glow = bctx.createRadialGradient(_x, _y, 0, _x, _y, burstR);
+      glow.addColorStop(0, `rgba(${_harvestBurstR},${_harvestBurstG},${_harvestBurstB},${burstA.toFixed(3)})`);
+      glow.addColorStop(0.5, `rgba(${HARVEST_ABSORB_COLOR[0]},${HARVEST_ABSORB_COLOR[1]},${HARVEST_ABSORB_COLOR[2]},${(burstA * 0.5).toFixed(3)})`);
+      glow.addColorStop(1, `rgba(${HARVEST_ABSORB_COLOR[0]},${HARVEST_ABSORB_COLOR[1]},${HARVEST_ABSORB_COLOR[2]},0)`);
+      bctx.fillStyle = glow;
+      bctx.beginPath();
+      bctx.arc(_x, _y, burstR, 0, Math.PI * 2);
+      bctx.fill();
     }
 
     // Sacred-site attunement: the spirit marks altar/shrine tile when engaged.

@@ -366,10 +366,36 @@ export function createDeathEssenceFxController({
     return orbs.map((o) => ({ ...o }));
   }
 
+  /**
+   * Return a live read-only view of the orbs array so the spirit wisp can
+   * scan for nearby essences without copying every frame.
+   */
+  function peekOrbs() {
+    return orbs;
+  }
+
+  /**
+   * Remove an orb by its array index and return the removed orb (or null).
+   * Used by the spirit wisp when it absorbs an essence.
+   */
+  function consumeOrbAt(index) {
+    if (index < 0 || index >= orbs.length) return null;
+    const orb = orbs[index];
+    orbs.splice(index, 1);
+    // Rebuild entity→index map after splice.
+    orbIndexByEntity.clear();
+    for (let i = 0; i < orbs.length; i++) {
+      orbIndexByEntity.set(Number(orbs[i].entityId || 0) | 0, i);
+    }
+    return orb;
+  }
+
   return {
     installListeners,
     tick,
     draw,
     getActiveOrbs,
+    peekOrbs,
+    consumeOrbAt,
   };
 }
