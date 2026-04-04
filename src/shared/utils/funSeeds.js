@@ -28,9 +28,16 @@ export const FUN_SEEDS = Object.freeze([
 
 /** @param {() => number} [nextFloat] */
 export function pickRandomSeed(nextFloat = randomUnitFloat) {
-  const seeds = FUN_SEEDS;
   const roll = Number(nextFloat());
-  if (!Number.isFinite(roll)) return seeds[0];
-  const i = Math.max(0, Math.min(seeds.length - 1, Math.floor(roll * seeds.length)));
-  return seeds[i];
+  if (!Number.isFinite(roll)) return FUN_SEEDS[0];
+
+  // ~10% chance of a fun seed, otherwise full 32-bit random
+  if (roll < 0.1) {
+    const i = Math.floor((roll / 0.1) * FUN_SEEDS.length);
+    return FUN_SEEDS[Math.min(i, FUN_SEEDS.length - 1)];
+  }
+  // Generate a random 32-bit seed from two float rolls
+  const hi = (nextFloat() * 0x10000) >>> 0;
+  const lo = (nextFloat() * 0x10000) >>> 0;
+  return ((hi << 16) | lo) >>> 0;
 }
