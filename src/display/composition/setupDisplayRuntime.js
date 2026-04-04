@@ -72,7 +72,16 @@ export function setupDisplayRuntime({
   cloudFx.installListeners();
   const surfaceAreaFx = createSurfaceAreaFxController({ getFxTime, classifySurfaceTile, fx, PERF });
 
-  const spiritWispFx = createSpiritWispFxController({ world, fx, getPosition, getPlayerEntity, sampleMood });
+  const deathEssenceFx = createDeathEssenceFxController({
+    world,
+    getFxTime,
+    getPosition,
+    getEntityIdentity,
+    getEntityVitality,
+  });
+  deathEssenceFx.installListeners();
+
+  const spiritWispFx = createSpiritWispFxController({ world, fx, getPosition, getPlayerEntity, sampleMood, deathEssenceFx });
   spiritWispFx.installListeners();
 
   const bumpFx = createBumpFxController();
@@ -83,15 +92,6 @@ export function setupDisplayRuntime({
 
   const hitstopFx = createHitstopController();
   hitstopFx.installListeners({ world, isPlayer });
-
-  const deathEssenceFx = createDeathEssenceFxController({
-    world,
-    getFxTime,
-    getPosition,
-    getEntityIdentity,
-    getEntityVitality,
-  });
-  deathEssenceFx.installListeners();
 
   const deathVfx = createDeathVfxController();
 
