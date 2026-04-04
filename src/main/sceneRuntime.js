@@ -116,6 +116,7 @@ export function createSceneRuntime({
     onShow = null,
     canShow = null,
     resolveEntityId = null,
+    resolveAnchor = null,
   }) {
     const next = createScriptedSpeechBubble({
       entityId,
@@ -128,6 +129,7 @@ export function createSceneRuntime({
     });
     next.canShow = typeof canShow === "function" ? canShow : null;
     next.resolveEntityId = typeof resolveEntityId === "function" ? resolveEntityId : null;
+    next.resolveAnchor = typeof resolveAnchor === "function" ? resolveAnchor : null;
     if (!(speechBubble.entityId > 0) && !speechBubble.text) {
       activateQueuedSpeech(next);
       return;
@@ -348,13 +350,21 @@ export function createSceneRuntime({
     if (bubble.delaySec > 0) return;
     if (bubble.usesTurnPacing && (bubble.delayTurns | 0) > 0) return;
     if (!world.isAlive(bubble.entityId)) return;
-    const pos = world.get(bubble.entityId, Position);
-    if (!pos) return;
+
+    // resolveAnchor allows VFX-space anchoring (e.g. spirit wisp position).
+    let anchorPos = null;
+    if (typeof bubble.resolveAnchor === "function") {
+      anchorPos = bubble.resolveAnchor();
+    }
+    if (!anchorPos) {
+      anchorPos = world.get(bubble.entityId, Position);
+    }
+    if (!anchorPos) return;
 
     const canvas = getCanvas();
     const canvasSetup = getCanvasSetup();
     const cam = getCam();
-    const anchor = { x: Number(pos.x || 0), y: Number(pos.y || 0) - 0.68 };
+    const anchor = { x: Number(anchorPos.x || 0), y: Number(anchorPos.y || 0) - 0.68 };
     const logicalCanvas = getLogicalCanvasSize(canvas, canvasSetup.cssW, canvasSetup.cssH);
     const projected = projectBubbleAnchor(cam, anchor, logicalCanvas, { left: 0, top: 0 });
     const dprScale = Math.max(1, canvas.width / Math.max(1, logicalCanvas.width));

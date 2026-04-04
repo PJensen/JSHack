@@ -66,6 +66,8 @@ export function installSpiritGuideWiring({
       text: tip.text,
       delaySec: tip.delaySec ?? 0.6,
       durationSec: tip.durationSec ?? 5,
+      // Anchor bubble to the wisp's VFX position for clean visual alignment.
+      resolveAnchor: () => spiritWispFx.getWispPos?.() || null,
     });
 
     // Let the wisp pulse when delivering guidance.
