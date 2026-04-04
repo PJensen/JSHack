@@ -149,6 +149,30 @@ Deno.test("first_pickup tip fires on item:pickup", () => {
   clearGuideStorage();
 });
 
+Deno.test("first_gem tip fires on gem pickup", () => {
+  const { world, playerId, bubbles } = setup();
+
+  const gemId = world.create();
+  world.add(gemId, NamedIdentity, { identity: "gem_ruby", name: "Ruby" });
+
+  world.emit("item:pickup", { actor: playerId, itemId: gemId, count: 1, itemX: 5, itemY: 5 });
+  const match = bubbles.find((b) => b.text.includes("Socket"));
+  assert(match, "first_gem tip should fire on gem pickup");
+  clearGuideStorage();
+});
+
+Deno.test("first_spellbook tip fires on spellbook pickup", () => {
+  const { world, playerId, bubbles } = setup();
+
+  const bookId = world.create();
+  world.add(bookId, NamedIdentity, { identity: "book_lightning", name: "Book of Lightning" });
+
+  world.emit("item:pickup", { actor: playerId, itemId: bookId, count: 1, itemX: 5, itemY: 5 });
+  const match = bubbles.find((b) => b.text.includes("spellbook"));
+  assert(match, "first_spellbook tip should fire on spellbook pickup");
+  clearGuideStorage();
+});
+
 Deno.test("first_combat tip fires when enemy spots player", () => {
   const { world, playerId, bubbles } = setup();
 

@@ -217,6 +217,28 @@ export function installSpiritGuideWiring({
     fire("first_pickup");
   });
 
+  // ── First gem pickup ──────────────────────────────────────────────────
+
+  world.on("item:pickup", ({ actor, itemId }) => {
+    if (seen.has("first_gem")) return;
+    const pe = getPlayerEntity();
+    if (!pe || Number(actor || 0) !== pe.id) return;
+    const ni = world.has(itemId, NamedIdentity) ? world.get(itemId, NamedIdentity) : null;
+    const ident = String(ni?.identity || "").toLowerCase();
+    if (ident.startsWith("gem_")) fire("first_gem");
+  });
+
+  // ── First spellbook pickup ───────────────────────────────────────────
+
+  world.on("item:pickup", ({ actor, itemId }) => {
+    if (seen.has("first_spellbook")) return;
+    const pe = getPlayerEntity();
+    if (!pe || Number(actor || 0) !== pe.id) return;
+    const ni = world.has(itemId, NamedIdentity) ? world.get(itemId, NamedIdentity) : null;
+    const ident = String(ni?.identity || "").toLowerCase();
+    if (ident.startsWith("book_")) fire("first_spellbook");
+  });
+
   // ── First equip ──────────────────────────────────────────────────────
 
   world.on("item:equipped", ({ actor }) => {
