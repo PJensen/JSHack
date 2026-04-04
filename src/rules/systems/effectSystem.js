@@ -381,6 +381,19 @@ export function effectSystem(world) {
             e.turnsLeft -= 1;
         }
 
+        // Destroy DerivedExpression entities owned by expiring effects
+        for (let ei = 0; ei < ae.effects.length; ei++) {
+            const ex = ae.effects[ei];
+            if (!ex) continue;
+            const tl = Number.isInteger(ex.turnsLeft) ? ex.turnsLeft : 0;
+            if (tl > 0) continue;
+            if (Number.isInteger(ex.onsetLeft) && ex.onsetLeft > 0) continue;
+            const exprId = ex?.meta?.exprEntityId;
+            if (typeof exprId === 'number' && exprId > 0) {
+                try { world.destroy(exprId); } catch {}
+            }
+        }
+
         // Cull expired effects
         ae.effects = ae.effects.filter((e) => (
             (e && Number.isInteger(e.turnsLeft) ? e.turnsLeft : 0) > 0

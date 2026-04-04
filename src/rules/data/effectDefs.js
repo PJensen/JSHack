@@ -183,6 +183,24 @@ export const EFFECT_DEFS = [
     statuses: ["mana_surge"],
   },
   {
+    id: "crit_boost",
+    keys: ["crit_boost"],
+    operation: "none",
+    statuses: ["crit_boost"],
+  },
+  {
+    id: "mana_surge_expr",
+    keys: ["mana_surge_expr"],
+    operation: "none",
+    statuses: ["mana_surge"],
+  },
+  {
+    id: "lethargic",
+    keys: ["lethargic"],
+    operation: "none",
+    statuses: ["lethargic"],
+  },
+  {
     id: "resist_fire",
     keys: ["resist_fire"],
     operation: "none",

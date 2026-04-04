@@ -45,6 +45,9 @@ const STATUS_LABEL_BY_KIND = Object.freeze({
 const STATUS_LABEL_BY_EFFECT = Object.freeze({
   taunt: '!',
   stoneskin: 'STONESKIN',
+  crit_boost: 'KEEN EDGE',
+  mana_surge: 'MANA SURGE',
+  lethargic: 'LETHARGIC',
   resist_fire: 'FIRE RESIST',
   resist_poison: 'POISON RESIST',
   resist_electric: 'LIGHTNING RESIST',

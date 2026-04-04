@@ -22,8 +22,26 @@ import { ItemCooldown } from "../components/ItemCooldown.js";
 import { Vitality } from "../components/Vitality.js";
 import { Stamina } from "../components/Stamina.js";
 import { Mana } from "../components/Mana.js";
+import { ActiveEffects } from "../components/ActiveEffects.js";
 import { createStatusEvent } from "../../shared/events/statusEvent.js";
 import { getPassiveBonuses } from "../utils/passiveBonuses.js";
+import { attachDerivedExpression, exprAddConst } from "../utils/statProcAuthoring.js";
+
+/**
+ * Destroy any existing DerivedExpression entity owned by an active effect
+ * with the given key. Prevents orphaned expr entities on refresh (re-drink).
+ */
+function cleanupPriorExprEntity(ctx, targetId, effectKey) {
+  const ae = ctx.query.get(targetId, ActiveEffects);
+  if (!ae || !Array.isArray(ae.effects)) return;
+  for (const e of ae.effects) {
+    if (e?.key !== effectKey) continue;
+    const exprId = e?.meta?.exprEntityId;
+    if (typeof exprId === 'number' && exprId > 0) {
+      try { ctx.world.destroy(exprId); } catch {}
+    }
+  }
+}
 
 export const MAGIC_ITEMS = {
   // Magic / Usable
@@ -2047,6 +2065,129 @@ export const MAGIC_ITEMS = {
       },
     },
   },
+  // ── DerivedExpression Potions ───────────────────────────────────────
+  // These potions attach a DerivedExpression child entity to the actor
+  // for the buff duration. The expression feeds into the derived stat
+  // pipeline (resolveDerivedStats → canonicalStats → combat/regen).
+  // On expiry, effectSystem destroys the expr entity via meta.exprEntityId.
+
+  potion_mana_surge: {
+    id: "potion_mana_surge",
+    catalogKind: "magic",
+    name: "Potion of Mana Surge",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 2,
+    rarityName: "magic",
+    value: 55,
+    description: "A luminous azure draught that accelerates mana recovery for several turns.",
+    weight: 0.5,
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [],
+      toxicity: null,
+      feel: "Arcane energy crackles through your veins.",
+    },
+    hooks: {
+      on_drink: (ctx, state) => {
+        const actorId = Number(state?.actor || ctx.actor || 0) | 0;
+        const targetId = ctx.rules.resolveTarget(actorId);
+        cleanupPriorExprEntity(ctx, targetId, "mana_surge_expr");
+        const exprId = attachDerivedExpression(ctx.world, targetId,
+          exprAddConst("manaRegen", 2, { stage: "derived" }));
+        ctx.helpers.addEffect(targetId, {
+          key: "mana_surge_expr", turnsLeft: 30, potency: 1,
+          stack: "refresh", maxStacks: 1,
+          meta: { source: "potion_mana_surge", exprEntityId: exprId },
+        });
+        ctx.io.emit("status", createStatusEvent({
+          id: targetId, kind: "buff", effect: "mana_surge",
+          source: actorId, masked: !state.identified,
+        }));
+        return { turns: 30 };
+      },
+    },
+  },
+  potion_keen_edge: {
+    id: "potion_keen_edge",
+    catalogKind: "magic",
+    name: "Potion of Keen Edge",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 3,
+    rarityName: "rare",
+    value: 70,
+    description: "A razor-sharp elixir that hones your instincts, greatly improving critical strike chance.",
+    weight: 0.5,
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [],
+      toxicity: null,
+      feel: "Your senses sharpen to a razor's edge.",
+    },
+    hooks: {
+      on_drink: (ctx, state) => {
+        const actorId = Number(state?.actor || ctx.actor || 0) | 0;
+        const targetId = ctx.rules.resolveTarget(actorId);
+        cleanupPriorExprEntity(ctx, targetId, "crit_boost");
+        const exprId = attachDerivedExpression(ctx.world, targetId,
+          exprAddConst("critChancePhysical", 0.10, { stage: "derived" }));
+        ctx.helpers.addEffect(targetId, {
+          key: "crit_boost", turnsLeft: 35, potency: 1,
+          stack: "refresh", maxStacks: 1,
+          meta: { source: "potion_keen_edge", exprEntityId: exprId },
+        });
+        ctx.io.emit("status", createStatusEvent({
+          id: targetId, kind: "buff", effect: "crit_boost",
+          source: actorId, masked: !state.identified,
+        }));
+        return { turns: 35 };
+      },
+    },
+  },
+  potion_lethargy: {
+    id: "potion_lethargy",
+    catalogKind: "magic",
+    name: "Potion of Lethargy",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 1,
+    rarityName: "common",
+    value: 5,
+    description: "A thick, sluggish grey brew that saps your endurance.",
+    weight: 0.5,
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [],
+      feel: "Your limbs grow heavy and sluggish.",
+    },
+    hooks: {
+      on_drink: (ctx, state) => {
+        const actorId = Number(state?.actor || ctx.actor || 0) | 0;
+        const targetId = ctx.rules.resolveTarget(actorId);
+        cleanupPriorExprEntity(ctx, targetId, "lethargic");
+        const exprId = attachDerivedExpression(ctx.world, targetId,
+          exprAddConst("staminaRegen", -0.5, { stage: "derived" }));
+        ctx.helpers.addEffect(targetId, {
+          key: "lethargic", turnsLeft: 30, potency: 1,
+          stack: "refresh", maxStacks: 1,
+          meta: { source: "potion_lethargy", exprEntityId: exprId },
+        });
+        ctx.io.emit("potion:lethargy", { actorId });
+        return { turns: 30 };
+      },
+    },
+  },
+
   potion_confusion: {
     id: "potion_confusion",
     catalogKind: "magic",

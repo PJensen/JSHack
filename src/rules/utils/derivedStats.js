@@ -37,6 +37,7 @@ export const RESOLVED_STAT_DEFAULTS = Object.freeze({
   visionRange: 0,
   hungerRate: 0,
   staminaRegen: 0,
+  manaRegen: 0,
   critChance: 0,
   critMultiplier: 1.5,
   baseDamageMin: 0,
@@ -305,6 +306,12 @@ export function defineDerivedStatVirtuals(world) {
 
 export function getResolvedStatsVirtual(world) {
   return world?.[RESOLVED_STATS_VIRTUAL] || null;
+}
+
+export function getResolvedStats(world, entityId) {
+  const Virtual = getResolvedStatsVirtual(world);
+  if (Virtual && typeof world?.vget === "function") return world.vget(entityId, Virtual);
+  return resolveDerivedStats(world, entityId);
 }
 
 export function getDamageProfileVirtual(world) {
