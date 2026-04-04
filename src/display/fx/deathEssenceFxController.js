@@ -337,26 +337,90 @@ export function createDeathEssenceFxController({
       const coreR = o.radius * pop;
       const yWithArc = y - lift;
 
+      // ── Breathing pulse: size oscillates gently ──
+      const breathe = 1 + 0.08 * Math.sin(age * 1.6 + o.phase * 2.3);
+      const gR = glowR * breathe;
+      const cR = coreR * breathe;
+
+      // ── Flicker: rapid subtle alpha variation for living feel ──
+      const flicker = 0.92 + 0.08 * Math.sin(age * 11.3 + o.phase * 5.1)
+        * Math.sin(age * 7.7 + o.phase);
+
+      // ── Outer glow (lighter blend) ──
       bctx.globalCompositeOperation = "lighter";
-      const glow = bctx.createRadialGradient(o.x, yWithArc, 0, o.x, yWithArc, glowR);
-      glow.addColorStop(0, `rgba(${CYAN_GLOW.r},${CYAN_GLOW.g},${CYAN_GLOW.b},0.44)`);
-      glow.addColorStop(0.35, `rgba(${CYAN_GLOW.r},${CYAN_GLOW.g},${CYAN_GLOW.b},0.18)`);
+      const glow = bctx.createRadialGradient(o.x, yWithArc, 0, o.x, yWithArc, gR);
+      glow.addColorStop(0, `rgba(${CYAN_GLOW.r},${CYAN_GLOW.g},${CYAN_GLOW.b},${(0.44 * flicker).toFixed(3)})`);
+      glow.addColorStop(0.35, `rgba(${CYAN_GLOW.r},${CYAN_GLOW.g},${CYAN_GLOW.b},${(0.18 * flicker).toFixed(3)})`);
       glow.addColorStop(0.78, `rgba(${CYAN_GLOW.r},${CYAN_GLOW.g},${CYAN_GLOW.b},0.05)`);
       glow.addColorStop(1, `rgba(${CYAN_GLOW.r},${CYAN_GLOW.g},${CYAN_GLOW.b},0)`);
       bctx.fillStyle = glow;
       bctx.beginPath();
-      bctx.arc(o.x, yWithArc, glowR, 0, Math.PI * 2);
+      bctx.arc(o.x, yWithArc, gR, 0, Math.PI * 2);
       bctx.fill();
 
+      // ── Entity-color aura: second softer halo in the creature's color ──
+      const auraR = gR * 0.75;
+      const auraA = 0.12 + 0.06 * Math.sin(age * 2.8 + o.phase);
+      const aura = bctx.createRadialGradient(o.x, yWithArc, 0, o.x, yWithArc, auraR);
+      aura.addColorStop(0, `rgba(${o.r},${o.g},${o.b},${(auraA * flicker).toFixed(3)})`);
+      aura.addColorStop(0.6, `rgba(${o.r},${o.g},${o.b},${(auraA * 0.4).toFixed(3)})`);
+      aura.addColorStop(1, `rgba(${o.r},${o.g},${o.b},0)`);
+      bctx.fillStyle = aura;
+      bctx.beginPath();
+      bctx.arc(o.x, yWithArc, auraR, 0, Math.PI * 2);
+      bctx.fill();
+
+      // ── Core sphere ──
       bctx.globalCompositeOperation = "source-over";
-      const core = bctx.createRadialGradient(o.x, yWithArc, coreR * 0.15, o.x, yWithArc, coreR);
-      core.addColorStop(0, "rgba(255,255,255,0.92)");
-      core.addColorStop(0.5, `rgba(${o.r},${o.g},${o.b},0.92)`);
+      const core = bctx.createRadialGradient(o.x, yWithArc, cR * 0.15, o.x, yWithArc, cR);
+      core.addColorStop(0, `rgba(255,255,255,${(0.92 * flicker).toFixed(3)})`);
+      core.addColorStop(0.5, `rgba(${o.r},${o.g},${o.b},${(0.92 * flicker).toFixed(3)})`);
       core.addColorStop(1, `rgba(${Math.max(0, o.r - 40)},${Math.max(0, o.g - 40)},${Math.max(0, o.b - 40)},0.75)`);
       bctx.fillStyle = core;
       bctx.beginPath();
-      bctx.arc(o.x, yWithArc, coreR, 0, Math.PI * 2);
+      bctx.arc(o.x, yWithArc, cR, 0, Math.PI * 2);
       bctx.fill();
+
+      // ── Orbiting spirit motes: 2-3 tiny sparks circling the orb ──
+      bctx.globalCompositeOperation = "lighter";
+      const moteCount = 2 + ((o.phase > 3.5) ? 1 : 0);
+      for (let m = 0; m < moteCount; m++) {
+        const mSpeed = 2.2 + m * 0.7 + o.hoverSpeed * 0.3;
+        const mAngle = age * mSpeed + m * 2.09 + o.phase;
+        const mRadius = cR * (1.6 + m * 0.5) + 0.01 * Math.sin(age * 4.3 + m);
+        const mx = o.x + Math.cos(mAngle) * mRadius;
+        const my = yWithArc + Math.sin(mAngle) * mRadius * 0.65;
+        const mAlpha = (0.25 + 0.2 * Math.sin(age * (5.1 + m * 1.7) + o.phase)) * flicker;
+        const mSize = 0.012 + 0.006 * Math.sin(age * 6.8 + m * 2.1);
+        bctx.fillStyle = `rgba(${Math.min(255, o.r + 80)},${Math.min(255, o.g + 80)},${Math.min(255, o.b + 80)},${mAlpha.toFixed(3)})`;
+        bctx.beginPath();
+        bctx.arc(mx, my, mSize, 0, Math.PI * 2);
+        bctx.fill();
+      }
+
+      // ── Wispy tendril: a short fading tail trailing upward ──
+      const tendrilLen = 3;
+      const tendrilBaseA = 0.14 * flicker;
+      bctx.lineWidth = 0.008;
+      bctx.lineCap = "round";
+      for (let t = 0; t < tendrilLen; t++) {
+        const tt = (t + 1) / tendrilLen;
+        const sway = 0.03 * Math.sin(age * 3.5 + o.phase + t * 1.4);
+        const tx = o.x + sway;
+        const ty = yWithArc - cR * (0.6 + tt * 1.2);
+        const ta = tendrilBaseA * (1 - tt * 0.7);
+        bctx.strokeStyle = `rgba(${o.r},${o.g},${o.b},${ta.toFixed(3)})`;
+        bctx.beginPath();
+        if (t === 0) {
+          bctx.moveTo(o.x, yWithArc - cR * 0.4);
+        } else {
+          const prevSway = 0.03 * Math.sin(age * 3.5 + o.phase + (t - 1) * 1.4);
+          const prevTt = t / tendrilLen;
+          bctx.moveTo(o.x + prevSway, yWithArc - cR * (0.6 + prevTt * 1.2));
+        }
+        bctx.lineTo(tx, ty);
+        bctx.stroke();
+      }
     }
 
     bctx.restore();
