@@ -645,8 +645,11 @@ export function createSpiritWispFxController(
     return true;
   }
 
-  /** Drive the gravity well: pull all essences toward the wisp. */
-  function _tickEssencePull(dtSec) {
+  /**
+   * Tick all in-flight essences — once an orb is pulling it always finishes.
+   * Called every frame regardless of downtime state.
+   */
+  function _tickActiveEssencePulls(dtSec) {
     if (!deathEssenceFx) return;
     const orbs = deathEssenceFx.peekOrbs();
     if (!orbs || orbs.length === 0) return;
@@ -702,14 +705,12 @@ export function createSpiritWispFxController(
       }
       // Pull toward wisp — accelerates as it gets closer (gravity)
       const pullStrength = o.pullStrength || 0;
-      // Ramp pull over time: gentle start, then accelerating
       o.pullStrength = Math.min(4.0, pullStrength + dtSec * 0.6);
       const speed = 0.3 + o.pullStrength * (1.0 + 1.5 / Math.max(0.5, dist));
       const step = Math.min(dist, speed * dtSec);
       const mx = (dx / dist) * step;
       const my = (dy / dist) * step;
       // Move the underlying coords so deathEssence draw() picks them up
-      // (draw recalculates o.x/o.y from fromX/fromY/toX/toY each frame)
       o.fromX += mx;
       o.fromY += my;
       o.toX += mx;
@@ -721,9 +722,18 @@ export function createSpiritWispFxController(
       o.radius = (o.baseRadius || o.radius) * (0.3 + 0.7 * shrink);
       o.glowRadius = (o.baseGlowRadius || o.glowRadius) * (0.2 + 0.8 * shrink);
     }
+  }
 
-    // Mark nearby orbs as pulling (activate gravity well)
+  /**
+   * Recruit new essences into the gravity well.
+   * Only called during downtime — but once recruited, they always finish.
+   */
+  function _recruitNewEssences() {
+    if (!deathEssenceFx) return;
+    const orbs = deathEssenceFx.peekOrbs();
+    if (!orbs || orbs.length === 0) return;
     if (_harvestDowntimeAccum < HARVEST_LINGER_DELAY) return;
+
     for (let i = 0; i < orbs.length; i++) {
       const o = orbs[i];
       if (o.pulling) continue;
@@ -731,25 +741,10 @@ export function createSpiritWispFxController(
       const dy = _y - o.y;
       const dist = Math.hypot(dx, dy);
       if (dist > 7 || dist < 0.2) continue;
-      // Activate pull — save base sizes for shrink calc
       o.pulling = true;
       o.pullStrength = 0;
       o.baseRadius = o.radius;
       o.baseGlowRadius = o.glowRadius;
-    }
-  }
-
-  /** Stop pulling all orbs (wisp got busy). */
-  function _releaseEssencePull() {
-    if (!deathEssenceFx) return;
-    const orbs = deathEssenceFx.peekOrbs();
-    for (let i = 0; i < orbs.length; i++) {
-      const o = orbs[i];
-      if (!o.pulling) continue;
-      o.pulling = false;
-      // Restore original sizes
-      if (o.baseRadius) o.radius = o.baseRadius;
-      if (o.baseGlowRadius) o.glowRadius = o.baseGlowRadius;
     }
   }
 
@@ -867,9 +862,11 @@ export function createSpiritWispFxController(
       }
     }
 
+    // Always finish in-flight essence pulls, even during combat/miracles
+    _tickActiveEssencePulls(dtSec);
+
     // Miracle flight overrides orbit
     if (_tickFlight(dtSec)) {
-      _releaseEssencePull(); // miracle takes priority — drop the gravity well
       _pushRibbonPoint();
       if (_flareBurstQueued) {
         _flareBurstQueued = false;
@@ -883,12 +880,11 @@ export function createSpiritWispFxController(
       return;
     }
 
-    // Essence harvest — passive gravity well pulls essences to wisp
+    // Essence harvest — recruit new essences only during downtime
     if (_isHarvestDowntime()) {
       _harvestDowntimeAccum += dtSec;
-      _tickEssencePull(dtSec);
+      _recruitNewEssences();
     } else {
-      if (_harvestDowntimeAccum > 0) _releaseEssencePull();
       _harvestDowntimeAccum = 0;
     }
 
