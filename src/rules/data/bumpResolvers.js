@@ -23,6 +23,7 @@ import { Position } from "../components/Position.js";
 import { Pushable } from "../components/Pushable.js";
 import { Flying } from "../components/Flying.js";
 import { DoorState } from "../components/DoorState.js";
+import { Owner } from "../components/Owner.js";
 import { CreatureType, CREATURE_TYPES } from "../components/CreatureType.js";
 import { areFactionsHostile } from "../utils/factionHostility.js";
 import { setDoorState } from "../utils/doorAccess.js";
@@ -106,7 +107,11 @@ const hostileMelee = {
     // Shopkeepers / neutrals with Interactable are handled by npc-interact
     if (targetFac && (targetFac.key === "shopkeeper" || targetFac.key === "neutral" || targetFac.key === "townfolk")
         && world.has(ctx.target, Interactable)) return false;
-    return areFactionsHostile(actorFac?.key, targetFac?.key);
+    if (!areFactionsHostile(actorFac?.key, targetFac?.key)) return false;
+    // Spawned creatures never attack their own nest (owner).
+    const owner = world.get(actor, Owner);
+    if (owner && owner.ownerId === ctx.target) return false;
+    return true;
   },
   resolve(world, actor, ctx) {
     if (world.has(actor, AttackIntent)) return;
