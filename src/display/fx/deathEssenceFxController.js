@@ -346,36 +346,46 @@ export function createDeathEssenceFxController({
       const flicker = 0.92 + 0.08 * Math.sin(age * 11.3 + o.phase * 5.1)
         * Math.sin(age * 7.7 + o.phase);
 
-      // ── Outer glow (lighter blend) ──
+      // Blend entity color into the glow — creature identity dominates,
+      // with a subtle cyan spiritual accent.
+      const glR = (o.r * 0.6 + CYAN_GLOW.r * 0.4) | 0;
+      const glG = (o.g * 0.6 + CYAN_GLOW.g * 0.4) | 0;
+      const glB = (o.b * 0.6 + CYAN_GLOW.b * 0.4) | 0;
+
+      // ── Outer glow (lighter blend) — creature-tinted ──
       bctx.globalCompositeOperation = "lighter";
       const glow = bctx.createRadialGradient(o.x, yWithArc, 0, o.x, yWithArc, gR);
-      glow.addColorStop(0, `rgba(${CYAN_GLOW.r},${CYAN_GLOW.g},${CYAN_GLOW.b},${(0.44 * flicker).toFixed(3)})`);
-      glow.addColorStop(0.35, `rgba(${CYAN_GLOW.r},${CYAN_GLOW.g},${CYAN_GLOW.b},${(0.18 * flicker).toFixed(3)})`);
-      glow.addColorStop(0.78, `rgba(${CYAN_GLOW.r},${CYAN_GLOW.g},${CYAN_GLOW.b},0.05)`);
-      glow.addColorStop(1, `rgba(${CYAN_GLOW.r},${CYAN_GLOW.g},${CYAN_GLOW.b},0)`);
+      glow.addColorStop(0, `rgba(${glR},${glG},${glB},${(0.46 * flicker).toFixed(3)})`);
+      glow.addColorStop(0.30, `rgba(${o.r},${o.g},${o.b},${(0.22 * flicker).toFixed(3)})`);
+      glow.addColorStop(0.70, `rgba(${o.r},${o.g},${o.b},0.06)`);
+      glow.addColorStop(1, `rgba(${o.r},${o.g},${o.b},0)`);
       bctx.fillStyle = glow;
       bctx.beginPath();
       bctx.arc(o.x, yWithArc, gR, 0, Math.PI * 2);
       bctx.fill();
 
-      // ── Entity-color aura: second softer halo in the creature's color ──
-      const auraR = gR * 0.75;
-      const auraA = 0.12 + 0.06 * Math.sin(age * 2.8 + o.phase);
-      const aura = bctx.createRadialGradient(o.x, yWithArc, 0, o.x, yWithArc, auraR);
-      aura.addColorStop(0, `rgba(${o.r},${o.g},${o.b},${(auraA * flicker).toFixed(3)})`);
-      aura.addColorStop(0.6, `rgba(${o.r},${o.g},${o.b},${(auraA * 0.4).toFixed(3)})`);
-      aura.addColorStop(1, `rgba(${o.r},${o.g},${o.b},0)`);
-      bctx.fillStyle = aura;
+      // ── Faint cyan spirit rim — the "soul" undertone beneath the identity ──
+      const rimR = gR * 0.55;
+      const rimA = 0.08 + 0.04 * Math.sin(age * 2.8 + o.phase);
+      const rim = bctx.createRadialGradient(o.x, yWithArc, rimR * 0.6, o.x, yWithArc, rimR);
+      rim.addColorStop(0, `rgba(${CYAN_GLOW.r},${CYAN_GLOW.g},${CYAN_GLOW.b},0)`);
+      rim.addColorStop(0.5, `rgba(${CYAN_GLOW.r},${CYAN_GLOW.g},${CYAN_GLOW.b},${(rimA * flicker).toFixed(3)})`);
+      rim.addColorStop(1, `rgba(${CYAN_GLOW.r},${CYAN_GLOW.g},${CYAN_GLOW.b},0)`);
+      bctx.fillStyle = rim;
       bctx.beginPath();
-      bctx.arc(o.x, yWithArc, auraR, 0, Math.PI * 2);
+      bctx.arc(o.x, yWithArc, rimR, 0, Math.PI * 2);
       bctx.fill();
 
-      // ── Core sphere ──
+      // ── Core sphere — hot white center fading to deep creature color ──
       bctx.globalCompositeOperation = "source-over";
-      const core = bctx.createRadialGradient(o.x, yWithArc, cR * 0.15, o.x, yWithArc, cR);
-      core.addColorStop(0, `rgba(255,255,255,${(0.92 * flicker).toFixed(3)})`);
-      core.addColorStop(0.5, `rgba(${o.r},${o.g},${o.b},${(0.92 * flicker).toFixed(3)})`);
-      core.addColorStop(1, `rgba(${Math.max(0, o.r - 40)},${Math.max(0, o.g - 40)},${Math.max(0, o.b - 40)},0.75)`);
+      const darkR = Math.max(0, o.r - 50) | 0;
+      const darkG = Math.max(0, o.g - 50) | 0;
+      const darkB = Math.max(0, o.b - 50) | 0;
+      const core = bctx.createRadialGradient(o.x, yWithArc, cR * 0.1, o.x, yWithArc, cR);
+      core.addColorStop(0, `rgba(255,255,255,${(0.94 * flicker).toFixed(3)})`);
+      core.addColorStop(0.35, `rgba(${Math.min(255, o.r + 60)},${Math.min(255, o.g + 60)},${Math.min(255, o.b + 60)},${(0.88 * flicker).toFixed(3)})`);
+      core.addColorStop(0.7, `rgba(${o.r},${o.g},${o.b},0.82)`);
+      core.addColorStop(1, `rgba(${darkR},${darkG},${darkB},0.65)`);
       bctx.fillStyle = core;
       bctx.beginPath();
       bctx.arc(o.x, yWithArc, cR, 0, Math.PI * 2);
@@ -398,28 +408,37 @@ export function createDeathEssenceFxController({
         bctx.fill();
       }
 
-      // ── Wispy tendril: a short fading tail trailing upward ──
-      const tendrilLen = 3;
-      const tendrilBaseA = 0.14 * flicker;
-      bctx.lineWidth = 0.008;
+      // ── Wispy tendrils: two spirit-smoke trails rising from the orb ──
+      const tendrilSegs = 5;
+      const tendrils = [
+        { freq: 3.5, amp: 0.04, phaseOff: 0, rise: 1.8, baseA: 0.16, width: 0.010 },
+        { freq: 2.8, amp: 0.03, phaseOff: 2.1, rise: 1.4, baseA: 0.10, width: 0.007 },
+      ];
       bctx.lineCap = "round";
-      for (let t = 0; t < tendrilLen; t++) {
-        const tt = (t + 1) / tendrilLen;
-        const sway = 0.03 * Math.sin(age * 3.5 + o.phase + t * 1.4);
-        const tx = o.x + sway;
-        const ty = yWithArc - cR * (0.6 + tt * 1.2);
-        const ta = tendrilBaseA * (1 - tt * 0.7);
-        bctx.strokeStyle = `rgba(${o.r},${o.g},${o.b},${ta.toFixed(3)})`;
-        bctx.beginPath();
-        if (t === 0) {
-          bctx.moveTo(o.x, yWithArc - cR * 0.4);
-        } else {
-          const prevSway = 0.03 * Math.sin(age * 3.5 + o.phase + (t - 1) * 1.4);
-          const prevTt = t / tendrilLen;
-          bctx.moveTo(o.x + prevSway, yWithArc - cR * (0.6 + prevTt * 1.2));
+      for (let ti = 0; ti < tendrils.length; ti++) {
+        const td = tendrils[ti];
+        bctx.lineWidth = td.width;
+        let prevX = o.x;
+        let prevY = yWithArc - cR * 0.3;
+        for (let s = 0; s < tendrilSegs; s++) {
+          const st = (s + 1) / tendrilSegs;
+          const sway = td.amp * Math.sin(age * td.freq + o.phase + td.phaseOff + s * 1.3)
+            * (1 + st * 0.5);
+          const sx = o.x + sway;
+          const sy = yWithArc - cR * (0.5 + st * td.rise);
+          const sa = td.baseA * flicker * (1 - st * 0.75);
+          // Fade from entity color to lighter at tips
+          const tipR = Math.min(255, o.r + (st * 60) | 0);
+          const tipG = Math.min(255, o.g + (st * 60) | 0);
+          const tipB = Math.min(255, o.b + (st * 60) | 0);
+          bctx.strokeStyle = `rgba(${tipR},${tipG},${tipB},${sa.toFixed(3)})`;
+          bctx.beginPath();
+          bctx.moveTo(prevX, prevY);
+          bctx.lineTo(sx, sy);
+          bctx.stroke();
+          prevX = sx;
+          prevY = sy;
         }
-        bctx.lineTo(tx, ty);
-        bctx.stroke();
       }
     }
 
