@@ -483,6 +483,17 @@ export const INTERACT_PAYLOADS = {
       const { world, actor, targetId } = ctx;
       const ds = world.get(targetId, DoorState);
       const nowOpen = !(ds?.open);
+      // Don't close a door while a living creature occupies the tile.
+      if (!nowOpen) {
+        const doorPos = world.get(targetId, Position);
+        if (doorPos) {
+          for (const [id, pos] of world.query(Position, Vitality)) {
+            if (pos.x === doorPos.x && pos.y === doorPos.y && (world.get(id, Vitality)?.hp | 0) > 0) {
+              return;
+            }
+          }
+        }
+      }
       setDoorState(world, targetId, {
         open: nowOpen,
         locked: nowOpen ? false : !!ds?.locked,
