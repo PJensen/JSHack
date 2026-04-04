@@ -85,3 +85,35 @@ Deno.test("death essence: player death also spawns an orb", () => {
   world.emit("died", { id: player, killer: 0 });
   assertEquals(fx.getActiveOrbs().length, 1);
 });
+
+Deno.test("death essence: inherits directional impulse from recent damage", () => {
+  const world = new World({ seed: 13 });
+  const foe = world.create();
+  world.add(foe, Position, { x: 5, y: 5 });
+  world.add(foe, Vitality, { hp: 1, maxHp: 18 });
+
+  const harness = createHarness();
+  const fx = createDeathEssenceFxController({
+    world,
+    getFxTime: harness.now,
+    getPosition: (id) => world.get(id, Position) || null,
+    getEntityIdentity: () => "",
+    getEntityVitality: (id) => world.get(id, Vitality) || null,
+  });
+  fx.installListeners();
+
+  world.emit("damaged", {
+    target: foe,
+    amount: 24,
+    cause: "ranged",
+    impactVector: { dx: 1, dy: 0 },
+  });
+  world.emit("died", { id: foe });
+
+  const orb = fx.getActiveOrbs()[0];
+  assert(orb, "orb should exist");
+  assert(
+    Number(orb.toX) > Number(orb.fromX),
+    "orb should be pushed in the same direction as loot-pop impulse",
+  );
+});
