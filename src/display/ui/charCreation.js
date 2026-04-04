@@ -670,6 +670,64 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
   hardRow.appendChild(hardBox);
   hardRow.appendChild(hardLabel);
   box.appendChild(hardRow);
+
+  // ---- tutorial toggle ----
+  const tutRow = document.createElement('label');
+  Object.assign(tutRow.style, {
+    display: 'inline-flex', alignItems: 'center', gap: '8px',
+    cursor: 'pointer', userSelect: 'none',
+    marginLeft: '18px',
+    marginBottom: '16px',
+    touchAction: 'manipulation',
+  });
+  const tutInput = document.createElement('input');
+  tutInput.type = 'checkbox';
+  // Default on if player has never completed the tutorial.
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('jshack:spiritGuide:seen:v1') : null;
+    const arr = raw ? JSON.parse(raw) : [];
+    tutInput.checked = !Array.isArray(arr) || arr.length < 10;
+  } catch { tutInput.checked = true; }
+  Object.assign(tutInput.style, { position: 'absolute', opacity: '0', pointerEvents: 'none' });
+
+  const tutBox = document.createElement('span');
+  Object.assign(tutBox.style, {
+    width: '18px', height: '18px',
+    border: '1px solid rgba(90,100,115,0.5)',
+    borderRadius: '4px',
+    background: 'transparent',
+    display: 'grid', placeItems: 'center',
+    color: 'transparent', fontSize: '11px',
+    transition: 'border-color 120ms, color 120ms, box-shadow 120ms',
+  });
+  tutBox.textContent = '\u2726';
+
+  const tutLabel = document.createElement('span');
+  tutLabel.textContent = 'Tutorial';
+  Object.assign(tutLabel.style, {
+    fontSize: '12px', color: UI.muted,
+    textTransform: 'uppercase', letterSpacing: '0.10em',
+  });
+
+  function renderTut() {
+    if (tutInput.checked) {
+      tutBox.style.borderColor = '#8ca2ba';
+      tutBox.style.color = '#d3e2f1';
+      tutBox.style.boxShadow = '0 0 8px rgba(127,152,178,0.2)';
+      tutLabel.style.color = '#c2d2e1';
+    } else {
+      tutBox.style.borderColor = 'rgba(90,100,115,0.5)';
+      tutBox.style.color = 'transparent';
+      tutBox.style.boxShadow = '';
+      tutLabel.style.color = UI.muted;
+    }
+  }
+  tutInput.addEventListener('change', renderTut);
+  renderTut();
+  tutRow.appendChild(tutInput);
+  tutRow.appendChild(tutBox);
+  tutRow.appendChild(tutLabel);
+  box.appendChild(tutRow);
   box.appendChild(document.createElement('br'));
 
   // ---- confirm button ----
@@ -719,8 +777,9 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
     const name = (nameInput.value || '').trim() || fallbackName;
     const seedVal = parseSeed(seedInput.value) ?? (defaultSeed >>> 0);
     const difficulty = hardInput.checked ? 'hard' : 'easy';
+    const tutorial = !!tutInput.checked;
     writeSavedName(name);
-    onConfirm({ name, classId: classes[classIndex].id, seed: seedVal, difficulty });
+    onConfirm({ name, classId: classes[classIndex].id, seed: seedVal, difficulty, tutorial });
     dispose();
   }
 
