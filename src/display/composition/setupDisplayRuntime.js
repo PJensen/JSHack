@@ -11,6 +11,7 @@ import { createStatusPresentationDelayController } from "../fx/statusPresentatio
 import { createBumpFxController } from "../fx/bumpFxController.js";
 import { createRecoilFxController } from "../fx/recoilFxController.js";
 import { createHitstopController } from "../fx/hitstopController.js";
+import { createDeathEssenceFxController } from "../fx/deathEssenceFxController.js";
 import { startShake } from "../camera/shake.js";
 import { startZoomPunch } from "../camera/zoomPunch.js";
 import { installFloatTextWiring } from "../ui/wiring/floatTextWiring.js";
@@ -30,6 +31,8 @@ export function setupDisplayRuntime({
   getActiveSpellId,
   setActiveSpell,
   getPosition,
+  getEntityIdentity,
+  getEntityVitality,
   isVisibleAt,
   isPet,
   isPlayer,
@@ -81,6 +84,15 @@ export function setupDisplayRuntime({
   const hitstopFx = createHitstopController();
   hitstopFx.installListeners({ world, isPlayer });
 
+  const deathEssenceFx = createDeathEssenceFxController({
+    world,
+    getFxTime,
+    getPosition,
+    getEntityIdentity,
+    getEntityVitality,
+  });
+  deathEssenceFx.installListeners();
+
   const deathVfx = createDeathVfxController();
 
   // ── Melee camera shake — scales with damage ───────────────────────
@@ -111,5 +123,5 @@ export function setupDisplayRuntime({
     dispatchRulesAction,
   });
 
-  return { statusEmitterFx, statusPresentationDelayFx, boltFx, delayedDeathFx, projectileFx, spellAreaFx, cloudFx, surfaceAreaFx, spiritWispFx, bumpFx, recoilFx, hitstopFx, deathVfx, ftext, goreTick };
+  return { statusEmitterFx, statusPresentationDelayFx, boltFx, delayedDeathFx, projectileFx, spellAreaFx, cloudFx, surfaceAreaFx, spiritWispFx, bumpFx, recoilFx, hitstopFx, deathEssenceFx, deathVfx, ftext, goreTick };
 }
