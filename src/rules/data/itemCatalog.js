@@ -24,8 +24,10 @@ const GEM_ITEM_HOOKS = Object.freeze({
   gem_topaz:    { canDipTarget: canGemSocketDipTarget, onDip: createGemSocketDipHook("gem_topaz") },
   gem_amethyst: { canDipTarget: canGemSocketDipTarget, onDip: createGemSocketDipHook("gem_amethyst") },
   gem_opal:     { canDipTarget: canGemSocketDipTarget, onDip: createGemSocketDipHook("gem_opal") },
-  gem_obsidian: { canDipTarget: canGemSocketDipTarget, onDip: createGemSocketDipHook("gem_obsidian") },
-  gem_garnet:   { canDipTarget: canGemSocketDipTarget, onDip: createGemSocketDipHook("gem_garnet") },
+  gem_obsidian:   { canDipTarget: canGemSocketDipTarget, onDip: createGemSocketDipHook("gem_obsidian") },
+  gem_garnet:     { canDipTarget: canGemSocketDipTarget, onDip: createGemSocketDipHook("gem_garnet") },
+  gem_jacinth:    { canDipTarget: canGemSocketDipTarget, onDip: createGemSocketDipHook("gem_jacinth") },
+  gem_aquamarine: { canDipTarget: canGemSocketDipTarget, onDip: createGemSocketDipHook("gem_aquamarine") },
 });
 
 /**
