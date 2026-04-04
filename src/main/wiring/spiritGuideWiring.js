@@ -151,18 +151,34 @@ export function installSpiritGuideWiring({
     return best;
   }
 
-  // ── Welcome + Movement + Pet + Quick Items ────────────────────────────
+  // ── Welcome (first move) ──────────────────────────────────────────────
 
-  // Staggered on turn count so the player isn't overwhelmed.
-  // 1st move: welcome, 2nd: pet companion, 3rd: quick items, 5th: movement.
   world.on("moved", ({ id }) => {
     const pe = getPlayerEntity();
     if (!pe || Number(id || 0) !== pe.id) return;
     turnCount++;
     if (turnCount === 1) fire("welcome");
-    if (turnCount === 2) fire("pet_companion");
-    if (turnCount === 3) fire("quick_items");
-    if (turnCount === 5) fire("movement");
+    if (turnCount === 8) fire("movement");
+  });
+
+  // ── Pet companion (pet delivers an item to the player) ──────────────
+
+  world.on("pet:deliver", () => {
+    fire("pet_companion");
+  });
+
+  // ── Quick items (first potion / consumable pickup) ──────────────────
+
+  world.on("item:pickup", ({ actor, itemId }) => {
+    if (seen.has("quick_items")) return;
+    const pe = getPlayerEntity();
+    if (!pe || Number(actor || 0) !== pe.id) return;
+    // Check if the picked-up item is a consumable (potion, scroll, food).
+    const ni = world.has(itemId, NamedIdentity) ? world.get(itemId, NamedIdentity) : null;
+    const ident = String(ni?.identity || "").toLowerCase();
+    if (ident.includes("potion") || ident.includes("scroll") || ident.includes("food") || ident.includes("stew")) {
+      fire("quick_items");
+    }
   });
 
   // ── Item on ground (player walks near an item) ───────────────────────
@@ -209,15 +225,11 @@ export function installSpiritGuideWiring({
     fire("first_equip");
   });
 
-  // ── First combat (enemy deals or receives damage near player) ────────
+  // ── First combat (enemy spots the player — status:alert from aiChase) ──
 
-  world.on("damaged", ({ target, source }) => {
-    const pe = getPlayerEntity();
-    if (!pe) return;
-    const pid = pe.id;
-    if (Number(target || 0) === pid || Number(source || 0) === pid) {
-      fire("first_combat");
-    }
+  world.on("status", ({ kind }) => {
+    if (kind !== "alert") return;
+    fire("first_combat");
   });
 
   // ── Low HP ───────────────────────────────────────────────────────────

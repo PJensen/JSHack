@@ -103,39 +103,40 @@ Deno.test("welcome tip fires on first player move", () => {
   clearGuideStorage();
 });
 
-Deno.test("pet_companion tip fires on 2nd move", () => {
+Deno.test("movement tip fires on 8th player move", () => {
   const { world, playerId, bubbles } = setup();
 
-  world.emit("moved", { id: playerId, from: { x: 5, y: 5 }, to: { x: 6, y: 5 } });
-  world.emit("moved", { id: playerId, from: { x: 6, y: 5 }, to: { x: 7, y: 5 } });
-  const match = bubbles.find((b) => b.text.includes("companion"));
-  assert(match, "pet_companion tip should fire on 2nd move");
-  clearGuideStorage();
-});
-
-Deno.test("quick_items tip fires on 3rd move", () => {
-  const { world, playerId, bubbles } = setup();
-
-  for (let i = 0; i < 3; i++) {
-    world.emit("moved", { id: playerId, from: { x: 5 + i, y: 5 }, to: { x: 6 + i, y: 5 } });
-  }
-  const match = bubbles.find((b) => b.text.includes("pinned items"));
-  assert(match, "quick_items tip should fire on 3rd move");
-  clearGuideStorage();
-});
-
-Deno.test("movement tip fires after 5 player moves", () => {
-  const { world, playerId, bubbles } = setup();
-
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 7; i++) {
     world.emit("moved", { id: playerId, from: { x: 5 + i, y: 5 }, to: { x: 6 + i, y: 5 } });
   }
   assertEquals(bubbles.filter((b) => b.text.includes("Tap the screen")).length, 0,
-    "should not fire before 5 moves");
+    "should not fire before 8 moves");
 
-  world.emit("moved", { id: playerId, from: { x: 9, y: 5 }, to: { x: 10, y: 5 } });
+  world.emit("moved", { id: playerId, from: { x: 12, y: 5 }, to: { x: 13, y: 5 } });
   const match = bubbles.find((b) => b.text.includes("Tap the screen"));
-  assert(match, "movement tip should fire on 5th move");
+  assert(match, "movement tip should fire on 8th move");
+  clearGuideStorage();
+});
+
+Deno.test("pet_companion tip fires on pet:deliver", () => {
+  const { world, bubbles } = setup();
+
+  world.emit("pet:deliver", { petId: 77, itemId: 99 });
+  const match = bubbles.find((b) => b.text.includes("companion"));
+  assert(match, "pet_companion tip should fire when pet delivers an item");
+  clearGuideStorage();
+});
+
+Deno.test("quick_items tip fires on consumable pickup", () => {
+  const { world, playerId, bubbles } = setup();
+
+  // Create a potion entity for the identity check.
+  const potionId = world.create();
+  world.add(potionId, NamedIdentity, { identity: "potion_heal", name: "Healing Potion" });
+
+  world.emit("item:pickup", { actor: playerId, itemId: potionId, count: 1, itemX: 5, itemY: 5 });
+  const match = bubbles.find((b) => b.text.includes("pinned items"));
+  assert(match, "quick_items tip should fire on consumable pickup");
   clearGuideStorage();
 });
 
@@ -148,20 +149,20 @@ Deno.test("first_pickup tip fires on item:pickup", () => {
   clearGuideStorage();
 });
 
-Deno.test("first_combat tip fires when player takes damage", () => {
+Deno.test("first_combat tip fires when enemy spots player", () => {
   const { world, playerId, bubbles } = setup();
 
-  world.emit("damaged", { target: playerId, source: 42, amount: 5, type: "physical", cause: "melee", critical: false });
+  world.emit("status", { id: 42, kind: "alert", at: { x: 8, y: 5 } });
   const match = bubbles.find((b) => b.text.includes("enemy"));
-  assert(match, "first_combat tip should fire when player is damaged");
+  assert(match, "first_combat tip should fire on enemy alert");
   clearGuideStorage();
 });
 
 Deno.test("low_hp tip fires when player HP drops below 40%", () => {
   const { world, playerId, bubbles } = setup();
 
-  // Fire first_combat first so it doesn't shadow.
-  world.emit("damaged", { target: playerId, source: 42, amount: 5, type: "physical", cause: "melee", critical: false });
+  // Fire first_combat first via enemy alert so it doesn't shadow.
+  world.emit("status", { id: 42, kind: "alert", at: { x: 8, y: 5 } });
 
   // Bring HP low.
   const vit = world.get(playerId, Vitality);
@@ -225,9 +226,9 @@ Deno.test("first_equip tip fires on item:equipped", () => {
 Deno.test("wait_action tip fires after first_combat is seen", () => {
   const { world, playerId, bubbles } = setup();
 
-  // wait_action should NOT fire before first_combat is seen.
-  world.emit("damaged", { target: playerId, source: 42, amount: 3, type: "physical", cause: "melee", critical: false });
-  // first_combat fires here. Now next damage should trigger wait_action.
+  // Fire first_combat via enemy alert.
+  world.emit("status", { id: 42, kind: "alert", at: { x: 8, y: 5 } });
+  // Now damage should trigger wait_action.
   world.emit("damaged", { target: playerId, source: 42, amount: 3, type: "physical", cause: "melee", critical: false });
   const match = bubbles.find((b) => b.text.includes("Wait"));
   assert(match, "wait_action tip should fire after first_combat is seen");
