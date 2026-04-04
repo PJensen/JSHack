@@ -861,6 +861,7 @@ _bootDoneUnits = _bootDungeonBase + _bootChunkUnits;
 updateBootProgress(`Dungeon ready (${_bootChunkUnits} chunks)`, _bootDoneUnits);
 
 let _savegameLoaded = false;
+let _tutorialDisabledThisSession = false;
 if (_pendingSavegame) {
   updateBootProgress("Applying save snapshot...", _bootDoneUnits);
   try {
@@ -904,10 +905,16 @@ function _finalizeNewGame(classData) {
   const classDef = classData ? getClass(classData.classId) : null;
 
   // Apply tutorial preference from character creation.
-  // ON:  leave localStorage alone — guide resumes from wherever the player left off.
-  // OFF: mark every tip as seen so the guide never activates.
-  if (classData && classData.tutorial === false) {
-    try { localStorage.setItem(GUIDE_STORAGE_KEY, JSON.stringify(GUIDANCE_TIPS.map(t => t.id))); } catch {}
+  // ON + all complete: reset localStorage → full replay.
+  // ON + partial:     leave alone → resume where they left off.
+  // OFF:              don't touch storage → just skip this session. Tips stay for next time.
+  if (classData && classData.tutorial === true) {
+    const seen = readSeenTips();
+    if (seen.size >= GUIDANCE_TIPS.length) {
+      try { localStorage.removeItem(GUIDE_STORAGE_KEY); } catch {}
+    }
+  } else if (classData && classData.tutorial === false) {
+    _tutorialDisabledThisSession = true;
   }
 
   // Apply difficulty settings from character creation
@@ -4293,8 +4300,9 @@ const flyingFx = createFlyingFxController(world);
 flyingFx.installListeners();
 const slideFx = createSlideFxController();
 
-// Spirit guide tutorial — only on new games, only when tips remain unseen.
-if (!_savegameLoaded) {
+// Spirit guide tutorial — only on new games, only when tips remain unseen,
+// and only if the player didn't uncheck Tutorial at character creation.
+if (!_savegameLoaded && !_tutorialDisabledThisSession) {
   const seenTips = readSeenTips();
   const hasUnseen = GUIDANCE_TIPS.some((t) => !seenTips.has(t.id));
   if (hasUnseen) {
