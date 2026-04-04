@@ -151,16 +151,20 @@ export function createDeathVfxController() {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalCompositeOperation = "source-over";
 
+    // Use physical canvas dimensions so the tint covers the full canvas on
+    // high-DPR screens where canvas.width/height > CSS W/H.
+    const pW = ctx.canvas.width, pH = ctx.canvas.height;
+
     // Radial gradient: transparent center → red edges
-    const cx = W / 2, cy = H / 2;
-    const outerR = Math.max(W, H) * 0.75;
-    const innerR = Math.min(W, H) * 0.25;
+    const cx = pW / 2, cy = pH / 2;
+    const outerR = Math.max(pW, pH) * 0.75;
+    const innerR = Math.min(pW, pH) * 0.25;
     const grad = ctx.createRadialGradient(cx, cy, innerR, cx, cy, outerR);
     grad.addColorStop(0, "rgba(0,0,0,0)");
     grad.addColorStop(0.5, `rgba(80,0,0,${(intensity * 0.4).toFixed(3)})`);
     grad.addColorStop(1, `rgba(120,8,8,${(intensity * 0.75).toFixed(3)})`);
     ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, W, H);
+    ctx.fillRect(0, 0, pW, pH);
     ctx.restore();
   }
 
@@ -184,14 +188,14 @@ export function createDeathVfxController() {
       const a = (1 - t / 0.15) * 0.6;
       ctx.globalCompositeOperation = "source-over";
       ctx.fillStyle = `rgba(255,255,255,${a.toFixed(3)})`;
-      ctx.fillRect(0, 0, W, H);
+      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
     } else {
       // Crimson fade
       const k = (t - 0.15) / 0.85; // 0→1
       const a = (1 - k) * 0.35;
       ctx.globalCompositeOperation = "source-over";
       ctx.fillStyle = `rgba(140,10,10,${a.toFixed(3)})`;
-      ctx.fillRect(0, 0, W, H);
+      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
     }
 
     ctx.restore();
@@ -226,7 +230,7 @@ export function createDeathVfxController() {
     // Grey fill in saturation mode desaturates the image beneath
     const grey = Math.round(128 + 20 * (1 - amount)); // slightly brighter grey
     ctx.fillStyle = `rgba(${grey},${grey},${grey},${(amount * 0.65).toFixed(3)})`;
-    ctx.fillRect(0, 0, W, H);
+    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
     ctx.restore();
   }
 
