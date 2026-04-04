@@ -352,24 +352,37 @@ export function createSceneRuntime({
     if (!world.isAlive(bubble.entityId)) return;
 
     // resolveAnchor allows VFX-space anchoring (e.g. spirit wisp position).
-    let anchorPos = null;
+    let liveAnchorPos = null;
     if (typeof bubble.resolveAnchor === "function") {
-      anchorPos = bubble.resolveAnchor();
+      liveAnchorPos = bubble.resolveAnchor();
     }
-    if (!anchorPos) {
-      anchorPos = world.get(bubble.entityId, Position);
+    if (!liveAnchorPos) {
+      liveAnchorPos = world.get(bubble.entityId, Position);
     }
-    if (!anchorPos) return;
+    if (!liveAnchorPos) return;
+
+    // Lock the bubble position on first visible frame so it doesn't jitter
+    // with the wisp's movement. The tether line still tracks the live position.
+    if (!bubble._lockedAnchor && typeof bubble.resolveAnchor === "function") {
+      bubble._lockedAnchor = { x: Number(liveAnchorPos.x || 0), y: Number(liveAnchorPos.y || 0) };
+    }
+    const bubbleAnchorPos = bubble._lockedAnchor || liveAnchorPos;
 
     const canvas = getCanvas();
     const canvasSetup = getCanvasSetup();
     const cam = getCam();
-    const anchor = { x: Number(anchorPos.x || 0), y: Number(anchorPos.y || 0) - 0.68 };
+    const anchor = { x: Number(bubbleAnchorPos.x || 0), y: Number(bubbleAnchorPos.y || 0) - 0.68 };
     const logicalCanvas = getLogicalCanvasSize(canvas, canvasSetup.cssW, canvasSetup.cssH);
     const projected = projectBubbleAnchor(cam, anchor, logicalCanvas, { left: 0, top: 0 });
     const dprScale = Math.max(1, canvas.width / Math.max(1, logicalCanvas.width));
     const sx = projected.localX * dprScale;
     const sy = projected.localY * dprScale;
+
+    // Live wisp position for the tether line endpoint.
+    const liveAnchor = { x: Number(liveAnchorPos.x || 0), y: Number(liveAnchorPos.y || 0) - 0.68 };
+    const liveProjected = projectBubbleAnchor(cam, liveAnchor, logicalCanvas, { left: 0, top: 0 });
+    const liveSx = liveProjected.localX * dprScale;
+    const liveSy = liveProjected.localY * dprScale;
     const padX = 12 * dprScale;
     const maxWidth = Math.min(logicalCanvas.width * 0.44, 360) * dprScale;
     const text = bubble.text;
@@ -402,8 +415,12 @@ export function createSceneRuntime({
     const alpha = 0.78 + (fade * 0.22);
     const tailTipX = Math.round(sx - (2 * dprScale));
     const tailTipY = boxY + boxH + tailH;
-    const lineDx = sx - tailTipX;
-    const lineDy = sy - tailTipY;
+    // Tether line targets the live wisp position (tracks movement)
+    // while the bubble box itself stays locked in place.
+    const tetherX = bubble._lockedAnchor ? liveSx : sx;
+    const tetherY = bubble._lockedAnchor ? liveSy : sy;
+    const lineDx = tetherX - tailTipX;
+    const lineDy = tetherY - tailTipY;
     const lineDist = Math.hypot(lineDx, lineDy);
 
     if (lineDist > (8 * dprScale)) {
@@ -413,7 +430,7 @@ export function createSceneRuntime({
       ctx.setLineDash([Math.max(5, 7 * dprScale), Math.max(4, 6 * dprScale)]);
       ctx.beginPath();
       ctx.moveTo(tailTipX, tailTipY);
-      ctx.lineTo(sx, sy);
+      ctx.lineTo(tetherX, tetherY);
       ctx.stroke();
 
       ctx.fillStyle = `rgba(252,248,238,${Math.min(1, alpha + 0.16).toFixed(3)})`;
@@ -421,7 +438,7 @@ export function createSceneRuntime({
       ctx.lineWidth = Math.max(1.5, 2.5 * dprScale);
       ctx.setLineDash([]);
       ctx.beginPath();
-      ctx.arc(sx, sy, Math.max(4, 5 * dprScale), 0, Math.PI * 2);
+      ctx.arc(tetherX, tetherY, Math.max(4, 5 * dprScale), 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
       ctx.restore();
