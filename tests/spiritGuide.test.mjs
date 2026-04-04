@@ -103,18 +103,39 @@ Deno.test("welcome tip fires on first player move", () => {
   clearGuideStorage();
 });
 
-Deno.test("movement tip fires after 4 player moves", () => {
+Deno.test("pet_companion tip fires on 2nd move", () => {
+  const { world, playerId, bubbles } = setup();
+
+  world.emit("moved", { id: playerId, from: { x: 5, y: 5 }, to: { x: 6, y: 5 } });
+  world.emit("moved", { id: playerId, from: { x: 6, y: 5 }, to: { x: 7, y: 5 } });
+  const match = bubbles.find((b) => b.text.includes("companion"));
+  assert(match, "pet_companion tip should fire on 2nd move");
+  clearGuideStorage();
+});
+
+Deno.test("quick_items tip fires on 3rd move", () => {
   const { world, playerId, bubbles } = setup();
 
   for (let i = 0; i < 3; i++) {
     world.emit("moved", { id: playerId, from: { x: 5 + i, y: 5 }, to: { x: 6 + i, y: 5 } });
   }
-  assertEquals(bubbles.filter((b) => b.text.includes("Tap the screen")).length, 0,
-    "should not fire before 4 moves");
+  const match = bubbles.find((b) => b.text.includes("pinned items"));
+  assert(match, "quick_items tip should fire on 3rd move");
+  clearGuideStorage();
+});
 
-  world.emit("moved", { id: playerId, from: { x: 8, y: 5 }, to: { x: 9, y: 5 } });
+Deno.test("movement tip fires after 5 player moves", () => {
+  const { world, playerId, bubbles } = setup();
+
+  for (let i = 0; i < 4; i++) {
+    world.emit("moved", { id: playerId, from: { x: 5 + i, y: 5 }, to: { x: 6 + i, y: 5 } });
+  }
+  assertEquals(bubbles.filter((b) => b.text.includes("Tap the screen")).length, 0,
+    "should not fire before 5 moves");
+
+  world.emit("moved", { id: playerId, from: { x: 9, y: 5 }, to: { x: 10, y: 5 } });
   const match = bubbles.find((b) => b.text.includes("Tap the screen"));
-  assert(match, "movement tip should fire on 4th move");
+  assert(match, "movement tip should fire on 5th move");
   clearGuideStorage();
 });
 
@@ -189,6 +210,40 @@ Deno.test("guide mode enabled when tips remain, and emits guidance:pulse", () =>
 
   world.emit("dungeon:transitioned", { depth: 1, pos: { x: 5, y: 5 } });
   assert(pulsed, "guidance:pulse should be emitted when a tip fires");
+  clearGuideStorage();
+});
+
+Deno.test("first_equip tip fires on item:equipped", () => {
+  const { world, playerId, bubbles } = setup();
+
+  world.emit("item:equipped", { actor: playerId, itemId: 50, slot: "weapon", name: "Sword" });
+  const match = bubbles.find((b) => b.text.includes("character sheet"));
+  assert(match, "first_equip tip should fire on item:equipped");
+  clearGuideStorage();
+});
+
+Deno.test("wait_action tip fires after first_combat is seen", () => {
+  const { world, playerId, bubbles } = setup();
+
+  // wait_action should NOT fire before first_combat is seen.
+  world.emit("damaged", { target: playerId, source: 42, amount: 3, type: "physical", cause: "melee", critical: false });
+  // first_combat fires here. Now next damage should trigger wait_action.
+  world.emit("damaged", { target: playerId, source: 42, amount: 3, type: "physical", cause: "melee", critical: false });
+  const match = bubbles.find((b) => b.text.includes("Wait"));
+  assert(match, "wait_action tip should fire after first_combat is seen");
+  clearGuideStorage();
+});
+
+Deno.test("spell_select tip fires on second spell learned", () => {
+  const { world, playerId, bubbles } = setup();
+
+  world.emit("spell:learned", { actor: playerId, spellId: "frost" });
+  assertEquals(bubbles.filter((b) => b.text.includes("multiple spells")).length, 0,
+    "should not fire on first spell");
+
+  world.emit("spell:learned", { actor: playerId, spellId: "agony" });
+  const match = bubbles.find((b) => b.text.includes("multiple spells"));
+  assert(match, "spell_select tip should fire on second spell:learned");
   clearGuideStorage();
 });
 

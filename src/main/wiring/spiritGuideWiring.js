@@ -150,16 +150,18 @@ export function installSpiritGuideWiring({
     return best;
   }
 
-  // ── Welcome + Movement ────────────────────────────────────────────────
+  // ── Welcome + Movement + Pet + Quick Items ────────────────────────────
 
-  // Welcome fires on the player's very first move (with a bubble delay).
-  // Movement tip fires after 3 moves.
+  // Staggered on turn count so the player isn't overwhelmed.
+  // 1st move: welcome, 2nd: pet companion, 3rd: quick items, 5th: movement.
   world.on("moved", ({ id }) => {
     const pe = getPlayerEntity();
     if (!pe || Number(id || 0) !== pe.id) return;
     turnCount++;
     if (turnCount === 1) fire("welcome");
-    if (turnCount === 4) fire("movement");
+    if (turnCount === 2) fire("pet_companion");
+    if (turnCount === 3) fire("quick_items");
+    if (turnCount === 5) fire("movement");
   });
 
   // ── Item on ground (player walks near an item) ───────────────────────
@@ -198,6 +200,14 @@ export function installSpiritGuideWiring({
     fire("first_pickup");
   });
 
+  // ── First equip ──────────────────────────────────────────────────────
+
+  world.on("item:equipped", ({ actor }) => {
+    const pe = getPlayerEntity();
+    if (!pe || Number(actor || 0) !== pe.id) return;
+    fire("first_equip");
+  });
+
   // ── First combat (enemy deals or receives damage near player) ────────
 
   world.on("damaged", ({ target, source }) => {
@@ -219,6 +229,15 @@ export function installSpiritGuideWiring({
     if (!vit) return;
     const ratio = (Number(vit.hp) || 0) / Math.max(1, Number(vit.maxHp) || 1);
     if (ratio < 0.4 && ratio > 0) fire("low_hp");
+  });
+
+  // ── Wait action (fires once after first combat is done) ──────────────
+
+  world.on("damaged", ({ target }) => {
+    if (seen.has("wait_action") || !seen.has("first_combat")) return;
+    const pe = getPlayerEntity();
+    if (!pe || Number(target || 0) !== pe.id) return;
+    fire("wait_action");
   });
 
   // ── First stair (dungeon transition) ─────────────────────────────────
@@ -247,6 +266,17 @@ export function installSpiritGuideWiring({
     const pe = getPlayerEntity();
     if (!pe || Number(actor || 0) !== pe.id) return;
     fire("first_spell");
+  });
+
+  // ── Spell selection (second spell learned) ────────────────────────────
+
+  let spellCount = 0;
+  world.on("spell:learned", ({ actor }) => {
+    if (seen.has("spell_select")) return;
+    const pe = getPlayerEntity();
+    if (!pe || Number(actor || 0) !== pe.id) return;
+    spellCount++;
+    if (spellCount >= 2) fire("spell_select");
   });
 
   // Enable guide mode on the wisp so it appears on the overworld.

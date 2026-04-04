@@ -15,6 +15,7 @@
 
 /** @type {GuidanceTip[]} */
 export const GUIDANCE_TIPS = [
+  // ── Early game (overworld, first steps) ───────────────────────────
   {
     id: "welcome",
     text: "I am a spirit of these lands. Stay close \u2014 I'll show you the way.",
@@ -27,6 +28,22 @@ export const GUIDANCE_TIPS = [
     durationSec: 5,
     delaySec: 0.4,
   },
+  {
+    id: "pet_companion",
+    text: "Your companion follows you and fetches nearby items. Tap the Pet button to give commands.",
+    durationSec: 5.5,
+    delaySec: 0.6,
+    pointTo: "#btn-pet",
+  },
+  {
+    id: "quick_items",
+    text: "These are your pinned items \u2014 tap one to use it. Hold to browse details.",
+    durationSec: 5.5,
+    delaySec: 0.5,
+    pointTo: "#hud-pinned-items",
+  },
+
+  // ── Items & inventory ─────────────────────────────────────────────
   {
     id: "item_ground",
     text: "Something on the ground! Double-tap it or press \u201c,\u201d to pick it up.",
@@ -41,6 +58,15 @@ export const GUIDANCE_TIPS = [
     delaySec: 0.6,
     pointTo: "#btn-bag",
   },
+  {
+    id: "first_equip",
+    text: "You equipped something! Open your character sheet to see your stats and gear.",
+    durationSec: 5,
+    delaySec: 0.5,
+    pointTo: "#btn-character-sheet",
+  },
+
+  // ── Combat ────────────────────────────────────────────────────────
   {
     id: "first_combat",
     text: "An enemy! Walk into it to attack. Watch your HP in the top-right gauge.",
@@ -57,6 +83,15 @@ export const GUIDANCE_TIPS = [
     pointTo: "#hud-pinned-items",
   },
   {
+    id: "wait_action",
+    text: "Press \u201c.\u201d or tap Wait to skip a turn. Useful for resting or letting enemies come to you.",
+    durationSec: 5,
+    delaySec: 0.8,
+    pointTo: "#btn-wait",
+  },
+
+  // ── Exploration ───────────────────────────────────────────────────
+  {
     id: "first_stair",
     text: "Stairs lead deeper into the dungeon. Step on them and tap the tooltip to descend.",
     durationSec: 5.5,
@@ -70,6 +105,8 @@ export const GUIDANCE_TIPS = [
     delaySec: 0.5,
     flyTo: "npc",
   },
+
+  // ── Deity & magic ─────────────────────────────────────────────────
   {
     id: "first_altar",
     text: "A sacred altar. Pray here or offer items to earn your deity's favor.",
@@ -84,6 +121,13 @@ export const GUIDANCE_TIPS = [
     durationSec: 5,
     delaySec: 0.6,
     pointTo: "#active-spell",
+  },
+  {
+    id: "spell_select",
+    text: "You know multiple spells now. Tap Spells to choose which one is active.",
+    durationSec: 5,
+    delaySec: 0.6,
+    pointTo: "#btn-spell-select",
   },
 ];
 
