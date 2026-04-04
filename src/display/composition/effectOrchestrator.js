@@ -42,6 +42,22 @@ export function drawWorldEffects({ bctx, worldView, glyphAtlas, boltFx, spellAre
   if (typeof spellAreaFx.drawSearchPulse === "function") {
     spellAreaFx.drawSearchPulse(bctx);
   }
+  // Class ability VFX
+  if (typeof spellAreaFx.drawCleave === "function") {
+    spellAreaFx.drawCleave(bctx);
+  }
+  if (typeof spellAreaFx.drawWarCry === "function") {
+    spellAreaFx.drawWarCry(bctx);
+  }
+  if (typeof spellAreaFx.drawDivineShield === "function") {
+    spellAreaFx.drawDivineShield(bctx);
+  }
+  if (typeof spellAreaFx.drawConsecrate === "function") {
+    spellAreaFx.drawConsecrate(bctx);
+  }
+  if (typeof spellAreaFx.drawSmokeBomb === "function") {
+    spellAreaFx.drawSmokeBomb(bctx);
+  }
   projectileFx.draw(bctx);
   if (spiritWispFx) spiritWispFx.draw(bctx);
   if (typeof cloudFx.drawFire === "function") {

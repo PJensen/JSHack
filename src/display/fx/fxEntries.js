@@ -162,6 +162,33 @@ export class SearchPulseFx extends FxEntry {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Arc sweep — for cleave-style melee AoE (center + angular sweep arc).
+// ---------------------------------------------------------------------------
+export class ArcSweepFx extends FxEntry {
+  constructor({ x, y, startAngle, sweepAngle, radius, ttl, color }) {
+    super(ttl);
+    this.x = x;
+    this.y = y;
+    this.startAngle = startAngle;
+    this.sweepAngle = sweepAngle;
+    this.radius = radius;
+    this.color = color; // [r,g,b]
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Smoke cloud — expanding translucent disc (smoke bomb, fog).
+// ---------------------------------------------------------------------------
+export class SmokeFx extends FxEntry {
+  constructor({ x, y, radius, ttl }) {
+    super(ttl);
+    this.x = x;
+    this.y = y;
+    this.radius = radius;
+  }
+}
+
 export class BubblePopFx extends FxEntry {
   constructor({ x, y, ttl, r0, r1, rise, phase }) {
     super(ttl);

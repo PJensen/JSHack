@@ -4,7 +4,7 @@
 import { startShake, startSlamShake } from "../camera/shake.js";
 import { pathPolyline, jitterLine } from "./fxGeom.js";
 import { Particle } from "../passes/vfx/particles/particlePool.js";
-import { RadialFx, BlinkFx, PhaseStrikeFx, SearchPulseFx } from "./fxEntries.js";
+import { RadialFx, BlinkFx, PhaseStrikeFx, SearchPulseFx, ArcSweepFx, SmokeFx } from "./fxEntries.js";
 
 /**
  * @param {{ world: import('../../lib/ecs-js/index.js').World, cam: object, fx: { pool: { spawn(o:object):void } }, PERF: { quality: string }, getFxTime: () => number, getPosition?: (id:number) => ({x:number,y:number}|null), ftext?: { addDamage: Function, addStatus?: Function }, sculptFloor?: ((x:number,y:number,delta:number,reliefKey?: string|number)=>void), sculptFloorBrush?: ((x:number,y:number,delta:number,radius:number,opts?:object,reliefKey?:string|number)=>void), getActiveReliefKey?: (() => (string|number|null|undefined)) }} deps
@@ -188,6 +188,18 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
   /** @type {RadialFx[]} */
   const _rampageFx = [];
 
+  // --- Class ability VFX state ---
+  /** @type {ArcSweepFx[]} */
+  const _cleaveFx = [];
+  /** @type {RadialFx[]} */
+  const _warCryFx = [];
+  /** @type {RadialFx[]} */
+  const _divineShieldFx = [];
+  /** @type {RadialFx[]} */
+  const _consecrateFx = [];
+  /** @type {SmokeFx[]} */
+  const _smokeBombFx = [];
+
   // --- Search pulse state ---
   /** @type {SearchPulseFx[]} */
   const _searchPulseFx = [];
@@ -366,6 +378,26 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
     for (let i = _searchPulseFx.length - 1; i >= 0; i--) {
       _searchPulseFx[i].tick(dt);
       if (_searchPulseFx[i].expired) _searchPulseFx.splice(i, 1);
+    }
+    for (let i = _cleaveFx.length - 1; i >= 0; i--) {
+      _cleaveFx[i].tick(dt);
+      if (_cleaveFx[i].expired) _cleaveFx.splice(i, 1);
+    }
+    for (let i = _warCryFx.length - 1; i >= 0; i--) {
+      _warCryFx[i].tick(dt);
+      if (_warCryFx[i].expired) _warCryFx.splice(i, 1);
+    }
+    for (let i = _divineShieldFx.length - 1; i >= 0; i--) {
+      _divineShieldFx[i].tick(dt);
+      if (_divineShieldFx[i].expired) _divineShieldFx.splice(i, 1);
+    }
+    for (let i = _consecrateFx.length - 1; i >= 0; i--) {
+      _consecrateFx[i].tick(dt);
+      if (_consecrateFx[i].expired) _consecrateFx.splice(i, 1);
+    }
+    for (let i = _smokeBombFx.length - 1; i >= 0; i--) {
+      _smokeBombFx[i].tick(dt);
+      if (_smokeBombFx[i].expired) _smokeBombFx.splice(i, 1);
     }
     const step = currentStep();
     for (const [k, h] of _impactWarmTiles) {
@@ -799,6 +831,203 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
       const glowR = 0.3 + t * 0.8;
       ctx.fillStyle = `rgba(255,100,20,${(0.2 * alpha * pulse).toFixed(3)})`;
       ctx.beginPath(); ctx.arc(eff.x, eff.y, glowR, 0, TAU); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // --- Draw: Cleave (arc sweep) ---
+  /** @param {CanvasRenderingContext2D} ctx */
+  function drawCleave(ctx) {
+    if (!_cleaveFx.length) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const _fxTime = getFxTime();
+    for (const eff of _cleaveFx) {
+      const t = eff.progress;
+      const alpha = eff.alpha;
+      const [cr, cg, cb] = eff.color || [255, 220, 200];
+
+      // Animated sweep: arc grows from startAngle through sweepAngle over lifetime
+      const sweepProgress = Math.min(1, t * 2.5); // complete sweep in first 40% of lifetime
+      const currentSweep = eff.sweepAngle * sweepProgress;
+      const R = eff.radius * (0.6 + t * 0.4);
+
+      // Outer glow arc
+      ctx.strokeStyle = `rgba(${cr},${cg},${cb},${(0.35 * alpha).toFixed(3)})`;
+      ctx.lineWidth = 0.28 + 0.12 * (1 - t);
+      ctx.beginPath();
+      ctx.arc(eff.x, eff.y, R + 0.15, eff.startAngle, eff.startAngle + currentSweep);
+      ctx.stroke();
+
+      // Bright inner arc (the slash)
+      ctx.strokeStyle = `rgba(255,250,240,${(0.8 * alpha * (1 - t * 0.4)).toFixed(3)})`;
+      ctx.lineWidth = 0.14 + 0.08 * (1 - t);
+      ctx.beginPath();
+      ctx.arc(eff.x, eff.y, R, eff.startAngle, eff.startAngle + currentSweep);
+      ctx.stroke();
+
+      // Leading edge spark
+      if (sweepProgress < 1) {
+        const edgeAngle = eff.startAngle + currentSweep;
+        const ex = eff.x + Math.cos(edgeAngle) * R;
+        const ey = eff.y + Math.sin(edgeAngle) * R;
+        const pulse = 0.6 + 0.4 * Math.sin(_fxTime * 22 + eff.startAngle);
+        ctx.fillStyle = `rgba(255,255,255,${(0.7 * alpha * pulse).toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(ex, ey, 0.12, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+
+  // --- Draw: War Cry (shockwave ring) ---
+  /** @param {CanvasRenderingContext2D} ctx */
+  function drawWarCry(ctx) {
+    if (!_warCryFx.length) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const TAU = Math.PI * 2;
+    const _fxTime = getFxTime();
+    for (const eff of _warCryFx) {
+      const t = eff.progress;
+      const alpha = eff.alpha;
+      const maxR = eff.radius + 0.5;
+
+      // Inner red flash (brief)
+      if (t < 0.2) {
+        const ft = t / 0.2;
+        const flashA = 0.6 * (1 - ft) * alpha;
+        ctx.fillStyle = `rgba(255,60,20,${flashA.toFixed(3)})`;
+        ctx.beginPath(); ctx.arc(eff.x, eff.y, 0.3 + ft * 0.5, 0, TAU); ctx.fill();
+      }
+
+      // Expanding shockwave ring (red-orange)
+      const ringR = t * maxR;
+      const ringW = Math.max(0.04, 0.22 * (1 - t * 0.6));
+      ctx.strokeStyle = `rgba(255,80,30,${(0.7 * alpha).toFixed(3)})`;
+      ctx.lineWidth = ringW;
+      ctx.beginPath(); ctx.arc(eff.x, eff.y, ringR, 0, TAU); ctx.stroke();
+
+      // Secondary thinner ring (slightly behind)
+      const ring2R = Math.max(0, ringR - 0.35);
+      if (ring2R > 0) {
+        ctx.strokeStyle = `rgba(255,140,50,${(0.4 * alpha).toFixed(3)})`;
+        ctx.lineWidth = Math.max(0.02, ringW * 0.5);
+        ctx.beginPath(); ctx.arc(eff.x, eff.y, ring2R, 0, TAU); ctx.stroke();
+      }
+
+      // Pulsing center glow
+      const pulse = 0.5 + 0.5 * Math.sin(_fxTime * 14 + eff.x);
+      const glowA = 0.15 * alpha * pulse * (1 - t);
+      ctx.fillStyle = `rgba(255,100,30,${glowA.toFixed(3)})`;
+      ctx.beginPath(); ctx.arc(eff.x, eff.y, 0.4, 0, TAU); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // --- Draw: Divine Shield (golden dome) ---
+  /** @param {CanvasRenderingContext2D} ctx */
+  function drawDivineShield(ctx) {
+    if (!_divineShieldFx.length) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const TAU = Math.PI * 2;
+    const _fxTime = getFxTime();
+    for (const eff of _divineShieldFx) {
+      const t = eff.progress;
+      const alpha = eff.alpha;
+
+      // Expanding golden dome ring
+      const ringR = 0.3 + t * 1.0;
+      const pulse = 0.6 + 0.4 * Math.sin(_fxTime * 10 + eff.y * 0.6);
+      ctx.strokeStyle = `rgba(255,220,80,${(0.7 * alpha * pulse).toFixed(3)})`;
+      ctx.lineWidth = Math.max(0.06, 0.18 * (1 - t * 0.5));
+      ctx.beginPath(); ctx.arc(eff.x, eff.y, ringR, 0, TAU); ctx.stroke();
+
+      // Inner golden glow disc
+      const discA = 0.25 * alpha * (1 - t * 0.6);
+      ctx.fillStyle = `rgba(255,240,150,${discA.toFixed(3)})`;
+      ctx.beginPath(); ctx.arc(eff.x, eff.y, ringR * 0.6, 0, TAU); ctx.fill();
+
+      // White center flash (brief)
+      if (t < 0.15) {
+        const ft = t / 0.15;
+        ctx.fillStyle = `rgba(255,255,230,${(0.8 * (1 - ft)).toFixed(3)})`;
+        ctx.beginPath(); ctx.arc(eff.x, eff.y, 0.35 * (1 - ft * 0.3), 0, TAU); ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+
+  // --- Draw: Consecrate (holy ground glow) ---
+  /** @param {CanvasRenderingContext2D} ctx */
+  function drawConsecrate(ctx) {
+    if (!_consecrateFx.length) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const TAU = Math.PI * 2;
+    const _fxTime = getFxTime();
+    for (const eff of _consecrateFx) {
+      const t = eff.progress;
+      const alpha = eff.alpha;
+      const R = eff.radius + 0.3;
+      const pulse = 0.55 + 0.45 * Math.sin(_fxTime * 6 + eff.x * 0.4);
+
+      // Ground glow disc (sustained, golden)
+      const discA = 0.18 * alpha * pulse;
+      ctx.fillStyle = `rgba(255,210,60,${discA.toFixed(3)})`;
+      ctx.beginPath(); ctx.arc(eff.x, eff.y, R, 0, TAU); ctx.fill();
+
+      // Ring border
+      ctx.strokeStyle = `rgba(255,220,80,${(0.4 * alpha).toFixed(3)})`;
+      ctx.lineWidth = Math.max(0.03, 0.08 * (1 - t * 0.3));
+      ctx.beginPath(); ctx.arc(eff.x, eff.y, R, 0, TAU); ctx.stroke();
+
+      // Cross pattern on ground (holy symbol)
+      const crossA = 0.12 * alpha * pulse;
+      ctx.strokeStyle = `rgba(255,240,180,${crossA.toFixed(3)})`;
+      ctx.lineWidth = 0.06;
+      ctx.beginPath();
+      ctx.moveTo(eff.x - R * 0.6, eff.y); ctx.lineTo(eff.x + R * 0.6, eff.y);
+      ctx.moveTo(eff.x, eff.y - R * 0.6); ctx.lineTo(eff.x, eff.y + R * 0.6);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // --- Draw: Smoke Bomb (expanding gray cloud) ---
+  /** @param {CanvasRenderingContext2D} ctx */
+  function drawSmokeBomb(ctx) {
+    if (!_smokeBombFx.length) return;
+    ctx.save();
+    const TAU = Math.PI * 2;
+    const _fxTime = getFxTime();
+    for (const eff of _smokeBombFx) {
+      const t = eff.progress;
+      const alpha = eff.alpha;
+      const maxR = eff.radius + 0.5;
+
+      // Expanding translucent smoke disc (normal composite for opacity)
+      ctx.globalCompositeOperation = 'source-over';
+      const discR = (0.3 + t * 0.7) * maxR;
+      const discA = Math.min(0.35, 0.35 * alpha * (1 - t * 0.3));
+      ctx.fillStyle = `rgba(80,80,90,${discA.toFixed(3)})`;
+      ctx.beginPath(); ctx.arc(eff.x, eff.y, discR, 0, TAU); ctx.fill();
+
+      // Swirling ring (lighter for glow)
+      ctx.globalCompositeOperation = 'lighter';
+      const ringR = t * maxR;
+      const swirl = _fxTime * 4 + eff.x;
+      ctx.strokeStyle = `rgba(140,140,150,${(0.3 * alpha).toFixed(3)})`;
+      ctx.lineWidth = Math.max(0.04, 0.16 * (1 - t * 0.5));
+      ctx.beginPath(); ctx.arc(eff.x, eff.y, ringR, swirl, swirl + Math.PI * 1.2); ctx.stroke();
+
+      // Wispy inner detail
+      const wispA = 0.15 * alpha * (1 - t);
+      ctx.strokeStyle = `rgba(180,180,190,${wispA.toFixed(3)})`;
+      ctx.lineWidth = 0.04;
+      ctx.beginPath(); ctx.arc(eff.x, eff.y, ringR * 0.5, swirl + Math.PI, swirl + Math.PI * 2); ctx.stroke();
     }
     ctx.restore();
   }
@@ -1793,6 +2022,300 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
       current.fadeLeft = current.fadeMax;
       current.endFlash = Math.max(Number(current.endFlash || 0), 0.16);
     });
+
+    // ── Class ability VFX ────────────────────────────────────────────────
+
+    world.on('spell:war_cry', ({ at, affected }) => {
+      if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
+      _warCryFx.push(new RadialFx({ x: at.x, y: at.y, radius: 3.5, ttl: 0.42 }));
+      // Red particle shockwave burst
+      const scale = PERF.quality === 'low' ? 0.65 : (PERF.quality === 'high' ? 1.25 : 1.0);
+      const count = Math.max(14, Math.round(28 * scale));
+      for (let i = 0; i < count; i++) {
+        const angle = (Math.PI * 2 * i / count) + (Math.random() - 0.5) * 0.45;
+        const speed = 1.2 + Math.random() * 2.0;
+        fx.pool.spawn(new Particle({
+          x: at.x + (Math.random() - 0.5) * 0.12,
+          y: at.y + (Math.random() - 0.5) * 0.12,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          life: 0.18 + Math.random() * 0.22,
+          size0: 0.10 + Math.random() * 0.06,
+          size1: 0.02,
+          r: 255, g: 70 + ((Math.random() * 50) | 0), b: 20 + ((Math.random() * 20) | 0),
+          a0: 0.85,
+        }));
+      }
+      startShake(cam, (affected || 0) > 0 ? 5 : 2, 0.16);
+    });
+
+    world.on('spell:cleave', ({ at, hits }) => {
+      if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
+      if (!hits || !hits.length) return;
+      // Determine sweep direction from hit positions → full 270° arc
+      let avgAngle = 0;
+      for (const h of hits) {
+        avgAngle += Math.atan2(h.y - at.y, h.x - at.x);
+      }
+      avgAngle /= hits.length;
+      const startAngle = avgAngle - Math.PI * 0.75; // 270° sweep centered on avg hit direction
+      _cleaveFx.push(new ArcSweepFx({
+        x: at.x, y: at.y,
+        startAngle,
+        sweepAngle: Math.PI * 1.5, // 270°
+        radius: 1.3,
+        ttl: 0.28,
+        color: [255, 200, 180],
+      }));
+      // Blood sparks at each hit
+      for (const h of hits) {
+        const count = PERF.quality === 'low' ? 4 : 8;
+        for (let i = 0; i < count; i++) {
+          const dx = h.x - at.x, dy = h.y - at.y;
+          const angle = Math.atan2(dy, dx) + (Math.random() - 0.5) * 1.2;
+          const speed = 0.4 + Math.random() * 1.0;
+          fx.pool.spawn(new Particle({
+            x: h.x, y: h.y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            ay: 0.15,
+            life: 0.12 + Math.random() * 0.16,
+            size0: 0.08 + Math.random() * 0.06,
+            size1: 0.02,
+            r: 255, g: 100 + ((Math.random() * 60) | 0), b: 80,
+            a0: 0.9,
+          }));
+        }
+      }
+      startShake(cam, 3, 0.10);
+    });
+
+    world.on('spell:bloodthirst', ({ at }) => {
+      if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
+      // Dark crimson aura pulse
+      _rampageFx.push(new RadialFx({ x: at.x, y: at.y, radius: 1.2, ttl: 0.45 }));
+      // Rising blood motes
+      const count = PERF.quality === 'low' ? 10 : 18;
+      for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 0.1 + Math.random() * 0.35;
+        fx.pool.spawn(new Particle({
+          x: at.x + (Math.random() - 0.5) * 0.6,
+          y: at.y + (Math.random() - 0.5) * 0.4,
+          vx: Math.cos(angle) * speed,
+          vy: -(0.3 + Math.random() * 0.5),
+          ay: -0.02,
+          life: 0.4 + Math.random() * 0.4,
+          size0: 0.06 + Math.random() * 0.04,
+          size1: 0.01,
+          r: 170 + ((Math.random() * 40) | 0), g: 10, b: 25 + ((Math.random() * 20) | 0),
+          a0: 0.8,
+        }));
+      }
+      startShake(cam, 2, 0.08);
+    });
+
+    world.on('proc:bloodthirst', ({ actor, target, healed }) => {
+      if (typeof getPosition !== "function") return;
+      const from = getPosition(Number(target || 0));
+      const to = getPosition(Number(actor || 0));
+      if (!from || !to) return;
+      // Red droplets flying from victim TO caster (life drain visual)
+      const count = Math.max(3, Math.min(8, (healed || 1) * 2));
+      for (let i = 0; i < count; i++) {
+        const dx = to.x - from.x, dy = to.y - from.y;
+        const dist = Math.hypot(dx, dy) || 1;
+        const speed = 2.0 + Math.random() * 1.5;
+        const spread = (Math.random() - 0.5) * 0.8;
+        fx.pool.spawn(new Particle({
+          x: from.x + (Math.random() - 0.5) * 0.2,
+          y: from.y + (Math.random() - 0.5) * 0.2,
+          vx: (dx / dist) * speed + spread,
+          vy: (dy / dist) * speed + spread - 0.3,
+          ay: 0.5,
+          life: 0.20 + Math.random() * 0.14,
+          size0: 0.09 + Math.random() * 0.05,
+          size1: 0.03,
+          r: 200, g: 20, b: 30 + ((Math.random() * 25) | 0),
+          a0: 0.9,
+        }));
+      }
+    });
+
+    world.on('spell:purify', ({ at, removed }) => {
+      if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
+      if (!removed) return;
+      // Golden upward burst
+      _flashHealFx.push(new RadialFx({ x: at.x, y: at.y, radius: 1.2, ttl: 0.38 }));
+      const scale = PERF.quality === 'low' ? 0.7 : 1.0;
+      // Rising golden sparkles (cleansing)
+      const goldCount = Math.max(10, Math.round(20 * scale));
+      for (let i = 0; i < goldCount; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 0.15 + Math.random() * 0.5;
+        fx.pool.spawn(new Particle({
+          x: at.x + (Math.random() - 0.5) * 0.5,
+          y: at.y + (Math.random() - 0.5) * 0.3,
+          vx: Math.cos(angle) * speed,
+          vy: -(0.5 + Math.random() * 0.8),
+          ay: -0.05,
+          life: 0.35 + Math.random() * 0.35,
+          size0: 0.07 + Math.random() * 0.04,
+          size1: 0.01,
+          r: 255, g: 230 + ((Math.random() * 25) | 0), b: 100 + ((Math.random() * 60) | 0),
+          a0: 0.9,
+        }));
+      }
+      // Dark corruption particles ejected outward (what's being removed)
+      const darkCount = Math.max(6, Math.round(removed * 4 * scale));
+      for (let i = 0; i < darkCount; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 0.8 + Math.random() * 1.2;
+        fx.pool.spawn(new Particle({
+          x: at.x + (Math.random() - 0.5) * 0.2,
+          y: at.y + (Math.random() - 0.5) * 0.2,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 0.4,
+          ay: 0.15,
+          life: 0.20 + Math.random() * 0.18,
+          size0: 0.08 + Math.random() * 0.04,
+          size1: 0.02,
+          r: 60 + ((Math.random() * 40) | 0), g: 30, b: 60 + ((Math.random() * 30) | 0),
+          a0: 0.75,
+        }));
+      }
+      startShake(cam, 2, 0.06);
+    });
+
+    world.on('spell:divine_shield', ({ at }) => {
+      if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
+      _divineShieldFx.push(new RadialFx({ x: at.x, y: at.y, radius: 1.4, ttl: 0.50 }));
+      // Orbiting golden sparkles
+      const count = PERF.quality === 'low' ? 12 : 22;
+      for (let i = 0; i < count; i++) {
+        const angle = (Math.PI * 2 * i / count);
+        const orbitR = 0.4 + Math.random() * 0.4;
+        const speed = 0.3 + Math.random() * 0.6;
+        fx.pool.spawn(new Particle({
+          x: at.x + Math.cos(angle) * orbitR,
+          y: at.y + Math.sin(angle) * orbitR,
+          vx: Math.cos(angle + Math.PI * 0.5) * speed,
+          vy: Math.sin(angle + Math.PI * 0.5) * speed - 0.15,
+          ay: -0.02,
+          life: 0.40 + Math.random() * 0.30,
+          size0: 0.07 + Math.random() * 0.04,
+          size1: 0.02,
+          r: 255, g: 220 + ((Math.random() * 30) | 0), b: 80 + ((Math.random() * 50) | 0),
+          a0: 0.85,
+        }));
+      }
+      startShake(cam, 2, 0.08);
+    });
+
+    world.on('spell:consecrate', ({ at, radius }) => {
+      if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
+      const r = Math.max(1, Number(radius || 2));
+      _consecrateFx.push(new RadialFx({ x: at.x, y: at.y, radius: r, ttl: 1.2 }));
+      // Burst of rising golden motes from the ground
+      const scale = PERF.quality === 'low' ? 0.6 : 1.0;
+      const count = Math.max(16, Math.round(32 * scale));
+      for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = Math.random() * r;
+        fx.pool.spawn(new Particle({
+          x: at.x + Math.cos(angle) * dist,
+          y: at.y + Math.sin(angle) * dist,
+          vx: (Math.random() - 0.5) * 0.15,
+          vy: -(0.3 + Math.random() * 0.6),
+          ay: -0.02,
+          life: 0.5 + Math.random() * 0.6,
+          size0: 0.05 + Math.random() * 0.04,
+          size1: 0.01,
+          r: 255, g: 210 + ((Math.random() * 40) | 0), b: 50 + ((Math.random() * 60) | 0),
+          a0: 0.75,
+        }));
+      }
+      startShake(cam, 3, 0.10);
+    });
+
+    world.on('spell:smoke_bomb', ({ at, affected }) => {
+      if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
+      _smokeBombFx.push(new SmokeFx({ x: at.x, y: at.y, radius: 3.5, ttl: 0.65 }));
+      // Gray billowing particles outward
+      const scale = PERF.quality === 'low' ? 0.6 : 1.0;
+      const count = Math.max(18, Math.round(36 * scale));
+      for (let i = 0; i < count; i++) {
+        const angle = (Math.PI * 2 * i / count) + (Math.random() - 0.5) * 0.5;
+        const speed = 0.6 + Math.random() * 1.8;
+        const gray = 100 + ((Math.random() * 80) | 0);
+        fx.pool.spawn(new Particle({
+          x: at.x + (Math.random() - 0.5) * 0.2,
+          y: at.y + (Math.random() - 0.5) * 0.2,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 0.15,
+          ay: -0.04,
+          life: 0.30 + Math.random() * 0.35,
+          size0: 0.14 + Math.random() * 0.10,
+          size1: 0.04,
+          r: gray, g: gray, b: gray + 10,
+          a0: 0.65,
+        }));
+      }
+      // Rising wispy tendrils
+      const wispCount = Math.max(8, Math.round(14 * scale));
+      for (let i = 0; i < wispCount; i++) {
+        fx.pool.spawn(new Particle({
+          x: at.x + (Math.random() - 0.5) * 1.2,
+          y: at.y + (Math.random() - 0.5) * 0.8,
+          vx: (Math.random() - 0.5) * 0.3,
+          vy: -(0.2 + Math.random() * 0.4),
+          ay: -0.01,
+          life: 0.5 + Math.random() * 0.4,
+          size0: 0.10 + Math.random() * 0.06,
+          size1: 0.03,
+          r: 140, g: 140, b: 150,
+          a0: 0.5,
+        }));
+      }
+      startShake(cam, (affected || 0) > 0 ? 3 : 1, 0.10);
+    });
+
+    world.on('spell:poison_blade', ({ at, fizzle }) => {
+      if (fizzle) return;
+      if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
+      // Green dripping particles falling from weapon area
+      const count = PERF.quality === 'low' ? 8 : 14;
+      for (let i = 0; i < count; i++) {
+        fx.pool.spawn(new Particle({
+          x: at.x + (Math.random() - 0.5) * 0.4,
+          y: at.y - 0.1 + Math.random() * 0.3,
+          vx: (Math.random() - 0.5) * 0.2,
+          vy: 0.2 + Math.random() * 0.5,
+          ay: 0.4,
+          life: 0.25 + Math.random() * 0.25,
+          size0: 0.06 + Math.random() * 0.04,
+          size1: 0.02,
+          r: 50 + ((Math.random() * 30) | 0), g: 200 + ((Math.random() * 50) | 0), b: 40,
+          a0: 0.85,
+        }));
+      }
+      // Brief green flash
+      const flashCount = PERF.quality === 'low' ? 4 : 8;
+      for (let i = 0; i < flashCount; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 0.2 + Math.random() * 0.4;
+        fx.pool.spawn(new Particle({
+          x: at.x, y: at.y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          life: 0.12 + Math.random() * 0.12,
+          size0: 0.05 + Math.random() * 0.03,
+          size1: 0.01,
+          r: 80, g: 255, b: 80,
+          a0: 0.7,
+        }));
+      }
+    });
   }
 
   /** Return active light sources for the lighting engine. */
@@ -1855,6 +2378,18 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
       const s = _searchPulseFx[i];
       out.push({ x: s.x, y: s.y, radius: 6 * s.alpha, color: [180, 220, 255] });
     }
+    for (let i = 0; i < _warCryFx.length; i++) {
+      const w = _warCryFx[i];
+      out.push({ x: w.x, y: w.y, radius: 4 * w.alpha, color: [255, 80, 30] });
+    }
+    for (let i = 0; i < _divineShieldFx.length; i++) {
+      const d = _divineShieldFx[i];
+      out.push({ x: d.x, y: d.y, radius: 4 * d.alpha, color: [255, 230, 120] });
+    }
+    for (let i = 0; i < _consecrateFx.length; i++) {
+      const c = _consecrateFx[i];
+      out.push({ x: c.x, y: c.y, radius: (c.radius || 2) * 2.5 * c.alpha, color: [255, 210, 60] });
+    }
     for (const [, ch] of _drainLifeChannels) {
       if (ch.from && ch.to) {
         out.push({ x: ch.to.x, y: ch.to.y, radius: 3, color: [255, 50, 50] });
@@ -1863,5 +2398,5 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
     return out;
   }
 
-  return { tick, drawBlink, drawMeteor, drawBlastwave, drawFlashHeal, drawSmite, drawPhaseStrike, drawRampage, drawSearchPulse, drawDrainLife, getActiveLights, installListeners };
+  return { tick, drawBlink, drawMeteor, drawBlastwave, drawFlashHeal, drawSmite, drawPhaseStrike, drawRampage, drawSearchPulse, drawDrainLife, drawCleave, drawWarCry, drawDivineShield, drawConsecrate, drawSmokeBomb, getActiveLights, installListeners };
 }
