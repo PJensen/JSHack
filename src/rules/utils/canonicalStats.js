@@ -63,5 +63,6 @@ export function resolveCanonicalStats(world, entityId) {
     visionRange: Number(resolved?.visionRange || 0) + Number(passive?.visionRangeDerived || 0),
     hungerRate: Number(resolved?.hungerRate || 0) + Number(passive?.hungerRateDerived || 0),
     staminaRegen: Number(resolved?.staminaRegen || 0) + Number(passive?.staminaRegenDerived || 0),
+    manaRegen: Number(resolved?.manaRegen || 0) + Number(passive?.manaRegenDerived || 0),
   });
 }

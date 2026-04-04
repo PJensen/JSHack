@@ -1530,6 +1530,10 @@ export function installMessageWiring({
     if (nameOfEntity(actor) !== 'You') return;
     log('Your stomach lurches violently. You feel poisoned!', 'danger');
   });
+  world.on('potion:lethargy', ({ actorId }) => {
+    if (nameOfEntity(actorId) !== 'You') return;
+    log('A wave of exhaustion washes over you. Your stamina recovery slows to a crawl.', 'danger');
+  });
 
   // ── Bad scroll messages ──────────────────────────────────────────────
   world.on('scroll:cursing', ({ actor, count }) => {
