@@ -159,6 +159,16 @@ export function createSpiritWispFxController(
   let _flightSavedX = 0, _flightSavedY = 0; // where wisp was before flying
   let _flareBurstQueued = false;
 
+  // Spell surge — wisp follows a projectile path with a slight orbit offset
+  let _surgeActive = false;
+  let _surgeFromX = 0, _surgeFromY = 0;
+  let _surgeToX = 0, _surgeToY = 0;
+  let _surgeDuration = 0;
+  let _surgeElapsed = 0;
+  const SURGE_ORBIT_OFFSET = 0.35; // tiles offset perpendicular to projectile path
+  const SURGE_ORBIT_FREQ = 12;     // fast helical spin around projectile
+  const SURGE_FLARE_TIME = 0.3;    // flare at impact before returning
+
   // Prayer spiral — wisp spirals inward, absorbs, then expands back
   let _prayerTimer = 0;
   const PRAYER_SPIRAL_DURATION = 1.2;
@@ -371,6 +381,61 @@ export function createSpiritWispFxController(
     }
 
     return false;
+  }
+
+  /**
+   * Start a spell surge — wisp follows alongside a projectile path.
+   * Takes priority over miracle flight (cancels it).
+   */
+  function _startSpellSurge(fromX, fromY, toX, toY, duration) {
+    // Cancel any in-progress miracle flight
+    _flightState = FLIGHT_IDLE;
+    _surgeActive = true;
+    _surgeFromX = fromX;
+    _surgeFromY = fromY;
+    _surgeToX = toX;
+    _surgeToY = toY;
+    _surgeDuration = Math.max(0.1, duration);
+    _surgeElapsed = 0;
+    // Snap wisp to start so it appears alongside projectile immediately
+    _x = fromX;
+    _y = fromY;
+  }
+
+  function _tickSpellSurge(dtSec) {
+    if (!_surgeActive) return false;
+    _surgeElapsed += dtSec;
+    const progress = Math.min(1, _surgeElapsed / _surgeDuration);
+
+    if (progress < 1) {
+      // Lerp along projectile path with a helical offset
+      const baseX = _surgeFromX + (_surgeToX - _surgeFromX) * progress;
+      const baseY = _surgeFromY + (_surgeToY - _surgeFromY) * progress;
+      // Perpendicular offset: rotate 90° from travel direction
+      const tdx = _surgeToX - _surgeFromX;
+      const tdy = _surgeToY - _surgeFromY;
+      const tLen = Math.hypot(tdx, tdy) || 1;
+      const perpX = -tdy / tLen;
+      const perpY = tdx / tLen;
+      const angle = _surgeElapsed * SURGE_ORBIT_FREQ;
+      const offset = Math.sin(angle) * SURGE_ORBIT_OFFSET;
+      const bobOffset = Math.cos(angle) * SURGE_ORBIT_OFFSET * 0.5;
+      _x = baseX + perpX * offset;
+      _y = baseY + perpY * offset + bobOffset * 0.3;
+      return true;
+    }
+
+    // Arrived at target — brief flare then hand off to miracle return
+    _surgeActive = false;
+    _x = _surgeToX;
+    _y = _surgeToY;
+    _flightTargetX = _surgeToX;
+    _flightTargetY = _surgeToY;
+    _flightState = FLIGHT_FLARE;
+    _flightTimer = 0;
+    _flareBurstQueued = true;
+    _agitation = COMBAT_DECAY * 2.5;
+    return true;
   }
 
   function _pushRibbonPoint() {
@@ -864,6 +929,16 @@ export function createSpiritWispFxController(
 
     // Always finish in-flight essence pulls, even during combat/miracles
     _tickActiveEssencePulls(dtSec);
+
+    // Spell surge overrides miracle flight and orbit
+    if (_tickSpellSurge(dtSec)) {
+      _pushRibbonPoint();
+      if (_flareBurstQueued) {
+        _flareBurstQueued = false;
+        _spawnFlareBurst();
+      }
+      return;
+    }
 
     // Miracle flight overrides orbit
     if (_tickFlight(dtSec)) {
@@ -1478,15 +1553,114 @@ export function createSpiritWispFxController(
       _agitation = COMBAT_DECAY;
     });
 
-    // Spirit spell boost — wisp surges to the spell target
-    world.on("spirit:spellBoost", ({ targetId }) => {
+    // Spirit spell boost — wisp follows the spell projectile to the target.
+    // The boost event sets a one-shot flag; the next matching spell:* projectile
+    // event triggers the actual surge flight so timing syncs perfectly.
+    let _pendingSurge = false;
+    world.on("spirit:spellBoost", () => {
       if (_betrayed || _deathVigil) return;
-      const tid = Number(targetId || 0) | 0;
-      const pos = tid > 0 ? getPosition(tid) : null;
-      if (pos) {
-        _startMiracleFlight(pos.x, pos.y);
-        _agitation = COMBAT_DECAY * 2.5;
-      }
+      _pendingSurge = true;
+      _agitation = COMBAT_DECAY * 2.5;
+    });
+
+    // Hook spell projectile events for surge flight.
+    // Each spell emits its own event with from/to coordinates; the wisp
+    // lerps alongside the first one that fires after a spirit:spellBoost.
+
+    /** Consume a pending surge and start the flight. */
+    function _trySurge(fromX, fromY, toX, toY, speed) {
+      if (!_pendingSurge) return;
+      _pendingSurge = false;
+      const dist = Math.hypot(toX - fromX, toY - fromY) || 1;
+      _startSpellSurge(fromX, fromY, toX, toY, Math.max(0.06, Math.min(0.7, dist / speed)));
+    }
+
+    // ── Ranged projectile spells ──────────────────────────────────────
+    world.on("spell:frost", ({ from, at, fizzle }) => {
+      if (fizzle || !from || !at) return;
+      _trySurge(from.x, from.y, at.x, at.y, 8);
+    });
+    world.on("spell:shadow_bolt", ({ from, to, fizzle }) => {
+      if (fizzle || !from || !to) return;
+      _trySurge(from.x, from.y, to.x, to.y, 10);
+    });
+    world.on("spell:bolt", ({ from, to, chainIndex }) => {
+      if (!from || !to || (chainIndex | 0) !== 0) return; // first chain segment only
+      _trySurge(from.x, from.y, to.x, to.y, 14);
+    });
+    world.on("spell:smite", ({ actor, targetId, fizzle }) => {
+      if (fizzle) return;
+      const apos = getPosition(Number(actor || 0));
+      const tpos = getPosition(Number(targetId || 0));
+      if (apos && tpos) _trySurge(apos.x, apos.y, tpos.x, tpos.y, 10);
+    });
+
+    // ── Ranged AoE (single-target AoE at a point) ────────────────────
+    world.on("spell:meteor", ({ from, origin, fizzle }) => {
+      if (fizzle || !from || !origin) return;
+      _trySurge(from.x, from.y, origin.x, origin.y, 10);
+    });
+    world.on("spell:scorch", ({ actor, targetId, fizzle }) => {
+      if (fizzle) return;
+      const apos = getPosition(Number(actor || 0));
+      const tpos = getPosition(Number(targetId || 0));
+      if (apos && tpos) _trySurge(apos.x, apos.y, tpos.x, tpos.y, 10);
+    });
+
+    // ── Targeted DoTs (wisp flies to target on application) ──────────
+    world.on("spell:agony", ({ from, at, fizzle }) => {
+      if (fizzle || !from || !at) return;
+      _trySurge(from.x, from.y, at.x, at.y, 8);
+    });
+    world.on("spell:drain_life:start", ({ from, to, fizzle }) => {
+      if (fizzle || !from || !to) return;
+      _trySurge(from.x, from.y, to.x, to.y, 8);
+    });
+
+    // ── Self-centered AoE (wisp flares in place instead of flying) ───
+    world.on("spell:blastwave", ({ origin }) => {
+      if (!_pendingSurge || !origin) return;
+      _pendingSurge = false;
+      // Flare at player rather than flying — AoE radiates from caster
+      _flareBurstQueued = true;
+      _agitation = COMBAT_DECAY * 2.5;
+    });
+    world.on("spell:earthshatter", () => {
+      if (!_pendingSurge) return;
+      _pendingSurge = false;
+      _flareBurstQueued = true;
+      _agitation = COMBAT_DECAY * 2.5;
+    });
+    world.on("spell:cleave", () => {
+      if (!_pendingSurge) return;
+      _pendingSurge = false;
+      _flareBurstQueued = true;
+      _agitation = COMBAT_DECAY * 2.5;
+    });
+    world.on("spell:thorn_burst", () => {
+      if (!_pendingSurge) return;
+      _pendingSurge = false;
+      _flareBurstQueued = true;
+      _agitation = COMBAT_DECAY * 2.5;
+    });
+    world.on("spell:war_cry", () => {
+      if (!_pendingSurge) return;
+      _pendingSurge = false;
+      _flareBurstQueued = true;
+      _agitation = COMBAT_DECAY * 2.5;
+    });
+
+    // ── Generic fallback — any remaining ranged spell ────────────────
+    world.on("castSpell", ({ targetId, spiritBoosted }) => {
+      if (!_pendingSurge || !spiritBoosted) return;
+      // If no specific spell:* event consumed the surge, fly to target directly
+      setTimeout(() => {
+        if (!_pendingSurge) return;
+        _pendingSurge = false;
+        const tid = Number(targetId || 0) | 0;
+        const pos = tid > 0 ? getPosition(tid) : null;
+        if (pos) _startMiracleFlight(pos.x, pos.y);
+      }, 0);
     });
 
     // Prayer — wisp spirals inward then eases back out
