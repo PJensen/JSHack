@@ -259,6 +259,17 @@ export function movementSystem(world) {
         world.emit?.("moved", { id: actor, from, to: { x: nx, y: ny } });
         // Reserve the destination so subsequent movers can't step into the same tile
         blocking.add(k);
+        // Keep livingByCell in sync so bump resolvers see entities that moved
+        // this tick (prevents stale-snapshot bugs like toggling a door when a
+        // creature stepped onto it earlier in the same movement pass).
+        const actorVit = world.get(actor, Vitality);
+        if (actorVit && (actorVit.hp | 0) > 0 && !world.has(actor, Flying)) {
+          const fromKey = key(from.x, from.y);
+          if (tiles.livingByCell.get(fromKey) === actor) {
+            tiles.livingByCell.delete(fromKey);
+          }
+          tiles.livingByCell.set(k, actor);
+        }
       }
     } catch (e) { console.error("[movementSystem] movement resolution failed:", e); }
     finally {
