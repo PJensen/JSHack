@@ -384,16 +384,41 @@ export function createSceneRuntime({
     const liveSx = liveProjected.localX * dprScale;
     const liveSy = liveProjected.localY * dprScale;
     const padX = 12 * dprScale;
-    const maxWidth = Math.min(logicalCanvas.width * 0.44, 360) * dprScale;
+    const padY = 10 * dprScale;
+    const isGuide = typeof bubble.resolveAnchor === "function";
+    const maxWidth = Math.min(logicalCanvas.width * (isGuide ? 0.72 : 0.44), isGuide ? 480 : 360) * dprScale;
     const text = bubble.text;
     const fade = Math.max(0, Math.min(1, bubble.durationSec > 0 ? bubble.ttlSec / bubble.durationSec : 1));
 
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.font = `600 ${Math.round(15 * dprScale)}px 'Trebuchet MS', sans-serif`;
-    const textWidth = Math.min(maxWidth, Math.ceil(ctx.measureText(text).width));
+    const fontSize = Math.round((isGuide ? 16 : 15) * dprScale);
+    const lineHeight = Math.round(fontSize * 1.35);
+    ctx.font = `600 ${fontSize}px 'Trebuchet MS', sans-serif`;
+
+    // Word-wrap text into lines that fit maxWidth.
+    const words = text.split(' ');
+    const lines = [];
+    let currentLine = words[0] || '';
+    for (let i = 1; i < words.length; i++) {
+      const test = currentLine + ' ' + words[i];
+      if (ctx.measureText(test).width > maxWidth) {
+        lines.push(currentLine);
+        currentLine = words[i];
+      } else {
+        currentLine = test;
+      }
+    }
+    lines.push(currentLine);
+
+    let widestLine = 0;
+    for (let i = 0; i < lines.length; i++) {
+      const w = ctx.measureText(lines[i]).width;
+      if (w > widestLine) widestLine = w;
+    }
+    const textWidth = Math.min(maxWidth, Math.ceil(widestLine));
     const boxW = textWidth + (padX * 2);
-    const boxH = 34 * dprScale;
+    const boxH = padY * 2 + lineHeight * lines.length;
     const scale = Math.max(1, Number(cam?.scale) || 1);
     const lift = Math.max(32, Math.min(96, Math.round(scale * 1.15))) * dprScale;
     const tailH = Math.max(14, 14 * dprScale);
@@ -462,8 +487,11 @@ export function createSceneRuntime({
 
     ctx.fillStyle = `rgba(32,26,18,${Math.min(1, alpha + 0.12).toFixed(3)})`;
     ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(text, Math.round(sx), boxY + Math.round(boxH / 2) + dprScale, maxWidth);
+    ctx.textBaseline = "top";
+    const textStartY = boxY + padY;
+    for (let i = 0; i < lines.length; i++) {
+      ctx.fillText(lines[i], Math.round(boxX + boxW / 2), textStartY + i * lineHeight, maxWidth);
+    }
     ctx.restore();
   }
 
