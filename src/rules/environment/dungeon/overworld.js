@@ -616,6 +616,7 @@ export function generateOverworldChunks(worldSeed) {
   const stairX = tavX0 + 4;
   const stairY = tavY0 + 5;
   setWorldTile(chunks, stairX, stairY, TILE_STAIR_DOWN);
+  setRoofed(stairX, stairY, true);
 
   // ── Windmill — west of the graveyard, outside of town ──
   const millX0 = crossingX - 10;

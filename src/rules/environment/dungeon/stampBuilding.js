@@ -52,7 +52,7 @@ const TILE_MAP = {
 };
 
 // Tile types that get a roof overhead
-const ROOFABLE = new Set(["floor", "wall", "door"]);
+const ROOFABLE = new Set(["floor", "wall", "door", "stair_down"]);
 
 /**
  * Stamp a building definition onto the world.
