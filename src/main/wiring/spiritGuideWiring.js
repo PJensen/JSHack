@@ -207,6 +207,11 @@ export function installSpiritGuideWiring({
     turnCount++;
     if (turnCount === 1) fire("welcome");
     if (turnCount === 4) fire("spirit_deity");
+    if (turnCount === 6) {
+      for (const [, ds] of world.query(DungeonState)) {
+        if ((ds.currentDepth | 0) === 0) fire("seek_barkeep");
+      }
+    }
     if (turnCount === 8) fire("movement");
     if (turnCount === 12) fire("facing");
     if (turnCount === 14) fire("facing_cone");
