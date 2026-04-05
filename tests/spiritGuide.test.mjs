@@ -134,7 +134,7 @@ Deno.test("quick_items tip does not fire for noQuickChip items", () => {
   world.add(hiddenId, ItemInfo, { type: "tool", slot: "", count: 1, noQuickChip: true });
 
   world.emit("inventory:added", { ownerId: playerId, itemId: hiddenId });
-  const match = bubbles.find((b) => b.text.includes("Quick Chip"));
+  const match = bubbles.find((b) => b.text.includes("pops up immediately after pickup"));
   assertEquals(match, undefined, "quick_items tip should skip noQuickChip items");
   clearGuideStorage();
 });
@@ -146,7 +146,7 @@ Deno.test("quick_items tip does not fire for currency inventory add", () => {
   world.add(coinId, ItemInfo, { type: "currency", slot: "", count: 1, noQuickChip: false });
 
   world.emit("inventory:added", { ownerId: playerId, itemId: coinId });
-  const match = bubbles.find((b) => b.text.includes("Quick Chip"));
+  const match = bubbles.find((b) => b.text.includes("pops up immediately after pickup"));
   assertEquals(match, undefined, "quick_items tip should skip currency");
   clearGuideStorage();
 });

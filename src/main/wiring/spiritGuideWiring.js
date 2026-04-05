@@ -224,7 +224,7 @@ export function installSpiritGuideWiring({
     if (seen.has("quick_items")) return;
     const pe = getPlayerEntity();
     if (!pe || Number(ownerId || 0) !== pe.id) return;
-    const info = world.has(itemId, ItemInfo) ? world.get(itemId, ItemInfo) : null;
+    const info = world.get(itemId, ItemInfo);
     if (!info) return;
     if (info.noQuickChip === true) return;
     if (String(info.type || "").toLowerCase() === "currency") return;
