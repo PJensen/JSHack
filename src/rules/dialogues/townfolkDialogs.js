@@ -3,6 +3,7 @@ import { inventoryHasIdentity } from "../utils/townEconomy.js";
 import { getDistrictBulletin } from "../utils/townInterpretationVirtuals.js";
 import { registerDialog } from "./registry.js";
 import { STARTER_PRIEST_FETCH_QUEST_ID, getQuestRecord } from "../quests/runtime.js";
+import { RAT_INFESTATION_QUEST_ID, REQUIRED_RAT_KILLS } from "../quests/definitions/ratInfestation.js";
 
 const PRIEST_FETCH_ITEM_ID = "book_dead";
 
@@ -74,8 +75,12 @@ function ambientTownfolkText(def, ctx) {
   }
 }
 
+function barkeepQuest(world, actorId) {
+  return getQuestRecord(world, RAT_INFESTATION_QUEST_ID, actorId);
+}
+
 for (const def of Object.values(TOWNFOLK)) {
-  if (def.role === "priest") continue;
+  if (def.role === "priest" || def.role === "barkeep") continue;
   registerDialog({
     id: `townfolk:${def.role}`,
     start: "root",
@@ -89,6 +94,115 @@ for (const def of Object.values(TOWNFOLK)) {
     },
   });
 }
+
+registerDialog({
+  id: "townfolk:barkeep",
+  start: "root",
+  nodes: {
+    root: {
+      text: (ctx) => {
+        const quest = barkeepQuest(ctx.world, ctx.actorId);
+        const state = quest?.state;
+        if (!state) return barkeepAmbientText(ctx, "What'll it be?");
+        if (String(state.status || "") === "complete") {
+          return "Cellar's been quiet since you cleared those rats. Drinks are on me.";
+        }
+        if (String(state.node || "") === "offer") {
+          return "Damn rats have been crawling up from the cellar. " +
+            `Kill ${REQUIRED_RAT_KILLS} of the wretches down there and I'll make it worth your while.`;
+        }
+        if (String(state.node || "") === "hunt") {
+          const kills = Number(quest.vars?.data?.killCount || 0);
+          return `You've got ${kills} of ${REQUIRED_RAT_KILLS} so far. Keep at it.`;
+        }
+        if (String(state.node || "") === "report") {
+          return "You got them all? Good. I owe you one.";
+        }
+        return barkeepAmbientText(ctx, "What'll it be?");
+      },
+      choices: [
+        {
+          id: "accept_rat_quest",
+          label: "I'll clear them out.",
+          visible: (ctx) => {
+            const quest = barkeepQuest(ctx.world, ctx.actorId);
+            return String(quest?.state?.status || "active") === "active"
+              && String(quest?.state?.node || "") === "offer";
+          },
+          emits: [
+            {
+              name: "dialog:accepted",
+              payload: (ctx) => ({
+                questId: RAT_INFESTATION_QUEST_ID,
+                playerId: ctx.actorId,
+                speakerId: ctx.targetId,
+              }),
+            },
+          ],
+          to: "accept_ack",
+        },
+        {
+          id: "turn_in_rats",
+          label: "The rats are dead.",
+          visible: (ctx) => {
+            const quest = barkeepQuest(ctx.world, ctx.actorId);
+            return String(quest?.state?.status || "active") === "active"
+              && String(quest?.state?.node || "") === "report";
+          },
+          emits: [
+            {
+              name: "dialog:reported",
+              payload: (ctx) => ({
+                questId: RAT_INFESTATION_QUEST_ID,
+                playerId: ctx.actorId,
+                speakerId: ctx.targetId,
+              }),
+            },
+          ],
+          to: "report_ack",
+        },
+        {
+          id: "progress",
+          label: "How many more?",
+          visible: (ctx) => {
+            const quest = barkeepQuest(ctx.world, ctx.actorId);
+            return String(quest?.state?.status || "active") === "active"
+              && String(quest?.state?.node || "") === "hunt";
+          },
+          to: "progress_reminder",
+        },
+        {
+          id: "leave",
+          label: "Goodbye.",
+          close: true,
+        },
+      ],
+    },
+    accept_ack: {
+      text: "Head down through the hatch in the back. Watch yourself — they bite.",
+      choices: [
+        { id: "leave", label: "I'll be back.", close: true },
+      ],
+    },
+    progress_reminder: {
+      text: (ctx) => {
+        const quest = barkeepQuest(ctx.world, ctx.actorId);
+        const kills = Number(quest?.vars?.data?.killCount || 0);
+        const remaining = REQUIRED_RAT_KILLS - kills;
+        return `${remaining} more to go. The cellar hatch is right here in the tavern.`;
+      },
+      choices: [
+        { id: "leave", label: "On it.", close: true },
+      ],
+    },
+    report_ack: {
+      text: "That's a load off my mind. Here — you've earned a hot meal and a cold drink.",
+      choices: [
+        { id: "leave", label: "Cheers.", close: true },
+      ],
+    },
+  },
+});
 
 registerDialog({
   id: "townfolk:priest",
