@@ -3147,7 +3147,7 @@ REGISTRY['consecrate'] = function consecrateScript(world, actor, spell, _intent)
   if (!apos) return;
 
   const RADIUS = Number(spell?.radius || 2) | 0;
-  const TURNS = 20;
+  const TURNS = 5;
   const BASE_TICK = 3;
   const scaledDmg = scaleSpellDamage(world, actor, BASE_TICK);
 
