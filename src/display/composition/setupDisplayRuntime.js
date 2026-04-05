@@ -17,6 +17,7 @@ import { startZoomPunch } from "../camera/zoomPunch.js";
 import { installFloatTextWiring } from "../ui/wiring/floatTextWiring.js";
 import { installEventUiWiring } from "../ui/wiring/eventUiWiring.js";
 import { createDeathVfxController } from "../fx/deathVfxController.js";
+import { installAudioWiring } from "../audio/audioWiring.js";
 
 /**
  * Configure display-owned runtime controllers and event wiring.
@@ -122,6 +123,8 @@ export function setupDisplayRuntime({
     resolveItemDisplayName,
     dispatchRulesAction,
   });
+
+  installAudioWiring({ world, isPlayer });
 
   return { statusEmitterFx, statusPresentationDelayFx, boltFx, delayedDeathFx, projectileFx, spellAreaFx, cloudFx, surfaceAreaFx, spiritWispFx, bumpFx, recoilFx, hitstopFx, deathEssenceFx, deathVfx, ftext, goreTick };
 }
