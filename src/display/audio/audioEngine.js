@@ -256,6 +256,84 @@ export function play(url, opts) {
   });
 }
 
+// ── Tracked playback (moving sounds) ────────────────────────
+
+/**
+ * Play a sound and return a handle for updating pan/volume each frame.
+ * Used for projectiles that travel across the screen.
+ *
+ * @param {string} url
+ * @param {{
+ *   volume?: number,
+ *   bus?: string,
+ *   loop?: boolean,
+ *   randomPitch?: number,
+ * }} [opts]
+ * @returns {{ updatePan(pan: number): void, updateVolume(v: number): void, stop(): void } | null}
+ */
+export function playTracked(url, opts) {
+  if (_muted) return null;
+  const buf = _cache.get(url);
+  if (buf) return _playTrackedBuffer(buf, opts);
+  // Async fallback — can't return handle synchronously if not preloaded
+  loadBuffer(url).then(b => {
+    if (b && !_muted) _playTrackedBuffer(b, opts);
+  });
+  return null;
+}
+
+function _playTrackedBuffer(buf, opts) {
+  try {
+    const ac = ctx();
+    const src = ac.createBufferSource();
+    src.buffer = buf;
+    if (opts?.loop) src.loop = true;
+
+    let detune = 0;
+    const randomPitch = Number(opts?.randomPitch || 0);
+    if (randomPitch > 0) detune = (Math.random() * 2 - 1) * randomPitch;
+    if (detune) src.detune.value = detune;
+
+    const dest = bus(opts?.bus || "spells");
+    const gain = ac.createGain();
+    gain.gain.value = Number(opts?.volume ?? 1);
+
+    const panner = (typeof ac.createStereoPanner === "function")
+      ? ac.createStereoPanner()
+      : null;
+
+    // Chain:  src → gain → panner → reverb send + bus
+    src.connect(gain);
+    if (panner) {
+      gain.connect(panner);
+      panner.connect(dest);
+      if (_reverbSend && _reverbSend.gain.value > 0) panner.connect(_reverbSend);
+    } else {
+      gain.connect(dest);
+      if (_reverbSend && _reverbSend.gain.value > 0) gain.connect(_reverbSend);
+    }
+
+    let stopped = false;
+    src.start();
+
+    return {
+      updatePan(pan) {
+        if (panner && !stopped) panner.pan.value = Math.max(-1, Math.min(1, pan));
+      },
+      updateVolume(v) {
+        if (!stopped) gain.gain.value = Math.max(0, Math.min(1, v));
+      },
+      stop() {
+        if (stopped) return;
+        stopped = true;
+        try { src.stop(); } catch (_) {}
+      },
+    };
+  } catch (_) {
+    return null;
+  }
+}
+
 /** Map<string, { src, gain }> — currently playing loops keyed by URL. */
 const _loops = new Map();
 
