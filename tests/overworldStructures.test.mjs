@@ -121,10 +121,11 @@ const tavX1 = homeX + 14;
 const tavY1 = homeY - 4;
 const tavDoorX = tavX0;
 const tavDoorY = tavY0 + 3;
+const crossingY = homeY - 16;
 const millX0 = homeX - 10;
-const millY0 = homeY - 8;
-const millX1 = homeX - 6;
-const millY1 = homeY - 4;
+const millY0 = crossingY - 13;
+const millX1 = millX0 + 4;
+const millY1 = millY0 + 4;
 const millDoorX = millX0 + 2;
 // New smithy: anchor (keystone) at (homeX - 7, homeY), stamped from JSON.
 const smithyAnchorX = homeX - 7;
