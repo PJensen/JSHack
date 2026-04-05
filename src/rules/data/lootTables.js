@@ -308,8 +308,8 @@ export const LOOT_TABLES = {
   "drop:tier0": {
     rolls: { min: 1, max: 2 },
     entries: [
-      { type: "nothing",   weight: 55 },
-      { type: "gold",      weight: 40, count: { base: 5, perDepth: 4 } },
+      { type: "nothing",   weight: 40 },
+      { type: "gold",      weight: 40, count: { base: 10, perDepth: 6 } },
       { type: "archetype", weight: 22, archetype: "HealthPotion" },
       { type: "item",      weight: 15, itemId: "scroll_identify" },
       { type: "item",      weight: 12, itemId: "potion_mana" },
@@ -330,8 +330,8 @@ export const LOOT_TABLES = {
   "drop:tier1": {
     rolls: { min: 1, max: 2 },
     entries: [
-      { type: "nothing",   weight: 35 },
-      { type: "gold",      weight: 40, count: { base: 12, perDepth: 5 } },
+      { type: "nothing",   weight: 25 },
+      { type: "gold",      weight: 40, count: { base: 22, perDepth: 8 } },
       { type: "table",     weight: 25, tableId: "sub:potions" },
       { type: "item",      weight: 12, itemId: "potion_mana" },
       { type: "table",     weight: 20, tableId: "sub:scrolls" },
@@ -354,8 +354,8 @@ export const LOOT_TABLES = {
   "drop:tier2": {
     rolls: { min: 1, max: 2 },
     entries: [
-      { type: "nothing",   weight: 40 },
-      { type: "gold",      weight: 22, count: { base: 15, perDepth: 6 } },
+      { type: "nothing",   weight: 30 },
+      { type: "gold",      weight: 28, count: { base: 28, perDepth: 9 } },
       { type: "table",     weight: 20, tableId: "sub:potions" },
       { type: "item",      weight: 10, itemId: "potion_mana" },
       { type: "table",     weight: 18, tableId: "sub:scrolls" },
@@ -378,8 +378,8 @@ export const LOOT_TABLES = {
   "drop:tier3": {
     rolls: { min: 1, max: 2 },
     entries: [
-      { type: "nothing",   weight: 25 },
-      { type: "gold",      weight: 18, count: { base: 30, perDepth: 8 } },
+      { type: "nothing",   weight: 18 },
+      { type: "gold",      weight: 22, count: { base: 55, perDepth: 12 } },
       { type: "table",     weight: 16, tableId: "sub:potions" },
       { type: "table",     weight: 22, tableId: "sub:equip_magic" },
       { type: "table",     weight: 18, tableId: "sub:spellbooks" },
