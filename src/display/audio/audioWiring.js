@@ -4,7 +4,7 @@
 // Spatial audio: sounds with a known {x,y} source are panned L/R and
 // attenuated by distance from the player. Sounds through walls are muffled.
 
-import { play, preload, startLoop, stopLoop } from "./audioEngine.js";
+import { play, preload, startLoop, stopLoop, setReverbMix } from "./audioEngine.js";
 import { resolve, allUrls } from "./sounds.js";
 
 // ── Spatial helpers ─────────────────────────────────────────
@@ -43,7 +43,7 @@ function sfx(id, opts) {
   const s = resolve(id);
   if (!s) return;
   play(s.url, {
-    bus: s.bus, maxVoices: s.maxVoices,
+    bus: s.bus, maxVoices: s.maxVoices, randomPitch: s.randomPitch,
     volume: s.volume, rate: s.rate, detune: s.detune,
     ...opts,
   });
@@ -100,9 +100,10 @@ const SPELL_IMPACT_MAP = {
  *   getItemInfo: (id: number) => object|null,
  *   getPlayerPosition: () => { x: number, y: number } | null,
  *   getPosition: (id: number) => { x: number, y: number } | null,
+ *   getDepth: () => number,
  * }} deps
  */
-export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosition, getPosition }) {
+export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosition, getPosition, getDepth }) {
 
   // ── Preload all registered sounds ─────────────────────────
   preload(allUrls());
@@ -245,9 +246,18 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     sfxAt("thunder", { x, y }, pp());
   });
 
-  // Stop rain on floor transitions (going underground, etc.)
+  // Floor transitions — stop rain, adjust reverb for environment
   world.on('dungeon:transitioned', () => {
     if (rainUrl) stopLoop(rainUrl, { fadeOut: 1.0 });
+
+    // Reverb: overworld (depth 0) = dry/open air, dungeon = stone room reverb
+    // Deeper floors get slightly more reverb (tighter stone corridors)
+    const depth = getDepth();
+    if (depth === 0) {
+      setReverbMix(0.05);  // outdoors — barely any
+    } else {
+      setReverbMix(Math.min(0.45, 0.15 + depth * 0.05));  // 0.20 at d1, 0.45 cap
+    }
   });
 
   // ── UI ────────────────────────────────────────────────────

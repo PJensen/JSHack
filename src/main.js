@@ -4277,6 +4277,10 @@ const displayRuntime = setupDisplayRuntime({
     if (!deity) return null;
     return deity._queryPrecise();
   },
+  getDepth: () => {
+    for (const [, ds] of world.query(DungeonState)) return ds.currentDepth ?? 0;
+    return 0;
+  },
 });
 const {
   statusEmitterFx,

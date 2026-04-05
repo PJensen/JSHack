@@ -46,6 +46,7 @@ export function setupDisplayRuntime({
   sculptFloorBrush,
   getActiveReliefKey,
   sampleMood,
+  getDepth,
 }) {
   const statusEmitterFx = createStatusEmitterController({ world, fx });
   statusEmitterFx.installListeners();
@@ -133,6 +134,7 @@ export function setupDisplayRuntime({
       const pe = getPlayerEntity();
       return pe ? getPosition(pe.id ?? pe) : null;
     },
+    getDepth: getDepth || (() => 0),
   });
 
   return { statusEmitterFx, statusPresentationDelayFx, boltFx, delayedDeathFx, projectileFx, spellAreaFx, cloudFx, surfaceAreaFx, spiritWispFx, bumpFx, recoilFx, hitstopFx, deathEssenceFx, deathVfx, ftext, goreTick };
