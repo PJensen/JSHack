@@ -120,7 +120,7 @@ Deno.test("quick_items tip fires on consumable pickup", () => {
   world.add(potionId, NamedIdentity, { identity: "potion_heal", name: "Healing Potion" });
 
   world.emit("item:pickup", { actor: playerId, itemId: potionId, count: 1, itemX: 5, itemY: 5 });
-  const match = bubbles.find((b) => b.text.includes("pinned items"));
+  const match = bubbles.find((b) => b.text.includes("Quick Chips"));
   assert(match, "quick_items tip should fire on consumable pickup");
   clearGuideStorage();
 });
@@ -164,6 +164,18 @@ Deno.test("first_combat tip fires when enemy spots player", () => {
   world.emit("status", { id: 42, kind: "alert", at: { x: 8, y: 5 } });
   const match = bubbles.find((b) => b.text.includes("enemy"));
   assert(match, "first_combat tip should fire on enemy alert");
+  clearGuideStorage();
+});
+
+Deno.test("first_bat tip fires when player first sees a bat", () => {
+  const { world, playerId, bubbles } = setup();
+  const batId = world.create();
+  world.add(batId, Position, { x: 8, y: 5 });
+  world.add(batId, NamedIdentity, { identity: "bat", name: "Bat" });
+
+  world.emit("moved", { id: playerId, from: { x: 5, y: 5 }, to: { x: 6, y: 5 } });
+  const match = bubbles.find((b) => b.text.includes("Bat ahead!"));
+  assert(match, "first_bat tip should fire when a bat is first seen");
   clearGuideStorage();
 });
 
