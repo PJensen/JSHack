@@ -800,7 +800,7 @@ export const MONSTERS = [
   {
     id: 'acid_spitter',
     name: 'Acid Spitter',
-    tags: ['beast', 'acid', 'ranged', 'caustic_glowing'],
+    tags: ['beast', 'acid', 'ranged'],
     tier: 1,
     minDepth: 7,
     intelligence: 5,
