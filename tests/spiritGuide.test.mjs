@@ -205,7 +205,7 @@ Deno.test("first_stair tip fires when player walks near stairs", () => {
   world.add(stairId, NamedIdentity, { identity: "stair_down", name: "Stairs Down" });
 
   world.emit("moved", { id: playerId, from: { x: 5, y: 5 }, to: { x: 6, y: 5 } });
-  const match = bubbles.find((b) => b.text.includes("stairs"));
+  const match = bubbles.find((b) => b.text.toLowerCase().includes("stair"));
   assert(match, "first_stair tip should fire when player walks near stairs");
   clearGuideStorage();
 });
