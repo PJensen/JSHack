@@ -49,7 +49,7 @@ function parseSeed(raw) {
 const CLASS_ICONS = {
   druid: '🌿', warden: '🛡️', outlaw: '🗡️', cleric: '✨',
   archeologist: '⛏️', warlock: '🔮', mage: '🔥',
-  mireborn: '☘️', pilgrim: '🙏',
+  mireborn: '🪷', pilgrim: '🙏',
 };
 
 export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm }) {
