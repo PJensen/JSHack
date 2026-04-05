@@ -207,14 +207,6 @@ export function installSpiritGuideWiring({
     turnCount++;
     if (turnCount === 1) fire("welcome");
     if (turnCount === 4) fire("spirit_deity");
-    if (turnCount === 6) {
-      for (const [, ds] of world.query(DungeonState)) {
-        if ((ds.currentDepth | 0) === 0) fire("seek_barkeep");
-      }
-    }
-    if (turnCount === 8) fire("movement");
-    if (turnCount === 12) fire("facing");
-    if (turnCount === 14) fire("facing_cone");
   });
 
   // ── Pet companion (pet delivers an item to the player) ──────────────
@@ -243,6 +235,10 @@ export function installSpiritGuideWiring({
     if (itemGroundFired || seen.has("item_ground")) return;
     const pe = getPlayerEntity();
     if (!pe || Number(id || 0) !== pe.id) return;
+    // Only relevant in the dungeon — overworld is full of placed objects.
+    for (const [, ds] of world.query(DungeonState)) {
+      if ((ds.currentDepth | 0) === 0) return;
+    }
     const px = Number(to?.x || 0) | 0;
     const py = Number(to?.y || 0) | 0;
 
@@ -338,6 +334,10 @@ export function installSpiritGuideWiring({
   // ── On-sight proximity tips (player walks near a feature) ────────────
 
   /** @type {Array<[string, (ident: string) => boolean]>} */
+  // Tips that only make sense in the dungeon (depth > 0).
+  const dungeonOnlySightTips = new Set(["first_stair", "first_chest", "first_sarcophagus", "first_weapon_rack"]);
+
+  /** @type {Array<[string, (ident: string) => boolean]>} */
   const sightTips = [
     ["first_stair", (ident) => ident.includes("stair")],
     ["first_fountain", (ident) => ident === "fountain"],
@@ -352,8 +352,16 @@ export function installSpiritGuideWiring({
     const pe = getPlayerEntity();
     if (!pe || Number(id || 0) !== pe.id) return;
 
+    // Determine current depth to gate dungeon-only tips.
+    let depth = -1;
+    for (const [, ds] of world.query(DungeonState)) { depth = ds.currentDepth | 0; }
+
     // Quick-exit: if all sight tips are already seen, skip the scan.
-    const unseen = sightTips.filter(([tipId]) => !seen.has(tipId));
+    const unseen = sightTips.filter(([tipId]) => {
+      if (seen.has(tipId)) return false;
+      if (depth === 0 && dungeonOnlySightTips.has(tipId)) return false;
+      return true;
+    });
     if (unseen.length === 0) return;
 
     const px = Number(to?.x || 0) | 0;
