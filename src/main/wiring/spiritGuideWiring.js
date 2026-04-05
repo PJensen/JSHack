@@ -338,6 +338,7 @@ export function installSpiritGuideWiring({
   const sightTips = [
     ["first_stair_down", (ident) => ident === "stair_down"],
     ["first_stair_up", (ident) => ident === "stair_up"],
+    ["first_bat", (ident) => ident === "bat"],
     ["first_fountain", (ident) => ident === "fountain"],
     ["first_door", (ident) => ident === "door_locked"],
     ["first_chest", (ident) => ident === "chest" || ident === "chest_locked"],

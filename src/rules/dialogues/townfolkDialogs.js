@@ -179,7 +179,7 @@ registerDialog({
       ],
     },
     accept_ack: {
-      text: "Head down through the hatch in the back. Watch yourself — they bite.",
+      text: "Head down through the hatch in the back. Take this bow and arrows — there are bats down there too.",
       choices: [
         { id: "leave", label: "I'll be back.", close: true },
       ],
