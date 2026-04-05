@@ -29,6 +29,13 @@ export const GUIDANCE_TIPS = [
     delaySec: 0.8,
   },
   {
+    id: "seek_barkeep",
+    text: "The barkeep knows what troubles this village. Seek them out \u2014 they may have work for you.",
+    durationSec: 6,
+    delaySec: 0.8,
+    flyTo: "npc",
+  },
+  {
     id: "movement",
     text: "Tap the screen edges to move. On keyboard: arrow keys, WASD, or HJKL.",
     durationSec: 5,
