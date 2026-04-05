@@ -40,7 +40,7 @@ export const GEM_DEFS = {
   gem_fluorite:    { id: 'gem_fluorite',    name: 'Fluorite Stone',      appearance: 'Green Gem',           value: 400,  weight: 1, hardness: 'soft', prob: 15,  material: 'gemstone' },
   gem_jade:        { id: 'gem_jade',        name: 'Jade Stone',          appearance: 'Green Gem',           value: 300,  weight: 1, hardness: 'soft', prob: 10,  material: 'gemstone' },
   gem_obsidian:    { id: 'gem_obsidian',    name: 'Obsidian Stone',      appearance: 'Black Gem',           value: 200,  weight: 1, hardness: 'soft', prob: 9,   material: 'gemstone', socketable: true, socketAffixId: 'gem_socket:obsidian' },
-  gem_voidstone:   { id: 'gem_voidstone',   name: 'Voidstone',           appearance: 'Black Gem',           value: 5000, weight: 1, hardness: 'hard', prob: 1,   material: 'gemstone' },
+  gem_voidstone:   { id: 'gem_voidstone',   name: 'Voidstone',           appearance: 'Black Gem',           value: 5000, weight: 1, hardness: 'hard', prob: 1,   material: 'gemstone', socketable: true, socketAffixId: 'gem_socket:voidstone' },
   gem_agate:       { id: 'gem_agate',       name: 'Agate Stone',         appearance: 'Orange Gem',          value: 200,  weight: 1, hardness: 'soft', prob: 12,  material: 'gemstone' },
 
   // ── Worthless glass (look like gems when unidentified) ─────────────
@@ -110,6 +110,10 @@ const GEM_SOCKET_DETAIL_LINES = Object.freeze({
   gem_aquamarine: Object.freeze([
     "Socketed: +0.5 mana regeneration.",
     "On hit: 20% chance to cause bleeding.",
+  ]),
+  gem_voidstone: Object.freeze([
+    "Socketed: +3 attack, +3 damage power.",
+    "On hit: 25% chance to drain 3 HP from the target.",
   ]),
 });
 
