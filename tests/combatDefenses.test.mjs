@@ -10,6 +10,7 @@ import { Position } from '../src/rules/components/Position.js';
 import { Facing } from '../src/rules/components/Facing.js';
 import { equipmentSystem } from '../src/rules/systems/equipmentSystem.js';
 import { combatSystem } from '../src/rules/systems/combatSystem.js';
+import { CombatPosture, COMBAT_POSTURES } from '../src/rules/components/CombatPosture.js';
 import { SHIELD_GUARD_KEY, SHIELD_MAX_GUARD_STACKS, SHIELD_BROKEN_KEY } from '../src/rules/utils/shieldGuard.js';
 
 function makeActor(world, name, eq, hp = 30) {
@@ -255,6 +256,7 @@ Deno.test("shield: guarded event fires when shield blocks", () => {
     positionActors(world, attacker, defender);
     // Defender faces north (attacker is hitting from front since attacker is at y=5, defender at y=6)
     world.add(defender, Facing, { dx: 0, dy: -1 });
+    world.add(defender, CombatPosture, { stance: COMBAT_POSTURES.guarded, lastChangedStep: 0, lastMoveStep: -1 });
     equipmentSystem(world);
 
     world.on('shield:guarded', () => { guardedCount++; });
@@ -281,6 +283,7 @@ Deno.test("shield: guard stacks decrement on successive blocks", () => {
     const defender = makeActor(world, 'Defender', { offhand: shield }, 80);
     positionActors(world, attacker, defender);
     world.add(defender, Facing, { dx: 0, dy: -1 });
+    world.add(defender, CombatPosture, { stance: COMBAT_POSTURES.guarded, lastChangedStep: 0, lastMoveStep: -1 });
     equipmentSystem(world);
 
     const guardEvents = [];
@@ -315,6 +318,7 @@ Deno.test("shield: broken event fires when all stacks consumed", () => {
     const defender = makeActor(world, 'Defender', { offhand: shield }, 80);
     positionActors(world, attacker, defender);
     world.add(defender, Facing, { dx: 0, dy: -1 });
+    world.add(defender, CombatPosture, { stance: COMBAT_POSTURES.guarded, lastChangedStep: 0, lastMoveStep: -1 });
     equipmentSystem(world);
 
     // Pre-set guard to 1 stack
