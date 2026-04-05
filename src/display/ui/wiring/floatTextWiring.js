@@ -966,5 +966,146 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     }
   });
 
+  // ── Wild Throw VFX ──────────────────────────────────────────────────
+
+  const WAND_SHATTER_COLORS = Object.freeze({
+    electric: { r: 120, g: 180, b: 255, label: 'SHATTER!', labelColor: '#78b4ff' },
+    fire:     { r: 255, g: 140, b: 30,  label: 'SHATTER!', labelColor: '#ff8c1e' },
+    cold:     { r: 140, g: 220, b: 255, label: 'SHATTER!', labelColor: '#8cdcff' },
+    holy:     { r: 255, g: 240, b: 160, label: 'SHATTER!', labelColor: '#fff0a0' },
+  });
+
+  world.on('wand:shatter', ({ at, element, charges }) => {
+    if (!at || !canShowAt(at.x, at.y)) return;
+    const pal = WAND_SHATTER_COLORS[element] || WAND_SHATTER_COLORS.electric;
+    const count = Math.min(40, 12 + charges * 4);
+
+    ftext.addStatus(at.x, at.y - 0.4, pal.label, {
+      color: pal.labelColor,
+      life: 1.0,
+      scaleStart: 1.5,
+      scaleEnd: 1.0,
+    });
+
+    // Radial shard burst
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.4;
+      const spd = 1.0 + Math.random() * 2.0;
+      fx.pool.spawn(new Particle({
+        x: at.x + (Math.random() - 0.5) * 0.3,
+        y: at.y + (Math.random() - 0.5) * 0.3,
+        vx: Math.cos(angle) * spd,
+        vy: Math.sin(angle) * spd - 0.3,
+        ay: 0.8,
+        life: 0.25 + Math.random() * 0.35,
+        size0: 0.14 + Math.random() * 0.1,
+        size1: 0.02,
+        r: pal.r, g: pal.g, b: pal.b,
+        a0: 0.95,
+        rotVel: (Math.random() - 0.5) * 6,
+      }));
+    }
+
+    // Inner flash — bright core burst
+    for (let i = 0; i < 6; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      fx.pool.spawn(new Particle({
+        x: at.x, y: at.y,
+        vx: Math.cos(angle) * 0.3,
+        vy: Math.sin(angle) * 0.3,
+        life: 0.15 + Math.random() * 0.1,
+        size0: 0.3, size1: 0.05,
+        r: 255, g: 255, b: 255,
+        a0: 0.8,
+      }));
+    }
+  });
+
+  const SPLASH_COLORS = Object.freeze({
+    stun:           { r: 200, g: 170, b: 50 },
+    hallucinating:  { r: 200, g: 100, b: 255 },
+    blinded:        { r: 30,  g: 30,  b: 40 },
+    weakened:       { r: 140, g: 140, b: 140 },
+    poison:         { r: 80,  g: 200, b: 60 },
+    confused:       { r: 220, g: 180, b: 60 },
+    lethargic:      { r: 120, g: 120, b: 130 },
+    berserk:        { r: 255, g: 60,  b: 40 },
+    resist_fire:    { r: 255, g: 140, b: 60 },
+    resist_poison:  { r: 60,  g: 180, b: 80 },
+    resist_electric:{ r: 100, g: 160, b: 255 },
+    resist_acid:    { r: 200, g: 180, b: 60 },
+    mana_drain:     { r: 80,  g: 120, b: 255 },
+  });
+
+  world.on('potion:splash', ({ at, effectKey }) => {
+    if (!at || !canShowAt(at.x, at.y)) return;
+    const pal = SPLASH_COLORS[effectKey] || { r: 160, g: 160, b: 200 };
+
+    ftext.addStatus(at.x, at.y - 0.3, 'SPLASH!', {
+      color: `rgb(${pal.r},${pal.g},${pal.b})`,
+      life: 0.8,
+    });
+
+    // Liquid splash — droplets arcing outward and falling
+    for (let i = 0; i < 14; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const spd = 0.5 + Math.random() * 1.2;
+      fx.pool.spawn(new Particle({
+        x: at.x + (Math.random() - 0.5) * 0.15,
+        y: at.y + (Math.random() - 0.5) * 0.15,
+        vx: Math.cos(angle) * spd,
+        vy: Math.sin(angle) * spd - 0.6,
+        ay: 2.0,
+        life: 0.2 + Math.random() * 0.25,
+        size0: 0.1 + Math.random() * 0.06,
+        size1: 0.02,
+        r: pal.r, g: pal.g, b: pal.b,
+        a0: 0.85,
+      }));
+    }
+  });
+
+  world.on('corpse:misdirect', ({ at, misdirectedCount }) => {
+    if (!at || !canShowAt(at.x, at.y)) return;
+
+    ftext.addStatus(at.x, at.y - 0.35, 'THUD!', {
+      color: '#a86c3c',
+      life: 0.9,
+      scaleStart: 1.3,
+      scaleEnd: 1.0,
+    });
+
+    // Dirt/dust puff on impact
+    for (let i = 0; i < 10; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const spd = 0.3 + Math.random() * 0.6;
+      fx.pool.spawn(new Particle({
+        x: at.x + (Math.random() - 0.5) * 0.2,
+        y: at.y + (Math.random() - 0.5) * 0.2,
+        vx: Math.cos(angle) * spd,
+        vy: Math.sin(angle) * spd - 0.2,
+        ay: 0.4,
+        life: 0.3 + Math.random() * 0.3,
+        size0: 0.15 + Math.random() * 0.08,
+        size1: 0.03,
+        r: 140, g: 110, b: 70,
+        a0: 0.6,
+      }));
+    }
+
+    // Question mark particles for each misdirected mob (floating upward)
+    if (misdirectedCount > 0) {
+      for (let i = 0; i < Math.min(misdirectedCount, 5); i++) {
+        const ox = (Math.random() - 0.5) * 2.0;
+        const oy = (Math.random() - 0.5) * 2.0;
+        ftext.addStatus(at.x + ox, at.y + oy - 0.3, '?', {
+          color: '#ffcc44',
+          life: 1.2,
+          delay: 150 + i * 100,
+        });
+      }
+    }
+  });
+
   return { goreTick: goreCtrl.tick };
 }
