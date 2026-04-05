@@ -121,8 +121,8 @@ const tavX0 = homeX + 6;
 const tavY0 = homeY - 10;
 const tavX1 = homeX + 14;
 const tavY1 = homeY - 4;
-const tavDoorX = tavX0 + 4;
-const tavDoorY = tavY1;
+const tavDoorX = tavX0;
+const tavDoorY = tavY0 + 3;
 const millX0 = homeX - 10;
 const millY0 = homeY - 8;
 const millX1 = homeX - 6;
@@ -228,7 +228,7 @@ Deno.test("tavern and windmill keep their intended footprints, doors, and interi
     `${tavX0 + 5},${tavY0 + 4}`,
     `${tavX0 + 6},${tavY0 + 4}`,
   ]);
-  assertEquals(coordsOfKind(chunks, "tavern_sign"), [`${tavDoorX + 1},${tavDoorY}`]);
+  assertEquals(coordsOfKind(chunks, "tavern_sign"), [`${tavDoorX - 1},${tavDoorY - 1}`]);
 
   // Mill corners may be overwritten by cottage paths; check interior + door instead
   assertEquals(getWorldTile(chunks, millX0 + 1, millY0), TILE_WALL);
@@ -272,8 +272,8 @@ Deno.test("overworld gem shop and town center props include the gem sign and bul
 Deno.test("overworld commute paths no longer punch holes in nearby buildings", () => {
   const { chunks } = generateOverworldChunks(SEED);
 
-  assertEquals(getWorldTile(chunks, tavX0 + 7, tavDoorY), TILE_WALL);
-  assertEquals(getWorldTile(chunks, tavX0 + 8, tavDoorY), TILE_WALL);
+  assertEquals(getWorldTile(chunks, tavX0, tavDoorY - 1), TILE_WALL);
+  assertEquals(getWorldTile(chunks, tavX0, tavDoorY + 1), TILE_WALL);
   assertEquals(getWorldTile(chunks, apothX0 + 2, apothY0), TILE_WALL);
   assertEquals(getWorldTile(chunks, apothX0 + 8, apothY0), TILE_WALL);
   assertEquals(getWorldTile(chunks, apothX0 + 2, apothDoorY), TILE_WALL);

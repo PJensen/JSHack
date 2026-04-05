@@ -381,6 +381,8 @@
 				]);
 			}
 
+			const SW_BOOT_RELOAD_KEY = 'jshack:sw-bootstrap-reload';
+
 			function waitForServiceWorkerController(timeoutMs = 600) {
 				if (!('serviceWorker' in navigator)) return Promise.resolve(null);
 				if (navigator.serviceWorker.controller) return Promise.resolve(navigator.serviceWorker.controller);
@@ -428,10 +430,10 @@
 			}
 
 			async function prepareServiceWorker(version) {
-				if (!('serviceWorker' in navigator)) return;
+				if (!('serviceWorker' in navigator)) return false;
 				try {
 					const reg = await navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' });
-					const readyReg = await withTimeout(navigator.serviceWorker.ready, 600);
+					const readyReg = await withTimeout(navigator.serviceWorker.ready, 1500);
 					const firstWorker = navigator.serviceWorker.controller
 						|| (readyReg && readyReg.active)
 						|| reg.active
@@ -441,17 +443,34 @@
 
 					if (firstWorker) await postVersionToWorker(firstWorker, version);
 
-					const controller = navigator.serviceWorker.controller || await waitForServiceWorkerController(600);
+					const controller = navigator.serviceWorker.controller || await waitForServiceWorkerController(1500);
 					if (controller && controller !== firstWorker) {
 						await postVersionToWorker(controller, version);
 					}
+					return Boolean(navigator.serviceWorker.controller || controller);
 				} catch {}
+				return false;
 			}
 
 			async function bootApp() {
 				const version = await loadAppVersion();
 				window.VERSION = version;
-				await prepareServiceWorker(version);
+				const hasController = await prepareServiceWorker(version);
+				const reloadToken = `pending:${version}`;
+				if ('serviceWorker' in navigator && !hasController) {
+					try {
+						if (sessionStorage.getItem(SW_BOOT_RELOAD_KEY) !== reloadToken) {
+							sessionStorage.setItem(SW_BOOT_RELOAD_KEY, reloadToken);
+							location.reload();
+							return;
+						}
+					} catch {}
+				}
+				try {
+					if (sessionStorage.getItem(SW_BOOT_RELOAD_KEY) === reloadToken) {
+						sessionStorage.removeItem(SW_BOOT_RELOAD_KEY);
+					}
+				} catch {}
 				const script = document.createElement('script');
 				script.type = 'module';
 				script.src = `./src/main.js?v=${encodeURIComponent(version)}`;
