@@ -12,27 +12,69 @@ function sfx(id, opts) {
 }
 
 /**
+ * Resolve an item entity's type to a sound category.
+ * Falls back to "generic" for unknown types.
+ */
+function itemCategory(getItemInfo, itemId) {
+  const info = getItemInfo(itemId);
+  if (!info) return "generic";
+  const t = info.type;
+  if (t === "weapon") return "weapon";
+  if (t === "armor" || t === "shield" || t === "helmet" || t === "boots" || t === "gloves") return "armor";
+  if (t === "potion") return "potion";
+  if (t === "scroll") return "scroll";
+  if (t === "gold" || t === "coin") return "gold";
+  if (t === "food" || t === "corpse") return "food";
+  if (t === "gem") return "gem";
+  return "generic";
+}
+
+/**
+ * Map a spell damage type to an impact sound category.
+ */
+const SPELL_IMPACT_MAP = {
+  fire:      "spell:impact:fire",
+  ice:       "spell:impact:ice",
+  cold:      "spell:impact:ice",
+  electric:  "spell:impact:lightning",
+  lightning: "spell:impact:lightning",
+  shadow:    "spell:impact:shadow",
+  necrotic:  "spell:impact:shadow",
+  holy:      "spell:impact:holy",
+  radiant:   "spell:impact:holy",
+  poison:    "spell:impact:poison",
+  acid:      "spell:impact:poison",
+};
+
+/**
  * Install audio event listeners on the ECS world.
  * Call once during display setup.
  *
- * @param {{ world: object, isPlayer: (id: number) => boolean }} deps
+ * @param {{
+ *   world: object,
+ *   isPlayer: (id: number) => boolean,
+ *   getItemInfo: (id: number) => object|null,
+ * }} deps
  */
-export function installAudioWiring({ world, isPlayer }) {
+export function installAudioWiring({ world, isPlayer, getItemInfo }) {
 
   // ── Preload all registered sounds ─────────────────────────
   preload(allUrls());
 
   // ── Combat ────────────────────────────────────────────────
 
-  world.on('damaged', ({ cause, critical, target }) => {
+  world.on('damaged', ({ cause, critical, type }) => {
     if (cause === 'melee' || cause === 'offhand') {
       sfx(critical ? "melee:crit" : "melee:hit");
     }
-    // Ranged impacts handled via ranged:shot below
+    // Spell damage impacts — play an impact sound based on damage type
+    if (cause === 'spell' || cause === 'magic') {
+      const impactId = SPELL_IMPACT_MAP[type] || "spell:impact:physical";
+      sfx(impactId);
+    }
   });
 
   world.on('hit', (ctx) => {
-    // miss — hit event fires but ctx.missed is true in some flows
     if (ctx.missed) sfx("melee:miss");
   });
 
@@ -48,18 +90,28 @@ export function installAudioWiring({ world, isPlayer }) {
     }
   });
 
-  // ── Items ─────────────────────────────────────────────────
+  // ── Items (sound varies by item type) ─────────────────────
 
-  world.on('item:pickup', () => {
-    sfx("item:pickup");
+  world.on('item:pickup', ({ itemId }) => {
+    const cat = itemCategory(getItemInfo, itemId);
+    sfx(`item:pickup:${cat}`);
   });
 
-  world.on('item:dropped', () => {
-    sfx("item:drop");
+  world.on('item:dropped', ({ itemId }) => {
+    const cat = itemCategory(getItemInfo, itemId);
+    // Only weapon/armor/potion have distinct drop sounds; rest use generic
+    const dropId = (cat === "weapon" || cat === "armor" || cat === "potion")
+      ? `item:drop:${cat}`
+      : "item:drop:generic";
+    sfx(dropId);
   });
 
-  world.on('item:equipped', () => {
-    sfx("item:equip");
+  world.on('item:equipped', ({ itemId }) => {
+    const cat = itemCategory(getItemInfo, itemId);
+    const equipId = (cat === "weapon" || cat === "armor")
+      ? `item:equip:${cat}`
+      : "item:equip:generic";
+    sfx(equipId);
   });
 
   world.on('chest:open', () => {
@@ -72,8 +124,10 @@ export function installAudioWiring({ world, isPlayer }) {
     sfx(direction === 'up' ? "stair:ascend" : "stair:descend");
   });
 
-  // ── Spells ────────────────────────────────────────────────
-  // Each spell gets its own sound file.
+  // ── Spells (cast / launch sounds) ─────────────────────────
+  // Each spell gets its own sound on cast. Impact sounds fire
+  // separately via the 'damaged' handler above when the spell
+  // actually hits after travel time.
 
   const spellEvents = [
     'spell:bolt',

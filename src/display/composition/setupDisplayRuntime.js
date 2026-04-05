@@ -124,7 +124,7 @@ export function setupDisplayRuntime({
     dispatchRulesAction,
   });
 
-  installAudioWiring({ world, isPlayer });
+  installAudioWiring({ world, isPlayer, getItemInfo });
 
   return { statusEmitterFx, statusPresentationDelayFx, boltFx, delayedDeathFx, projectileFx, spellAreaFx, cloudFx, surfaceAreaFx, spiritWispFx, bumpFx, recoilFx, hitstopFx, deathEssenceFx, deathVfx, ftext, goreTick };
 }

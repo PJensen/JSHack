@@ -1,12 +1,17 @@
+import { createFrom } from "../../../lib/ecs-js/archetype.js";
+import { GoldStack } from "../../archetypes/Items.js";
+import { ItemInfo } from "../../components/ItemInfo.js";
 import { NamedIdentity } from "../../components/NamedIdentity.js";
 import { Player } from "../../components/Player.js";
 import { QuestVars } from "../../components/QuestVars.js";
+import { addToInventory } from "../../utils/inventoryFacade.js";
 import { emit, incVar, setVar } from "../actions.js";
 import { registerQuest } from "../registry.js";
 import { getQuestRecord } from "../runtime.js";
 
 export const RAT_INFESTATION_QUEST_ID = "starter.rat_infestation";
 export const REQUIRED_RAT_KILLS = 5;
+const REWARD_GOLD = 75;
 
 const RAT_HOOKS_KEY = Symbol.for("jshack:quests:ratInfestation:installed");
 
@@ -123,6 +128,18 @@ export const RatInfestationQuest = registerQuest({
             },
             actions: [
               setVar("reported", true),
+              (ctx) => {
+                const pid = Number(ctx.bind.player || 0);
+                if (!(pid > 0)) return;
+                const gid = createFrom(ctx.world, GoldStack, {});
+                ctx.world.mutate(gid, ItemInfo, (r) => { r.count = REWARD_GOLD; });
+                addToInventory(ctx.world, pid, gid);
+              },
+              emit("quest:reward", (ctx) => ({
+                questId: RAT_INFESTATION_QUEST_ID,
+                playerId: ctx.bind.player,
+                gold: REWARD_GOLD,
+              })),
               emit("quest:completed", (ctx) => ({
                 questId: RAT_INFESTATION_QUEST_ID,
                 playerId: ctx.bind.player,
