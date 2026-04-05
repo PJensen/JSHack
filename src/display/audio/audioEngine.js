@@ -172,13 +172,18 @@ function trackVoice(url, src, maxVoices) {
 
 // ── File loading ────────────────────────────────────────────
 
+/** Set<string> — URLs that 404'd or failed. Don't retry these. */
+const _failed = new Set();
+
 /**
  * Fetch + decode an audio file. Returns cached buffer on repeat calls.
+ * URLs that fail are blacklisted so we never retry them.
  * @param {string} url
  * @returns {Promise<AudioBuffer|null>}
  */
 function loadBuffer(url) {
   if (_cache.has(url)) return Promise.resolve(_cache.get(url));
+  if (_failed.has(url)) return Promise.resolve(null);
   if (_loading.has(url)) return _loading.get(url);
 
   const promise = fetch(url)
@@ -193,8 +198,9 @@ function loadBuffer(url) {
       return buf;
     })
     .catch(err => {
-      console.warn(`[audio] Failed to load ${url}:`, err.message);
+      console.warn(`[audio] ${url}: ${err.message}`);
       _loading.delete(url);
+      _failed.add(url);
       return null;
     });
 

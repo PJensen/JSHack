@@ -7,8 +7,19 @@ import { ArrowFx, ArrowSparkFx, RadialFx, StuckArrowFx } from "./fxEntries.js";
 import { resolveDominantProjectileVfx } from "../../bridge/schema/weaponVfxResolver.js";
 import { normalizedGoreType } from "../ui/wiring/goreEngine.js";
 import { setInputLock } from "../input/inputLock.js";
-import { playTracked } from "../audio/audioEngine.js";
-import { resolve as resolveSound } from "../audio/sounds.js";
+
+// Lazy audio imports — must not break projectile VFX if audio fails to load
+let _playTracked = null;
+let _resolveSound = null;
+let _audioLoaded = false;
+function _ensureAudio() {
+  if (_audioLoaded) return;
+  _audioLoaded = true;
+  try {
+    import("../audio/audioEngine.js").then(m => { _playTracked = m.playTracked; }).catch(() => {});
+    import("../audio/sounds.js").then(m => { _resolveSound = m.resolve; }).catch(() => {});
+  } catch (_) {}
+}
 
 /**
  * @param {{ world: import('../../lib/ecs-js/index.js').World, cam: object, fx: { pool: { spawn(o:object):void } }, getPosition: (id:number) => ({x:number,y:number}|null) }} deps
@@ -71,7 +82,9 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
     try { setInputLock('projectileFx', _hasInflight()); } catch (e) { console.debug('[projectileFx] input lock sync failed:', e); }
   }
 
-  /** @param {number} dt */
+  /** WeakMap<ArrowFx, { updatePan, updateVolume, stop }> — travel audio handles */
+  const _travelAudio = new WeakMap();
+
   /**
    * Update travel audio pan for a projectile based on current interpolated position.
    * Pan is relative to the camera center (cam.x), which tracks the player.
@@ -638,8 +651,7 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
     venom:        "travel:poison",
   };
 
-  /** WeakMap<ArrowFx, { updatePan, updateVolume, stop }> */
-  const _travelAudio = new WeakMap();
+
 
   function spawnTransientProjectile({
     from,
@@ -674,11 +686,12 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
 
     // Attach travel sound if registered and flight is long enough to hear
     if (duration >= 0.15) {
+      _ensureAudio();
       const soundId = TRAVEL_SOUND[style];
-      if (soundId) {
-        const s = resolveSound(soundId);
+      if (soundId && _playTracked && _resolveSound) {
+        const s = _resolveSound(soundId);
         if (s) {
-          const handle = playTracked(s.url, { bus: s.bus, loop: true, volume: 0.6 });
+          const handle = _playTracked(s.url, { bus: s.bus, loop: true, volume: 0.6 });
           if (handle) _travelAudio.set(entry, handle);
         }
       }
