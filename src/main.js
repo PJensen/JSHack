@@ -6304,7 +6304,7 @@ function render(worldView) {
       drawProcStateBadges(bctx, renderEntity.pos.x, renderEntity.pos.y, renderEntity.procStates, _fxTime, renderEntity.id);
     }
 
-    // Equipment corner badges — weapon (bottom-right) and shield (bottom-left) icons
+    // Equipment corner badges — melee right, ranged/zap bottom-left, shield top-left
     if (renderEntity.equipBadges) {
       const eb = renderEntity.equipBadges;
       const resolved = {};
@@ -6312,6 +6312,16 @@ function render(worldView) {
         const pe = palette[eb.weaponIdentity];
         if (pe) { resolved.weaponGlyph = pe.glyph; resolved.weaponColor = pe.fg; }
         else { resolved.weaponGlyph = ')'; resolved.weaponColor = '#bbbbbb'; }
+      }
+      if (eb.offhandIdentity) {
+        const pe = palette[eb.offhandIdentity];
+        if (pe) { resolved.offhandGlyph = pe.glyph; resolved.offhandColor = pe.fg; }
+        else { resolved.offhandGlyph = ')'; resolved.offhandColor = '#bbbbbb'; }
+      }
+      if (eb.rangedIdentity) {
+        const pe = palette[eb.rangedIdentity];
+        if (pe) { resolved.rangedGlyph = pe.glyph; resolved.rangedColor = pe.fg; }
+        else { resolved.rangedGlyph = ')'; resolved.rangedColor = '#88bbdd'; }
       }
       if (eb.shieldIdentity) {
         const pe = palette[eb.shieldIdentity];
