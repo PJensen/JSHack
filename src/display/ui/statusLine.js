@@ -40,6 +40,10 @@ export function initStatusLine() {
   let luck = 0;
   let armorClass = 10;
   let critPct = 0;
+  let scoreTarget = 0;
+  let scoreDisplay = 0;
+  let scoreClimbing = false;
+  let scoreValueEl = null; // cached ref into the DOM for live updates
 
 
   function colorForDelta(value) {
@@ -78,6 +82,7 @@ export function initStatusLine() {
     pushSegment(parts, 'DLvl', String(depth));
     pushSegment(parts, 'Turn', String(turn));
     pushSegment(parts, 'Gold', String(gold), '#ffde5a');
+    pushSegment(parts, 'Score', String(Math.floor(scoreDisplay)), '#c8f4ff');
     pushSegment(parts, 'Atk', String(atk), atk > 0 ? '#64c87a' : '#98a0ab');
     pushSegment(parts, 'Def', String(def), def > 0 ? '#64c87a' : '#98a0ab');
     pushSegment(parts, 'Lk', fmtSigned(luck), colorForDelta(luck));
@@ -94,6 +99,41 @@ export function initStatusLine() {
       }
       statsLine.appendChild(parts[i]);
     }
+    // Cache the Score value span for live tick-up updates without full re-render
+    const scoreWrap = parts[3]; // Score is the 4th segment
+    scoreValueEl = scoreWrap?.querySelector('span:last-child') || null;
+  }
+
+  // Arcade score tick-up — runs on rAF while climbing
+  let _scoreRafId = 0;
+  let _scorePrevTime = 0;
+  function tickScore(now) {
+    _scoreRafId = 0;
+    if (scoreDisplay >= scoreTarget) {
+      scoreClimbing = false;
+      if (scoreValueEl) scoreValueEl.style.textShadow = '';
+      return;
+    }
+    const dt = Math.min(0.1, (now - _scorePrevTime) / 1000);
+    _scorePrevTime = now;
+    const gap = scoreTarget - scoreDisplay;
+    const step = Math.max(1, Math.ceil(gap * 6 * dt));
+    scoreDisplay = Math.min(scoreTarget, scoreDisplay + step);
+    if (scoreValueEl) {
+      scoreValueEl.textContent = String(Math.floor(scoreDisplay));
+      // Pulse glow while climbing
+      const intensity = Math.min(1, gap / 80);
+      const blur = 4 + intensity * 8;
+      scoreValueEl.style.textShadow = `0 0 ${blur}px rgba(200,244,255,${0.5 + intensity * 0.4})`;
+    }
+    _scoreRafId = requestAnimationFrame(tickScore);
+  }
+
+  function startScoreClimb() {
+    if (scoreClimbing) return; // already running
+    scoreClimbing = true;
+    _scorePrevTime = performance.now();
+    _scoreRafId = requestAnimationFrame(tickScore);
   }
 
 
@@ -120,6 +160,21 @@ export function initStatusLine() {
     const e = ev;
     gold = Math.max(0, Number(e?.detail?.gold ?? gold) | 0);
     renderStats();
+  });
+
+  window.addEventListener('ui:updateScore', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const incoming = Math.max(0, Number(e?.detail?.score ?? 0) | 0);
+    if (incoming > scoreTarget) {
+      scoreTarget = incoming;
+      startScoreClimb();
+    } else if (incoming !== scoreTarget) {
+      // Score reset (new game, etc.)
+      scoreTarget = incoming;
+      scoreDisplay = incoming;
+      renderStats();
+    }
   });
 
   window.addEventListener('ui:updateCombatHUD', (ev) => {
