@@ -15,6 +15,7 @@ const QUEST_EVENT_ROUTES_KEY = Symbol.for("jshack:quests:runtime:eventRoutes");
 const QUEST_SCRIPT_ID = "quest.runtime";
 export const STARTER_PRIEST_FETCH_QUEST_ID = "starter.priest_fetch";
 export const STARTER_GRAVEYARD_QUEST_ID = STARTER_PRIEST_FETCH_QUEST_ID;
+export const STARTER_RAT_QUEST_ID = "starter.rat_infestation";
 
 function cloneVars(data) {
   const v = data || {};
@@ -210,19 +211,31 @@ export function ensureStarterQuests(world) {
   }
 
   let priestId = 0;
+  let barkeepId = 0;
   for (const [id, ni] of world.query(NamedIdentity)) {
-    if (String(ni.identity || "") === "townfolk_priest") {
-      priestId = id;
-      break;
-    }
+    const identity = String(ni.identity || "");
+    if (identity === "townfolk_priest") priestId = id;
+    if (identity === "townfolk_barkeep") barkeepId = id;
   }
-  if (!(priestId > 0)) return 0;
 
-  return instantiateQuest(world, STARTER_PRIEST_FETCH_QUEST_ID, {
-    player: playerId,
-    giver: priestId,
-    target: priestId,
-  }, {}, { node: "offer" });
+  let lastId = 0;
+  if (priestId > 0 && findQuestEntity(world, STARTER_PRIEST_FETCH_QUEST_ID, playerId) <= 0) {
+    lastId = instantiateQuest(world, STARTER_PRIEST_FETCH_QUEST_ID, {
+      player: playerId,
+      giver: priestId,
+      target: priestId,
+    }, {}, { node: "offer" });
+  }
+
+  if (barkeepId > 0 && findQuestEntity(world, STARTER_RAT_QUEST_ID, playerId) <= 0) {
+    lastId = instantiateQuest(world, STARTER_RAT_QUEST_ID, {
+      player: playerId,
+      giver: barkeepId,
+      target: barkeepId,
+    }, {}, { node: "offer" });
+  }
+
+  return lastId;
 }
 
 export function isPlayerNearIdentity(world, playerId, identity, radius = 1) {

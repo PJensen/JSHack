@@ -107,10 +107,6 @@ const houseStairAnchorX = eastWalkX + 1;
 const houseStairAnchorY = homeY + 2;
 const wellX = houseStairAnchorX + 5;
 const wellY = houseStairAnchorY;
-const bedX0 = fountainCX + 3;
-const bedY0 = fountainCY - 1;
-const stairX = bedX0;
-const stairY = bedY0 + 1;
 const gateX = homeX + 1;
 const gateY = homeY + 5;
 const farmX0 = homeX - 4;
@@ -119,6 +115,8 @@ const farmY0 = homeY + 6;
 const farmY1 = homeY + 18;
 const tavX0 = homeX + 6;
 const tavY0 = homeY - 10;
+const stairX = tavX0 + 4;
+const stairY = tavY0 + 5;
 const tavX1 = homeX + 14;
 const tavY1 = homeY - 4;
 const tavDoorX = tavX0;
@@ -171,12 +169,13 @@ Deno.test("overworld scales the player house down to a 9x5 footprint with a fron
   assertEquals(getWorldTile(chunks, eastWalkX, southWalkY), TILE_FLOOR);
 });
 
-Deno.test("overworld places the non-crypt dungeon entrance in the church square approach", () => {
+Deno.test("overworld places the dungeon entrance inside the tavern", () => {
   const { chunks } = generateOverworldChunks(SEED);
 
   assertEquals(getWorldTile(chunks, stairX, stairY), TILE_STAIR_DOWN);
-  assertEquals(getWorldTile(chunks, stairX - 1, stairY), TILE_COBBLESTONE);
-  assertEquals(getWorldTile(chunks, stairX, stairY + 1), TILE_GRASS);
+  // Cobblestone path leads from fountain plaza to tavern door
+  assertEquals(getWorldTile(chunks, tavDoorX, tavDoorY), TILE_DOOR);
+  assertEquals(getWorldTile(chunks, tavDoorX - 2, tavDoorY), TILE_COBBLESTONE);
 });
 
 Deno.test("overworld farm keeps the full tilled plot and uses a real fence gate", () => {

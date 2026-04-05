@@ -610,6 +610,10 @@ export function generateOverworldChunks(worldSeed) {
   addSpawn(chunks, tavX0 + 7, tavY0 + 2, "tavern_chest");
   addSpawn(chunks, tavX0 + 7, tavY0 + 4, "cooking_fire");
   addSpawn(chunks, tavDoorX - 1, tavDoorY - 1, "tavern_sign");
+  // Dungeon entrance — cellar hatch in the tavern's open south row
+  const stairX = tavX0 + 4;
+  const stairY = tavY0 + 5;
+  setWorldTile(chunks, stairX, stairY, TILE_STAIR_DOWN);
 
   // ── Windmill — slightly larger square so the millstone is not jammed into the shell ──
   const millX0 = homeX - 10;
@@ -758,27 +762,10 @@ export function generateOverworldChunks(worldSeed) {
   addSpawn(chunks, fountainCX, fountainCY, "fountain");
   addSpawn(chunks, fountainCX - 3, fountainCY + 1, "message_board");
 
-  // ── Flowers — small bed near fountain + scattered decorative across town ──
-  const flowerKinds = [
-    "flower_rose", "flower_sunflower", "flower_tulip",
-    "flower_daisy", "flower_bluebell",
-  ];
-  let flowerIdx = 0;
-  // Small flower bed east of fountain plaza
-  const bedX0 = fountainCX + 3;
-  const bedY0 = fountainCY - 1;
-  for (let fy = bedY0; fy <= bedY0 + 2; fy++) {
-    for (let fx = bedX0; fx <= bedX0 + 2; fx++) {
-      setWorldTile(chunks, fx, fy, TILE_GRASS);
-      if ((fx + fy) % 2 === 0) {
-        addSpawn(chunks, fx, fy, flowerKinds[flowerIdx++ % flowerKinds.length]);
-      }
-    }
+  // ── Cobblestone path from fountain plaza east to tavern door ──
+  for (let px = fountainCX + 3; px <= tavDoorX; px++) {
+    setWorldTile(chunks, px, tavDoorY, TILE_COBBLESTONE);
   }
-  // Main non-crypt down stair: church square, right-side flower bed in front of the church.
-  const stairX = bedX0;
-  const stairY = bedY0 + 1;
-  setWorldTile(chunks, stairX, stairY, TILE_STAIR_DOWN);
 
   // ── Worker cottages — actual homes for the town to sleep in ─────────────
   const farmerHouse = buildCottage(chunks, homeX + 8, homeY + 10, "north");
@@ -859,29 +846,6 @@ export function generateOverworldChunks(worldSeed) {
   carvePath(chunks, bookDoor.x, bookDoor.y + 1, bookDoor.x, northWalkY);
   carvePath(chunks, bookDoor.x, northWalkY, eastWalkX, northWalkY);
 
-  // Scattered decorative flowers near buildings and paths
-  const scatteredFlowers = [
-    // Near farm fence
-    { x: farmX0 - 1, y: fenceY },
-    { x: farmX1 + 1, y: fenceY },
-    // Near church entrance
-    { x: churchDoorX - 2, y: churchDoorY + 1 },
-    { x: churchDoorX + 2, y: churchDoorY + 1 },
-    // Near cottage doorsteps
-    { x: farmerHouse.doorX + 1, y: farmerHouse.doorY - 1 },
-    { x: masonHouse.doorX + 1, y: masonHouse.doorY + 1 },
-    { x: villagerHouse.doorX - 1, y: villagerHouse.doorY - 1 },
-    { x: priestHouse.doorX + 1, y: priestHouse.doorY + 1 },
-    { x: barkeepHouse.doorX - 1, y: barkeepHouse.doorY + 1 },
-    { x: herbalistDoor.x + 1, y: herbalistDoor.y + 1 },
-    { x: alchemistHouse.doorX - 1, y: alchemistHouse.doorY + 1 },
-    { x: gemVendorHouse.doorX + 1, y: gemVendorHouse.doorY + 1 },
-  ];
-  for (const p of scatteredFlowers) {
-    const t = getWorldTile(chunks, p.x, p.y);
-    if (t !== TILE_GRASS && t !== TILE_GRASS_A && t !== TILE_GRASS_C && t !== TILE_GRASS_D) continue;
-    addSpawn(chunks, p.x, p.y, flowerKinds[flowerIdx++ % flowerKinds.length]);
-  }
 
   // Natural harvestables are placed after all structures so they cannot end up in walls or on paths.
   for (const p of berrySpots) {
@@ -980,7 +944,7 @@ export function generateOverworldChunks(worldSeed) {
     scheduleEnabled: true,
     homeX: villagerHouse.standX, homeY: villagerHouse.standY,
     bedX: villagerHouse.sleepX, bedY: villagerHouse.sleepY,
-    workX: bedX0 + 1, workY: bedY0 + 1,
+    workX: fountainCX + 1, workY: fountainCY + 1,
     workAuxX: homeX - 3, workAuxY: southWalkY + 1,
     pubX: tavX0 + 6, pubY: tavY0 + 2,
   });
