@@ -1,11 +1,14 @@
 import { ActiveEffects } from "../components/ActiveEffects.js";
+import { CombatPosture, COMBAT_POSTURES } from "../components/CombatPosture.js";
 import { Equipment } from "../components/Equipment.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
+import { Stamina } from "../components/Stamina.js";
+import { STAMINA_REGEN_COOLDOWN } from "../data/regenConstants.js";
 
 export const SHIELD_GUARD_KEY = "shield_guard";
 export const SHIELD_BROKEN_KEY = "shield_broken";
-export const SHIELD_MAX_GUARD_STACKS = 3;
+export const SHIELD_MAX_GUARD_STACKS = 2;
 
 function toInt(value, fallback = 0) {
   const n = Number(value);
@@ -95,7 +98,9 @@ export function refreshShieldGuard(world, entityId) {
   if (!ae) return;
   const effects = ae.effects;
   const broken = findEffect(effects, SHIELD_BROKEN_KEY);
-  if (!hasEquippedShield(world, id)) {
+  const posture = world.get(id, CombatPosture);
+  const stance = String(posture?.stance || "").toLowerCase();
+  if (!hasEquippedShield(world, id) || stance !== COMBAT_POSTURES.guarded) {
     removeEffect(effects, SHIELD_GUARD_KEY);
     removeEffect(effects, SHIELD_BROKEN_KEY);
     return;
@@ -139,6 +144,17 @@ export function consumeShieldGuardStack(world, entityId, context = {}) {
   const nextStacks = Math.max(0, toInt(guard.stacks, SHIELD_MAX_GUARD_STACKS) - 1);
   guard.stacks = nextStacks;
   guard.turnsLeft = Math.max(2, toInt(guard.turnsLeft, 0));
+  // Drain stamina proportional to damage blocked: floor(damage * 0.5)
+  const dmgAmount = Math.max(0, Number(context.damageAmount || 0) | 0);
+  if (dmgAmount > 0) {
+    const stam = world.get(id, Stamina);
+    if (stam) {
+      const cost = Math.floor(dmgAmount * 0.5);
+      stam.stamina = Math.max(0, (Number(stam.stamina) || 0) - cost);
+      stam.regenCooldown = STAMINA_REGEN_COOLDOWN;
+    }
+  }
+
   if (nextStacks > 0) {
     try {
       world.emit?.("shield:chip", {
