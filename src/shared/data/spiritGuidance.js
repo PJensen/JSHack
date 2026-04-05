@@ -13,6 +13,21 @@
  * @property {string}  [pointTo]   — CSS selector of a UI button the wisp orb flies to in screen-space
  */
 
+/**
+ * True when the device looks like a touch-first / mobile device.
+ * Evaluated once at module load — fine because the device class won't
+ * change mid-session.
+ */
+const _touch = (() => {
+  if (typeof window === "undefined") return false;
+  try {
+    const coarse = typeof window.matchMedia === "function"
+      && window.matchMedia("(pointer: coarse)").matches;
+    const touchPoints = Number(window.navigator?.maxTouchPoints || 0);
+    return coarse || touchPoints > 0;
+  } catch { return false; }
+})();
+
 /** @type {GuidanceTip[]} */
 export const GUIDANCE_TIPS = [
   // ── Early game (overworld, first steps) ───────────────────────────
@@ -24,13 +39,15 @@ export const GUIDANCE_TIPS = [
   },
   {
     id: "movement",
-    text: "Arrow keys or WASD to move.",
+    text: _touch
+      ? "Tap where you want to go."
+      : "Tap, arrow keys, or WASD to move.",
     durationSec: 3,
     delaySec: 0.6,
   },
   {
     id: "seek_barkeep",
-    text: "The barkeep may know what ails this village \u2014 seek them out.",
+    text: "The barkeep may know what ails this village \u2014 look, one approaches.",
     durationSec: 5,
     delaySec: 0.6,
     flyTo: "npc",
