@@ -2282,4 +2282,54 @@ export function installMessageWiring({
   world.on('trap:gas', () => {
     log('A cloud of noxious gas billows from the trap!', 'warning');
   });
+
+  // ── Wild Throw Interactions ────────────────────────────────────────────
+
+  const WAND_SHATTER_MSG = Object.freeze({
+    electric: 'The wand explodes in a storm of lightning!',
+    fire:     'The wand detonates in a ball of flame!',
+    cold:     'The wand shatters in a wave of frost!',
+    holy:     'The wand bursts in a pulse of healing light!',
+  });
+  world.on('wand:shatter', ({ actor, element, charges, hitCount }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    const msg = WAND_SHATTER_MSG[element] || 'The wand shatters violently!';
+    log(`${msg} (${charges} charge${charges !== 1 ? 's' : ''} released, ${hitCount} hit)`, 'legendary');
+  });
+
+  const SPLASH_EFFECT_MSG = Object.freeze({
+    stun:           'The potion shatters — paralytic liquid drenches the area!',
+    hallucinating:  'The potion shatters — iridescent fumes swirl outward!',
+    blinded:        'The potion shatters — inky darkness splashes across the ground!',
+    weakened:       'The potion shatters — a grey mist saps the air!',
+    poison:         'The potion shatters — toxic sludge splashes everywhere!',
+    confused:       'The potion shatters — disorienting vapour billows out!',
+    lethargic:      'The potion shatters — a thick grey fog clings to the ground!',
+    berserk:        'The potion shatters — liquid adrenaline sprays everywhere!',
+    resist_fire:    'The potion shatters — a shimmering heat ward splashes outward!',
+    resist_poison:  'The potion shatters — emerald tonic coats the area!',
+    resist_electric:'The potion shatters — crackling energy grounds outward!',
+    resist_acid:    'The potion shatters — thick amber syrup coats the area!',
+    mana_drain:     'The potion shatters — arcane static crackles through the air!',
+  });
+  world.on('potion:splash', ({ actor, effectKey, hitCount }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    const msg = SPLASH_EFFECT_MSG[effectKey] || 'The potion shatters on impact!';
+    const hitSuffix = hitCount > 0 ? ` (${hitCount} drenched)` : '';
+    log(`${msg}${hitSuffix}`, effectKey && effectKey.startsWith('resist') ? 'system' : 'danger');
+  });
+  world.on('potion:splash:dud', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('The potion shatters harmlessly — the oily liquid just pools on the ground.', 'system');
+  });
+
+  world.on('corpse:misdirect', ({ actor, identity, misdirectedCount, isUndead }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    const label = String(identity || '').replace(/^corpse_/, '').replace(/_/g, ' ');
+    if (isUndead) {
+      log(`You hurl the ${label} corpse — nearby undead hesitate, recognising their own.`, 'system');
+    } else if (misdirectedCount > 0) {
+      log(`The ${label} corpse hits the ground with a meaty thud — ${misdirectedCount} creature${misdirectedCount !== 1 ? 's investigate' : ' investigates'} the noise!`, 'system');
+    }
+  });
 }
