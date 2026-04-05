@@ -9,6 +9,7 @@ import { Mana } from '../components/Mana.js';
 import { Brain } from '../components/Brain.js';
 import { Channeling } from '../components/Channeling.js';
 import { Faction } from '../components/Faction.js';
+import { areFactionsHostile } from '../utils/factionHostility.js';
 import { EFFECT_DEFS } from '../data/effectDefs.js';
 import { dealDamage } from '../utils/dealDamage.js';
 import { compactDotEffects } from '../utils/effectSemantics.js';
@@ -451,7 +452,7 @@ function _processSwarmJumps(world, jumps) {
             const vit = world.get(cid, Vitality);
             if (!vit || (vit.hp | 0) <= 0) continue;
             const fac = world.get(cid, /** @type any */ (Faction));
-            if (!fac || String(fac.key || '') === 'player') continue;
+            if (!fac || !areFactionsHostile('player', String(fac.key || ''))) continue;
             const cdist2 = d2(spos.x, spos.y, cp.x, cp.y);
             if (cdist2 > radius * radius || cdist2 >= bestD2) continue;
             // Skip if already swarmed
