@@ -621,6 +621,110 @@ export function registerBuiltinCommands(console, { world, messageLog, lightingEn
     });
     return `Killed entity #${targetId}.`;
   });
+
+  // ══════════════════════════════════════════════════════════
+  //  Audio debug commands
+  // ══════════════════════════════════════════════════════════
+
+  let _audio = null;
+  function audio() {
+    if (!_audio) {
+      try { _audio = import("../../display/audio/index.js"); } catch (_) {}
+    }
+    return _audio;
+  }
+  let _sounds = null;
+  function sounds() {
+    if (!_sounds) {
+      try { _sounds = import("../../display/audio/sounds.js"); } catch (_) {}
+    }
+    return _sounds;
+  }
+
+  console.registerCommand('sfx', 'sfx <sound-id> [volume] [pitch] — play a sound by registry ID', async (argsStr) => {
+    const [id, volStr, pitchStr] = argsStr.trim().split(/\s+/);
+    if (!id) return 'Usage: sfx <sound-id> [volume 0-1] [randomPitch cents]\nUse "sfx list" to see all IDs.';
+    if (id === 'list') {
+      const s = await sounds();
+      const ids = s.allIds();
+      const loaded = [];
+      const missing = [];
+      for (const sid of ids) {
+        const r = s.resolve(sid);
+        // Check cache by trying to see if url would resolve
+        (r ? loaded : missing).push(sid);
+      }
+      return `${ids.length} registered sounds:\n${ids.map(i => {
+        const r = s.resolve(i);
+        return `  ${i}  →  ${r?.file || '?'}  [${r?.bus || '?'}]`;
+      }).join('\n')}`;
+    }
+    const a = await audio();
+    const s = await sounds();
+    const resolved = s.resolve(id);
+    if (!resolved) return `Unknown sound ID: "${id}"\nUse "sfx list" to see all IDs.`;
+    const opts = { bus: resolved.bus, maxVoices: resolved.maxVoices };
+    if (volStr) opts.volume = Math.max(0, Math.min(1, parseFloat(volStr)));
+    if (pitchStr) opts.randomPitch = Math.abs(parseInt(pitchStr, 10));
+    a.play(resolved.url, opts);
+    return `▶ ${id} → ${resolved.file} [bus:${resolved.bus}]${opts.volume != null ? ` vol:${opts.volume}` : ''}${opts.randomPitch ? ` pitch:±${opts.randomPitch}¢` : ''}`;
+  });
+
+  console.registerCommand('sfx-volume', 'sfx-volume [0-1] — get/set master volume', async (argsStr) => {
+    const a = await audio();
+    const v = argsStr.trim();
+    if (!v) return `Master volume: ${a.getVolume().toFixed(2)}`;
+    const n = Math.max(0, Math.min(1, parseFloat(v)));
+    a.setVolume(n);
+    return `Master volume set to ${n.toFixed(2)}`;
+  });
+
+  console.registerCommand('sfx-bus', 'sfx-bus [name] [0-1] — get/set bus volume (combat/spells/items/ambient/ui)', async (argsStr) => {
+    const a = await audio();
+    const [name, volStr] = argsStr.trim().split(/\s+/);
+    if (!name) {
+      const buses = ['combat', 'spells', 'items', 'ambient', 'ui'];
+      return buses.map(b => `  ${b}: ${a.getBusVolume(b).toFixed(2)}`).join('\n');
+    }
+    if (!volStr) return `${name}: ${a.getBusVolume(name).toFixed(2)}`;
+    const n = Math.max(0, Math.min(1, parseFloat(volStr)));
+    a.setBusVolume(name, n);
+    return `${name} bus volume set to ${n.toFixed(2)}`;
+  });
+
+  console.registerCommand('sfx-mute', 'sfx-mute — toggle mute', async () => {
+    const a = await audio();
+    a.setMuted(!a.isMuted());
+    return a.isMuted() ? 'Audio muted' : 'Audio unmuted';
+  });
+
+  console.registerCommand('sfx-reverb', 'sfx-reverb [0-1] — get/set reverb wet mix', async (argsStr) => {
+    const a = await audio();
+    const v = argsStr.trim();
+    if (!v) return `Reverb mix: ${a.getReverbMix().toFixed(2)}`;
+    const n = Math.max(0, Math.min(1, parseFloat(v)));
+    a.setReverbMix(n);
+    return `Reverb mix set to ${n.toFixed(2)}`;
+  });
+
+  console.registerCommand('sfx-test', 'sfx-test [bus] — play all sounds in a bus (or all sounds)', async (argsStr) => {
+    const a = await audio();
+    const s = await sounds();
+    const filterBus = argsStr.trim().toLowerCase() || null;
+    const ids = s.allIds();
+    let count = 0;
+    let delay = 0;
+    for (const id of ids) {
+      const r = s.resolve(id);
+      if (!r) continue;
+      if (filterBus && r.bus !== filterBus) continue;
+      if (r.file === 'rain_loop.wav') continue; // skip loops
+      a.play(r.url, { bus: r.bus, delay });
+      delay += 0.6;
+      count++;
+    }
+    return `Playing ${count} sounds with 0.6s spacing${filterBus ? ` (bus: ${filterBus})` : ''}…`;
+  });
 }
 
 function fmtNum(n) {

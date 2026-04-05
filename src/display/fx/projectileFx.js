@@ -7,6 +7,8 @@ import { ArrowFx, ArrowSparkFx, RadialFx, StuckArrowFx } from "./fxEntries.js";
 import { resolveDominantProjectileVfx } from "../../bridge/schema/weaponVfxResolver.js";
 import { normalizedGoreType } from "../ui/wiring/goreEngine.js";
 import { setInputLock } from "../input/inputLock.js";
+import { playTracked } from "../audio/audioEngine.js";
+import { resolve as resolveSound } from "../audio/sounds.js";
 
 /**
  * @param {{ world: import('../../lib/ecs-js/index.js').World, cam: object, fx: { pool: { spawn(o:object):void } }, getPosition: (id:number) => ({x:number,y:number}|null) }} deps
@@ -70,6 +72,27 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
   }
 
   /** @param {number} dt */
+  /**
+   * Update travel audio pan for a projectile based on current interpolated position.
+   * Pan is relative to the camera center (cam.x), which tracks the player.
+   */
+  function _tickTravelAudio(entry) {
+    const handle = _travelAudio.get(entry);
+    if (!handle) return;
+    const hx = entry.from.x + (entry.to.x - entry.from.x) * entry.progress;
+    const cx = cam?.x ?? 0;
+    handle.updatePan(Math.max(-1, Math.min(1, (hx - cx) / 8)));
+  }
+
+  /** Stop travel audio for a projectile that has arrived or been removed. */
+  function _stopTravelAudio(entry) {
+    const handle = _travelAudio.get(entry);
+    if (handle) {
+      handle.stop();
+      _travelAudio.delete(entry);
+    }
+  }
+
   function tick(dt) {
     // Arrows
     for (let i = _arrowFx.length - 1; i >= 0; i--) {
@@ -125,8 +148,10 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
           }
         }
       }
+      _tickTravelAudio(a);
       a.tick(dt);
       if (a.arrived) {
+        _stopTravelAudio(a);
         // Arrow arrived — spawn impact spark
         _arrowSparks.push(new ArrowSparkFx({ x: a.to.x, y: a.to.y, ttl: 0.18, style: a.style || 'plain' }));
         _arrowFx.splice(i, 1);
@@ -183,9 +208,11 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
         }
       }
 
+      _tickTravelAudio(sb);
       sb.tick(dt);
 
       if (sb.arrived) {
+        _stopTravelAudio(sb);
         // Impact radial burst
         _sboltImpact.push(new RadialFx({ x: sb.to.x, y: sb.to.y, radius: 0.9, ttl: 0.50 }));
         startShake(cam, 4, 0.16);
@@ -265,9 +292,11 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
         }
       }
 
+      _tickTravelAudio(fb);
       fb.tick(dt);
 
       if (fb.arrived) {
+        _stopTravelAudio(fb);
         // Impact radial burst
         _fireballImpact.push(new RadialFx({ x: fb.to.x, y: fb.to.y, radius: 0.7, ttl: 0.40 }));
         startShake(cam, 3, 0.12);
@@ -345,9 +374,11 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
         }
       }
 
+      _tickTravelAudio(fb);
       fb.tick(dt);
 
       if (fb.arrived) {
+        _stopTravelAudio(fb);
         // Impact radial burst
         _frostboltImpact.push(new RadialFx({ x: fb.to.x, y: fb.to.y, radius: 0.7, ttl: 0.40 }));
         startShake(cam, 3, 0.14);
@@ -402,9 +433,11 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
     // Ricochet Theology projectiles
     for (let i = _ricochetFx.length - 1; i >= 0; i--) {
       const bolt = _ricochetFx[i];
+      _tickTravelAudio(bolt);
       bolt.tick(dt);
 
       if (bolt.arrived) {
+        _stopTravelAudio(bolt);
         _ricochetImpact.push(new RadialFx({ x: bolt.to.x, y: bolt.to.y, radius: 0.55, ttl: 0.22 }));
         startShake(cam, 2, 0.08);
 
@@ -465,9 +498,11 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
         }
       }
 
+      _tickTravelAudio(sw);
       sw.tick(dt);
 
       if (sw.arrived) {
+        _stopTravelAudio(sw);
         // Impact: swarm burst
         _swarmImpact.push(new RadialFx({ x: sw.to.x, y: sw.to.y, radius: 0.6, ttl: 0.45 }));
         startShake(cam, 2, 0.08);
@@ -531,9 +566,11 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
         }
       }
 
+      _tickTravelAudio(ws);
       ws.tick(dt);
 
       if (ws.arrived) {
+        _stopTravelAudio(ws);
         // Impact: sticky web radial + particle burst
         _webSpitImpact.push(new RadialFx({ x: ws.to.x, y: ws.to.y, radius: 0.8, ttl: 0.55 }));
         startShake(cam, 3, 0.10);
@@ -588,6 +625,22 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
     _syncInputLock();
   }
 
+  // ── Travel sound mapping (projectile style → sound ID) ────
+  const TRAVEL_SOUND = {
+    fireball:     "travel:fire",
+    frostbolt:    "travel:ice",
+    shadow_bolt:  "travel:shadow",
+    plague_swarm: "travel:poison",
+    plain:        "travel:arrow",
+    fire:         "travel:fire",
+    frost:        "travel:ice",
+    storm:        "travel:lightning",
+    venom:        "travel:poison",
+  };
+
+  /** WeakMap<ArrowFx, { updatePan, updateVolume, stop }> */
+  const _travelAudio = new WeakMap();
+
   function spawnTransientProjectile({
     from,
     to,
@@ -618,6 +671,18 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
     else if (style === 'web_spit') _webSpitFx.push(entry);
     else if (style === 'plague_swarm') _swarmFx.push(entry);
     else _arrowFx.push(entry);
+
+    // Attach travel sound if registered and flight is long enough to hear
+    if (duration >= 0.15) {
+      const soundId = TRAVEL_SOUND[style];
+      if (soundId) {
+        const s = resolveSound(soundId);
+        if (s) {
+          const handle = playTracked(s.url, { bus: s.bus, loop: true, volume: 0.6 });
+          if (handle) _travelAudio.set(entry, handle);
+        }
+      }
+    }
 
     _syncInputLock();
   }

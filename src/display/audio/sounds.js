@@ -81,6 +81,15 @@ const SOUNDS = {
   "spell:web_spit":      { file: "spell_web_spit.wav",      bus: "spells" },
   "spell:fizzle":        { file: "spell_fizzle.wav",        bus: "spells" },
 
+  // ── Spell travel (in-flight projectile) ────────
+  "travel:fire":       { file: "travel_fire.wav",      bus: "spells" },
+  "travel:ice":        { file: "travel_ice.wav",       bus: "spells" },
+  "travel:lightning":   { file: "travel_lightning.wav",  bus: "spells" },
+  "travel:shadow":     { file: "travel_shadow.wav",    bus: "spells" },
+  "travel:holy":       { file: "travel_holy.wav",      bus: "spells" },
+  "travel:poison":     { file: "travel_poison.wav",    bus: "spells" },
+  "travel:arrow":      { file: "travel_arrow.wav",     bus: "combat" },
+
   // ── Spell impacts (hit after travel) ───────────
   "spell:impact:fire":      { file: "impact_fire.wav",      bus: "spells", maxVoices: 4 },
   "spell:impact:ice":       { file: "impact_ice.wav",       bus: "spells", maxVoices: 4 },
