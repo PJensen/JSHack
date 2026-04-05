@@ -429,6 +429,11 @@ export function installMessageWiring({
     log(`${label} is not ready yet.`, 'system');
   });
 
+  world.on('spell:lifetap', ({ actor, hpSpent, manaGained }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log(`You sacrifice ${hpSpent} life, gaining ${manaGained} mana.`, 'system');
+  });
+
   world.on('spell:fizzle', ({ actor, spellId, confused, reason }) => {
     if (nameOfEntity(actor) !== 'You') return;
     const s = getSpell ? getSpell(String(spellId || '')) : null;

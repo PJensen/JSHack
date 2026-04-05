@@ -914,5 +914,19 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     });
   });
 
+  world.on('spell:lifetap', ({ actor, manaGained }) => {
+    const pos = getPosition(Number(actor || 0));
+    if (!pos || !canShowAt(pos.x, pos.y)) return;
+    ftext.addStatus(pos.x, pos.y - 0.45, 'LIFE TAP', {
+      color: '#8b00ff',
+      life: 1.2,
+      scaleStart: 1.3,
+      scaleEnd: 1.0,
+    });
+    if (manaGained > 0) {
+      ftext.addHeal(pos.x, pos.y - 0.15, `+${manaGained} mana`, { color: '#4488ff' });
+    }
+  });
+
   return { goreTick: goreCtrl.tick };
 }

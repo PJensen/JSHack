@@ -161,7 +161,7 @@ export const CLASS_DEFS = {
       { itemId: 'potion_mana', count: 3 },
       { itemId: 'scroll_identify', count: 4 },
     ],
-    startingSpells: ['shadow_bolt','summon_skeleton','agony','drain_life'],
+    startingSpells: ['shadow_bolt','summon_skeleton','agony','drain_life','lifetap'],
   },
 
   cleric: {
