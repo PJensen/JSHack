@@ -1,5 +1,10 @@
 // Audio engine — loads and plays real audio files (.wav, .mp3, .mp4) via Web Audio API.
 // Decoded buffers are cached so each file is fetched only once.
+//
+// Routing:  BufferSource → per-sound GainNode → bus GainNode → master GainNode → destination
+//
+// Buses:    combat, spells, items, ambient, ui  (each independently adjustable)
+// Polyphony: max concurrent plays per URL, oldest voice is killed when cap is hit.
 
 let _ctx = null;
 let _master = null;
@@ -32,6 +37,76 @@ function masterGain() {
   }
   return _master;
 }
+
+// ── Category buses ──────────────────────────────────────────
+
+/** @type {Map<string, GainNode>} */
+const _buses = new Map();
+
+const BUS_DEFAULTS = {
+  combat:  1.0,
+  spells:  1.0,
+  items:   0.8,
+  ambient: 0.6,
+  ui:      1.0,
+};
+
+/**
+ * Get (or lazily create) a category bus GainNode.
+ * @param {string} name
+ * @returns {GainNode}
+ */
+function bus(name) {
+  if (_buses.has(name)) return _buses.get(name);
+  const g = ctx().createGain();
+  g.gain.value = BUS_DEFAULTS[name] ?? 1.0;
+  g.connect(masterGain());
+  _buses.set(name, g);
+  return g;
+}
+
+/**
+ * Set volume for a category bus (0–1).
+ * @param {string} name — "combat" | "spells" | "items" | "ambient" | "ui"
+ * @param {number} v
+ */
+export function setBusVolume(name, v) {
+  bus(name).gain.value = Math.max(0, Math.min(1, v));
+}
+
+/** Get current volume for a category bus. */
+export function getBusVolume(name) {
+  return bus(name).gain.value;
+}
+
+// ── Polyphony tracking ──────────────────────────────────────
+
+const DEFAULT_MAX_VOICES = 3;
+
+/**
+ * Map<url, Array<BufferSourceNode>> — active voices per sound URL.
+ * When a voice ends it removes itself. When cap is exceeded the oldest is stopped.
+ */
+const _voices = new Map();
+
+function trackVoice(url, src, maxVoices) {
+  if (!_voices.has(url)) _voices.set(url, []);
+  const list = _voices.get(url);
+
+  // Kill oldest voices if we're at the cap
+  while (list.length >= maxVoices) {
+    const old = list.shift();
+    try { old.stop(); } catch (_) { /* already stopped */ }
+  }
+
+  list.push(src);
+  src.onended = () => {
+    const idx = list.indexOf(src);
+    if (idx !== -1) list.splice(idx, 1);
+  };
+}
+
+// ── File loading ────────────────────────────────────────────
 
 /**
  * Fetch + decode an audio file. Returns cached buffer on repeat calls.
@@ -94,22 +169,23 @@ export function preload(urls) {
  * Play a sound once.
  * @param {string} url — path to audio file (relative to site root)
  * @param {{
- *   volume?: number,       // 0–1, multiplied with master (default 1)
+ *   volume?: number,       // 0–1, per-sound gain (default 1)
  *   rate?: number,         // playback rate (default 1)
  *   detune?: number,       // cents detune (default 0)
  *   delay?: number,        // seconds before playback starts (default 0)
+ *   bus?: string,          // category bus name (default "ui")
+ *   maxVoices?: number,    // max concurrent plays of this URL (default 3)
  * }} [opts]
  */
 export function play(url, opts) {
   if (_muted) return;
   const buf = _cache.get(url);
   if (buf) {
-    _playBuffer(buf, opts);
+    _playBuffer(url, buf, opts);
     return;
   }
-  // Not cached yet — load then play (slight latency on first use)
   loadBuffer(url).then(b => {
-    if (b && !_muted) _playBuffer(b, opts);
+    if (b && !_muted) _playBuffer(url, b, opts);
   });
 }
 
@@ -118,9 +194,8 @@ const _loops = new Map();
 
 /**
  * Start a looping sound. If already looping, does nothing.
- * Returns a handle to stop it later, or call stopLoop(url).
  * @param {string} url
- * @param {{ volume?: number, fadeIn?: number }} [opts]
+ * @param {{ volume?: number, fadeIn?: number, bus?: string }} [opts]
  */
 export function startLoop(url, opts) {
   if (_loops.has(url)) return;
@@ -144,6 +219,7 @@ function _startLoopBuffer(url, buf, opts) {
     const gain = ac.createGain();
     const vol = Number(opts?.volume ?? 1);
     const fadeIn = Number(opts?.fadeIn || 0);
+    const dest = bus(opts?.bus || "ambient");
 
     if (fadeIn > 0) {
       gain.gain.setValueAtTime(0, ac.currentTime);
@@ -153,7 +229,7 @@ function _startLoopBuffer(url, buf, opts) {
     }
 
     src.connect(gain);
-    gain.connect(masterGain());
+    gain.connect(dest);
     src.start();
     _loops.set(url, { src, gain });
   } catch (_) {
@@ -191,8 +267,9 @@ export function stopAllLoops() {
   for (const url of [..._loops.keys()]) stopLoop(url);
 }
 
-/** @param {AudioBuffer} buf */
-function _playBuffer(buf, opts) {
+// ── Internal playback ───────────────────────────────────────
+
+function _playBuffer(url, buf, opts) {
   try {
     const ac = ctx();
     const src = ac.createBufferSource();
@@ -201,15 +278,20 @@ function _playBuffer(buf, opts) {
     if (opts?.rate) src.playbackRate.value = opts.rate;
     if (opts?.detune) src.detune.value = opts.detune;
 
+    const dest = bus(opts?.bus || "ui");
     const vol = Number(opts?.volume ?? 1);
+
     if (vol < 1) {
       const g = ac.createGain();
       g.gain.value = vol;
       src.connect(g);
-      g.connect(masterGain());
+      g.connect(dest);
     } else {
-      src.connect(masterGain());
+      src.connect(dest);
     }
+
+    const maxV = Number(opts?.maxVoices ?? DEFAULT_MAX_VOICES);
+    trackVoice(url, src, maxV);
 
     const when = opts?.delay ? ac.currentTime + opts.delay : 0;
     src.start(when);

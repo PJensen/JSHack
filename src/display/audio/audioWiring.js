@@ -8,7 +8,11 @@ import { resolve, allUrls } from "./sounds.js";
 function sfx(id, opts) {
   const s = resolve(id);
   if (!s) return;
-  play(s.url, { volume: s.volume, rate: s.rate, detune: s.detune, ...opts });
+  play(s.url, {
+    bus: s.bus, maxVoices: s.maxVoices,
+    volume: s.volume, rate: s.rate, detune: s.detune,
+    ...opts,
+  });
 }
 
 /**
