@@ -29,6 +29,7 @@ const S_OBSIDIAN = "gem_socket:obsidian:passive";
 const S_GARNET   = "gem_socket:garnet:passive";
 const S_JACINTH  = "gem_socket:jacinth:passive";
 const S_AQUAMARINE = "gem_socket:aquamarine:passive";
+const S_VOIDSTONE = "gem_socket:voidstone:passive";
 
 // ── Register passive scripts ─────────────────────────────────────
 registerScript(S_RUBY,     { [ScriptVerb.AffixPassive]: (_w, ctx) => ctx.addBonus("fireResist", 0.10) });
@@ -42,6 +43,7 @@ registerScript(S_OBSIDIAN, { [ScriptVerb.AffixPassive]: (_w, ctx) => ctx.addBonu
 registerScript(S_GARNET,   { [ScriptVerb.AffixPassive]: (_w, ctx) => ctx.addBonus("fireResist", 0.20) });
 registerScript(S_JACINTH,  { [ScriptVerb.AffixPassive]: (_w, ctx) => ctx.addBonus("acidResist", 0.10) });
 registerScript(S_AQUAMARINE, { [ScriptVerb.AffixPassive]: (_w, ctx) => ctx.addBonus("manaRegen", 0.5) });
+registerScript(S_VOIDSTONE, { [ScriptVerb.AffixPassive]: (_w, ctx) => { ctx.addBonus("accuracy", 3); ctx.addBonus("damagePower", 3); } });
 
 // ── Register affix definitions (weight:0 = not randomly generated) ──
 [
@@ -56,6 +58,7 @@ registerScript(S_AQUAMARINE, { [ScriptVerb.AffixPassive]: (_w, ctx) => ctx.addBo
   ["gem_socket:garnet",     { name: "Garnet Socket",     slots: ["weapon", "armor"], weight: 0, passiveRefs: [S_GARNET] }],
   ["gem_socket:jacinth",    { name: "Jacinth Socket",    slots: ["weapon", "armor"], weight: 0, passiveRefs: [S_JACINTH] }],
   ["gem_socket:aquamarine", { name: "Aquamarine Socket", slots: ["weapon", "armor"], weight: 0, passiveRefs: [S_AQUAMARINE] }],
+  ["gem_socket:voidstone",  { name: "Voidstone Socket",  slots: ["weapon", "armor"], weight: 0, passiveRefs: [S_VOIDSTONE] }],
 ].forEach(([id, spec]) => registerAffixDefinition(id, spec));
 
 // ── Proc builders — gems that trigger on-hit effects ─────────────
@@ -129,6 +132,12 @@ const GEM_PROC_BUILDERS = {
     attachProcNode(world, socketNodeId, {
       gates: [gateEventKind("onHit"), gateChance(0.20)],
       effects: [effectApplyStatus("bleed", 3, 1)],
+    });
+  },
+  gem_voidstone(world, weaponId, socketNodeId) {
+    attachProcNode(world, socketNodeId, {
+      gates: [gateEventKind("onHit"), gateChance(0.25)],
+      effects: [effectBonusDamageFlat(3, 3, "void"), effectRestoreResource("hp", 3, { target: "source" })],
     });
   },
 };

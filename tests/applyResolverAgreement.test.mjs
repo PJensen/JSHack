@@ -13,6 +13,7 @@ import { buildCatalogItem } from "../src/rules/data/itemCatalogLoader.js";
 import { createItemById } from "../src/rules/utils/itemFactory.js";
 import { resetIdentification } from "../src/rules/data/identification.js";
 import { addToInventory } from "../src/rules/utils/inventoryFacade.js";
+import { Equipment } from "../src/rules/components/Equipment.js";
 
 /**
  * @param {World} world
@@ -136,6 +137,36 @@ Deno.test("apply target listing accepts legacy touchstone identity aliases", () 
   assertEquals(runtimeResult.ok, true);
   assertEquals(runtimeResult.metrics.path, "payload");
   assertEquals(runtimeResult.metrics.payloadMatched, true);
+});
+
+Deno.test("gem socket lists equipped weapon as target", () => {
+  const world = new World({ seed: 7305 });
+  const actor = createActorWithInventory(world);
+
+  const gemId = createItemById(world, "gem_ruby");
+  const maceId = buildCatalogItem(world, "iron_mace");
+  addToInventory(world, actor, gemId);
+
+  // Equip the mace — it is NOT in inventory, only in Equipment slot
+  world.add(actor, Equipment, { weapon: maceId });
+
+  const targets = listApplyTargetsForTool(world, actor, gemId);
+  const targetSet = new Set(targets);
+  assert(targetSet.has(maceId), "equipped weapon with empty socket should be a valid gem target");
+});
+
+Deno.test("voidstone gem can socket into equipped weapon", () => {
+  const world = new World({ seed: 7306 });
+  const actor = createActorWithInventory(world);
+
+  const gemId = createItemById(world, "gem_voidstone");
+  const maceId = buildCatalogItem(world, "iron_mace");
+  addToInventory(world, actor, gemId);
+  world.add(actor, Equipment, { weapon: maceId });
+
+  const targets = listApplyTargetsForTool(world, actor, gemId);
+  const targetSet = new Set(targets);
+  assert(targetSet.has(maceId), "voidstone should be socketable into equipped weapon with empty socket");
 });
 
 Deno.test("apply tool detection keeps touchstone selectable with zero targets", () => {
