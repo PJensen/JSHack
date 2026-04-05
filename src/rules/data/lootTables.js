@@ -447,8 +447,8 @@ export const LOOT_TABLES = {
   "drop:humanoid": {
     rolls: { min: 1, max: 2 },
     entries: [
-      { type: "nothing",   weight: 40 },
-      { type: "gold",      weight: 40, count: { base: 5, perDepth: 5 } },
+      { type: "nothing",   weight: 28 },
+      { type: "gold",      weight: 40, count: { base: 12, perDepth: 7 } },
       { type: "table",     weight: 22, tableId: "sub:potions" },
       { type: "item",      weight: 10, itemId: "potion_mana" },
       { type: "item",      weight: 4,  itemId: "potion_keen_edge" },
@@ -470,8 +470,8 @@ export const LOOT_TABLES = {
   "drop:undead": {
     rolls: { min: 1, max: 2 },
     entries: [
-      { type: "nothing",   weight: 40 },
-      { type: "gold",      weight: 35, count: { base: 6, perDepth: 4 } },
+      { type: "nothing",   weight: 28 },
+      { type: "gold",      weight: 38, count: { base: 14, perDepth: 6 } },
       { type: "item",      weight: 12, itemId: "potion_holy_water" },
       { type: "table",     weight: 22, tableId: "sub:scrolls" },
       { type: "table",     weight: 16, tableId: "sub:potions" },
@@ -493,8 +493,8 @@ export const LOOT_TABLES = {
   "drop:caster": {
     rolls: { min: 1, max: 2 },
     entries: [
-      { type: "nothing",   weight: 30 },
-      { type: "gold",      weight: 25, count: { base: 8, perDepth: 4 } },
+      { type: "nothing",   weight: 22 },
+      { type: "gold",      weight: 28, count: { base: 16, perDepth: 6 } },
       { type: "table",     weight: 35, tableId: "sub:scrolls" },
       { type: "table",     weight: 28, tableId: "sub:spellbooks" },
       { type: "table",     weight: 20, tableId: "sub:wands" },
@@ -518,8 +518,8 @@ export const LOOT_TABLES = {
   "drop:bat": {
     rolls: { min: 1, max: 1 },
     entries: [
-      { type: "nothing",   weight: 78 },
-      { type: "gold",      weight: 12, count: { base: 1, perDepth: 1 } },
+      { type: "nothing",   weight: 68 },
+      { type: "gold",      weight: 18, count: { base: 3, perDepth: 2 } },
       { type: "archetype", weight: 8,  archetype: "WildBerries" },
       { type: "archetype", weight: 5,  archetype: "WildHerbs" },
       { type: "table",     weight: 3,  tableId: "sub:potions" },
@@ -530,8 +530,8 @@ export const LOOT_TABLES = {
   "drop:wight": {
     rolls: { min: 1, max: 2 },
     entries: [
-      { type: "nothing",   weight: 28 },
-      { type: "gold",      weight: 28, count: { base: 10, perDepth: 4 } },
+      { type: "nothing",   weight: 20 },
+      { type: "gold",      weight: 32, count: { base: 20, perDepth: 6 } },
       { type: "item",      weight: 18, itemId: "potion_holy_water" },
       { type: "item",      weight: 14, itemId: "scroll_remove_curse" },
       { type: "item",      weight: 10, itemId: "potion_anti_venom" },
@@ -550,7 +550,7 @@ export const LOOT_TABLES = {
       { type: "equip",     weight: 12, pool: ["venomfang_dagger"], affixChance: 0 },
       { type: "table",     weight: 25, tableId: "sub:equip_common" },
       { type: "table",     weight: 15, tableId: "sub:potions" },
-      { type: "gold",      weight: 15, count: { base: 33, perDepth: 3 } },
+      { type: "gold",      weight: 18, count: { base: 50, perDepth: 5 } },
       { type: "table",     weight: 5,  tableId: "sub:scrolls" },
     ],
   },
@@ -558,8 +558,8 @@ export const LOOT_TABLES = {
   "drop:goblin": {
     rolls: { min: 1, max: 1 },
     entries: [
-      { type: "nothing",   weight: 120 },
-      { type: "gold",      weight: 30, count: { base: 5, perDepth: 3 } },
+      { type: "nothing",   weight: 90 },
+      { type: "gold",      weight: 40, count: { base: 10, perDepth: 5 } },
       { type: "equip",     weight: 25, pool: ["dagger_quick"], affixChance: 0.25, affixCountMax: 1 },
       { type: "table",     weight: 5,  tableId: "sub:equip_early_proc" },
       { type: "archetype", weight: 28, archetype: "ArrowsStack" },
@@ -576,7 +576,7 @@ export const LOOT_TABLES = {
   "drop:loot_goblin": {
     rolls: { min: 3, max: 5 },
     entries: [
-      { type: "gold",      weight: 60, count: { base: 18, perDepth: 6 } },
+      { type: "gold",      weight: 60, count: { base: 35, perDepth: 10 } },
       { type: "table",     weight: 20, tableId: "sub:equip_rare" },
       { type: "table",     weight: 12, tableId: "sub:equip_epic" },
       { type: "table",     weight: 7,  tableId: "sub:equip_legendary" },
@@ -588,7 +588,7 @@ export const LOOT_TABLES = {
   "hit:loot_goblin": {
     rolls: { min: 1, max: 1 },
     entries: [
-      { type: "gold",      weight: 78, count: { base: 6, perDepth: 2 } },
+      { type: "gold",      weight: 78, count: { base: 12, perDepth: 4 } },
       { type: "table",     weight: 14, tableId: "sub:equip_rare" },
       { type: "table",     weight: 6,  tableId: "sub:equip_epic" },
       { type: "table",     weight: 2,  tableId: "sub:equip_legendary" },
@@ -598,8 +598,8 @@ export const LOOT_TABLES = {
   "drop:dragon_whelp": {
     rolls: { min: 1, max: 2 },
     entries: [
-      { type: "nothing",   weight: 35 },
-      { type: "gold",      weight: 28, count: { base: 20, perDepth: 4 } },
+      { type: "nothing",   weight: 25 },
+      { type: "gold",      weight: 32, count: { base: 35, perDepth: 7 } },
       { type: "equip",     weight: 18, pool: ["ember_knife", "smoldering_club", "ring_fire_resist"], affixChance: 0 },
       { type: "equip",     weight: 12, pool: ["shield_fireward"], affixChance: 0.15, affixCountMax: 1 },
       { type: "table",     weight: 18, tableId: "sub:potions" },
@@ -611,8 +611,8 @@ export const LOOT_TABLES = {
   "drop:dragon": {
     rolls: { min: 1, max: 3 },
     entries: [
-      { type: "nothing",   weight: 20 },
-      { type: "gold",      weight: 30, count: { base: 50, perDepth: 10 } },
+      { type: "nothing",   weight: 12 },
+      { type: "gold",      weight: 35, count: { base: 85, perDepth: 15 } },
       { type: "equip",     weight: 24, pool: ["axe_heavy", "chain_armor", "amulet_vigor", "belt_girded", "gauntlets_iron", "greaves_steel", "helm_steel", "shield_iron", "ring_health", "ring_precision", "ring_arcana", "ring_fire_resist", "ring_poison_resist", "shield_fireward", "leadweave_mantle", "ring_endurance", "shield_spiked_pavise"],
         affixChance: 0.80, affixCountMax: 2 },
       { type: "equip",     weight: 1,  pool: ["warhammer"], affixChance: 0, affixCountMax: 0 },
@@ -630,9 +630,9 @@ export const LOOT_TABLES = {
   "drop:lich": {
     rolls: { min: 1, max: 2 },
     entries: [
-      { type: "nothing",   weight: 25 },
+      { type: "nothing",   weight: 18 },
       { type: "table",     weight: 30, tableId: "sub:spellbooks" },
-      { type: "gold",      weight: 20, count: { base: 20, perDepth: 5 } },
+      { type: "gold",      weight: 24, count: { base: 35, perDepth: 8 } },
       { type: "table",     weight: 15, tableId: "sub:scrolls" },
       { type: "equip",     weight: 15, pool: ["amulet_vigor", "belt_girded", "gauntlets_iron", "greaves_steel", "helm_steel", "ring_health", "ring_precision", "ring_arcana", "ring_fire_resist", "ring_poison_resist", "ring_endurance"],
         affixChance: 0.50, affixCountMax: 2 },
