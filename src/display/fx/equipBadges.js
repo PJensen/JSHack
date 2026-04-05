@@ -9,8 +9,7 @@ const BADGE_ALPHA = 0.88;
 const BADGE_Y_OFFSET = 0.32;     // downward from tile center
 const BADGE_X_OFFSET = 0.30;     // horizontal offset from tile center
 const BADGE_BG_RADIUS = 0.14;    // dark disc behind glyph for readability
-const DUAL_Y_OFFSET_TOP = 0.18;  // upper badge when dual-wielding
-const DUAL_Y_OFFSET_BOT = 0.42;  // lower badge when dual-wielding
+const DUAL_X_NUDGE = 0.10;       // horizontal nudge for tightly-packed dual badges
 const SHIELD_Y_OFFSET = -0.32;   // upward from tile center (top-left)
 
 /**
@@ -30,10 +29,10 @@ export function drawEquipmentBadges(ctx, wx, wy, badges, fxTime, entityId = 0) {
   // Melee weapon(s) — bottom right
   const rx = wx + BADGE_X_OFFSET;
   if (badges.weaponGlyph && badges.offhandGlyph) {
-    // Dual-wield: stack both weapons on right side
-    _drawBadge(ctx, rx, wy + DUAL_Y_OFFSET_TOP,
+    // Dual-wield: side-by-side )) tightly packed
+    _drawBadge(ctx, rx - DUAL_X_NUDGE, wy + BADGE_Y_OFFSET,
       badges.weaponGlyph, badges.weaponColor || '#cccccc', pulse);
-    _drawBadge(ctx, rx, wy + DUAL_Y_OFFSET_BOT,
+    _drawBadge(ctx, rx + DUAL_X_NUDGE, wy + BADGE_Y_OFFSET,
       badges.offhandGlyph, badges.offhandColor || '#cccccc', pulse);
   } else if (badges.weaponGlyph) {
     _drawBadge(ctx, rx, wy + BADGE_Y_OFFSET,
