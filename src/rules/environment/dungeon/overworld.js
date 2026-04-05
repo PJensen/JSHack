@@ -586,10 +586,10 @@ export function generateOverworldChunks(worldSeed) {
       tavFloorCells.push({ x: tx, y: ty });
     }
   }
-  const tavDoorX = tavX0 + 4;
-  const tavDoorY = tavY0 + 6;
+  const tavDoorX = tavX0;
+  const tavDoorY = tavY0 + 3;
   paintStructure(chunks, tavFloorCells, { x: tavDoorX, y: tavDoorY });
-  carvePath(chunks, tavDoorX, tavDoorY + 1, eastWalkX, northWalkY);
+  carvePath(chunks, eastWalkX, tavDoorY, eastWalkX, northWalkY);
   // Interior layout:
   //   o ═ ═ ═ ═ . .     keg + long bar along the north wall
   //   . . . . . . .     standing room behind the benches
@@ -609,7 +609,7 @@ export function generateOverworldChunks(worldSeed) {
   addSpawn(chunks, tavX0 + 6, tavY0 + 4, "tavern_bench");
   addSpawn(chunks, tavX0 + 7, tavY0 + 2, "tavern_chest");
   addSpawn(chunks, tavX0 + 7, tavY0 + 4, "cooking_fire");
-  addSpawn(chunks, tavDoorX + 1, tavDoorY, "tavern_sign");
+  addSpawn(chunks, tavDoorX - 1, tavDoorY - 1, "tavern_sign");
 
   // ── Windmill — slightly larger square so the millstone is not jammed into the shell ──
   const millX0 = homeX - 10;
@@ -798,7 +798,8 @@ export function generateOverworldChunks(worldSeed) {
   carvePath(chunks, villagerHouse.doorX, villagerHouse.doorY - 1, eastWalkX, southWalkY);
 
   const barkeepHouse = buildCottage(chunks, tavX0 + 12, tavY0 + 1, "south");
-  carvePathVerticalFirst(chunks, barkeepHouse.doorX, barkeepHouse.doorY + 1, tavDoorX + 3, tavDoorY + 1);
+  carvePathVerticalFirst(chunks, barkeepHouse.doorX, barkeepHouse.doorY + 1, eastWalkX, tavDoorY);
+  setStructureTile(chunks, tavDoorX, tavDoorY, TILE_DOOR, true);
 
   const priestHouse = buildCottage(chunks, crossingX - 15, crossingY - 1, "south");
   carvePath(chunks, priestHouse.doorX, priestHouse.doorY + 1, priestHouse.doorX, northWalkY);

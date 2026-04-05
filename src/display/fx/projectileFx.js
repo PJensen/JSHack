@@ -59,16 +59,10 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
   /** @type {RadialFx[]} */
   const _webSpitImpact = [];
 
-  // --- Acid Spit projectile state ---
-  /** @type {ArrowFx[]} */
-  const _acidSpitFx = [];
-  /** @type {RadialFx[]} */
-  const _acidSpitImpact = [];
-
   function _hasInflight() {
     return _arrowFx.length > 0 || _sboltFx.length > 0 || _fireballFx.length > 0
       || _frostboltFx.length > 0 || _ricochetFx.length > 0 || _webSpitFx.length > 0
-      || _swarmFx.length > 0 || _acidSpitFx.length > 0;
+      || _swarmFx.length > 0;
   }
 
   function _syncInputLock() {
@@ -591,83 +585,6 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
       if (_webSpitImpact[i].expired) _webSpitImpact.splice(i, 1);
     }
 
-    // Acid Spit projectiles — trailing caustic droplets
-    for (let i = _acidSpitFx.length - 1; i >= 0; i--) {
-      const as = _acidSpitFx[i];
-
-      if (fx?.pool && as.progress < 1) {
-        const hx = as.from.x + (as.to.x - as.from.x) * as.progress;
-        const hy = as.from.y + (as.to.y - as.from.y) * as.progress;
-        const count = Math.max(1, Math.ceil(dt * 50));
-        for (let j = 0; j < count; j++) {
-          fx.pool.spawn(new Particle({
-            x: hx + (Math.random() - 0.5) * 0.08,
-            y: hy + (Math.random() - 0.5) * 0.08,
-            vx: -as.dx * 0.4 + (Math.random() - 0.5) * 0.5,
-            vy: -as.dy * 0.4 + (Math.random() - 0.5) * 0.3 + 0.25,
-            ay: 0.5,
-            life: 0.15 + Math.random() * 0.15,
-            size0: 0.04 + Math.random() * 0.03,
-            size1: 0.01,
-            r: 140 + (Math.random() * 60 | 0),
-            g: 220 + (Math.random() * 35 | 0),
-            b: 40 + (Math.random() * 40 | 0),
-            a0: 0.65,
-          }));
-        }
-      }
-
-      as.tick(dt);
-
-      if (as.arrived) {
-        _acidSpitImpact.push(new RadialFx({ x: as.to.x, y: as.to.y, radius: 0.7, ttl: 0.45 }));
-        startShake(cam, 3, 0.10);
-
-        if (fx?.pool) {
-          for (let k = 0; k < 14; k++) {
-            const angle = (k / 14) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
-            const spd = 0.35 + Math.random() * 1.0;
-            fx.pool.spawn(new Particle({
-              x: as.to.x + (Math.random() - 0.5) * 0.15,
-              y: as.to.y + (Math.random() - 0.5) * 0.15,
-              vx: Math.cos(angle) * spd,
-              vy: Math.sin(angle) * spd + 0.05,
-              ay: 0.3,
-              life: 0.30 + Math.random() * 0.25,
-              size0: 0.08 + Math.random() * 0.06,
-              size1: 0.02,
-              r: 160 + (Math.random() * 40 | 0),
-              g: 240,
-              b: 80 + (Math.random() * 40 | 0),
-              a0: 0.85,
-              rotVel: (Math.random() - 0.5) * 2,
-            }));
-          }
-          // Acid drips (slow-falling, lingering)
-          for (let k = 0; k < 6; k++) {
-            fx.pool.spawn(new Particle({
-              x: as.to.x + (Math.random() - 0.5) * 0.5,
-              y: as.to.y + (Math.random() - 0.5) * 0.3,
-              vx: (Math.random() - 0.5) * 0.15,
-              vy: 0.2 + Math.random() * 0.3,
-              ay: 0.15,
-              life: 0.5 + Math.random() * 0.4,
-              size0: 0.04 + Math.random() * 0.03,
-              size1: 0.01,
-              r: 120, g: 200, b: 50,
-              a0: 0.45,
-            }));
-          }
-        }
-        _acidSpitFx.splice(i, 1);
-      }
-    }
-    // Acid spit impacts
-    for (let i = _acidSpitImpact.length - 1; i >= 0; i--) {
-      _acidSpitImpact[i].tick(dt);
-      if (_acidSpitImpact[i].expired) _acidSpitImpact.splice(i, 1);
-    }
-
     _syncInputLock();
   }
 
@@ -699,7 +616,6 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
     else if (style === 'frostbolt') _frostboltFx.push(entry);
     else if (style === 'ricochet_theology') _ricochetFx.push(entry);
     else if (style === 'web_spit') _webSpitFx.push(entry);
-    else if (style === 'acid_spit') _acidSpitFx.push(entry);
     else if (style === 'plague_swarm') _swarmFx.push(entry);
     else _arrowFx.push(entry);
 
@@ -714,9 +630,8 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
     const hasFrostbolt = _frostboltFx.length || _frostboltImpact.length;
     const hasRicochet = _ricochetFx.length || _ricochetImpact.length;
     const hasWebSpit = _webSpitFx.length || _webSpitImpact.length;
-    const hasAcidSpit = _acidSpitFx.length || _acidSpitImpact.length;
     const hasSwarm = _swarmFx.length || _swarmImpact.length;
-    if (!hasArrows && !hasSbolt && !hasFireball && !hasFrostbolt && !hasRicochet && !hasWebSpit && !hasAcidSpit && !hasSwarm) return;
+    if (!hasArrows && !hasSbolt && !hasFireball && !hasFrostbolt && !hasRicochet && !hasWebSpit && !hasSwarm) return;
     ctx.save();
 
     // Draw flying arrows
@@ -1204,56 +1119,6 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
       ctx.restore();
     }
 
-    // --- Acid Spit projectile ---
-    if (_acidSpitFx.length) {
-      for (const as of _acidSpitFx) {
-        const progress = as.progress;
-        const hx = as.from.x + (as.to.x - as.from.x) * progress;
-        const hy = as.from.y + (as.to.y - as.from.y) * progress;
-        const scale = 0.35 + 0.65 * progress;
-
-        // Outer acid glow (toxic green halo)
-        ctx.save();
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.fillStyle = `rgba(140,240,60,${(0.18 + 0.12 * progress).toFixed(3)})`;
-        ctx.beginPath(); ctx.arc(hx, hy, 0.26 * scale, 0, Math.PI * 2); ctx.fill();
-        ctx.restore();
-
-        // Acid glob rendered as scaled text
-        ctx.save();
-        ctx.translate(hx, hy);
-        ctx.scale(scale, scale);
-        ctx.rotate(progress * Math.PI * 2.5);
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.font = '900 0.75px monospace';
-        ctx.shadowColor = 'rgba(100,255,60,0.8)';
-        ctx.shadowBlur = 3 + 5 * progress;
-        ctx.fillStyle = `rgba(160,240,80,${(0.75 + 0.25 * progress).toFixed(3)})`;
-        ctx.fillText('\u223F', 0, 0);
-        ctx.shadowBlur = 0;
-        ctx.restore();
-      }
-    }
-    // Acid spit impacts — expanding caustic ring
-    if (_acidSpitImpact.length) {
-      ctx.save();
-      for (const imp of _acidSpitImpact) {
-        const t = imp.progress;
-        const alpha = imp.alpha;
-        const ringR = imp.radius * (0.3 + t * 0.7);
-        ctx.strokeStyle = `rgba(140,240,60,${(0.5 * alpha).toFixed(3)})`;
-        ctx.lineWidth = 0.08 * (1 - t * 0.4);
-        ctx.beginPath(); ctx.arc(imp.x, imp.y, ringR, 0, Math.PI * 2); ctx.stroke();
-        if (t < 0.5) {
-          const discA = 0.25 * (1 - t / 0.5);
-          ctx.fillStyle = `rgba(120,220,50,${discA.toFixed(3)})`;
-          ctx.beginPath(); ctx.arc(imp.x, imp.y, ringR * 0.6, 0, Math.PI * 2); ctx.fill();
-        }
-      }
-      ctx.restore();
-    }
-
     // --- Plague Swarm projectile ---
     if (_swarmFx.length) {
       for (const sw of _swarmFx) {
@@ -1490,18 +1355,51 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
       });
     });
 
-    // Acid Spit: caustic glob projectile from acid_spitter to target
+    // Acid Spit: spray of acid particles from caster to target
     world.on('spell:acid_spit', ({ actor, at }) => {
+      if (!fx?.pool || !at) return;
       const from = getPosition(Number(actor || 0));
-      if (!from || !at) return;
-      spawnTransientProjectile({
-        from,
-        to: at,
-        style: 'acid_spit',
-        speed: 6,
-        minDuration: 0.14,
-        maxDuration: 0.5,
-      });
+      if (!from) return;
+      const dx = Number(at.x) - Number(from.x);
+      const dy = Number(at.y) - Number(from.y);
+      const len = Math.hypot(dx, dy) || 1;
+      const nx = dx / len;
+      const ny = dy / len;
+      // Spray of acid globs along the flight path
+      for (let i = 0; i < 12; i++) {
+        const spread = (Math.random() - 0.5) * 0.35;
+        const spd = 3.5 + Math.random() * 2.5;
+        fx.pool.spawn(new Particle({
+          x: Number(from.x) + (Math.random() - 0.5) * 0.15,
+          y: Number(from.y) + (Math.random() - 0.5) * 0.15,
+          vx: nx * spd + (-ny) * spread * spd,
+          vy: ny * spd + nx * spread * spd,
+          ay: 0.4,
+          life: (len / spd) * (0.8 + Math.random() * 0.5),
+          size0: 0.06 + Math.random() * 0.05,
+          size1: 0.02,
+          r: 140 + (Math.random() * 60 | 0),
+          g: 220 + (Math.random() * 35 | 0),
+          b: 40 + (Math.random() * 40 | 0),
+          a0: 0.80,
+        }));
+      }
+      // A few dripping trailing drops
+      for (let i = 0; i < 5; i++) {
+        const spd = 2.0 + Math.random() * 1.5;
+        fx.pool.spawn(new Particle({
+          x: Number(from.x) + (Math.random() - 0.5) * 0.1,
+          y: Number(from.y) + (Math.random() - 0.5) * 0.1,
+          vx: nx * spd + (Math.random() - 0.5) * 0.6,
+          vy: ny * spd + (Math.random() - 0.5) * 0.4 + 0.3,
+          ay: 0.8,
+          life: 0.25 + Math.random() * 0.3,
+          size0: 0.03 + Math.random() * 0.03,
+          size1: 0.01,
+          r: 120, g: 200, b: 50,
+          a0: 0.55,
+        }));
+      }
     });
 
     // Web struggle: silk strands burst when stuck actor tries to move
@@ -1646,20 +1544,6 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
     for (let i = 0; i < _webSpitImpact.length; i++) {
       const imp = _webSpitImpact[i];
       out.push({ x: imp.x, y: imp.y, radius: 2 * imp.alpha, color: [200, 200, 220] });
-    }
-    // Acid spit — toxic green glow
-    for (let i = 0; i < _acidSpitFx.length; i++) {
-      const as = _acidSpitFx[i];
-      const u = as.progress;
-      out.push({
-        x: as.from.x + (as.to.x - as.from.x) * u,
-        y: as.from.y + (as.to.y - as.from.y) * u,
-        radius: 2.5, color: [140, 240, 60],
-      });
-    }
-    for (let i = 0; i < _acidSpitImpact.length; i++) {
-      const imp = _acidSpitImpact[i];
-      out.push({ x: imp.x, y: imp.y, radius: 2.5 * imp.alpha, color: [140, 240, 60] });
     }
     // Elemental arrow impacts — brief flare
     for (let i = 0; i < _arrowSparks.length; i++) {
