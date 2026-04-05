@@ -3148,7 +3148,7 @@ REGISTRY['consecrate'] = function consecrateScript(world, actor, spell, _intent)
 
   const RADIUS = Number(spell?.radius || 2) | 0;
   const TURNS = 20;
-  const BASE_TICK = 3;
+  const BASE_TICK = 5;
   const scaledDmg = scaleSpellDamage(world, actor, BASE_TICK);
 
   // Holy ground hazard — damages hostiles
