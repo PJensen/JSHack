@@ -18,15 +18,28 @@ export const GUIDANCE_TIPS = [
   // ── Early game (overworld, first steps) ───────────────────────────
   {
     id: "welcome",
-    text: "I am your spirit. Arrow keys or WASD to move. The barkeep may know what ails this village \u2014 seek them out.",
-    durationSec: 6.5,
+    text: "I am the eye of your deity, watching over you.",
+    durationSec: 4,
     delaySec: 1.8,
   },
   {
-    id: "spirit_deity",
-    text: "I am the eye of your deity, watching over you. Your deeds shape their favor \u2014 and your fate.",
-    durationSec: 6,
-    delaySec: 0.8,
+    id: "movement",
+    text: "Arrow keys or WASD to move.",
+    durationSec: 3,
+    delaySec: 0.6,
+  },
+  {
+    id: "seek_barkeep",
+    text: "The barkeep may know what ails this village \u2014 seek them out.",
+    durationSec: 5,
+    delaySec: 0.6,
+    flyTo: "npc",
+  },
+  {
+    id: "doors",
+    text: "Walk into doors to open them.",
+    durationSec: 3,
+    delaySec: 0.6,
   },
 
   // ── Equipment glyphs ──────────────────────────────────────────────
@@ -191,8 +204,8 @@ export const GUIDANCE_TIPS = [
   },
   {
     id: "first_door",
-    text: "A door! Walk into it to open or close it. Some doors are locked \u2014 find the key.",
-    durationSec: 5,
+    text: "Some doors are locked. You'll need to find the key.",
+    durationSec: 4,
     delaySec: 0.5,
     flyTo: "door",
   },
