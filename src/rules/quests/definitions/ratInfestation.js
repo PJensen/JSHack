@@ -79,17 +79,18 @@ export const RatInfestationQuest = registerQuest({
                 if (!(giverId > 0)) return;
                 const giverPos = ctx.world.get(giverId, Position);
                 if (!giverPos) return;
-                const x = Number.isFinite(giverPos.x) ? (giverPos.x | 0) : 0;
-                const y = Number.isFinite(giverPos.y) ? (giverPos.y | 0) : 0;
+                if (!Number.isFinite(giverPos.x) || !Number.isFinite(giverPos.y)) return;
+                const x = giverPos.x | 0;
+                const y = giverPos.y | 0;
 
                 const bowId = createItemById(ctx.world, "bow_short");
-                if (Number.isFinite(bowId) && bowId > 0) {
+                if (bowId > 0) {
                   ctx.world.add(bowId, Position, { x, y });
                   emitSafe(ctx.world, "item:dropped", { itemId: bowId, count: 1, at: { x, y } });
                 }
 
                 const arrowsId = createItemById(ctx.world, "ammo_arrows", { count: 20 });
-                if (Number.isFinite(arrowsId) && arrowsId > 0) {
+                if (arrowsId > 0) {
                   ctx.world.add(arrowsId, Position, { x, y });
                   emitSafe(ctx.world, "item:dropped", { itemId: arrowsId, count: 20, at: { x, y } });
                 }
