@@ -363,6 +363,8 @@ export function generateOverworldChunks(worldSeed) {
   const doorY = homeY - halfH;
   const fountainCX = homeX;
   const fountainCY = homeY - 6;
+  const crossingX = homeX;
+  const crossingY = homeY - 16;
   const spawnX = fountainCX;
   const spawnY = fountainCY + 2;
   const northWalkY = homeY - halfH - 1;
@@ -615,11 +617,12 @@ export function generateOverworldChunks(worldSeed) {
   const stairY = tavY0 + 5;
   setWorldTile(chunks, stairX, stairY, TILE_STAIR_DOWN);
 
-  // ── Windmill — slightly larger square so the millstone is not jammed into the shell ──
-  const millX0 = homeX - 10;
-  const millY0 = homeY - 8;
-  const millX1 = homeX - 6;
-  const millY1 = homeY - 4;
+  // ── Windmill — west of the graveyard, outside of town ──
+  const millX0 = crossingX - 10;
+  const millY0 = crossingY - 13;
+  const millX1 = millX0 + 4;
+  const millY1 = millY0 + 4;
+  fillDisk(chunks, millX0 + 2, millY0 + 2, 4);
   for (let my = millY0; my <= millY1; my++) {
     for (let mx = millX0; mx <= millX1; mx++) {
       const border = mx === millX0 || mx === millX1 || my === millY0 || my === millY1;
@@ -628,7 +631,9 @@ export function generateOverworldChunks(worldSeed) {
   }
   const millDoorX = millX0 + 2;
   setStructureTile(chunks, millDoorX, millY1, TILE_DOOR, true);
-  carvePath(chunks, millDoorX, millY1 + 1, westWalkX, northWalkY);
+  carvePath(chunks, millDoorX, millY1 + 1, crossingX - 4, crossingY - 11);
+  carvePath(chunks, crossingX - 4, crossingY - 11, crossingX - 4, crossingY - 5);
+  carvePath(chunks, crossingX - 4, crossingY - 5, westWalkX, northWalkY);
   // Interior
   addSpawn(chunks, millX0 + 2, millY0 + 2, "millstone");
   addSpawn(chunks, millX0 + 1, millY0 + 2, "mill_chest");
@@ -703,8 +708,6 @@ export function generateOverworldChunks(worldSeed) {
   addSpawn(chunks, gardenX + 1, gardenY + 1, "harvest_thorn_bramble");
 
   // ── Church — stamped from JSON building definition ─────────────
-  const crossingX = homeX;
-  const crossingY = homeY - 16;
   fillDisk(chunks, crossingX, crossingY, 8);
   const churchResult = stampBuilding(chunks, churchDef, crossingX, crossingY);
   const churchDoorX = crossingX;
@@ -752,18 +755,31 @@ export function generateOverworldChunks(worldSeed) {
     setWorldTile(chunks, crossingX, py, TILE_COBBLESTONE);
   }
 
-  // ── Fountain plaza — cobblestone square with fountain ────────
-  // Placed on the church-to-walkway path, north of house
-  for (let fy = fountainCY - 2; fy <= fountainCY + 2; fy++) {
-    for (let fx = fountainCX - 2; fx <= fountainCX + 2; fx++) {
+  // ── Town square — cobblestone plaza with fountain, trees, and benches ────────
+  const sqX0 = fountainCX - 4;
+  const sqX1 = fountainCX + 4;
+  const sqY0 = fountainCY - 3;
+  const sqY1 = fountainCY + 3;
+  for (let fy = sqY0; fy <= sqY1; fy++) {
+    for (let fx = sqX0; fx <= sqX1; fx++) {
       setWorldTile(chunks, fx, fy, TILE_COBBLESTONE);
     }
   }
   addSpawn(chunks, fountainCX, fountainCY, "fountain");
   addSpawn(chunks, fountainCX - 3, fountainCY + 1, "message_board");
+  // Corner trees
+  addSpawn(chunks, sqX0, sqY0, "tree_node");
+  addSpawn(chunks, sqX1, sqY0, "tree_node");
+  addSpawn(chunks, sqX0, sqY1, "tree_node");
+  addSpawn(chunks, sqX1, sqY1, "tree_node");
+  // Benches along the sides
+  addSpawn(chunks, fountainCX - 2, sqY0 + 1, "bench");
+  addSpawn(chunks, fountainCX + 2, sqY0 + 1, "bench");
+  addSpawn(chunks, fountainCX - 2, sqY1 - 1, "bench");
+  addSpawn(chunks, fountainCX + 2, sqY1 - 1, "bench");
 
-  // ── Cobblestone path from fountain plaza east to tavern door ──
-  for (let px = fountainCX + 3; px <= tavDoorX; px++) {
+  // ── Cobblestone path from town square east to tavern door ──
+  for (let px = sqX1 + 1; px <= tavDoorX; px++) {
     setWorldTile(chunks, px, tavDoorY, TILE_COBBLESTONE);
   }
 
