@@ -516,8 +516,8 @@ const SUN_ARC = SUNSET - SUNRISE;                          // 430 turns of dayli
 const MOON_ARC = TURNS_PER_DAY - SUNSET + SUNRISE;         // 290 turns of moonlight
 
 // Colour palettes (linear RGB, 0-1)
-const SUN_ZENITH  = [0.95, 0.93, 0.88];   // overhead — near-white with slight warmth
-const SUN_HORIZON = [1.00, 0.55, 0.20];   // low sun  — golden-amber (dawn/dusk only)
+const SUN_ZENITH  = [0.82, 0.81, 0.78];   // overhead — soft daylight, desaturated
+const SUN_HORIZON = [0.85, 0.55, 0.30];   // low sun  — muted golden (dawn/dusk only)
 const MOON_ZENITH = [0.18, 0.20, 0.35];   // overhead — cool blue-white
 const MOON_HORIZON = [0.08, 0.08, 0.18];  // low moon — dim indigo
 
