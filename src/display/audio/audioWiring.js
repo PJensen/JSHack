@@ -105,8 +105,8 @@ const SPELL_IMPACT_MAP = {
  */
 export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosition, getPosition, getDepth }) {
 
-  // ── Preload all registered sounds ─────────────────────────
-  preload(allUrls());
+  // No preload — sounds are fetched on first play. Missing files fail once
+  // and are blacklisted so they never retry or flood the network.
 
   /** Shorthand — current player pos for spatial calcs. */
   function pp() { return getPlayerPosition(); }
