@@ -398,31 +398,32 @@ function projectEquipmentDisplayTags(world, id, rec) {
 	const resolved = resolveEquippedWeaponVfx(world, id, { slots: ["weapon", "offhand"] });
 	if (resolved.length > 0) rec.weaponVfx = resolved;
 
-	// Equipment corner badges — weapon identity + offhand identity for display layer glyph lookup
+	// Equipment corner badges — right: melee weapon(s), bottom-left: ranged/zap, top-left: shield
 	const weaponId = Number(eq.weapon || 0) | 0;
 	const rangedId = Number(eq.ranged || 0) | 0;
 	let weaponIdentity = null;
+	let offhandIdentity = null;
+	let rangedIdentity = null;
 	let shieldIdentity = null;
 	if (weaponId > 0 && world.isAlive(weaponId)) {
 		weaponIdentity = String(world.get(weaponId, NamedIdentity)?.identity || "").toLowerCase() || null;
 	}
-	// Ranged weapon: show in weapon badge when no melee weapon equipped
-	if (!weaponIdentity && rangedId > 0 && world.isAlive(rangedId)) {
-		weaponIdentity = String(world.get(rangedId, NamedIdentity)?.identity || "").toLowerCase() || null;
-	}
+	// Offhand: dual-wield weapon (right side) or shield (top-left)
 	if (offhandId > 0 && world.isAlive(offhandId)) {
 		const offInfo = /** @type any */ (world.get(offhandId, ItemInfo));
-		const offIdentity = String(world.get(offhandId, NamedIdentity)?.identity || "").toLowerCase();
-		// Shield: no damageDice in offhand. Weapon offhand: has damageDice (dual-wield).
-		if (offInfo && !offInfo.damageDice) {
-			shieldIdentity = offIdentity || null;
-		} else if (offInfo?.damageDice) {
-			// Dual-wield: show offhand weapon in the left badge slot
-			shieldIdentity = offIdentity || null;
+		const offIdentity = String(world.get(offhandId, NamedIdentity)?.identity || "").toLowerCase() || null;
+		if (offInfo?.damageDice) {
+			offhandIdentity = offIdentity;
+		} else {
+			shieldIdentity = offIdentity;
 		}
 	}
-	if (weaponIdentity || shieldIdentity) {
-		rec.equipBadges = { weaponIdentity, shieldIdentity };
+	// Ranged/zap: bottom-left
+	if (rangedId > 0 && world.isAlive(rangedId)) {
+		rangedIdentity = String(world.get(rangedId, NamedIdentity)?.identity || "").toLowerCase() || null;
+	}
+	if (weaponIdentity || offhandIdentity || rangedIdentity || shieldIdentity) {
+		rec.equipBadges = { weaponIdentity, offhandIdentity, rangedIdentity, shieldIdentity };
 	}
 }
 
