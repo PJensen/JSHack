@@ -21,6 +21,7 @@ import { getPassiveBonuses, effectiveMaxHp, effectiveMaxMana } from "../../rules
 import { resolveCanonicalStats } from "../../rules/utils/canonicalStats.js";
 import { getSpell } from "../../rules/data/spells.js";
 import { getSpellCooldown } from "../../rules/utils/spellCooldowns.js";
+import { spellCost, spellCostResource } from "../../rules/data/spells.js";
 import { impactTracker } from "../../display/fx/projectileImpactTracker.js";
 
 /**
@@ -52,7 +53,7 @@ export function createHudFeeds(world, deps) {
   let lastGold = -1;
   let lastPetExists = false;
   let lastPetState = "";
-  let lastSpellMana = -1;
+  let lastSpellResourceSig = "";
   let lastCalendarDay = -1;
   let _lastSpellBarSig = '';
   let _lastPinnedSpellBarSig = '';
@@ -285,9 +286,13 @@ export function createHudFeeds(world, deps) {
 
   function updateActiveSpellHUD() {
     const activeId = ensureActiveSpell();
+    const pe = playerEntity(world);
     const { mana } = getPlayerMana();
-    if (mana !== lastSpellMana) {
-      lastSpellMana = mana;
+    const staminaComp = pe ? /** @type any */ (world.get(pe.id, Stamina)) : null;
+    const stamina = Number(staminaComp?.stamina ?? 0);
+    const spellResourceSig = `${mana}|${stamina}`;
+    if (spellResourceSig !== lastSpellResourceSig) {
+      lastSpellResourceSig = spellResourceSig;
       updateActiveSpellLabel();
     }
 
@@ -320,15 +325,17 @@ export function createHudFeeds(world, deps) {
           const def = getSpell(id);
           if (!def) return null;
           const cd = getSpellCooldown(world, id);
+          const resource = spellCostResource(def);
+          const cost = spellCost(def);
           return {
-            id, name: def.name, symbol: def.symbol, cost: def.manaCost,
+            id, name: def.name, symbol: def.symbol, cost, costKind: resource,
             cdRemaining: cd ? cd.remaining : 0,
             cdMax: cd ? cd.max : 0,
           };
         });
         try {
           window.dispatchEvent(new CustomEvent('ui:updateSpellBar', {
-            detail: { slots: resolved, activeSpellId: activeId, mana }
+            detail: { slots: resolved, activeSpellId: activeId, mana, stamina }
           }));
         } catch (e) { console.debug('[hudFeeds] dispatch ui:updateSpellBar:', e); }
       }
@@ -351,15 +358,17 @@ export function createHudFeeds(world, deps) {
           const def = getSpell(id);
           if (!def) return null;
           const cd = getSpellCooldown(world, id);
+          const resource = spellCostResource(def);
+          const cost = spellCost(def);
           return {
-            id, name: def.name, symbol: def.symbol, cost: def.manaCost,
+            id, name: def.name, symbol: def.symbol, cost, costKind: resource,
             cdRemaining: cd ? cd.remaining : 0,
             cdMax: cd ? cd.max : 0,
           };
         });
         try {
           window.dispatchEvent(new CustomEvent('ui:updatePinnedSpellBar', {
-            detail: { pinnedSlots: resolved, mana, hasLearnedSpells: hasSpells }
+            detail: { pinnedSlots: resolved, mana, stamina, hasLearnedSpells: hasSpells }
           }));
         } catch (e) { console.debug('[hudFeeds] dispatch ui:updatePinnedSpellBar:', e); }
       }

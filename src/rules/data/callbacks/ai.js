@@ -10,6 +10,7 @@ import { Mana } from "../../components/Mana.js";
 import { NamedIdentity } from "../../components/NamedIdentity.js";
 import { Position } from "../../components/Position.js";
 import { ActiveEffects } from "../../components/ActiveEffects.js";
+import { Stamina } from "../../components/Stamina.js";
 import { Vitality } from "../../components/Vitality.js";
 import { getSpell } from "../../data/spells.js";
 import { bresenhamLine } from "../../../shared/math/bresenham.js";
@@ -21,6 +22,7 @@ import { findNearestValidTileAround } from "../../utils/queries.js";
 import { worldChance } from "../../utils/rng.js";
 import { chebyshev, manhattan } from "../../utils/distance.js";
 import { emitSafe } from "../../utils/emitSafe.js";
+import { spellCost, spellCostResource } from "../../data/spells.js";
 
 const SELF_THROW_COOLDOWN_KEY = Symbol.for("jshack:ai:selfThrowNearTargetOnSeen:cooldown");
 const FIRE_BREATH_COOLDOWN_KEY = Symbol.for("jshack:ai:fireBreathLineOnLOS:cooldown");
@@ -674,9 +676,24 @@ export function castSpellOnLOS(opts) {
       }
     }
 
-    const mana = ctx.world.get(ctx.actor, Mana);
-    const needMana = Number(spell.manaCost || 0);
-    if (mana && Number(mana.mana || 0) < needMana) return;
+    const resource = spellCostResource(spell);
+    const need = Math.max(0, Number(spellCost(spell)));
+    if (resource === "stamina") {
+      const stamina = ctx.world.get(ctx.actor, Stamina);
+      if (stamina) {
+        const have = Number(stamina.stamina || 0);
+        if (have < need) return;
+      }
+    } else if (resource === "life") {
+      const vitality = ctx.world.get(ctx.actor, Vitality);
+      if (vitality) {
+        const have = Number(vitality.hp || 0);
+        if (have - need < 1) return;
+      }
+    } else {
+      const mana = ctx.world.get(ctx.actor, Mana);
+      if (mana && Number(mana.mana || 0) < need) return;
+    }
 
     if (telegraphTurns > 0 && !windupReady) {
       const readyStep = now + telegraphTurns;

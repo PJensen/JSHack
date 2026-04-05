@@ -20,6 +20,9 @@ import { Vitality } from "../components/Vitality.js";
 import { Devotion } from "../components/Devotion.js";
 import { effectiveMaxHp } from "../utils/passiveBonuses.js";
 import { getDeityInstance } from "./deitySystem.js";
+import { Stamina } from "../components/Stamina.js";
+import { STAMINA_REGEN_COOLDOWN } from "../data/regenConstants.js";
+import { spellCost, spellCostPerTick, spellCostResource } from "../data/spells.js";
 /** @typedef {import('../../lib/ecs-js/index.js').World} World */
 
 // ── Spirit wisp spell boost ───────────────────────────────────────
@@ -149,7 +152,7 @@ function resolveConfusedCast(world, actor, intendedSpell, learnedSpellIds) {
 /**
  * Resolve CastSpellIntent:
  * - Validate that actor knows the spell
- * - Check Mana and deduct cost
+ * - Check resource (mana/stamina/life) and deduct cost
  * - Confused casters miscast to another learned spell, or fizzle if none exists
  * - Emit 'castSpell' semantic event for bridge/display to react to
  * - Clear intent
@@ -256,6 +259,10 @@ export function castSpellSystem(world) {
 
     /** @type {{ mana?: number, maxMana?:number }|null} */
     const mana = /** @type any */ (world.get(actor, Mana));
+    /** @type {{ stamina?: number, maxStamina?:number }|null} */
+    const stamina = /** @type any */ (world.get(actor, Stamina));
+    /** @type {{ hp?: number, maxHp?:number }|null} */
+    const vit = /** @type any */ (world.get(actor, Vitality));
 
     const confusion = resolveConfusedCast(world, actor, spell, learned);
     const resolvedSpell = confusion.spell;
@@ -264,28 +271,47 @@ export function castSpellSystem(world) {
     const isSustainedChannel = !!resolvedSpell?.channeling;
     const echoRepeat = !!(!isSustainedChannel && echoState && echoState.turnsLeft > 0 && echoState.spellId && echoState.spellId === resolvedSpell.id);
     let spellPowerScale = echoRepeat ? 0.8 : 1;
-    const baseManaCost = isSustainedChannel
-      ? Number(resolvedSpell.manaPerTick ?? resolvedSpell.manaCost ?? 0)
-      : Number(resolvedSpell.manaCost || 0);
-    const manaCost = echoRepeat ? 0 : baseManaCost;
+    const resource = spellCostResource(resolvedSpell);
+    const baseCost = isSustainedChannel
+      ? spellCostPerTick(resolvedSpell)
+      : spellCost(resolvedSpell);
+    const resourceCost = echoRepeat ? 0 : baseCost;
+    const reserve = resource === "life" ? 1 : 0;
     const requiredToStart = isSustainedChannel
-      ? Math.max(0, manaCost) * 2
-      : manaCost;
+      ? Math.max(0, resourceCost) * 2 + reserve
+      : resourceCost + reserve;
 
-    // Sustained channels gate on one tick of mana up front but spend it during the
+    let have = 0;
+    if (resource === "stamina") {
+      have = Number(stamina?.stamina ?? 0);
+    } else if (resource === "life") {
+      have = Number(vit?.hp ?? 0);
+    } else {
+      have = Number(mana?.mana ?? 0);
+    }
+    const costKind = resource === "stamina" ? "stamina" : resource === "life" ? "life" : "mana";
+
+    // Sustained channels gate on one tick of resource up front but spend it during the
     // realtime channel loop. Cast-time channels keep the existing upfront payment.
     if (!fromChanneling) {
-      const have = Number(mana?.mana ?? 0);
       if (have < requiredToStart) {
-        emitSafe(world, 'spell:oom', { actor, spellId: resolvedSpell.id, need: requiredToStart, have });
+        emitSafe(world, 'spell:oom', { actor, spellId: resolvedSpell.id, need: requiredToStart, have, costKind });
         world.remove(actor, CastSpellIntent);
         continue;
       }
 
-      if (mana && !isSustainedChannel) {
-        // Deduct upfront mana and suppress regen this turn for instant/cast-time spells.
-        mana.mana = have - manaCost;
-        mana.regenCooldown = MANA_REGEN_COOLDOWN;
+      if (!isSustainedChannel) {
+        if (resource === "stamina" && stamina) {
+          stamina.stamina = have - resourceCost;
+          stamina.regenCooldown = STAMINA_REGEN_COOLDOWN;
+        } else if (resource === "life" && vit) {
+          const floor = 1;
+          vit.hp = Math.max(floor, have - resourceCost);
+        } else if (mana) {
+          // Deduct upfront mana and suppress regen this turn for instant/cast-time spells.
+          mana.mana = have - resourceCost;
+          mana.regenCooldown = MANA_REGEN_COOLDOWN;
+        }
       }
     }
 
@@ -335,7 +361,9 @@ export function castSpellSystem(world) {
           mode: "sustain",
           turnsRemaining: 0,
           turnsTotal: 0,
-          manaPerTick: manaCost,
+          manaPerTick: resource === "mana" ? resourceCost : 0,
+          staminaPerTick: resource === "stamina" ? resourceCost : 0,
+          lifePerTick: resource === "life" ? resourceCost : 0,
           spellId: resolvedSpell.id,
           targetId: intent.targetId || actor,
           x: intent.x ?? null,
@@ -346,7 +374,9 @@ export function castSpellSystem(world) {
         actor,
         spellId: resolvedSpell.id,
         mode: "sustain",
-        manaPerTick: manaCost,
+        manaPerTick: resource === "mana" ? resourceCost : 0,
+        staminaPerTick: resource === "stamina" ? resourceCost : 0,
+        lifePerTick: resource === "life" ? resourceCost : 0,
       });
       world.remove(actor, CastSpellIntent);
       continue;
