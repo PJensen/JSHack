@@ -95,7 +95,7 @@ export const GUIDANCE_TIPS = [
   },
   {
     id: "quick_items",
-    text: "These are your Quick Chips \u2014 tap one to use it fast. Hold to browse details.",
+    text: "A Quick Chip pops up immediately after pickup. Tap it to use fast, or pin it so it stays in your quick slots.",
     durationSec: 5.5,
     delaySec: 0.5,
     pointTo: "#hud-pinned-items",

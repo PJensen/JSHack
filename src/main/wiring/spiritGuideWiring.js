@@ -218,18 +218,17 @@ export function installSpiritGuideWiring({
     fire("pet_companion");
   });
 
-  // ── Quick items (first potion / consumable pickup) ──────────────────
+  // ── Quick items (first quick-chip-eligible inventory add) ───────────
 
-  world.on("item:pickup", ({ actor, itemId }) => {
+  world.on("inventory:added", ({ ownerId, itemId }) => {
     if (seen.has("quick_items")) return;
     const pe = getPlayerEntity();
-    if (!pe || Number(actor || 0) !== pe.id) return;
-    // Check if the picked-up item is a consumable (potion, scroll, food).
-    const ni = world.has(itemId, NamedIdentity) ? world.get(itemId, NamedIdentity) : null;
-    const ident = String(ni?.identity || "").toLowerCase();
-    if (ident.includes("potion") || ident.includes("scroll") || ident.includes("food") || ident.includes("stew")) {
-      fire("quick_items");
-    }
+    if (!pe || Number(ownerId || 0) !== pe.id) return;
+    const info = world.has(itemId, ItemInfo) ? world.get(itemId, ItemInfo) : null;
+    if (!info) return;
+    if (info.noQuickChip === true) return;
+    if (String(info.type || "").toLowerCase() === "currency") return;
+    fire("quick_items");
   });
 
   // ── Item on ground (player walks near an item) ───────────────────────
