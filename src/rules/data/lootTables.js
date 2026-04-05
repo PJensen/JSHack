@@ -405,8 +405,8 @@ export const LOOT_TABLES = {
   "drop:nymph": {
     rolls: { min: 1, max: 2 },
     entries: [
-      { type: "nothing",   weight: 30 },
-      { type: "gold",      weight: 40, count: { base: 8, perDepth: 4 } },
+      { type: "nothing",   weight: 20 },
+      { type: "gold",      weight: 40, count: { base: 16, perDepth: 6 } },
       { type: "table",     weight: 20, tableId: "sub:potions" },
       { type: "table",     weight: 15, tableId: "sub:jewelry" },
       { type: "table",     weight: 10, tableId: "sub:scrolls" },
@@ -420,8 +420,8 @@ export const LOOT_TABLES = {
   "drop:beast": {
     rolls: { min: 1, max: 1 },
     entries: [
-      { type: "nothing",   weight: 65 },
-      { type: "gold",      weight: 20, count: { base: 2, perDepth: 2 } },
+      { type: "nothing",   weight: 50 },
+      { type: "gold",      weight: 28, count: { base: 5, perDepth: 3 } },
       { type: "archetype", weight: 15, archetype: "Ration" },
       { type: "archetype", weight: 10, archetype: "HealthPotion" },
       { type: "table",     weight: 8,  tableId: "sub:equip_early_proc" },
@@ -433,8 +433,8 @@ export const LOOT_TABLES = {
   "drop:venomous": {
     rolls: { min: 1, max: 2 },
     entries: [
-      { type: "nothing",   weight: 48 },
-      { type: "gold",      weight: 24, count: { base: 4, perDepth: 3 } },
+      { type: "nothing",   weight: 35 },
+      { type: "gold",      weight: 30, count: { base: 8, perDepth: 5 } },
       { type: "item",      weight: 18, itemId: "potion_resist_poison" },
       { type: "item",      weight: 12, itemId: "potion_anti_venom" },
       { type: "table",     weight: 16, tableId: "sub:potions" },
