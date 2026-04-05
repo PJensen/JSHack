@@ -197,12 +197,16 @@ Deno.test("low_hp tip fires when player HP drops below 40%", () => {
   clearGuideStorage();
 });
 
-Deno.test("first_stair tip fires on dungeon:transitioned", () => {
-  const { world, bubbles } = setup();
+Deno.test("first_stair tip fires when player walks near stairs", () => {
+  const { world, playerId, bubbles } = setup();
 
-  world.emit("dungeon:transitioned", { depth: 1, pos: { x: 5, y: 5 } });
-  const match = bubbles.find((b) => b.text.includes("Stairs"));
-  assert(match, "first_stair tip should fire on dungeon transition");
+  const stairId = world.create();
+  world.add(stairId, Position, { x: 7, y: 5 });
+  world.add(stairId, NamedIdentity, { identity: "stair_down", name: "Stairs Down" });
+
+  world.emit("moved", { id: playerId, from: { x: 5, y: 5 }, to: { x: 6, y: 5 } });
+  const match = bubbles.find((b) => b.text.includes("stairs"));
+  assert(match, "first_stair tip should fire when player walks near stairs");
   clearGuideStorage();
 });
 
@@ -227,13 +231,16 @@ Deno.test("tips do not fire twice for the same trigger", () => {
 });
 
 Deno.test("guide mode enabled when tips remain, and emits guidance:pulse", () => {
-  const { world, wisp } = setup();
+  const { world, playerId, wisp } = setup();
   assert(wisp.guideMode, "guide mode should be enabled when unseen tips remain");
 
   let pulsed = false;
   world.on("guidance:pulse", () => { pulsed = true; });
 
-  world.emit("dungeon:transitioned", { depth: 1, pos: { x: 5, y: 5 } });
+  const stairId = world.create();
+  world.add(stairId, Position, { x: 7, y: 5 });
+  world.add(stairId, NamedIdentity, { identity: "stair_down", name: "Stairs Down" });
+  world.emit("moved", { id: playerId, from: { x: 5, y: 5 }, to: { x: 6, y: 5 } });
   assert(pulsed, "guidance:pulse should be emitted when a tip fires");
   clearGuideStorage();
 });
@@ -286,21 +293,29 @@ Deno.test("non-player events do not trigger tips", () => {
 
 // ── Interactable tips ──────────────────────────────────────────────
 
-Deno.test("first_fountain tip fires on fountain:drink", () => {
+Deno.test("first_fountain tip fires when player walks near fountain", () => {
   const { world, playerId, bubbles } = setup();
 
-  world.emit("fountain:drink", { actor: playerId, targetId: 200, amount: 20 });
+  const ftnId = world.create();
+  world.add(ftnId, Position, { x: 8, y: 5 });
+  world.add(ftnId, NamedIdentity, { identity: "fountain", name: "Fountain" });
+
+  world.emit("moved", { id: playerId, from: { x: 5, y: 5 }, to: { x: 6, y: 5 } });
   const match = bubbles.find((b) => b.text.includes("fountain"));
-  assert(match, "first_fountain tip should fire on fountain:drink");
+  assert(match, "first_fountain tip should fire when player walks near fountain");
   clearGuideStorage();
 });
 
-Deno.test("first_door tip fires on door interaction", () => {
+Deno.test("first_door tip fires when player walks near door", () => {
   const { world, playerId, bubbles } = setup();
 
-  world.emit("interaction", { actor: playerId, targetId: 201, action: "toggleDoor", result: "opened" });
+  const doorId = world.create();
+  world.add(doorId, Position, { x: 7, y: 5 });
+  world.add(doorId, NamedIdentity, { identity: "door", name: "Door" });
+
+  world.emit("moved", { id: playerId, from: { x: 5, y: 5 }, to: { x: 6, y: 5 } });
   const match = bubbles.find((b) => b.text.includes("door"));
-  assert(match, "first_door tip should fire on toggleDoor interaction");
+  assert(match, "first_door tip should fire when player walks near door");
   clearGuideStorage();
 });
 
@@ -313,12 +328,16 @@ Deno.test("first_trap tip fires on trap:triggered", () => {
   clearGuideStorage();
 });
 
-Deno.test("first_chest tip fires on chest:open", () => {
+Deno.test("first_chest tip fires when player walks near chest", () => {
   const { world, playerId, bubbles } = setup();
 
-  world.emit("chest:open", { actor: playerId, targetId: 203 });
+  const chestId = world.create();
+  world.add(chestId, Position, { x: 8, y: 5 });
+  world.add(chestId, NamedIdentity, { identity: "chest", name: "Chest" });
+
+  world.emit("moved", { id: playerId, from: { x: 5, y: 5 }, to: { x: 6, y: 5 } });
   const match = bubbles.find((b) => b.text.includes("chest"));
-  assert(match, "first_chest tip should fire on chest:open");
+  assert(match, "first_chest tip should fire when player walks near chest");
   clearGuideStorage();
 });
 
@@ -367,30 +386,42 @@ Deno.test("first_craft tip fires on smithy:open", () => {
   clearGuideStorage();
 });
 
-Deno.test("first_shrine tip fires on shrine:touch", () => {
+Deno.test("first_shrine tip fires when player walks near shrine", () => {
   const { world, playerId, bubbles } = setup();
 
-  world.emit("shrine:touch", { actor: playerId, targetId: 209 });
+  const shrineId = world.create();
+  world.add(shrineId, Position, { x: 8, y: 5 });
+  world.add(shrineId, NamedIdentity, { identity: "shrine", name: "Shrine" });
+
+  world.emit("moved", { id: playerId, from: { x: 5, y: 5 }, to: { x: 6, y: 5 } });
   const match = bubbles.find((b) => b.text.includes("shrine"));
-  assert(match, "first_shrine tip should fire on shrine:touch");
+  assert(match, "first_shrine tip should fire when player walks near shrine");
   clearGuideStorage();
 });
 
-Deno.test("first_weapon_rack tip fires on rack:looted", () => {
+Deno.test("first_weapon_rack tip fires when player walks near rack", () => {
   const { world, playerId, bubbles } = setup();
 
-  world.emit("rack:looted", { actor: playerId, targetId: 210, count: 1 });
+  const rackId = world.create();
+  world.add(rackId, Position, { x: 7, y: 5 });
+  world.add(rackId, NamedIdentity, { identity: "weapon_rack", name: "Weapon Rack" });
+
+  world.emit("moved", { id: playerId, from: { x: 5, y: 5 }, to: { x: 6, y: 5 } });
   const match = bubbles.find((b) => b.text.includes("weapon rack"));
-  assert(match, "first_weapon_rack tip should fire on rack:looted");
+  assert(match, "first_weapon_rack tip should fire when player walks near rack");
   clearGuideStorage();
 });
 
-Deno.test("first_sarcophagus tip fires on sarcophagus:opened", () => {
+Deno.test("first_sarcophagus tip fires when player walks near sarcophagus", () => {
   const { world, playerId, bubbles } = setup();
 
-  world.emit("sarcophagus:opened", { actor: playerId, targetId: 211, depth: 2, spawned: true });
+  const sarcId = world.create();
+  world.add(sarcId, Position, { x: 9, y: 5 });
+  world.add(sarcId, NamedIdentity, { identity: "sarcophagus", name: "Sarcophagus" });
+
+  world.emit("moved", { id: playerId, from: { x: 5, y: 5 }, to: { x: 6, y: 5 } });
   const match = bubbles.find((b) => b.text.includes("sarcophagus"));
-  assert(match, "first_sarcophagus tip should fire on sarcophagus:opened");
+  assert(match, "first_sarcophagus tip should fire when player walks near sarcophagus");
   clearGuideStorage();
 });
 

@@ -147,6 +147,12 @@ export function installSpiritGuideWiring({
         // Nearest non-player creature with Brain component — but we keep it
         // simple and just return null (wisp stays near player for combat tips).
         break;
+      case "door":
+        scan((ni) => {
+          const ident = String(ni?.identity || "").toLowerCase();
+          return ident === "door" || ident === "door_locked";
+        });
+        break;
       case "fountain":
         scan((ni) => {
           const ident = String(ni?.identity || "").toLowerCase();
@@ -317,10 +323,42 @@ export function installSpiritGuideWiring({
     fire("wait_action");
   });
 
-  // ── First stair (dungeon transition) ─────────────────────────────────
+  // ── On-sight proximity tips (player walks near a feature) ────────────
 
-  world.on("dungeon:transitioned", () => {
-    fire("first_stair");
+  /** @type {Array<[string, (ident: string) => boolean]>} */
+  const sightTips = [
+    ["first_stair", (ident) => ident.includes("stair")],
+    ["first_fountain", (ident) => ident === "fountain"],
+    ["first_door", (ident) => ident === "door" || ident === "door_locked"],
+    ["first_chest", (ident) => ident === "chest" || ident === "chest_locked"],
+    ["first_shrine", (ident) => ident === "shrine"],
+    ["first_weapon_rack", (ident) => ident === "weapon_rack"],
+    ["first_sarcophagus", (ident) => ident === "sarcophagus"],
+  ];
+
+  world.on("moved", ({ id, to }) => {
+    const pe = getPlayerEntity();
+    if (!pe || Number(id || 0) !== pe.id) return;
+
+    // Quick-exit: if all sight tips are already seen, skip the scan.
+    const unseen = sightTips.filter(([tipId]) => !seen.has(tipId));
+    if (unseen.length === 0) return;
+
+    const px = Number(to?.x || 0) | 0;
+    const py = Number(to?.y || 0) | 0;
+
+    for (const [eid, pos, ni] of world.query(Position, NamedIdentity)) {
+      if (eid === pe.id) continue;
+      const dist = Math.max(Math.abs((pos.x | 0) - px), Math.abs((pos.y | 0) - py));
+      if (dist > 4) continue;
+      const ident = String(ni?.identity || "").toLowerCase();
+      for (const [tipId, predicate] of unseen) {
+        if (predicate(ident)) {
+          fire(tipId);
+          return; // one tip per move — don't overwhelm
+        }
+      }
+    }
   });
 
   // ── First NPC dialogue (overworld only — townfolk don't exist in the dungeon) ──
@@ -359,22 +397,8 @@ export function installSpiritGuideWiring({
     if (spellCount >= 2) fire("spell_select");
   });
 
-  // ── First fountain drink ───────────────────────────────────────────
-
-  world.on("fountain:drink", ({ actor }) => {
-    const pe = getPlayerEntity();
-    if (!pe || Number(actor || 0) !== pe.id) return;
-    fire("first_fountain");
-  });
-
-  // ── First door interaction ────────────────────────────────────────
-
-  world.on("interaction", ({ actor, action }) => {
-    if (action !== "toggleDoor") return;
-    const pe = getPlayerEntity();
-    if (!pe || Number(actor || 0) !== pe.id) return;
-    fire("first_door");
-  });
+  // (fountain, door, chest, shrine, weapon rack, sarcophagus — handled by
+  //  on-sight proximity scanner above)
 
   // ── First trap (player takes trap damage) ─────────────────────────
 
@@ -382,14 +406,6 @@ export function installSpiritGuideWiring({
     const pe = getPlayerEntity();
     if (!pe || Number(actor || 0) !== pe.id) return;
     fire("first_trap");
-  });
-
-  // ── First chest opened ────────────────────────────────────────────
-
-  world.on("chest:open", ({ actor }) => {
-    const pe = getPlayerEntity();
-    if (!pe || Number(actor || 0) !== pe.id) return;
-    fire("first_chest");
   });
 
   // ── First shop ────────────────────────────────────────────────────
@@ -424,30 +440,6 @@ export function installSpiritGuideWiring({
     const pe = getPlayerEntity();
     if (!pe || Number(actor || 0) !== pe.id) return;
     fire("first_craft");
-  });
-
-  // ── First shrine ──────────────────────────────────────────────────
-
-  world.on("shrine:touch", ({ actor }) => {
-    const pe = getPlayerEntity();
-    if (!pe || Number(actor || 0) !== pe.id) return;
-    fire("first_shrine");
-  });
-
-  // ── First weapon rack ─────────────────────────────────────────────
-
-  world.on("rack:looted", ({ actor }) => {
-    const pe = getPlayerEntity();
-    if (!pe || Number(actor || 0) !== pe.id) return;
-    fire("first_weapon_rack");
-  });
-
-  // ── First sarcophagus ─────────────────────────────────────────────
-
-  world.on("sarcophagus:opened", ({ actor }) => {
-    const pe = getPlayerEntity();
-    if (!pe || Number(actor || 0) !== pe.id) return;
-    fire("first_sarcophagus");
   });
 
   // ── First weather (rain) ──────────────────────────────────────────
