@@ -1,10 +1,18 @@
-// Audio engine — lazy Web Audio API context with master volume control.
-// All game sounds are synthesized (no audio files).
+// Audio engine — loads and plays real audio files (.wav, .mp3, .mp4) via Web Audio API.
+// Decoded buffers are cached so each file is fetched only once.
 
 let _ctx = null;
 let _master = null;
 let _muted = false;
-let _volume = 0.35;
+let _volume = 0.5;
+
+/** Map<string, AudioBuffer> — decoded file cache keyed by URL. */
+const _cache = new Map();
+
+/** Map<string, Promise<AudioBuffer|null>> — in-flight loads. */
+const _loading = new Map();
+
+// ── Internals ───────────────────────────────────────────────
 
 /** @returns {AudioContext} */
 function ctx() {
@@ -16,13 +24,43 @@ function ctx() {
 }
 
 /** @returns {GainNode} */
-function master() {
+function masterGain() {
   if (!_master) {
     _master = ctx().createGain();
     _master.gain.value = _muted ? 0 : _volume;
     _master.connect(ctx().destination);
   }
   return _master;
+}
+
+/**
+ * Fetch + decode an audio file. Returns cached buffer on repeat calls.
+ * @param {string} url
+ * @returns {Promise<AudioBuffer|null>}
+ */
+function loadBuffer(url) {
+  if (_cache.has(url)) return Promise.resolve(_cache.get(url));
+  if (_loading.has(url)) return _loading.get(url);
+
+  const promise = fetch(url)
+    .then(r => {
+      if (!r.ok) throw new Error(`Audio fetch failed: ${r.status} ${url}`);
+      return r.arrayBuffer();
+    })
+    .then(ab => ctx().decodeAudioData(ab))
+    .then(buf => {
+      _cache.set(url, buf);
+      _loading.delete(url);
+      return buf;
+    })
+    .catch(err => {
+      console.warn(`[audio] Failed to load ${url}:`, err.message);
+      _loading.delete(url);
+      return null;
+    });
+
+  _loading.set(url, promise);
+  return promise;
 }
 
 // ── Public API ──────────────────────────────────────────────
@@ -43,63 +81,61 @@ export function setMuted(m) {
 export function isMuted() { return _muted; }
 
 /**
- * Play a registered sound.
- * @param {(ac: AudioContext, dest: GainNode, opts?: object) => void} soundFn
- * @param {object} [opts] — forwarded to the sound function
+ * Preload one or more audio files into the buffer cache.
+ * Call during init so sounds are ready when needed.
+ * @param {string[]} urls
+ * @returns {Promise<void>}
  */
-export function play(soundFn, opts) {
+export function preload(urls) {
+  return Promise.all(urls.map(loadBuffer)).then(() => {});
+}
+
+/**
+ * Play a sound.
+ * @param {string} url — path to audio file (relative to site root)
+ * @param {{
+ *   volume?: number,       // 0–1, multiplied with master (default 1)
+ *   rate?: number,         // playback rate (default 1)
+ *   detune?: number,       // cents detune (default 0)
+ *   delay?: number,        // seconds before playback starts (default 0)
+ * }} [opts]
+ */
+export function play(url, opts) {
   if (_muted) return;
+  const buf = _cache.get(url);
+  if (buf) {
+    _playBuffer(buf, opts);
+    return;
+  }
+  // Not cached yet — load then play (slight latency on first use)
+  loadBuffer(url).then(b => {
+    if (b && !_muted) _playBuffer(b, opts);
+  });
+}
+
+/** @param {AudioBuffer} buf */
+function _playBuffer(buf, opts) {
   try {
-    soundFn(ctx(), master(), opts);
+    const ac = ctx();
+    const src = ac.createBufferSource();
+    src.buffer = buf;
+
+    if (opts?.rate) src.playbackRate.value = opts.rate;
+    if (opts?.detune) src.detune.value = opts.detune;
+
+    const vol = Number(opts?.volume ?? 1);
+    if (vol < 1) {
+      const g = ac.createGain();
+      g.gain.value = vol;
+      src.connect(g);
+      g.connect(masterGain());
+    } else {
+      src.connect(masterGain());
+    }
+
+    const when = opts?.delay ? ac.currentTime + opts.delay : 0;
+    src.start(when);
   } catch (_) {
     // Web Audio not available — silent fail
   }
-}
-
-// ── Shared synthesis helpers ────────────────────────────────
-
-/**
- * Play a single tone with attack/release envelope.
- */
-export function tone(ac, freq, start, dur, type, gain, dest) {
-  const osc = ac.createOscillator();
-  const env = ac.createGain();
-  osc.type = type;
-  osc.frequency.value = freq;
-
-  const t0 = ac.currentTime + start;
-  const attack = 0.015;
-  const release = Math.min(dur * 0.4, 0.2);
-  env.gain.setValueAtTime(0, t0);
-  env.gain.linearRampToValueAtTime(gain, t0 + attack);
-  env.gain.setValueAtTime(gain, t0 + dur - release);
-  env.gain.linearRampToValueAtTime(0, t0 + dur);
-
-  osc.connect(env);
-  env.connect(dest);
-  osc.start(t0);
-  osc.stop(t0 + dur + 0.05);
-}
-
-/**
- * White noise burst — useful for impacts, footsteps, etc.
- */
-export function noiseBurst(ac, start, dur, gain, dest) {
-  const bufSize = Math.ceil(ac.sampleRate * dur);
-  const buf = ac.createBuffer(1, bufSize, ac.sampleRate);
-  const data = buf.getChannelData(0);
-  for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
-
-  const src = ac.createBufferSource();
-  src.buffer = buf;
-
-  const env = ac.createGain();
-  const t0 = ac.currentTime + start;
-  env.gain.setValueAtTime(gain, t0);
-  env.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
-
-  src.connect(env);
-  env.connect(dest);
-  src.start(t0);
-  src.stop(t0 + dur + 0.01);
 }
