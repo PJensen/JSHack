@@ -6,7 +6,7 @@ import { ItemInfo } from "../../components/ItemInfo.js";
 import { NamedIdentity } from "../../components/NamedIdentity.js";
 import { Player } from "../../components/Player.js";
 import { Position } from "../../components/Position.js";
-import { addToInventory } from "../../utils/inventoryFacade.js";
+import { emitSafe } from "../../utils/emitSafe.js";
 import { consumeInventoryIdentity, inventoryHasIdentity } from "../../utils/townEconomy.js";
 import { emit, setVar } from "../actions.js";
 import { registerQuest } from "../registry.js";
@@ -187,17 +187,15 @@ export const GraveyardWatchQuest = registerQuest({
               },
               setVar("delivered", true),
               (ctx) => {
-                const pid = Number(ctx.bind.player || 0);
-                if (!(pid > 0)) return;
+                const giverId = Number(ctx.bind.giver || 0);
+                const giverPos = giverId > 0 ? ctx.world.get(giverId, Position) : null;
+                const x = giverPos?.x ?? 0;
+                const y = giverPos?.y ?? 0;
                 const gid = createFrom(ctx.world, GoldStack, {});
                 ctx.world.mutate(gid, ItemInfo, (r) => { r.count = REWARD_GOLD; });
-                addToInventory(ctx.world, pid, gid);
+                ctx.world.add(gid, Position, { x, y });
+                emitSafe(ctx.world, 'item:dropped', { itemId: gid, count: REWARD_GOLD, at: { x, y } });
               },
-              emit("quest:reward", (ctx) => ({
-                questId: STARTER_PRIEST_FETCH_QUEST_ID,
-                playerId: ctx.bind.player,
-                gold: REWARD_GOLD,
-              })),
               emit("quest:completed", (ctx) => ({
                 questId: STARTER_PRIEST_FETCH_QUEST_ID,
                 playerId: ctx.bind.player,
