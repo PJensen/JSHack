@@ -197,7 +197,7 @@ Deno.test("low_hp tip fires when player HP drops below 40%", () => {
   clearGuideStorage();
 });
 
-Deno.test("first_stair tip fires when player walks near stairs", () => {
+Deno.test("first_stair_down tip fires when player walks near down stairs", () => {
   const { world, playerId, bubbles } = setup();
 
   const stairId = world.create();
@@ -205,8 +205,21 @@ Deno.test("first_stair tip fires when player walks near stairs", () => {
   world.add(stairId, NamedIdentity, { identity: "stair_down", name: "Stairs Down" });
 
   world.emit("moved", { id: playerId, from: { x: 5, y: 5 }, to: { x: 6, y: 5 } });
-  const match = bubbles.find((b) => b.text.toLowerCase().includes("stair"));
-  assert(match, "first_stair tip should fire when player walks near stairs");
+  const match = bubbles.find((b) => b.text.includes("Darker things"));
+  assert(match, "first_stair_down tip should fire near down stairs");
+  clearGuideStorage();
+});
+
+Deno.test("first_stair_up tip fires when player walks near up stairs", () => {
+  const { world, playerId, bubbles } = setup();
+
+  const stairId = world.create();
+  world.add(stairId, Position, { x: 7, y: 5 });
+  world.add(stairId, NamedIdentity, { identity: "stair_up", name: "Stairs Up" });
+
+  world.emit("moved", { id: playerId, from: { x: 5, y: 5 }, to: { x: 6, y: 5 } });
+  const match = bubbles.find((b) => b.text.includes("safer ground"));
+  assert(match, "first_stair_up tip should fire near up stairs");
   clearGuideStorage();
 });
 

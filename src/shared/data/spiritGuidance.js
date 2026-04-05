@@ -136,9 +136,16 @@ export const GUIDANCE_TIPS = [
 
   // ── Exploration ───────────────────────────────────────────────────
   {
-    id: "first_stair",
-    text: "Stairs. Step on them to travel between floors.",
-    durationSec: 5.5,
+    id: "first_stair_down",
+    text: "Stairs leading down. Darker things await below.",
+    durationSec: 5,
+    delaySec: 0.5,
+    flyTo: "stair",
+  },
+  {
+    id: "first_stair_up",
+    text: "Stairs leading up. A way back to safer ground.",
+    durationSec: 5,
     delaySec: 0.5,
     flyTo: "stair",
   },

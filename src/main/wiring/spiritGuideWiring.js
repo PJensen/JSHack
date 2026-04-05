@@ -335,11 +335,12 @@ export function installSpiritGuideWiring({
 
   /** @type {Array<[string, (ident: string) => boolean]>} */
   // Tips that only make sense in the dungeon (depth > 0).
-  const dungeonOnlySightTips = new Set(["first_stair", "first_chest", "first_sarcophagus", "first_weapon_rack"]);
+  const dungeonOnlySightTips = new Set(["first_stair_down", "first_stair_up", "first_chest", "first_sarcophagus", "first_weapon_rack"]);
 
   /** @type {Array<[string, (ident: string) => boolean]>} */
   const sightTips = [
-    ["first_stair", (ident) => ident.includes("stair")],
+    ["first_stair_down", (ident) => ident === "stair_down"],
+    ["first_stair_up", (ident) => ident === "stair_up"],
     ["first_fountain", (ident) => ident === "fountain"],
     ["first_door", (ident) => ident === "door" || ident === "door_locked"],
     ["first_chest", (ident) => ident === "chest" || ident === "chest_locked"],
