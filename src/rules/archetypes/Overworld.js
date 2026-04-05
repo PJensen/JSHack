@@ -321,7 +321,7 @@ export const TavernBench = defineArchetype(
   [Position, (p) => ({ x: p.x, y: p.y })],
   [NamedIdentity, { name: "Bench", identity: "tavern_bench" }],
   [Material, { kind: "wood" }],
-  [Collider, { solid: true, blocksSight: false }],
+  [Collider, { solid: false, blocksSight: false }],
 );
 
 export const TavernPillar = defineArchetype(
@@ -329,7 +329,7 @@ export const TavernPillar = defineArchetype(
   [Position, (p) => ({ x: p.x, y: p.y })],
   [NamedIdentity, { name: "Pillar", identity: "tavern_pillar" }],
   [Material, { kind: "wood" }],
-  [Collider, { solid: true, blocksSight: false }],
+  [Collider, { solid: false, blocksSight: false }],
 );
 
 export const TavernSign = defineArchetype(
