@@ -547,5 +547,5 @@ export function createFacets(init) {
     },
   });
 
-  return { query, mutate, io, audit, rules, rng, fx, stats, status };
+  return { world, query, mutate, io, audit, rules, rng, fx, stats, status };
 }

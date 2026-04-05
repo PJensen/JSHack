@@ -59,7 +59,7 @@ export const CLASS_DEFS = {
       { itemId: 'potion_mana', count: 3 },
       { itemId: 'scroll_identify', count: 4 },
     ],
-    startingSpells: ['frost', 'blizzard', 'harmony_ward', 'firestorm'],
+    startingSpells: ['frost', 'blizzard', 'harmony_ward', 'firestorm', 'plague_swarm', 'fireball'],
   },
 
   outlaw: {

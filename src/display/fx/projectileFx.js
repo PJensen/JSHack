@@ -40,6 +40,12 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
   /** @type {RadialFx[]} */
   const _ricochetImpact = [];
 
+  // --- Plague Swarm projectile state ---
+  /** @type {ArrowFx[]} */
+  const _swarmFx = [];
+  /** @type {RadialFx[]} */
+  const _swarmImpact = [];
+
   // --- Web Spit projectile state ---
   /** @type {ArrowFx[]} */
   const _webSpitFx = [];
@@ -48,7 +54,8 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
 
   function _hasInflight() {
     return _arrowFx.length > 0 || _sboltFx.length > 0 || _fireballFx.length > 0
-      || _frostboltFx.length > 0 || _ricochetFx.length > 0 || _webSpitFx.length > 0;
+      || _frostboltFx.length > 0 || _ricochetFx.length > 0 || _webSpitFx.length > 0
+      || _swarmFx.length > 0;
   }
 
   function _syncInputLock() {
@@ -403,6 +410,73 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
       if (_ricochetImpact[i].expired) _ricochetImpact.splice(i, 1);
     }
 
+    // Plague Swarm projectiles — buzzing bee-like particles
+    for (let i = _swarmFx.length - 1; i >= 0; i--) {
+      const sw = _swarmFx[i];
+
+      // Spawn chaotic buzzing yellow-black particles during flight
+      if (fx?.pool && sw.progress < 1) {
+        const hx = sw.from.x + (sw.to.x - sw.from.x) * sw.progress;
+        const hy = sw.from.y + (sw.to.y - sw.from.y) * sw.progress;
+        const count = Math.max(1, Math.ceil(dt * 90));
+        for (let j = 0; j < count; j++) {
+          // Alternating yellow and dark particles for bee swarm look
+          const isYellow = Math.random() > 0.35;
+          fx.pool.spawn(new Particle({
+            x: hx + (Math.random() - 0.5) * 0.25,
+            y: hy + (Math.random() - 0.5) * 0.25,
+            vx: (Math.random() - 0.5) * 2.0 - sw.dx * 0.5,
+            vy: (Math.random() - 0.5) * 2.0 - sw.dy * 0.5,
+            life: 0.12 + Math.random() * 0.14,
+            size0: isYellow ? (0.04 + Math.random() * 0.03) : (0.03 + Math.random() * 0.02),
+            size1: 0.01,
+            r: isYellow ? (220 + (Math.random() * 35 | 0)) : (40 + (Math.random() * 20 | 0)),
+            g: isYellow ? (180 + (Math.random() * 40 | 0)) : (30 + (Math.random() * 15 | 0)),
+            b: isYellow ? (20 + (Math.random() * 20 | 0)) : (10 + (Math.random() * 10 | 0)),
+            a0: 0.85,
+          }));
+        }
+      }
+
+      sw.tick(dt);
+
+      if (sw.arrived) {
+        // Impact: swarm burst
+        _swarmImpact.push(new RadialFx({ x: sw.to.x, y: sw.to.y, radius: 0.6, ttl: 0.45 }));
+        startShake(cam, 2, 0.08);
+
+        // Swarm explosion particles
+        if (fx?.pool) {
+          for (let k = 0; k < 22; k++) {
+            const angle = (k / 22) * Math.PI * 2 + (Math.random() - 0.5) * 0.6;
+            const spd = 0.5 + Math.random() * 1.6;
+            const isYellow = Math.random() > 0.3;
+            fx.pool.spawn(new Particle({
+              x: sw.to.x + (Math.random() - 0.5) * 0.3,
+              y: sw.to.y + (Math.random() - 0.5) * 0.3,
+              vx: Math.cos(angle) * spd,
+              vy: Math.sin(angle) * spd - 0.2,
+              ay: 0.15,
+              life: 0.25 + Math.random() * 0.3,
+              size0: 0.05 + Math.random() * 0.04,
+              size1: 0.01,
+              r: isYellow ? (230 + (Math.random() * 25 | 0)) : 35,
+              g: isYellow ? (190 + (Math.random() * 40 | 0)) : 25,
+              b: isYellow ? 15 : 5,
+              a0: 0.8,
+              rotVel: (Math.random() - 0.5) * 5,
+            }));
+          }
+        }
+        _swarmFx.splice(i, 1);
+      }
+    }
+    // Swarm impacts
+    for (let i = _swarmImpact.length - 1; i >= 0; i--) {
+      _swarmImpact[i].tick(dt);
+      if (_swarmImpact[i].expired) _swarmImpact.splice(i, 1);
+    }
+
     // Web Spit projectiles — trailing silk strands
     for (let i = _webSpitFx.length - 1; i >= 0; i--) {
       const ws = _webSpitFx[i];
@@ -515,6 +589,7 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
     else if (style === 'frostbolt') _frostboltFx.push(entry);
     else if (style === 'ricochet_theology') _ricochetFx.push(entry);
     else if (style === 'web_spit') _webSpitFx.push(entry);
+    else if (style === 'plague_swarm') _swarmFx.push(entry);
     else _arrowFx.push(entry);
 
     _syncInputLock();
@@ -528,7 +603,8 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
     const hasFrostbolt = _frostboltFx.length || _frostboltImpact.length;
     const hasRicochet = _ricochetFx.length || _ricochetImpact.length;
     const hasWebSpit = _webSpitFx.length || _webSpitImpact.length;
-    if (!hasArrows && !hasSbolt && !hasFireball && !hasFrostbolt && !hasRicochet && !hasWebSpit) return;
+    const hasSwarm = _swarmFx.length || _swarmImpact.length;
+    if (!hasArrows && !hasSbolt && !hasFireball && !hasFrostbolt && !hasRicochet && !hasWebSpit && !hasSwarm) return;
     ctx.save();
 
     // Draw flying arrows
@@ -982,6 +1058,56 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
       ctx.restore();
     }
 
+    // --- Plague Swarm projectile ---
+    if (_swarmFx.length) {
+      for (const sw of _swarmFx) {
+        const progress = sw.progress;
+        const hx = sw.from.x + (sw.to.x - sw.from.x) * progress;
+        const hy = sw.from.y + (sw.to.y - sw.from.y) * progress;
+
+        // Swarm cloud: cluster of small buzzing dots
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        // Amber glow halo
+        ctx.fillStyle = 'rgba(220,180,30,0.18)';
+        ctx.beginPath(); ctx.arc(hx, hy, 0.35, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+
+        // Individual "bees" orbiting the center
+        const t = performance.now() * 0.008;
+        for (let k = 0; k < 6; k++) {
+          const a = (k / 6) * Math.PI * 2 + t + progress * 4;
+          const r = 0.12 + 0.06 * Math.sin(t * 1.5 + k);
+          const bx = hx + Math.cos(a) * r;
+          const by = hy + Math.sin(a) * r;
+          ctx.fillStyle = (k % 2 === 0) ? 'rgba(240,200,30,0.95)' : 'rgba(50,35,10,0.9)';
+          ctx.beginPath(); ctx.arc(bx, by, 0.04, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+    }
+
+    // --- Plague Swarm impact ---
+    if (_swarmImpact.length) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      for (const imp of _swarmImpact) {
+        const t = imp.progress;
+        // Amber flash
+        if (t < 0.2) {
+          const flashA = 0.6 * (1 - t / 0.2);
+          ctx.fillStyle = `rgba(230,190,40,${flashA.toFixed(3)})`;
+          ctx.beginPath(); ctx.arc(imp.x, imp.y, 0.25 + t * 0.3, 0, Math.PI * 2); ctx.fill();
+        }
+        // Expanding swarm ring
+        const ringR = t * (imp.radius + 0.2);
+        const ringA = 0.4 * (1 - t);
+        ctx.strokeStyle = `rgba(200,170,20,${ringA.toFixed(3)})`;
+        ctx.lineWidth = 0.08 * (1 - t * 0.5);
+        ctx.beginPath(); ctx.arc(imp.x, imp.y, ringR, 0, Math.PI * 2); ctx.stroke();
+      }
+      ctx.restore();
+    }
+
     ctx.restore();
   }
 
@@ -1071,6 +1197,47 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
         speed: 10,
         minDuration: 0.08,
         maxDuration: 0.7,
+      });
+    });
+
+    // Fireball: fiery orb from caster to target (reuses familiar fireball VFX)
+    world.on('spell:fireball', ({ from, to, fizzle }) => {
+      if (fizzle) return;
+      if (!from || !to) return;
+      spawnTransientProjectile({
+        from,
+        to,
+        style: 'fireball',
+        speed: 8,
+        minDuration: 0.1,
+        maxDuration: 0.6,
+      });
+    });
+
+    // Plague Swarm: buzzing swarm projectile from caster to target
+    world.on('spell:plague_swarm', ({ from, at, fizzle, missed }) => {
+      if (fizzle || missed) return;
+      if (!from || !at) return;
+      spawnTransientProjectile({
+        from,
+        to: at,
+        style: 'plague_swarm',
+        speed: 6,
+        minDuration: 0.15,
+        maxDuration: 0.7,
+      });
+    });
+
+    // Plague Swarm jump: swarm leaps from one enemy to the next
+    world.on('spell:plague_swarm:jump', ({ from, to }) => {
+      if (!from || !to) return;
+      spawnTransientProjectile({
+        from,
+        to,
+        style: 'plague_swarm',
+        speed: 5,
+        minDuration: 0.18,
+        maxDuration: 0.6,
       });
     });
 
@@ -1172,6 +1339,16 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
         x: r.from.x + (r.to.x - r.from.x) * u,
         y: r.from.y + (r.to.y - r.from.y) * u,
         radius: 4, color: [255, 240, 180],
+      });
+    }
+    // Plague swarm — amber glow
+    for (let i = 0; i < _swarmFx.length; i++) {
+      const sw = _swarmFx[i];
+      const u = sw.progress;
+      out.push({
+        x: sw.from.x + (sw.to.x - sw.from.x) * u,
+        y: sw.from.y + (sw.to.y - sw.from.y) * u,
+        radius: 3, color: [220, 180, 40],
       });
     }
     // Elemental arrows — compact moving glow

@@ -766,6 +766,24 @@ export function installMessageWiring({
     log('You scorch the target.', 'combat');
   });
 
+  world.on('spell:plague_swarm', ({ actor, fizzle, missed }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    if (fizzle) { log('The swarm finds no host.', 'system'); return; }
+    if (missed) { log('Your plague swarm misses!', 'system'); return; }
+    log('You unleash a plague swarm!', 'combat');
+  });
+
+  world.on('spell:plague_swarm:jump', () => {
+    log('The swarm leaps to a new host!', 'combat');
+  });
+
+  world.on('spell:fireball', ({ actor, fizzle, missed }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    if (fizzle) { log('Fireball finds no target.', 'system'); return; }
+    if (missed) { log('Your fireball misses!', 'system'); return; }
+    log('You hurl a fireball!', 'combat');
+  });
+
   world.on('spell:meteor', ({ actor, randomized, randomReason }) => {
     if (nameOfEntity(actor) !== 'You') return;
     if (randomized) {

@@ -249,6 +249,12 @@ export const EFFECT_DEFS = [
     statuses: ["agony"],
   },
   {
+    id: "swarm",
+    keys: ["swarm", "swarmed"],
+    operation: "damage",
+    statuses: ["swarmed"],
+  },
+  {
     id: "blinded",
     keys: ["blinded", "blind"],
     operation: "none",

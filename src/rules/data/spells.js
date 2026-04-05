@@ -725,6 +725,40 @@ export const SPELL_DEFS = {
     ],
   },
 
+  plague_swarm: {
+    id: 'plague_swarm',
+    name: 'Plague Swarm',
+    symbol: '\u{1F41D}',    // 🐝
+    schools: ['nature', 'destruction'],
+    manaCost: 10,
+    minIntelligence: 6,
+    range: 8,
+    cooldown: 12,
+    script: 'plague_swarm',
+    targeting: 'auto',
+    description: 'Unleash a stinging swarm that burrows into the target and leaps to a new host every few turns.',
+    effects: [
+      { kind: 'damage', element: 'nature', amount: '2 per tick, INT-scaled; jumps to nearby enemy every 3 ticks' },
+      { kind: 'status', status: 'swarmed', duration: '8 turns; spreads on jump' },
+    ],
+  },
+  fireball: {
+    id: 'fireball',
+    name: 'Fireball',
+    symbol: '\u{1F525}',    // 🔥
+    schools: ['destruction', 'fire'],
+    manaCost: 8,
+    minIntelligence: 6,
+    range: 10,
+    script: 'fireball',
+    targeting: 'auto',
+    description: 'Hurl a roaring ball of fire that explodes on impact and leaves the target burning.',
+    effects: [
+      { kind: 'damage', element: 'fire', amount: '8 base, INT-scaled, can crit' },
+      { kind: 'status', status: 'burn', duration: '2 turns' },
+    ],
+  },
+
   // ── Warden abilities ──────────────────────────────────────────────────────
   war_cry: {
     id: 'war_cry',
