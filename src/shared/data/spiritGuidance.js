@@ -109,7 +109,7 @@ export const GUIDANCE_TIPS = [
   // ── Exploration ───────────────────────────────────────────────────
   {
     id: "first_stair",
-    text: "Stairs lead deeper into the dungeon. Step on them and tap the tooltip to descend.",
+    text: "Look \u2014 stairs! They lead deeper into the dungeon. Step on them and tap the tooltip to descend.",
     durationSec: 5.5,
     delaySec: 0.5,
     flyTo: "stair",
@@ -159,6 +159,7 @@ export const GUIDANCE_TIPS = [
     text: "A door! Walk into it to open or close it. Some doors are locked \u2014 find the key.",
     durationSec: 5,
     delaySec: 0.5,
+    flyTo: "door",
   },
   {
     id: "first_trap",
