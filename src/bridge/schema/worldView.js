@@ -11,7 +11,7 @@ import { Equipment } from "../../rules/components/Equipment.js";
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
 import { ObjectState } from "../../rules/components/ObjectState.js";
 import { getTile, forEachTileInRect, forEachLoadedTile, isRoofed } from '../../rules/environment/dungeon/tileMap.js';
-import { TILE_DOOR, TILE_FLOOR, TILE_WALL } from "../../rules/environment/dungeon/constants.js";
+import { TILE_DOOR, TILE_FLOOR, TILE_STAIR_DOWN, TILE_WALL } from "../../rules/environment/dungeon/constants.js";
 import { buildBlocksVisionMap, blockedCallback } from '../../rules/utils/vision.js';
 import { updateFOV, isVisible, isExplored } from '../../rules/environment/dungeon/exploredMap.js';
 import { forEachInRect, ensureSpatialIndex } from '../../rules/utils/spatialIndex.js';
@@ -193,7 +193,7 @@ function makePerceptionEcho(src, extraTags, at, kindOverride = undefined) {
 }
 
 function isRoofBearingTile(tile) {
-	return tile === TILE_FLOOR || tile === TILE_WALL || tile === TILE_DOOR;
+	return tile === TILE_FLOOR || tile === TILE_WALL || tile === TILE_DOOR || tile === TILE_STAIR_DOWN;
 }
 
 /**
