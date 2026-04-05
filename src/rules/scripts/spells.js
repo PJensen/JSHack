@@ -14,6 +14,7 @@ import { NamedIdentity } from "../components/NamedIdentity.js";
 import { DungeonState } from "../components/DungeonState.js";
 import { Faction } from "../components/Faction.js";
 import { Vitality } from "../components/Vitality.js";
+import { Mana } from "../components/Mana.js";
 import { Brain } from "../components/Brain.js";
 import { Collider } from "../components/Collider.js";
 import { ActiveEffects } from "../components/ActiveEffects.js";
@@ -2242,6 +2243,29 @@ REGISTRY['agony'] = function agonyScript(world, actor, spell, _intent) {
     actor, targetId,
     from: { x: apos.x, y: apos.y }, at: tpos,
     potency: basePotency, duration: baseDuration,
+  });
+};
+
+// Life Tap — sacrifice HP to restore mana. Mana gained = 150% of HP spent, scaled by INT.
+REGISTRY['lifetap'] = function lifetapScript(world, actor, spell, intent) {
+  const vit = /** @type any */ (world.get(actor, Vitality));
+  const mana = /** @type any */ (world.get(actor, Mana));
+  if (!vit || !mana) return;
+
+  const hpSpent = Number(spell?.lifeCost ?? 8);
+  // HP is already deducted by castSpellSystem (costResource:'life').
+  // Calculate mana restored: 150% of HP spent, plus INT scaling.
+  const intBonus = getSpellIntelligenceBonus(world, actor);
+  const manaGained = Math.round(hpSpent * 1.5 + intBonus * 0.5);
+  const maxM = effectiveMaxMana(world, actor, mana);
+  const before = Number(mana.mana || 0);
+  mana.mana = Math.min(maxM, before + manaGained);
+  const actual = mana.mana - before;
+
+  emitSafe(world, 'spell:lifetap', {
+    actor,
+    hpSpent,
+    manaGained: actual,
   });
 };
 

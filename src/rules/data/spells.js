@@ -492,6 +492,21 @@ export const SPELL_DEFS = {
       { kind: 'status', status: 'agony', duration: '6-10 turns, snapshotted from cast-time INT' },
     ],
   },
+  lifetap: {
+    id: 'lifetap',
+    name: 'Life Tap',
+    symbol: '\u{1F4A0}',   // 💠
+    schools: ['darkness'],
+    costResource: 'life',
+    lifeCost: 8,
+    minIntelligence: 8,
+    script: 'lifetap',
+    targeting: 'self',
+    description: 'Sacrifice a sliver of your life force, converting vitality into raw mana.',
+    effects: [
+      { kind: 'utility', note: 'Costs 8 HP, restores mana equal to 150% of HP spent (INT-scaled)' },
+    ],
+  },
   drain_life: {
     id: 'drain_life',
     name: 'Drain Life',
