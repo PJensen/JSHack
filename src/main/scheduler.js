@@ -24,6 +24,7 @@ import { castSpellSystem } from "../rules/systems/castSpellSystem.js";
 import { aiChaseSystem, installAggroFromDamageListener, installAggroFromStealthOffenseListener } from "../rules/systems/aiChaseSystem.js";
 import { aiTownfolkSystem, installTownfolkDoorListener, installBellListener } from "../rules/systems/aiTownfolkSystem.js";
 import { aiScurrySystem } from "../rules/systems/aiScurrySystem.js";
+import { aiFarmAnimalSystem } from "../rules/systems/aiFarmAnimalSystem.js";
 import { aiWeaponPickupSystem } from "../rules/systems/aiWeaponPickupSystem.js";
 import { aiCorpseEatSystem } from "../rules/systems/aiCorpseEatSystem.js";
 import { aiFlyingSystem } from "../rules/systems/aiFlyingSystem.js";
@@ -158,6 +159,7 @@ export function configureWorld(world) {
   // Scurry before chase: dumb idle creatures set a random MoveIntent which
   // aiChaseSystem's existing intent-skip guard then honours.
   registerSystem(aiScurrySystem, 'ai');
+  registerSystem(aiFarmAnimalSystem, 'ai');
   registerSystem(aiTownfolkSystem, 'ai');
   registerSystem(aiChaseSystem, 'ai');
   // Weapon pickup after chase so the monster's hunt state is settled first.
