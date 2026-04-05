@@ -283,3 +283,150 @@ Deno.test("non-player events do not trigger tips", () => {
   assertEquals(match, undefined, "non-player pickup should not trigger tips");
   clearGuideStorage();
 });
+
+// ── Interactable tips ──────────────────────────────────────────────
+
+Deno.test("first_fountain tip fires on fountain:drink", () => {
+  const { world, playerId, bubbles } = setup();
+
+  world.emit("fountain:drink", { actor: playerId, targetId: 200, amount: 20 });
+  const match = bubbles.find((b) => b.text.includes("fountain"));
+  assert(match, "first_fountain tip should fire on fountain:drink");
+  clearGuideStorage();
+});
+
+Deno.test("first_door tip fires on door interaction", () => {
+  const { world, playerId, bubbles } = setup();
+
+  world.emit("interaction", { actor: playerId, targetId: 201, action: "toggleDoor", result: "opened" });
+  const match = bubbles.find((b) => b.text.includes("door"));
+  assert(match, "first_door tip should fire on toggleDoor interaction");
+  clearGuideStorage();
+});
+
+Deno.test("first_trap tip fires on trap:triggered", () => {
+  const { world, playerId, bubbles } = setup();
+
+  world.emit("trap:triggered", { actor: playerId, trapId: 202 });
+  const match = bubbles.find((b) => b.text.includes("trap"));
+  assert(match, "first_trap tip should fire on trap:triggered");
+  clearGuideStorage();
+});
+
+Deno.test("first_chest tip fires on chest:open", () => {
+  const { world, playerId, bubbles } = setup();
+
+  world.emit("chest:open", { actor: playerId, targetId: 203 });
+  const match = bubbles.find((b) => b.text.includes("chest"));
+  assert(match, "first_chest tip should fire on chest:open");
+  clearGuideStorage();
+});
+
+Deno.test("first_shop tip fires on shop:open", () => {
+  const { world, playerId, bubbles } = setup();
+
+  world.emit("shop:open", { actor: playerId, targetId: 204, buyMarkup: 1.5, sellDiscount: 0.5 });
+  const match = bubbles.find((b) => b.text.includes("shop"));
+  assert(match, "first_shop tip should fire on shop:open");
+  clearGuideStorage();
+});
+
+Deno.test("first_harvest tip fires on harvest:picked", () => {
+  const { world, playerId, bubbles } = setup();
+
+  world.emit("harvest:picked", { actor: playerId, targetId: 205, kind: "mushroom" });
+  const match = bubbles.find((b) => b.text.includes("harvested"));
+  assert(match, "first_harvest tip should fire on harvest:picked");
+  clearGuideStorage();
+});
+
+Deno.test("first_craft tip fires on alchemy:open", () => {
+  const { world, playerId, bubbles } = setup();
+
+  world.emit("alchemy:open", { actor: playerId, targetId: 206, ingredients: [], recipes: [] });
+  const match = bubbles.find((b) => b.text.includes("crafting station"));
+  assert(match, "first_craft tip should fire on alchemy:open");
+  clearGuideStorage();
+});
+
+Deno.test("first_craft tip fires on cooking:open", () => {
+  const { world, playerId, bubbles } = setup();
+
+  world.emit("cooking:open", { actor: playerId, targetId: 207, corpses: [], herbs: [] });
+  const match = bubbles.find((b) => b.text.includes("crafting station"));
+  assert(match, "first_craft tip should fire on cooking:open");
+  clearGuideStorage();
+});
+
+Deno.test("first_craft tip fires on smithy:open", () => {
+  const { world, playerId, bubbles } = setup();
+
+  world.emit("smithy:open", { actor: playerId, targetId: 208, station: "anvil", materials: [], recipes: [] });
+  const match = bubbles.find((b) => b.text.includes("crafting station"));
+  assert(match, "first_craft tip should fire on smithy:open");
+  clearGuideStorage();
+});
+
+Deno.test("first_shrine tip fires on shrine:touch", () => {
+  const { world, playerId, bubbles } = setup();
+
+  world.emit("shrine:touch", { actor: playerId, targetId: 209 });
+  const match = bubbles.find((b) => b.text.includes("shrine"));
+  assert(match, "first_shrine tip should fire on shrine:touch");
+  clearGuideStorage();
+});
+
+Deno.test("first_weapon_rack tip fires on rack:looted", () => {
+  const { world, playerId, bubbles } = setup();
+
+  world.emit("rack:looted", { actor: playerId, targetId: 210, count: 1 });
+  const match = bubbles.find((b) => b.text.includes("weapon rack"));
+  assert(match, "first_weapon_rack tip should fire on rack:looted");
+  clearGuideStorage();
+});
+
+Deno.test("first_sarcophagus tip fires on sarcophagus:opened", () => {
+  const { world, playerId, bubbles } = setup();
+
+  world.emit("sarcophagus:opened", { actor: playerId, targetId: 211, depth: 2, spawned: true });
+  const match = bubbles.find((b) => b.text.includes("sarcophagus"));
+  assert(match, "first_sarcophagus tip should fire on sarcophagus:opened");
+  clearGuideStorage();
+});
+
+Deno.test("first_weather tip fires on rain weather:changed", () => {
+  const { world, bubbles } = setup();
+
+  world.emit("weather:changed", { weather: "rain", prev: "clear" });
+  const match = bubbles.find((b) => b.text.includes("Rain"));
+  assert(match, "first_weather tip should fire on rain weather:changed");
+  clearGuideStorage();
+});
+
+Deno.test("first_weather tip does not fire on clear weather", () => {
+  const { world, bubbles } = setup();
+
+  world.emit("weather:changed", { weather: "clear", prev: "rain" });
+  const match = bubbles.find((b) => b.text.includes("Rain"));
+  assertEquals(match, undefined, "first_weather tip should not fire on clear weather");
+  clearGuideStorage();
+});
+
+Deno.test("first_dual_wield tip fires on offhand equip", () => {
+  const { world, playerId, bubbles } = setup();
+
+  world.emit("item:equipped", { actor: playerId, itemId: 212, slot: "offhand", name: "Dagger" });
+  const match = bubbles.find((b) => b.text.includes("off-hand"));
+  assert(match, "first_dual_wield tip should fire on offhand equip");
+  clearGuideStorage();
+});
+
+Deno.test("first_dual_wield tip does not fire on weapon slot equip", () => {
+  const { world, playerId, bubbles } = setup();
+
+  world.emit("item:equipped", { actor: playerId, itemId: 213, slot: "weapon", name: "Sword" });
+  // Should fire first_equip, not first_dual_wield
+  const match = bubbles.find((b) => b.text.includes("off-hand"));
+  assertEquals(match, undefined, "first_dual_wield should not fire on weapon slot equip");
+  clearGuideStorage();
+});

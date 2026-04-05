@@ -147,6 +147,48 @@ export function installSpiritGuideWiring({
         // Nearest non-player creature with Brain component — but we keep it
         // simple and just return null (wisp stays near player for combat tips).
         break;
+      case "fountain":
+        scan((ni) => {
+          const ident = String(ni?.identity || "").toLowerCase();
+          return ident === "fountain";
+        });
+        break;
+      case "chest":
+        scan((ni) => {
+          const ident = String(ni?.identity || "").toLowerCase();
+          return ident === "chest" || ident === "chest_locked";
+        });
+        break;
+      case "trap":
+        scan((ni) => {
+          const ident = String(ni?.identity || "").toLowerCase();
+          return ident.includes("trap");
+        });
+        break;
+      case "craft":
+        scan((ni) => {
+          const ident = String(ni?.identity || "").toLowerCase();
+          return ident === "anvil" || ident === "furnace" || ident === "cooking_fire" || ident === "alchemy_bench";
+        });
+        break;
+      case "shrine":
+        scan((ni) => {
+          const ident = String(ni?.identity || "").toLowerCase();
+          return ident === "shrine";
+        });
+        break;
+      case "rack":
+        scan((ni) => {
+          const ident = String(ni?.identity || "").toLowerCase();
+          return ident === "weapon_rack";
+        });
+        break;
+      case "sarcophagus":
+        scan((ni) => {
+          const ident = String(ni?.identity || "").toLowerCase();
+          return ident === "sarcophagus";
+        });
+        break;
     }
     return best;
   }
@@ -315,6 +357,113 @@ export function installSpiritGuideWiring({
     if (!pe || Number(actor || 0) !== pe.id) return;
     spellCount++;
     if (spellCount >= 2) fire("spell_select");
+  });
+
+  // ── First fountain drink ───────────────────────────────────────────
+
+  world.on("fountain:drink", ({ actor }) => {
+    const pe = getPlayerEntity();
+    if (!pe || Number(actor || 0) !== pe.id) return;
+    fire("first_fountain");
+  });
+
+  // ── First door interaction ────────────────────────────────────────
+
+  world.on("interaction", ({ actor, action }) => {
+    if (action !== "toggleDoor") return;
+    const pe = getPlayerEntity();
+    if (!pe || Number(actor || 0) !== pe.id) return;
+    fire("first_door");
+  });
+
+  // ── First trap (player takes trap damage) ─────────────────────────
+
+  world.on("trap:triggered", ({ actor }) => {
+    const pe = getPlayerEntity();
+    if (!pe || Number(actor || 0) !== pe.id) return;
+    fire("first_trap");
+  });
+
+  // ── First chest opened ────────────────────────────────────────────
+
+  world.on("chest:open", ({ actor }) => {
+    const pe = getPlayerEntity();
+    if (!pe || Number(actor || 0) !== pe.id) return;
+    fire("first_chest");
+  });
+
+  // ── First shop ────────────────────────────────────────────────────
+
+  world.on("shop:open", ({ actor }) => {
+    const pe = getPlayerEntity();
+    if (!pe || Number(actor || 0) !== pe.id) return;
+    fire("first_shop");
+  });
+
+  // ── First harvest ─────────────────────────────────────────────────
+
+  world.on("harvest:picked", ({ actor }) => {
+    const pe = getPlayerEntity();
+    if (!pe || Number(actor || 0) !== pe.id) return;
+    fire("first_harvest");
+  });
+
+  // ── First crafting station ────────────────────────────────────────
+
+  world.on("alchemy:open", ({ actor }) => {
+    const pe = getPlayerEntity();
+    if (!pe || Number(actor || 0) !== pe.id) return;
+    fire("first_craft");
+  });
+  world.on("cooking:open", ({ actor }) => {
+    const pe = getPlayerEntity();
+    if (!pe || Number(actor || 0) !== pe.id) return;
+    fire("first_craft");
+  });
+  world.on("smithy:open", ({ actor }) => {
+    const pe = getPlayerEntity();
+    if (!pe || Number(actor || 0) !== pe.id) return;
+    fire("first_craft");
+  });
+
+  // ── First shrine ──────────────────────────────────────────────────
+
+  world.on("shrine:touch", ({ actor }) => {
+    const pe = getPlayerEntity();
+    if (!pe || Number(actor || 0) !== pe.id) return;
+    fire("first_shrine");
+  });
+
+  // ── First weapon rack ─────────────────────────────────────────────
+
+  world.on("rack:looted", ({ actor }) => {
+    const pe = getPlayerEntity();
+    if (!pe || Number(actor || 0) !== pe.id) return;
+    fire("first_weapon_rack");
+  });
+
+  // ── First sarcophagus ─────────────────────────────────────────────
+
+  world.on("sarcophagus:opened", ({ actor }) => {
+    const pe = getPlayerEntity();
+    if (!pe || Number(actor || 0) !== pe.id) return;
+    fire("first_sarcophagus");
+  });
+
+  // ── First weather (rain) ──────────────────────────────────────────
+
+  world.on("weather:changed", ({ weather }) => {
+    if (weather !== "rain" && weather !== "heavy_rain") return;
+    fire("first_weather");
+  });
+
+  // ── First dual wield ──────────────────────────────────────────────
+
+  world.on("item:equipped", ({ actor, slot }) => {
+    if (slot !== "offhand") return;
+    const pe = getPlayerEntity();
+    if (!pe || Number(actor || 0) !== pe.id) return;
+    fire("first_dual_wield");
   });
 
   // Enable guide mode on the wisp so it appears on the overworld.

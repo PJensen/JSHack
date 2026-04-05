@@ -18,7 +18,7 @@ export const GUIDANCE_TIPS = [
   // ── Early game (overworld, first steps) ───────────────────────────
   {
     id: "welcome",
-    text: "I am a spirit of these lands. Stay close \u2014 I'll show you the way.",
+    text: "I am your spirit. Stay close \u2014 I'll show you the way.",
     durationSec: 5.5,
     delaySec: 1.8,
   },
@@ -144,6 +144,87 @@ export const GUIDANCE_TIPS = [
     durationSec: 5,
     delaySec: 0.6,
     pointTo: "#btn-spell-select",
+  },
+
+  // ── Interactables ─────────────────────────────────────────────────
+  {
+    id: "first_fountain",
+    text: "A fountain! Drink to restore health or mana \u2014 but beware, some sips carry a sting.",
+    durationSec: 5.5,
+    delaySec: 0.5,
+    flyTo: "fountain",
+  },
+  {
+    id: "first_door",
+    text: "A door! Walk into it to open or close it. Some doors are locked \u2014 find the key.",
+    durationSec: 5,
+    delaySec: 0.5,
+  },
+  {
+    id: "first_trap",
+    text: "A trap! Watch for hidden dangers on the floor. Tread carefully in the dark.",
+    durationSec: 5,
+    delaySec: 0.3,
+    flyTo: "trap",
+  },
+  {
+    id: "first_chest",
+    text: "A chest! Open it for treasure \u2014 but not every chest is what it seems.",
+    durationSec: 5,
+    delaySec: 0.5,
+    flyTo: "chest",
+  },
+  {
+    id: "first_shop",
+    text: "A shop! Browse wares to buy, or sell what you no longer need.",
+    durationSec: 5,
+    delaySec: 0.5,
+  },
+  {
+    id: "first_harvest",
+    text: "You harvested a resource! Some nodes need tools and regrow over time.",
+    durationSec: 5,
+    delaySec: 0.5,
+  },
+  {
+    id: "first_craft",
+    text: "A crafting station! Combine materials to forge weapons, brew potions, or cook meals.",
+    durationSec: 5.5,
+    delaySec: 0.5,
+    flyTo: "craft",
+  },
+  {
+    id: "first_shrine",
+    text: "A shrine channels your deity\u2019s presence. Touch it to commune with the divine.",
+    durationSec: 5,
+    delaySec: 0.5,
+    flyTo: "shrine",
+  },
+  {
+    id: "first_weapon_rack",
+    text: "A weapon rack! Browse the arms on display and take what suits you.",
+    durationSec: 5,
+    delaySec: 0.5,
+    flyTo: "rack",
+  },
+  {
+    id: "first_sarcophagus",
+    text: "A sarcophagus. Disturbing the dead may yield treasure \u2014 or unleash something terrible.",
+    durationSec: 5.5,
+    delaySec: 0.5,
+    flyTo: "sarcophagus",
+  },
+  {
+    id: "first_weather",
+    text: "Rain! It douses flames and waters crops. Heavy storms darken the sky.",
+    durationSec: 5,
+    delaySec: 0.6,
+  },
+  {
+    id: "first_dual_wield",
+    text: "Two weapons! Your off-hand strikes with a penalty, but twice the attacks can fell foes fast.",
+    durationSec: 5.5,
+    delaySec: 0.5,
   },
 ];
 
