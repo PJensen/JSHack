@@ -59,7 +59,7 @@ function anyCoordWithin(coords, centerX, centerY, radius) {
 function canReach(startX, startY, targetX, targetY) {
   const minX = homeX - 32;
   const maxX = homeX + 32;
-  const minY = homeY - 28;
+  const minY = homeY - 40;
   const maxY = homeY + 32;
   const queue = [[startX, startY]];
   const seen = new Set([key(startX, startY)]);
@@ -121,7 +121,7 @@ const tavX1 = homeX + 14;
 const tavY1 = homeY - 4;
 const tavDoorX = tavX0;
 const tavDoorY = tavY0 + 3;
-const crossingY = homeY - 16;
+const crossingY = homeY - 20;
 const millX0 = homeX - 10;
 const millY0 = crossingY - 13;
 const millX1 = millX0 + 4;
