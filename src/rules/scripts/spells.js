@@ -35,7 +35,7 @@ import { chebyshev, chebyshevScalar } from "../utils/distance.js";
 import { buildSpellDamageSpec, createSpellDamageContext, emitSpellMiss, getSpellHitChancePct, getSpellIntelligenceBonus, rollSpellHit, scaleSpellDamage } from "../utils/spellDamage.js";
 import { hasSpellLineOfSight } from "../utils/spellTargeting.js";
 import { isVisible as isTileVisible } from "../environment/dungeon/exploredMap.js";
-import { getPassiveBonuses, effectiveMaxHp } from "../utils/passiveBonuses.js";
+import { getPassiveBonuses, effectiveMaxHp, effectiveMaxMana } from "../utils/passiveBonuses.js";
 import { spawnHazard } from "../utils/hazardSpawn.js";
 import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { Monster } from "../archetypes/Creatures.js";
