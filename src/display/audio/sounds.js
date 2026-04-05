@@ -1,10 +1,8 @@
 // Sound registry — maps sound IDs to audio file paths, bus routing, and playback defaults.
-// All paths are relative to site root.
-// Add .wav / .mp3 / .mp4 files to assets/audio/ and register them here.
 //
 // Buses:       combat | spells | items | ambient | ui
 // maxVoices:   how many of this sound can play at once (default 3)
-// randomPitch: cents of random detune jitter per play (e.g. 60 → ±60 cents variation)
+// randomPitch: cents of random detune jitter per play — opt-in, set after hearing the files
 
 const BASE = "./assets/audio/";
 
@@ -13,12 +11,12 @@ const BASE = "./assets/audio/";
  */
 const SOUNDS = {
   // ── Combat ──────────────────────────────────────
-  "melee:hit":        { file: "melee_hit.wav",    bus: "combat", randomPitch: 80 },
-  "melee:crit":       { file: "melee_crit.wav",   bus: "combat", randomPitch: 50 },
-  "melee:miss":       { file: "melee_miss.wav",   bus: "combat", randomPitch: 60 },
-  "ranged:shot":      { file: "ranged_shot.wav",  bus: "combat", randomPitch: 40 },
-  "death":            { file: "death.wav",         bus: "combat", maxVoices: 3, randomPitch: 100 },
-  "player:death":     { file: "player_death.wav",  bus: "combat", maxVoices: 1 },
+  "melee:hit":        { file: "melee_hit.wav",     bus: "combat" },
+  "melee:crit":       { file: "melee_crit.wav",    bus: "combat" },
+  "melee:miss":       { file: "melee_miss.wav",    bus: "combat" },
+  "ranged:shot":      { file: "ranged_shot.wav",   bus: "combat" },
+  "death":            { file: "death.wav",          bus: "combat", maxVoices: 3 },
+  "player:death":     { file: "player_death.wav",   bus: "combat", maxVoices: 1 },
 
   // ── Items (by type) ─────────────────────────────
   "item:pickup:weapon":    { file: "pickup_weapon.wav",   bus: "items" },
@@ -103,7 +101,7 @@ const SOUNDS = {
 /**
  * Resolve a sound ID to its full URL and default options.
  * @param {string} id
- * @returns {{ url: string, bus?: string, maxVoices?: number, volume?: number, rate?: number, detune?: number } | null}
+ * @returns {{ url: string, bus?: string, maxVoices?: number, randomPitch?: number, volume?: number, rate?: number, detune?: number } | null}
  */
 export function resolve(id) {
   const entry = SOUNDS[id];
