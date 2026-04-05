@@ -148,6 +148,21 @@ Deno.test("facing tip fires on 12th player move", () => {
   clearGuideStorage();
 });
 
+Deno.test("facing_cone tip fires on 14th player move", () => {
+  const { world, playerId, bubbles } = setup();
+
+  for (let i = 0; i < 13; i++) {
+    world.emit("moved", { id: playerId, from: { x: 5 + i, y: 5 }, to: { x: 6 + i, y: 5 } });
+  }
+  assertEquals(bubbles.filter((b) => b.text.includes("vision is a narrow cone")).length, 0,
+    "should not fire before 14 moves");
+
+  world.emit("moved", { id: playerId, from: { x: 18, y: 5 }, to: { x: 19, y: 5 } });
+  const match = bubbles.find((b) => b.text.includes("vision is a narrow cone"));
+  assert(match, "facing_cone tip should fire on 14th move");
+  clearGuideStorage();
+});
+
 Deno.test("pet_companion tip fires on pet:deliver", () => {
   const { world, bubbles } = setup();
 
