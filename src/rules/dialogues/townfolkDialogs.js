@@ -321,7 +321,7 @@ registerDialog({
       ],
     },
     report_ack: {
-      text: "Good. I will lock it away before sunset. You have done the town a service.",
+      text: "Good. I will lock it away before sunset. Here — 100 gold from the parish coffers. You have earned it.",
       choices: [
         { id: "leave", label: "Goodbye.", close: true },
       ],
