@@ -3,8 +3,9 @@
 
 import { startShake } from "../camera/shake.js";
 import { Particle } from "../passes/vfx/particles/particlePool.js";
-import { ArrowFx, ArrowSparkFx, RadialFx } from "./fxEntries.js";
+import { ArrowFx, ArrowSparkFx, RadialFx, StuckArrowFx } from "./fxEntries.js";
 import { resolveDominantProjectileVfx } from "../../bridge/schema/weaponVfxResolver.js";
+import { normalizedGoreType } from "../ui/wiring/goreEngine.js";
 import { setInputLock } from "../input/inputLock.js";
 
 /**
@@ -15,6 +16,12 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
   const _arrowFx = [];
   /** @type {ArrowSparkFx[]} */
   const _arrowSparks = [];
+  /** @type {StuckArrowFx[]} */
+  const _stuckArrows = [];
+  /** @type {Array<{ fireAt:number, fn:()=>void }>} */
+  const _pendingStuck = [];
+  /** @type {Map<number, string>} last arrow style per target (for stuck arrow coloring) */
+  const _lastShotStyle = new Map();
 
   // --- Shadow Bolt projectile state ---
   /** @type {ArrowFx[]} */
@@ -128,6 +135,26 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
     for (let i = _arrowSparks.length - 1; i >= 0; i--) {
       _arrowSparks[i].tick(dt);
       if (_arrowSparks[i].expired) _arrowSparks.splice(i, 1);
+    }
+
+    // Stuck arrows — track target entity position, expire on TTL or lost target
+    for (let i = _stuckArrows.length - 1; i >= 0; i--) {
+      const sa = _stuckArrows[i];
+      sa.tick(dt);
+      const pos = getPosition(sa.targetId);
+      if (!pos || sa.expired) { _stuckArrows.splice(i, 1); continue; }
+      sa.x = pos.x + sa.ox;
+      sa.y = pos.y + sa.oy;
+    }
+    // Flush deferred stuck arrow spawns
+    if (_pendingStuck.length) {
+      const t = performance.now() / 1000;
+      for (let i = _pendingStuck.length - 1; i >= 0; i--) {
+        if (t >= _pendingStuck[i].fireAt) {
+          _pendingStuck[i].fn();
+          _pendingStuck.splice(i, 1);
+        }
+      }
     }
 
     // Shadow Bolt projectiles
@@ -597,7 +624,7 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
 
   /** @param {CanvasRenderingContext2D} ctx */
   function draw(ctx) {
-    const hasArrows = _arrowFx.length || _arrowSparks.length;
+    const hasArrows = _arrowFx.length || _arrowSparks.length || _stuckArrows.length;
     const hasSbolt = _sboltFx.length || _sboltImpact.length;
     const hasFireball = _fireballFx.length || _fireballImpact.length;
     const hasFrostbolt = _frostboltFx.length || _frostboltImpact.length;
@@ -759,6 +786,40 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
         ctx.fillStyle = `rgba(255,250,230,${0.3 * alpha})`;
         ctx.beginPath(); ctx.arc(s.x, s.y, 0.1 * alpha, 0, Math.PI * 2); ctx.fill();
       }
+    }
+
+    // --- Stuck arrows lodged in targets ---
+    for (const sa of _stuckArrows) {
+      const alpha = sa.alpha;
+      if (alpha <= 0) continue;
+      const shaftLen = 0.38;
+      const tx = sa.x - sa.dx * shaftLen;
+      const ty = sa.y - sa.dy * shaftLen;
+      const isFire = sa.style === 'fire';
+      const isVenom = sa.style === 'venom';
+      const isStorm = sa.style === 'storm';
+      const isFrost = sa.style === 'frost';
+      // Shaft
+      if (isFire) {
+        ctx.strokeStyle = `rgba(255,160,40,${(0.85 * alpha).toFixed(3)})`;
+      } else if (isVenom) {
+        ctx.strokeStyle = `rgba(110,245,120,${(0.80 * alpha).toFixed(3)})`;
+      } else if (isStorm) {
+        ctx.strokeStyle = `rgba(185,225,255,${(0.82 * alpha).toFixed(3)})`;
+      } else if (isFrost) {
+        ctx.strokeStyle = `rgba(165,235,255,${(0.82 * alpha).toFixed(3)})`;
+      } else {
+        ctx.strokeStyle = `rgba(210,180,110,${(0.80 * alpha).toFixed(3)})`;
+      }
+      ctx.lineWidth = 0.05;
+      ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(sa.x, sa.y); ctx.stroke();
+      // Fletching nock at tail end
+      const nx = tx - sa.dx * 0.06;
+      const ny = ty - sa.dy * 0.06;
+      ctx.strokeStyle = `rgba(180,170,155,${(0.5 * alpha).toFixed(3)})`;
+      ctx.lineWidth = 0.035;
+      ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(nx, ny); ctx.stroke();
     }
 
     // --- Shadow Bolt projectile ---
@@ -1120,6 +1181,7 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
       const profile = resolveDominantProjectileVfx(world, Number(attacker || 0));
       const profileStyle = String(profile?.projectileStyle || "").toLowerCase();
       const s = (baseStyle === "plain" && profileStyle) ? profileStyle : baseStyle;
+      _lastShotStyle.set(Number(target || 0), s);
       const speed = Number(projectileSpeed || 18);
       spawnTransientProjectile({
         from: apos,
@@ -1158,6 +1220,44 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
             a0: 0.9,
           }));
         }
+      }
+    });
+
+    // Stuck arrows — lodge in target on arrow hit (VFX only)
+    world.on('damaged', ({ target, cause, projectileKind, projectileDelay, impactVector, goreType, targetKind }) => {
+      if (String(cause || '') !== 'ranged') return;
+      if (String(projectileKind || '').toLowerCase() !== 'arrow') return;
+      const tid = Number(target || 0);
+      if (!(tid > 0)) return;
+      // Skip bodyless targets (skeletons, ghosts, spirits)
+      const gore = normalizedGoreType(goreType, targetKind);
+      if (gore === 'bone' || gore === 'none') return;
+      const iv = impactVector;
+      if (!iv || !Number.isFinite(iv.dx) || !Number.isFinite(iv.dy)) return;
+      const delay = Number(projectileDelay) || 0;
+      const doSpawn = () => {
+        const pos = getPosition(tid);
+        if (!pos) return;
+        // Angular jitter: ±5–10° off arrival vector
+        const jitterAngle = (Math.random() - 0.5) * (Math.PI / 12);
+        const cos = Math.cos(jitterAngle), sin = Math.sin(jitterAngle);
+        const dx = iv.dx * cos - iv.dy * sin;
+        const dy = iv.dx * sin + iv.dy * cos;
+        // Positional jitter: small random offset from entity center
+        const ox = (Math.random() - 0.5) * 0.25;
+        const oy = (Math.random() - 0.5) * 0.25;
+        const arrowStyle = _lastShotStyle.get(tid) || 'plain';
+        _lastShotStyle.delete(tid);
+        _stuckArrows.push(new StuckArrowFx({
+          targetId: tid, ox, oy, dx, dy,
+          style: arrowStyle,
+          ttl: 2.5 + Math.random() * 1.5,
+        }));
+      };
+      if (delay > 0) {
+        _pendingStuck.push({ fireAt: performance.now() / 1000 + delay, fn: doSpawn });
+      } else {
+        doSpawn();
       }
     });
 
