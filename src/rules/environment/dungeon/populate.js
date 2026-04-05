@@ -545,8 +545,12 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
   ));
 
   // Solid spawn kinds that should be marked solid in the solidPositions set.
+  // Every archetype with Collider { solid: true } must be listed here so that
+  // (a) it gets tracked in solidPositions, and (b) the narrow-passage guard
+  // can skip placement when the tile would block the only walkable path.
   const SOLID_PREFAB_KINDS = new Set([
     'statue', 'urn', 'pillar', 'sarcophagus', 'fountain', 'altar', 'shrine',
+    'mushrooms', 'weapon_rack', 'web', 'flayed_man', 'hanging_chains',
   ]);
   const SACRED_FEATURE_KINDS = new Set(['altar', 'shrine', 'church_altar']);
 
@@ -580,9 +584,9 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
       const cx = room.x + Math.floor(room.w / 2);
       const cy = room.y + Math.floor(room.h / 2);
 
-      // For noise-generated floors, solid features must not block narrow passages.
+      // Solid features must not block narrow passages in any dungeon type.
       let skipFeature = false;
-      if (floorPlan.profile?.generator && SOLID_PREFAB_KINDS.has(featureKind)) {
+      if (SOLID_PREFAB_KINDS.has(featureKind)) {
         const lx = cx - chunk.chunkX * CHUNK_SIZE;
         const ly = cy - chunk.chunkY * CHUNK_SIZE;
         const inBounds = lx >= 0 && ly >= 0 && lx < CHUNK_SIZE && ly < CHUNK_SIZE;

@@ -1,10 +1,12 @@
 // Audio engine — loads and plays real audio files (.wav, .mp3, .mp4) via Web Audio API.
 // Decoded buffers are cached so each file is fetched only once.
 //
-// Routing:  BufferSource → per-sound GainNode → bus GainNode → master GainNode → destination
+// Routing:  BufferSource → GainNode → StereoPanner → ConvolverNode(reverb) → Bus → Master → speakers
 //
 // Buses:    combat, spells, items, ambient, ui  (each independently adjustable)
 // Polyphony: max concurrent plays per URL, oldest voice is killed when cap is hit.
+// Pitch:    randomPitch option jitters detune ±N cents per play for variation.
+// Reverb:   convolver-based reverb send, wet/dry mix adjustable per environment.
 
 let _ctx = null;
 let _master = null;
@@ -77,6 +79,68 @@ export function setBusVolume(name, v) {
 /** Get current volume for a category bus. */
 export function getBusVolume(name) {
   return bus(name).gain.value;
+}
+
+// ── Reverb ──────────────────────────────────────────────────
+
+let _reverbNode = null;   // ConvolverNode
+let _reverbSend = null;   // GainNode — wet level (0 = dry, 1 = full reverb)
+let _reverbDry = null;    // GainNode — dry pass-through
+
+/**
+ * Generate a synthetic impulse response for a stone room.
+ * @param {AudioContext} ac
+ * @param {number} duration — seconds
+ * @param {number} decay    — higher = faster decay
+ * @returns {AudioBuffer}
+ */
+function generateImpulse(ac, duration, decay) {
+  const len = ac.sampleRate * duration;
+  const buf = ac.createBuffer(2, len, ac.sampleRate);
+  for (let ch = 0; ch < 2; ch++) {
+    const data = buf.getChannelData(ch);
+    for (let i = 0; i < len; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+    }
+  }
+  return buf;
+}
+
+/**
+ * Get the reverb send node. Lazily creates the convolver and wiring.
+ * Signal flow:  sound → reverbSend(wet) → convolver → master
+ *               sound → reverbDry       → bus (normal path)
+ *
+ * Callers connect to the returned dry node; if reverb > 0 they also
+ * connect to the wet send.
+ */
+function getReverbNodes() {
+  if (!_reverbNode) {
+    const ac = ctx();
+    _reverbNode = ac.createConvolver();
+    // Medium stone room: 1.8s tail, moderate decay
+    _reverbNode.buffer = generateImpulse(ac, 1.8, 2.5);
+
+    _reverbSend = ac.createGain();
+    _reverbSend.gain.value = 0;  // wet level, controlled by setReverbMix
+    _reverbSend.connect(_reverbNode);
+    _reverbNode.connect(masterGain());
+  }
+  return { wet: _reverbSend, convolver: _reverbNode };
+}
+
+/**
+ * Set reverb wet level (0 = fully dry, 1 = full reverb).
+ * Call this when the environment changes (dungeon vs overworld).
+ * @param {number} mix — 0–1
+ */
+export function setReverbMix(mix) {
+  getReverbNodes();
+  _reverbSend.gain.value = Math.max(0, Math.min(1, mix));
+}
+
+export function getReverbMix() {
+  return _reverbSend ? _reverbSend.gain.value : 0;
 }
 
 // ── Polyphony tracking ──────────────────────────────────────
@@ -172,10 +236,12 @@ export function preload(urls) {
  *   volume?: number,       // 0–1, per-sound gain (default 1)
  *   rate?: number,         // playback rate (default 1)
  *   detune?: number,       // cents detune (default 0)
+ *   randomPitch?: number,  // random detune jitter in cents (e.g. 80 → ±80 cents)
  *   delay?: number,        // seconds before playback starts (default 0)
  *   bus?: string,          // category bus name (default "ui")
  *   maxVoices?: number,    // max concurrent plays of this URL (default 3)
  *   pan?: number,          // stereo pan -1 (left) to +1 (right), default 0 (center)
+ *   reverb?: boolean,      // send this sound through reverb (default true)
  * }} [opts]
  */
 export function play(url, opts) {
@@ -276,14 +342,21 @@ function _playBuffer(url, buf, opts) {
     const src = ac.createBufferSource();
     src.buffer = buf;
 
+    // ── Pitch: fixed detune + random jitter ───────────────
+    let detune = Number(opts?.detune || 0);
+    const randomPitch = Number(opts?.randomPitch || 0);
+    if (randomPitch > 0) {
+      detune += (Math.random() * 2 - 1) * randomPitch;
+    }
+    if (detune) src.detune.value = detune;
     if (opts?.rate) src.playbackRate.value = opts.rate;
-    if (opts?.detune) src.detune.value = opts.detune;
 
     const dest = bus(opts?.bus || "ui");
     const vol = Number(opts?.volume ?? 1);
     const pan = Number(opts?.pan || 0);
 
-    // Build chain:  src → [gain] → [panner] → bus
+    // Build chain:  src → [gain] → [panner] → bus  (dry path)
+    //                                        ↘ reverb send  (wet path)
     let tail = src;
 
     if (vol < 1) {
@@ -300,7 +373,14 @@ function _playBuffer(url, buf, opts) {
       tail = p;
     }
 
+    // Dry path → bus
     tail.connect(dest);
+
+    // Wet path → reverb send (if reverb is enabled and mix > 0)
+    const useReverb = opts?.reverb !== false;
+    if (useReverb && _reverbSend && _reverbSend.gain.value > 0) {
+      tail.connect(_reverbSend);
+    }
 
     const maxV = Number(opts?.maxVoices ?? DEFAULT_MAX_VOICES);
     trackVoice(url, src, maxV);
