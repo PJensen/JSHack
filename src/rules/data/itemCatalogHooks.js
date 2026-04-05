@@ -674,5 +674,222 @@ export function createTorchThrowHook(opts = {}) {
   };
 }
 
+// ── Wand Shatter on Throw ──────────────────────────────────────────────
+// When a wand is thrown it shatters, releasing all remaining charges in a
+// chaotic burst at the landing tile.  Each element has a different flavour:
+// lightning chains, meteor explodes into fire, frost freezes, heal heals.
+
+/**
+ * @param {{
+ *   element?: string,
+ *   damagePerCharge?: number,
+ *   radius?: number,
+ *   effectKey?: string|null,
+ *   effectDurationPerCharge?: number,
+ *   hazardKind?: string|null,
+ *   hazardTurns?: number,
+ *   hazardTickDamage?: number,
+ *   healPerCharge?: number,
+ * }} [opts]
+ */
+export function createWandShatterThrowHook(opts = {}) {
+  const element = String(opts?.element || "arcane");
+  const damagePerCharge = Math.max(0, Number(opts?.damagePerCharge ?? 4) | 0);
+  const radius = Math.max(0, Number(opts?.radius ?? 2) | 0);
+  const effectKey = opts?.effectKey || null;
+  const effectDurPerCharge = Math.max(0, Number(opts?.effectDurationPerCharge ?? 0) | 0);
+  const hazardKind = opts?.hazardKind || null;
+  const hazardTurns = Math.max(1, Number(opts?.hazardTurns ?? 3) | 0);
+  const hazardTickDmg = Math.max(0, Number(opts?.hazardTickDamage ?? 0) | 0);
+  const healPerCharge = Math.max(0, Number(opts?.healPerCharge ?? 0) | 0);
+
+  return (ctx, state) => {
+    const actorId = Number(state?.actor || ctx.actor || 0) | 0;
+    const itemId = Number(state?.itemId || ctx.primary || 0) | 0;
+    const throwSpec = (state?.throw && typeof state.throw === "object") ? state.throw : null;
+    const fallback = ctx.helpers.adjacentPoint(actorId);
+    const at = {
+      x: Number.isFinite(Number(throwSpec?.to?.x)) ? (Number(throwSpec.to.x) | 0) : (fallback.x | 0),
+      y: Number.isFinite(Number(throwSpec?.to?.y)) ? (Number(throwSpec.to.y) | 0) : (fallback.y | 0),
+    };
+
+    const charges = Math.max(1, Number(state?.info?.charges || 1) | 0);
+    const totalDamage = charges * damagePerCharge;
+    const totalHeal = charges * healPerCharge;
+    const effectDuration = charges * effectDurPerCharge;
+
+    // Collect all living entities in blast radius
+    const hitIds = [];
+    for (let dx = -radius; dx <= radius; dx++) {
+      for (let dy = -radius; dy <= radius; dy++) {
+        const ids = ctx.query.livingAt(at.x + dx, at.y + dy, {});
+        for (const id of (Array.isArray(ids) ? ids : [])) {
+          if (!hitIds.includes(id)) hitIds.push(id);
+        }
+      }
+    }
+
+    for (const hitId of hitIds) {
+      if (totalDamage > 0) {
+        ctx.mutate.queue({
+          type: "damage",
+          entityId: hitId,
+          amount: totalDamage,
+          source: actorId,
+          damageType: element,
+        });
+      }
+      if (totalHeal > 0) {
+        ctx.mutate.heal(hitId, totalHeal);
+      }
+      if (effectKey && effectDuration > 0) {
+        ctx.helpers.addEffect(hitId, {
+          key: effectKey,
+          potency: 1,
+          turnsLeft: effectDuration,
+          onsetLeft: 0,
+          peakLeft: 0,
+          stack: "refresh",
+          maxStacks: 1,
+          sourceId: itemId,
+          meta: { source: "wand_shatter", element, delivery: "thrown" },
+        });
+      }
+    }
+
+    if (hazardKind) {
+      ctx.helpers.hazardSpawn({
+        kind: hazardKind,
+        medium: "floor",
+        turnsLeft: hazardTurns,
+        radius,
+        tickDamage: hazardTickDmg || Math.ceil(totalDamage / 4),
+        damageType: element,
+        cause: "wand_shatter",
+        sourceId: actorId,
+        sourceKind: "wand",
+        identity: `wand_shatter_${element}`,
+        name: `${element[0].toUpperCase() + element.slice(1)} Burst`,
+        meta: { source: "wand_shatter", element, delivery: "thrown" },
+      }, at);
+    }
+
+    ctx.io.emit("wand:shatter", {
+      actor: actorId,
+      itemId,
+      at: { ...at },
+      element,
+      charges,
+      damage: totalDamage,
+      heal: totalHeal,
+      hitCount: hitIds.length,
+    });
+
+    return { consumed: true, at, element, charges };
+  };
+}
+
+// ── Potion Splash on Throw ─────────────────────────────────────────────
+// Generic factory for potions that splash their effect onto whatever is
+// standing on the landing tile when thrown.
+
+/**
+ * @param {{
+ *   effectKey?: string,
+ *   duration?: number,
+ *   potency?: number,
+ *   damage?: number,
+ *   damageType?: string,
+ *   healPct?: number,
+ *   hazardKind?: string|null,
+ *   hazardTurns?: number,
+ *   hazardTickDamage?: number,
+ *   sourceKind?: string,
+ *   eventName?: string,
+ * }} [opts]
+ */
+export function createPotionSplashThrowHook(opts = {}) {
+  const effectKey = String(opts?.effectKey || "");
+  const duration = Math.max(0, Number(opts?.duration || 10) | 0);
+  const potency = Number(opts?.potency ?? 1);
+  const damage = Math.max(0, Number(opts?.damage || 0) | 0);
+  const damageType = String(opts?.damageType || "physical");
+  const healPct = Number(opts?.healPct || 0);
+  const hazardKind = opts?.hazardKind || null;
+  const hazardTurns = Math.max(1, Number(opts?.hazardTurns ?? 2) | 0);
+  const hazardTickDmg = Math.max(0, Number(opts?.hazardTickDamage ?? 0) | 0);
+  const sourceKind = String(opts?.sourceKind || "thrown_potion");
+  const eventName = String(opts?.eventName || "potion:splash");
+
+  return (ctx, state) => {
+    const actorId = Number(state?.actor || ctx.actor || 0) | 0;
+    const itemId = Number(state?.itemId || ctx.primary || 0) | 0;
+    const throwSpec = (state?.throw && typeof state.throw === "object") ? state.throw : null;
+    const fallback = ctx.helpers.adjacentPoint(actorId);
+    const at = {
+      x: Number.isFinite(Number(throwSpec?.to?.x)) ? (Number(throwSpec.to.x) | 0) : (fallback.x | 0),
+      y: Number.isFinite(Number(throwSpec?.to?.y)) ? (Number(throwSpec.to.y) | 0) : (fallback.y | 0),
+    };
+
+    const hitIds = ctx.query.livingAt(at.x, at.y, {});
+    for (const hitId of (Array.isArray(hitIds) ? hitIds : [])) {
+      if (damage > 0) {
+        ctx.mutate.queue({
+          type: "damage",
+          entityId: hitId,
+          amount: damage,
+          source: actorId,
+          damageType,
+        });
+      }
+      if (healPct > 0) {
+        const vit = ctx.query.get(hitId, Vitality);
+        if (vit) {
+          const amount = Math.max(1, Math.floor((vit.maxHp | 0) * healPct));
+          ctx.mutate.heal(hitId, amount);
+        }
+      }
+      if (effectKey) {
+        ctx.helpers.addEffect(hitId, {
+          key: effectKey,
+          potency,
+          turnsLeft: duration,
+          onsetLeft: 0,
+          peakLeft: 0,
+          stack: "refresh",
+          maxStacks: 1,
+          sourceId: itemId,
+          meta: { source: sourceKind, delivery: "splash" },
+        });
+      }
+    }
+
+    if (hazardKind) {
+      ctx.helpers.hazardSpawn({
+        kind: hazardKind,
+        medium: "floor",
+        turnsLeft: hazardTurns,
+        radius: 0,
+        tickDamage: hazardTickDmg,
+        damageType,
+        cause: "potion_splash",
+        sourceId: actorId,
+        sourceKind,
+        meta: { source: sourceKind, delivery: "thrown" },
+      }, at);
+    }
+
+    ctx.io.emit(eventName, {
+      actor: actorId,
+      itemId,
+      at: { ...at },
+      effectKey: effectKey || null,
+      hitCount: Array.isArray(hitIds) ? hitIds.length : 0,
+    });
+
+    return { consumed: true, at, effectKey: effectKey || null };
+  };
+}
+
 export const EAT_ON_USE = createEatOnUseHook();
 export const MAPPING_ON_USE = createMappingOnUseHook();

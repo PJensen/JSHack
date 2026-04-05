@@ -10,6 +10,8 @@ import {
   canStonecoatDipTarget,
   createWaterPotionHooks,
   createCastSpellFromIdentityHook,
+  createWandShatterThrowHook,
+  createPotionSplashThrowHook,
   createLearnSpellFromIdentityHook,
   createOpenFlavorBookHook,
   EAT_ON_USE,
@@ -296,6 +298,10 @@ export const MAGIC_ITEMS = {
         ctx.helpers.heal(targetId, amount);
         return { healed: amount };
       },
+      on_throw: createPotionSplashThrowHook({
+        healPct: 0.15,
+        sourceKind: "potion_vigor",
+      }),
     },
   },
   potion_adrenaline: {
@@ -329,6 +335,12 @@ export const MAGIC_ITEMS = {
         stam.stamina = cap;
         return { restored: stam.stamina - before };
       },
+      on_throw: createPotionSplashThrowHook({
+        effectKey: "berserk",
+        duration: 8,
+        potency: 1,
+        sourceKind: "potion_adrenaline",
+      }),
     },
   },
   potion_mana: {
@@ -450,6 +462,12 @@ export const MAGIC_ITEMS = {
         ctx.io.emit("status", createStatusEvent({ id: targetId, kind: "buff", effect: "resist_fire", source: Number(state?.actor || ctx.actor || 0) | 0, masked: !state.identified }));
         return { resist: "fire", duration: 40 };
       },
+      on_throw: createPotionSplashThrowHook({
+        effectKey: "resist_fire",
+        duration: 20,
+        potency: 0.3,
+        sourceKind: "potion_resist_fire",
+      }),
     },
   },
   potion_resist_poison: {
@@ -489,6 +507,12 @@ export const MAGIC_ITEMS = {
         ctx.io.emit("status", createStatusEvent({ id: targetId, kind: "buff", effect: "resist_poison", source: Number(state?.actor || ctx.actor || 0) | 0, masked: !state.identified }));
         return { resist: "poison", duration: 40 };
       },
+      on_throw: createPotionSplashThrowHook({
+        effectKey: "resist_poison",
+        duration: 20,
+        potency: 0.3,
+        sourceKind: "potion_resist_poison",
+      }),
     },
   },
   potion_anti_venom: {
@@ -522,6 +546,12 @@ export const MAGIC_ITEMS = {
         }
         return { cured: hadPoison ? "poison" : "none" };
       },
+      on_throw: createPotionSplashThrowHook({
+        effectKey: "resist_poison",
+        duration: 15,
+        potency: 0.2,
+        sourceKind: "potion_anti_venom",
+      }),
     },
   },
   potion_resist_electric: {
@@ -1299,6 +1329,13 @@ export const MAGIC_ITEMS = {
         castEventSource: "wand",
         consumeOnSuccess: true,
       }),
+      on_throw: createWandShatterThrowHook({
+        element: "electric",
+        damagePerCharge: 4,
+        radius: 2,
+        effectKey: "shocked",
+        effectDurationPerCharge: 2,
+      }),
     },
   },
   wand_meteor: {
@@ -1319,6 +1356,16 @@ export const MAGIC_ITEMS = {
         targetMode: "intentTarget",
         castEventSource: "wand",
         consumeOnSuccess: true,
+      }),
+      on_throw: createWandShatterThrowHook({
+        element: "fire",
+        damagePerCharge: 6,
+        radius: 2,
+        effectKey: "burning",
+        effectDurationPerCharge: 2,
+        hazardKind: "fire",
+        hazardTurns: 4,
+        hazardTickDamage: 3,
       }),
     },
   },
@@ -1341,6 +1388,13 @@ export const MAGIC_ITEMS = {
         castEventSource: "wand",
         consumeOnSuccess: true,
       }),
+      on_throw: createWandShatterThrowHook({
+        element: "cold",
+        damagePerCharge: 2,
+        radius: 2,
+        effectKey: "frozen",
+        effectDurationPerCharge: 2,
+      }),
     },
   },
   wand_heal: {
@@ -1361,6 +1415,12 @@ export const MAGIC_ITEMS = {
         targetMode: "target",
         castEventSource: "wand",
         consumeOnSuccess: true,
+      }),
+      on_throw: createWandShatterThrowHook({
+        element: "holy",
+        damagePerCharge: 0,
+        healPerCharge: 3,
+        radius: 2,
       }),
     },
   },
@@ -1922,6 +1982,14 @@ export const MAGIC_ITEMS = {
         ctx.io.emit("potion:sickness", { actor });
         return { consumed: true };
       },
+      on_throw: createPotionSplashThrowHook({
+        effectKey: "poison",
+        duration: 8,
+        potency: 2,
+        damage: 4,
+        damageType: "poison",
+        sourceKind: "potion_sickness",
+      }),
     },
   },
 
@@ -1954,6 +2022,12 @@ export const MAGIC_ITEMS = {
         ctx.io.emit("potion:paralysis", { actor });
         return { consumed: true };
       },
+      on_throw: createPotionSplashThrowHook({
+        effectKey: "stun",
+        duration: 5,
+        potency: 1,
+        sourceKind: "potion_paralysis",
+      }),
       can_dip_target: canParalysisDipTarget,
       on_dip: createParalysisCoatDipHook({
         chargesGranted: 8,
@@ -1989,6 +2063,12 @@ export const MAGIC_ITEMS = {
         ctx.io.emit("potion:hallucination", { actor });
         return { consumed: true };
       },
+      on_throw: createPotionSplashThrowHook({
+        effectKey: "hallucinating",
+        duration: 15,
+        potency: 1,
+        sourceKind: "potion_hallucination",
+      }),
     },
   },
   potion_blindness: {
@@ -2032,6 +2112,12 @@ export const MAGIC_ITEMS = {
         ctx.io.emit("potion:blindness", { actor });
         return { consumed: true };
       },
+      on_throw: createPotionSplashThrowHook({
+        effectKey: "blinded",
+        duration: 10,
+        potency: 1,
+        sourceKind: "potion_blindness",
+      }),
     },
   },
   potion_weakness: {
@@ -2071,6 +2157,12 @@ export const MAGIC_ITEMS = {
         ctx.io.emit("potion:weakness", { actor, hpLost: 8, staminaLost: 8 });
         return { consumed: true };
       },
+      on_throw: createPotionSplashThrowHook({
+        effectKey: "weakened",
+        duration: 20,
+        potency: 1,
+        sourceKind: "potion_weakness",
+      }),
     },
   },
   // ── DerivedExpression Potions ───────────────────────────────────────
@@ -2223,6 +2315,12 @@ export const MAGIC_ITEMS = {
         ctx.io.emit("potion:confusion", { actor });
         return { consumed: true };
       },
+      on_throw: createPotionSplashThrowHook({
+        effectKey: "confused",
+        duration: 12,
+        potency: 1,
+        sourceKind: "potion_confusion",
+      }),
     },
   },
 

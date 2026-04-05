@@ -37,7 +37,6 @@ export function initStatusLine() {
   let gold = 0;
   let atk = 0;
   let def = 0;
-  let mit = 0;
   let luck = 0;
   let armorClass = 10;
   let critPct = 0;
@@ -79,9 +78,8 @@ export function initStatusLine() {
     pushSegment(parts, 'DLvl', String(depth));
     pushSegment(parts, 'Turn', String(turn));
     pushSegment(parts, 'Gold', String(gold), '#ffde5a');
-    pushSegment(parts, 'Atk', fmtSigned(atk), colorForDelta(atk));
-    pushSegment(parts, 'Def', fmtSigned(def), colorForDelta(def));
-    pushSegment(parts, 'Mit', fmtSigned(mit), colorForDelta(mit));
+    pushSegment(parts, 'Atk', String(atk), atk > 0 ? '#64c87a' : '#98a0ab');
+    pushSegment(parts, 'Def', String(def), def > 0 ? '#64c87a' : '#98a0ab');
     pushSegment(parts, 'Lk', fmtSigned(luck), colorForDelta(luck));
     pushSegment(parts, 'AC', String(armorClass), colorForDelta(armorClass - 10));
     pushSegment(parts, 'Crit', fmtSignedPct(critPct), colorForDelta(critPct));
@@ -127,9 +125,8 @@ export function initStatusLine() {
   window.addEventListener('ui:updateCombatHUD', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
-    atk = Number(e?.detail?.attack ?? e?.detail?.weapon?.attack ?? 0);
+    atk = Number(e?.detail?.attack ?? 0);
     def = Number(e?.detail?.defense ?? 0);
-    mit = Number(e?.detail?.mitigation ?? 0);
     luck = Number(e?.detail?.luck ?? 0);
     armorClass = Number(e?.detail?.armorClass ?? (10 + def));
     critPct = Number(e?.detail?.critChancePercent ?? 0);

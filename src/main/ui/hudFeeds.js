@@ -16,6 +16,7 @@ import { getHungerLevel } from "../../rules/data/food.js";
 import { Pet } from "../../rules/components/Pet.js";
 import { PetState } from "../../rules/components/PetState.js";
 import { resolveCombatSnapshot } from "../../rules/utils/resolveCombatSnapshot.js";
+import { resolveResistance } from "../../rules/utils/dealDamage.js";
 import { canonicalStatusKey } from "../../rules/utils/effectSemantics.js";
 import { getPassiveBonuses, effectiveMaxHp, effectiveMaxMana } from "../../rules/utils/passiveBonuses.js";
 import { resolveCanonicalStats } from "../../rules/utils/canonicalStats.js";
@@ -98,6 +99,19 @@ export function createHudFeeds(world, deps) {
     }
   }
 
+  /**
+   * Average roll for a dice spec like "2d6" → 7.
+   * @param {string} spec
+   * @returns {number}
+   */
+  function averageDice(spec) {
+    const m = /^\s*(\d+)d(\d+)\s*$/i.exec(String(spec || ""));
+    if (!m) return 1;
+    const count = Math.max(1, parseInt(m[1], 10) | 0);
+    const sides = Math.max(2, parseInt(m[2], 10) | 0);
+    return count * (sides + 1) / 2;
+  }
+
   function updateCombatHUD() {
     const pe = playerEntity(world);
     if (!pe) return;
@@ -109,19 +123,30 @@ export function createHudFeeds(world, deps) {
     const wid = Number(eq?.weapon || 0);
     const rangedId = Number(eq?.ranged || 0);
     const combat = resolveCombatSnapshot(world, pe.id, { mode: "melee" });
-    const atk = Number(combat?.attackBonus ?? (1 + Number(canonical?.accuracy || 0)));
-    const def = Number(canonical?.evade ?? 0);
+
+    // Compute actual expected damage: avg dice + flat bonus, scaled by mult
+    const wInfo = wid ? world.get(wid, ItemInfo) : null;
+    const dmgDice = wInfo?.damageDice ? String(wInfo.damageDice) : (wid ? "1d2" : "1d2");
+    const avgRoll = averageDice(dmgDice);
+    const flatBonus = Number(combat?.damageFlatBonus ?? 0);
+    const damageMult = Number(combat?.damageMult ?? 1);
+    const atk = Math.max(0, Math.floor((avgRoll + flatBonus) * damageMult));
+
+    // Simulate canonical attacker: send reference hit through player's resistance pipeline
+    const CANONICAL_HIT = 100;
+    const afterResist = resolveResistance(world, pe.id, CANONICAL_HIT, 'physical');
+    const def = CANONICAL_HIT - afterResist;
+
     const luck = Number(combat?.luck ?? canonical?.luck ?? 0);
-    const armorClass = Number(combat?.armorClass ?? (10 + def));
+    const evade = Number(canonical?.evade ?? 0);
+    const armorClass = Number(combat?.armorClass ?? (10 + evade));
     const critPct = (Number(combat?.critChance ?? canonical?.critChancePhysical ?? 0) * 100) + luck;
     const posture = String(combat?.posture?.stance || "balanced");
     const mitigation = Number(canonical?.mitigation ?? 0);
-    const wInfo = wid ? world.get(wid, ItemInfo) : null;
     const rangedInfo = rangedId ? world.get(rangedId, ItemInfo) : null;
     const rangedCount = Number(rangedInfo?.count || 0);
     const wName = wid ? (world.get(wid, NamedIdentity)?.name || wInfo?.description || wInfo?.type) : "";
     const rangedName = rangedId ? (world.get(rangedId, NamedIdentity)?.name || rangedInfo?.description || rangedInfo?.type) : "";
-    const dmgDice = wInfo?.damageDice || "";
     const wCoating = wInfo?.coating && typeof wInfo.coating === 'object' ? wInfo.coating : null;
     const coatingSig = wCoating ? `${wCoating.kind}:${wCoating.charges || 0}` : "";
     const rangedType = String(rangedInfo?.type || "");
@@ -201,7 +226,7 @@ export function createHudFeeds(world, deps) {
       try {
         window.dispatchEvent(new CustomEvent("ui:updateCombatHUD", { detail: {
           attack: atk,
-          weapon: wid ? { id: wid, name: wName || null, damageDice: dmgDice || null, attack: atk, coating: wCoating } : null,
+          weapon: wid ? { id: wid, name: wName || null, damageDice: wInfo?.damageDice || null, attack: atk, coating: wCoating } : null,
           ranged: rangedId ? { id: rangedId, name: rangedName || null, isWand: rangedType === 'wand', count: rangedCount } : null,
           defense: def,
           mitigation,
