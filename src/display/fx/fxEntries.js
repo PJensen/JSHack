@@ -151,6 +151,23 @@ export class ArrowSparkFx extends FxEntry {
 }
 
 // ---------------------------------------------------------------------------
+// Stuck arrow — lodged in a target entity, tracks position + fades out.
+// ---------------------------------------------------------------------------
+export class StuckArrowFx extends FxEntry {
+  constructor({ targetId, ox, oy, dx, dy, style, ttl }) {
+    super(ttl);
+    this.targetId = targetId;
+    this.ox = ox;            // jitter offset from entity center
+    this.oy = oy;
+    this.dx = dx;            // arrow direction (normalized)
+    this.dy = dy;
+    this.style = style;
+    this.x = 0;              // updated each tick from getPosition
+    this.y = 0;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Search pulse — expanding off-white ring from the searcher's position.
 // ---------------------------------------------------------------------------
 export class SearchPulseFx extends FxEntry {
