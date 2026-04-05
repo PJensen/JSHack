@@ -73,30 +73,47 @@ export function installAudioWiring({ world, isPlayer }) {
   });
 
   // ── Spells ────────────────────────────────────────────────
+  // Each spell gets its own sound file.
 
-  world.on('spell:bolt', () => {
-    sfx("spell:bolt");
-  });
+  const spellEvents = [
+    'spell:bolt',
+    'spell:frost',
+    'spell:shadow_bolt',
+    'spell:fireball',
+    'spell:meteor',
+    'spell:blizzard',
+    'spell:firestorm',
+    'spell:blastwave',
+    'spell:flash_heal',
+    'spell:smite',
+    'spell:death_volley',
+    'spell:blink',
+    'spell:plague_swarm',
+    'spell:earthshatter',
+    'spell:war_cry',
+    'spell:cleave',
+    'spell:rampage',
+    'spell:phase_strike',
+    'spell:shield_bash',
+    'spell:wolf_howl',
+    'spell:boar_charge',
+    'spell:consecrate',
+    'spell:divine_shield',
+    'spell:purify',
+    'spell:bloodthirst',
+    'spell:verdant_ward',
+    'spell:harmony_ward',
+    'spell:shadow_veil',
+    'spell:smoke_bomb',
+    'spell:poison_blade',
+    'spell:lifetap',
+    'spell:acid_spit',
+    'spell:web_spit',
+  ];
 
-  world.on('spell:meteor', () => {
-    sfx("spell:area");
-  });
-
-  world.on('spell:blizzard', () => {
-    sfx("spell:area");
-  });
-
-  world.on('spell:firestorm', () => {
-    sfx("spell:area");
-  });
-
-  world.on('spell:blastwave', () => {
-    sfx("spell:area");
-  });
-
-  world.on('spell:flash_heal', () => {
-    sfx("spell:heal");
-  });
+  for (const ev of spellEvents) {
+    world.on(ev, () => { sfx(ev); });
+  }
 
   // ── Weather ───────────────────────────────────────────────
 
