@@ -591,6 +591,12 @@ export const MAGIC_ITEMS = {
         ctx.io.emit("status", createStatusEvent({ id: targetId, kind: "buff", effect: "resist_electric", source: Number(state?.actor || ctx.actor || 0) | 0, masked: !state.identified }));
         return { resist: "electric", duration: 40 };
       },
+      on_throw: createPotionSplashThrowHook({
+        effectKey: "resist_electric",
+        duration: 20,
+        potency: 0.3,
+        sourceKind: "potion_resist_electric",
+      }),
     },
   },
   potion_resist_acid: {
@@ -630,6 +636,12 @@ export const MAGIC_ITEMS = {
         ctx.io.emit("status", createStatusEvent({ id: targetId, kind: "buff", effect: "resist_acid", source: Number(state?.actor || ctx.actor || 0) | 0, masked: !state.identified }));
         return { resist: "acid", duration: 40 };
       },
+      on_throw: createPotionSplashThrowHook({
+        effectKey: "resist_acid",
+        duration: 20,
+        potency: 0.3,
+        sourceKind: "potion_resist_acid",
+      }),
     },
   },
   book_lightning: {
@@ -2209,6 +2221,13 @@ export const MAGIC_ITEMS = {
         }));
         return { turns: 30 };
       },
+      on_throw: createPotionSplashThrowHook({
+        effectKey: "mana_drain",
+        duration: 8,
+        potency: 1,
+        sourceKind: "potion_mana_surge",
+        eventName: "potion:splash",
+      }),
     },
   },
   potion_keen_edge: {
@@ -2249,6 +2268,10 @@ export const MAGIC_ITEMS = {
         }));
         return { turns: 35 };
       },
+      on_throw: createPotionSplashThrowHook({
+        sourceKind: "potion_keen_edge",
+        eventName: "potion:splash:dud",
+      }),
     },
   },
   potion_lethargy: {
@@ -2285,6 +2308,12 @@ export const MAGIC_ITEMS = {
         ctx.io.emit("potion:lethargy", { actorId });
         return { turns: 30 };
       },
+      on_throw: createPotionSplashThrowHook({
+        effectKey: "lethargic",
+        duration: 15,
+        potency: 1,
+        sourceKind: "potion_lethargy",
+      }),
     },
   },
 
