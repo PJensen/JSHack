@@ -154,15 +154,10 @@ export function initStatusLine() {
   window.addEventListener('ui:updateScore', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
-    const incoming = Math.max(0, Number(e?.detail?.score ?? 0) | 0);
-    if (incoming > scoreTarget) {
-      scoreTarget = incoming;
+    const pts = Math.max(0, Number(e?.detail?.points ?? 0) | 0);
+    if (pts > 0) {
+      scoreTarget += pts;
       startScoreClimb();
-    } else if (incoming !== scoreTarget) {
-      // Score reset (new game, etc.)
-      scoreTarget = incoming;
-      scoreDisplay = incoming;
-      renderStats();
     }
   });
 

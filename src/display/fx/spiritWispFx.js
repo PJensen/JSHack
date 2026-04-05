@@ -11,8 +11,6 @@ import { Particle } from "../passes/vfx/particles/particlePool.js";
 import { Position } from "../../rules/components/Position.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 import { Trap } from "../../rules/components/Trap.js";
-import { Score } from "../../rules/components/Score.js";
-import { Player } from "../../rules/components/Player.js";
 
 const INSTALLED_KEY = Symbol.for("jshack:display:spiritWisp:installed");
 
@@ -771,13 +769,10 @@ export function createSpiritWispFxController(
         {
           const depth = Math.max(1, _lastDepth);
           const pts = Math.max(1, (o.maxHp || 1) * depth);
-          const pid = getPlayerEntity?.();
-          const sc = pid ? world.get(pid, Score) : null;
           world.emit('wisp:harvest', {
             x: _x, y: _y,
             wispX: _x, wispY: _y,
             points: pts,
-            score: sc ? sc.current : 0,
           });
         }
         deathEssenceFx.consumeOrbAt(i);
