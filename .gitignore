@@ -20,4 +20,8 @@ CLAUDE.md
 
 end-of-day.sh
 .deno_cache/
+
+# Unused audio source files
+assets/audio/unused/
+assets/audio/*.zip
 .claude/projects/-home-pjensen-Repos-JSHack/memory/feedback_additive_changes.md
