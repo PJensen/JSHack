@@ -18,6 +18,13 @@ Deno.test("spell defs include tooltip flavor and impact notes", () => {
   assert(detailLines.some((line) => String(line).includes("Mana 5")), "frost details should include mana cost");
 });
 
+Deno.test("physical spells can declare stamina costs in tooltip detail lines", () => {
+  const phaseStrike = getSpell("phase_strike");
+  assert(phaseStrike, "phase_strike should exist");
+  const details = describeSpellDetailLines(phaseStrike);
+  assert(details.some((line) => String(line).includes("Stamina 10")), "phase_strike should show stamina cost");
+});
+
 Deno.test("all spells expose tooltip-ready description and impacts", () => {
   for (const spell of listSpells()) {
     assert(typeof spell.description === "string" && spell.description.length > 0, `${spell.id} missing description`);
