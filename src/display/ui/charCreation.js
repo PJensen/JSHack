@@ -80,6 +80,40 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
   let bgRafId = null;
   let bgLastT = 0;
 
+  // ---- entropy-driven seed (mouse/touch/keyboard/accelerometer → RNG seed) ----
+  const entropyPool = [];
+  let entropyHash = 0x811C9DC5; // FNV-1a offset basis
+  const ENTROPY_TARGET = 64;
+  let runeFlash = 0;
+  let runeRotation = 0;
+
+  function feedEntropy(rawVal) {
+    const val = (rawVal ^ (Date.now() & 0xFFFF)) >>> 0;
+    entropyPool.push(val);
+    for (let shift = 0; shift < 32; shift += 8) {
+      entropyHash ^= (val >>> shift) & 0xFF;
+      entropyHash = Math.imul(entropyHash, 0x01000193) >>> 0;
+    }
+    const segs = Math.min(16, Math.floor(entropyPool.length / (ENTROPY_TARGET / 16)));
+    const prevSegs = Math.min(16, Math.floor((entropyPool.length - 1) / (ENTROPY_TARGET / 16)));
+    if (segs > prevSegs) {
+      try { navigator.vibrate?.(segs >= 16 ? [12, 40, 12] : 6); } catch {}
+    }
+    runeFlash = 1.0;
+  }
+
+  // rune canvas (created here so bgLoop can draw; appended to DOM later)
+  const runeSize = 80;
+  const runeCanvas = document.createElement('canvas');
+  runeCanvas.width = runeSize * 2;
+  runeCanvas.height = runeSize * 2;
+  Object.assign(runeCanvas.style, {
+    width: runeSize + 'px', height: runeSize + 'px',
+    display: 'block', margin: '0 auto',
+  });
+  const runeCtx = runeCanvas.getContext('2d');
+  let runeLabelEl = null; // set when DOM element is created
+
   function resizeBgCanvas() {
     bgCanvas.width = window.innerWidth;
     bgCanvas.height = window.innerHeight;
@@ -355,6 +389,104 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
     vignette.addColorStop(1, 'rgba(0,0,0,0.74)');
     bgCtx.fillStyle = vignette;
     bgCtx.fillRect(0, 0, w, h);
+
+    // ---- draw entropy rune ----
+    const rc = runeCtx;
+    const rs = runeSize * 2;
+    const rcx = rs / 2, rcy = rs / 2;
+    rc.clearRect(0, 0, rs, rs);
+
+    const progress = clamp01(entropyPool.length / ENTROPY_TARGET);
+    const litSegs = Math.min(16, Math.floor(progress * 16));
+    runeRotation += dt * (0.15 + progress * 0.35);
+    runeFlash = Math.max(0, runeFlash - dt * 3.5);
+
+    // color lerp: steel-blue → amber
+    const runeHue = 210 - progress * 172;
+    const runeSat = 30 + progress * 50;
+    const runeLit = 45 + progress * 20;
+    const activeCol = `hsl(${runeHue}, ${runeSat}%, ${runeLit}%)`;
+    const dimCol = `hsla(210, 20%, 35%, 0.3)`;
+    const glowCol = `hsla(${runeHue}, ${runeSat + 10}%, ${runeLit + 15}%, ${0.15 + runeFlash * 0.4})`;
+
+    // outer glow
+    if (progress > 0) {
+      const rGlow = rc.createRadialGradient(rcx, rcy, 20, rcx, rcy, rs / 2);
+      rGlow.addColorStop(0, glowCol);
+      rGlow.addColorStop(1, 'transparent');
+      rc.fillStyle = rGlow;
+      rc.fillRect(0, 0, rs, rs);
+    }
+
+    // outer ring: 16 arc segments
+    const outerR = rs * 0.38;
+    for (let i = 0; i < 16; i++) {
+      const baseAngle = (i / 16) * Math.PI * 2 + runeRotation;
+      const gap = 0.12;
+      const arcStart = baseAngle + gap;
+      const arcEnd = baseAngle + (Math.PI * 2 / 16) - gap;
+      const isLit = i < litSegs;
+
+      rc.strokeStyle = isLit ? activeCol : dimCol;
+      rc.lineWidth = isLit ? 3 : 1.5;
+      rc.lineCap = 'round';
+      rc.beginPath();
+      rc.arc(rcx, rcy, outerR, arcStart, arcEnd);
+      rc.stroke();
+
+      if (isLit && runeFlash > 0.3) {
+        rc.strokeStyle = `hsla(${runeHue}, 90%, 85%, ${runeFlash * 0.6})`;
+        rc.lineWidth = 5;
+        rc.beginPath();
+        rc.arc(rcx, rcy, outerR, arcStart, arcEnd);
+        rc.stroke();
+      }
+    }
+
+    // inner ring: 8 rune tick marks
+    const innerR = rs * 0.24;
+    for (let i = 0; i < 8; i++) {
+      const angle = (i / 8) * Math.PI * 2 + runeRotation * -0.6;
+      const isLit = litSegs >= (i + 1) * 2;
+      rc.strokeStyle = isLit ? activeCol : dimCol;
+      rc.lineWidth = isLit ? 2.5 : 1;
+      rc.lineCap = 'round';
+      const r0 = innerR - 8;
+      const r1 = innerR + 8;
+      rc.beginPath();
+      rc.moveTo(rcx + Math.cos(angle) * r0, rcy + Math.sin(angle) * r0);
+      rc.lineTo(rcx + Math.cos(angle) * r1, rcy + Math.sin(angle) * r1);
+      rc.stroke();
+    }
+
+    // center orb
+    const orbPulse = 0.6 + Math.sin(now * 0.003) * 0.4;
+    const orbR = 5 + progress * 4;
+    const orbGrad = rc.createRadialGradient(rcx, rcy, 0, rcx, rcy, orbR + 10);
+    orbGrad.addColorStop(0, `hsla(${runeHue}, ${runeSat + 20}%, ${runeLit + 25}%, ${0.5 + orbPulse * 0.5})`);
+    orbGrad.addColorStop(0.5, `hsla(${runeHue}, ${runeSat}%, ${runeLit}%, ${0.2 + orbPulse * 0.15})`);
+    orbGrad.addColorStop(1, 'transparent');
+    rc.fillStyle = orbGrad;
+    rc.beginPath();
+    rc.arc(rcx, rcy, orbR + 10, 0, Math.PI * 2);
+    rc.fill();
+
+    // continuously update seed display + label
+    if (entropyPool.length > 0 && !seedInput.matches(':focus')) {
+      seedInput.value = '0x' + (entropyHash >>> 0).toString(16).toUpperCase();
+    }
+    if (runeLabelEl) {
+      if (progress >= 1 && runeLabelEl.dataset.state !== 'sealed') {
+        runeLabelEl.textContent = 'Fate sealed';
+        runeLabelEl.style.color = activeCol;
+        runeLabelEl.dataset.state = 'sealed';
+      } else if (progress > 0 && progress < 1) {
+        const dots = '\u2022'.repeat(litSegs) + '\u00B7'.repeat(16 - litSegs);
+        runeLabelEl.textContent = dots;
+        runeLabelEl.style.color = activeCol;
+        runeLabelEl.dataset.state = 'weaving';
+      }
+    }
   }
   bgLoop();
 
@@ -731,6 +863,22 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
   box.appendChild(tutRow);
   box.appendChild(document.createElement('br'));
 
+  // ---- entropy rune widget ----
+  const runeWrap = document.createElement('div');
+  Object.assign(runeWrap.style, {
+    textAlign: 'center', marginBottom: '14px', userSelect: 'none',
+  });
+  runeLabelEl = document.createElement('div');
+  Object.assign(runeLabelEl.style, {
+    fontSize: '10px', color: UI.low, marginTop: '4px',
+    letterSpacing: '0.12em', textTransform: 'uppercase',
+    transition: 'color 600ms',
+  });
+  runeLabelEl.textContent = 'Weaving fate\u2026';
+  runeWrap.appendChild(runeCanvas);
+  runeWrap.appendChild(runeLabelEl);
+  box.appendChild(runeWrap);
+
   // ---- confirm button ----
   const confirmBtn = document.createElement('button');
   Object.assign(confirmBtn.style, {
@@ -776,7 +924,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
 
   function doConfirm() {
     const name = (nameInput.value || '').trim() || fallbackName;
-    const seedVal = parseSeed(seedInput.value) ?? (defaultSeed >>> 0);
+    const seedVal = parseSeed(seedInput.value) ?? (entropyPool.length >= 4 ? entropyHash >>> 0 : defaultSeed >>> 0);
     const difficulty = hardInput.checked ? 'hard' : 'easy';
     const tutorial = !!tutInput.checked;
     writeSavedName(name);
@@ -955,6 +1103,51 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
 
   nameInput.select();
 
+  // ---- entropy listeners (all input forms → seed) ----
+  function onPointerEntropy(e) {
+    feedEntropy((e.clientX * 31337) ^ (e.clientY * 7919));
+  }
+  function onKeyEntropy(e) {
+    feedEntropy((e.keyCode || 0) ^ (Date.now() * 2654435761));
+  }
+  function onWheelEntropy(e) {
+    feedEntropy((e.deltaY * 48271) ^ (e.deltaX * 16807));
+  }
+  function onTouchEntropy(e) {
+    const t = e.touches[0] || e.changedTouches[0];
+    if (t) {
+      feedEntropy((t.clientX * 31337) ^ (t.clientY * 7919));
+      try { navigator.vibrate?.(4); } catch {}
+    }
+  }
+
+  panel.addEventListener('pointermove', onPointerEntropy);
+  panel.addEventListener('pointerdown', onPointerEntropy);
+  panel.addEventListener('keydown', onKeyEntropy);
+  panel.addEventListener('wheel', onWheelEntropy, { passive: true });
+  panel.addEventListener('touchmove', onTouchEntropy, { passive: true });
+
+  // accelerometer (device motion) — best entropy source on mobile
+  let accelCleanup = null;
+  function onDeviceMotion(e) {
+    const a = e.accelerationIncludingGravity;
+    if (a) feedEntropy(((a.x || 0) * 10000) ^ ((a.y || 0) * 10000) ^ ((a.z || 0) * 10000));
+  }
+  function startAccel() {
+    window.addEventListener('devicemotion', onDeviceMotion, { passive: true });
+    accelCleanup = () => window.removeEventListener('devicemotion', onDeviceMotion);
+  }
+  if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+    // iOS requires permission — request on first touch
+    const onFirstTouch = () => {
+      DeviceMotionEvent.requestPermission().then(state => { if (state === 'granted') startAccel(); }).catch(() => {});
+      panel.removeEventListener('touchstart', onFirstTouch);
+    };
+    panel.addEventListener('touchstart', onFirstTouch, { passive: true });
+  } else if (typeof DeviceMotionEvent !== 'undefined') {
+    startAccel();
+  }
+
   // keyboard: Enter to confirm, left/right arrows for carousel
   panel.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
@@ -989,6 +1182,12 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
     if (bgRafId !== null) cancelAnimationFrame(bgRafId);
     if (ctaPulseAnim) { try { ctaPulseAnim.cancel(); } catch {} ctaPulseAnim = null; }
     window.removeEventListener('resize', resizeBgCanvas);
+    panel.removeEventListener('pointermove', onPointerEntropy);
+    panel.removeEventListener('pointerdown', onPointerEntropy);
+    panel.removeEventListener('keydown', onKeyEntropy);
+    panel.removeEventListener('wheel', onWheelEntropy);
+    panel.removeEventListener('touchmove', onTouchEntropy);
+    if (accelCleanup) accelCleanup();
     if (panel.parentNode) panel.parentNode.removeChild(panel);
   }
 
