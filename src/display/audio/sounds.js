@@ -1,108 +1,108 @@
-// Sound registry — maps sound IDs to audio file paths and default playback options.
+// Sound registry — maps sound IDs to audio file paths, bus routing, and playback defaults.
 // All paths are relative to site root.
 // Add .wav / .mp3 / .mp4 files to assets/audio/ and register them here.
+//
+// Buses:  combat | spells | items | ambient | ui
+// maxVoices: how many of this sound can play at once (default 3)
 
 const BASE = "./assets/audio/";
 
 /**
- * Each entry:  id → { file, volume?, rate?, detune? }
- *
- * `file` is the filename inside assets/audio/.
- * Optional defaults can be overridden per-play in audioWiring.
+ * Each entry:  id → { file, bus, maxVoices?, volume?, rate?, detune? }
  */
 const SOUNDS = {
   // ── Combat ──────────────────────────────────────
-  "melee:hit":        { file: "melee_hit.wav" },
-  "melee:crit":       { file: "melee_crit.wav" },
-  "melee:miss":       { file: "melee_miss.wav" },
-  "ranged:shot":      { file: "ranged_shot.wav" },
-  "death":            { file: "death.wav" },
+  "melee:hit":        { file: "melee_hit.wav",    bus: "combat" },
+  "melee:crit":       { file: "melee_crit.wav",   bus: "combat" },
+  "melee:miss":       { file: "melee_miss.wav",   bus: "combat" },
+  "ranged:shot":      { file: "ranged_shot.wav",  bus: "combat" },
+  "death":            { file: "death.wav",         bus: "combat", maxVoices: 3 },
+  "player:death":     { file: "player_death.wav",  bus: "combat", maxVoices: 1 },
 
   // ── Items (by type) ─────────────────────────────
-  "item:pickup:weapon":    { file: "pickup_weapon.wav" },
-  "item:pickup:armor":     { file: "pickup_armor.wav" },
-  "item:pickup:potion":    { file: "pickup_potion.wav" },
-  "item:pickup:scroll":    { file: "pickup_scroll.wav" },
-  "item:pickup:gold":      { file: "pickup_gold.wav" },
-  "item:pickup:food":      { file: "pickup_food.wav" },
-  "item:pickup:gem":       { file: "pickup_gem.wav" },
-  "item:pickup:generic":   { file: "pickup_generic.wav" },
+  "item:pickup:weapon":    { file: "pickup_weapon.wav",   bus: "items" },
+  "item:pickup:armor":     { file: "pickup_armor.wav",    bus: "items" },
+  "item:pickup:potion":    { file: "pickup_potion.wav",   bus: "items" },
+  "item:pickup:scroll":    { file: "pickup_scroll.wav",   bus: "items" },
+  "item:pickup:gold":      { file: "pickup_gold.wav",     bus: "items" },
+  "item:pickup:food":      { file: "pickup_food.wav",     bus: "items" },
+  "item:pickup:gem":       { file: "pickup_gem.wav",      bus: "items" },
+  "item:pickup:generic":   { file: "pickup_generic.wav",  bus: "items" },
 
-  "item:drop:weapon":      { file: "drop_weapon.wav" },
-  "item:drop:armor":       { file: "drop_armor.wav" },
-  "item:drop:potion":      { file: "drop_potion.wav" },
-  "item:drop:generic":     { file: "drop_generic.wav" },
+  "item:drop:weapon":      { file: "drop_weapon.wav",     bus: "items" },
+  "item:drop:armor":       { file: "drop_armor.wav",      bus: "items" },
+  "item:drop:potion":      { file: "drop_potion.wav",     bus: "items" },
+  "item:drop:generic":     { file: "drop_generic.wav",    bus: "items" },
 
-  "item:equip:weapon":     { file: "equip_weapon.wav" },
-  "item:equip:armor":      { file: "equip_armor.wav" },
-  "item:equip:generic":    { file: "equip_generic.wav" },
+  "item:equip:weapon":     { file: "equip_weapon.wav",    bus: "items" },
+  "item:equip:armor":      { file: "equip_armor.wav",     bus: "items" },
+  "item:equip:generic":    { file: "equip_generic.wav",   bus: "items" },
 
-  "chest:open":            { file: "chest_open.wav" },
+  "chest:open":            { file: "chest_open.wav",      bus: "items" },
 
   // ── Environment ─────────────────────────────────
-  "stair:descend":    { file: "stair_descend.wav" },
-  "stair:ascend":     { file: "stair_ascend.wav" },
-  "door:open":        { file: "door_open.wav" },
-  "fountain":         { file: "fountain.wav" },
+  "stair:descend":    { file: "stair_descend.wav", bus: "ambient" },
+  "stair:ascend":     { file: "stair_ascend.wav",  bus: "ambient" },
+  "door:open":        { file: "door_open.wav",     bus: "ambient" },
+  "fountain":         { file: "fountain.wav",      bus: "ambient" },
 
-  // ── Spells ──────────────────────────────────────
-  "spell:bolt":          { file: "spell_bolt.wav" },
-  "spell:frost":         { file: "spell_frost.wav" },
-  "spell:shadow_bolt":   { file: "spell_shadow_bolt.wav" },
-  "spell:fireball":      { file: "spell_fireball.wav" },
-  "spell:meteor":        { file: "spell_meteor.wav" },
-  "spell:blizzard":      { file: "spell_blizzard.wav" },
-  "spell:firestorm":     { file: "spell_firestorm.wav" },
-  "spell:blastwave":     { file: "spell_blastwave.wav" },
-  "spell:flash_heal":    { file: "spell_heal.wav" },
-  "spell:smite":         { file: "spell_smite.wav" },
-  "spell:death_volley":  { file: "spell_death_volley.wav" },
-  "spell:blink":         { file: "spell_blink.wav" },
-  "spell:plague_swarm":  { file: "spell_plague_swarm.wav" },
-  "spell:earthshatter":  { file: "spell_earthshatter.wav" },
-  "spell:war_cry":       { file: "spell_war_cry.wav" },
-  "spell:cleave":        { file: "spell_cleave.wav" },
-  "spell:rampage":       { file: "spell_rampage.wav" },
-  "spell:phase_strike":  { file: "spell_phase_strike.wav" },
-  "spell:shield_bash":   { file: "spell_shield_bash.wav" },
-  "spell:wolf_howl":     { file: "spell_wolf_howl.wav" },
-  "spell:boar_charge":   { file: "spell_boar_charge.wav" },
-  "spell:consecrate":    { file: "spell_consecrate.wav" },
-  "spell:divine_shield": { file: "spell_divine_shield.wav" },
-  "spell:purify":        { file: "spell_purify.wav" },
-  "spell:bloodthirst":   { file: "spell_bloodthirst.wav" },
-  "spell:verdant_ward":  { file: "spell_verdant_ward.wav" },
-  "spell:harmony_ward":  { file: "spell_harmony_ward.wav" },
-  "spell:shadow_veil":   { file: "spell_shadow_veil.wav" },
-  "spell:smoke_bomb":    { file: "spell_smoke_bomb.wav" },
-  "spell:poison_blade":  { file: "spell_poison_blade.wav" },
-  "spell:lifetap":       { file: "spell_lifetap.wav" },
-  "spell:acid_spit":     { file: "spell_acid_spit.wav" },
-  "spell:web_spit":      { file: "spell_web_spit.wav" },
-  "spell:fizzle":        { file: "spell_fizzle.wav" },
+  // ── Spells (cast / launch) ─────────────────────
+  "spell:bolt":          { file: "spell_bolt.wav",          bus: "spells" },
+  "spell:frost":         { file: "spell_frost.wav",         bus: "spells" },
+  "spell:shadow_bolt":   { file: "spell_shadow_bolt.wav",   bus: "spells" },
+  "spell:fireball":      { file: "spell_fireball.wav",      bus: "spells" },
+  "spell:meteor":        { file: "spell_meteor.wav",        bus: "spells" },
+  "spell:blizzard":      { file: "spell_blizzard.wav",      bus: "spells" },
+  "spell:firestorm":     { file: "spell_firestorm.wav",     bus: "spells" },
+  "spell:blastwave":     { file: "spell_blastwave.wav",     bus: "spells" },
+  "spell:flash_heal":    { file: "spell_heal.wav",          bus: "spells" },
+  "spell:smite":         { file: "spell_smite.wav",         bus: "spells" },
+  "spell:death_volley":  { file: "spell_death_volley.wav",  bus: "spells" },
+  "spell:blink":         { file: "spell_blink.wav",         bus: "spells" },
+  "spell:plague_swarm":  { file: "spell_plague_swarm.wav",  bus: "spells" },
+  "spell:earthshatter":  { file: "spell_earthshatter.wav",  bus: "spells" },
+  "spell:war_cry":       { file: "spell_war_cry.wav",       bus: "spells" },
+  "spell:cleave":        { file: "spell_cleave.wav",        bus: "spells" },
+  "spell:rampage":       { file: "spell_rampage.wav",       bus: "spells" },
+  "spell:phase_strike":  { file: "spell_phase_strike.wav",  bus: "spells" },
+  "spell:shield_bash":   { file: "spell_shield_bash.wav",   bus: "spells" },
+  "spell:wolf_howl":     { file: "spell_wolf_howl.wav",     bus: "spells" },
+  "spell:boar_charge":   { file: "spell_boar_charge.wav",   bus: "spells" },
+  "spell:consecrate":    { file: "spell_consecrate.wav",    bus: "spells" },
+  "spell:divine_shield": { file: "spell_divine_shield.wav", bus: "spells" },
+  "spell:purify":        { file: "spell_purify.wav",        bus: "spells" },
+  "spell:bloodthirst":   { file: "spell_bloodthirst.wav",   bus: "spells" },
+  "spell:verdant_ward":  { file: "spell_verdant_ward.wav",  bus: "spells" },
+  "spell:harmony_ward":  { file: "spell_harmony_ward.wav",  bus: "spells" },
+  "spell:shadow_veil":   { file: "spell_shadow_veil.wav",   bus: "spells" },
+  "spell:smoke_bomb":    { file: "spell_smoke_bomb.wav",    bus: "spells" },
+  "spell:poison_blade":  { file: "spell_poison_blade.wav",  bus: "spells" },
+  "spell:lifetap":       { file: "spell_lifetap.wav",       bus: "spells" },
+  "spell:acid_spit":     { file: "spell_acid_spit.wav",     bus: "spells" },
+  "spell:web_spit":      { file: "spell_web_spit.wav",      bus: "spells" },
+  "spell:fizzle":        { file: "spell_fizzle.wav",        bus: "spells" },
 
   // ── Spell impacts (hit after travel) ───────────
-  "spell:impact:fire":     { file: "impact_fire.wav" },
-  "spell:impact:ice":      { file: "impact_ice.wav" },
-  "spell:impact:lightning": { file: "impact_lightning.wav" },
-  "spell:impact:shadow":   { file: "impact_shadow.wav" },
-  "spell:impact:holy":     { file: "impact_holy.wav" },
-  "spell:impact:poison":   { file: "impact_poison.wav" },
-  "spell:impact:physical": { file: "impact_physical.wav" },
+  "spell:impact:fire":      { file: "impact_fire.wav",      bus: "spells", maxVoices: 4 },
+  "spell:impact:ice":       { file: "impact_ice.wav",       bus: "spells", maxVoices: 4 },
+  "spell:impact:lightning":  { file: "impact_lightning.wav",  bus: "spells", maxVoices: 4 },
+  "spell:impact:shadow":    { file: "impact_shadow.wav",    bus: "spells", maxVoices: 4 },
+  "spell:impact:holy":      { file: "impact_holy.wav",      bus: "spells", maxVoices: 4 },
+  "spell:impact:poison":    { file: "impact_poison.wav",    bus: "spells", maxVoices: 4 },
+  "spell:impact:physical":  { file: "impact_physical.wav",  bus: "spells", maxVoices: 4 },
 
   // ── Weather ─────────────────────────────────────
-  "thunder":          { file: "thunder.wav" },
-  "rain:loop":        { file: "rain_loop.wav" },
+  "thunder":          { file: "thunder.wav",    bus: "ambient", maxVoices: 2 },
+  "rain:loop":        { file: "rain_loop.wav",  bus: "ambient" },
 
   // ── UI / Misc ───────────────────────────────────
-  "level:up":         { file: "level_up.wav" },
-  "player:death":     { file: "player_death.wav" },
+  "level:up":         { file: "level_up.wav",   bus: "ui", maxVoices: 1 },
 };
 
 /**
  * Resolve a sound ID to its full URL and default options.
  * @param {string} id
- * @returns {{ url: string, volume?: number, rate?: number, detune?: number } | null}
+ * @returns {{ url: string, bus?: string, maxVoices?: number, volume?: number, rate?: number, detune?: number } | null}
  */
 export function resolve(id) {
   const entry = SOUNDS[id];
