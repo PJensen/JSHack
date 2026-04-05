@@ -1607,7 +1607,17 @@ export function createSpiritWispFxController(
       if (apos && tpos) _trySurge(apos.x, apos.y, tpos.x, tpos.y, 10);
     });
 
+    // ── Fireball (wisp flies to target) ────────────────────────────
+    world.on("spell:fireball", ({ from, to, fizzle }) => {
+      if (fizzle || !from || !to) return;
+      _trySurge(from.x, from.y, to.x, to.y, 10);
+    });
+
     // ── Targeted DoTs (wisp flies to target on application) ──────────
+    world.on("spell:plague_swarm", ({ from, at, fizzle }) => {
+      if (fizzle || !from || !at) return;
+      _trySurge(from.x, from.y, at.x, at.y, 8);
+    });
     world.on("spell:agony", ({ from, at, fizzle }) => {
       if (fizzle || !from || !at) return;
       _trySurge(from.x, from.y, at.x, at.y, 8);
