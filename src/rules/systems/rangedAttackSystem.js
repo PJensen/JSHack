@@ -16,6 +16,7 @@ import { hasLOS } from '../../shared/math/gridLOS.js';
 import { buildBlocksVisionMap, blockedCallback } from '../utils/vision.js';
 import { mulberry32, rngInt, rollDice, combatSeed, pct } from '../utils/rng.js';
 import { dealDamage } from '../utils/dealDamage.js';
+import { applyWeaponCoatingOnHit } from '../data/weaponCoatings.js';
 import { addToInventory, inventoryItems, removeFromInventory } from '../utils/inventoryFacade.js';
 import { resolveCombatSnapshot } from '../utils/resolveCombatSnapshot.js';
 import { areFactionsHostile } from '../utils/factionHostility.js';
@@ -337,6 +338,12 @@ export function rangedAttackSystem(world) {
       scratch: procScratch,
       tags: ['ranged', 'projectile', `relation:${positional.relation}`],
     }), { excludeSlots: ['weapon'] });
+
+    // Ammo coating (e.g. paralysis-coated arrows)
+    applyWeaponCoatingOnHit(world, {
+      attacker, defender, weaponId: ammoId,
+      didHit: dmg > 0,
+    });
 
     // Apply damage through canonical pipeline
     const result = dealDamage(world, {

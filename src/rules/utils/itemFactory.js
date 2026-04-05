@@ -124,5 +124,6 @@ export function isValidItemId(itemId) {
 export function listAllItemIds() {
   const simpleIds = Object.keys(SIMPLE_ITEM_ARCHETYPES);
   const catalogIds = Object.keys(ITEM_CATALOG || {});
-  return Array.from(new Set([...simpleIds, ...catalogIds]));
+  const gemIds = gems.listGemIds();
+  return Array.from(new Set([...simpleIds, ...catalogIds, ...gemIds]));
 }
