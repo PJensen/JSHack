@@ -3,9 +3,10 @@ import { GoldStack } from "../../archetypes/Items.js";
 import { ItemInfo } from "../../components/ItemInfo.js";
 import { NamedIdentity } from "../../components/NamedIdentity.js";
 import { Player } from "../../components/Player.js";
+import { Position } from "../../components/Position.js";
 import { QuestVars } from "../../components/QuestVars.js";
-import { addToInventory } from "../../utils/inventoryFacade.js";
 import { createItemById } from "../../utils/itemFactory.js";
+import { emitSafe } from "../../utils/emitSafe.js";
 import { emit, incVar, setVar } from "../actions.js";
 import { registerQuest } from "../registry.js";
 import { getQuestRecord } from "../runtime.js";
@@ -130,17 +131,22 @@ export const RatInfestationQuest = registerQuest({
             actions: [
               setVar("reported", true),
               (ctx) => {
-                const pid = Number(ctx.bind.player || 0);
-                if (!(pid > 0)) return;
+                const giverId = Number(ctx.bind.giver || 0);
+                const giverPos = giverId > 0 ? ctx.world.get(giverId, Position) : null;
+                const x = giverPos?.x ?? 0;
+                const y = giverPos?.y ?? 0;
+                // Drop gold at the giver's feet
                 const gid = createFrom(ctx.world, GoldStack, {});
                 ctx.world.mutate(gid, ItemInfo, (r) => { r.count = REWARD_GOLD; });
-                addToInventory(ctx.world, pid, gid);
+                ctx.world.add(gid, Position, { x, y });
+                emitSafe(ctx.world, 'item:dropped', { itemId: gid, count: REWARD_GOLD, at: { x, y } });
+                // Drop a hot meal
+                const stewId = createItemById(ctx.world, "food_stew");
+                if (stewId > 0) {
+                  ctx.world.add(stewId, Position, { x, y });
+                  emitSafe(ctx.world, 'item:dropped', { itemId: stewId, count: 1, at: { x, y } });
+                }
               },
-              emit("quest:reward", (ctx) => ({
-                questId: RAT_INFESTATION_QUEST_ID,
-                playerId: ctx.bind.player,
-                gold: REWARD_GOLD,
-              })),
               emit("quest:completed", (ctx) => ({
                 questId: RAT_INFESTATION_QUEST_ID,
                 playerId: ctx.bind.player,
