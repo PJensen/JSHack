@@ -36,10 +36,44 @@ export const GUIDANCE_TIPS = [
   },
   {
     id: "facing",
-    text: "You can only see and strike where you face. Turn wisely \u2014 danger may lurk behind you.",
+    text: "See that golden dot? It shows where you face. You can only see and strike in that direction.",
+    durationSec: 6,
+    delaySec: 0.5,
+  },
+  {
+    id: "facing_cone",
+    text: "Your vision is a narrow cone. On Easy difficulty, vision is full 360\u00b0 \u2014 but on Hard, watch your back.",
+    durationSec: 6,
+    delaySec: 0.5,
+  },
+
+  // ── Equipment glyphs ──────────────────────────────────────────────
+  {
+    id: "glyph_weapon",
+    text: "The small icon at your bottom-right is your wielded weapon. Equip something from your inventory to see it change.",
+    durationSec: 6,
+    delaySec: 0.5,
+  },
+  {
+    id: "glyph_shield",
+    text: "A shield badge appeared at your top-left \u2014 it shows your off-hand defense at a glance.",
     durationSec: 5.5,
     delaySec: 0.5,
   },
+  {
+    id: "glyph_ranged",
+    text: "A ranged weapon badge appeared at your bottom-left. Press \u201cf\u201d or tap Fire to shoot.",
+    durationSec: 5.5,
+    delaySec: 0.5,
+    pointTo: "#btn-fire",
+  },
+  {
+    id: "glyph_dual_wield",
+    text: "Both weapon badges are stacked on your right \u2014 you\u2019re dual-wielding! Off-hand strikes hit with a penalty.",
+    durationSec: 6,
+    delaySec: 0.5,
+  },
+
   {
     id: "pet_companion",
     text: "Your companion follows you and fetches nearby items. Tap the Pet button to give commands.",
@@ -232,12 +266,6 @@ export const GUIDANCE_TIPS = [
     text: "Rain! It douses flames and waters crops. Heavy storms darken the sky.",
     durationSec: 5,
     delaySec: 0.6,
-  },
-  {
-    id: "first_dual_wield",
-    text: "Two weapons! Your off-hand strikes with a penalty, but twice the attacks can fell foes fast.",
-    durationSec: 5.5,
-    delaySec: 0.5,
   },
 ];
 

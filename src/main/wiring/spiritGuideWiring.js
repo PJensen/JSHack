@@ -209,6 +209,7 @@ export function installSpiritGuideWiring({
     if (turnCount === 4) fire("spirit_deity");
     if (turnCount === 8) fire("movement");
     if (turnCount === 12) fire("facing");
+    if (turnCount === 14) fire("facing_cone");
   });
 
   // ── Pet companion (pet delivers an item to the player) ──────────────
@@ -291,10 +292,14 @@ export function installSpiritGuideWiring({
 
   // ── First equip ──────────────────────────────────────────────────────
 
-  world.on("item:equipped", ({ actor }) => {
+  world.on("item:equipped", ({ actor, slot }) => {
     const pe = getPlayerEntity();
     if (!pe || Number(actor || 0) !== pe.id) return;
     fire("first_equip");
+    if (slot === "weapon") fire("glyph_weapon");
+    if (slot === "shield") fire("glyph_shield");
+    if (slot === "ranged") fire("glyph_ranged");
+    if (slot === "offhand") fire("glyph_dual_wield");
   });
 
   // ── First combat (enemy spots the player — status:alert from aiChase) ──
@@ -451,14 +456,8 @@ export function installSpiritGuideWiring({
     fire("first_weather");
   });
 
-  // ── First dual wield ──────────────────────────────────────────────
-
-  world.on("item:equipped", ({ actor, slot }) => {
-    if (slot !== "offhand") return;
-    const pe = getPlayerEntity();
-    if (!pe || Number(actor || 0) !== pe.id) return;
-    fire("first_dual_wield");
-  });
+  // (glyph_weapon, glyph_shield, glyph_ranged, glyph_dual_wield — handled
+  //  by the item:equipped handler above alongside first_equip)
 
   // Enable guide mode on the wisp so it appears on the overworld.
   if (remaining()) {
