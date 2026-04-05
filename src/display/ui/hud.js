@@ -1426,23 +1426,40 @@ export function initHUD() {
   root.appendChild(pinnedSpellDock.el);
   root.appendChild(pinnedSpellDock.fan);
 
+  function syncQuickSlotPosition() {
+    quick.syncPosition(_pinnedSpellDockEl, mobileLayoutMq);
+  }
+
   applyCommandBarLayout();
   syncActionBarHeight();
+  syncQuickSlotPosition();
+
+  window.addEventListener('ui:updatePinnedSpellBar', () => {
+    syncQuickSlotPosition();
+  });
 
   if (typeof mobileLayoutMq.addEventListener === 'function') {
     mobileLayoutMq.addEventListener('change', () => {
       applyCommandBarLayout();
       syncActionBarHeight();
+      syncQuickSlotPosition();
     });
   } else if (typeof mobileLayoutMq.addListener === 'function') {
     mobileLayoutMq.addListener(() => {
       applyCommandBarLayout();
       syncActionBarHeight();
+      syncQuickSlotPosition();
     });
   }
-  window.addEventListener('resize', syncActionBarHeight);
+  window.addEventListener('resize', () => {
+    syncActionBarHeight();
+    syncQuickSlotPosition();
+  });
   if (typeof ResizeObserver !== 'undefined') {
-    const obs = new ResizeObserver(() => syncActionBarHeight());
+    const obs = new ResizeObserver(() => {
+      syncActionBarHeight();
+      syncQuickSlotPosition();
+    });
     obs.observe(bar);
   }
 
@@ -1634,11 +1651,13 @@ function ensureRoot() {
 // --- Singular Quick Slot (LIFO, most recent pickup first) -----------------
 function createQuickSlot(opts = {}) {
   const onPinItem = typeof opts?.onPinItem === 'function' ? opts.onPinItem : null;
+  const BASE_BOTTOM = 'calc(var(--jshack-actionbar-height, 48px) + 12px + env(safe-area-inset-bottom, 0px))';
+  const MOBILE_DOCK_GAP_PX = 8;
   const el = document.createElement('div');
   Object.assign(el.style, {
     position: 'fixed',
     right: '8px',
-    bottom: 'calc(var(--jshack-actionbar-height, 48px) + 12px + env(safe-area-inset-bottom, 0px))',
+    bottom: BASE_BOTTOM,
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'flex-end',
@@ -1835,7 +1854,22 @@ function createQuickSlot(opts = {}) {
     }
   });
 
-  return { el, presentItem };
+  function syncPosition(anchorEl, mobileLayout) {
+    const isMobile = !!mobileLayout?.matches;
+    if (!isMobile || !(anchorEl instanceof HTMLElement)) {
+      el.style.bottom = BASE_BOTTOM;
+      return;
+    }
+    const rect = anchorEl.getBoundingClientRect();
+    if (rect.height <= 0 || rect.width <= 0) {
+      el.style.bottom = BASE_BOTTOM;
+      return;
+    }
+    const bottomPx = Math.max(0, Math.round(window.innerHeight - rect.top + MOBILE_DOCK_GAP_PX));
+    el.style.bottom = `${bottomPx}px`;
+  }
+
+  return { el, presentItem, syncPosition };
 }
 
 function createPinnedItemSlots() {
