@@ -7,16 +7,18 @@ import { Channeling } from "../components/Channeling.js";
 import { ActiveEffects } from "../components/ActiveEffects.js";
 import { CastSpellIntent } from "../components/Intents/CastSpellIntent.js";
 import { Mana } from "../components/Mana.js";
+import { Stamina } from "../components/Stamina.js";
 import { Position } from "../components/Position.js";
 import { Vitality } from "../components/Vitality.js";
 import { getSpell } from "../data/spells.js";
-import { MANA_REGEN_COOLDOWN } from "../data/regenConstants.js";
+import { MANA_REGEN_COOLDOWN, STAMINA_REGEN_COOLDOWN } from "../data/regenConstants.js";
 import { runSpellScript } from "../scripts/spells.js";
-import { effectiveMaxMana } from "../utils/passiveBonuses.js";
+import { effectiveMaxMana, effectiveMaxStamina } from "../utils/passiveBonuses.js";
 import { getChannelInterruptionReason } from "../utils/channelInterruptionPolicy.js";
 import { emitSafe } from "../utils/emitSafe.js";
 import { hasLOS } from "../../shared/math/gridLOS.js";
 import { buildBlocksVisionMap, blockedCallback } from "../utils/vision.js";
+import { spellCostPerTick, spellCostResource } from "../data/spells.js";
 
 const DRAIN_LIFE_DAMAGE_INTERRUPT_INSTALLED = Symbol.for("jshack:channeling:drainLifeDamageInterrupt:installed");
 
@@ -123,18 +125,45 @@ export function channelingSystem(world) {
         continue;
       }
 
+      const resource = spellCostResource(spell);
       const mana = world.get(id, Mana);
-      const have = Number(mana?.mana ?? 0);
-      const manaPerTick = Math.max(0, Number(ch.manaPerTick ?? spell.manaPerTick ?? spell.manaCost ?? 0));
-      if (have < manaPerTick) {
+      const stamina = world.get(id, Stamina);
+      const vitality = world.get(id, Vitality);
+      const perTick = Math.max(0, Number(
+        resource === "stamina"
+          ? (ch.staminaPerTick ?? spellCostPerTick(spell))
+          : resource === "life"
+            ? (ch.lifePerTick ?? spellCostPerTick(spell))
+            : (ch.manaPerTick ?? spellCostPerTick(spell))
+      ));
+      const have = Number(
+        resource === "stamina"
+          ? (stamina?.stamina ?? 0)
+          : resource === "life"
+            ? (vitality?.hp ?? 0)
+            : (mana?.mana ?? 0)
+      );
+      const minLife = resource === "life" ? 1 : 0;
+      if (have - perTick < minLife) {
         try { world.remove(id, Channeling); } catch {}
-        emitSafe(world, "spell:oom", { actor: id, spellId: spell.id, need: manaPerTick, have });
+        emitSafe(world, "spell:oom", {
+          actor: id,
+          spellId: spell.id,
+          need: perTick + minLife,
+          have,
+          costKind: resource === "stamina" ? "stamina" : resource === "life" ? "life" : "mana",
+        });
         emitSafe(world, "channeling:cancelled", { actor: id, spellId: spell.id, reason: "oom" });
         continue;
       }
 
-      if (mana) {
-        mana.mana = have - manaPerTick;
+      if (resource === "stamina" && stamina) {
+        stamina.stamina = have - perTick;
+        stamina.regenCooldown = STAMINA_REGEN_COOLDOWN;
+      } else if (resource === "life" && vitality) {
+        vitality.hp = Math.max(1, have - perTick);
+      } else if (mana) {
+        mana.mana = have - perTick;
         mana.regenCooldown = MANA_REGEN_COOLDOWN;
       }
 
@@ -152,9 +181,14 @@ export function channelingSystem(world) {
         actor: id,
         spellId: spell.id,
         mode: "sustain",
-        manaPerTick,
-        manaRemaining: Number(mana?.mana ?? have - manaPerTick),
+        manaPerTick: resource === "mana" ? perTick : 0,
+        staminaPerTick: resource === "stamina" ? perTick : 0,
+        lifePerTick: resource === "life" ? perTick : 0,
+        manaRemaining: Number(mana?.mana ?? 0),
         manaMax: effectiveMaxMana(world, id, mana),
+        staminaRemaining: Number(stamina?.stamina ?? 0),
+        staminaMax: effectiveMaxStamina(world, id, stamina),
+        lifeRemaining: Number(vitality?.hp ?? 0),
       });
       continue;
     }

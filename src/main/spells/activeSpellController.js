@@ -1,8 +1,12 @@
 import { playerEntity } from "../../rules/utils/queries.js";
 import { Brain } from "../../rules/components/Brain.js";
 import { Mana } from "../../rules/components/Mana.js";
+import { Stamina } from "../../rules/components/Stamina.js";
 import { getSpell } from "../../rules/data/spells.js";
 import { effectiveMaxMana } from "../../rules/utils/passiveBonuses.js";
+import { Vitality } from "../../rules/components/Vitality.js";
+import { effectiveMaxHp } from "../../rules/utils/passiveBonuses.js";
+import { spellCost, spellCostResource } from "../../rules/data/spells.js";
 
 /**
  * Controls the currently selected active spell and related metadata.
@@ -52,17 +56,39 @@ export function createActiveSpellController(world) {
     return { mana: Number(m?.mana || 0), maxMana: effectiveMaxMana(world, pe.id, m) };
   }
 
+  function getPlayerResources() {
+    const pe = playerEntity(world);
+    if (!pe) return { mana: 0, maxMana: 0, stamina: 0, maxStamina: 0, hp: 0, maxHp: 0 };
+    const m = /** @type any */ (world.get(pe.id, Mana));
+    const s = /** @type any */ (world.get(pe.id, Stamina));
+    const v = /** @type any */ (world.get(pe.id, Vitality));
+    return {
+      mana: Number(m?.mana || 0),
+      maxMana: effectiveMaxMana(world, pe.id, m),
+      stamina: Number(s?.stamina || 0),
+      maxStamina: Number(s?.maxStamina || 0),
+      hp: Number(v?.hp || 0),
+      maxHp: effectiveMaxHp(world, pe.id, v),
+    };
+  }
+
   function updateActiveSpellLabel() {
     const spell = activeSpellId ? getSpell(activeSpellId) : null;
     const name = spell?.name || activeSpellId || "";
     const symbol = spell?.symbol || "";
-    const cost = Number(spell?.manaCost || 0);
-    const { mana } = getPlayerMana();
-    const canCast = mana >= cost && !!activeSpellId;
+    const cost = Number(spellCost(spell));
+    const costKind = spellCostResource(spell);
+    const resources = getPlayerResources();
+    const available = costKind === "stamina"
+      ? resources.stamina
+      : costKind === "life"
+        ? Math.max(0, resources.hp - 1)
+        : resources.mana;
+    const canCast = available >= cost && !!activeSpellId;
     try {
       if (uiTarget && typeof uiTarget.dispatchEvent === "function") {
         uiTarget.dispatchEvent(new CustomEvent("ui:updateActiveSpellLabel", {
-          detail: { id: activeSpellId, name, symbol, cost, canCast }
+          detail: { id: activeSpellId, name, symbol, cost, canCast, costKind }
         }));
       }
     } catch (e) { console.debug('[activeSpellController] dispatch ui:updateActiveSpellLabel:', e); }

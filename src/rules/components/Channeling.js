@@ -7,6 +7,8 @@ import { defineComponent } from "../../lib/ecs-js/index.js";
  * turnsRemaining: how many more world ticks until the cast completes.
  * turnsTotal:     the original total cast time (for UI progress display).
  * manaPerTick:    mana spent on each sustain tick.
+ * staminaPerTick: stamina spent on each sustain tick.
+ * lifePerTick:    life spent on each sustain tick.
  * spellId:        the spell being channeled.
  * targetId:       entity target (0 = self).
  * x, y:           optional tile target coordinates.
@@ -19,6 +21,8 @@ export const Channeling = defineComponent("Channeling", {
   turnsRemaining: 0,
   turnsTotal: 0,
   manaPerTick: 0,
+  staminaPerTick: 0,
+  lifePerTick: 0,
   spellId: "",
   targetId: 0,
   x: null,

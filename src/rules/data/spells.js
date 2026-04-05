@@ -17,11 +17,16 @@
  * @property {string} name
  * @property {string} [symbol]  // unicode glyph for UI display
  * @property {number} manaCost
+ * @property {'mana'|'stamina'|'life'} [costResource]
+ * @property {number} [staminaCost]
+ * @property {number} [lifeCost]
  * @property {number} [minIntelligence]
  * @property {number} [range]   // max casting range in tiles
  * @property {number} [castTime] // turns to channel before casting (0 or omitted = instant)
  * @property {boolean} [channeling] // true = sustained realtime channel until cancelled
  * @property {number} [manaPerTick] // mana drained each channel tick when channeling
+ * @property {number} [staminaPerTick] // stamina drained each channel tick when channeling
+ * @property {number} [lifePerTick] // life drained each channel tick when channeling
  * @property {number} [boltsPerTick] // storm impacts per sustain tick
  * @property {string} [script]  // optional key for scripted behavior
  * @property {string} [description] // flavor-forward tooltip text
@@ -607,7 +612,9 @@ export const SPELL_DEFS = {
     symbol: '\u2381',       // ⌁
     schools: ['destruction', 'trickery'],
     clearMindedCasting: true,
-    manaCost: 10,
+    manaCost: 0,
+    costResource: 'stamina',
+    staminaCost: 10,
     minIntelligence: 0,
     range: 4,
     cooldown: 6,
@@ -725,7 +732,9 @@ export const SPELL_DEFS = {
     name: 'Cleave',
     symbol: '\u{1FA93}',    // 🪓
     schools: ['destruction', 'martial'],
-    manaCost: 4,
+    manaCost: 0,
+    costResource: 'stamina',
+    staminaCost: 4,
     minIntelligence: 0,
     cooldown: 5,
     script: 'cleave',
@@ -853,14 +862,59 @@ export function listSpells() {
 
 /**
  * @param {SpellDef | null | undefined} spell
+ * @returns {'mana'|'stamina'|'life'}
+ */
+export function spellCostResource(spell) {
+  const resource = String(spell?.costResource || "mana").toLowerCase();
+  if (resource === "stamina") return "stamina";
+  if (resource === "life") return "life";
+  return "mana";
+}
+
+/**
+ * @param {'mana'|'stamina'|'life'} resource
+ * @returns {string}
+ */
+export function spellResourceLabel(resource) {
+  if (resource === "stamina") return "Stamina";
+  if (resource === "life") return "Life";
+  return "Mana";
+}
+
+/**
+ * @param {SpellDef | null | undefined} spell
+ * @returns {number}
+ */
+export function spellCost(spell) {
+  const resource = spellCostResource(spell);
+  if (resource === "stamina") return Number(spell?.staminaCost ?? 0);
+  if (resource === "life") return Number(spell?.lifeCost ?? 0);
+  return Number(spell?.manaCost ?? 0);
+}
+
+/**
+ * @param {SpellDef | null | undefined} spell
+ * @returns {number}
+ */
+export function spellCostPerTick(spell) {
+  const resource = spellCostResource(spell);
+  if (resource === "stamina") return Number(spell?.staminaPerTick ?? spell?.staminaCost ?? 0);
+  if (resource === "life") return Number(spell?.lifePerTick ?? spell?.lifeCost ?? 0);
+  return Number(spell?.manaPerTick ?? spell?.manaCost ?? 0);
+}
+
+/**
+ * @param {SpellDef | null | undefined} spell
  * @returns {string[]}
  */
 export function describeSpellDetailLines(spell) {
   if (!spell) return [];
+  const resource = spellCostResource(spell);
+  const resourceLabel = spellResourceLabel(resource);
   return [
     spell.channeling
-      ? `Mana ${Number(spell.manaPerTick ?? spell.manaCost ?? 0)} / tick`
-      : `Mana ${Number(spell.manaCost || 0)}`,
+      ? `${resourceLabel} ${spellCostPerTick(spell)} / tick`
+      : `${resourceLabel} ${spellCost(spell)}`,
     Number.isFinite(spell.range) ? `Range ${Number(spell.range) | 0}` : "",
     Number.isFinite(spell.minIntelligence) && Number(spell.minIntelligence) > 0
       ? `Int ${Number(spell.minIntelligence) | 0}+`
