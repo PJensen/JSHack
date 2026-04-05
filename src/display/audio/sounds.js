@@ -2,21 +2,22 @@
 // All paths are relative to site root.
 // Add .wav / .mp3 / .mp4 files to assets/audio/ and register them here.
 //
-// Buses:  combat | spells | items | ambient | ui
-// maxVoices: how many of this sound can play at once (default 3)
+// Buses:       combat | spells | items | ambient | ui
+// maxVoices:   how many of this sound can play at once (default 3)
+// randomPitch: cents of random detune jitter per play (e.g. 60 → ±60 cents variation)
 
 const BASE = "./assets/audio/";
 
 /**
- * Each entry:  id → { file, bus, maxVoices?, volume?, rate?, detune? }
+ * Each entry:  id → { file, bus, maxVoices?, volume?, rate?, detune?, randomPitch? }
  */
 const SOUNDS = {
   // ── Combat ──────────────────────────────────────
-  "melee:hit":        { file: "melee_hit.wav",    bus: "combat" },
-  "melee:crit":       { file: "melee_crit.wav",   bus: "combat" },
-  "melee:miss":       { file: "melee_miss.wav",   bus: "combat" },
-  "ranged:shot":      { file: "ranged_shot.wav",  bus: "combat" },
-  "death":            { file: "death.wav",         bus: "combat", maxVoices: 3 },
+  "melee:hit":        { file: "melee_hit.wav",    bus: "combat", randomPitch: 80 },
+  "melee:crit":       { file: "melee_crit.wav",   bus: "combat", randomPitch: 50 },
+  "melee:miss":       { file: "melee_miss.wav",   bus: "combat", randomPitch: 60 },
+  "ranged:shot":      { file: "ranged_shot.wav",  bus: "combat", randomPitch: 40 },
+  "death":            { file: "death.wav",         bus: "combat", maxVoices: 3, randomPitch: 100 },
   "player:death":     { file: "player_death.wav",  bus: "combat", maxVoices: 1 },
 
   // ── Items (by type) ─────────────────────────────
