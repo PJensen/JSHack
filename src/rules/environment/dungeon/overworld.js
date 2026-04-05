@@ -553,6 +553,14 @@ export function generateOverworldChunks(worldSeed) {
   addSpawn(chunks, homeX, homeY + 10, "scarecrow");
   addSpawn(chunks, homeX, homeY + 14, "scarecrow");
 
+  // ── Farm chickens — a small flock pecking around the crops ────
+  addSpawn(chunks, homeX - 2, homeY + 8,  "farm_animal", { name: "Rooster", identity: "chicken_rooster", maxHp: 5, massKg: 3 });
+  addSpawn(chunks, homeX + 2, homeY + 9,  "farm_animal", { name: "Hen", identity: "chicken_hen" });
+  addSpawn(chunks, homeX - 1, homeY + 12, "farm_animal", { name: "Hen", identity: "chicken_hen" });
+  addSpawn(chunks, homeX + 3, homeY + 13, "farm_animal", { name: "Hen", identity: "chicken_hen" });
+  addSpawn(chunks, homeX + 1, homeY + 16, "farm_animal", { name: "Chick", identity: "chick", maxHp: 2, massKg: 0.5 });
+  addSpawn(chunks, homeX + 2, homeY + 16, "farm_animal", { name: "Chick", identity: "chick", maxHp: 2, massKg: 0.5 });
+
   // ── Well plaza — east of the dungeon entrance ────────────────
   // A cobblestone courtyard with a walkable well and short path from staircase.
   const wellX = houseStairAnchorX + 5;
