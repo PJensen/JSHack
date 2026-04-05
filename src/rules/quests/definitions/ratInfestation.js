@@ -74,6 +74,33 @@ export const RatInfestationQuest = registerQuest({
             actions: [
               setVar("accepted", true),
               setVar("killCount", 0),
+              (ctx) => {
+                const giverId = Number(ctx.bind.giver || 0);
+                if (!(giverId > 0)) return;
+                const giverPos = ctx.world.get(giverId, Position);
+                if (!giverPos) return;
+                if (!Number.isFinite(giverPos.x) || !Number.isFinite(giverPos.y)) return;
+                const x = giverPos.x | 0;
+                const y = giverPos.y | 0;
+
+                const bowId = createItemById(ctx.world, "bow_short");
+                if (bowId > 0) {
+                  ctx.world.add(bowId, Position, { x, y });
+                  emitSafe(ctx.world, "item:dropped", { itemId: bowId, count: 1, at: { x, y } });
+                }
+
+                const arrowsId = createItemById(ctx.world, "ammo_arrows", { count: 20 });
+                if (arrowsId > 0) {
+                  ctx.world.add(arrowsId, Position, { x, y });
+                  emitSafe(ctx.world, "item:dropped", { itemId: arrowsId, count: 20, at: { x, y } });
+                }
+
+                emitSafe(ctx.world, "npc:dialogue", {
+                  actor: giverId,
+                  targetId: Number(ctx.bind.player || 0) | 0,
+                  text: "take these, there are bats down there too!",
+                });
+              },
               emit("quest:started", (ctx) => ({
                 questId: RAT_INFESTATION_QUEST_ID,
                 playerId: ctx.bind.player,

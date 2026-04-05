@@ -33,7 +33,7 @@ export const GUIDANCE_TIPS = [
   // ── Early game (overworld, first steps) ───────────────────────────
   {
     id: "welcome",
-    text: "I am the eye of your deity, watching over you.",
+    text: "I am your spirit guide — the eye of your deity, watching over you.",
     durationSec: 4,
     delaySec: 1.8,
   },
@@ -95,7 +95,7 @@ export const GUIDANCE_TIPS = [
   },
   {
     id: "quick_items",
-    text: "These are your pinned items \u2014 tap one to use it. Hold to browse details.",
+    text: "A Quick Chip pops up immediately after pickup. Tap it to use fast, or pin it so it stays in your quick slots.",
     durationSec: 5.5,
     delaySec: 0.5,
     pointTo: "#hud-pinned-items",
@@ -151,10 +151,17 @@ export const GUIDANCE_TIPS = [
   },
   {
     id: "low_hp",
-    text: "You're wounded! Use a potion from your pinned items, or retreat to safety.",
+    text: "You're wounded! Use a potion from your Quick Chips, or retreat to safety.",
     durationSec: 5,
     delaySec: 0.3,
     pointTo: "#hud-pinned-items",
+  },
+  {
+    id: "first_bat",
+    text: "Bat ahead! Shoot with Fire, then tap ammo and potions in your Quick Chips.",
+    durationSec: 5.5,
+    delaySec: 0.3,
+    pointTo: "#btn-fire",
   },
   {
     id: "wait_action",
