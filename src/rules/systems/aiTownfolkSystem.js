@@ -50,6 +50,8 @@ import { getTownPhase } from "../data/calendar.js";
 import { actorHasDoorKey, setDoorState } from "../utils/doorAccess.js";
 import { SMITH_RECIPES, chooseSmithRecipe } from "../data/smithRecipes.js";
 import { CARDINAL_DIRS } from "../utils/directions.js";
+import { getQuestRecord } from "../quests/runtime.js";
+import { RAT_INFESTATION_QUEST_ID } from "../quests/definitions/ratInfestation.js";
 
 const TOWNFOLK_RADIUS = 40;
 const MAX_STUCK_TURNS = 5;
@@ -1136,11 +1138,21 @@ function getRoleWorkTarget(world, job) {
         return { x: job.workX, y: job.workY, kind: "minister", state: TOWNFOLK_STATES.working, radius: 1 };
       }
       return { x: job.workAuxX, y: job.workAuxY, kind: "pray", state: TOWNFOLK_STATES.working, radius: 0 };
-    case TOWNFOLK_ROLES.barkeep:
+    case TOWNFOLK_ROLES.barkeep: {
+      // Approach the player to offer the rat quest
+      const _pl = playerEntity(world);
+      if (_pl) {
+        const quest = getQuestRecord(world, RAT_INFESTATION_QUEST_ID, _pl.id);
+        if (quest && String(quest.state?.node || "") === "offer"
+            && String(quest.state?.status || "") === "active") {
+          return { x: _pl.pos.x, y: _pl.pos.y, kind: "serve", state: TOWNFOLK_STATES.walking, radius: 2 };
+        }
+      }
       if ((workBeat % 2) === 0) {
         return { x: job.workX, y: job.workY, kind: "cook", state: TOWNFOLK_STATES.working, radius: 0 };
       }
       return { x: job.workAuxX, y: job.workAuxY, kind: "pour", state: TOWNFOLK_STATES.working, radius: 0 };
+    }
     case TOWNFOLK_ROLES.mason: {
       const ledger = Object.values(getDestroyedTileLedger(world));
       let best = null;
