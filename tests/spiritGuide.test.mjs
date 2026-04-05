@@ -488,21 +488,49 @@ Deno.test("first_weather tip does not fire on clear weather", () => {
   clearGuideStorage();
 });
 
-Deno.test("first_dual_wield tip fires on offhand equip", () => {
+// ── Equipment glyph tips ─────────────────────────────────────────
+
+Deno.test("glyph_weapon tip fires on weapon slot equip", () => {
   const { world, playerId, bubbles } = setup();
 
-  world.emit("item:equipped", { actor: playerId, itemId: 212, slot: "offhand", name: "Dagger" });
-  const match = bubbles.find((b) => b.text.includes("off-hand"));
-  assert(match, "first_dual_wield tip should fire on offhand equip");
+  world.emit("item:equipped", { actor: playerId, itemId: 212, slot: "weapon", name: "Sword" });
+  const match = bubbles.find((b) => b.text.includes("bottom-right"));
+  assert(match, "glyph_weapon tip should fire on weapon equip");
   clearGuideStorage();
 });
 
-Deno.test("first_dual_wield tip does not fire on weapon slot equip", () => {
+Deno.test("glyph_shield tip fires on shield slot equip", () => {
   const { world, playerId, bubbles } = setup();
 
-  world.emit("item:equipped", { actor: playerId, itemId: 213, slot: "weapon", name: "Sword" });
-  // Should fire first_equip, not first_dual_wield
-  const match = bubbles.find((b) => b.text.includes("off-hand"));
-  assertEquals(match, undefined, "first_dual_wield should not fire on weapon slot equip");
+  world.emit("item:equipped", { actor: playerId, itemId: 213, slot: "shield", name: "Buckler" });
+  const match = bubbles.find((b) => b.text.includes("top-left"));
+  assert(match, "glyph_shield tip should fire on shield equip");
+  clearGuideStorage();
+});
+
+Deno.test("glyph_ranged tip fires on ranged slot equip", () => {
+  const { world, playerId, bubbles } = setup();
+
+  world.emit("item:equipped", { actor: playerId, itemId: 214, slot: "ranged", name: "Short Bow" });
+  const match = bubbles.find((b) => b.text.includes("bottom-left"));
+  assert(match, "glyph_ranged tip should fire on ranged equip");
+  clearGuideStorage();
+});
+
+Deno.test("glyph_dual_wield tip fires on offhand equip", () => {
+  const { world, playerId, bubbles } = setup();
+
+  world.emit("item:equipped", { actor: playerId, itemId: 215, slot: "offhand", name: "Dagger" });
+  const match = bubbles.find((b) => b.text.includes("dual-wielding"));
+  assert(match, "glyph_dual_wield tip should fire on offhand equip");
+  clearGuideStorage();
+});
+
+Deno.test("glyph_weapon tip does not fire on shield equip", () => {
+  const { world, playerId, bubbles } = setup();
+
+  world.emit("item:equipped", { actor: playerId, itemId: 216, slot: "shield", name: "Buckler" });
+  const match = bubbles.find((b) => b.text.includes("bottom-right"));
+  assertEquals(match, undefined, "glyph_weapon should not fire on shield equip");
   clearGuideStorage();
 });
