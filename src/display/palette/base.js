@@ -33,6 +33,9 @@ export const basePalette = {
   player_cleric:  { glyph: "@", fg: "#ffe066", glow: "#cca830" },
   player_archeologist: { glyph: "@", fg: "#d2a064", glow: "#8a6030" },
   player_warlock:  { glyph: "@", fg: "#b366ff", glow: "#8833cc" },
+  player_mireborn: { glyph: "@", fg: "#6b8e5a", glow: "#3a5a2a" },
+  player_mage:     { glyph: "@", fg: "#ff6644", glow: "#cc3311" },
+  player_pilgrim:  { glyph: "@", fg: "#c0c8d8", glow: "#8090a8" },
   monster: { glyph: "m", fg: "#ffb0a0", glow: "#f66" },  // fallback
   // Tier 0
   rat:      { glyph: "r", fg: "#b89070", glow: "#a06030" }, // 🐀
