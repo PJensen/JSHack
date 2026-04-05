@@ -1,7 +1,7 @@
 // Wires ECS world events to audio playback.
 // Listens to game events and plays the matching sound from the registry.
 
-import { play, preload } from "./audioEngine.js";
+import { play, preload, startLoop, stopLoop } from "./audioEngine.js";
 import { resolve, allUrls } from "./sounds.js";
 
 /** Helper — play a registered sound ID with optional overrides. */
@@ -171,8 +171,24 @@ export function installAudioWiring({ world, isPlayer, getItemInfo }) {
 
   // ── Weather ───────────────────────────────────────────────
 
+  const rainUrl = resolve("rain:loop")?.url;
+
+  world.on('weather:changed', ({ weather }) => {
+    if ((weather === 'rain' || weather === 'heavy_rain') && rainUrl) {
+      const vol = weather === 'heavy_rain' ? 0.7 : 0.4;
+      startLoop(rainUrl, { volume: vol, fadeIn: 2.0 });
+    } else {
+      if (rainUrl) stopLoop(rainUrl, { fadeOut: 3.0 });
+    }
+  });
+
   world.on('weather:lightning', () => {
     sfx("thunder");
+  });
+
+  // Stop rain on floor transitions (going underground, etc.)
+  world.on('dungeon:transitioned', () => {
+    if (rainUrl) stopLoop(rainUrl, { fadeOut: 1.0 });
   });
 
   // ── UI ────────────────────────────────────────────────────
