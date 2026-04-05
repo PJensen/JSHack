@@ -206,7 +206,9 @@ export function installSpiritGuideWiring({
     if (!pe || Number(id || 0) !== pe.id) return;
     turnCount++;
     if (turnCount === 1) fire("welcome");
+    if (turnCount === 4) fire("spirit_deity");
     if (turnCount === 8) fire("movement");
+    if (turnCount === 12) fire("facing");
   });
 
   // ── Pet companion (pet delivers an item to the player) ──────────────

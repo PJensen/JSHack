@@ -103,6 +103,21 @@ Deno.test("welcome tip fires on first player move", () => {
   clearGuideStorage();
 });
 
+Deno.test("spirit_deity tip fires on 4th player move", () => {
+  const { world, playerId, bubbles } = setup();
+
+  for (let i = 0; i < 3; i++) {
+    world.emit("moved", { id: playerId, from: { x: 5 + i, y: 5 }, to: { x: 6 + i, y: 5 } });
+  }
+  assertEquals(bubbles.filter((b) => b.text.includes("deity")).length, 0,
+    "should not fire before 4 moves");
+
+  world.emit("moved", { id: playerId, from: { x: 8, y: 5 }, to: { x: 9, y: 5 } });
+  const match = bubbles.find((b) => b.text.includes("deity"));
+  assert(match, "spirit_deity tip should fire on 4th move");
+  clearGuideStorage();
+});
+
 Deno.test("movement tip fires on 8th player move", () => {
   const { world, playerId, bubbles } = setup();
 
@@ -115,6 +130,21 @@ Deno.test("movement tip fires on 8th player move", () => {
   world.emit("moved", { id: playerId, from: { x: 12, y: 5 }, to: { x: 13, y: 5 } });
   const match = bubbles.find((b) => b.text.includes("Tap the screen"));
   assert(match, "movement tip should fire on 8th move");
+  clearGuideStorage();
+});
+
+Deno.test("facing tip fires on 12th player move", () => {
+  const { world, playerId, bubbles } = setup();
+
+  for (let i = 0; i < 11; i++) {
+    world.emit("moved", { id: playerId, from: { x: 5 + i, y: 5 }, to: { x: 6 + i, y: 5 } });
+  }
+  assertEquals(bubbles.filter((b) => b.text.includes("face")).length, 0,
+    "should not fire before 12 moves");
+
+  world.emit("moved", { id: playerId, from: { x: 16, y: 5 }, to: { x: 17, y: 5 } });
+  const match = bubbles.find((b) => b.text.includes("face"));
+  assert(match, "facing tip should fire on 12th move");
   clearGuideStorage();
 });
 

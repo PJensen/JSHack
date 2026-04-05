@@ -23,10 +23,22 @@ export const GUIDANCE_TIPS = [
     delaySec: 1.8,
   },
   {
+    id: "spirit_deity",
+    text: "I am the eye of your deity, watching over you. Your deeds shape their favor \u2014 and your fate.",
+    durationSec: 6,
+    delaySec: 0.8,
+  },
+  {
     id: "movement",
     text: "Tap the screen edges to move. On keyboard: arrow keys, WASD, or HJKL.",
     durationSec: 5,
     delaySec: 0.4,
+  },
+  {
+    id: "facing",
+    text: "You can only see and strike where you face. Turn wisely \u2014 danger may lurk behind you.",
+    durationSec: 5.5,
+    delaySec: 0.5,
   },
   {
     id: "pet_companion",
