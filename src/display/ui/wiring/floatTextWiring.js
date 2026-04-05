@@ -1111,42 +1111,21 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
   // Uses numeric float text so the batching system combines rapid absorptions
   // into a single climbing number: +50 → +120 → +200, each re-popping bigger.
 
-  world.on('wisp:harvest', ({ x, y, wispX, wispY, points, r, g, b }) => {
-    const wx = Number(x || 0);
-    const wy = Number(y || 0);
+  world.on('wisp:harvest', ({ x, y, wispX, wispY, points }) => {
+    const sx = Number(wispX || x || 0);
+    const sy = Number(wispY || y || 0);
     const pts = Math.max(1, Number(points) || 0);
 
-    // Score float text at player position — batches naturally via FloatText
-    ftext.add(wx, wy - 0.6, '+' + pts, {
-      flavor: 'gold',
+    // Small sticky score at the wisp — nearly zero drift so it stays put.
+    // Batching makes the number climb as successive essences are absorbed.
+    const ft = ftext.add(sx, sy - 0.25, '+' + pts, {
+      flavor: 'status',
       color: '#c8f4ff',
-      life: 1.3,
-      scaleStart: 1.1,
+      life: 1.0,
+      scaleStart: 0.8,
       scaleEnd: 0.7,
     });
-
-    // Upward-arcing cyan sparkle burst from wisp toward the score text
-    const sx = Number(wispX || wx);
-    const sy = Number(wispY || wy);
-    for (let i = 0; i < 8; i++) {
-      const ang = -Math.PI * 0.5 + (Math.random() - 0.5) * 1.2; // biased upward
-      const spd = 1.0 + Math.random() * 1.4;
-      fx.pool.spawn(new Particle({
-        x: sx + (Math.random() - 0.5) * 0.12,
-        y: sy + (Math.random() - 0.5) * 0.12,
-        vx: Math.cos(ang) * spd * 0.4,
-        vy: Math.sin(ang) * spd,
-        ay: -0.6, // float upward (negative = up in screen space)
-        life: 0.3 + Math.random() * 0.25,
-        size0: 0.06 + Math.random() * 0.04,
-        size1: 0.01,
-        r: 180 + ((Math.random() * 60) | 0),
-        g: 230 + ((Math.random() * 25) | 0),
-        b: 255,
-        a0: 0.85,
-        a1: 0,
-      }));
-    }
+    if (ft) { ft.vy = -0.12; ft.vx = 0; }
   });
 
   return { goreTick: goreCtrl.tick };
