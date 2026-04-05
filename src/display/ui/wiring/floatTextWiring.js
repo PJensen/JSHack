@@ -1136,7 +1136,7 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
 
     // Also push to stat bar
     window.dispatchEvent(new CustomEvent('ui:updateScore', {
-      detail: { score: Number(score) || 0 },
+      detail: { points: pts },
     }));
   });
 
