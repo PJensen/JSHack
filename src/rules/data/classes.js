@@ -59,7 +59,7 @@ export const CLASS_DEFS = {
       { itemId: 'potion_mana', count: 3 },
       { itemId: 'scroll_identify', count: 4 },
     ],
-    startingSpells: ['frost', 'blizzard', 'harmony_ward', 'firestorm', 'plague_swarm', 'fireball'],
+    startingSpells: ['heal', 'harmony_ward', 'entangle', 'plague_swarm', 'verdant_ward', 'thorn_burst'],
   },
 
   outlaw: {
@@ -162,6 +162,99 @@ export const CLASS_DEFS = {
       { itemId: 'scroll_identify', count: 4 },
     ],
     startingSpells: ['shadow_bolt','summon_skeleton','agony','drain_life','lifetap'],
+  },
+
+  mage: {
+    id: 'mage',
+    name: 'Mage',
+    description: 'Pure elemental destruction. Glass cannon — lowest HP, highest mana.',
+    deityId: 'loki',
+    stats: {
+      maxHp: 18,
+      maxMana: 75,
+      manaRegen: 0.16,
+      maxStamina: 70,
+      staminaRegen: 1.8,
+      intelligence: 15,
+      dexterity: 11,
+      visionRange: 6,
+    },
+    equipment: {
+      weapon: 'staff_oak',
+      armor: null,
+      offhand: null,
+      gloves: 'gloves_arcane',
+      feet: 'shoes_cloth',
+    },
+    inventoryItems: [
+      { itemId: 'hearthstone', count: 1 },
+      { itemId: 'potion_health', count: 2 },
+      { itemId: 'potion_mana', count: 3 },
+      { itemId: 'scroll_identify', count: 4 },
+    ],
+    startingSpells: ['fireball', 'firestorm', 'frost', 'blizzard', 'meteor'],
+  },
+
+  mireborn: {
+    id: 'mireborn',
+    name: 'Mireborn',
+    description: 'Swamp-born and thick-skinned. Poisons, entangles, and outlasts.',
+    deityId: 'gaia',
+    stats: {
+      maxHp: 28,
+      maxMana: 35,
+      manaRegen: 0.08,
+      maxStamina: 100,
+      staminaRegen: 3.0,
+      intelligence: 9,
+      dexterity: 13,
+      visionRange: 6,
+    },
+    equipment: {
+      weapon: 'morningstar',
+      armor: 'leather_armor',
+      offhand: null,
+      feet: 'boots_leather',
+    },
+    inventoryItems: [
+      { itemId: 'hearthstone', count: 1 },
+      { itemId: 'potion_health', count: 2 },
+      { itemId: 'potion_mana', count: 3 },
+      { itemId: 'potion_anti_venom', count: 2 },
+      { itemId: 'scroll_identify', count: 4 },
+    ],
+    startingSpells: ['entangle', 'plague_swarm', 'thorn_burst', 'verdant_ward', 'poison_blade'],
+  },
+
+  pilgrim: {
+    id: 'pilgrim',
+    name: 'Pilgrim',
+    description: 'Wandering ascetic. Starts with almost nothing — rewards exploration and patience.',
+    deityId: 'seraphine',
+    stats: {
+      maxHp: 19,
+      maxMana: 45,
+      manaRegen: 0.18,
+      maxStamina: 90,
+      staminaRegen: 2.5,
+      intelligence: 11,
+      dexterity: 12,
+      visionRange: 6,
+      perception: 8,
+    },
+    equipment: {
+      weapon: 'staff_oak',
+      armor: null,
+      offhand: null,
+      feet: 'sandals_hemp',
+    },
+    inventoryItems: [
+      { itemId: 'hearthstone', count: 1 },
+      { itemId: 'potion_health', count: 2 },
+      { itemId: 'potion_mana', count: 3 },
+      { itemId: 'scroll_identify', count: 4 },
+    ],
+    startingSpells: ['flash_heal', 'blink', 'homecoming'],
   },
 
   cleric: {
