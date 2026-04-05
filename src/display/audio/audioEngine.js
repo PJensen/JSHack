@@ -91,7 +91,7 @@ export function preload(urls) {
 }
 
 /**
- * Play a sound.
+ * Play a sound once.
  * @param {string} url — path to audio file (relative to site root)
  * @param {{
  *   volume?: number,       // 0–1, multiplied with master (default 1)
@@ -111,6 +111,84 @@ export function play(url, opts) {
   loadBuffer(url).then(b => {
     if (b && !_muted) _playBuffer(b, opts);
   });
+}
+
+/** Map<string, { src, gain }> — currently playing loops keyed by URL. */
+const _loops = new Map();
+
+/**
+ * Start a looping sound. If already looping, does nothing.
+ * Returns a handle to stop it later, or call stopLoop(url).
+ * @param {string} url
+ * @param {{ volume?: number, fadeIn?: number }} [opts]
+ */
+export function startLoop(url, opts) {
+  if (_loops.has(url)) return;
+  const buf = _cache.get(url);
+  if (buf) {
+    _startLoopBuffer(url, buf, opts);
+    return;
+  }
+  loadBuffer(url).then(b => {
+    if (b && !_loops.has(url)) _startLoopBuffer(url, b, opts);
+  });
+}
+
+function _startLoopBuffer(url, buf, opts) {
+  try {
+    const ac = ctx();
+    const src = ac.createBufferSource();
+    src.buffer = buf;
+    src.loop = true;
+
+    const gain = ac.createGain();
+    const vol = Number(opts?.volume ?? 1);
+    const fadeIn = Number(opts?.fadeIn || 0);
+
+    if (fadeIn > 0) {
+      gain.gain.setValueAtTime(0, ac.currentTime);
+      gain.gain.linearRampToValueAtTime(vol, ac.currentTime + fadeIn);
+    } else {
+      gain.gain.value = vol;
+    }
+
+    src.connect(gain);
+    gain.connect(masterGain());
+    src.start();
+    _loops.set(url, { src, gain });
+  } catch (_) {
+    // Web Audio not available
+  }
+}
+
+/**
+ * Stop a looping sound.
+ * @param {string} url
+ * @param {{ fadeOut?: number }} [opts]
+ */
+export function stopLoop(url, opts) {
+  const entry = _loops.get(url);
+  if (!entry) return;
+  _loops.delete(url);
+
+  const fadeOut = Number(opts?.fadeOut || 0);
+  try {
+    if (fadeOut > 0) {
+      const ac = ctx();
+      entry.gain.gain.setValueAtTime(entry.gain.gain.value, ac.currentTime);
+      entry.gain.gain.linearRampToValueAtTime(0, ac.currentTime + fadeOut);
+      entry.src.stop(ac.currentTime + fadeOut + 0.05);
+    } else {
+      entry.src.stop();
+    }
+  } catch (_) {
+    // already stopped
+  }
+}
+
+/** Stop all active loops. */
+export function stopAllLoops() {
+  for (const url of [..._loops.keys()]) stopLoop(url);
 }
 
 /** @param {AudioBuffer} buf */
