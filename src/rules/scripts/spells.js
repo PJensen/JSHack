@@ -597,6 +597,7 @@ REGISTRY['blink'] = function blinkScript(world, actor, spell, intent) {
 REGISTRY['phase_strike'] = function phaseStrikeScript(world, actor, spell, intent) {
   const apos = /** @type any */ (world.get(actor, Position));
   if (!apos) return;
+  const actorFaction = String(world.get(actor, Faction)?.key || 'player');
 
   const from = { x: apos.x | 0, y: apos.y | 0 };
   const maxRange = Math.max(1, Number.isFinite(spell?.range) ? (Number(spell.range) | 0) : 10);
@@ -653,7 +654,7 @@ REGISTRY['phase_strike'] = function phaseStrikeScript(world, actor, spell, inten
   for (const [id, p] of world.query(Position)) {
     if (id === actor) continue;
     const fac = /** @type any */ (world.get(id, Faction));
-    if (!fac || fac.key !== 'enemy') continue;
+    if (!fac || !areFactionsHostile(actorFaction, fac.key)) continue;
     const vit = /** @type any */ (world.get(id, Vitality));
     if (!vit || (vit.hp | 0) <= 0) continue;
     const key = (p.x | 0) + ',' + (p.y | 0);
@@ -812,6 +813,7 @@ REGISTRY['hearthstone'] = function hearthstoneScript(world, actor, _spell, _inte
 REGISTRY['meteor'] = function meteorScript(world, actor, spell, intent) {
   const apos = /** @type any */ (world.get(actor, Position));
   if (!apos) return;
+  const actorFaction = String(world.get(actor, Faction)?.key || 'player');
   const isBlocked = createLOSBlocker(world);
 
   const RADIUS = 2;
@@ -879,7 +881,7 @@ REGISTRY['meteor'] = function meteorScript(world, actor, spell, intent) {
     for (const [id, pos] of world.query(Position)) {
       if (id === actor) continue;
       const fac = /** @type any */ (world.get(id, Faction));
-      if (!fac || fac.key !== 'enemy') continue;
+      if (!fac || !areFactionsHostile(actorFaction, fac.key)) continue;
       const vit = /** @type any */ (world.get(id, Vitality));
       if (!vit || (vit.hp | 0) <= 0) continue;
       const dx = (pos.x | 0) - (apos.x | 0);
@@ -1000,7 +1002,7 @@ REGISTRY['frost'] = function frostScript(world, actor, spell, intent) {
   for (const [id, p] of world.query(Position)) {
     if (id === actor) continue;
     const fac = /** @type any */ (world.get(id, Faction));
-    if (!fac || fac.key !== 'enemy') continue;
+    if (!fac || !areFactionsHostile(actorFaction, fac.key)) continue;
     const vit = /** @type any */ (world.get(id, Vitality));
     if (!vit || (vit.hp | 0) <= 0) continue;
     if (actorFaction === 'player' && !isTileVisible(p.x | 0, p.y | 0)) continue;
