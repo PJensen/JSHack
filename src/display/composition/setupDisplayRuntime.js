@@ -124,7 +124,16 @@ export function setupDisplayRuntime({
     dispatchRulesAction,
   });
 
-  installAudioWiring({ world, isPlayer, getItemInfo });
+  installAudioWiring({
+    world,
+    isPlayer,
+    getItemInfo,
+    getPosition,
+    getPlayerPosition: () => {
+      const pe = getPlayerEntity();
+      return pe ? getPosition(pe.id ?? pe) : null;
+    },
+  });
 
   return { statusEmitterFx, statusPresentationDelayFx, boltFx, delayedDeathFx, projectileFx, spellAreaFx, cloudFx, surfaceAreaFx, spiritWispFx, bumpFx, recoilFx, hitstopFx, deathEssenceFx, deathVfx, ftext, goreTick };
 }
