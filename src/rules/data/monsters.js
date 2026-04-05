@@ -140,10 +140,10 @@ export const MONSTERS = [
     id: 'loot_goblin',
     name: 'Loot Goblin',
     tags: ['humanoid', 'rare'],
-    tier: 1,
+    tier: 0,
     rare: true,
     intelligence: 9,
-    visionRange: 9,
+    visionRange: 3,
     // Keep retreating at all health values.
     retreatHpPct: 2.0,
     baseHp: 64,
@@ -800,7 +800,7 @@ export const MONSTERS = [
   {
     id: 'acid_spitter',
     name: 'Acid Spitter',
-    tags: ['beast', 'acid', 'ranged'],
+    tags: ['beast', 'acid', 'ranged', 'caustic_glowing'],
     tier: 1,
     minDepth: 7,
     intelligence: 5,
