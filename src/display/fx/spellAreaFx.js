@@ -2316,6 +2316,56 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
         }));
       }
     });
+
+    // Life Tap — particles sucked inward toward caster (life→mana conversion)
+    world.on('spell:lifetap', ({ actor }) => {
+      if (typeof getPosition !== "function") return;
+      const pos = getPosition(Number(actor || 0));
+      if (!pos || !Number.isFinite(pos.x) || !Number.isFinite(pos.y)) return;
+
+      // Ring of particles that converge on the caster
+      const count = PERF.quality === 'low' ? 14 : 24;
+      for (let i = 0; i < count; i++) {
+        const angle = (Math.PI * 2 * i / count) + (Math.random() - 0.5) * 0.3;
+        const dist = 0.7 + Math.random() * 0.5;
+        const px = pos.x + Math.cos(angle) * dist;
+        const py = pos.y + Math.sin(angle) * dist;
+        const speed = 1.2 + Math.random() * 0.8;
+        fx.pool.spawn(new Particle({
+          x: px, y: py,
+          vx: -Math.cos(angle) * speed,
+          vy: -Math.sin(angle) * speed,
+          life: 0.35 + Math.random() * 0.15,
+          size0: 0.07 + Math.random() * 0.04,
+          size1: 0.01,
+          r: 140 + ((Math.random() * 50) | 0),
+          g: 20 + ((Math.random() * 20) | 0),
+          b: 60 + ((Math.random() * 40) | 0),
+          a0: 0.85,
+        }));
+      }
+      // Secondary inner burst — small bright motes rushing in fast
+      const inner = PERF.quality === 'low' ? 6 : 10;
+      for (let i = 0; i < inner; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 0.35 + Math.random() * 0.25;
+        const speed = 1.8 + Math.random() * 1.0;
+        fx.pool.spawn(new Particle({
+          x: pos.x + Math.cos(angle) * dist,
+          y: pos.y + Math.sin(angle) * dist,
+          vx: -Math.cos(angle) * speed,
+          vy: -Math.sin(angle) * speed,
+          life: 0.15 + Math.random() * 0.10,
+          size0: 0.04 + Math.random() * 0.02,
+          size1: 0.005,
+          r: 200 + ((Math.random() * 55) | 0),
+          g: 60 + ((Math.random() * 30) | 0),
+          b: 180 + ((Math.random() * 50) | 0),
+          a0: 0.95,
+        }));
+      }
+      startShake(cam, 2, 0.06);
+    });
   }
 
   /** Return active light sources for the lighting engine. */
