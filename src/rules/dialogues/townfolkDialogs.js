@@ -196,7 +196,7 @@ registerDialog({
       ],
     },
     report_ack: {
-      text: "That's a load off my mind. Here — you've earned a hot meal and a cold drink.",
+      text: "That's a load off my mind. Here — 75 gold and a hot meal on the house.",
       choices: [
         { id: "leave", label: "Cheers.", close: true },
       ],

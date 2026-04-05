@@ -1,8 +1,12 @@
+import { createFrom } from "../../../lib/ecs-js/archetype.js";
+import { GoldStack } from "../../archetypes/Items.js";
 import { buildCatalogItem } from "../../data/itemCatalogLoader.js";
 import { DungeonState } from "../../components/DungeonState.js";
+import { ItemInfo } from "../../components/ItemInfo.js";
 import { NamedIdentity } from "../../components/NamedIdentity.js";
 import { Player } from "../../components/Player.js";
 import { Position } from "../../components/Position.js";
+import { addToInventory } from "../../utils/inventoryFacade.js";
 import { consumeInventoryIdentity, inventoryHasIdentity } from "../../utils/townEconomy.js";
 import { emit, setVar } from "../actions.js";
 import { registerQuest } from "../registry.js";
@@ -10,6 +14,7 @@ import { STARTER_PRIEST_FETCH_QUEST_ID, getQuestRecord } from "../runtime.js";
 
 const STARTER_FETCH_ITEM_ID = "book_dead";
 const STARTER_FETCH_HOOKS_KEY = Symbol.for("jshack:quests:starterFetch:installed");
+const REWARD_GOLD = 100;
 
 function playerHasBook(world, playerId) {
   return inventoryHasIdentity(world, playerId, STARTER_FETCH_ITEM_ID, 1);
@@ -181,6 +186,18 @@ export const GraveyardWatchQuest = registerQuest({
                 consumeInventoryIdentity(ctx.world, ctx.bind.player, STARTER_FETCH_ITEM_ID, 1);
               },
               setVar("delivered", true),
+              (ctx) => {
+                const pid = Number(ctx.bind.player || 0);
+                if (!(pid > 0)) return;
+                const gid = createFrom(ctx.world, GoldStack, {});
+                ctx.world.mutate(gid, ItemInfo, (r) => { r.count = REWARD_GOLD; });
+                addToInventory(ctx.world, pid, gid);
+              },
+              emit("quest:reward", (ctx) => ({
+                questId: STARTER_PRIEST_FETCH_QUEST_ID,
+                playerId: ctx.bind.player,
+                gold: REWARD_GOLD,
+              })),
               emit("quest:completed", (ctx) => ({
                 questId: STARTER_PRIEST_FETCH_QUEST_ID,
                 playerId: ctx.bind.player,

@@ -18,11 +18,26 @@ const SOUNDS = {
   "ranged:shot":      { file: "ranged_shot.wav" },
   "death":            { file: "death.wav" },
 
-  // ── Items ───────────────────────────────────────
-  "item:pickup":      { file: "item_pickup.wav" },
-  "item:drop":        { file: "item_drop.wav" },
-  "item:equip":       { file: "item_equip.wav" },
-  "chest:open":       { file: "chest_open.wav" },
+  // ── Items (by type) ─────────────────────────────
+  "item:pickup:weapon":    { file: "pickup_weapon.wav" },
+  "item:pickup:armor":     { file: "pickup_armor.wav" },
+  "item:pickup:potion":    { file: "pickup_potion.wav" },
+  "item:pickup:scroll":    { file: "pickup_scroll.wav" },
+  "item:pickup:gold":      { file: "pickup_gold.wav" },
+  "item:pickup:food":      { file: "pickup_food.wav" },
+  "item:pickup:gem":       { file: "pickup_gem.wav" },
+  "item:pickup:generic":   { file: "pickup_generic.wav" },
+
+  "item:drop:weapon":      { file: "drop_weapon.wav" },
+  "item:drop:armor":       { file: "drop_armor.wav" },
+  "item:drop:potion":      { file: "drop_potion.wav" },
+  "item:drop:generic":     { file: "drop_generic.wav" },
+
+  "item:equip:weapon":     { file: "equip_weapon.wav" },
+  "item:equip:armor":      { file: "equip_armor.wav" },
+  "item:equip:generic":    { file: "equip_generic.wav" },
+
+  "chest:open":            { file: "chest_open.wav" },
 
   // ── Environment ─────────────────────────────────
   "stair:descend":    { file: "stair_descend.wav" },
@@ -65,6 +80,15 @@ const SOUNDS = {
   "spell:acid_spit":     { file: "spell_acid_spit.wav" },
   "spell:web_spit":      { file: "spell_web_spit.wav" },
   "spell:fizzle":        { file: "spell_fizzle.wav" },
+
+  // ── Spell impacts (hit after travel) ───────────
+  "spell:impact:fire":     { file: "impact_fire.wav" },
+  "spell:impact:ice":      { file: "impact_ice.wav" },
+  "spell:impact:lightning": { file: "impact_lightning.wav" },
+  "spell:impact:shadow":   { file: "impact_shadow.wav" },
+  "spell:impact:holy":     { file: "impact_holy.wav" },
+  "spell:impact:poison":   { file: "impact_poison.wav" },
+  "spell:impact:physical": { file: "impact_physical.wav" },
 
   // ── Weather ─────────────────────────────────────
   "thunder":          { file: "thunder.wav" },

@@ -1842,6 +1842,11 @@ export function installMessageWiring({
     if (text) log(`Objective updated: ${text}`, 'system');
   });
 
+  world.on('quest:reward', ({ gold }) => {
+    const amount = Number(gold || 0);
+    if (amount > 0) log(`Received ${amount} gold.`, 'good');
+  });
+
   world.on('quest:completed', ({ title }) => {
     const label = String(title || 'Quest');
     log(`Quest completed: ${label}.`, 'system');
