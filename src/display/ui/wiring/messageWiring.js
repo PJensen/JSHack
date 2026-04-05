@@ -1,4 +1,5 @@
 import { normalizeStatusEvent } from "../../../shared/events/statusEvent.js";
+import { hasEquippedShield } from "../../../rules/utils/shieldGuard.js";
 
 const INSTALLED = Symbol.for("jshack:display:messageWiring:installed");
 const ALL_CAPS_DB_BY_SOURCE = Object.freeze({
@@ -1016,6 +1017,16 @@ export function installMessageWiring({
       log(broken
         ? `${who} blocks your attack — the shield breaks!`
         : `${who} blocks with a shield.`, 'combat');
+    }
+  });
+
+  world.on('combat:posture', ({ id, stance, previous }) => {
+    const who = nameOfEntity(id);
+    if (who !== 'You') return;
+    if (stance === 'guarded' && hasEquippedShield(world, id)) {
+      log('You raise your shield.', 'combat');
+    } else if (previous === 'guarded' && hasEquippedShield(world, id)) {
+      log('You lower your shield.', 'combat');
     }
   });
 

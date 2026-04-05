@@ -1,5 +1,6 @@
 import { CombatPosture, COMBAT_POSTURES } from "../components/CombatPosture.js";
 import { emitSafe } from "./emitSafe.js";
+import { refreshShieldGuard } from "./shieldGuard.js";
 
 function normalizePosture(stance) {
   const value = String(stance || COMBAT_POSTURES.balanced).toLowerCase();
@@ -49,6 +50,7 @@ export function setCombatPosture(world, entityId, stance, options = {}) {
     if (emit) {
       emitSafe(world, "combat:posture", { id, stance: next, reason });
     }
+    refreshShieldGuard(world, id);
     return world.get(id, CombatPosture) || null;
   }
 
@@ -58,6 +60,7 @@ export function setCombatPosture(world, entityId, stance, options = {}) {
   if (emit && prev !== next) {
     emitSafe(world, "combat:posture", { id, stance: next, previous: prev, reason });
   }
+  if (prev !== next) refreshShieldGuard(world, id);
   return cur;
 }
 

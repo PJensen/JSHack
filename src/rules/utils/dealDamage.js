@@ -302,6 +302,7 @@ export function dealDamage(world, spec) {
       const guard = consumeShieldGuardStack(world, target, {
         source,
         at: spec.at || undefined,
+        damageAmount: finalAmount,
       });
       if (guard.guarded) {
         finalAmount = Math.max(1, Math.floor(finalAmount * shieldArcMult));
