@@ -1110,8 +1110,10 @@ export function initHUD() {
     const name = String(e?.detail?.name || '').trim();
     const symbol = String(e?.detail?.symbol || '').trim();
     const cost = Number(e?.detail?.cost || 0);
+    const costKind = String(e?.detail?.costKind || 'mana');
     const canCast = Boolean(e?.detail?.canCast ?? true);
-    setDesktopLabel(castBtn, name ? (cost ? `Cast [${name}] (${cost})` : `Cast [${name}]`) : 'Cast');
+    const costSuffix = costKind === 'stamina' ? ' stam' : costKind === 'life' ? ' hp' : '';
+    setDesktopLabel(castBtn, name ? (cost ? `Cast [${name}] (${cost}${costSuffix})` : `Cast [${name}]`) : 'Cast');
     if (symbol) {
       setDesktopIcon(castBtn, symbol);
       setMobileIcon(castBtn, symbol);
@@ -1280,12 +1282,13 @@ export function initHUD() {
     const slots = Array.isArray(detail?.slots) ? detail.slots : [];
     const activeId = detail?.activeSpellId || null;
     const mana = Number(detail?.mana || 0);
+    const stamina = Number(detail?.stamina || 0);
 
     // Fingerprint includes cooldown state so UI updates each tick while any CD is active
     const fp = JSON.stringify(slots.map(s => {
       if (!s) return '';
       return s.id + ':' + (s.cdRemaining || 0);
-    })) + '|' + (activeId || '') + '|' + mana;
+    })) + '|' + (activeId || '') + '|' + mana + '|' + stamina;
     if (fp === _lastSlotFingerprint) return;
     _lastSlotFingerprint = fp;
 
@@ -1303,13 +1306,15 @@ export function initHUD() {
 
       if (spell && spell.id) {
         iconSpan.textContent = spell.symbol || ACTION_ICONS.cast;
-        const canAfford = mana >= Number(spell.cost || 0);
+        const resource = String(spell.costKind || 'mana');
+        const canAfford = (resource === 'stamina' ? stamina : mana) >= Number(spell.cost || 0);
         btn.style.opacity = (canAfford && !onCooldown) ? '1' : '0.5';
         const isActive = spell.id === activeId;
         btn.style.borderColor = isActive ? '#6b8fbf' : '#2d3b52';
         btn.style.background = isActive ? '#152035' : '#101626';
         const cdTip = onCooldown ? ` [${cdRemaining} turns]` : '';
-        btn.title = `${spell.name || spell.id} (${spell.cost || 0} mana)${cdTip}`;
+        const label = resource === 'stamina' ? 'stamina' : resource === 'life' ? 'life' : 'mana';
+        btn.title = `${spell.name || spell.id} (${spell.cost || 0} ${label})${cdTip}`;
         btn.setAttribute('aria-label', btn.title);
         btn.disabled = false;
       } else {
@@ -3325,6 +3330,7 @@ function createPinnedSpellDock(mobileLayoutMq) {
   function refreshSlots(detail) {
     const pinnedSlots = Array.isArray(detail?.pinnedSlots) ? detail.pinnedSlots : [];
     const mana = Number(detail?.mana || 0);
+    const stamina = Number(detail?.stamina || 0);
     _cachedMana = mana;
 
     let anyAssigned = false;
@@ -3338,14 +3344,16 @@ function createPinnedSpellDock(mobileLayoutMq) {
         s.glyphSpan.textContent = spell.symbol || '\u2726';
         s.glyphSpan.style.opacity = '1';
         const cost = Number(spell.cost || 0);
-        const canAfford = mana >= cost;
+        const resource = String(spell.costKind || 'mana');
+        const canAfford = (resource === 'stamina' ? stamina : mana) >= cost;
         const cdRemaining = Number(spell.cdRemaining || 0);
         const cdMax = Number(spell.cdMax || 0);
         const onCooldown = cdRemaining > 0 && cdMax > 0;
 
         s.btn.style.opacity = (canAfford && !onCooldown) ? '1' : '0.5';
         s.btn.style.borderColor = '#2d3b52';
-        s.btn.title = `${spell.name || spell.id} (${cost} mana)${onCooldown ? ` [${cdRemaining}]` : ''}`;
+        const label = resource === 'stamina' ? 'stamina' : resource === 'life' ? 'life' : 'mana';
+        s.btn.title = `${spell.name || spell.id} (${cost} ${label})${onCooldown ? ` [${cdRemaining}]` : ''}`;
 
         s.manaBadge.textContent = cost > 0 ? String(cost) : '';
         s.manaBadge.style.display = cost > 0 ? 'block' : 'none';

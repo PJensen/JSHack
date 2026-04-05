@@ -407,17 +407,19 @@ export function installMessageWiring({
     log(`${who} attempts an invalid spell${spellId ? ` [${spellId}]` : ''}.`, 'system');
   });
 
-  world.on('spell:oom', ({ actor, spellId, need, have }) => {
+  world.on('spell:oom', ({ actor, spellId, need, have, costKind }) => {
     const who = nameOfEntity(actor);
+    const resource = String(costKind || 'mana');
+    const label = resource === 'stamina' ? 'stamina' : resource === 'life' ? 'life' : 'mana';
     if (who === 'You') {
-      log(`Not enough mana to cast [${String(spellId || 'spell')}] (need ${need}, have ${have}).`, 'system');
+      log(`Not enough ${label} to cast [${String(spellId || 'spell')}] (need ${need}, have ${have}).`, 'system');
       return;
     }
     if (spellId) {
-      log(`${who} lacks mana for [${String(spellId)}].`, 'system');
+      log(`${who} lacks ${label} for [${String(spellId)}].`, 'system');
       return;
     }
-    log(`${who} lacks mana to cast.`, 'system');
+    log(`${who} lacks ${label} to cast.`, 'system');
   });
 
   world.on('spell:on-cooldown', ({ actor, spellId }) => {

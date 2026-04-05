@@ -4,6 +4,8 @@ import { World } from '../src/lib/ecs-js/index.js';
 import { createPlayer } from '../src/rules/archetypes/Player.js';
 import { Brain } from '../src/rules/components/Brain.js';
 import { Mana } from '../src/rules/components/Mana.js';
+import { Stamina } from '../src/rules/components/Stamina.js';
+import { Player } from "../src/rules/components/Player.js";
 import { CastSpellIntent } from '../src/rules/components/Intents/CastSpellIntent.js';
 import { Status } from "../src/rules/components/Status.js";
 import { castSpellSystem } from '../src/rules/systems/castSpellSystem.js';
@@ -92,4 +94,39 @@ Deno.test("casting is prevented by canonical interruption statuses", () => {
     assert(fizzles.some((e) => e.reason === status || (status === "stunned" && e.reason === "stunned")), `${status} should report spell:fizzle reason`);
     assert(world.get(player, Mana).mana === 10, `${status} should block mana spend`);
   }
+});
+
+Deno.test("phase_strike spends stamina (not mana) and emits stamina oom metadata", () => {
+  const world = new World({ seed: 303 });
+  world.setScheduler((w) => scheduler(w));
+
+  const player = createPlayer(world, { name: "Outlaw" });
+  const brain = world.get(player, Brain);
+  if (!Array.isArray(brain.learnedSpellIds)) brain.learnedSpellIds = [];
+  if (!brain.learnedSpellIds.includes("phase_strike")) brain.learnedSpellIds.push("phase_strike");
+
+  const mana = world.get(player, Mana);
+  mana.mana = 50;
+  const stamina = world.get(player, Stamina);
+  stamina.stamina = 10;
+  stamina.maxStamina = 10;
+  world.remove(player, Player);
+
+  const events = [];
+  world.on("castSpell", (e) => events.push(["cast", e.spellId]));
+  world.on("spell:oom", (e) => events.push(["oom", e]));
+
+  world.add(player, CastSpellIntent, { spellId: "phase_strike" });
+  world.tick(1);
+
+  assert(events.some((e) => e[0] === "cast" && e[1] === "phase_strike"), "phase_strike should cast");
+  assert(world.get(player, Stamina).stamina === 0, "phase_strike should spend stamina");
+  assert(world.get(player, Mana).mana === 50, "phase_strike should not spend mana");
+
+  world.add(player, CastSpellIntent, { spellId: "phase_strike" });
+  world.tick(1);
+
+  const oom = events.find((e) => e[0] === "oom")?.[1];
+  assert(oom && oom.spellId === "phase_strike", "should emit oom for phase_strike");
+  assert(oom && oom.costKind === "stamina", "oom should report stamina cost kind");
 });
