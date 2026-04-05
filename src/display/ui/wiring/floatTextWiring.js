@@ -1111,21 +1111,39 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
   // Uses numeric float text so the batching system combines rapid absorptions
   // into a single climbing number: +50 → +120 → +200, each re-popping bigger.
 
+  // Harvest score accumulator — holds a single climbing float text alive
+  // across the entire harvest window (orbs arrive seconds apart).
+  let _harvestFt = null;
+  let _harvestTotal = 0;
+
   world.on('wisp:harvest', ({ x, y, wispX, wispY, points }) => {
     const sx = Number(wispX || x || 0);
     const sy = Number(wispY || y || 0);
     const pts = Math.max(1, Number(points) || 0);
+    _harvestTotal += pts;
 
-    // Small sticky score at the wisp — nearly zero drift so it stays put.
-    // Batching makes the number climb as successive essences are absorbed.
-    const ft = ftext.add(sx, sy - 0.25, '+' + pts, {
-      flavor: 'status',
-      color: '#c8f4ff',
-      life: 1.0,
-      scaleStart: 0.8,
-      scaleEnd: 0.7,
-    });
-    if (ft) { ft.vy = -0.12; ft.vx = 0; }
+    if (_harvestFt && _harvestFt.ttl > 0) {
+      // Still alive — update text, re-pop, and follow wisp
+      _harvestFt.text = '+' + _harvestTotal;
+      _harvestFt.ttl = _harvestFt.life;
+      _harvestFt.x = sx;
+      _harvestFt.y = sy - 0.25;
+      _harvestFt.x0 = sx;
+      _harvestFt.y0 = sy - 0.25;
+      const mag = Math.min(1.4, 0.8 + _harvestTotal / 200);
+      _harvestFt.scaleStart = mag;
+    } else {
+      // First absorption or previous counter expired — spawn fresh
+      _harvestTotal = pts;
+      _harvestFt = ftext.add(sx, sy - 0.25, '+' + pts, {
+        flavor: 'status',
+        color: '#c8f4ff',
+        life: 1.4,
+        scaleStart: 0.8,
+        scaleEnd: 0.7,
+      });
+      if (_harvestFt) { _harvestFt.vy = -0.12; _harvestFt.vx = 0; }
+    }
   });
 
   return { goreTick: goreCtrl.tick };
