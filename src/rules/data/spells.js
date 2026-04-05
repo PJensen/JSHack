@@ -497,6 +497,7 @@ export const SPELL_DEFS = {
     name: 'Life Tap',
     symbol: '\u{1F4A0}',   // 💠
     schools: ['darkness'],
+    manaCost: 0,
     costResource: 'life',
     lifeCost: 8,
     minIntelligence: 8,
