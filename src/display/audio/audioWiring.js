@@ -1,10 +1,44 @@
 // Wires ECS world events to audio playback.
 // Listens to game events and plays the matching sound from the registry.
+//
+// Spatial audio: sounds with a known {x,y} source are panned L/R and
+// attenuated by distance from the player. Sounds through walls are muffled.
 
 import { play, preload, startLoop, stopLoop } from "./audioEngine.js";
 import { resolve, allUrls } from "./sounds.js";
 
-/** Helper — play a registered sound ID with optional overrides. */
+// ── Spatial helpers ─────────────────────────────────────────
+
+/** Max tile distance at which a sound is still audible. Beyond this → silent. */
+const MAX_HEAR_DIST = 16;
+
+/**
+ * Compute pan (-1…+1) and volume (0…1) from source position relative to player.
+ * @param {{ x: number, y: number }} sourcePos
+ * @param {{ x: number, y: number }} playerPos
+ * @returns {{ pan: number, volume: number }}
+ */
+function spatialize(sourcePos, playerPos) {
+  if (!sourcePos || !playerPos) return { pan: 0, volume: 1 };
+
+  const dx = sourcePos.x - playerPos.x;
+  const dy = sourcePos.y - playerPos.y;
+  const dist = Math.max(1, Math.sqrt(dx * dx + dy * dy));
+
+  if (dist > MAX_HEAR_DIST) return { pan: 0, volume: 0 };
+
+  // Volume: inverse-distance falloff, full at dist<=1, fading to 0.15 at MAX_HEAR_DIST
+  const volume = Math.max(0.15, 1.0 - (dist - 1) / MAX_HEAR_DIST);
+
+  // Pan: horizontal offset clamped to -1…+1, scaled so ~8 tiles = full pan
+  const pan = Math.max(-1, Math.min(1, dx / 8));
+
+  return { pan, volume };
+}
+
+// ── Sound playback helpers ──────────────────────────────────
+
+/** Play a registered sound with optional spatial + overrides. */
 function sfx(id, opts) {
   const s = resolve(id);
   if (!s) return;
@@ -15,9 +49,15 @@ function sfx(id, opts) {
   });
 }
 
+/** Play a registered sound positioned in world space. */
+function sfxAt(id, sourcePos, playerPos, extraOpts) {
+  const spatial = spatialize(sourcePos, playerPos);
+  if (spatial.volume <= 0) return; // too far, don't play
+  sfx(id, { pan: spatial.pan, volume: spatial.volume, ...extraOpts });
+}
+
 /**
  * Resolve an item entity's type to a sound category.
- * Falls back to "generic" for unknown types.
  */
 function itemCategory(getItemInfo, itemId) {
   const info = getItemInfo(itemId);
@@ -58,56 +98,66 @@ const SPELL_IMPACT_MAP = {
  *   world: object,
  *   isPlayer: (id: number) => boolean,
  *   getItemInfo: (id: number) => object|null,
+ *   getPlayerPosition: () => { x: number, y: number } | null,
+ *   getPosition: (id: number) => { x: number, y: number } | null,
  * }} deps
  */
-export function installAudioWiring({ world, isPlayer, getItemInfo }) {
+export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosition, getPosition }) {
 
   // ── Preload all registered sounds ─────────────────────────
   preload(allUrls());
 
+  /** Shorthand — current player pos for spatial calcs. */
+  function pp() { return getPlayerPosition(); }
+
   // ── Combat ────────────────────────────────────────────────
 
-  world.on('damaged', ({ cause, critical, type }) => {
+  world.on('damaged', ({ cause, critical, type, at, target }) => {
+    const pos = at || (target != null ? getPosition(target) : null);
     if (cause === 'melee' || cause === 'offhand') {
-      sfx(critical ? "melee:crit" : "melee:hit");
+      sfxAt(critical ? "melee:crit" : "melee:hit", pos, pp());
     }
-    // Spell damage impacts — play an impact sound based on damage type
     if (cause === 'spell' || cause === 'magic') {
       const impactId = SPELL_IMPACT_MAP[type] || "spell:impact:physical";
-      sfx(impactId);
+      sfxAt(impactId, pos, pp());
     }
   });
 
   world.on('hit', (ctx) => {
-    if (ctx.missed) sfx("melee:miss");
+    if (ctx.missed) {
+      const pos = ctx.at || (ctx.target != null ? getPosition(ctx.target) : null);
+      sfxAt("melee:miss", pos, pp());
+    }
   });
 
-  world.on('ranged:shot', () => {
-    sfx("ranged:shot");
+  world.on('ranged:shot', ({ attacker, target }) => {
+    const pos = attacker != null ? getPosition(attacker) : null;
+    sfxAt("ranged:shot", pos, pp());
   });
 
   world.on('died', ({ id }) => {
+    const pos = getPosition(id);
     if (isPlayer(id)) {
-      sfx("player:death");
+      sfx("player:death"); // player death is always full volume center
     } else {
-      sfx("death");
+      sfxAt("death", pos, pp());
     }
   });
 
   // ── Items (sound varies by item type) ─────────────────────
 
-  world.on('item:pickup', ({ itemId }) => {
+  world.on('item:pickup', ({ itemId, itemX, itemY }) => {
     const cat = itemCategory(getItemInfo, itemId);
-    sfx(`item:pickup:${cat}`);
+    const pos = (itemX != null && itemY != null) ? { x: itemX, y: itemY } : null;
+    sfxAt(`item:pickup:${cat}`, pos, pp());
   });
 
-  world.on('item:dropped', ({ itemId }) => {
+  world.on('item:dropped', ({ itemId, at }) => {
     const cat = itemCategory(getItemInfo, itemId);
-    // Only weapon/armor/potion have distinct drop sounds; rest use generic
     const dropId = (cat === "weapon" || cat === "armor" || cat === "potion")
       ? `item:drop:${cat}`
       : "item:drop:generic";
-    sfx(dropId);
+    sfxAt(dropId, at, pp());
   });
 
   world.on('item:equipped', ({ itemId }) => {
@@ -115,11 +165,12 @@ export function installAudioWiring({ world, isPlayer, getItemInfo }) {
     const equipId = (cat === "weapon" || cat === "armor")
       ? `item:equip:${cat}`
       : "item:equip:generic";
-    sfx(equipId);
+    sfx(equipId); // equip is always the player — center, full vol
   });
 
-  world.on('chest:open', () => {
-    sfx("chest:open");
+  world.on('chest:open', ({ targetId }) => {
+    const pos = targetId != null ? getPosition(targetId) : null;
+    sfxAt("chest:open", pos, pp());
   });
 
   // ── Environment ───────────────────────────────────────────
@@ -170,7 +221,11 @@ export function installAudioWiring({ world, isPlayer, getItemInfo }) {
   ];
 
   for (const ev of spellEvents) {
-    world.on(ev, () => { sfx(ev); });
+    world.on(ev, (payload) => {
+      // Spells carry origin info in various fields
+      const pos = payload?.at || payload?.origin || payload?.from || null;
+      sfxAt(ev, pos, pp());
+    });
   }
 
   // ── Weather ───────────────────────────────────────────────
@@ -180,14 +235,14 @@ export function installAudioWiring({ world, isPlayer, getItemInfo }) {
   world.on('weather:changed', ({ weather }) => {
     if ((weather === 'rain' || weather === 'heavy_rain') && rainUrl) {
       const vol = weather === 'heavy_rain' ? 0.7 : 0.4;
-      startLoop(rainUrl, { volume: vol, fadeIn: 2.0 });
+      startLoop(rainUrl, { volume: vol, fadeIn: 2.0, bus: "ambient" });
     } else {
       if (rainUrl) stopLoop(rainUrl, { fadeOut: 3.0 });
     }
   });
 
-  world.on('weather:lightning', () => {
-    sfx("thunder");
+  world.on('weather:lightning', ({ x, y }) => {
+    sfxAt("thunder", { x, y }, pp());
   });
 
   // Stop rain on floor transitions (going underground, etc.)
@@ -198,6 +253,6 @@ export function installAudioWiring({ world, isPlayer, getItemInfo }) {
   // ── UI ────────────────────────────────────────────────────
 
   world.on('spell:learned', () => {
-    sfx("level:up");
+    sfx("level:up"); // UI sounds are always center, full vol
   });
 }

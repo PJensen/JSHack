@@ -175,6 +175,7 @@ export function preload(urls) {
  *   delay?: number,        // seconds before playback starts (default 0)
  *   bus?: string,          // category bus name (default "ui")
  *   maxVoices?: number,    // max concurrent plays of this URL (default 3)
+ *   pan?: number,          // stereo pan -1 (left) to +1 (right), default 0 (center)
  * }} [opts]
  */
 export function play(url, opts) {
@@ -280,15 +281,26 @@ function _playBuffer(url, buf, opts) {
 
     const dest = bus(opts?.bus || "ui");
     const vol = Number(opts?.volume ?? 1);
+    const pan = Number(opts?.pan || 0);
+
+    // Build chain:  src → [gain] → [panner] → bus
+    let tail = src;
 
     if (vol < 1) {
       const g = ac.createGain();
       g.gain.value = vol;
-      src.connect(g);
-      g.connect(dest);
-    } else {
-      src.connect(dest);
+      tail.connect(g);
+      tail = g;
     }
+
+    if (pan !== 0 && typeof ac.createStereoPanner === "function") {
+      const p = ac.createStereoPanner();
+      p.pan.value = Math.max(-1, Math.min(1, pan));
+      tail.connect(p);
+      tail = p;
+    }
+
+    tail.connect(dest);
 
     const maxV = Number(opts?.maxVoices ?? DEFAULT_MAX_VOICES);
     trackVoice(url, src, maxV);
