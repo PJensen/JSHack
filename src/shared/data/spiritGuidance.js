@@ -18,8 +18,8 @@ export const GUIDANCE_TIPS = [
   // ── Early game (overworld, first steps) ───────────────────────────
   {
     id: "welcome",
-    text: "I am your spirit. Stay close \u2014 I'll show you the way.",
-    durationSec: 5.5,
+    text: "I am your spirit. Arrow keys or WASD to move. The barkeep may know what ails this village \u2014 seek them out.",
+    durationSec: 6.5,
     delaySec: 1.8,
   },
   {
@@ -27,31 +27,6 @@ export const GUIDANCE_TIPS = [
     text: "I am the eye of your deity, watching over you. Your deeds shape their favor \u2014 and your fate.",
     durationSec: 6,
     delaySec: 0.8,
-  },
-  {
-    id: "seek_barkeep",
-    text: "The barkeep knows what troubles this village. Seek them out \u2014 they may have work for you.",
-    durationSec: 6,
-    delaySec: 0.8,
-    flyTo: "npc",
-  },
-  {
-    id: "movement",
-    text: "Tap the screen edges to move. On keyboard: arrow keys, WASD, or HJKL.",
-    durationSec: 5,
-    delaySec: 0.4,
-  },
-  {
-    id: "facing",
-    text: "See that golden dot? It shows where you face. You can only see and strike in that direction.",
-    durationSec: 6,
-    delaySec: 0.5,
-  },
-  {
-    id: "facing_cone",
-    text: "Your vision is a narrow cone. On Easy difficulty, vision is full 360\u00b0 \u2014 but on Hard, watch your back.",
-    durationSec: 6,
-    delaySec: 0.5,
   },
 
   // ── Equipment glyphs ──────────────────────────────────────────────
