@@ -33,7 +33,6 @@ export function initStatusLine() {
   // Calendar line removed — date now shown at top of character sheet only.
 
   let depth = 1;
-  let turn = 0;
   let gold = 0;
   let atk = 0;
   let def = 0;
@@ -65,11 +64,12 @@ export function initStatusLine() {
     return `${rounded > 0 ? "+" : ""}${core}%`;
   }
 
-  function pushSegment(parts, label, value, color = '#cfd3dc') {
+  function pushSegment(parts, label, value, color = '#cfd3dc', labelColor = null) {
     const wrap = document.createElement('span');
     const l = document.createElement('span');
     const v = document.createElement('span');
     l.textContent = `${label}:`;
+    if (labelColor) Object.assign(l.style, { color: labelColor });
     v.textContent = value;
     Object.assign(v.style, { color });
     wrap.appendChild(l);
@@ -80,14 +80,10 @@ export function initStatusLine() {
   function renderStats() {
     const parts = [];
     pushSegment(parts, 'DLvl', String(depth));
-    pushSegment(parts, 'Turn', String(turn));
-    pushSegment(parts, 'Gold', String(gold), '#ffde5a');
-    pushSegment(parts, 'Score', String(Math.floor(scoreDisplay)), '#c8f4ff');
     pushSegment(parts, 'Atk', String(atk), atk > 0 ? '#64c87a' : '#98a0ab');
-    pushSegment(parts, 'Def', String(def), def > 0 ? '#64c87a' : '#98a0ab');
-    pushSegment(parts, 'Lk', fmtSigned(luck), colorForDelta(luck));
-    pushSegment(parts, 'AC', String(armorClass), colorForDelta(armorClass - 10));
-    pushSegment(parts, 'Crit', fmtSignedPct(critPct), colorForDelta(critPct));
+    pushSegment(parts, 'Def', `${def}%`, def > 0 ? '#64c87a' : '#98a0ab');
+    pushSegment(parts, '$', String(gold), '#ffde5a', '#ffde5a');
+    pushSegment(parts, 'Score', String(Math.floor(scoreDisplay)), '#5b9ff5');
 
     statsLine.replaceChildren();
     for (let i = 0; i < parts.length; i++) {
@@ -100,7 +96,7 @@ export function initStatusLine() {
       statsLine.appendChild(parts[i]);
     }
     // Cache the Score value span for live tick-up updates without full re-render
-    const scoreWrap = parts[3]; // Score is the 4th segment
+    const scoreWrap = parts[4]; // Score is the 5th segment
     scoreValueEl = scoreWrap?.querySelector('span:last-child') || null;
   }
 
@@ -146,13 +142,6 @@ export function initStatusLine() {
 
   window.addEventListener('ui:updateVitals', (ev) => {
     // Status line no longer shows vitals; keep listener as a no-op for compatibility.
-  });
-
-  window.addEventListener('ui:updateTurn', (ev) => {
-    /** @type {CustomEvent} */ // @ts-ignore
-    const e = ev;
-    turn = Math.max(0, Number(e?.detail?.turn ?? turn) | 0);
-    renderStats();
   });
 
   window.addEventListener('ui:updateGold', (ev) => {
