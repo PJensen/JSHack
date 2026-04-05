@@ -76,6 +76,21 @@ export function getQuickChipPrimaryActionLabel(it) {
 
 /**
  * @param {any} it
+ * @param {{ expanded?: boolean }} opts
+ * @returns {string}
+ */
+export function getQuickChipDetailLine(it, opts = {}) {
+  const expanded = !!opts?.expanded;
+  const count = normalizePositiveCount(it?.count);
+  if (expanded) return `x${count} • details open`;
+  const actionable = isQuickChipActionable(it);
+  if (actionable && !!it?.justPickedUp) return `x${count} • just picked up • tap for details/pin`;
+  if (actionable) return `x${count} • tap for details`;
+  return `x${count} • picked up`;
+}
+
+/**
+ * @param {any} it
  * @returns {boolean}
  */
 export function isQuickChipActionable(it) {
@@ -1685,6 +1700,7 @@ function createQuickSlot(opts = {}) {
       hasScrollOfIdentify: !!item?.hasScrollOfIdentify,
       canApply: !!item?.canApply,
       applyTargetCount: Math.max(0, Number(item?.applyTargetCount || 0) | 0),
+      justPickedUp: !!item?.justPickedUp,
       interacted: false,
       details: item?.details || item,
     };
@@ -1809,7 +1825,7 @@ function createQuickSlot(opts = {}) {
     if (!item) return;
     const idx = stack.findIndex((x) => x && x.id === item.id);
     if (idx >= 0) stack.splice(idx, 1);
-    stack.push(normalizeQuickItem(item));
+    stack.push(normalizeQuickItem({ ...item, justPickedUp: true }));
     const top = peekStackTop(stack);
     console.debug('[quickSlot] stack after push:', JSON.stringify(stack), 'actionable[top]:', top ? actionable(top) : 'empty');
     renderStack();
@@ -3528,9 +3544,7 @@ function renderQuickChip(it, h) {
     textOverflow: 'ellipsis',
   });
   const line2 = document.createElement('span');
-  line2.textContent = actionable
-    ? `x${normalizePositiveCount(it.count)} • tap for details`
-    : `x${normalizePositiveCount(it.count)} • picked up`;
+  line2.textContent = getQuickChipDetailLine(it, { expanded: false });
   Object.assign(line2.style, {
     fontSize: '10px',
     opacity: '0.8',
@@ -3702,11 +3716,7 @@ function renderQuickChip(it, h) {
     expanded = !!next;
     expandedWrap.style.display = expanded ? 'flex' : 'none';
     chevron.textContent = expanded ? '▴' : '▾';
-    line2.textContent = expanded
-      ? `x${normalizePositiveCount(it.count)} • details open`
-      : (actionable
-          ? `x${normalizePositiveCount(it.count)} • tap for details`
-          : `x${normalizePositiveCount(it.count)} • picked up`);
+    line2.textContent = getQuickChipDetailLine(it, { expanded });
   };
   header.addEventListener('click', () => {
     markInteracted();

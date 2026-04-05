@@ -4,6 +4,7 @@ import { Position } from "../src/rules/components/Position.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { Vitality } from "../src/rules/components/Vitality.js";
 import { Player } from "../src/rules/components/Player.js";
+import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 import {
   GUIDANCE_TIPS,
   GUIDE_STORAGE_KEY,
@@ -112,16 +113,41 @@ Deno.test("pet_companion tip fires on pet:deliver", () => {
   clearGuideStorage();
 });
 
-Deno.test("quick_items tip fires on consumable pickup", () => {
+Deno.test("quick_items tip fires on quick-chip-eligible inventory add", () => {
   const { world, playerId, bubbles } = setup();
 
-  // Create a potion entity for the identity check.
+  // Create a quick-chip-eligible item entity.
   const potionId = world.create();
   world.add(potionId, NamedIdentity, { identity: "potion_heal", name: "Healing Potion" });
+  world.add(potionId, ItemInfo, { type: "potion", slot: "", count: 1, noQuickChip: false });
 
-  world.emit("item:pickup", { actor: playerId, itemId: potionId, count: 1, itemX: 5, itemY: 5 });
-  const match = bubbles.find((b) => b.text.includes("pinned items"));
-  assert(match, "quick_items tip should fire on consumable pickup");
+  world.emit("inventory:added", { ownerId: playerId, itemId: potionId });
+  const match = bubbles.find((b) => b.text.includes("pops up immediately after pickup"));
+  assert(match, "quick_items tip should fire on quick-chip-eligible inventory add");
+  clearGuideStorage();
+});
+
+Deno.test("quick_items tip does not fire for noQuickChip items", () => {
+  const { world, playerId, bubbles } = setup();
+  const hiddenId = world.create();
+  world.add(hiddenId, NamedIdentity, { identity: "quest_relic", name: "Relic" });
+  world.add(hiddenId, ItemInfo, { type: "tool", slot: "", count: 1, noQuickChip: true });
+
+  world.emit("inventory:added", { ownerId: playerId, itemId: hiddenId });
+  const match = bubbles.find((b) => b.text.includes("pops up immediately after pickup"));
+  assertEquals(match, undefined, "quick_items tip should skip noQuickChip items");
+  clearGuideStorage();
+});
+
+Deno.test("quick_items tip does not fire for currency inventory add", () => {
+  const { world, playerId, bubbles } = setup();
+  const coinId = world.create();
+  world.add(coinId, NamedIdentity, { identity: "gold_coin", name: "Gold Coin" });
+  world.add(coinId, ItemInfo, { type: "currency", slot: "", count: 1, noQuickChip: false });
+
+  world.emit("inventory:added", { ownerId: playerId, itemId: coinId });
+  const match = bubbles.find((b) => b.text.includes("pops up immediately after pickup"));
+  assertEquals(match, undefined, "quick_items tip should skip currency");
   clearGuideStorage();
 });
 
@@ -164,6 +190,18 @@ Deno.test("first_combat tip fires when enemy spots player", () => {
   world.emit("status", { id: 42, kind: "alert", at: { x: 8, y: 5 } });
   const match = bubbles.find((b) => b.text.includes("enemy"));
   assert(match, "first_combat tip should fire on enemy alert");
+  clearGuideStorage();
+});
+
+Deno.test("first_bat tip fires when player first sees a bat", () => {
+  const { world, playerId, bubbles } = setup();
+  const batId = world.create();
+  world.add(batId, Position, { x: 8, y: 5 });
+  world.add(batId, NamedIdentity, { identity: "bat", name: "Bat" });
+
+  world.emit("moved", { id: playerId, from: { x: 5, y: 5 }, to: { x: 6, y: 5 } });
+  const match = bubbles.find((b) => b.text.includes("Bat ahead!"));
+  assert(match, "first_bat tip should fire when a bat is first seen");
   clearGuideStorage();
 });
 

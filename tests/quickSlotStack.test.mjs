@@ -5,6 +5,7 @@ import {
   popUntilActionableTop,
   getQuickChipPrimaryAction,
   getQuickChipPrimaryActionLabel,
+  getQuickChipDetailLine,
   isQuickChipActionable,
 } from "../src/display/ui/hud.js";
 import { rarityStyle } from "../src/display/ui/overlayUtils.js";
@@ -60,4 +61,15 @@ Deno.test("quick-chip treats gems as actionable stack items", () => {
 
 Deno.test("quick-chip rarity style maps epic to purple", () => {
   assertEquals(rarityStyle("epic"), { color: "#c47bff", fontWeight: "bold" });
+});
+
+Deno.test("quick-chip detail line highlights immediate pickup and pin affordance", () => {
+  const item = { type: "potion", count: 2, justPickedUp: true };
+  assertEquals(getQuickChipDetailLine(item), "x2 • just picked up • tap for details/pin");
+});
+
+Deno.test("quick-chip detail line falls back to existing actionable/non-actionable copy", () => {
+  assertEquals(getQuickChipDetailLine({ type: "scroll", count: 1 }), "x1 • tap for details");
+  assertEquals(getQuickChipDetailLine({ type: "quest", count: 1 }), "x1 • picked up");
+  assertEquals(getQuickChipDetailLine({ type: "scroll", count: 1 }, { expanded: true }), "x1 • details open");
 });
