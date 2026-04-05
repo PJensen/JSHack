@@ -5,6 +5,7 @@ import { NamedIdentity } from "../../components/NamedIdentity.js";
 import { Player } from "../../components/Player.js";
 import { QuestVars } from "../../components/QuestVars.js";
 import { addToInventory } from "../../utils/inventoryFacade.js";
+import { createItemById } from "../../utils/itemFactory.js";
 import { emit, incVar, setVar } from "../actions.js";
 import { registerQuest } from "../registry.js";
 import { getQuestRecord } from "../runtime.js";
