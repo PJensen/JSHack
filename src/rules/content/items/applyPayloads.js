@@ -2,6 +2,7 @@ import { Inventory } from "../../components/Inventory.js";
 import { ItemInfo } from "../../components/ItemInfo.js";
 import { NamedIdentity } from "../../components/NamedIdentity.js";
 import { inventoryItems, inventoryContains } from "../../utils/inventoryFacade.js";
+import { Equipment, GEAR_SLOTS } from "../../components/Equipment.js";
 import { getItemHooksByIdentity } from "./itemHooks.js";
 import { Beatitude } from "../../components/Beatitude.js";
 
@@ -146,6 +147,17 @@ export function listApplyTargetsForTool(world, actor, toolId) {
   if (!inventoryContains(world, actorId, toolEntityId)) return [];
 
   const items = inventoryItems(world, actorId);
+
+  // Also include equipped items as potential targets (e.g. socketing gems into equipped weapons)
+  const eq = world.get(actorId, Equipment);
+  const seen = new Set(items);
+  if (eq) {
+    for (let s = 0; s < GEAR_SLOTS.length; s++) {
+      const eqId = eq[GEAR_SLOTS[s]] | 0;
+      if (eqId > 0 && !seen.has(eqId)) { seen.add(eqId); items.push(eqId); }
+    }
+  }
+
   const out = [];
   const reader = createWorldApplyPayloadReader(world);
   for (let i = 0; i < items.length; i++) {
