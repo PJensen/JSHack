@@ -206,7 +206,9 @@ export function installSpiritGuideWiring({
     if (!pe || Number(id || 0) !== pe.id) return;
     turnCount++;
     if (turnCount === 1) fire("welcome");
-    if (turnCount === 4) fire("spirit_deity");
+    if (turnCount === 2) fire("movement");
+    if (turnCount === 4) fire("seek_barkeep");
+    if (turnCount === 6) fire("doors");
   });
 
   // ── Pet companion (pet delivers an item to the player) ──────────────
@@ -342,7 +344,7 @@ export function installSpiritGuideWiring({
     ["first_stair_down", (ident) => ident === "stair_down"],
     ["first_stair_up", (ident) => ident === "stair_up"],
     ["first_fountain", (ident) => ident === "fountain"],
-    ["first_door", (ident) => ident === "door" || ident === "door_locked"],
+    ["first_door", (ident) => ident === "door_locked"],
     ["first_chest", (ident) => ident === "chest" || ident === "chest_locked"],
     ["first_shrine", (ident) => ident === "shrine"],
     ["first_weapon_rack", (ident) => ident === "weapon_rack"],

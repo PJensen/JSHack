@@ -98,23 +98,8 @@ Deno.test("welcome tip fires on first player move", () => {
   const { world, playerId, bubbles } = setup();
 
   world.emit("moved", { id: playerId, from: { x: 5, y: 5 }, to: { x: 6, y: 5 } });
-  const match = bubbles.find((b) => b.text.includes("I am your spirit"));
-  assert(match, "welcome tip should fire on first move");
-  clearGuideStorage();
-});
-
-Deno.test("spirit_deity tip fires on 4th player move", () => {
-  const { world, playerId, bubbles } = setup();
-
-  for (let i = 0; i < 3; i++) {
-    world.emit("moved", { id: playerId, from: { x: 5 + i, y: 5 }, to: { x: 6 + i, y: 5 } });
-  }
-  assertEquals(bubbles.filter((b) => b.text.includes("deity")).length, 0,
-    "should not fire before 4 moves");
-
-  world.emit("moved", { id: playerId, from: { x: 8, y: 5 }, to: { x: 9, y: 5 } });
   const match = bubbles.find((b) => b.text.includes("deity"));
-  assert(match, "spirit_deity tip should fire on 4th move");
+  assert(match, "welcome tip should fire on first move");
   clearGuideStorage();
 });
 
@@ -319,16 +304,16 @@ Deno.test("first_fountain tip fires when player walks near fountain", () => {
   clearGuideStorage();
 });
 
-Deno.test("first_door tip fires when player walks near door", () => {
+Deno.test("first_door tip fires when player walks near locked door", () => {
   const { world, playerId, bubbles } = setup();
 
   const doorId = world.create();
   world.add(doorId, Position, { x: 7, y: 5 });
-  world.add(doorId, NamedIdentity, { identity: "door", name: "Door" });
+  world.add(doorId, NamedIdentity, { identity: "door_locked", name: "Locked Door" });
 
   world.emit("moved", { id: playerId, from: { x: 5, y: 5 }, to: { x: 6, y: 5 } });
-  const match = bubbles.find((b) => b.text.includes("door"));
-  assert(match, "first_door tip should fire when player walks near door");
+  const match = bubbles.find((b) => b.text.toLowerCase().includes("locked"));
+  assert(match, "first_door tip should fire when player walks near locked door");
   clearGuideStorage();
 });
 
