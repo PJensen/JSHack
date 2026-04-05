@@ -498,6 +498,38 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     });
   });
 
+  world.on('spell:plague_swarm', ({ at, fizzle, missed }) => {
+    if (fizzle || missed) return;
+    if (!at || !canShowAt(at.x, at.y)) return;
+    ftext.addStatus(at.x, at.y - 0.3, 'SWARMED!', {
+      color: '#ddb820',
+      life: 1.3,
+      scaleStart: 1.4,
+      scaleEnd: 0.9,
+    });
+  });
+
+  world.on('spell:plague_swarm:jump', ({ to }) => {
+    if (!to || !canShowAt(to.x, to.y)) return;
+    ftext.addStatus(to.x, to.y - 0.3, 'SWARM!', {
+      color: '#ccaa10',
+      life: 1.0,
+      scaleStart: 1.2,
+      scaleEnd: 0.8,
+    });
+  });
+
+  world.on('spell:fireball', ({ to, fizzle, missed }) => {
+    if (fizzle || missed) return;
+    if (!to || !canShowAt(to.x, to.y)) return;
+    ftext.addStatus(to.x, to.y - 0.3, 'FIREBALL!', {
+      color: '#ff4400',
+      life: 1.3,
+      scaleStart: 1.5,
+      scaleEnd: 1.0,
+    });
+  });
+
   world.on('spell:earthshatter', ({ origin, enhanced }) => {
     if (!origin || !canShowAt(origin.x, origin.y)) return;
     ftext.addStatus(origin.x, origin.y - 0.45, 'EARTHQUAKE!', {
