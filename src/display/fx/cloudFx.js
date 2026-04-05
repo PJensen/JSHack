@@ -320,8 +320,56 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
 
   // --- Draw: Fire hazards (area rendering moved to SDF light field) ---
   /** @param {CanvasRenderingContext2D} _ctx */
-  function drawFire(_ctx) {
-    return;
+  function drawFire(ctx) {
+    if (!_fireCloudFx.size) return;
+    ctx.save();
+    const _fxTime = getFxTime();
+    const TAU = Math.PI * 2;
+
+    for (const cloud of _fireCloudFx.values()) {
+      const cx = cloud.x;
+      const cy = cloud.y;
+      const r = Math.max(0, cloud.radius | 0);
+      const lifeFactor = Math.max(0.30, Math.min(1, (cloud.maxTurns > 0) ? (cloud.turnsLeft / cloud.maxTurns) : 1));
+      const fadeFactor = cloud.fading
+        ? Math.max(0, Math.min(1, (cloud.fadeMax > 0) ? (cloud.fadeLeft / cloud.fadeMax) : 0))
+        : 1;
+      const alphaScale = lifeFactor * fadeFactor;
+      if (alphaScale < 0.01) continue;
+      const flashBoost = cloud.pulseFlash > 0 ? (cloud.pulseFlash / 0.20) : 0;
+
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) > r) continue;
+          const tx = cx + dx;
+          const ty = cy + dy;
+
+          // Flickering fire fill
+          const flicker = 0.55 + 0.45 * Math.sin(_fxTime * 5.2 + cloud.phase + dx * 1.3 + dy * 0.9);
+          const fillA = (0.08 + flicker * 0.06 + flashBoost * 0.08) * alphaScale;
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.fillStyle = `rgba(180,60,12,${fillA.toFixed(3)})`;
+          ctx.beginPath();
+          ctx.rect(tx - 0.5, ty - 0.5, 1, 1);
+          ctx.fill();
+
+          // Bright ember core
+          ctx.globalCompositeOperation = 'lighter';
+          const pulse = 0.5 + 0.5 * Math.sin(_fxTime * 7.8 + cloud.phase * 0.6 + dx * 2.1 + dy * 1.7);
+          const coreA = (0.06 + pulse * 0.06 + flashBoost * 0.10) * alphaScale;
+          const grad = ctx.createRadialGradient(tx, ty, 0.02, tx, ty, 0.38);
+          grad.addColorStop(0, `rgba(255,200,80,${coreA.toFixed(3)})`);
+          grad.addColorStop(0.5, `rgba(255,100,20,${(coreA * 0.55).toFixed(3)})`);
+          grad.addColorStop(1, 'rgba(140,30,0,0)');
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(tx, ty, 0.38, 0, TAU);
+          ctx.fill();
+        }
+      }
+    }
+
+    ctx.restore();
   }
 
   // --- Draw: Poison clouds — Bezier perimeter + flat fill + bubble pops ---
@@ -493,10 +541,59 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
     ctx.restore();
   }
 
-  // --- Draw: Plasma clouds (area rendering moved to SDF light field) ---
-  /** @param {CanvasRenderingContext2D} _ctx */
-  function drawPlasma(_ctx) {
-    return;
+  // --- Draw: Plasma clouds ---
+  /** @param {CanvasRenderingContext2D} ctx */
+  function drawPlasma(ctx) {
+    if (!_plasmaCloudFx.size) return;
+    ctx.save();
+    const _fxTime = getFxTime();
+    const TAU = Math.PI * 2;
+
+    for (const cloud of _plasmaCloudFx.values()) {
+      const cx = cloud.x;
+      const cy = cloud.y;
+      const r = Math.max(0, cloud.radius | 0);
+      const lifeFactor = Math.max(0.35, Math.min(1, (cloud.maxTurns > 0) ? (cloud.turnsLeft / cloud.maxTurns) : 1));
+      const fadeFactor = cloud.fading
+        ? Math.max(0, Math.min(1, (cloud.fadeMax > 0) ? (cloud.fadeLeft / cloud.fadeMax) : 0))
+        : 1;
+      const alphaScale = lifeFactor * fadeFactor;
+      if (alphaScale < 0.01) continue;
+      const flashBoost = cloud.flash > 0 ? (cloud.flash / 0.26) : 0;
+
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) > r) continue;
+          const tx = cx + dx;
+          const ty = cy + dy;
+
+          // Crackling cyan fill
+          const crackle = 0.4 + 0.6 * Math.sin(_fxTime * 9.3 + cloud.phase + dx * 3.1 + dy * 2.7)
+                                    * Math.sin(_fxTime * 6.1 + cloud.phase * 0.5 + dx * 1.4);
+          const fillA = (0.06 + Math.max(0, crackle) * 0.07 + flashBoost * 0.10) * alphaScale;
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.fillStyle = `rgba(30,60,100,${fillA.toFixed(3)})`;
+          ctx.beginPath();
+          ctx.rect(tx - 0.5, ty - 0.5, 1, 1);
+          ctx.fill();
+
+          // Electric arc glow
+          ctx.globalCompositeOperation = 'lighter';
+          const arc = 0.5 + 0.5 * Math.sin(_fxTime * 12.0 + cloud.phase + dx * 4.7 + dy * 3.3);
+          const glowA = (0.05 + arc * 0.06 + flashBoost * 0.12) * alphaScale;
+          const grad = ctx.createRadialGradient(tx, ty, 0.02, tx, ty, 0.35);
+          grad.addColorStop(0, `rgba(180,240,255,${glowA.toFixed(3)})`);
+          grad.addColorStop(0.55, `rgba(60,160,220,${(glowA * 0.5).toFixed(3)})`);
+          grad.addColorStop(1, 'rgba(20,60,120,0)');
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(tx, ty, 0.35, 0, TAU);
+          ctx.fill();
+        }
+      }
+    }
+
+    ctx.restore();
   }
 
   // --- Draw: Quake — emissive crack lines only (ground tint via light field) ---
