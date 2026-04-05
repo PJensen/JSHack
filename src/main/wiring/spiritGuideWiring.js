@@ -15,6 +15,7 @@ import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 import { Player } from "../../rules/components/Player.js";
 import { Vitality } from "../../rules/components/Vitality.js";
 import { DungeonState } from "../../rules/components/DungeonState.js";
+import { ItemInfo } from "../../rules/components/ItemInfo.js";
 
 const INSTALLED = Symbol.for("jshack:main:spiritGuideWiring:installed");
 
@@ -244,16 +245,10 @@ export function installSpiritGuideWiring({
     const px = Number(to?.x || 0) | 0;
     const py = Number(to?.y || 0) | 0;
 
-    // Scan for any ground item within 2 tiles.
+    // Scan for any actual item (has ItemInfo) within 2 tiles.
     for (const [eid, pos] of world.query(Position)) {
       if (eid === pe.id) continue;
-      // Quick identity check: anything with an ItemInfo component-ish name
-      // We just check anything nearby that is NOT the player, an NPC, or a monster.
-      const ni = world.get(eid, NamedIdentity);
-      if (!ni) continue;
-      const ident = String(ni.identity || "").toLowerCase();
-      if (ident.startsWith("townfolk_")) continue;
-      if (ident === "altar" || ident === "shrine") continue;
+      if (!world.has(eid, ItemInfo)) continue;
       const dist = Math.max(Math.abs((pos.x | 0) - px), Math.abs((pos.y | 0) - py));
       if (dist <= 2) {
         itemGroundFired = true;
