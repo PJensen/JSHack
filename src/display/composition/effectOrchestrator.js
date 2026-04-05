@@ -11,7 +11,7 @@ export function tickDisplayEffects({ dtSec, boltFx, spellAreaFx, projectileFx, t
   if (spiritWispFx) spiritWispFx.tick(dtSec);
   if (deathEssenceFx) deathEssenceFx.tick(dtSec);
   ftext.step(dtSec);
-  if (goreTick) goreTick();
+  if (goreTick) goreTick(dtSec);
 }
 
 /**

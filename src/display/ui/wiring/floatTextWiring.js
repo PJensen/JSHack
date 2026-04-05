@@ -1107,13 +1107,53 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     }
   });
 
-  // ── Spirit wisp essence harvest — push score to stat bar ─────────
+  // ── Spirit wisp essence harvest — arcade score climb + stat bar ───
 
-  world.on('wisp:harvest', ({ score }) => {
+  let _harvestFt = null;
+  let _harvestTarget = 0;
+  let _harvestDisplay = 0;
+
+  world.on('wisp:harvest', ({ x, y, wispX, wispY, points, score }) => {
+    const sx = Number(wispX || x || 0);
+    const sy = Number(wispY || y || 0);
+    const pts = Math.max(1, Number(points) || 0);
+    _harvestTarget += pts;
+
+    if (_harvestFt && _harvestFt.ttl > 0) {
+      _harvestFt.ttl = _harvestFt.life;
+    } else {
+      _harvestDisplay = 0;
+      _harvestTarget = pts;
+      _harvestFt = ftext.add(sx, sy - 0.25, '+0', {
+        flavor: 'status',
+        color: '#c8f4ff',
+        life: 1.6,
+        scaleStart: 0.8,
+        scaleEnd: 0.7,
+      });
+      if (_harvestFt) { _harvestFt.vy = -0.1; _harvestFt.vx = 0; }
+    }
+
+    // Also push to stat bar
     window.dispatchEvent(new CustomEvent('ui:updateScore', {
       detail: { score: Number(score) || 0 },
     }));
   });
 
-  return { goreTick: goreCtrl.tick };
+  function tickHarvestCounter(dt) {
+    if (!_harvestFt || _harvestFt.ttl <= 0) {
+      _harvestFt = null;
+      _harvestTarget = 0;
+      _harvestDisplay = 0;
+      return;
+    }
+    if (_harvestDisplay >= _harvestTarget) return;
+    const gap = _harvestTarget - _harvestDisplay;
+    const step = Math.max(1, Math.ceil(gap * 6 * dt));
+    _harvestDisplay = Math.min(_harvestTarget, _harvestDisplay + step);
+    _harvestFt.text = '+' + _harvestDisplay;
+  }
+
+  const _goreTick = goreCtrl.tick;
+  return { goreTick(dt) { _goreTick(dt); tickHarvestCounter(dt); } };
 }

@@ -767,11 +767,18 @@ export function createSpiritWispFxController(
           [_r | 0, _g | 0, _b | 0],
           6, 0.3, 0.7, 0.18, 0.12, 0.4,
         );
-        // Arcade score feedback — read actual score total and push to HUD
+        // Arcade score feedback — float text at wisp + stat bar update
         {
+          const depth = Math.max(1, _lastDepth);
+          const pts = Math.max(1, (o.maxHp || 1) * depth);
           const pid = getPlayerEntity?.();
           const sc = pid ? world.get(pid, Score) : null;
-          world.emit('wisp:harvest', { score: sc ? sc.current : 0 });
+          world.emit('wisp:harvest', {
+            x: _x, y: _y,
+            wispX: _x, wispY: _y,
+            points: pts,
+            score: sc ? sc.current : 0,
+          });
         }
         deathEssenceFx.consumeOrbAt(i);
         continue;
