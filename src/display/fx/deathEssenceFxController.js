@@ -121,6 +121,7 @@ export function createDeathEssenceFxController({
 
     const orb = {
       entityId,
+      maxHp,
       x: Number(pos.x) + (jitterA - 0.5) * 0.06,
       y: Number(pos.y) + (jitterB - 0.5) * 0.06,
       bornAt: now(),

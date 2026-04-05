@@ -765,6 +765,15 @@ export function createSpiritWispFxController(
           [_r | 0, _g | 0, _b | 0],
           6, 0.3, 0.7, 0.18, 0.12, 0.4,
         );
+        // Arcade score feedback — emit at anchor (player pos) so float text batches
+        const depth = Math.max(1, _lastDepth);
+        const pts = Math.max(1, (o.maxHp || 1) * depth);
+        world.emit('wisp:harvest', {
+          x: _anchorX, y: _anchorY,
+          wispX: _x, wispY: _y,
+          points: pts,
+          r: o.r, g: o.g, b: o.b,
+        });
         deathEssenceFx.consumeOrbAt(i);
         continue;
       }
