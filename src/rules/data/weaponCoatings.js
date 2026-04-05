@@ -13,6 +13,13 @@ export const WEAPON_COATING_DEFS = Object.freeze({
     emitEvent: 'proc:poisoned',
     effect: Object.freeze({ key: 'poison', turnsLeft: 4, potency: 2, stacks: 1 }),
   }),
+  paralysis: Object.freeze({
+    chancePct: 40,
+    consumeOnHit: true,
+    seedSalt: 0xc0470002,
+    emitEvent: 'proc:paralyzed',
+    effect: Object.freeze({ key: 'stun', turnsLeft: 4, potency: 1, stacks: 1 }),
+  }),
 });
 
 function upsertEffect(world, entityId, effect) {

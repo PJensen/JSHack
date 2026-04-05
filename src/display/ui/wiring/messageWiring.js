@@ -968,6 +968,20 @@ export function installMessageWiring({
     log(`${who}'s ${bracketizeName('Hemorrhage')} tears ${tgt} open.`, 'combat');
   });
 
+  world.on('proc:paralyzed', ({ actor, target }) => {
+    const who = nameOfEntity(actor);
+    const tgt = nameOfEntity(target);
+    if (tgt === 'You') {
+      log(`${who}'s strike paralyzes you!`, 'danger');
+      return;
+    }
+    if (who === 'You') {
+      log(`Your strike paralyzes ${tgt}!`, 'combat');
+      return;
+    }
+    log(`${who}'s strike paralyzes ${tgt}!`, 'combat');
+  });
+
   world.on('spell:wolf_howl', ({ actor, alertedIds }) => {
     const who = nameOfEntity(actor);
     const count = Array.isArray(alertedIds) ? alertedIds.length : 0;

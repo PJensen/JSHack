@@ -5,6 +5,8 @@ import {
   canPoisonDipTarget,
   createPoisonCoatDipHook,
   createPoisonCloudThrowHook,
+  canParalysisDipTarget,
+  createParalysisCoatDipHook,
   canStonecoatDipTarget,
   createWaterPotionHooks,
   createCastSpellFromIdentityHook,
@@ -1935,7 +1937,7 @@ export const MAGIC_ITEMS = {
     rarity: 1,
     rarityName: "common",
     value: 5,
-    description: "A thick, syrupy liquid that locks every muscle in place.",
+    description: "A thick, syrupy liquid that locks every muscle in place. Can be used to coat weapons or arrows.",
     weight: 0.5, // glass potion
     potion: {
       route: "oral",
@@ -1952,6 +1954,12 @@ export const MAGIC_ITEMS = {
         ctx.io.emit("potion:paralysis", { actor });
         return { consumed: true };
       },
+      can_dip_target: canParalysisDipTarget,
+      on_dip: createParalysisCoatDipHook({
+        chargesGranted: 8,
+        coatingColor: "#ccaa44",
+        messageTemplate: "You coat $targetName with paralytic venom (+$chargesGranted charges, total $chargesTotal).",
+      }),
     },
   },
   potion_hallucination: {

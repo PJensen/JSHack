@@ -218,6 +218,68 @@ export function canPoisonDipTarget(state) {
   return toolType === "potion" && targetType === "equip" && targetSlot === "weapon";
 }
 
+/**
+ * @param {any} state
+ */
+export function canParalysisDipTarget(state) {
+  const toolType = String(state?.toolInfo?.type || "");
+  const targetType = String(state?.targetInfo?.type || "");
+  const targetSlot = String(state?.targetInfo?.slot || "");
+  if (toolType !== "potion") return false;
+  return (targetType === "equip" && targetSlot === "weapon")
+    || (targetType === "ammo" && targetSlot === "ammo");
+}
+
+/**
+ * @param {{
+ *   chargesGranted?: number | ((ctx:any, state:any) => number),
+ *   coatingColor?: string,
+ *   messageTemplate?: string,
+ * }} [opts]
+ */
+export function createParalysisCoatDipHook(opts = {}) {
+  const resolveChargesGranted = typeof opts?.chargesGranted === "function"
+    ? opts.chargesGranted
+    : () => Number(opts?.chargesGranted ?? 8);
+  const messageTemplate = String(
+    opts?.messageTemplate
+    || "You coat $targetName with paralytic venom (+$chargesGranted charges, total $chargesTotal)."
+  );
+
+  return (ctx, state) => {
+    const targetInfo = state?.targetInfo;
+    if (!targetInfo) return { applied: false, consumedTool: false, resultType: "nothing" };
+    const currentCharges = Math.max(0, Number(targetInfo?.coating?.charges || 0) | 0);
+    const grantedRaw = Number(resolveChargesGranted(ctx, state));
+    const chargesGranted = Math.max(1, Number.isFinite(grantedRaw) ? (grantedRaw | 0) : 1);
+    const nextCharges = currentCharges + chargesGranted;
+    const coating = { kind: "paralysis", charges: nextCharges };
+    if (opts?.coatingColor) coating.color = opts.coatingColor;
+    const fallbackLabel = targetInfo?.type === "ammo" ? "arrows" : "weapon";
+    const targetName = resolveApplyTargetName(ctx, state, fallbackLabel);
+    const message = interpolateFields(messageTemplate, {
+      targetName,
+      currentCharges,
+      chargesGranted,
+      chargesTotal: nextCharges,
+    });
+    ctx.helpers.patchItemInfo(state.targetId, { coating });
+    ctx.io.emit("item:applied", {
+      actor: state.actor,
+      toolId: state.toolId,
+      targetId: state.targetId,
+      result: {
+        type: "paralysis_coat",
+        coating,
+        chargesGranted,
+        chargesTotal: nextCharges,
+        message,
+      },
+    });
+    return { applied: true, consumedTool: true, resultType: "paralysis_coat" };
+  };
+}
+
 const STONECOAT_ALLOWED_SLOTS = Object.freeze(new Set([
   "weapon",
   "armor",

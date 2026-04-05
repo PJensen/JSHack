@@ -202,6 +202,12 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     }
   });
 
+  world.on('proc:paralyzed', ({ target }) => {
+    const tpos = getPosition(Number(target || 0));
+    if (!tpos || !canShowAt(tpos.x, tpos.y)) return;
+    ftext.addStatus(tpos.x, tpos.y - 0.3, 'PARALYZED', { color: '#ccaa44', life: 0.7 });
+  });
+
   world.on('proc:flaming_bat:hit', ({ target }) => {
     const tpos = getPosition(Number(target || 0));
     if (!tpos || !canShowAt(tpos.x, tpos.y)) return;
