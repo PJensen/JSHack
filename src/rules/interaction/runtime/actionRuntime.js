@@ -84,6 +84,7 @@ export function executeInteraction(world, spec) {
     target,
     params,
     publicParams,
+    world: facets.world,
     query: facets.query,
     mutate: facets.mutate,
     io: facets.io,

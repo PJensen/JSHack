@@ -2617,6 +2617,176 @@ REGISTRY['scorch'] = function scorchScript(world, actor, spell, intent) {
   });
 };
 
+// Plague Swarm — nature DOT that jumps between enemies every 3 ticks.
+REGISTRY['plague_swarm'] = function plagueSwarmScript(world, actor, spell, _intent) {
+  const apos = /** @type any */ (world.get(actor, Position));
+  if (!apos) return;
+  const actorFaction = String(world.get(actor, Faction)?.key || 'player');
+
+  const MAX_R = Math.max(1, Number(spell.range || 8));
+  const isBlocked = createLOSBlocker(world);
+  const d2 = (x0, y0, x1, y1) => { const dx = x1 - x0, dy = y1 - y0; return dx * dx + dy * dy; };
+
+  // Collect living hostile candidates in range
+  /** @type {Array<{id:number,x:number,y:number,dist2:number}>} */
+  const candidates = [];
+  for (const [id, p] of world.query(Position)) {
+    if (id === actor) continue;
+    const fac = /** @type any */ (world.get(id, Faction));
+    if (!fac || !areFactionsHostile(actorFaction, fac.key)) continue;
+    const vit = /** @type any */ (world.get(id, Vitality));
+    if (!vit || (vit.hp | 0) <= 0) continue;
+    if (actorFaction === 'player' && !isTileVisible(p.x | 0, p.y | 0)) continue;
+    const dist2v = d2(apos.x, apos.y, p.x, p.y);
+    if (dist2v <= MAX_R * MAX_R) candidates.push({ id, x: p.x, y: p.y, dist2: dist2v });
+  }
+
+  // Pick nearest with LOS
+  candidates.sort((a, b) => a.dist2 - b.dist2);
+  let target = null;
+  for (const c of candidates) {
+    if (hasSpellLineOfSight(world, {
+      sourceId: actor, targetId: c.id,
+      sourcePos: apos, targetPos: c,
+      range: MAX_R, isBlocked,
+    })) { target = c; break; }
+  }
+  if (!target) {
+    emitSafe(world, 'spell:plague_swarm', { actor, fizzle: true });
+    return;
+  }
+
+  // Hit roll
+  if (!rollSpellHit(world, actor, target.id, spell)) {
+    emitSpellMiss(world, actor, target.id, spell, {
+      cause: 'spell:plague_swarm',
+      hitChancePct: getSpellHitChancePct(world, actor, target.id),
+      at: { x: target.x, y: target.y },
+    });
+    emitSafe(world, 'spell:plague_swarm', {
+      actor, targetId: target.id,
+      from: { x: apos.x, y: apos.y }, at: { x: target.x, y: target.y },
+      missed: true,
+    });
+    return;
+  }
+
+  // Apply swarm DOT
+  const intBonus = getSpellIntelligenceBonus(world, actor);
+  const basePotency = Math.max(1, 2 + Math.floor(intBonus / 6));
+  const duration = 8;
+
+  const swarmEffect = createSpellDotEffect(world, actor, spell, {
+    key: 'swarm',
+    turnsLeft: duration,
+    potency: basePotency,
+    stacks: 1,
+    cause: 'spell:plague_swarm',
+    type: 'nature',
+  });
+  // Tag with jump metadata so effectSystem can spread it
+  swarmEffect.meta.jumpInterval = 3;
+  swarmEffect.meta.jumpRadius = 6;
+  swarmEffect.meta.jumpsLeft = 3;
+
+  const ae = /** @type any */ (world.get(target.id, ActiveEffects));
+  if (ae && Array.isArray(ae.effects)) {
+    upsertTimedEffect(ae.effects, swarmEffect);
+  } else {
+    try { world.add(target.id, ActiveEffects, { effects: [swarmEffect] }); } catch {}
+  }
+
+  emitSafe(world, 'spell:plague_swarm', {
+    actor, targetId: target.id,
+    from: { x: apos.x, y: apos.y },
+    at: { x: target.x, y: target.y },
+    potency: basePotency, duration,
+  });
+};
+
+// Fireball — fiery projectile with burn DOT.
+REGISTRY['fireball'] = function fireballScript(world, actor, spell, _intent) {
+  const apos = /** @type any */ (world.get(actor, Position));
+  if (!apos) return;
+  const actorFaction = String(world.get(actor, Faction)?.key || 'player');
+  const isBlocked = createLOSBlocker(world);
+
+  const MAX_R = Math.max(1, Number(spell.range || 10));
+  const BASE_DMG = 8;
+  const d2 = (x0, y0, x1, y1) => { const dx = x1 - x0, dy = y1 - y0; return dx * dx + dy * dy; };
+
+  // Collect living hostile candidates in range
+  /** @type {Array<{id:number,x:number,y:number,dist2:number}>} */
+  const candidates = [];
+  for (const [id, p] of world.query(Position)) {
+    if (id === actor) continue;
+    const fac = /** @type any */ (world.get(id, Faction));
+    if (!fac || !areFactionsHostile(actorFaction, fac.key)) continue;
+    const vit = /** @type any */ (world.get(id, Vitality));
+    if (!vit || (vit.hp | 0) <= 0) continue;
+    if (actorFaction === 'player' && !isTileVisible(p.x | 0, p.y | 0)) continue;
+    const dist2v = d2(apos.x, apos.y, p.x, p.y);
+    if (dist2v <= MAX_R * MAX_R) candidates.push({ id, x: p.x, y: p.y, dist2: dist2v });
+  }
+
+  // Pick nearest with LOS
+  candidates.sort((a, b) => a.dist2 - b.dist2);
+  let target = null;
+  for (const c of candidates) {
+    if (hasSpellLineOfSight(world, {
+      sourceId: actor, targetId: c.id,
+      sourcePos: apos, targetPos: c,
+      range: MAX_R, isBlocked,
+    })) { target = c; break; }
+  }
+  if (!target) {
+    emitSafe(world, 'spell:fireball', { actor, fizzle: true });
+    return;
+  }
+
+  // Projectile travel duration (matches display-layer fireball: speed 8)
+  const dist = Math.hypot(target.x - apos.x, target.y - apos.y) || 1;
+  const projDelay = Math.max(0.1, Math.min(0.6, dist / 8));
+
+  // Deal fire damage
+  const result = dealDamage(world, buildSpellDamageSpec(world, actor, target.id, {
+    spell,
+    baseAmount: BASE_DMG,
+    type: 'fire',
+    cause: 'spell:fireball',
+    at: { x: target.x, y: target.y },
+    projectileDelay: projDelay,
+  }));
+
+  // Apply 2-turn burn to survivors
+  if (result.applied && !result.killed) {
+    const burnEffect = createSpellDotEffect(world, actor, spell, {
+      key: 'burn',
+      turnsLeft: 3,   // 3 so first-tick decrement leaves 2 truly burning turns
+      potency: scaleSpellDamage(world, actor, 2),
+      stacks: 1,
+      cause: 'spell:fireball:burn',
+      type: 'fire',
+    });
+    const ae = /** @type any */ (world.get(target.id, ActiveEffects));
+    if (ae && Array.isArray(ae.effects)) {
+      upsertTimedEffect(ae.effects, burnEffect);
+    } else {
+      try { world.add(target.id, ActiveEffects, { effects: [burnEffect] }); } catch {}
+    }
+    emitSafe(world, 'proc:burning', { actor, target: target.id });
+  }
+
+  // Emit VFX event
+  emitSafe(world, 'spell:fireball', {
+    actor,
+    targetId: target.id,
+    from: { x: apos.x, y: apos.y },
+    to: { x: target.x, y: target.y },
+    missed: result.reason === 'missed',
+  });
+};
+
 /**
  * @param {World} world
  * @param {number} entityId

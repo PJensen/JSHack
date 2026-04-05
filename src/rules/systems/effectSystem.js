@@ -8,6 +8,7 @@ import { Stamina } from '../components/Stamina.js';
 import { Mana } from '../components/Mana.js';
 import { Brain } from '../components/Brain.js';
 import { Channeling } from '../components/Channeling.js';
+import { Faction } from '../components/Faction.js';
 import { EFFECT_DEFS } from '../data/effectDefs.js';
 import { dealDamage } from '../utils/dealDamage.js';
 import { compactDotEffects } from '../utils/effectSemantics.js';
@@ -50,6 +51,7 @@ function effectKeyToType(key) {
         case 'bleed': case 'bleeding': return 'generic';
         case 'shock': case 'shocked': return 'lightning';
         case 'agony': return 'shadow';
+        case 'swarm': case 'swarmed': return 'nature';
         default: return 'generic';
     }
 }
@@ -294,6 +296,9 @@ function stopDrainLifeChannel(world, casterId, effect, reason = 'ended') {
  * - Expires effects when their turnsLeft reach 0
  */
 export function effectSystem(world) {
+    /** @type {Array<{sourceId:number, effect:any}>} */
+    const _pendingSwarmJumps = [];
+
     for (const [id, ae] of world.query(ActiveEffects)) {
         if (!ae || !Array.isArray(ae.effects)) continue;
         compactDotEffects(ae.effects);
@@ -379,6 +384,15 @@ export function effectSystem(world) {
 
             // Age the effect at the end of its tick
             e.turnsLeft -= 1;
+
+            // ── Swarm jump: every jumpInterval ticks, spread to a nearby enemy ──
+            if (key === 'swarm' && e.meta?.jumpInterval && e.meta?.jumpsLeft > 0) {
+                const elapsed = (Number(e.meta.startTurns || 0) || (e.turnsLeft + 1)) - e.turnsLeft;
+                if (!e.meta.startTurns) e.meta.startTurns = e.turnsLeft + 1;
+                if (elapsed > 0 && elapsed % e.meta.jumpInterval === 0) {
+                    _pendingSwarmJumps.push({ sourceId: id, effect: e });
+                }
+            }
         }
 
         // Destroy DerivedExpression entities owned by expiring effects
@@ -413,6 +427,77 @@ export function effectSystem(world) {
             if (hadStatus || world.has(id, Status)) world.set(id, Status, { statuses });
             else world.add(id, Status, { statuses });
         } catch { /* deferred during tick; will flush post-tick */ }
+    }
+
+    // ── Process pending swarm jumps ─────────────────────────────────────
+    if (_pendingSwarmJumps.length > 0) {
+        _processSwarmJumps(world, _pendingSwarmJumps);
+    }
+}
+
+/** @param {import('../../lib/ecs-js/index.js').World} world */
+function _processSwarmJumps(world, jumps) {
+    const d2 = (x0, y0, x1, y1) => { const dx = x1 - x0, dy = y1 - y0; return dx * dx + dy * dy; };
+
+    for (const { sourceId, effect } of jumps) {
+        const spos = world.get(sourceId, Position);
+        if (!spos) continue;
+        const radius = Number(effect.meta?.jumpRadius || 6);
+
+        // Find nearest living hostile without an active swarm effect
+        let bestId = 0, bestD2 = Infinity;
+        for (const [cid, cp] of world.query(Position)) {
+            if (cid === sourceId) continue;
+            const vit = world.get(cid, Vitality);
+            if (!vit || (vit.hp | 0) <= 0) continue;
+            const fac = world.get(cid, /** @type any */ (Faction));
+            if (!fac || String(fac.key || '') === 'player') continue;
+            const cdist2 = d2(spos.x, spos.y, cp.x, cp.y);
+            if (cdist2 > radius * radius || cdist2 >= bestD2) continue;
+            // Skip if already swarmed
+            const cae = world.get(cid, ActiveEffects);
+            if (cae && Array.isArray(cae.effects) && cae.effects.some(e => e && e.key === 'swarm' && e.turnsLeft > 0)) continue;
+            bestId = cid;
+            bestD2 = cdist2;
+        }
+        if (!bestId) continue;
+
+        // Clone the swarm effect onto the new target
+        const jumpEffect = {
+            key: 'swarm',
+            turnsLeft: Math.max(1, effect.turnsLeft),
+            potency: effect.potency || 1,
+            stacks: 1,
+            startedAtTurn: world.step,
+            sourceId: effect.sourceId,
+            spellId: effect.spellId,
+            meta: {
+                ...(effect.meta || {}),
+                spellDamage: effect.meta?.spellDamage || null,
+                jumpInterval: effect.meta.jumpInterval,
+                jumpRadius: effect.meta.jumpRadius,
+                jumpsLeft: Math.max(0, (effect.meta.jumpsLeft || 0) - 1),
+                startTurns: null,
+            },
+        };
+
+        // Decrement jumps on the source effect
+        effect.meta.jumpsLeft = Math.max(0, (effect.meta.jumpsLeft || 0) - 1);
+
+        const tae = world.get(bestId, ActiveEffects);
+        if (tae && Array.isArray(tae.effects)) {
+            tae.effects.push(jumpEffect);
+        } else {
+            try { world.add(bestId, ActiveEffects, { effects: [jumpEffect] }); } catch {}
+        }
+
+        const tpos = world.get(bestId, Position);
+        emitSafe(world, 'spell:plague_swarm:jump', {
+            sourceId,
+            targetId: bestId,
+            from: { x: spos.x, y: spos.y },
+            to: { x: tpos?.x || 0, y: tpos?.y || 0 },
+        });
     }
 }
 
