@@ -53,7 +53,7 @@ const CLASS_ICONS = {
 };
 
 export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm }) {
-  let classIndex = 0;
+  let classIndex = Math.floor(Math.random() * classes.length);
   const savedName = readSavedName();
   const fallbackName = savedName || pickRandomCharacterName();
 
