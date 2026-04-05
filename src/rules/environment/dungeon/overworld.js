@@ -364,7 +364,7 @@ export function generateOverworldChunks(worldSeed) {
   const fountainCX = homeX;
   const fountainCY = homeY - 6;
   const crossingX = homeX;
-  const crossingY = homeY - 16;
+  const crossingY = homeY - 20;
   const spawnX = fountainCX;
   const spawnY = fountainCY + 2;
   const northWalkY = homeY - halfH - 1;
@@ -631,9 +631,8 @@ export function generateOverworldChunks(worldSeed) {
   }
   const millDoorX = millX0 + 2;
   setStructureTile(chunks, millDoorX, millY1, TILE_DOOR, true);
-  carvePath(chunks, millDoorX, millY1 + 1, crossingX - 4, crossingY - 11);
-  carvePath(chunks, crossingX - 4, crossingY - 11, crossingX - 4, crossingY - 5);
-  carvePath(chunks, crossingX - 4, crossingY - 5, westWalkX, northWalkY);
+  carvePath(chunks, millDoorX, millY1 + 1, millDoorX, northWalkY);
+  carvePath(chunks, millDoorX, northWalkY, westWalkX, northWalkY);
   // Interior
   addSpawn(chunks, millX0 + 2, millY0 + 2, "millstone");
   addSpawn(chunks, millX0 + 1, millY0 + 2, "mill_chest");
