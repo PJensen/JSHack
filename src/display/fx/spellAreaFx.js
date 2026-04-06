@@ -2200,8 +2200,40 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
 
     // ── Generator impact VFX (small, snappy) ──
 
+    // Savage Strike — boar-bite-style radial flash + gravity particles + shake
+    world.on('spell:savage_strike', ({ at, hit, missed }) => {
+      if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
+      _smiteFx.push(new RadialFx({
+        x: Number(at.x),
+        y: Number(at.y),
+        radius: hit ? 0.55 : 0.38,
+        ttl: 0.10,
+      }));
+      const burst = hit ? (PERF.quality === 'low' ? 6 : 12) : 5;
+      for (let i = 0; i < burst; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = (hit ? 0.28 : 0.18) + Math.random() * 0.32;
+        fx.pool.spawn(new Particle({
+          x: Number(at.x) + (Math.random() - 0.5) * 0.10,
+          y: Number(at.y) + (Math.random() - 0.5) * 0.10,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 0.03,
+          ay: 0.06,
+          life: 0.09 + Math.random() * 0.11,
+          size0: 0.035 + Math.random() * 0.03,
+          size1: 0.01,
+          r: 210,
+          g: 110 + ((Math.random() * 30) | 0),
+          b: 45 + ((Math.random() * 20) | 0),
+          a0: 0.85,
+        }));
+      }
+      if (hit) startShake(cam, 3, 0.08);
+      else if (missed) startShake(cam, 1, 0.04);
+    });
+
     // Melee generators — small burst at impact
-    for (const _ev of ['spell:savage_strike', 'spell:cheap_shot', 'spell:holy_strike']) {
+    for (const _ev of ['spell:cheap_shot', 'spell:holy_strike']) {
       world.on(_ev, ({ at, hit }) => {
         if (!hit || !at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
         const isHoly = _ev === 'spell:holy_strike';
@@ -2217,9 +2249,9 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
             life: 0.12 + Math.random() * 0.1,
             size0: 0.04 + Math.random() * 0.03,
             size1: 0.01,
-            r: isHoly ? 255 : _ev === 'spell:savage_strike' ? 200 : 140,
-            g: isHoly ? 230 : _ev === 'spell:savage_strike' ? 100 : 140,
-            b: isHoly ? 100 : _ev === 'spell:savage_strike' ? 50 : 180,
+            r: isHoly ? 255 : 140,
+            g: isHoly ? 230 : 140,
+            b: isHoly ? 100 : 180,
             a0: 0.8,
           }));
         }
