@@ -115,7 +115,6 @@ export const MOBILE_ACTION_BAR_GRID_AREAS = Object.freeze({
   pray: Object.freeze({ col: '4', row: '1' }),
   wait: Object.freeze({ col: '5', row: '1' }),
   shoot: Object.freeze({ col: '6', row: '1' }),
-  mobileRow2: Object.freeze({ col: '1 / 7', row: '2' }),
 });
 
 const STARTER_PIN_PRIORITY = Object.freeze([
@@ -979,23 +978,64 @@ export function initHUD() {
     const gaugeSize = isMobile ? 'min(110px, 26vw)' : 'min(188px, 22vw)';
     vitals.style.width = gaugeSize;
     vitals.style.height = gaugeSize;
-    // Mobile: spell slots inline in row 2; desktop: in bar flex row
-    spellSlotsContainer.style.display = 'flex';
+    // Hide spell slots on mobile (spell dock handles it), show on desktop
+    spellSlotsContainer.style.display = isMobile ? 'none' : 'flex';
     bagBtn.style.display = isMobile ? 'none' : 'grid';
     castBtn.style.display = isMobile ? 'none' : 'grid';
     spellSelectBtn.style.display = isMobile ? 'none' : 'grid';
-    // Door button hidden on mobile (replaced by row 2 spells+items)
+    // Door button hidden on mobile
     quickInteractBtn.style.display = isMobile ? 'none' : 'grid';
-    // Hide radial and pinned spell dock — spell slots are now inline on mobile
+    // Hide main radial — pinned spell dock replaces it
     if (_mobileRadialEl) _mobileRadialEl.style.display = 'none';
-    if (_pinnedSpellDockEl) _pinnedSpellDockEl.style.display = 'none';
-    if (_pinnedSpellDockFanEl) _pinnedSpellDockFanEl.style.display = 'none';
+    if (_pinnedSpellDockEl) _pinnedSpellDockEl.style.display = isMobile ? 'flex' : 'none';
+    if (_pinnedSpellDockFanEl) _pinnedSpellDockFanEl.style.display = isMobile ? '' : 'none';
+
+    // Move pinned quick items into the spell dock row on mobile, back to bar on desktop
+    if (isMobile && _pinnedSpellDockEl) {
+      _pinnedSpellDockEl.appendChild(pinSlots.el);
+      Object.assign(pinSlots.el.style, {
+        display: 'flex',
+        flexDirection: 'row',
+        gap: '6px',
+        gridTemplateColumns: '',
+        gridTemplateRows: '',
+        alignItems: 'center',
+      });
+      for (const btn of pinSlots.el.children) {
+        Object.assign(btn.style, {
+          width: '40px', height: '40px',
+          minWidth: '0', minHeight: '0',
+          borderRadius: '50%',
+        });
+      }
+    } else {
+      // Reparent back into the action bar for desktop
+      if (!bar.contains(pinSlots.el)) {
+        bar.insertBefore(pinSlots.el, spellSlotsContainer);
+      }
+      Object.assign(pinSlots.el.style, {
+        display: 'grid',
+        flexDirection: '',
+        gap: '4px',
+        gridTemplateColumns: 'repeat(2, 44px)',
+        gridTemplateRows: 'repeat(2, 44px)',
+        alignItems: 'center',
+      });
+      for (const btn of pinSlots.el.children) {
+        Object.assign(btn.style, {
+          width: '', height: '',
+          minWidth: '', minHeight: '',
+          borderRadius: '6px',
+        });
+      }
+    }
 
     if (isMobile) {
+      // Single-row action bar
       Object.assign(bar.style, {
         display: 'grid',
         gridTemplateColumns: 'repeat(6, minmax(0, 1fr))',
-        gridTemplateRows: 'repeat(2, 44px)',
+        gridTemplateRows: '44px',
         alignItems: 'stretch',
         justifyContent: 'stretch',
         gap: '6px'
@@ -1013,52 +1053,18 @@ export function initHUD() {
       charBtn.style.gridRow = area.character.row;
       petBtn.style.gridColumn = area.pet.col;
       petBtn.style.gridRow = area.pet.row;
-      prayBtn.style.gridColumn = area.pray.col;
-      prayBtn.style.gridRow = area.pray.row;
       postureBtn.style.gridColumn = area.posture.col;
       postureBtn.style.gridRow = area.posture.row;
+      prayBtn.style.gridColumn = area.pray.col;
+      prayBtn.style.gridRow = area.pray.row;
       waitBtn.style.gridColumn = area.wait.col;
       waitBtn.style.gridRow = area.wait.row;
       shootBtn.style.gridColumn = area.shoot.col;
       shootBtn.style.gridRow = area.shoot.row;
-
-      // Row 2: spell slots (first 4) + pinned quick items in a single flex row
-      Object.assign(mobileRow2.style, {
-        display: 'flex',
-        gap: '4px',
-        gridColumn: area.mobileRow2.col,
-        gridRow: area.mobileRow2.row,
-      });
-      // Show first 4 spell slots, hide 5 & 6
-      Object.assign(spellSlotsContainer.style, {
-        flex: '1', gap: '4px',
-      });
-      for (let i = 0; i < SPELL_SLOT_COUNT; i++) {
-        _slotBtns[i].style.display = i < 4 ? 'grid' : 'none';
-        _slotBtns[i].style.flex = '1';
-        _slotBtns[i].style.minWidth = '0';
-      }
-      // Pinned items: switch from 2×2 grid to 1×4 flex row
-      Object.assign(pinSlots.el.style, {
-        display: 'flex',
-        flex: '1',
-        gap: '4px',
-        gridTemplateColumns: '',
-        gridTemplateRows: '',
-        gridColumn: '',
-        gridRow: '',
-      });
-      for (const btn of pinSlots.el.children) {
-        btn.style.flex = '1';
-        btn.style.minWidth = '0';
-      }
-
       refreshCommandLabels();
       return;
     }
 
-    // Desktop layout
-    mobileRow2.style.display = 'contents';
     Object.assign(bar.style, {
       display: 'flex',
       gridTemplateColumns: '',
@@ -1076,24 +1082,6 @@ export function initHUD() {
       btn.style.textOverflow = '';
       btn.style.gridColumn = '';
       btn.style.gridRow = '';
-    }
-    // Restore spell slot visibility and sizing for desktop
-    for (let i = 0; i < SPELL_SLOT_COUNT; i++) {
-      _slotBtns[i].style.display = 'grid';
-      _slotBtns[i].style.flex = '';
-      _slotBtns[i].style.minWidth = '44px';
-    }
-    spellSlotsContainer.style.flex = '';
-    // Restore pinned items to 2×2 grid
-    Object.assign(pinSlots.el.style, {
-      display: 'grid',
-      flex: '',
-      gridTemplateColumns: 'repeat(2, 44px)',
-      gridTemplateRows: 'repeat(2, 44px)',
-    });
-    for (const btn of pinSlots.el.children) {
-      btn.style.flex = '';
-      btn.style.minWidth = '';
     }
     setPinSlotsGridPlacement('', '');
     refreshCommandLabels();
@@ -1449,6 +1437,7 @@ export function initHUD() {
   window.addEventListener('ui:updateSpellBar', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
+    if (mobileLayoutMq.matches) return;
     refreshSpellSlots(e?.detail);
     syncActionBarHeight();
   });
@@ -1459,13 +1448,6 @@ export function initHUD() {
     onPinItem: (item) => pinSlots.pinItem(item),
   });
   pinSlots.setPresenter((item) => quick.presentItem(item));
-  // Row 2 wrapper: on desktop display:contents makes children act as direct bar children;
-  // on mobile it becomes a flex row holding spell slots + pinned items.
-  const mobileRow2 = document.createElement('div');
-  mobileRow2.style.display = 'contents';
-  mobileRow2.appendChild(spellSlotsContainer);
-  mobileRow2.appendChild(pinSlots.el);
-
   bar.appendChild(charBtn);
   bar.appendChild(bagBtn);
   bar.appendChild(petBtn);
@@ -1473,7 +1455,8 @@ export function initHUD() {
   bar.appendChild(spellSelectBtn);
   bar.appendChild(quickInteractBtn);
   bar.appendChild(postureBtn);
-  bar.appendChild(mobileRow2);
+  bar.appendChild(pinSlots.el);
+  bar.appendChild(spellSlotsContainer);
   bar.appendChild(prayBtn);
   bar.appendChild(waitBtn);
   bar.appendChild(shootBtn);
@@ -3084,13 +3067,14 @@ function createPinnedSpellDock(mobileLayoutMq) {
   const el = document.createElement('div');
   Object.assign(el.style, {
     position: 'fixed',
-    left: '50%',
-    transform: 'translateX(-50%)',
-    bottom: 'calc(var(--jshack-actionbar-height, 48px) + 26px + env(safe-area-inset-bottom, 0px))',
+    left: '8px',
+    right: '8px',
+    bottom: 'calc(var(--jshack-actionbar-height, 48px) + 10px + env(safe-area-inset-bottom, 0px))',
     display: 'none',
     flexDirection: 'row',
     gap: '6px',
     alignItems: 'center',
+    justifyContent: 'center',
     pointerEvents: 'auto',
     zIndex: '919',
   });
@@ -3484,9 +3468,8 @@ function createPinnedSpellDock(mobileLayoutMq) {
         s.cdLabel.style.display = 'none';
       }
     }
-    // Show dock if at least one spell is pinned or player knows any spells
-    const hasSpells = (detail?.hasLearnedSpells != null) ? !!detail.hasLearnedSpells : anyAssigned;
-    el.style.display = (mobileLayoutMq.matches && hasSpells) ? 'flex' : 'none';
+    // Always show dock on mobile — it hosts spells + pinned quick items
+    el.style.display = mobileLayoutMq.matches ? 'flex' : 'none';
   }
 
   // Listen for spell data responses (for fan rendering)
