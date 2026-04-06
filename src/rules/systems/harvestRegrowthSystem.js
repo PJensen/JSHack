@@ -1,5 +1,6 @@
 import { HarvestNode } from "../components/HarvestNode.js";
 import { Collider } from "../components/Collider.js";
+import { NamedIdentity } from "../components/NamedIdentity.js";
 import { WeatherState } from "../components/WeatherState.js";
 
 /**
@@ -26,16 +27,29 @@ export function harvestRegrowthSystem(world) {
       world.mutate(id, HarvestNode, (r) => { r.regrowCountdown = left - 1; });
       continue;
     }
-    world.set(id, HarvestNode, {
-      kind: node.kind,
-      ready: true,
-      regrowTurns: node.regrowTurns,
-      regrowCountdown: 0,
+    world.mutate(id, HarvestNode, (r) => {
+      r.ready = true;
+      r.regrowCountdown = 0;
     });
-    // Regrown trees become solid again.
-    if (node.kind === "tree") {
+    // Regrown trees and mushrooms become solid again.
+    if (node.kind === "tree" || node.kind === "mushrooms") {
       const col = world.get(id, Collider);
-      if (col) world.set(id, Collider, { solid: true, blocksSight: true });
+      if (col) {
+        world.set(id, Collider, {
+          solid: true,
+          blocksSight: node.kind === "tree",
+        });
+      }
+    }
+    if (node.kind === "mushrooms") {
+      const ni = world.get(id, NamedIdentity);
+      if (ni) {
+        world.set(id, NamedIdentity, {
+          ...ni,
+          name: "Mushrooms",
+          identity: "mushrooms",
+        });
+      }
     }
     world.emit?.("harvest:regrown", { id, kind: node.kind });
   }

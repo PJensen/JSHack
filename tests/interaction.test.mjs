@@ -374,6 +374,46 @@ Deno.test("harvest node creates food and enters regrow cooldown", () => {
   assert((info.count || 0) >= 1, "harvest count should be at least 1");
 });
 
+Deno.test("dungeon mushrooms harvest into item and visually disappear", () => {
+  const world = new World({ seed: 171 });
+  const actor = world.create();
+  world.add(actor, Inventory, { items: [], capacity: 20, weightLimit: null });
+
+  const node = world.create();
+  world.add(node, Interactable, {
+    action: "harvestNode",
+    params: { kind: "mushrooms" },
+  });
+  world.add(node, HarvestNode, {
+    kind: "mushrooms",
+    ready: true,
+    regrowTurns: 9,
+    regrowCountdown: 0,
+    yield: "food_mushrooms",
+    yieldMin: 1,
+    yieldMax: 3,
+  });
+  world.add(node, Position, { x: 2, y: 2 });
+  world.add(node, NamedIdentity, { name: "Mushrooms", identity: "mushrooms" });
+  world.add(node, Collider, { solid: true, blocksSight: false });
+
+  world.add(actor, InteractIntent, { targetId: node });
+  interactionSystem(world);
+
+  const hn = world.get(node, HarvestNode);
+  assert(hn.ready === false, "mushroom node should be depleted");
+  const ni = world.get(node, NamedIdentity);
+  assertEquals(ni.identity, "mushrooms_picked", "picked mushrooms should hide visuals");
+  const col = world.get(node, Collider);
+  assertEquals(col.solid, false, "picked mushrooms should be walkable");
+  assertEquals(col.blocksSight, false, "picked mushrooms should not block sight");
+
+  const actorItems = inventoryItems(world, actor);
+  assert(actorItems.length >= 1, "actor should receive mushroom item");
+  const itemNi = world.get(actorItems[0], NamedIdentity);
+  assertEquals(itemNi.identity, "food_mushrooms", "harvest should yield dungeon mushrooms item");
+});
+
 Deno.test("harvest node reports empty while regrowing", () => {
   const world = new World({ seed: 19 });
   const actor = world.create();

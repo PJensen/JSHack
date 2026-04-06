@@ -387,6 +387,7 @@ export const basePalette = {
   pillar:      { glyph: "#", fg: "#b0a8c0",  glow: "#706880" },
   weapon_rack: { glyph: "⚔", fg: "#bbbbcc", glow: "#888899" },
   mushrooms:   { glyph: "`", fg: "#88cc88", glow: "#558855" },
+  mushrooms_picked: { glyph: " " },
   web:         { glyph: "🕸", fg: "#c8c8c8", glow: "#888888" },
   torch:       { glyph: "🕯", fg: "#ffaa44", glow: "#ff6600" },
   urn:         { glyph: "⚱", fg: "#c8a060", glow: "#8a6030" },
