@@ -182,8 +182,154 @@ The game exists. It has gods and pets and hunger and material conduction and a S
 
 ---
 
+## The DSL Pays Off
+
+Late February was the proof that the architecture had worked.
+
+On February 20th, a single commit message runs to eleven lines: *"CC took 5 tries to change a constant. Plasma, lightning, and electric. Fixed bypass invoke and bypass resist on DOTs. Fixing CC's stuff again. SHOCKING. Fixing CC's hallucinations. Shock trap. Shocked. Bleed pulse. FX table container. Frozen. Glow adjust. Hallu status. Status VFX. Fixed combat issue. Msg log. Combat log. More UX. Concentric gauge. MV HUD. Apply btn. Adding throw to bar, dropping use and apply. Inventory UX first visit. UX pass on inventory."*
+
+That's one commit. Twenty-two changes. The developer is moving so fast that the commit messages can barely keep up, but every change is a game feature, not an engine feature. This is what it looks like when the DSL is working — when adding a shock trap means adding data, not writing plumbing.
+
+February 22nd alone produced forty commits. Weapon racks, sarcophagi, webs, berserk mode, cooking, trap disarming, a score system, two-handed weapons. The architecture is invisible. The developer is just making a game.
+
+On February 26th, there's a commit that reads: *"I don't want to hard code prices if I can help it — added a basic appraisal subroutine to stave off hardcoding prices for just a bit longer."* This is a developer talking to themselves in commit messages, negotiating between the right thing and the fast thing, and choosing the right thing because the architecture makes the right thing fast enough.
+
+---
+
+## The Collaborator
+
+There is a second voice in the repository now.
+
+CC — Copilot, the AI — appears in the commit messages the way a junior developer appears in a codebase: with enthusiasm, with speed, and with a specific flavor of wrongness that requires cleanup.
+
+*"CC took 5 tries to change a constant."* *"FIXED: CC's awkward implementations around altars and offerings."* *"FIXED: a small handful of CC's oversights."* *"LOL: not what I meant by 'tunes'."* *"FIXING: more of CCs issues."* *"FIXED: CC's BADNESS."* *"FIXED: more CC junk."*
+
+And then, on March 29th: *"CC is on fire today."* And that evening: *"MEGA TUNES -- CC IS ON FIRE."*
+
+The relationship is visible in the log. CC submits pull requests — well-formatted, with plans and tests. The developer merges some, rewrites others, and occasionally writes commit messages that read like exasperated post-it notes left on a colleague's monitor. The dynamic is a team, not a tool. CC hallucinates things that don't exist, builds systems that miss the point, and occasionally solves exactly the right problem at exactly the right moment. The developer's job is knowing which is which.
+
+By March, the merge requests have real substance. CC fixes the floating eye's gaze beam. CC adds long-press continuous walking. CC implements sensory overload for lightning spells. The developer stops saying "FIXED: CC's stuff" and starts saying "Merge pull request #123." The collaborator is learning the codebase. Or the developer is learning how to brief the collaborator. Probably both.
+
+---
+
+## Building a Village
+
+March 8th is the day the overworld stopped being terrain and became a place.
+
+The commit messages shift from systems language to place language: *"OVERWORLD: adjusting footprint before we go heuristic procedural on it."* Then *"OVERWORLD: more reworking."* Then *"ADDED: rooflines."* Then *"FIXED: door vis."* Then *"OVERWORLD: added church."*
+
+Roofs that burn and then fall. Fences. Houses. A smithy. A church. And then, at 8:23pm: *"ADDED: town folk (early)."*
+
+The townfolk are the most ambitious thing in the codebase, and they almost don't work. March 15th: *"CHECKPOINT: npc work, yikes."* Then, forty minutes later: *"ADDRESSING: an abysmal failure."* The NPCs were supposed to have daily schedules — wake up, go to work, eat, go to the pub, sleep. The reality was pathfinding bugs, stalled state machines, missing entrances, locked doors with nobody holding the key.
+
+*"FIXED: gave the herbalist the key to the alchemy shoppe."*
+
+That commit is funny, and it tells you everything about the difference between designing a system and making it live. The economy was architecturally sound — miners deliver ore, smiths forge tools, barkeeps cook stew. But someone forgot to give the herbalist a key. The game is in the details that no design document accounts for.
+
+By March 15th, the village works. Ten NPCs wake up, walk to their jobs, produce goods, deliver them, eat dinner at the tavern, and sleep. The economy runs whether or not the player is watching. A message board appears in the town square. A bell rings — and the commit says *"there is a hint here."*
+
+---
+
+## The Canary Sings in a New Key
+
+March 29th, 2026. A Saturday morning. 9:18am.
+
+*"EXPERIMENTAL: lighting engine"*
+
+Five months. Five months since "Thou shalt not build a lighting engine" was carved into `TEN_COMMANDMENTS.md` with the specificity of someone who remembered exactly how many lines they'd written and exactly how many they'd deleted. Five months since Commandment XI: *"If you are excited about the math, that is the warning sign."*
+
+9:48am: *"amazing -- continued."*
+
+9:52am: *"VFX: lighting continued."*
+
+11:57am: *"snap."*
+
+12:26pm: *"checkpoint."*
+
+12:35pm: *"incredible."*
+
+The commit messages look exactly like October 23rd. Short. Breathless. Piling up. The developer is in a flow state. Something interesting is being solved. The canary is singing.
+
+But look at what comes *before* the lighting engine this time. Not before it in the commit — before it in the project. By March 29th there are fifty-seven monsters with intelligence tiers and pack alerting. Nine character classes. Four deities who track your eating habits. An overworld village where NPCs cook stew and a calendar with moon phases. Weather that extinguishes fires. Dungeon biome slices. Trap disarming. A spirit guide. Over a thousand tests. Combat with hitstop and recoil. The architecture is a DSL and the game is *fun*.
+
+On October 23rd, the lighting engine was the third thing built. Before items. Before monsters had behaviors. Before the dungeon had rooms that connected properly. It was the interesting thing, not the important thing.
+
+On March 29th, the lighting engine was the *last* thing built.
+
+The gold got a glow. Then it got dialed back — *"DIAL BACK: gold glow"* — because restraint matters even when you've earned the indulgence. Corner torches appeared in dungeons. Sacred spaces got decorated. The floating eye's gaze beam got its own lighting pass, clipped by line-of-sight blockers so it stops at walls.
+
+On April 1st: *"LIGHTING ENGINE TUNES."* Then *"VOID LIGHT"* — light in empty spaces, the inverse of shadow. The lighting engine was getting polish. It was being tuned. It was not consuming the project.
+
+Commandment II — *"Thou shalt not build a lighting engine"* — was never a permanent prohibition. It was a question of timing. The same math that killed the project in October became a reward in March. The same excitement. The same rabbit hole. The same developer who deleted 12,924 lines wrote *"incredible"* five months later, and this time nobody needed to stop.
+
+The canary was singing, but it was singing in a different key.
+
+---
+
+## Game Feel
+
+Early April brought a shift that is hard to see in the feature list but obvious in the commit messages.
+
+*"WEIGHTS." "WEIGHTS." "WEIGHTs." "WEIGHTS." "WEIGHt." "WEIGHTS." "WEIGHTS."*
+
+Seven commits with the same word, each slightly different in capitalization, the way someone types when they're deep in a thing and the commit is muscle memory. Then: *"IMPULSE 0." "IMPLULSE 1."* — misspelled, because who cares about the commit message when the hit feels right. Then: *"VNICE." "FEEL." "WINCE." "VISCERAL TUNES."*
+
+This is the developer discovering game feel. Not combat math — that was solved months ago. This is the moment when a hit stops being a number and starts being a sensation. Hitstop. Recoil. Bump FX that communicates contact. Float text that staggers so the offhand damage arrives after the main hit, the way a punch and its follow-through are two distinct moments.
+
+The commit message canary would say these are short, breathless messages — the warning sign. But the commandments were written about engine work. This is game work. The difference between *"WEIGHTS"* repeated seven times for combat feel and *"a." "a." "a."* repeated six times for a geometry kernel is the difference between solving a problem the player can feel and solving a problem the player will never see.
+
+Commandment IX: *"Thou shalt not solve problems the player cannot see."*
+
+The player can feel hitstop. The player can see the wince. This is allowed.
+
+---
+
+## The Spirit Guide Problem
+
+The spirit guide was the hardest thing to get right, and not for technical reasons.
+
+The guide appears in early April. The intent is onboarding — teach new players how to play a roguelike without reading a manual. The danger is obvious: tutorials kill roguelikes. The moment a game tells you what to do next, it stops being a game about discovery and becomes a game about following instructions.
+
+The developer's own rule, stated explicitly: *"Never add tutorial rails; spirit guide must feel organic, not hand-holdy."*
+
+The commit log for the spirit guide is the longest tuning sequence in the project. *"SPIRIT TUNES." "GUIDE TUNES." "SPIRIT GUIDANCE." "DONT BURN LOCAL on GUIDE DISABLE." "RESUME GUIDE PARTIAL." "GUIDE." "GUIDE GATING."* Each commit is a small adjustment to when the guide speaks, what it says, and — critically — when it shuts up.
+
+The guide knows whether you're on a phone or a desktop. It teaches differently based on device. It watches what you pick up and offers context. It gates itself so it doesn't pile on. You can disable it and it doesn't burn your local state on the way out.
+
+The attention lavished on making the guide *not annoying* — the number of commits spent on the negative space of what the guide doesn't do — is the same kind of discipline that produced the Ten Commandments. The interesting problem is building a clever tutorialization system. The important problem is making sure the player never feels tutorialized.
+
+---
+
+## Sound and Silence
+
+For five months, the game had been silent.
+
+Movement was visual. Combat was visual. Weather was visual. The overworld economy — miners walking to the quarry, the smith hammering at the anvil, the barkeep stirring stew — all of it happened in silence. The game worked. The silence was not a bug. But it was an absence.
+
+The audio engine arrived in early April. File-based Web Audio with buses and spatial panning. Randomized pitches so no two sword swings sound the same. Travel sounds that change with the terrain. Then, almost immediately: *"AUDIO CLEANUP."* The first version was too much. The second version was tuned.
+
+This is the same pattern as the lighting engine. The technology is interesting. The restraint is more interesting. The audio engine works because it arrived after the game was fun without it, and because the first thing the developer did after building it was dial it back.
+
+---
+
+## The Commit Messages of April 6th
+
+*"BENCH." "BENCH." "NODE KIND." "BH." "NG DEFAULT." "NG." "NG."*
+
+Short commits. Rapid fire. On any other day in this project's history, this would be a warning. The canary. The sign that someone is solving the wrong problem.
+
+But these are not engine commits. *"NG"* is new game flow. *"BENCH"* is benchmarking. *"BH"* is behavior tuning. These are the commits of someone playing their own game over and over, tweaking what doesn't feel right, and committing the fix in the time it takes to notice it. The messages are short because the changes are small. The changes are small because the architecture is right.
+
+1,350 commits. Sixty-two active days of development across six months. The commit messages started as descriptions, became commandments, degraded into single letters, recovered into systems, and finally settled into the shorthand of someone who knows the codebase well enough that the message is a bookmark, not an explanation.
+
+The project that started with *"init"* — which was a lie — and survived two near-fatal encounters with its own developer's enthusiasm for beautiful math, is now a game that runs on a phone in your pocket. Zero dependencies. No build step. Pure JavaScript. The architecture is invisible, which was always the point. You edit a file, you hit refresh, you see your changes.
+
+The Ten Commandments are still in the repository. They haven't been updated. They don't need to be. The lighting engine exists now, and the game didn't die. That's the update.
+
+---
+
 *The repository is at https://github.com/PJensen/JSHack.*
 *The Ten Commandments are in [TEN_COMMANDMENTS.md](TEN_COMMANDMENTS.md).*
 *The first commit was October 15, 2025.*
-*Today is February 19, 2026.*
+*Today is April 6, 2026.*
 *The work continues.*
