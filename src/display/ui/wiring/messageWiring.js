@@ -1150,6 +1150,20 @@ export function installMessageWiring({
     log('The corpse flashes into cinders.', 'combat');
   });
 
+  world.on('monster:death:gas_spore', ({ at }) => {
+    if (!at || !canSeeAt(at.x, at.y)) return;
+    log('The gas spore ruptures — a massive explosion tears through the air!', 'danger');
+  });
+
+  world.on('proc:rot_grub:burrow', ({ actor, target }) => {
+    const tgt = nameOfEntity(target);
+    if (tgt === 'You') {
+      log('A rot grub burrows under your skin! You are bleeding badly!', 'danger');
+      return;
+    }
+    log(`A rot grub burrows into ${tgt}!`, 'combat');
+  });
+
   // === Combat events ===
   world.on('attack:insufficient-stamina', ({ attacker, defender, weaponId, need, have }) => {
     const weaponInfo = compGet(weaponId, ItemInfo);

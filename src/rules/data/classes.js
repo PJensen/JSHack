@@ -31,6 +31,7 @@ export const CLASS_DEFS = {
     ],
     startingSpells: [
       'savage_strike',   // 🦬 generator: free melee, +20 stamina
+      'cleave',          // 🪓 spender: AoE sweep, hits all adjacent hostiles
     ],
   },
 

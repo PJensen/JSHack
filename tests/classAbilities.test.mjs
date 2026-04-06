@@ -362,10 +362,11 @@ Deno.test("poison_blade fizzles with no weapon equipped", () => {
 
 import { CLASS_DEFS } from "../src/rules/data/classes.js";
 
-Deno.test("warden starts with only savage_strike", () => {
+Deno.test("warden starts with savage_strike and cleave", () => {
   const spells = CLASS_DEFS.warden.startingSpells;
   assert(spells.includes('savage_strike'));
-  assertEquals(spells.length, 1);
+  assert(spells.includes('cleave'));
+  assertEquals(spells.length, 2);
 });
 
 Deno.test("cleric starts with holy_strike and smite", () => {
