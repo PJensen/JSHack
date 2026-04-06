@@ -1392,6 +1392,20 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
       });
     });
 
+    // Generator projectiles (ranged builders)
+    for (const _ev of ['spell:arcane_bolt', 'spell:natures_touch', 'spell:leech_spores']) {
+      world.on(_ev, ({ from, at, hit }) => {
+        if (!hit || !from || !at) return;
+        const style = _ev === 'spell:arcane_bolt' ? 'plain'
+          : _ev === 'spell:natures_touch' ? 'venom'
+          : 'venom';
+        spawnTransientProjectile({
+          from, to: at, style,
+          speed: 12, minDuration: 0.06, maxDuration: 0.4,
+        });
+      });
+    }
+
     // Plague Swarm: buzzing swarm projectile from caster to target
     world.on('spell:plague_swarm', ({ from, at, fizzle, missed }) => {
       if (fizzle || missed) return;

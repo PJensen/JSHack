@@ -690,6 +690,38 @@ export function installMessageWiring({
     }
   });
 
+  // ── Generator messages ──
+
+  world.on('spell:savage_strike', ({ actor, hit }) => {
+    if (nameOfEntity(actor) !== 'You' || !hit) return;
+    log('You land a savage strike — stamina surges!', 'combat');
+  });
+
+  world.on('spell:natures_touch', ({ actor, hit }) => {
+    if (nameOfEntity(actor) !== 'You' || !hit) return;
+    log('Nature replenishes your reserves.', 'system');
+  });
+
+  world.on('spell:cheap_shot', ({ actor, hit }) => {
+    if (nameOfEntity(actor) !== 'You' || !hit) return;
+    log('A dirty hit — mana flows back.', 'combat');
+  });
+
+  world.on('spell:arcane_bolt', ({ actor, hit }) => {
+    if (nameOfEntity(actor) !== 'You' || !hit) return;
+    log('Arcane energy siphons back into you.', 'system');
+  });
+
+  world.on('spell:leech_spores', ({ actor, hit }) => {
+    if (nameOfEntity(actor) !== 'You' || !hit) return;
+    log('Parasitic spores drain your foe — you feel renewed.', 'combat');
+  });
+
+  world.on('spell:holy_strike', ({ actor, hit }) => {
+    if (nameOfEntity(actor) !== 'You' || !hit) return;
+    log('Holy light renews your faith.', 'system');
+  });
+
   // ── Buff / Rotation ability messages ──
 
   world.on('spell:iron_flesh', ({ actor }) => {

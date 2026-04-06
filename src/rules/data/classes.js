@@ -29,7 +29,16 @@ export const CLASS_DEFS = {
       { itemId: 'potion_mana', count: 3 },
       { itemId: 'scroll_identify', count: 4 },
     ],
-    startingSpells: ['rampage', 'earthshatter', 'war_cry', 'cleave', 'bloodthirst', 'iron_flesh'],
+    // Rotation: Generator → Buff → Core → Utility → Finisher
+    startingSpells: [
+      'savage_strike',   // 🦬 generator: free melee, +20 stamina
+      'iron_flesh',      // 💪 buff: +4 AC, thorns, slowed
+      'bloodthirst',     // sustain buff: 25% lifesteal on hit
+      'cleave',          // AoE melee damage
+      'war_cry',         // AoE debuff: weaken nearby
+      'earthshatter',    // AoE stun + ground hazard
+      'rampage',         // finisher: berserk 100 turns (all mana)
+    ],
   },
 
   druid: {
@@ -59,7 +68,16 @@ export const CLASS_DEFS = {
       { itemId: 'potion_mana', count: 3 },
       { itemId: 'scroll_identify', count: 4 },
     ],
-    startingSpells: ['heal', 'harmony_ward', 'entangle', 'plague_swarm', 'verdant_ward', 'thorn_burst', 'barkskin'],
+    // Rotation: Generator → Buff → Core → CC → Sustain
+    startingSpells: [
+      'natures_touch',   // 🌿 generator: free ranged, +8 mana
+      'barkskin',        // 🌳 buff: +2 AC, thorns, regen
+      'thorn_burst',     // 🥀 AoE burst from caster
+      'entangle',        // 🔗 CC: targeted stun + poison
+      'heal',            // single-target heal
+      'verdant_ward',    // sustain: regen + stoneskin + vision
+      'harmony_ward',    // resist all elements
+    ],
   },
 
   outlaw: {
@@ -97,7 +115,16 @@ export const CLASS_DEFS = {
       { itemId: 'ammo_blunt_arrows', count: 1 },
       { itemId: 'ammo_fire_arrows', count: 1 }
     ],
-    startingSpells: ['phase_strike', 'blind', 'shadow_veil', 'smoke_bomb', 'poison_blade', 'quicken'],
+    // Rotation: Generator → Buff → Engage → CC → Utility
+    startingSpells: [
+      'cheap_shot',      // 👊 generator: free melee, +10 mana
+      'quicken',         // ⚡ buff: +crit, +attack, +stam regen
+      'phase_strike',    // engage: teleport-slash along path
+      'poison_blade',    // utility: coat weapon in venom
+      'blind',           // CC: blind target
+      'shadow_veil',     // stealth: invisible + phase + crit
+      'smoke_bomb',      // escape: AoE blind + disengage
+    ],
   },
 
   archeologist: {
@@ -161,7 +188,15 @@ export const CLASS_DEFS = {
       { itemId: 'potion_mana', count: 3 },
       { itemId: 'scroll_identify', count: 4 },
     ],
-    startingSpells: ['shadow_bolt','summon_skeleton','agony','drain_life','lifetap','mark_of_death'],
+    // Rotation: Generator(lifetap) → Debuff → DoT → Core → Sustain → Summon
+    startingSpells: [
+      'lifetap',         // generator: sacrifice HP → mana
+      'mark_of_death',   // 💀 debuff: target takes +35% damage
+      'agony',           // DoT: shadow damage over time
+      'shadow_bolt',     // core ranged damage
+      'drain_life',      // sustain: channel life siphon
+      'summon_skeleton',  // summon: skeleton minion
+    ],
   },
 
   mage: {
@@ -192,7 +227,16 @@ export const CLASS_DEFS = {
       { itemId: 'potion_mana', count: 3 },
       { itemId: 'scroll_identify', count: 4 },
     ],
-    startingSpells: ['fireball', 'firestorm', 'frost', 'blizzard', 'meteor', 'ignite_weapons'],
+    // Rotation: Generator → Buff → Core → Core → AoE → Finisher
+    startingSpells: [
+      'arcane_bolt',     // ✴️ generator: free ranged, +6 mana
+      'ignite_weapons',  // 🔥 buff: +3 fire per hit, burn proc
+      'fireball',        // core: fire projectile
+      'frost',           // core: frost projectile + slow
+      'firestorm',       // AoE: sustained fire rain (channel)
+      'blizzard',        // AoE: sustained frost rain (channel)
+      'meteor',          // finisher: massive AoE nuke
+    ],
   },
 
   mireborn: {
@@ -223,7 +267,16 @@ export const CLASS_DEFS = {
       { itemId: 'potion_anti_venom', count: 2 },
       { itemId: 'scroll_identify', count: 4 },
     ],
-    startingSpells: ['entangle', 'plague_swarm', 'thorn_burst', 'verdant_ward', 'poison_blade', 'primal_roar'],
+    // Rotation: Generator → Buff → Core → CC → Sustain → DoT
+    startingSpells: [
+      'leech_spores',    // 🍄 generator: free ranged, +6 mana +10 stam
+      'primal_roar',     // 🦁 buff: berserk + fury + stagger nearby
+      'thorn_burst',     // 🥀 AoE burst from caster
+      'entangle',        // 🔗 CC: targeted stun + poison
+      'poison_blade',    // utility: coat weapon in venom
+      'verdant_ward',    // sustain: regen + stoneskin + vision
+      'plague_swarm',    // DoT: jumping plague
+    ],
   },
 
   pilgrim: {
@@ -285,7 +338,15 @@ export const CLASS_DEFS = {
       { itemId: 'potion_holy_water', count: 1 },
       { itemId: 'scroll_identify', count: 4 },
     ],
-    startingSpells: ['smite', 'flash_heal', 'purify', 'divine_shield', 'consecrate'],
+    // Rotation: Generator → Buff → Core → Heal → Cleanse → Finisher
+    startingSpells: [
+      'holy_strike',     // ☀️ generator: free melee, +8 mana
+      'divine_shield',   // buff: stoneskin + shield + blessed
+      'smite',           // core: ranged holy damage
+      'flash_heal',      // heal: instant self-heal + adjacent holy damage
+      'purify',          // cleanse: remove all debuffs
+      'consecrate',      // finisher: AoE holy damage + heal
+    ],
   },
 };
 
