@@ -3192,6 +3192,56 @@ REGISTRY['cheap_shot'] = function(world, actor, spell, intent) {
   });
 };
 
+REGISTRY['evocation'] = function evocationScript(world, actor, spell, intent) {
+  const isChannelTick = !!intent?._channelTick;
+  const apos = /** @type any */ (world.get(actor, Position));
+  if (!apos) return;
+  const actorVit = /** @type any */ (world.get(actor, Vitality));
+  if (!actorVit || (actorVit.hp | 0) <= 0) return;
+
+  const mana = /** @type any */ (world.get(actor, Mana));
+  if (!mana) return;
+  const maxM = effectiveMaxMana(world, actor, mana);
+  const currentMana = Number(mana.mana || 0);
+
+  // Already full — cancel channel, no point
+  if (currentMana >= maxM) {
+    if (isChannelTick) {
+      try { world.remove(actor, Channeling); } catch {}
+      emitSafe(world, 'channeling:cancelled', { actor, spellId: spell?.id, reason: 'mana_full' });
+    }
+    return;
+  }
+
+  // On initial cast, just emit start event (channel system handles Channeling component)
+  if (!isChannelTick) {
+    emitSafe(world, 'spell:evocation:start', {
+      actor,
+      at: { x: apos.x | 0, y: apos.y | 0 },
+    });
+    return;
+  }
+
+  // Sustained tick — restore mana (INT-scaled)
+  const intel = Number(getPassiveBonuses(world, actor).intelligence || 10);
+  const baseMana = Math.max(1, Number(spell?.manaPerChannelTick || 6));
+  const restored = Math.min(
+    Math.round(baseMana + (intel - 10) * 0.4),
+    maxM - currentMana,
+  );
+  if (restored > 0) {
+    mana.mana = Math.min(maxM, currentMana + restored);
+  }
+
+  emitSafe(world, 'spell:evocation:tick', {
+    actor,
+    at: { x: apos.x | 0, y: apos.y | 0 },
+    manaRestored: restored,
+    manaRemaining: mana.mana,
+    manaMax: maxM,
+  });
+};
+
 REGISTRY['arcane_bolt'] = function(world, actor, spell, intent) {
   runGeneratorScript(world, actor, spell, {
     baseAmount: 3, type: 'arcane', cause: 'spell:arcane_bolt',

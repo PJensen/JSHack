@@ -29,6 +29,9 @@ export function drawWorldEffects({ bctx, worldView, glyphAtlas, boltFx, spellAre
   if (typeof spellAreaFx.drawDrainLife === "function") {
     spellAreaFx.drawDrainLife(bctx);
   }
+  if (typeof spellAreaFx.drawEvocation === "function") {
+    spellAreaFx.drawEvocation(bctx);
+  }
   // Frost + Shadow bolt VFX are drawn by projectileFx.draw() (projectile style).
   if (typeof spellAreaFx.drawFlashHeal === "function") {
     spellAreaFx.drawFlashHeal(bctx);

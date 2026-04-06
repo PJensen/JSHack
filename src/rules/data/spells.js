@@ -947,6 +947,26 @@ export const SPELL_DEFS = {
       { kind: 'utility', note: 'Restores 10 mana on hit' },
     ],
   },
+  evocation: {
+    id: 'evocation',
+    name: 'Evocation',
+    symbol: '\u{2728}',      // ✨
+    schools: ['arcane'],
+    manaCost: 0,
+    manaPerTick: 0,
+    channeling: true,
+    breakOnMove: true,
+    minIntelligence: 0,
+    manaPerChannelTick: 6,
+    script: 'evocation',
+    targeting: 'self',
+    cooldown: 8,
+    description: 'Stand still, open your mind to the aether, and draw raw mana back into yourself. Each moment of concentration restores mana — but you are utterly vulnerable while channeling.',
+    effects: [
+      { kind: 'utility', note: 'Restores ~6 mana per tick (INT-scaled)' },
+      { kind: 'utility', note: 'Sustained channel; breaks on movement, stun, or damage' },
+    ],
+  },
   arcane_bolt: {
     id: 'arcane_bolt',
     name: 'Arcane Bolt',
