@@ -381,8 +381,29 @@ function resolveHitRoll(world, {
                 appliedDamage: result.amount,
                 critical: isCrit,
             });
+            // Ignite Weapons: bonus fire damage on melee hit
+            const _fwAe = world.get(source, ActiveEffects);
+            const _hasFw = _fwAe && Array.isArray(_fwAe.effects) && _fwAe.effects.some(e => e && e.key === 'fire_weapon' && (e.turnsLeft | 0) > 0);
+            if (result.amount > 0 && _hasFw) {
+                const fireDmg = 3;
+                dealDamage(world, {
+                    source, target, amount: fireDmg, type: 'fire',
+                    cause: 'proc:fire_weapon', at: spec.at,
+                    bypassResist: false,
+                });
+                // 20% chance to apply burn
+                const fwRng = mulberry32(combatSeed(world.seed, world.step, source, target, 0xF1AE));
+                if (fwRng() < 0.20) {
+                    const tae = world.get(target, ActiveEffects);
+                    if (tae && Array.isArray(tae.effects)) {
+                        upsertTimedEffect(tae.effects, {
+                            key: 'burn', turnsLeft: 3, potency: 1, stacks: 1, sourceId: source,
+                        });
+                    }
+                }
+            }
             // Bloodthirst: heal attacker for 25% of melee damage dealt
-            const _btAe = world.get(source, ActiveEffects);
+            const _btAe = _fwAe || world.get(source, ActiveEffects);
             const _hasBt = _btAe && Array.isArray(_btAe.effects) && _btAe.effects.some(e => e && e.key === 'bloodthirst' && (e.turnsLeft | 0) > 0);
             if (result.amount > 0 && _hasBt) {
                 const healAmt = Math.max(1, Math.floor(result.amount * 0.25));

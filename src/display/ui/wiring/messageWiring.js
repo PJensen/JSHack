@@ -690,6 +690,52 @@ export function installMessageWiring({
     }
   });
 
+  // ── Buff / Rotation ability messages ──
+
+  world.on('spell:iron_flesh', ({ actor }) => {
+    if (nameOfEntity(actor) === 'You') {
+      log('Your flesh hardens to iron!', 'system');
+    }
+  });
+
+  world.on('spell:ignite_weapons', ({ actor }) => {
+    if (nameOfEntity(actor) === 'You') {
+      log('Flames wreathe your weapons!', 'combat');
+    }
+  });
+
+  world.on('spell:barkskin', ({ actor }) => {
+    if (nameOfEntity(actor) === 'You') {
+      log('Bark grows over your skin — thorns bristle outward.', 'system');
+    }
+  });
+
+  world.on('spell:quicken', ({ actor }) => {
+    if (nameOfEntity(actor) === 'You') {
+      log('Adrenaline surges through you — everything slows down.', 'system');
+    }
+  });
+
+  world.on('spell:mark_of_death', ({ actor, targetId }) => {
+    const who = nameOfEntity(actor);
+    const whom = nameOfEntity(targetId);
+    if (who === 'You') {
+      log(`A death sigil burns into ${whom} — all damage amplified!`, 'combat');
+    } else if (whom === 'You') {
+      log(`${who} brands you with a mark of death!`, 'danger');
+    }
+  });
+
+  world.on('spell:primal_roar', ({ actor, affected }) => {
+    if (nameOfEntity(actor) === 'You') {
+      if (affected > 0) {
+        log(`You unleash a primal roar — ${affected} ${affected > 1 ? 'enemies stagger' : 'enemy staggers'}!`, 'combat');
+      } else {
+        log('You unleash a primal roar — savage fury fills you!', 'system');
+      }
+    }
+  });
+
   // ── Warden ability messages ──
   world.on('spell:war_cry', ({ actor, affected }) => {
     if (nameOfEntity(actor) !== 'You') return;

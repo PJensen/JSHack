@@ -29,7 +29,7 @@ export const CLASS_DEFS = {
       { itemId: 'potion_mana', count: 3 },
       { itemId: 'scroll_identify', count: 4 },
     ],
-    startingSpells: ['rampage', 'earthshatter', 'war_cry', 'cleave', 'bloodthirst'],
+    startingSpells: ['rampage', 'earthshatter', 'war_cry', 'cleave', 'bloodthirst', 'iron_flesh'],
   },
 
   druid: {
@@ -59,7 +59,7 @@ export const CLASS_DEFS = {
       { itemId: 'potion_mana', count: 3 },
       { itemId: 'scroll_identify', count: 4 },
     ],
-    startingSpells: ['heal', 'harmony_ward', 'entangle', 'plague_swarm', 'verdant_ward', 'thorn_burst'],
+    startingSpells: ['heal', 'harmony_ward', 'entangle', 'plague_swarm', 'verdant_ward', 'thorn_burst', 'barkskin'],
   },
 
   outlaw: {
@@ -97,7 +97,7 @@ export const CLASS_DEFS = {
       { itemId: 'ammo_blunt_arrows', count: 1 },
       { itemId: 'ammo_fire_arrows', count: 1 }
     ],
-    startingSpells: ['phase_strike', 'blind', 'shadow_veil', 'smoke_bomb', 'poison_blade'],
+    startingSpells: ['phase_strike', 'blind', 'shadow_veil', 'smoke_bomb', 'poison_blade', 'quicken'],
   },
 
   archeologist: {
@@ -161,7 +161,7 @@ export const CLASS_DEFS = {
       { itemId: 'potion_mana', count: 3 },
       { itemId: 'scroll_identify', count: 4 },
     ],
-    startingSpells: ['shadow_bolt','summon_skeleton','agony','drain_life','lifetap'],
+    startingSpells: ['shadow_bolt','summon_skeleton','agony','drain_life','lifetap','mark_of_death'],
   },
 
   mage: {
@@ -192,7 +192,7 @@ export const CLASS_DEFS = {
       { itemId: 'potion_mana', count: 3 },
       { itemId: 'scroll_identify', count: 4 },
     ],
-    startingSpells: ['fireball', 'firestorm', 'frost', 'blizzard', 'meteor'],
+    startingSpells: ['fireball', 'firestorm', 'frost', 'blizzard', 'meteor', 'ignite_weapons'],
   },
 
   mireborn: {
@@ -223,7 +223,7 @@ export const CLASS_DEFS = {
       { itemId: 'potion_anti_venom', count: 2 },
       { itemId: 'scroll_identify', count: 4 },
     ],
-    startingSpells: ['entangle', 'plague_swarm', 'thorn_burst', 'verdant_ward', 'poison_blade'],
+    startingSpells: ['entangle', 'plague_swarm', 'thorn_burst', 'verdant_ward', 'poison_blade', 'primal_roar'],
   },
 
   pilgrim: {
