@@ -680,13 +680,13 @@ export function installMessageWiring({
     }
   });
 
-  world.on('spell:thorn_burst', ({ actor, targetId }) => {
+  world.on('spell:thorn_burst', ({ actor, impacts }) => {
     const who = nameOfEntity(actor);
-    const whom = nameOfEntity(targetId);
+    const hitCount = Array.isArray(impacts) ? impacts.length : 0;
     if (who === 'You') {
-      log(`Razor thorns shred ${whom}!`, 'combat');
-    } else if (whom === 'You') {
-      log(`${who} hurls a burst of thorns at you!`, 'danger');
+      log(`Razor thorns erupt outward${hitCount > 1 ? `, shredding ${hitCount} foes!` : hitCount === 1 ? ', shredding a foe!' : '!'}`, 'combat');
+    } else {
+      log(`${who} erupts in a burst of razor thorns!`, 'danger');
     }
   });
 
