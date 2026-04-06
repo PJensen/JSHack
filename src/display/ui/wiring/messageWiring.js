@@ -407,6 +407,11 @@ export function installMessageWiring({
     log(`${who} attempts an invalid spell${spellId ? ` [${spellId}]` : ''}.`, 'system');
   });
 
+  world.on('spell:no-target', ({ actor, range }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log(range <= 1 ? 'No enemy in melee range.' : 'No enemy in range.', 'system');
+  });
+
   world.on('spell:oom', ({ actor, spellId, need, have, costKind }) => {
     const who = nameOfEntity(actor);
     const resource = String(costKind || 'mana');
