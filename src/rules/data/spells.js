@@ -896,6 +896,113 @@ export const SPELL_DEFS = {
       { kind: 'utility', note: 'Coats equipped weapon with 8 charges of poison (75% proc chance per hit)' },
     ],
   },
+
+  // ── Buff / Rotation abilities ─────────────────────────────────────────────
+
+  iron_flesh: {
+    id: 'iron_flesh',
+    name: 'Iron Flesh',
+    symbol: '\u{1F4AA}',     // 💪
+    schools: ['alteration'],
+    manaCost: 12,
+    minIntelligence: 0,
+    cooldown: 25,
+    script: 'iron_flesh',
+    targeting: 'self',
+    description: 'Harden your body into living iron. You become nearly immovable — tougher, but slower.',
+    effects: [
+      { kind: 'status', status: 'stoneskin', duration: '15 turns (+4 AC)' },
+      { kind: 'status', status: 'slowed', duration: '15 turns (movement penalty)' },
+      { kind: 'utility', note: 'Melee attackers take 2 recoil damage' },
+    ],
+  },
+  ignite_weapons: {
+    id: 'ignite_weapons',
+    name: 'Ignite Weapons',
+    symbol: '\u{1F525}',     // 🔥
+    schools: ['alteration', 'fire'],
+    manaCost: 10,
+    minIntelligence: 8,
+    cooldown: 20,
+    script: 'ignite_weapons',
+    targeting: 'self',
+    description: 'Wreathe your weapons in arcane flame. Each strike sears the target.',
+    effects: [
+      { kind: 'status', status: 'fire_weapon', duration: '12 turns' },
+      { kind: 'utility', note: 'Melee hits deal +3 bonus fire damage and 20% chance to apply burn' },
+    ],
+  },
+  barkskin: {
+    id: 'barkskin',
+    name: 'Barkskin',
+    symbol: '\u{1F333}',     // 🌳
+    schools: ['nature', 'alteration'],
+    manaCost: 8,
+    minIntelligence: 5,
+    cooldown: 18,
+    script: 'barkskin',
+    targeting: 'self',
+    description: 'Your skin hardens into gnarled bark. Thorns sprout from your flesh, punishing those who strike you.',
+    effects: [
+      { kind: 'status', status: 'stoneskin', duration: '20 turns (+2 AC)' },
+      { kind: 'status', status: 'thorns', duration: '20 turns (attackers take 1-3 nature damage)' },
+      { kind: 'status', status: 'regen', duration: '20 turns (slow HP regen)' },
+    ],
+  },
+  quicken: {
+    id: 'quicken',
+    name: 'Quicken',
+    symbol: '\u26A1',         // ⚡
+    schools: ['alteration', 'trickery'],
+    costResource: 'stamina',
+    staminaCost: 15,
+    manaCost: 0,
+    minIntelligence: 0,
+    cooldown: 15,
+    script: 'quicken',
+    targeting: 'self',
+    description: 'Flood your muscles with adrenaline. Everything slows down — except you.',
+    effects: [
+      { kind: 'status', status: 'crit_boost', duration: '10 turns (+15% crit chance)' },
+      { kind: 'status', status: 'battle_fury', duration: '10 turns (+2 attack)' },
+      { kind: 'utility', note: 'Restores 5 stamina per turn for the duration' },
+    ],
+  },
+  mark_of_death: {
+    id: 'mark_of_death',
+    name: 'Mark of Death',
+    symbol: '\u{1F480}',     // 💀
+    schools: ['darkness', 'destruction'],
+    manaCost: 14,
+    minIntelligence: 7,
+    range: 8,
+    cooldown: 12,
+    script: 'mark_of_death',
+    targeting: 'enemy',
+    description: 'Brand a foe with a skull sigil. All damage they receive is amplified.',
+    effects: [
+      { kind: 'status', status: 'marked', duration: '8 turns' },
+      { kind: 'utility', note: 'Marked target takes 35% more damage from all sources' },
+    ],
+  },
+  primal_roar: {
+    id: 'primal_roar',
+    name: 'Primal Roar',
+    symbol: '\u{1F981}',     // 🦁
+    schools: ['nature', 'alteration'],
+    manaCost: 15,
+    minIntelligence: 0,
+    cooldown: 30,
+    script: 'primal_roar',
+    targeting: 'self',
+    radius: 2,
+    description: 'Channel the fury of the wild. Your strikes become savage and nearby enemies cower.',
+    effects: [
+      { kind: 'status', status: 'berserk', duration: '12 turns (1.5x damage, +3 attack)' },
+      { kind: 'status', status: 'battle_fury', duration: '12 turns (+2 attack)' },
+      { kind: 'utility', note: 'Enemies in radius 2 are staggered for 3 turns' },
+    ],
+  },
 };
 
 /**

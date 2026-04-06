@@ -18,6 +18,7 @@ import { clamp } from "../../shared/math/math.js";
 import { getShieldArcMultiplier } from "./combatPositioning.js";
 import { consumeShieldGuardStack, refreshShieldGuard } from "./shieldGuard.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
+import { statusStrength } from "./statusFacade.js";
 import { Physiology } from "../components/Physiology.js";
 import { getMonster } from "../data/monsters.js";
 import { emitSafe } from "./emitSafe.js";
@@ -292,6 +293,11 @@ export function dealDamage(world, spec) {
   let finalAmount = spec.bypassResist
     ? rawAmount
     : resolveResistance(world, target, rawAmount, type, armorPenetration);
+
+  // Mark of Death amplification: +35% damage to marked targets
+  if (finalAmount > 0 && statusStrength(world, target, "marked") > 0) {
+    finalAmount = Math.ceil(finalAmount * 1.35);
+  }
 
   // Front-arc shield mitigation (only when an actual offhand shield is equipped
   // and the guard state is currently active).

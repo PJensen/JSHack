@@ -1669,6 +1669,14 @@ export function createSpiritWispFxController(
       _flareBurstQueued = true;
       _agitation = COMBAT_DECAY * 2.5;
     });
+    for (const _ev of ["spell:iron_flesh", "spell:ignite_weapons", "spell:barkskin", "spell:quicken", "spell:mark_of_death", "spell:primal_roar"]) {
+      world.on(_ev, () => {
+        if (!_pendingSurge) return;
+        _pendingSurge = false;
+        _flareBurstQueued = true;
+        _agitation = COMBAT_DECAY * 2.5;
+      });
+    }
 
     // ── Generic fallback — any remaining ranged spell ────────────────
     world.on("castSpell", ({ targetId, spiritBoosted }) => {

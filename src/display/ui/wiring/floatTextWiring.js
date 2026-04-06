@@ -566,6 +566,68 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     });
   });
 
+  // ── Buff / Rotation ability floats ──
+
+  world.on('spell:iron_flesh', ({ at }) => {
+    if (!at || !canShowAt(at.x, at.y)) return;
+    ftext.addStatus(at.x, at.y - 0.3, 'IRON FLESH!', {
+      color: '#aabbcc',
+      life: 1.3,
+      scaleStart: 1.4,
+      scaleEnd: 1.0,
+    });
+  });
+
+  world.on('spell:ignite_weapons', ({ at }) => {
+    if (!at || !canShowAt(at.x, at.y)) return;
+    ftext.addStatus(at.x, at.y - 0.3, 'IGNITE!', {
+      color: '#ff6600',
+      life: 1.2,
+      scaleStart: 1.3,
+      scaleEnd: 0.9,
+    });
+  });
+
+  world.on('spell:barkskin', ({ at }) => {
+    if (!at || !canShowAt(at.x, at.y)) return;
+    ftext.addStatus(at.x, at.y - 0.3, 'BARKSKIN!', {
+      color: '#66aa44',
+      life: 1.2,
+      scaleStart: 1.3,
+      scaleEnd: 0.9,
+    });
+  });
+
+  world.on('spell:quicken', ({ at }) => {
+    if (!at || !canShowAt(at.x, at.y)) return;
+    ftext.addStatus(at.x, at.y - 0.3, 'QUICKEN!', {
+      color: '#ffee44',
+      life: 1.1,
+      scaleStart: 1.3,
+      scaleEnd: 0.9,
+    });
+  });
+
+  world.on('spell:mark_of_death', ({ at }) => {
+    if (!at || !canShowAt(at.x, at.y)) return;
+    ftext.addStatus(at.x, at.y - 0.3, 'MARKED!', {
+      color: '#cc33ff',
+      life: 1.4,
+      scaleStart: 1.5,
+      scaleEnd: 1.0,
+    });
+  });
+
+  world.on('spell:primal_roar', ({ at }) => {
+    if (!at || !canShowAt(at.x, at.y)) return;
+    ftext.addStatus(at.x, at.y - 0.45, 'ROAR!', {
+      color: '#ff8833',
+      life: 1.4,
+      scaleStart: 1.6,
+      scaleEnd: 1.0,
+    });
+  });
+
   // ── Warden ability floats ──
 
   world.on('spell:war_cry', ({ at }) => {

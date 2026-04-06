@@ -1894,11 +1894,11 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
       if (!from || !Number.isFinite(from.x) || !Number.isFinite(from.y)) return;
       const r = Math.max(1, Number(radius || 3));
 
-      // Radial thorn spray outward from caster
+      // Random thorn spray outward from caster
       const N = PERF.quality === 'low' ? 16 : 28;
       for (let i = 0; i < N; i++) {
-        const angle = (i / N) * Math.PI * 2 + (Math.random() - 0.5) * 0.35;
-        const spd = 1.0 + Math.random() * r * 0.5;
+        const angle = Math.random() * Math.PI * 2;
+        const spd = 0.8 + Math.random() * r * 0.6;
         fx.pool.spawn(new Particle({
           x: from.x + (Math.random() - 0.5) * 0.15,
           y: from.y + (Math.random() - 0.5) * 0.15,
@@ -1915,10 +1915,10 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
         }));
       }
 
-      // Secondary slower poison mist ring
+      // Secondary slower poison mist puffs
       const mist = PERF.quality === 'low' ? 8 : 14;
       for (let i = 0; i < mist; i++) {
-        const angle = (i / mist) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+        const angle = Math.random() * Math.PI * 2;
         const spd = 0.3 + Math.random() * 0.4;
         fx.pool.spawn(new Particle({
           x: from.x, y: from.y,
@@ -2017,6 +2017,160 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
         }));
       }
       startShake(cam, 1, 0.05);
+    });
+
+    // ── Buff / Rotation ability VFX ──
+
+    // Iron Flesh — metallic sparks converging inward
+    world.on('spell:iron_flesh', ({ at }) => {
+      if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
+      const count = PERF.quality === 'low' ? 16 : 26;
+      for (let i = 0; i < count; i++) {
+        const angle = (Math.PI * 2 * i / count) + (Math.random() - 0.5) * 0.3;
+        const dist = 0.6 + Math.random() * 0.4;
+        const speed = 1.2 + Math.random() * 0.6;
+        fx.pool.spawn(new Particle({
+          x: at.x + Math.cos(angle) * dist,
+          y: at.y + Math.sin(angle) * dist,
+          vx: -Math.cos(angle) * speed,
+          vy: -Math.sin(angle) * speed,
+          life: 0.3 + Math.random() * 0.15,
+          size0: 0.06 + Math.random() * 0.04,
+          size1: 0.02,
+          r: 170 + ((Math.random() * 50) | 0),
+          g: 180 + ((Math.random() * 50) | 0),
+          b: 200 + ((Math.random() * 55) | 0),
+          a0: 0.9,
+        }));
+      }
+      startShake(cam, 2, 0.08);
+    });
+
+    // Ignite Weapons — fire burst from caster
+    world.on('spell:ignite_weapons', ({ at }) => {
+      if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
+      const count = PERF.quality === 'low' ? 14 : 22;
+      for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 0.3 + Math.random() * 0.6;
+        fx.pool.spawn(new Particle({
+          x: at.x + (Math.random() - 0.5) * 0.2,
+          y: at.y + (Math.random() - 0.5) * 0.2,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 0.3,
+          ay: -0.05,
+          life: 0.25 + Math.random() * 0.2,
+          size0: 0.07 + Math.random() * 0.04,
+          size1: 0.02,
+          r: 255,
+          g: 120 + ((Math.random() * 80) | 0),
+          b: 20 + ((Math.random() * 30) | 0),
+          a0: 0.88,
+        }));
+      }
+      startShake(cam, 2, 0.06);
+    });
+
+    // Barkskin — green/brown particles converging + rising leaf motes
+    world.on('spell:barkskin', ({ at }) => {
+      if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
+      const count = PERF.quality === 'low' ? 14 : 22;
+      for (let i = 0; i < count; i++) {
+        const angle = (Math.PI * 2 * i / count) + (Math.random() - 0.5) * 0.4;
+        const dist = 0.5 + Math.random() * 0.3;
+        const speed = 0.8 + Math.random() * 0.5;
+        const bark = Math.random() > 0.4;
+        fx.pool.spawn(new Particle({
+          x: at.x + Math.cos(angle) * dist,
+          y: at.y + Math.sin(angle) * dist,
+          vx: -Math.cos(angle) * speed,
+          vy: -Math.sin(angle) * speed - 0.1,
+          ay: 0.05,
+          life: 0.3 + Math.random() * 0.2,
+          size0: 0.06 + Math.random() * 0.04,
+          size1: 0.02,
+          r: bark ? 110 + ((Math.random() * 30) | 0) : 50 + ((Math.random() * 30) | 0),
+          g: bark ? 80 + ((Math.random() * 30) | 0) : 170 + ((Math.random() * 60) | 0),
+          b: bark ? 40 : 40 + ((Math.random() * 20) | 0),
+          a0: 0.85,
+          rotVel: (Math.random() - 0.5) * 1.5,
+        }));
+      }
+      startShake(cam, 1, 0.05);
+    });
+
+    // Quicken — yellow/white energy sparks swirling upward
+    world.on('spell:quicken', ({ at }) => {
+      if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
+      const count = PERF.quality === 'low' ? 12 : 20;
+      for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 0.2 + Math.random() * 0.5;
+        fx.pool.spawn(new Particle({
+          x: at.x + (Math.random() - 0.5) * 0.3,
+          y: at.y + (Math.random() - 0.5) * 0.3,
+          vx: Math.cos(angle) * speed,
+          vy: -(0.4 + Math.random() * 0.6),
+          ay: -0.05,
+          life: 0.25 + Math.random() * 0.25,
+          size0: 0.04 + Math.random() * 0.03,
+          size1: 0.01,
+          r: 255,
+          g: 240 + ((Math.random() * 15) | 0),
+          b: 100 + ((Math.random() * 80) | 0),
+          a0: 0.9,
+        }));
+      }
+    });
+
+    // Mark of Death — dark purple implosion on target
+    world.on('spell:mark_of_death', ({ at }) => {
+      if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
+      const count = PERF.quality === 'low' ? 16 : 24;
+      for (let i = 0; i < count; i++) {
+        const angle = (Math.PI * 2 * i / count) + (Math.random() - 0.5) * 0.3;
+        const dist = 0.7 + Math.random() * 0.4;
+        const speed = 1.4 + Math.random() * 0.8;
+        fx.pool.spawn(new Particle({
+          x: at.x + Math.cos(angle) * dist,
+          y: at.y + Math.sin(angle) * dist,
+          vx: -Math.cos(angle) * speed,
+          vy: -Math.sin(angle) * speed,
+          life: 0.3 + Math.random() * 0.15,
+          size0: 0.06 + Math.random() * 0.04,
+          size1: 0.01,
+          r: 160 + ((Math.random() * 40) | 0),
+          g: 30 + ((Math.random() * 30) | 0),
+          b: 200 + ((Math.random() * 55) | 0),
+          a0: 0.92,
+        }));
+      }
+      startShake(cam, 2, 0.06);
+    });
+
+    // Primal Roar — orange/red shockwave burst outward
+    world.on('spell:primal_roar', ({ at, radius }) => {
+      if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
+      const r = Math.max(1, Number(radius || 2));
+      const N = PERF.quality === 'low' ? 18 : 30;
+      for (let i = 0; i < N; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const spd = 0.8 + Math.random() * r * 0.5;
+        fx.pool.spawn(new Particle({
+          x: at.x + (Math.random() - 0.5) * 0.15,
+          y: at.y + (Math.random() - 0.5) * 0.15,
+          vx: Math.cos(angle) * spd,
+          vy: Math.sin(angle) * spd,
+          life: 0.2 + Math.random() * 0.2,
+          size0: 0.08 + Math.random() * 0.05,
+          size1: 0.02,
+          r: 240 + ((Math.random() * 15) | 0),
+          g: 100 + ((Math.random() * 60) | 0),
+          b: 20 + ((Math.random() * 20) | 0),
+          a0: 0.88,
+        }));
+      }
+      startShake(cam, 4, 0.14);
     });
 
     world.on('spell:earthshatter', ({ origin, radius, enhanced }) => {

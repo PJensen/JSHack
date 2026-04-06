@@ -235,7 +235,9 @@ export function resolveCombatSnapshot(world, entityId, context = {}) {
     evade,
     mitigation: Number(resolvedStats?.mitigation || 0),
     luck,
-    critChance: critChance + (shadowAmbushActive ? 0.15 * statusTotals.shadow_cloak : 0),
+    critChance: critChance
+      + (shadowAmbushActive ? 0.15 * statusTotals.shadow_cloak : 0)
+      + (statusTotals.crit_boost > 0 ? 0.15 : 0),
     critMult: critMult + (shadowAmbushActive ? 0.5 * statusTotals.shadow_cloak : 0),
     status: Object.freeze({ ...statusTotals }),
     posture: Object.freeze({

@@ -3471,6 +3471,177 @@ REGISTRY['poison_blade'] = function poisonBladeScript(world, actor, _spell, _int
   });
 };
 
+// ─── Buff / Rotation abilities ──────────────────────────────────────────────
+
+REGISTRY['iron_flesh'] = function ironFleshScript(world, actor, _spell, _intent) {
+  const pos = /** @type any */ (world.get(actor, Position));
+  if (!pos) return;
+  const ae = ensureActiveEffectList(world, actor);
+  if (!ae) return;
+
+  const DURATION = 15;
+  upsertTimedEffect(ae.effects, {
+    key: 'stoneskin', turnsLeft: DURATION + 1, potency: 4, stacks: 1, sourceId: actor,
+  });
+  upsertTimedEffect(ae.effects, {
+    key: 'slowed', turnsLeft: DURATION + 1, potency: 1, stacks: 1, sourceId: actor,
+  });
+  upsertTimedEffect(ae.effects, {
+    key: 'thorns', turnsLeft: DURATION + 1, potency: 2, stacks: 1, sourceId: actor,
+  });
+
+  emitSafe(world, 'spell:iron_flesh', { actor, at: { x: pos.x, y: pos.y }, duration: DURATION });
+};
+
+REGISTRY['ignite_weapons'] = function igniteWeaponsScript(world, actor, _spell, _intent) {
+  const pos = /** @type any */ (world.get(actor, Position));
+  if (!pos) return;
+  const ae = ensureActiveEffectList(world, actor);
+  if (!ae) return;
+
+  const DURATION = 12;
+  upsertTimedEffect(ae.effects, {
+    key: 'fire_weapon', turnsLeft: DURATION + 1, potency: 3, stacks: 1, sourceId: actor,
+  });
+
+  emitSafe(world, 'spell:ignite_weapons', { actor, at: { x: pos.x, y: pos.y }, duration: DURATION });
+};
+
+REGISTRY['barkskin'] = function barkskinScript(world, actor, _spell, _intent) {
+  const pos = /** @type any */ (world.get(actor, Position));
+  if (!pos) return;
+  const ae = ensureActiveEffectList(world, actor);
+  if (!ae) return;
+
+  const DURATION = 20;
+  upsertTimedEffect(ae.effects, {
+    key: 'stoneskin', turnsLeft: DURATION + 1, potency: 2, stacks: 1, sourceId: actor,
+  });
+  upsertTimedEffect(ae.effects, {
+    key: 'thorns', turnsLeft: DURATION + 1, potency: 1, stacks: 1, sourceId: actor,
+  });
+  upsertTimedEffect(ae.effects, {
+    key: 'regen', turnsLeft: DURATION + 1, potency: 1, stacks: 1, sourceId: actor,
+  });
+
+  emitSafe(world, 'spell:barkskin', { actor, at: { x: pos.x, y: pos.y }, duration: DURATION });
+};
+
+REGISTRY['quicken'] = function quickenScript(world, actor, _spell, _intent) {
+  const pos = /** @type any */ (world.get(actor, Position));
+  if (!pos) return;
+  const ae = ensureActiveEffectList(world, actor);
+  if (!ae) return;
+
+  const DURATION = 10;
+  upsertTimedEffect(ae.effects, {
+    key: 'crit_boost', turnsLeft: DURATION + 1, potency: 1, stacks: 1, sourceId: actor,
+  });
+  upsertTimedEffect(ae.effects, {
+    key: 'battle_fury', turnsLeft: DURATION + 1, potency: 1, stacks: 1, sourceId: actor,
+  });
+  upsertTimedEffect(ae.effects, {
+    key: 'stamina_restore', turnsLeft: DURATION + 1, potency: 5, stacks: 1, sourceId: actor,
+  });
+
+  emitSafe(world, 'spell:quicken', { actor, at: { x: pos.x, y: pos.y }, duration: DURATION });
+};
+
+REGISTRY['mark_of_death'] = function markOfDeathScript(world, actor, spell, intent) {
+  const apos = /** @type any */ (world.get(actor, Position));
+  if (!apos) return;
+  const actorFaction = String(world.get(actor, Faction)?.key || 'player');
+  const range = Number(spell?.range || 8) | 0;
+
+  // Resolve target from intent or auto-target
+  let targetId = intent?.targetId || 0;
+  if (targetId) {
+    const vit = /** @type any */ (world.get(targetId, Vitality));
+    if (!vit || (vit.hp | 0) <= 0) targetId = 0;
+    if (targetId === actor) targetId = 0;
+  }
+
+  if (!targetId) {
+    let bestD2 = Infinity;
+    for (const [id, pos] of world.query(Position)) {
+      if (id === actor) continue;
+      const fac = /** @type any */ (world.get(id, Faction));
+      if (!fac || !areFactionsHostile(actorFaction, fac.key)) continue;
+      const vit = /** @type any */ (world.get(id, Vitality));
+      if (!vit || (vit.hp | 0) <= 0) continue;
+      const dx = (pos.x | 0) - (apos.x | 0), dy = (pos.y | 0) - (apos.y | 0);
+      const d2 = dx * dx + dy * dy;
+      if (d2 > range * range) continue;
+      if (!hasSpellLineOfSight({ sourcePos: apos, targetPos: pos, range, isBlocked: blockedCallback(buildBlocksVisionMap(world)) })) continue;
+      if (d2 < bestD2) { bestD2 = d2; targetId = id; }
+    }
+  }
+  if (!targetId) return;
+
+  const tpos = /** @type any */ (world.get(targetId, Position));
+  const ae = ensureActiveEffectList(world, targetId);
+  if (!ae) return;
+
+  const DURATION = 8;
+  upsertTimedEffect(ae.effects, {
+    key: 'marked', turnsLeft: DURATION + 1, potency: 1, stacks: 1, sourceId: actor,
+  });
+
+  emitSafe(world, 'spell:mark_of_death', {
+    actor, targetId,
+    at: { x: tpos.x, y: tpos.y },
+    duration: DURATION,
+  });
+};
+
+REGISTRY['primal_roar'] = function primalRoarScript(world, actor, spell, _intent) {
+  const apos = /** @type any */ (world.get(actor, Position));
+  if (!apos) return;
+  const ae = ensureActiveEffectList(world, actor);
+  if (!ae) return;
+  const actorFaction = String(world.get(actor, Faction)?.key || 'player');
+
+  const DURATION = 12;
+  const RADIUS = Number(spell?.radius || 2) | 0;
+
+  // Self buffs
+  upsertTimedEffect(ae.effects, {
+    key: 'berserk', turnsLeft: DURATION + 1, potency: 1, stacks: 1, sourceId: actor,
+  });
+  upsertTimedEffect(ae.effects, {
+    key: 'battle_fury', turnsLeft: DURATION + 1, potency: 1, stacks: 1, sourceId: actor,
+  });
+
+  // Stagger nearby enemies
+  let affected = 0;
+  for (const [id, pos] of world.query(Position)) {
+    if (id === actor) continue;
+    const fac = /** @type any */ (world.get(id, Faction));
+    if (!fac || !areFactionsHostile(actorFaction, fac.key)) continue;
+    const vit = /** @type any */ (world.get(id, Vitality));
+    if (!vit || (vit.hp | 0) <= 0) continue;
+    const dx = Math.abs((pos.x | 0) - (apos.x | 0));
+    const dy = Math.abs((pos.y | 0) - (apos.y | 0));
+    if (Math.max(dx, dy) > RADIUS) continue;
+
+    const tae = ensureActiveEffectList(world, id);
+    if (tae) {
+      upsertTimedEffect(tae.effects, {
+        key: 'stagger', turnsLeft: 4, potency: 1, stacks: 1, sourceId: actor,
+      });
+      affected++;
+    }
+  }
+
+  emitSafe(world, 'spell:primal_roar', {
+    actor,
+    at: { x: apos.x, y: apos.y },
+    radius: RADIUS,
+    affected,
+    duration: DURATION,
+  });
+};
+
 /**
  * Execute a spell script if present.
  * @param {World} world

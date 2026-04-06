@@ -393,4 +393,17 @@ export const EFFECT_DEFS = [
     operation: "none",
     statuses: ["bloodthirst"],
   },
+  // ── Buff / Rotation ability statuses ──────────────────────────────
+  {
+    id: "fire_weapon",
+    keys: ["fire_weapon"],
+    operation: "none",
+    statuses: ["fire_weapon"],
+  },
+  {
+    id: "marked",
+    keys: ["marked", "mark_of_death"],
+    operation: "none",
+    statuses: ["marked"],
+  },
 ];
