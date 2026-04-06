@@ -66,7 +66,7 @@ import { resolveLootTable, materializeDrop } from "../../data/lootResolver.js";
 import { spawnHazard } from "../../utils/hazardSpawn.js";
 import { dealDamage } from "../../utils/dealDamage.js";
 import { getCatalogItem } from "../../data/itemCatalog.js";
-import { Ashes } from "../../archetypes/Items.js";
+import { Ashes, GoldStack } from "../../archetypes/Items.js";
 import { Encumbrance } from "../../components/Encumbrance.js";
 import {
   brewAtAlchemyBench,
@@ -81,7 +81,13 @@ import { buildNoticeBoardPayload } from "../../quests/localGenerator.js";
 import { GroundStackOrder } from "../../components/GroundStackOrder.js";
 import { HazardArea } from "../../components/HazardArea.js";
 import { emitSafe } from "../../utils/emitSafe.js";
-import { isWalkable } from "../../environment/dungeon/tileMap.js";
+import { isWalkable, forEachLoadedTile, setTile, getTile } from "../../environment/dungeon/tileMap.js";
+import { TILE_SHALLOW_WATER, TILE_FLOOR } from "../../environment/dungeon/constants.js";
+import { ActiveEffects } from "../../components/ActiveEffects.js";
+import { ensureActiveEffects } from "../../utils/effects.js";
+import { upsertTimedEffect } from "../../utils/effectSemantics.js";
+import { spawnMonsterEntity } from "../../utils/spawnMonsterEntity.js";
+import { findNearestValidTileAround } from "../../utils/queries.js";
 
 // Maps catalog item IDs → archetypes for harvest yield entity creation.
 const CATALOG_ARCHETYPES = {
@@ -369,6 +375,32 @@ function setFountainState(world, targetId, updates) {
     params.maxCharges = Math.max(1, params.chargesRemaining | 0);
   }
   world.set(targetId, Interactable, { action: inter.action, params });
+}
+
+function _fountainPrimary(world, actor, targetId, primaryEffect, vit, r) {
+  if (primaryEffect === "heal") {
+    const fountainCap = effectiveMaxHp(world, actor, vit);
+    const healAmt = Math.max(1, Math.floor(fountainCap * (0.2 + r() * 0.2)));
+    const newHp = Math.min(fountainCap, vit.hp + healAmt);
+    world.set(actor, Vitality, { maxHp: vit.maxHp, hp: newHp });
+    world.emit?.("fountain:drink", {
+      actor, targetId, effect: "heal", amount: healAmt,
+    });
+  } else {
+    const mana = world.get(actor, Mana);
+    if (mana && mana.maxMana > 0) {
+      const maxM = effectiveMaxMana(world, actor, mana);
+      const amt = Math.max(1, Math.floor(maxM * 0.3));
+      world.set(actor, Mana, { ...mana, mana: Math.min(maxM, mana.mana + amt) });
+      world.emit?.("fountain:drink", {
+        actor, targetId, effect: "mana", amount: amt,
+      });
+    } else {
+      world.emit?.("fountain:drink", {
+        actor, targetId, effect: "nothing", amount: 0,
+      });
+    }
+  }
 }
 
 function setWorkstationActive(world, targetId, fallbackState) {
@@ -982,72 +1014,196 @@ export const INTERACT_PAYLOADS = {
         0xF0C5,
       );
       const r = mulberry32(fSeed);
+
+      // ── Weighted outcome table ─────────────────────────────────────
+      // Outcomes are cumulative-weight bands.  Each drink is a pull of
+      // the slot machine — mostly good, sometimes weird, rarely great.
+      //
+      //  0.00–0.30  primary (heal or mana restore)
+      //  0.30–0.42  attribute buff (lucky / keen_eye / bear_vigor)
+      //  0.42–0.52  see invisible (temporary)
+      //  0.52–0.60  nothing (stale water)
+      //  0.60–0.68  gold bubbles up
+      //  0.68–0.75  curse a random inventory item
+      //  0.75–0.82  poison
+      //  0.82–0.88  spawn water creature (nymph or snake)
+      //  0.88–0.93  teleport
+      //  0.93–0.97  gushing flood (destroys fountain, creates water)
+      //  0.97–1.00  wish (rare loot drop)
       const roll = r();
 
-      if (roll < 0.75) {
-        if (primaryEffect === "heal") {
-          const fountainCap = effectiveMaxHp(world, actor, vit);
-          const healAmt = Math.max(
-            1,
-            Math.floor(fountainCap * (0.2 + r() * 0.2)),
-          );
-          const newHp = Math.min(fountainCap, vit.hp + healAmt);
-          world.set(actor, Vitality, { maxHp: vit.maxHp, hp: newHp });
-          world.emit?.("fountain:drink", {
-            actor,
-            targetId,
-            effect: "heal",
-            amount: healAmt,
+      if (roll < 0.30) {
+        // ── Primary: heal or mana ──────────────────────────────────
+        _fountainPrimary(world, actor, targetId, primaryEffect, vit, r);
+      } else if (roll < 0.42) {
+        // ── Attribute buff ─────────────────────────────────────────
+        const buffs = ["lucky", "keen_eye", "bear_vigor"];
+        const pick = buffs[Math.floor(r() * buffs.length)];
+        const turns = 30 + Math.floor(r() * 40);
+        const ae = ensureActiveEffects(world, actor);
+        if (ae) {
+          upsertTimedEffect(ae.effects, { key: pick, turnsLeft: turns, potency: 1 });
+        }
+        world.emit?.("fountain:drink", {
+          actor, targetId, effect: "buff", buff: pick, turns,
+        });
+      } else if (roll < 0.52) {
+        // ── See invisible ──────────────────────────────────────────
+        const turns = 40 + Math.floor(r() * 60);
+        const ae = ensureActiveEffects(world, actor);
+        if (ae) {
+          upsertTimedEffect(ae.effects, { key: "esp_sense", turnsLeft: turns, potency: 1 });
+        }
+        world.emit?.("fountain:drink", {
+          actor, targetId, effect: "see_invisible", turns,
+        });
+      } else if (roll < 0.60) {
+        // ── Nothing ────────────────────────────────────────────────
+        world.emit?.("fountain:drink", {
+          actor, targetId, effect: "nothing", amount: 0,
+        });
+      } else if (roll < 0.68) {
+        // ── Gold bubbles up ────────────────────────────────────────
+        const fPos = world.get(targetId, Position);
+        const goldAmt = 8 + Math.floor(r() * 25);
+        if (fPos) {
+          const gid = createFrom(world, GoldStack, { x: fPos.x, y: fPos.y });
+          if (gid > 0) {
+            try { world.add(gid, Position, { x: fPos.x, y: fPos.y }); } catch { /* already has Position */ }
+            const gi = world.get(gid, ItemInfo);
+            if (gi) world.set(gid, ItemInfo, { ...gi, count: goldAmt });
+          }
+        }
+        world.emit?.("fountain:drink", {
+          actor, targetId, effect: "gold", amount: goldAmt,
+        });
+      } else if (roll < 0.75) {
+        // ── Curse a random inventory item ──────────────────────────
+        const items = inventoryItems(world, actor);
+        const curseable = items.filter(iid => {
+          if (!world.isAlive(iid)) return false;
+          const b = world.get(iid, Beatitude);
+          return !b || String(b.state) !== "cursed";
+        });
+        let cursedName = null;
+        if (curseable.length > 0) {
+          const pick = curseable[Math.floor(r() * curseable.length)];
+          world.set(pick, Beatitude, { state: "cursed" });
+          const ni = world.get(pick, NamedIdentity);
+          cursedName = ni?.name || "an item";
+        }
+        world.emit?.("fountain:drink", {
+          actor, targetId, effect: "curse", cursedName,
+        });
+      } else if (roll < 0.82) {
+        // ── Poison ─────────────────────────────────────────────────
+        const dmgAmt = Math.max(1, Math.floor(vit.maxHp * (0.05 + r() * 0.05)));
+        dealDamage(world, {
+          target: actor, amount: dmgAmt, type: "poison",
+          source: targetId, cause: "fountain",
+        });
+        world.emit?.("fountain:drink", {
+          actor, targetId, effect: "poison", amount: dmgAmt,
+        });
+      } else if (roll < 0.88) {
+        // ── Spawn water creature ───────────────────────────────────
+        const fPos = world.get(targetId, Position);
+        let spawnedName = null;
+        if (fPos) {
+          const tile = findNearestValidTileAround(world, fPos, { maxDistance: 2 });
+          if (tile) {
+            const isNymph = r() < 0.5;
+            const def = isNymph
+              ? { name: "Water Nymph", identity: "nymph", maxHp: 14, baseHp: 14, attack: 2, defense: 1, damageDice: "1d4", faction: "enemy", speed: 3 }
+              : { name: "Water Snake", identity: "cave_snake", maxHp: 10, baseHp: 10, attack: 3, defense: 0, damageDice: "1d6", faction: "enemy", speed: 2 };
+            const eid = spawnMonsterEntity(world, { ...def, x: tile.x, y: tile.y });
+            if (eid > 0) spawnedName = def.name;
+          }
+        }
+        world.emit?.("fountain:drink", {
+          actor, targetId, effect: "creature", spawnedName,
+        });
+      } else if (roll < 0.93) {
+        // ── Teleport ───────────────────────────────────────────────
+        const pos = world.get(actor, Position);
+        if (pos) {
+          const from = { x: pos.x | 0, y: pos.y | 0 };
+          const candidates = [];
+          forEachLoadedTile((x, y) => {
+            if (!isWalkable(x, y)) return;
+            const dx = x - from.x, dy = y - from.y;
+            if (dx * dx + dy * dy < 36) return; // min distance 6
+            candidates.push({ x, y });
           });
-        } else {
-          const mana = world.get(actor, Mana);
-          if (mana && mana.maxMana > 0) {
-            const maxM = effectiveMaxMana(world, actor, mana);
-            const amt = Math.max(1, Math.floor(maxM * 0.3));
-            world.set(actor, Mana, {
-              ...mana,
-              mana: Math.min(maxM, mana.mana + amt),
-            });
+          if (candidates.length > 0) {
+            const to = candidates[Math.floor(r() * candidates.length)];
+            world.set(actor, Position, { x: to.x, y: to.y });
+            emitSafe(world, "moved", { id: actor, from, to });
             world.emit?.("fountain:drink", {
-              actor,
-              targetId,
-              effect: "mana",
-              amount: amt,
+              actor, targetId, effect: "teleport", from, to,
             });
           } else {
             world.emit?.("fountain:drink", {
-              actor,
-              targetId,
-              effect: "nothing",
-              amount: 0,
+              actor, targetId, effect: "nothing", amount: 0,
             });
           }
         }
-      } else if (roll < 0.90) {
+      } else if (roll < 0.97) {
+        // ── Gushing flood ──────────────────────────────────────────
+        // Fountain explodes: converts nearby floor tiles to shallow water,
+        // permanently destroys the fountain.
+        const fPos = world.get(targetId, Position);
+        let tilesFlooded = 0;
+        if (fPos) {
+          const cx = fPos.x | 0, cy = fPos.y | 0;
+          for (let dy = -2; dy <= 2; dy++) {
+            for (let dx = -2; dx <= 2; dx++) {
+              if (dx * dx + dy * dy > 5) continue; // rough circle r~2
+              const tx = cx + dx, ty = cy + dy;
+              const t = getTile(tx, ty);
+              if (t === TILE_FLOOR) {
+                setTile(tx, ty, TILE_SHALLOW_WATER);
+                tilesFlooded++;
+              }
+            }
+          }
+        }
+        // Destroy the fountain entity
         world.emit?.("fountain:drink", {
-          actor,
-          targetId,
-          effect: "nothing",
-          amount: 0,
+          actor, targetId, effect: "gush", tilesFlooded,
         });
+        world.emit?.("fountain:destroyed", { actor, targetId, tilesFlooded });
+        if (world.isAlive(targetId)) world.destroy(targetId);
+        // Skip normal charge decrement — fountain is gone
+        return;
       } else {
-        const mana = world.get(actor, Mana);
-        const dmgAmt = Math.max(1, Math.floor(vit.maxHp * (0.05 + r() * 0.05)));
-        dealDamage(world, {
-          target: actor,
-          amount: dmgAmt,
-          type: "poison",
-          source: targetId,
-          cause: "fountain",
-        });
+        // ── Wish: rare loot drop ───────────────────────────────────
+        const fPos = world.get(targetId, Position);
+        let wishedItem = null;
+        if (fPos) {
+          let depth = 1;
+          for (const [, ds] of world.query(DungeonState)) {
+            depth = Math.max(1, Number(ds?.currentDepth ?? 1));
+          }
+          const lootRng = createRng(
+            (world.seed ^ (targetId * 0xBEEF) ^ (world.step * 0x1337)) >>> 0,
+          );
+          const drops = resolveLootTable("chest:magic", lootRng, depth, 0, {});
+          if (drops.length > 0) {
+            const drop = drops[0];
+            const eid = materializeDrop(world, drop, { x: fPos.x, y: fPos.y });
+            if (eid > 0) {
+              const ni = world.get(eid, NamedIdentity);
+              wishedItem = ni?.name || "something";
+            }
+          }
+        }
         world.emit?.("fountain:drink", {
-          actor,
-          targetId,
-          effect: "poison",
-          amount: dmgAmt,
+          actor, targetId, effect: "wish", wishedItem,
         });
       }
 
+      // ── Charge bookkeeping ─────────────────────────────────────
       const nextCharges = Math.max(0, charges - 1);
       if (nextCharges <= 0) {
         const cooldownTurns = Math.max(

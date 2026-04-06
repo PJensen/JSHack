@@ -23,6 +23,30 @@ function _throttle(tag, cooldownMs = 3000) {
   return true;
 }
 
+/** Radial particle burst around a fountain for drink outcomes. */
+function _fountainBurst(fx, pos, hexColor, count) {
+  const cr = parseInt(hexColor.slice(1, 3), 16);
+  const cg = parseInt(hexColor.slice(3, 5), 16);
+  const cb = parseInt(hexColor.slice(5, 7), 16);
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 0.5 + Math.random() * 1.0;
+    fx.pool.spawn(new Particle({
+      x: pos.x,
+      y: pos.y - 0.15,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 0.4,
+      ax: 0,
+      ay: 1.2,
+      life: 0.4 + Math.random() * 0.4,
+      size0: 0.18,
+      size1: 0.04,
+      r: cr, g: cg, b: cb,
+      a0: 0.85,
+    }));
+  }
+}
+
 const _staminaLines = [
   'Too exhausted!',
   'Your arms feel heavy...',
@@ -810,6 +834,56 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
       scaleStart: 1.3,
       scaleEnd: 1.0,
     });
+  });
+
+  // ── Fountain VFX ───────────────────────────────────────────────────
+
+  world.on('fountain:drink', (ev) => {
+    const pos = getPosition(Number(ev.targetId || 0));
+    if (!pos || !canShowAt(pos.x, pos.y)) return;
+
+    const eff = String(ev.effect || '');
+    if (eff === 'heal' || eff === 'mana') {
+      const col = eff === 'heal' ? '#44ff88' : '#6699ff';
+      ftext.addHeal(pos.x, pos.y - 0.45, ev.amount || 0, { color: col });
+      _fountainBurst(fx, pos, col, 8);
+    } else if (eff === 'buff' || eff === 'see_invisible') {
+      const col = eff === 'see_invisible' ? '#bb88ff' : '#ffdd44';
+      const label = eff === 'see_invisible' ? 'SIXTH SENSE!' : 'BLESSED!';
+      ftext.addStatus(pos.x, pos.y - 0.45, label, { color: col, life: 1.2, scaleStart: 1.3, scaleEnd: 1.0 });
+      _fountainBurst(fx, pos, col, 12);
+    } else if (eff === 'gold') {
+      ftext.addGold(pos.x, pos.y - 0.45, ev.amount || 0);
+      _fountainBurst(fx, pos, '#ffcc00', 10);
+    } else if (eff === 'curse') {
+      ftext.addStatus(pos.x, pos.y - 0.45, 'CURSED!', { color: '#aa33cc', life: 1.3, scaleStart: 1.4, scaleEnd: 1.0 });
+      _fountainBurst(fx, pos, '#6622aa', 14);
+    } else if (eff === 'poison') {
+      ftext.addDamage(pos.x, pos.y - 0.45, ev.amount || 0, { color: '#88ff33' });
+      _fountainBurst(fx, pos, '#66cc22', 8);
+    } else if (eff === 'creature') {
+      if (ev.spawnedName) {
+        ftext.addStatus(pos.x, pos.y - 0.45, 'SOMETHING STIRS!', { color: '#ff4466', life: 1.4, scaleStart: 1.5, scaleEnd: 1.0 });
+        _fountainBurst(fx, pos, '#ff2244', 16);
+      }
+    } else if (eff === 'teleport') {
+      ftext.addStatus(pos.x, pos.y - 0.45, 'WARPED!', { color: '#44ddff', life: 1.2, scaleStart: 1.3, scaleEnd: 1.0 });
+      _fountainBurst(fx, pos, '#22bbee', 14);
+    } else if (eff === 'gush') {
+      ftext.addStatus(pos.x, pos.y - 0.45, 'ERUPTION!', { color: '#3399ff', life: 1.5, scaleStart: 1.6, scaleEnd: 1.0 });
+      _fountainBurst(fx, pos, '#2277dd', 24);
+    } else if (eff === 'wish') {
+      ftext.addStatus(pos.x, pos.y - 0.45, 'A BOON!', { color: '#ffee88', life: 1.8, scaleStart: 1.8, scaleEnd: 1.0 });
+      _fountainBurst(fx, pos, '#ffdd44', 20);
+      _fountainBurst(fx, pos, '#ffffff', 12);
+    }
+  });
+
+  world.on('fountain:destroyed', ({ targetId }) => {
+    const pos = getPosition(Number(targetId || 0));
+    if (!pos || !canShowAt(pos.x, pos.y)) return;
+    _fountainBurst(fx, pos, '#2277dd', 30);
+    _fountainBurst(fx, pos, '#88ccff', 20);
   });
 
   // ── Misc float text ─────────────────────────────────────────────────

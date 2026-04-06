@@ -1582,12 +1582,37 @@ export function installMessageWiring({
     else log('You draw water from the well. You feel refreshed.', 'system');
   });
 
-  world.on('fountain:drink', ({ actor, effect, amount }) => {
+  world.on('fountain:drink', (ev) => {
+    const { actor, effect, amount } = ev;
     if (nameOfEntity(actor) !== 'You') return;
     if (effect === 'heal') log(`You drink from the fountain and feel refreshed. (+${amount} HP)`, 'system');
     else if (effect === 'mana') log(`You drink from the fountain. Magical energy surges through you. (+${amount} MP)`, 'system');
+    else if (effect === 'buff') {
+      const labels = { lucky: 'Lucky', keen_eye: 'Keen Eye', bear_vigor: "Bear's Vigor" };
+      log(`You drink from the fountain. A warm tingle spreads through you. (${labels[ev.buff] || ev.buff})`, 'system');
+    }
+    else if (effect === 'see_invisible') log('You drink from the fountain. Your eyes tingle — you can perceive the unseen!', 'system');
+    else if (effect === 'gold') log(`Gold coins bubble up from the fountain depths! (+${amount} gold)`, 'system');
+    else if (effect === 'curse') {
+      if (ev.cursedName) log(`You drink from the fountain. A black aura envelops your ${ev.cursedName}!`, 'danger');
+      else log('You drink from the fountain. You feel a chill, but nothing happens.', 'system');
+    }
     else if (effect === 'poison') log(`You drink from the fountain. It was contaminated! (-${amount} HP)`, 'combat');
+    else if (effect === 'creature') {
+      if (ev.spawnedName) log(`Something emerges from the fountain! A ${ev.spawnedName} appears!`, 'danger');
+      else log('You drink from the fountain. The water churns ominously, then settles.', 'system');
+    }
+    else if (effect === 'teleport') log('You drink from the fountain. The world spins and you are elsewhere!', 'danger');
+    else if (effect === 'gush') log('The fountain erupts! Water gushes everywhere as the fountain crumbles!', 'danger');
+    else if (effect === 'wish') {
+      if (ev.wishedItem) log(`A shimmering spirit rises from the fountain depths and grants you a boon: ${ev.wishedItem}!`, 'system');
+      else log('A spirit stirs in the depths... but the waters fall still.', 'system');
+    }
     else log('You drink from the fountain. The water is stale.', 'system');
+  });
+  world.on('fountain:destroyed', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('The fountain is destroyed!', 'danger');
   });
   world.on('fountain:dry', ({ actor }) => {
     if (nameOfEntity(actor) !== 'You') return;

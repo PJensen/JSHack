@@ -3,7 +3,8 @@ node_modules/
 *.log
 *.tmp
 .DS_Store
-Thumbs.db
+Thumbs.
+JSHack.code-workspace
 
 *.zip
 assets/audio/8bitRPGHack&SlashSFX 2
