@@ -1,6 +1,8 @@
 import { assert } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";
 import { HarvestNode } from "../src/rules/components/HarvestNode.js";
+import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
+import { Collider } from "../src/rules/components/Collider.js";
 import { WeatherState } from "../src/rules/components/WeatherState.js";
 import { harvestRegrowthSystem } from "../src/rules/systems/harvestRegrowthSystem.js";
 
@@ -49,4 +51,34 @@ Deno.test("harvestRegrowthSystem does nothing when not raining", () => {
   harvestRegrowthSystem(world);
   const h = world.get(id, HarvestNode);
   assert(h.regrowCountdown === 3, "countdown should not change when clear");
+});
+
+Deno.test("harvestRegrowthSystem restores picked mushrooms identity and collider", () => {
+  const world = new World({ seed: 4 });
+  addRain(world);
+  const id = world.create();
+  world.add(id, HarvestNode, {
+    kind: "mushrooms",
+    ready: false,
+    regrowTurns: 6,
+    regrowCountdown: 1,
+    yield: "food_mushrooms",
+    yieldMin: 1,
+    yieldMax: 3,
+  });
+  world.add(id, NamedIdentity, { name: "Mushrooms", identity: "mushrooms_picked" });
+  world.add(id, Collider, { solid: false, blocksSight: false });
+
+  harvestRegrowthSystem(world);
+
+  const h = world.get(id, HarvestNode);
+  assert(h.ready === true, "mushrooms should become ready again");
+  assert(h.regrowCountdown === 0, "mushroom regrow countdown should reset");
+  assert(h.yield === "food_mushrooms", "regrowth should preserve harvest payload data");
+
+  const ni = world.get(id, NamedIdentity);
+  assert(ni.identity === "mushrooms", "regrowth should restore mushrooms identity");
+  const col = world.get(id, Collider);
+  assert(col.solid === true, "regrown mushrooms should block movement again");
+  assert(col.blocksSight === false, "regrown mushrooms should not block sight");
 });

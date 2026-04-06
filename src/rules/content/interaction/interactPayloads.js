@@ -1524,6 +1524,16 @@ export const INTERACT_PAYLOADS = {
           world.set(targetId, Collider, { solid: false, blocksSight: false });
         }
       }
+      // Picked dungeon mushrooms should visually disappear until regrowth.
+      if (node.kind === "mushrooms") {
+        const ni = world.get(targetId, NamedIdentity);
+        if (ni) {
+          world.set(targetId, NamedIdentity, {
+            ...ni,
+            identity: "mushrooms_picked",
+          });
+        }
+      }
 
       world.emit?.("harvest:picked", {
         actor,
