@@ -930,6 +930,11 @@ function _finalizeNewGame(classData) {
     try { localStorage.setItem('jshack.facingTurnCost', 'false'); } catch {}
   }
 
+  // Apply gore preference from character creation
+  if (classData) {
+    try { localStorage.setItem('jshack.disableGore', classData.disableGore ? 'true' : 'false'); } catch {}
+  }
+
   // If the player chose a different seed, regenerate the world
   if (classData && typeof classData.seed === 'number') {
     const chosenSeed = classData.seed >>> 0;

@@ -5,7 +5,7 @@
 
 import { Particle } from "../../passes/vfx/particles/particlePool.js";
 import { normalizeStatusEvent } from "../../../shared/events/statusEvent.js";
-import { installGoreWiring } from "./goreEngine.js";
+import { installGoreWiring, isGoreDisabled } from "./goreEngine.js";
 import { installPetUiBridge } from "./petUiBridge.js";
 
 const _installed = Symbol.for('jshack:display:floatTextWiring:installed');
@@ -113,6 +113,7 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
 
   // ── Blood burst helper (used by bleeding/hemorrhage procs) ──────────
   function spawnBloodBurst(wx, wy, { amount = 4, hue = 'blood' } = {}) {
+    if (isGoreDisabled()) return;
     const count = Math.max(10, Math.min(44, 10 + ((Number(amount) || 4) * 3) | 0));
     const bloodHue = hue === 'ichor'
       ? { r: 104, g: 165, b: 84 }

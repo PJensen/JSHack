@@ -855,6 +855,11 @@ function spawnDeathGore(pool, wx, wy, dx, dy, amount, goreType, damageType, crit
  *   getFxTime?: () => number,
  * }} deps
  */
+/** @returns {boolean} */
+export function isGoreDisabled() {
+  try { return typeof localStorage !== 'undefined' && localStorage.getItem('jshack.disableGore') === 'true'; } catch { return false; }
+}
+
 export function installGoreWiring({ world, ftext, fx, getPosition, canShowAt, isPlayer, getFxTime }) {
   /** @type {Map<number, { goreType:string, damageType:string, amount:number, critical:boolean, dx:number, dy:number }>} */
   const lastImpactByTarget = new Map();
@@ -894,7 +899,8 @@ export function installGoreWiring({ world, ftext, fx, getPosition, canShowAt, is
     const causeStr = String(cause || '');
     if (pos && fx?.pool && amount > 0
         && isGoreImpactCause(causeStr)
-        && resolvedGoreType !== 'none') {
+        && resolvedGoreType !== 'none'
+        && !isGoreDisabled()) {
       const srcPos = getPosition(Number(source || 0));
       let dx = 0, dy = 0;
       if (srcPos) {
@@ -951,7 +957,7 @@ export function installGoreWiring({ world, ftext, fx, getPosition, canShowAt, is
     const pos = getPosition(deadId);
     const rec = lastImpactByTarget.get(deadId);
     lastImpactByTarget.delete(deadId);
-    if (!pos || !canShowAt(pos.x, pos.y) || !rec || rec.goreType === 'none') return;
+    if (!pos || !canShowAt(pos.x, pos.y) || !rec || rec.goreType === 'none' || isGoreDisabled()) return;
     const deathFireAt = impactTracker.impactTimeFor(deadId, now());
     impactTracker.clear(deadId);
     const doDeathGore = () => {
