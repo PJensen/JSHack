@@ -1307,7 +1307,7 @@ export function initHUD() {
       border: '1px solid #2d3b52', background: '#101626', color: '#cfe8ff',
       cursor: 'pointer', fontSize: '22px', lineHeight: '1',
       display: 'grid', placeItems: 'center', whiteSpace: 'nowrap',
-      touchAction: 'manipulation', opacity: '0.4',
+      touchAction: 'manipulation', opacity: '0.6',
     });
     btn.addEventListener('click', () => {
       window.dispatchEvent(new CustomEvent('ui:castSpellSlot', { detail: { slot: index } }));
@@ -1411,12 +1411,12 @@ export function initHUD() {
       // Bar label (spell name)
       if (spell && spell.name) {
         const labelSpan = document.createElement('span');
-        labelSpan.textContent = spell.name.length > 6 ? spell.name.slice(0, 5) + '\u2026' : spell.name;
+        labelSpan.textContent = spell.name.length > 9 ? spell.name.slice(0, 8) + '\u2026' : spell.name;
         Object.assign(labelSpan.style, {
-          position: 'absolute', bottom: '1px', left: '0', right: '0',
-          textAlign: 'center', fontSize: '11px', lineHeight: '1',
-          opacity: '0.95', letterSpacing: '0.3px', pointerEvents: 'none',
-          zIndex: '3', textShadow: '0 0 3px #000, 0 1px 2px #000',
+          position: 'absolute', bottom: '1px', left: '-2px', right: '-2px',
+          textAlign: 'center', fontSize: '13px', lineHeight: '1',
+          fontWeight: '600', opacity: '1', letterSpacing: '0.3px', pointerEvents: 'none',
+          zIndex: '3', textShadow: '0 0 4px #000, 0 1px 2px #000, 0 0 8px #000',
         });
         btn.appendChild(labelSpan);
       }
@@ -2945,12 +2945,12 @@ function createMobileSpellRadial(mobileLayoutMq) {
       // Spell name label
       const label = document.createElement('span');
       const name = spell.name || spell.id;
-      label.textContent = name.length > 6 ? name.slice(0, 5) + '\u2026' : name;
+      label.textContent = name.length > 9 ? name.slice(0, 8) + '\u2026' : name;
       Object.assign(label.style, {
         position: 'absolute', bottom: '-13px', left: '-8px', right: '-8px',
-        textAlign: 'center', fontSize: '9px', opacity: '0.8',
+        textAlign: 'center', fontSize: '11px', fontWeight: '600', opacity: '1',
         pointerEvents: 'none', whiteSpace: 'nowrap',
-        textShadow: '0 0 4px #000, 0 0 2px #000',
+        textShadow: '0 0 4px #000, 0 0 2px #000, 0 0 8px #000',
       });
       item.appendChild(label);
 

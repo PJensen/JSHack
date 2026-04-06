@@ -3130,7 +3130,10 @@ function runGeneratorScript(world, actor, spell, { baseAmount, type, cause, mana
     if (!hasSpellLineOfSight({ sourcePos: apos, targetPos: pos, range, isBlocked })) continue;
     if (dist < bestDist) { bestDist = dist; bestId = id; }
   }
-  if (!bestId) { emitSpellMiss(world, actor, spell); return; }
+  if (!bestId) {
+    emitSafe(world, 'spell:no-target', { actor, spellId: spell?.id || cause, range });
+    return;
+  }
 
   const tpos = /** @type any */ (world.get(bestId, Position));
   const result = dealDamage(world, buildSpellDamageSpec(world, actor, bestId, {
