@@ -752,56 +752,10 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
     scrollTo((classIndex + 1) % classes.length);
   });
 
-  // ---- hard mode checkbox ----
-  const hardRow = document.createElement('label');
-  Object.assign(hardRow.style, {
-    display: 'inline-flex', alignItems: 'center', gap: '8px',
-    cursor: 'pointer', userSelect: 'none',
-    marginBottom: '16px',
-    touchAction: 'manipulation',
-  });
+  // ---- hard mode checkbox (rendered inside confirm button, created here) ----
   const hardInput = document.createElement('input');
   hardInput.type = 'checkbox';
   Object.assign(hardInput.style, { position: 'absolute', opacity: '0', pointerEvents: 'none' });
-
-  const hardBox = document.createElement('span');
-  Object.assign(hardBox.style, {
-    width: '18px', height: '18px',
-    border: '1px solid rgba(90,100,115,0.5)',
-    borderRadius: '4px',
-    background: 'transparent',
-    display: 'grid', placeItems: 'center',
-    color: 'transparent', fontSize: '11px',
-    transition: 'border-color 120ms, color 120ms, box-shadow 120ms',
-  });
-  hardBox.textContent = '\u2726';
-
-  const hardLabel = document.createElement('span');
-  hardLabel.textContent = 'Hard';
-  Object.assign(hardLabel.style, {
-    fontSize: '12px', color: UI.muted,
-    textTransform: 'uppercase', letterSpacing: '0.10em',
-  });
-
-  function renderHard() {
-    if (hardInput.checked) {
-      hardBox.style.borderColor = '#8ca2ba';
-      hardBox.style.color = '#d3e2f1';
-      hardBox.style.boxShadow = '0 0 8px rgba(127,152,178,0.2)';
-      hardLabel.style.color = '#c2d2e1';
-    } else {
-      hardBox.style.borderColor = 'rgba(90,100,115,0.5)';
-      hardBox.style.color = 'transparent';
-      hardBox.style.boxShadow = '';
-      hardLabel.style.color = UI.muted;
-    }
-    refreshConfirmCta();
-  }
-  hardInput.addEventListener('change', renderHard);
-  hardRow.appendChild(hardInput);
-  hardRow.appendChild(hardBox);
-  hardRow.appendChild(hardLabel);
-  box.appendChild(hardRow);
 
   // ---- tutorial toggle ----
   const tutRow = document.createElement('label');
@@ -873,10 +827,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
   });
   const goreInput = document.createElement('input');
   goreInput.type = 'checkbox';
-  try {
-    goreInput.checked = typeof localStorage !== 'undefined'
-      && localStorage.getItem('jshack.disableGore') === 'true';
-  } catch { goreInput.checked = false; }
+  goreInput.checked = false;
   Object.assign(goreInput.style, { position: 'absolute', opacity: '0', pointerEvents: 'none' });
 
   const goreBox = document.createElement('span');
@@ -935,10 +886,11 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
   runeWrap.appendChild(runeLabelEl);
   box.appendChild(runeWrap);
 
-  // ---- confirm button ----
+  // ---- confirm button (with inline hard-mode checkbox) ----
   const confirmBtn = document.createElement('button');
   Object.assign(confirmBtn.style, {
-    display: 'block', width: '100%',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    width: '100%',
     padding: '14px',
     fontSize: '15px', fontWeight: 'bold', fontFamily: 'monospace',
     background: 'linear-gradient(180deg, #2a2f35 0%, #1f2329 100%)',
@@ -949,13 +901,72 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
     transition: 'transform 120ms, border-color 120ms, box-shadow 120ms',
     touchAction: 'manipulation',
     marginBottom: '14px',
+    gap: '10px',
   });
+
+  const confirmText = document.createElement('span');
+  const hardToggle = document.createElement('label');
+  Object.assign(hardToggle.style, {
+    display: 'inline-flex', alignItems: 'center', gap: '5px',
+    cursor: 'pointer', userSelect: 'none',
+    marginLeft: '6px',
+    fontSize: '11px',
+    touchAction: 'manipulation',
+  });
+
+  const hardBox = document.createElement('span');
+  Object.assign(hardBox.style, {
+    width: '16px', height: '16px',
+    border: '1px solid rgba(90,100,115,0.5)',
+    borderRadius: '3px',
+    background: 'transparent',
+    display: 'grid', placeItems: 'center',
+    color: 'transparent', fontSize: '10px',
+    transition: 'border-color 120ms, color 120ms, box-shadow 120ms',
+    flexShrink: '0',
+  });
+  hardBox.textContent = '\u2726';
+
+  const hardLabel = document.createElement('span');
+  hardLabel.textContent = 'Hard';
+  Object.assign(hardLabel.style, {
+    fontSize: '11px', color: UI.muted,
+    textTransform: 'uppercase', letterSpacing: '0.08em',
+    transition: 'color 120ms',
+  });
+
+  hardToggle.appendChild(hardInput);
+  hardToggle.appendChild(hardBox);
+  hardToggle.appendChild(hardLabel);
+
+  // Clicking the hard toggle should NOT trigger the confirm action
+  hardToggle.addEventListener('pointerdown', (e) => { e.stopPropagation(); });
+  hardToggle.addEventListener('click', (e) => { e.stopPropagation(); });
+
+  function renderHard() {
+    if (hardInput.checked) {
+      hardBox.style.borderColor = '#8ca2ba';
+      hardBox.style.color = '#d3e2f1';
+      hardBox.style.boxShadow = '0 0 6px rgba(127,152,178,0.2)';
+      hardLabel.style.color = '#c2d2e1';
+    } else {
+      hardBox.style.borderColor = 'rgba(90,100,115,0.5)';
+      hardBox.style.color = 'transparent';
+      hardBox.style.boxShadow = '';
+      hardLabel.style.color = UI.muted;
+    }
+    refreshConfirmCta();
+  }
+  hardInput.addEventListener('change', renderHard);
+
+  confirmBtn.appendChild(confirmText);
+  confirmBtn.appendChild(hardToggle);
 
   let ctaPulseAnim = null;
   function refreshConfirmCta() {
     const cls = classes[classIndex];
     const hard = hardInput.checked;
-    confirmBtn.textContent = hard ? `Swear and descend as ${cls.name}` : `Begin as ${cls.name}`;
+    confirmText.textContent = hard ? `Swear and descend as ${cls.name}` : `Begin as ${cls.name}`;
     confirmBtn.style.borderColor = hard ? '#8ca2ba' : '#6f7d8d';
     if (ctaPulseAnim) { try { ctaPulseAnim.cancel(); } catch {} ctaPulseAnim = null; }
     try {
