@@ -559,7 +559,7 @@ Deno.test("movementSystem: non-spider does not spawn web", () => {
   } finally { clearAll(); }
 });
 
-Deno.test("movementSystem: slowed status prevents movement while active", () => {
+Deno.test("movementSystem: slowed status skips every Nth movement attempt", () => {
   loadFloorChunk();
   try {
     const world = new World({ seed: 42 });
@@ -567,26 +567,29 @@ Deno.test("movementSystem: slowed status prevents movement while active", () => 
     world.add(player, Position, { x: 5, y: 5 });
     world.add(player, Player);
     world.add(player, ActiveEffects, {
-      effects: [{ key: "slowed", turnsLeft: 2, potency: 1, stacks: 1, startedAtTurn: 0 }],
+      effects: [{ key: "slowed", turnsLeft: 6, potency: 1, stacks: 1, startedAtTurn: 0 }],
     });
 
+    // 1 stack → move every 2nd attempt (skip, move, skip, move, ...)
     world.add(player, MoveIntent, { dx: 1, dy: 0 });
     movementSystem(world);
     let pos = world.get(player, Position);
-    assertEquals(pos.x, 5, "slowed actor should not move on first attempt");
-    effectSystem(world);
+    assertEquals(pos.x, 5, "1st attempt should be blocked (slowed cadence)");
 
     world.add(player, MoveIntent, { dx: 1, dy: 0 });
     movementSystem(world);
     pos = world.get(player, Position);
-    assertEquals(pos.x, 5, "slowed actor should remain immobile while status is active");
-    effectSystem(world);
-    effectSystem(world);
+    assertEquals(pos.x, 6, "2nd attempt should succeed (cadence allows)");
 
     world.add(player, MoveIntent, { dx: 1, dy: 0 });
     movementSystem(world);
     pos = world.get(player, Position);
-    assertEquals(pos.x, 6, "actor should move once slowed expires");
+    assertEquals(pos.x, 6, "3rd attempt should be blocked again");
+
+    world.add(player, MoveIntent, { dx: 1, dy: 0 });
+    movementSystem(world);
+    pos = world.get(player, Position);
+    assertEquals(pos.x, 7, "4th attempt should succeed again");
   } finally { clearAll(); }
 });
 

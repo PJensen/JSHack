@@ -2151,10 +2151,10 @@ export function installMessageWiring({
     if (!Player || !world.has(actor, Player)) return;
     const lines = [
       'You struggle against the sticky web!',
-      'You wriggle but the web holds fast!',
-      'The web clings to you — you can\'t move!',
+      'You wriggle but the web slows you!',
+      'The web clings to you — you stumble!',
       'You strain against the webbing!',
-      'Sticky silk binds your limbs!',
+      'Sticky silk drags at your limbs!',
     ];
     const pick = lines[(world.step || 0) % lines.length];
     log(pick, 'warning');
