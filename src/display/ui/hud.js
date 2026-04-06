@@ -1413,10 +1413,10 @@ export function initHUD() {
         const labelSpan = document.createElement('span');
         labelSpan.textContent = spell.name.length > 6 ? spell.name.slice(0, 5) + '\u2026' : spell.name;
         Object.assign(labelSpan.style, {
-          position: 'absolute', bottom: '2px', left: '0', right: '0',
-          textAlign: 'center', fontSize: '9px', lineHeight: '1',
-          opacity: '0.7', letterSpacing: '0.3px', pointerEvents: 'none',
-          zIndex: '3',
+          position: 'absolute', bottom: '1px', left: '0', right: '0',
+          textAlign: 'center', fontSize: '11px', lineHeight: '1',
+          opacity: '0.95', letterSpacing: '0.3px', pointerEvents: 'none',
+          zIndex: '3', textShadow: '0 0 3px #000, 0 1px 2px #000',
         });
         btn.appendChild(labelSpan);
       }
@@ -1793,11 +1793,12 @@ function createQuickSlot(opts = {}) {
     }, AUTO_DISMISS_MS);
   }
 
-  function renderStack() {
+  function renderStack(opts) {
     el.innerHTML = '';
     const it = peekStackTop(stack);
     if (!it) return;
     const chip = renderQuickChip(it, {
+      startExpanded: !!(opts && opts.startExpanded),
       onUse: () => dispatchAction(it),
       onThrow: Number(it?.id || 0) > 0 ? () => dispatchThrow(it) : null,
       onDrop: Number(it?.id || 0) > 0 ? () => dispatchDrop(it) : null,
@@ -1851,7 +1852,7 @@ function createQuickSlot(opts = {}) {
     const idx = stack.findIndex((x) => x && x.id === normalized.id);
     if (idx >= 0) stack.splice(idx, 1);
     stack.push(normalized);
-    renderStack();
+    renderStack({ startExpanded: true });
     resetDismissTimer();
   }
 
@@ -3765,6 +3766,7 @@ function renderQuickChip(it, h) {
     chevron.textContent = expanded ? '▴' : '▾';
     line2.textContent = getQuickChipDetailLine(it, { expanded });
   };
+  if (h.startExpanded) setExpanded(true);
   header.addEventListener('click', () => {
     markInteracted();
     setExpanded(!expanded);
