@@ -368,7 +368,15 @@ export const basePalette = {
     ]
   },
   market_stall:  { glyph: "⌂", fg: "#c4a060", glow: "#8a6830" },
-  bench:         { glyph: "▬", fg: "#9a7850", glow: "#6a5030" },
+  bench: {
+    layers: [
+      { glyph: "⌞", fg: "#5f4444", glow: "#aaaaaa", dx: -0.19, dy: 0.128, scale: 0.92 },
+      { glyph: "⌟", fg: "#5f4444", glow: "#aaaaaa", dx: 0.19, dy: 0.128, scale: 0.92 },
+      { glyph: "▬", fg: "#6f5454", glow: "#aaaaaa", dy: -0.112, scale: 1.06 },
+      { glyph: "▬", fg: "#8a6d6d", glow: "#aaaaaa", dy: 0.064, scale: 1.18 },
+      { glyph: "┄", fg: "#7a5e5e", glow: "#aaaaaa", dy: 0.016, scale: 0.9 },
+    ]
+  },
   // Natural features
   boulder:       { glyph: "●", fg: "#8a8e93", glow: "#5a5e63" },
   fallen_log:    { glyph: "═", fg: "#6a5a3a", glow: "#3a2a18" },
