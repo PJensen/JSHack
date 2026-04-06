@@ -1,7 +1,6 @@
 import { createFrom } from "../../../lib/ecs-js/archetype.js";
 import { GoldStack } from "../../archetypes/Items.js";
 import { ItemInfo } from "../../components/ItemInfo.js";
-import { DungeonState } from "../../components/DungeonState.js";
 import { NamedIdentity } from "../../components/NamedIdentity.js";
 import { Player } from "../../components/Player.js";
 import { Position } from "../../components/Position.js";
@@ -106,19 +105,12 @@ export const RatInfestationQuest = registerQuest({
                   text: "take this — there are bats down there too.",
                 });
 
-                // Spawn a rat next to the cellar hatch so the player sees one immediately
-                let stairPos = null;
-                for (const [, ds] of ctx.world.query(DungeonState)) {
-                  if (Array.isArray(ds?.downStairPositions) && ds.downStairPositions.length > 0) {
-                    stairPos = ds.downStairPositions[0];
-                    break;
-                  }
-                }
-                if (stairPos) {
+                // Spawn a rat inside the tavern near the barkeep
+                if (Number.isFinite(x) && Number.isFinite(y)) {
                   const offsets = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]];
                   for (const [dx, dy] of offsets) {
-                    const rx = (stairPos.x | 0) + dx;
-                    const ry = (stairPos.y | 0) + dy;
+                    const rx = x + dx;
+                    const ry = y + dy;
                     if (isWalkable(rx, ry)) {
                       const def = getMonster("rat");
                       if (def) {
@@ -141,7 +133,7 @@ export const RatInfestationQuest = registerQuest({
                 }
 
                 // Beat 2: react to the rat
-                if (stairPos) {
+                if (Number.isFinite(x) && Number.isFinite(y)) {
                   emitSafe(ctx.world, "npc:dialogue", {
                     actor: giverId,
                     targetId: Number(ctx.bind.player || 0) | 0,
