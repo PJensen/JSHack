@@ -5,6 +5,14 @@ node_modules/
 .DS_Store
 Thumbs.db
 
+*.zip
+assets/audio/8bitRPGHack&SlashSFX 2
+assets/audio/wav_notes.txt
+assets/audio/unused/
+assets/audio/*.zip
+assets/audio/play_all_wavs.sh
+
+
 # VS Code
 .vscode/
 
