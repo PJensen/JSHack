@@ -508,6 +508,8 @@ export function installMessageWiring({
       log('You are stunned and lose the channel.', 'system');
     } else if (reason === 'mindlocked') {
       log('Your mind locks and the channel breaks.', 'system');
+    } else if (reason === 'mana_full') {
+      log('Your mana is fully restored.', 'system');
     } else {
       log('Channeling interrupted.', 'system');
     }

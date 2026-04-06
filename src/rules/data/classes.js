@@ -204,6 +204,7 @@ export const CLASS_DEFS = {
       { itemId: 'scroll_identify', count: 4 },
     ],
     startingSpells: [
+      'evocation',       // ✨ channel: stand still, restore mana over time
       'frost',           // core: frost projectile + slow
     ],
   },

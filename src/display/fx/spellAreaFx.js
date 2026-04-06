@@ -219,6 +219,21 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
    * }>} */
   const _drainLifeChannels = new Map();
 
+  /**
+   * Evocation channel VFX state — arcane mana-draw aura.
+   * @type {Map<number, {
+   *   actor:number,
+   *   phase:number,
+   *   intensity:number,
+   *   moteClock:number,
+   *   tickFlash:number,
+   *   fading:boolean,
+   *   fadeLeft:number,
+   *   fadeMax:number,
+   * }>}
+   */
+  const _evocationChannels = new Map();
+
   const STORM_VOLLEY_SWAY_MAX_RAD = Math.PI / 36; // +/- 5deg
   const STORM_LOCAL_SWAY_MAX_RAD = Math.PI / 60; // +/- 3deg
 
@@ -469,6 +484,170 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
         a0: 0.72,
       }));
     }
+
+    // --- Tick: Evocation channels ---
+    for (const [actorId, ch] of _evocationChannels) {
+      ch.tickFlash = Math.max(0, Number(ch.tickFlash || 0) - dt);
+      ch.moteClock = Math.max(0, Number(ch.moteClock || 0) - dt);
+
+      const actorPos = typeof getPosition === "function" ? getPosition(actorId) : null;
+      if (!actorPos) { _evocationChannels.delete(actorId); continue; }
+
+      if (ch.fading) {
+        ch.fadeLeft = Math.max(0, Number(ch.fadeLeft || 0) - dt);
+        if (ch.fadeLeft <= 0) _evocationChannels.delete(actorId);
+        continue;
+      }
+
+      // Ramp intensity up over time
+      ch.intensity = Math.min(1.5, (ch.intensity || 0) + dt * 0.6);
+
+      if (!fx?.pool || ch.moteClock > 0) continue;
+      ch.moteClock = 0.025 + Math.random() * 0.04;
+
+      // Spawn converging aether particles in a ring around the caster, spiraling inward
+      const cx = Number(actorPos.x);
+      const cy = Number(actorPos.y);
+      const spawnRadius = 0.8 + Math.random() * 0.6;
+      const angle = Math.random() * Math.PI * 2;
+      const px = cx + Math.cos(angle) * spawnRadius;
+      const py = cy + Math.sin(angle) * spawnRadius;
+      // Velocity toward center with tangential spiral component
+      const toCenterX = cx - px;
+      const toCenterY = cy - py;
+      const tangentX = -toCenterY * 0.4;
+      const tangentY = toCenterX * 0.4;
+      const speed = 0.8 + Math.random() * 0.5;
+      const life = 0.3 + Math.random() * 0.25;
+
+      // Primary arcane motes — blue-violet converging
+      fx.pool.spawn(new Particle({
+        x: px, y: py,
+        vx: (toCenterX + tangentX) * speed,
+        vy: (toCenterY + tangentY) * speed,
+        life,
+        size0: 0.06 + Math.random() * 0.05,
+        size1: 0.01,
+        r: 120 + ((Math.random() * 40) | 0),
+        g: 140 + ((Math.random() * 60) | 0),
+        b: 255,
+        a0: 0.7 * ch.intensity,
+        a1: 0,
+      }));
+
+      // Secondary bright mote — white-cyan core energy (sparser)
+      if (Math.random() < 0.35) {
+        const innerRadius = 0.3 + Math.random() * 0.3;
+        const a2 = Math.random() * Math.PI * 2;
+        fx.pool.spawn(new Particle({
+          x: cx + Math.cos(a2) * innerRadius,
+          y: cy + Math.sin(a2) * innerRadius,
+          vx: (cx - (cx + Math.cos(a2) * innerRadius)) * 1.2,
+          vy: (cy - (cy + Math.sin(a2) * innerRadius)) * 1.2 - 0.15,
+          life: 0.15 + Math.random() * 0.12,
+          size0: 0.04 + Math.random() * 0.03,
+          size1: 0.005,
+          r: 200 + ((Math.random() * 55) | 0),
+          g: 220 + ((Math.random() * 35) | 0),
+          b: 255,
+          a0: 0.85 * ch.intensity,
+          a1: 0,
+        }));
+      }
+
+      // Rising wisps — energy ascending from the draw point
+      if (Math.random() < 0.2) {
+        fx.pool.spawn(new Particle({
+          x: cx + (Math.random() - 0.5) * 0.15,
+          y: cy,
+          vx: (Math.random() - 0.5) * 0.15,
+          vy: -0.6 - Math.random() * 0.4,
+          life: 0.35 + Math.random() * 0.25,
+          size0: 0.035 + Math.random() * 0.025,
+          size1: 0.005,
+          r: 180 + ((Math.random() * 40) | 0),
+          g: 160 + ((Math.random() * 60) | 0),
+          b: 255,
+          a0: 0.5 * ch.intensity,
+          a1: 0,
+        }));
+      }
+    }
+  }
+
+  // --- Draw: Evocation ---
+  /** @param {CanvasRenderingContext2D} ctx */
+  function drawEvocation(ctx) {
+    if (!_evocationChannels.size || typeof getPosition !== "function") return;
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    const now = getFxTime();
+    const TAU = Math.PI * 2;
+
+    for (const [actorId, ch] of _evocationChannels) {
+      const pos = getPosition(actorId);
+      if (!pos) continue;
+      const cx = Number(pos.x);
+      const cy = Number(pos.y);
+
+      const baseAlpha = ch.fading
+        ? 0.7 * (Number(ch.fadeLeft || 0) / Math.max(0.001, Number(ch.fadeMax || 1)))
+        : 0.7;
+      const intensity = Number(ch.intensity || 0);
+      const pulse = 0.5 + 0.5 * Math.sin(now * 8 + Number(ch.phase || 0));
+      const pulse2 = 0.5 + 0.5 * Math.sin(now * 12 + Number(ch.phase || 0) + 1.5);
+
+      // Outer aura glow — large soft circle
+      const outerR = 0.55 + pulse * 0.15 * intensity;
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, outerR);
+      grad.addColorStop(0, `rgba(100,160,255,${(0.20 * baseAlpha * intensity).toFixed(3)})`);
+      grad.addColorStop(0.5, `rgba(130,120,255,${(0.12 * baseAlpha * intensity).toFixed(3)})`);
+      grad.addColorStop(1, `rgba(80,60,200,0)`);
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, outerR, 0, TAU);
+      ctx.fill();
+
+      // Inner core glow — bright arcane center
+      const innerR = 0.15 + pulse2 * 0.08 * intensity;
+      const coreGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, innerR);
+      coreGrad.addColorStop(0, `rgba(220,240,255,${(0.35 * baseAlpha * intensity).toFixed(3)})`);
+      coreGrad.addColorStop(0.6, `rgba(140,180,255,${(0.18 * baseAlpha * intensity).toFixed(3)})`);
+      coreGrad.addColorStop(1, `rgba(100,100,220,0)`);
+      ctx.fillStyle = coreGrad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, innerR, 0, TAU);
+      ctx.fill();
+
+      // Rotating sigil arcs — 3 arcs orbiting the caster
+      const arcCount = 3;
+      const arcRadius = 0.35 + pulse * 0.06;
+      ctx.lineWidth = 0.03;
+      ctx.lineCap = "round";
+      for (let i = 0; i < arcCount; i++) {
+        const baseAngle = now * 2.5 + (TAU / arcCount) * i + Number(ch.phase || 0);
+        const arcLen = 0.6 + pulse * 0.3;
+        ctx.strokeStyle = `rgba(160,200,255,${(0.35 * baseAlpha * intensity + 0.15 * pulse).toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(cx, cy, arcRadius, baseAngle, baseAngle + arcLen);
+        ctx.stroke();
+      }
+
+      // Tick flash — bright burst when mana is restored
+      if (ch.tickFlash > 0) {
+        const tf = Math.min(1, Number(ch.tickFlash) / 0.12);
+        const flashR = 0.25 + tf * 0.20;
+        const flashGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, flashR);
+        flashGrad.addColorStop(0, `rgba(200,230,255,${(0.40 * tf).toFixed(3)})`);
+        flashGrad.addColorStop(0.5, `rgba(120,180,255,${(0.22 * tf).toFixed(3)})`);
+        flashGrad.addColorStop(1, `rgba(80,80,200,0)`);
+        ctx.fillStyle = flashGrad;
+        ctx.beginPath();
+        ctx.arc(cx, cy, flashR, 0, TAU);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
   }
 
   // --- Draw: Blink ---
@@ -2346,6 +2525,61 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
       current.endFlash = Math.max(Number(current.endFlash || 0), 0.16);
     });
 
+    // ── Evocation channel VFX ──────────────────────────────────────────
+
+    world.on("spell:evocation:start", ({ actor }) => {
+      const a = Number(actor || 0) | 0;
+      if (!(a > 0)) return;
+      _evocationChannels.set(a, {
+        actor: a,
+        phase: Math.random() * Math.PI * 2,
+        intensity: 0,
+        moteClock: 0,
+        tickFlash: 0,
+        fading: false,
+        fadeLeft: 0,
+        fadeMax: 0,
+      });
+    });
+
+    world.on("spell:evocation:tick", ({ actor, manaRestored }) => {
+      const a = Number(actor || 0) | 0;
+      if (!(a > 0)) return;
+      const current = _evocationChannels.get(a);
+      if (!current) return;
+      current.tickFlash = Math.max(0.12, Number(current.tickFlash || 0));
+
+      // Float text: "+N MANA"
+      const pos = typeof getPosition === "function" ? getPosition(a) : null;
+      if (pos && ftext && Number(manaRestored) > 0) {
+        ftext.addStatus(pos.x, pos.y - 0.45, `+${manaRestored} MANA`, {
+          color: '#88ccff', life: 0.85, scaleStart: 1.15, scaleEnd: 0.85,
+        });
+      }
+    });
+
+    world.on("channeling:cancelled", ({ actor, spellId, reason }) => {
+      if (String(spellId || "") !== "evocation") return;
+      const a = Number(actor || 0) | 0;
+      if (!(a > 0)) return;
+      const current = _evocationChannels.get(a);
+      if (!current) return;
+      current.fading = true;
+      current.fadeMax = 0.28;
+      current.fadeLeft = current.fadeMax;
+    });
+
+    world.on("channeling:complete", ({ actor, spellId }) => {
+      if (String(spellId || "") !== "evocation") return;
+      const a = Number(actor || 0) | 0;
+      if (!(a > 0)) return;
+      const current = _evocationChannels.get(a);
+      if (!current) return;
+      current.fading = true;
+      current.fadeMax = 0.22;
+      current.fadeLeft = current.fadeMax;
+    });
+
     // ── Class ability VFX ────────────────────────────────────────────────
 
     world.on('spell:war_cry', ({ at, affected }) => {
@@ -2771,5 +3005,5 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
     return out;
   }
 
-  return { tick, drawBlink, drawMeteor, drawBlastwave, drawFlashHeal, drawSmite, drawPhaseStrike, drawRampage, drawSearchPulse, drawDrainLife, drawCleave, drawWarCry, drawDivineShield, drawConsecrate, drawSmokeBomb, getActiveLights, installListeners };
+  return { tick, drawBlink, drawMeteor, drawBlastwave, drawFlashHeal, drawSmite, drawPhaseStrike, drawRampage, drawSearchPulse, drawDrainLife, drawEvocation, drawCleave, drawWarCry, drawDivineShield, drawConsecrate, drawSmokeBomb, getActiveLights, installListeners };
 }
