@@ -1,12 +1,16 @@
 import { createFrom } from "../../../lib/ecs-js/archetype.js";
 import { GoldStack } from "../../archetypes/Items.js";
 import { ItemInfo } from "../../components/ItemInfo.js";
+import { DungeonState } from "../../components/DungeonState.js";
 import { NamedIdentity } from "../../components/NamedIdentity.js";
 import { Player } from "../../components/Player.js";
 import { Position } from "../../components/Position.js";
 import { QuestVars } from "../../components/QuestVars.js";
+import { getMonster } from "../../data/monsters.js";
 import { createItemById } from "../../utils/itemFactory.js";
+import { spawnMonsterEntity } from "../../utils/spawnMonsterEntity.js";
 import { emitSafe } from "../../utils/emitSafe.js";
+import { isWalkable } from "../../environment/dungeon/tileMap.js";
 import { emit, incVar, setVar } from "../actions.js";
 import { registerQuest } from "../registry.js";
 import { getQuestRecord } from "../runtime.js";
@@ -95,11 +99,55 @@ export const RatInfestationQuest = registerQuest({
                   emitSafe(ctx.world, "item:dropped", { itemId: arrowsId, count: 20, at: { x, y } });
                 }
 
+                // Beat 1: hand over the gear
                 emitSafe(ctx.world, "npc:dialogue", {
                   actor: giverId,
                   targetId: Number(ctx.bind.player || 0) | 0,
-                  text: "take these, there are bats down there too!",
+                  text: "take this — there are bats down there too.",
                 });
+
+                // Spawn a rat next to the cellar hatch so the player sees one immediately
+                let stairPos = null;
+                for (const [, ds] of ctx.world.query(DungeonState)) {
+                  if (Array.isArray(ds?.downStairPositions) && ds.downStairPositions.length > 0) {
+                    stairPos = ds.downStairPositions[0];
+                    break;
+                  }
+                }
+                if (stairPos) {
+                  const offsets = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]];
+                  for (const [dx, dy] of offsets) {
+                    const rx = (stairPos.x | 0) + dx;
+                    const ry = (stairPos.y | 0) + dy;
+                    if (isWalkable(rx, ry)) {
+                      const def = getMonster("rat");
+                      if (def) {
+                        spawnMonsterEntity(ctx.world, {
+                          x: rx, y: ry,
+                          name: def.name,
+                          identity: def.id,
+                          maxHp: def.baseHp,
+                          faction: "enemy",
+                          naturalDamageDice: def.damageDice,
+                          sizeClass: def.sizeClass,
+                          massKg: def.massKg,
+                          resistances: def.resistances,
+                          speed: def.speed,
+                        });
+                      }
+                      break;
+                    }
+                  }
+                }
+
+                // Beat 2: react to the rat
+                if (stairPos) {
+                  emitSafe(ctx.world, "npc:dialogue", {
+                    actor: giverId,
+                    targetId: Number(ctx.bind.player || 0) | 0,
+                    text: "there's one! Kill it!",
+                  });
+                }
               },
               emit("quest:started", (ctx) => ({
                 questId: RAT_INFESTATION_QUEST_ID,
