@@ -269,8 +269,10 @@ export const basePalette = {
   lumber_chest:    { glyph: "]", fg: "#b88752", glow: "#7c4f22" },
   bed_home: {
     layers: [
-      { glyph: "▬", fg: "#7b6345", glow: "#5a4a3a" },                           // frame
-      { glyph: "▪", fg: "#d4c9b0", glow: "#a09080", dx: -0.14, dy: -0.06, scale: 0.5 }, // pillow
+    { glyph: "┌", fg: "#965a5a", glow: "#aaaaaa", dx: -0.21, dy: -0.07, scale: 0.75 },
+    { glyph: "┐", fg: "#9e6767", glow: "#aaaaaa", dx: 0.27, dy: -0.04, scale: 0.68 },
+    { glyph: "▬", fg: "#7b6345", glow: "#5a4a3a", dx: 0.03, dy: -0.03, scale: 1.5 },
+    { glyph: "▪", fg: "#d8d4cb", glow: "#a09080", dx: -0.14, dy: -0.06, scale: 0.75 },
     ]
   },
   house_sign: { glyph: "!", fg: "#d8c08a", glow: "#8b6f3f" },
