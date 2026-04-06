@@ -80,7 +80,7 @@ export const CLASS_DEFS = {
     },
     equipment: {
       weapon: 'dagger_quick',
-      armor: null,
+      armor: 'leather_armor',
       offhand: null,
       feet: 'boots_leather',
       ranged: 'bow_short',
@@ -117,7 +117,7 @@ export const CLASS_DEFS = {
     },
     equipment: {
       weapon: 'iron_pickaxe',
-      armor: null,
+      armor: 'leather_armor',
       offhand: null,
       neck: 'pendant_lucky',
       feet: 'boots_leather',
