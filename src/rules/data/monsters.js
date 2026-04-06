@@ -1573,6 +1573,87 @@ export const MONSTERS = [
     specials: [],
     description: 'An animated stone idol that heckles anything that breathes.',
   },
+  // ── Killer Bee (tier 0, minDepth 2) — flying poison swarm ────────────
+  {
+    id: 'killer_bee',
+    name: 'Killer Bee',
+    tags: ['beast', 'vermin'],
+    tier: 0,
+    minDepth: 2,
+    canFly: true,
+    intelligence: 2,   // instinct-driven swarm insect
+    packSense: true, packRadius: 12,
+    baseHp: 3,
+    hpPerLevel: 0.5,
+    attack: 0,
+    defense: 0,
+    damageDice: '1d2',
+    sizeClass: 'XS',
+    massKg: 1,
+    resistances: { kinetic: { DR: 0 }, chemical: { toxMult: 0 } },
+    speed: 3,          // fast (actEvery = 1)
+    hooks: {
+      onHit: [statusEffectOnHit(20, 0xdead0060, { key: "poison", turnsLeft: 4, potency: 1 }, "proc:poisoned")],
+    },
+    specials: ["Poison sting 20%", "Flying", "Large swarm radius"],
+    description: 'A fat-bodied insect that attacks in angry clouds. One sting is nothing — twenty is a funeral.',
+  },
+  // ── Gelatinous Cube (tier 0, minDepth 3) — paralyzing acid blob ─────
+  {
+    id: 'gelatinous_cube',
+    name: 'Gelatinous Cube',
+    tags: ['aberration'],
+    goreType: 'ichor',
+    tier: 0,
+    minDepth: 3,
+    intelligence: 1,   // mindless — wanders aimlessly
+    baseHp: 16,
+    hpPerLevel: 1.5,
+    attack: 1,
+    defense: 0,
+    damageDice: '1d4',
+    sizeClass: 'L',
+    massKg: 200,
+    resistances: {
+      kinetic: { DR: 4 },
+      chemical: { toxMult: 0 },
+      electric: { ohms: 60 },
+    },
+    speed: 1,          // very slow (actEvery = 3)
+    hooks: {
+      onHit: [statusEffectOnHit(30, 0xdead0070, { key: "stun", turnsLeft: 2, potency: 1 }, "proc:stunned")],
+      onDamaged: [retaliateOnDamaged(2, "proc:gelatinous_cube:acid")],
+    },
+    specials: ["Paralyze 30%", "Acid retaliation (2 dmg)", "Poison/shock resistant"],
+    description: 'A translucent mass of quivering jelly that fills the corridor wall to wall. Bones float inside it.',
+  },
+  // ── Cockatrice (tier 0, minDepth 4) — petrifying touch ──────────────
+  {
+    id: 'cockatrice',
+    name: 'Cockatrice',
+    tags: ['beast'],
+    tier: 0,
+    minDepth: 4,
+    intelligence: 2,   // animal instinct
+    aggro: 'passive',  // doesn't chase — strikes when bumped
+    baseHp: 8,
+    hpPerLevel: 1,
+    attack: 0,
+    defense: 0,
+    damageDice: '1d3',
+    sizeClass: 'S',
+    massKg: 12,
+    resistances: { kinetic: { DR: 0 }, chemical: { toxMult: 0 } },
+    speed: 2,
+    hooks: {
+      onHit: [
+        statusEffectOnHit(40, 0xdead0080, { key: "slowed", turnsLeft: 4, potency: 1 }, "proc:slowed"),
+        statusEffectOnHit(25, 0xdead0081, { key: "confuse", turnsLeft: 3, potency: 1 }, "proc:confused"),
+      ],
+    },
+    specials: ["Petrifying touch (slow 40%)", "Confuse 25%", "Passive"],
+    description: 'A scaly hen-lizard with dead white eyes. Its touch numbs flesh to stone.',
+  },
   // ── Lichen (tier 0) — sessile food source ────────────────────────────
   {
     id: 'lichen',
