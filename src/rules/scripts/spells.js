@@ -35,7 +35,8 @@ import { chebyshev, chebyshevScalar } from "../utils/distance.js";
 import { buildSpellDamageSpec, createSpellDamageContext, emitSpellMiss, getSpellHitChancePct, getSpellIntelligenceBonus, rollSpellHit, scaleSpellDamage } from "../utils/spellDamage.js";
 import { hasSpellLineOfSight } from "../utils/spellTargeting.js";
 import { isVisible as isTileVisible } from "../environment/dungeon/exploredMap.js";
-import { getPassiveBonuses, effectiveMaxHp, effectiveMaxMana } from "../utils/passiveBonuses.js";
+import { getPassiveBonuses, effectiveMaxHp, effectiveMaxMana, effectiveMaxStamina } from "../utils/passiveBonuses.js";
+import { Stamina } from "../components/Stamina.js";
 import { spawnHazard } from "../utils/hazardSpawn.js";
 import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { Monster } from "../archetypes/Creatures.js";
@@ -3104,6 +3105,109 @@ REGISTRY['earthshatter'] = function earthshatterScript(world, actor, spell, inte
     origin: { x: apos.x, y: apos.y },
     radius: RADIUS,
     enhanced,
+  });
+};
+
+// ─── Generators (resource builders) ─────────────────────────────────────────
+
+/** Shared helper: auto-target nearest hostile in range + LOS, deal damage, restore resources. */
+function runGeneratorScript(world, actor, spell, { baseAmount, type, cause, manaRestore, staminaRestore }) {
+  const apos = /** @type any */ (world.get(actor, Position));
+  if (!apos) return;
+  const actorFaction = String(world.get(actor, Faction)?.key || 'player');
+  const range = Number(spell?.range || 1) | 0;
+  const isBlocked = blockedCallback(buildBlocksVisionMap(world));
+
+  let bestId = 0, bestD2 = Infinity;
+  for (const [id, pos] of world.query(Position)) {
+    if (id === actor) continue;
+    const fac = /** @type any */ (world.get(id, Faction));
+    if (!fac || !areFactionsHostile(actorFaction, fac.key)) continue;
+    const vit = /** @type any */ (world.get(id, Vitality));
+    if (!vit || (vit.hp | 0) <= 0) continue;
+    const dx = (pos.x | 0) - (apos.x | 0), dy = (pos.y | 0) - (apos.y | 0);
+    const d2 = dx * dx + dy * dy;
+    if (d2 > range * range) continue;
+    if (!hasSpellLineOfSight({ sourcePos: apos, targetPos: pos, range, isBlocked })) continue;
+    if (d2 < bestD2) { bestD2 = d2; bestId = id; }
+  }
+  if (!bestId) { emitSpellMiss(world, actor, spell); return; }
+
+  const tpos = /** @type any */ (world.get(bestId, Position));
+  const result = dealDamage(world, buildSpellDamageSpec(world, actor, bestId, {
+    spell, baseAmount, type, cause,
+    at: { x: tpos.x, y: tpos.y },
+  }));
+
+  // Restore resources on hit
+  if (result.applied) {
+    if (manaRestore > 0) {
+      const mana = /** @type any */ (world.get(actor, Mana));
+      if (mana) {
+        const maxM = effectiveMaxMana(world, actor, mana);
+        const before = Number(mana.mana || 0);
+        mana.mana = Math.min(maxM, before + manaRestore);
+      }
+    }
+    if (staminaRestore > 0) {
+      const stam = /** @type any */ (world.get(actor, Stamina));
+      if (stam) {
+        const maxS = effectiveMaxStamina(world, actor, stam);
+        const before = Number(stam.stamina || 0);
+        stam.stamina = Math.min(maxS, before + staminaRestore);
+      }
+    }
+  }
+
+  emitSafe(world, cause, {
+    actor, targetId: bestId,
+    from: { x: apos.x, y: apos.y },
+    at: { x: tpos.x, y: tpos.y },
+    hit: result.applied,
+    manaRestored: result.applied ? manaRestore : 0,
+    staminaRestored: result.applied ? staminaRestore : 0,
+  });
+}
+
+REGISTRY['savage_strike'] = function(world, actor, spell, intent) {
+  runGeneratorScript(world, actor, spell, {
+    baseAmount: 4, type: 'physical', cause: 'spell:savage_strike',
+    manaRestore: 0, staminaRestore: 20,
+  });
+};
+
+REGISTRY['natures_touch'] = function(world, actor, spell, intent) {
+  runGeneratorScript(world, actor, spell, {
+    baseAmount: 2, type: 'nature', cause: 'spell:natures_touch',
+    manaRestore: 8, staminaRestore: 0,
+  });
+};
+
+REGISTRY['cheap_shot'] = function(world, actor, spell, intent) {
+  runGeneratorScript(world, actor, spell, {
+    baseAmount: 3, type: 'physical', cause: 'spell:cheap_shot',
+    manaRestore: 10, staminaRestore: 0,
+  });
+};
+
+REGISTRY['arcane_bolt'] = function(world, actor, spell, intent) {
+  runGeneratorScript(world, actor, spell, {
+    baseAmount: 3, type: 'arcane', cause: 'spell:arcane_bolt',
+    manaRestore: 6, staminaRestore: 0,
+  });
+};
+
+REGISTRY['leech_spores'] = function(world, actor, spell, intent) {
+  runGeneratorScript(world, actor, spell, {
+    baseAmount: 2, type: 'nature', cause: 'spell:leech_spores',
+    manaRestore: 6, staminaRestore: 10,
+  });
+};
+
+REGISTRY['holy_strike'] = function(world, actor, spell, intent) {
+  runGeneratorScript(world, actor, spell, {
+    baseAmount: 3, type: 'holy', cause: 'spell:holy_strike',
+    manaRestore: 8, staminaRestore: 0,
   });
 };
 

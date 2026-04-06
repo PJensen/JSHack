@@ -897,6 +897,105 @@ export const SPELL_DEFS = {
     ],
   },
 
+  // ── Generators (resource builders) ─────────────────────────────────────────
+
+  savage_strike: {
+    id: 'savage_strike',
+    name: 'Savage Strike',
+    symbol: '\u{1F9AC}',     // 🦬
+    schools: ['physical'],
+    manaCost: 0,
+    minIntelligence: 0,
+    range: 1,
+    script: 'savage_strike',
+    targeting: 'auto',
+    description: 'A brutal, efficient blow. Costs nothing — fuels everything.',
+    effects: [
+      { kind: 'damage', element: 'physical', amount: '4 base, STR-scaled' },
+      { kind: 'utility', note: 'Restores 20 stamina on hit' },
+    ],
+  },
+  natures_touch: {
+    id: 'natures_touch',
+    name: "Nature's Touch",
+    symbol: '\u{1F33F}',     // 🌿
+    schools: ['nature'],
+    manaCost: 0,
+    minIntelligence: 0,
+    range: 6,
+    script: 'natures_touch',
+    targeting: 'auto',
+    description: 'Draw on the green — a wisp of nature that wounds and restores.',
+    effects: [
+      { kind: 'damage', element: 'nature', amount: '2 base, INT-scaled' },
+      { kind: 'utility', note: 'Restores 8 mana on hit' },
+    ],
+  },
+  cheap_shot: {
+    id: 'cheap_shot',
+    name: 'Cheap Shot',
+    symbol: '\u{1F44A}',     // 👊
+    schools: ['trickery', 'physical'],
+    manaCost: 0,
+    minIntelligence: 0,
+    range: 1,
+    script: 'cheap_shot',
+    targeting: 'auto',
+    description: 'A dirty hit. No finesse, just momentum and mana.',
+    effects: [
+      { kind: 'damage', element: 'physical', amount: '3 base' },
+      { kind: 'utility', note: 'Restores 10 mana on hit' },
+    ],
+  },
+  arcane_bolt: {
+    id: 'arcane_bolt',
+    name: 'Arcane Bolt',
+    symbol: '\u{2734}',      // ✴️
+    schools: ['destruction', 'arcane'],
+    manaCost: 0,
+    minIntelligence: 0,
+    range: 10,
+    script: 'arcane_bolt',
+    targeting: 'auto',
+    description: 'A thin lance of raw arcana. Barely costs a thought — and returns more than it spends.',
+    effects: [
+      { kind: 'damage', element: 'arcane', amount: '3 base, INT-scaled' },
+      { kind: 'utility', note: 'Restores 6 mana on hit' },
+    ],
+  },
+  leech_spores: {
+    id: 'leech_spores',
+    name: 'Leech Spores',
+    symbol: '\u{1F344}',     // 🍄
+    schools: ['nature', 'chemical'],
+    manaCost: 0,
+    minIntelligence: 0,
+    range: 4,
+    script: 'leech_spores',
+    targeting: 'auto',
+    description: 'Puff parasitic spores at the nearest foe. What they lose, you gain.',
+    effects: [
+      { kind: 'damage', element: 'nature', amount: '2 base' },
+      { kind: 'utility', note: 'Restores 6 mana and 10 stamina on hit' },
+    ],
+  },
+  holy_strike: {
+    id: 'holy_strike',
+    name: 'Holy Strike',
+    symbol: '\u2600',         // ☀️
+    schools: ['holy', 'physical'],
+    manaCost: 0,
+    minIntelligence: 0,
+    range: 1,
+    script: 'holy_strike',
+    targeting: 'auto',
+    description: 'Channel Seraphine\'s light through your weapon. Each blow renews your faith.',
+    effects: [
+      { kind: 'damage', element: 'holy', amount: '3 base, INT-scaled' },
+      { kind: 'utility', note: 'Restores 8 mana on hit' },
+    ],
+  },
+
   // ── Buff / Rotation abilities ─────────────────────────────────────────────
 
   iron_flesh: {

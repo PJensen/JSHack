@@ -566,6 +566,50 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     });
   });
 
+  // ── Generator float text ──
+
+  world.on('spell:savage_strike', ({ at, hit, staminaRestored }) => {
+    if (!hit || !at || !canShowAt(at.x, at.y)) return;
+    ftext.addStatus(at.x, at.y - 0.3, `+${staminaRestored || 20} STAM`, {
+      color: '#ffcc33', life: 0.9, scaleStart: 1.1, scaleEnd: 0.8,
+    });
+  });
+
+  world.on('spell:natures_touch', ({ at, hit, manaRestored }) => {
+    if (!hit || !at || !canShowAt(at.x, at.y)) return;
+    ftext.addStatus(at.x, at.y - 0.3, `+${manaRestored || 8} MANA`, {
+      color: '#44ccaa', life: 0.9, scaleStart: 1.1, scaleEnd: 0.8,
+    });
+  });
+
+  world.on('spell:cheap_shot', ({ at, hit, manaRestored }) => {
+    if (!hit || !at || !canShowAt(at.x, at.y)) return;
+    ftext.addStatus(at.x, at.y - 0.3, `+${manaRestored || 10} MANA`, {
+      color: '#88aaff', life: 0.9, scaleStart: 1.1, scaleEnd: 0.8,
+    });
+  });
+
+  world.on('spell:arcane_bolt', ({ at, hit, manaRestored }) => {
+    if (!hit || !at || !canShowAt(at.x, at.y)) return;
+    ftext.addStatus(at.x, at.y - 0.3, `+${manaRestored || 6} MANA`, {
+      color: '#cc88ff', life: 0.9, scaleStart: 1.1, scaleEnd: 0.8,
+    });
+  });
+
+  world.on('spell:leech_spores', ({ at, hit, manaRestored, staminaRestored }) => {
+    if (!hit || !at || !canShowAt(at.x, at.y)) return;
+    ftext.addStatus(at.x, at.y - 0.3, `+${manaRestored || 6} MANA +${staminaRestored || 10} STAM`, {
+      color: '#88cc44', life: 1.0, scaleStart: 1.1, scaleEnd: 0.8,
+    });
+  });
+
+  world.on('spell:holy_strike', ({ at, hit, manaRestored }) => {
+    if (!hit || !at || !canShowAt(at.x, at.y)) return;
+    ftext.addStatus(at.x, at.y - 0.3, `+${manaRestored || 8} MANA`, {
+      color: '#ffee88', life: 0.9, scaleStart: 1.1, scaleEnd: 0.8,
+    });
+  });
+
   // ── Buff / Rotation ability floats ──
 
   world.on('spell:iron_flesh', ({ at }) => {

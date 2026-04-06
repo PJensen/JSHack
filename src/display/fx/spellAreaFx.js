@@ -2019,6 +2019,60 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
       startShake(cam, 1, 0.05);
     });
 
+    // ── Generator impact VFX (small, snappy) ──
+
+    // Melee generators — small burst at impact
+    for (const _ev of ['spell:savage_strike', 'spell:cheap_shot', 'spell:holy_strike']) {
+      world.on(_ev, ({ at, hit }) => {
+        if (!hit || !at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
+        const isHoly = _ev === 'spell:holy_strike';
+        const count = PERF.quality === 'low' ? 4 : 8;
+        for (let i = 0; i < count; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const speed = 0.3 + Math.random() * 0.5;
+          fx.pool.spawn(new Particle({
+            x: at.x + (Math.random() - 0.5) * 0.15,
+            y: at.y + (Math.random() - 0.5) * 0.15,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 0.12 + Math.random() * 0.1,
+            size0: 0.04 + Math.random() * 0.03,
+            size1: 0.01,
+            r: isHoly ? 255 : _ev === 'spell:savage_strike' ? 200 : 140,
+            g: isHoly ? 230 : _ev === 'spell:savage_strike' ? 100 : 140,
+            b: isHoly ? 100 : _ev === 'spell:savage_strike' ? 50 : 180,
+            a0: 0.8,
+          }));
+        }
+      });
+    }
+
+    // Ranged generators — small impact burst at target
+    for (const _ev of ['spell:arcane_bolt', 'spell:natures_touch', 'spell:leech_spores']) {
+      world.on(_ev, ({ at, hit }) => {
+        if (!hit || !at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
+        const isArcane = _ev === 'spell:arcane_bolt';
+        const count = PERF.quality === 'low' ? 5 : 10;
+        for (let i = 0; i < count; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const speed = 0.2 + Math.random() * 0.4;
+          fx.pool.spawn(new Particle({
+            x: at.x + (Math.random() - 0.5) * 0.12,
+            y: at.y + (Math.random() - 0.5) * 0.12,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed - 0.1,
+            life: 0.15 + Math.random() * 0.12,
+            size0: 0.04 + Math.random() * 0.02,
+            size1: 0.01,
+            r: isArcane ? 180 : 60,
+            g: isArcane ? 120 : 180 + ((Math.random() * 40) | 0),
+            b: isArcane ? 255 : 60,
+            a0: 0.75,
+          }));
+        }
+      });
+    }
+
     // ── Buff / Rotation ability VFX ──
 
     // Iron Flesh — metallic sparks converging inward
