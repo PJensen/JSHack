@@ -47,7 +47,7 @@ export const basePalette = {
   boar:     { glyph: "b", fg: "#9c6f3d", glow: "#5f3f20" },
   bat:      { glyph: "b", fg: "#9080b0", glow: "#605080" }, // 🦇
   flaming_bat: { glyph: "b", fg: "#ff7a38", glow: "#b83f1d" },
-  grid_bug: { glyph: "x", fg: "#bb66ff", glow: "#44ccff" },
+  grid_bug: { glyph: "¤", fg: "#bb66ff", glow: "#44ccff" },
   cave_snake: { glyph: "S", fg: "#88aa66", glow: "#667744" },
   cave_spider: { glyph: "x", fg: "#88bb88", glow: "#558855" },
   floating_eye: { glyph: "e", fg: "#dd55ff", glow: "#9922cc" },
@@ -57,6 +57,9 @@ export const basePalette = {
   cave_bear: { glyph: "B", fg: "#8b6040", glow: "#5a3a20" },
   skeleton_archer: { glyph: "s", fg: "#c8c4b0", glow: "#908870" },
   kobold_shaman: { glyph: "k", fg: "#ffdd44", glow: "#ccaa22" },
+  killer_bee: { glyph: "a", fg: "#e8cc30", glow: "#b89a10" },
+  gelatinous_cube: { glyph: "■", fg: "#55ddbb", glow: "#22aa88" },
+  cockatrice: { glyph: "c", fg: "#b0b898", glow: "#787f68" },
   // Tier 1
   bone_bowman: { glyph: "s", fg: "#d8d4c0", glow: "#a8a490" },
   dire_wolf: { glyph: "d", fg: "#909f76", glow: "#5b6947" },
