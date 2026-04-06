@@ -5,6 +5,7 @@ import { startShake, startSlamShake } from "../camera/shake.js";
 import { pathPolyline, jitterLine } from "./fxGeom.js";
 import { Particle } from "../passes/vfx/particles/particlePool.js";
 import { RadialFx, BlinkFx, PhaseStrikeFx, SearchPulseFx, ArcSweepFx, SmokeFx } from "./fxEntries.js";
+import { isGoreDisabled } from "../ui/wiring/goreEngine.js";
 
 /**
  * @param {{ world: import('../../lib/ecs-js/index.js').World, cam: object, fx: { pool: { spawn(o:object):void } }, PERF: { quality: string }, getFxTime: () => number, getPosition?: (id:number) => ({x:number,y:number}|null), ftext?: { addDamage: Function, addStatus?: Function }, sculptFloor?: ((x:number,y:number,delta:number,reliefKey?: string|number)=>void), sculptFloorBrush?: ((x:number,y:number,delta:number,radius:number,opts?:object,reliefKey?:string|number)=>void), getActiveReliefKey?: (() => (string|number|null|undefined)) }} deps
@@ -2658,7 +2659,7 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
         color: [255, 200, 180],
       }));
       // Blood sparks at each hit
-      for (const h of hits) {
+      for (const h of (isGoreDisabled() ? [] : hits)) {
         const count = PERF.quality === 'low' ? 4 : 8;
         for (let i = 0; i < count; i++) {
           const dx = h.x - at.x, dy = h.y - at.y;
@@ -2684,6 +2685,7 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
       if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
       // Dark crimson aura pulse
       _rampageFx.push(new RadialFx({ x: at.x, y: at.y, radius: 1.2, ttl: 0.45 }));
+      if (isGoreDisabled()) { startShake(cam, 2, 0.08); return; }
       // Rising blood motes
       const count = PERF.quality === 'low' ? 10 : 18;
       for (let i = 0; i < count; i++) {
@@ -2707,6 +2709,7 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
 
     world.on('proc:bloodthirst', ({ actor, target, healed }) => {
       if (typeof getPosition !== "function") return;
+      if (isGoreDisabled()) return;
       const from = getPosition(Number(target || 0));
       const to = getPosition(Number(actor || 0));
       if (!from || !to) return;

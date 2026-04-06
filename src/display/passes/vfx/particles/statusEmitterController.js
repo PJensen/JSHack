@@ -1,3 +1,5 @@
+import { isGoreDisabled } from "../../../ui/wiring/goreEngine.js";
+
 const INSTALLED_KEY = Symbol.for("jshack:display:statusEmitters:installed");
 
 /**
@@ -131,6 +133,7 @@ export function createStatusEmitterController({ world, fx }) {
           const tag = e.tags[t];
           const sc = TAG_EMITTER_CFG[tag];
           if (!sc) continue;
+          if (tag === "bleeding" && isGoreDisabled()) continue;
           const key = `${sc.prefix}:${e.id}`;
           seenEmitterKeys.add(key);
           if (!sc.tracker.has(e.id)) {
