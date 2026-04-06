@@ -392,6 +392,33 @@ export function mindflayerBlastOnHit(chancePct, seedSalt) {
   };
 }
 
+// ── Burrow and die (rot grub) ─────────────────────────────────────────
+
+/**
+ * Roll → push bleed on defender → kill attacker (it burrowed in).
+ * The grub IS the bleed now — it disappears completely on a successful hit.
+ * @param {number} chancePct
+ * @param {number} seedSalt
+ * @param {{ key:string, turnsLeft:number, potency:number }} effect
+ * @param {string} emitEvent
+ */
+export function burrowAndDieOnHit(chancePct, seedSalt, effect, emitEvent) {
+  return (ctx) => {
+    if (!ctx.roll(chancePct, seedSalt)) return;
+    ctx.pushEffect(ctx.defender, { stacks: 1, ...effect });
+    if (emitEvent) ctx.emit(emitEvent, { actor: ctx.attacker, target: ctx.defender });
+    // Kill the grub — it burrowed in and is gone
+    dealDamage(ctx.world, {
+      target: ctx.attacker,
+      amount: 9999,
+      source: ctx.attacker,
+      type: "physical",
+      cause: "burrow:consumed",
+      noTrigger: true,
+    });
+  };
+}
+
 // ── Corrode equipment (rust monster) ────────────────────────────────
 
 /** Slots eligible for corrosion (metal gear). */
