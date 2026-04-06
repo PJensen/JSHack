@@ -60,6 +60,9 @@ export const basePalette = {
   killer_bee: { glyph: "a", fg: "#e8cc30", glow: "#b89a10" },
   gelatinous_cube: { glyph: "■", fg: "#55ddbb", glow: "#22aa88" },
   cockatrice: { glyph: "c", fg: "#b0b898", glow: "#787f68" },
+  shrieker: { glyph: "F", fg: "#e0cc88", glow: "#aa9050" },
+  rot_grub: { glyph: "µ", fg: "#d4a0a0", glow: "#aa6060" },
+  gas_spore: { glyph: "e", fg: "#cc66ee", glow: "#9933bb" },
   // Tier 1
   bone_bowman: { glyph: "s", fg: "#d8d4c0", glow: "#a8a490" },
   dire_wolf: { glyph: "d", fg: "#909f76", glow: "#5b6947" },

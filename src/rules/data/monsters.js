@@ -22,7 +22,7 @@ import {
   spillLootAndShortBlinkOnDamaged,
 } from "./callbacks/combat.js";
 import { selfThrowNearTargetOnSeen, gazeOnLOS, fireBreathLineOnLOS, castSpellOnLOS } from "./callbacks/ai.js";
-import { spawnPlasmaCloudOnDeath, centipedeSplitOnDeath, spawnFirePuffOnDeath } from "./callbacks/death.js";
+import { spawnPlasmaCloudOnDeath, centipedeSplitOnDeath, spawnFirePuffOnDeath, gasSporeExplodeOnDeath } from "./callbacks/death.js";
 
 export const MONSTERS = [
   // ── Tier 0 (floors 1-5) ────────────────────────────────────────────
@@ -305,9 +305,8 @@ export const MONSTERS = [
           chance: 0.55,
         }),
       ],
-      onHit: [statusEffectOnHit(15, 0xdead0006, { key: "stun", turnsLeft: 1, potency: 1 }, "proc:stunned")],
     },
-    specials: ["Stun 15%", "Telegraphed shriek"],
+    specials: ["Telegraphed shriek"],
     description: 'A leathery-winged vermin that darts erratically.',
   },
   {
@@ -1654,6 +1653,93 @@ export const MONSTERS = [
     },
     specials: ["Petrifying touch (slow 80%)", "Confuse 60%", "Weaken 40%", "Passive"],
     description: 'A scaly hen-lizard with dead white eyes. Its touch numbs flesh to stone.',
+  },
+  // ── Shrieker (tier 0, minDepth 3) — alarm fungus ───────────────────
+  {
+    id: 'shrieker',
+    name: 'Shrieker',
+    tags: ['plant'],
+    goreType: 'ichor',
+    tier: 0,
+    minDepth: 3,
+    intelligence: 1,   // mindless fungus
+    ambush: true,      // sessile — doesn't move until disturbed
+    baseHp: 10,
+    hpPerLevel: 1,
+    attack: 0,
+    defense: 0,
+    damageDice: '1d2',
+    sizeClass: 'M',
+    massKg: 30,
+    resistances: { kinetic: { DR: 0 }, chemical: { toxMult: 0 } },
+    speed: 1,          // very slow (actEvery = 3)
+    learnedSpellIds: ['shrieker_scream'],
+    hooks: {
+      whileLOS: [
+        castSpellOnLOS({
+          spellId: 'shrieker_scream',
+          abilityId: 'shrieker_scream',
+          abilityName: 'Shriek',
+          targeting: 'self',
+          maxRange: 10,
+          cooldownTurns: 12,
+          telegraphTurns: 1,
+          chance: 0.80,
+        }),
+      ],
+    },
+    specials: ["Telegraphed shriek (alerts all nearby monsters)", "Immobile"],
+    description: 'A pallid, trumpet-shaped fungus. It has no eyes, no brain — just a scream.',
+  },
+  // ── Rot Grub (tier 0, minDepth 2) — burrowing bleeder ─────────────
+  {
+    id: 'rot_grub',
+    name: 'Rot Grub',
+    tags: ['beast', 'vermin'],
+    tier: 0,
+    minDepth: 2,
+    intelligence: 1,   // mindless parasite
+    baseHp: 2,
+    hpPerLevel: 0.3,
+    attack: 0,
+    defense: 0,
+    damageDice: '1d1',
+    sizeClass: 'XS',
+    massKg: 0.5,
+    resistances: { kinetic: { DR: 0 } },
+    speed: 2,
+    hooks: {
+      onHit: [
+        statusEffectOnHit(80, 0xdead0090, { key: "bleed", turnsLeft: 8, potency: 2 }, "proc:rot_grub:burrow"),
+      ],
+    },
+    specials: ["Burrows in (heavy bleed 80%)", "Fragile"],
+    description: 'A writhing pale grub no bigger than a finger. It burrows under the skin on contact.',
+  },
+  // ── Gas Spore (tier 0, minDepth 4) — explosive mimic ──────────────
+  {
+    id: 'gas_spore',
+    name: 'Gas Spore',
+    tags: ['plant', 'aberration'],
+    goreType: 'ichor',
+    tier: 0,
+    minDepth: 4,
+    intelligence: 1,   // mindless — drifts aimlessly
+    canFly: true,
+    baseHp: 4,
+    hpPerLevel: 0.5,
+    attack: 0,
+    defense: 0,
+    damageDice: '1d2',
+    sizeClass: 'M',
+    massKg: 5,
+    resistances: { kinetic: { DR: 0 } },
+    speed: 1,          // very slow drifter
+    hooks: {
+      onDeath: [gasSporeExplodeOnDeath({ turnsLeft: 3, tickDamage: 6, radius: 2 })],
+    },
+    specials: ["Explodes on death (radius 2, 6 fire dmg)", "Fragile"],
+    description: 'A bloated, pulsing sphere that drifts in silence. It looks just like a floating eye — until you pop it.',
   },
   // ── Lichen (tier 0) — sessile food source ────────────────────────────
   {

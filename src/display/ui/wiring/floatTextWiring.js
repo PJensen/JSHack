@@ -1141,6 +1141,56 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     });
   });
 
+  // ── Gas Spore explosion ──────────────────────────────────────────────
+  world.on('monster:death:gas_spore', ({ at }) => {
+    if (!at || !canShowAt(at.x, at.y)) return;
+    ftext.addStatus(at.x, at.y - 0.55, 'BOOM!', {
+      color: '#ff3300',
+      life: 1.8,
+      scaleStart: 2.5,
+      scaleEnd: 1.2,
+    });
+    // Big radial fire burst
+    for (let i = 0; i < 28; i++) {
+      const angle = (i / 28) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
+      const spd = 1.2 + Math.random() * 2.0;
+      fx.pool.spawn(new Particle({
+        x: at.x + 0.5,
+        y: at.y + 0.5,
+        vx: Math.cos(angle) * spd,
+        vy: Math.sin(angle) * spd,
+        ay: -0.3,
+        life: 0.4 + Math.random() * 0.4,
+        size0: 0.22, size1: 0.04,
+        r: 255, g: 100 + (Math.random() * 100) | 0, b: 20,
+        a0: 1.0,
+      }));
+    }
+    // Inner flash particles
+    for (let i = 0; i < 12; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const spd = 0.3 + Math.random() * 0.5;
+      fx.pool.spawn(new Particle({
+        x: at.x + 0.5 + (Math.random() - 0.5) * 0.3,
+        y: at.y + 0.5 + (Math.random() - 0.5) * 0.3,
+        vx: Math.cos(angle) * spd,
+        vy: Math.sin(angle) * spd,
+        life: 0.15 + Math.random() * 0.15,
+        size0: 0.30, size1: 0.10,
+        r: 255, g: 240, b: 180,
+        a0: 1.0,
+      }));
+    }
+  });
+
+  // ── Rot Grub burrow ──────────────────────────────────────────────────
+  world.on('proc:rot_grub:burrow', ({ target }) => {
+    const pos = getPosition(Number(target || 0));
+    if (!pos || !canShowAt(pos.x, pos.y)) return;
+    ftext.addStatus(pos.x, pos.y - 0.35, 'BURROWS IN!', { color: '#cc4444', life: 0.9 });
+    spawnBloodBurst(pos.x, pos.y, { amount: 8, hue: 'blood' });
+  });
+
   world.on('hunger:choke', () => {
     const pe = playerEntity(world);
     if (!pe) return;

@@ -131,6 +131,46 @@ export function spawnFirePuffOnDeath(params = {}) {
   };
 }
 
+// ── Gas spore explosion ──────────────────────────────────────────────
+
+/**
+ * Spawn a large fire explosion at death location — gas spore detonation.
+ * Creates a multi-tile fire hazard and emits a dedicated event for VFX.
+ *
+ * @param {{
+ *   turnsLeft?: number,
+ *   tickDamage?: number,
+ *   radius?: number,
+ * }} [params]
+ */
+export function gasSporeExplodeOnDeath(params = {}) {
+  const cfg = (params && typeof params === "object") ? { ...params } : {};
+  return (ctx) => {
+    if (!ctx?.pos) return;
+    const x = ctx.pos.x | 0;
+    const y = ctx.pos.y | 0;
+    spawnHazard(ctx.world, {
+      x,
+      y,
+      kind: "fire",
+      medium: "air",
+      turnsLeft: Math.max(1, Number(cfg.turnsLeft ?? 3) | 0),
+      radius: Math.max(0, Number(cfg.radius ?? 2) | 0),
+      tickDamage: Math.max(0, Number(cfg.tickDamage ?? 6) | 0),
+      damageType: "fire",
+      cause: "monster:death:gas_spore",
+      sourceId: ctx.deadId | 0,
+      sourceKind: "gas_spore",
+      identity: "gas_spore_blast",
+      name: "Spore Blast",
+    });
+    emitSafe(ctx.world, "monster:death:gas_spore", {
+      id: ctx.deadId | 0,
+      at: { x, y },
+    });
+  };
+}
+
 // ── Centipede split-on-death ──────────────────────────────────────────
 
 /**

@@ -363,6 +363,24 @@ export const SPELL_DEFS = {
       { kind: 'utility', note: 'Nearby enemies are alerted toward the player' },
     ],
   },
+  shrieker_scream: {
+    id: 'shrieker_scream',
+    name: 'Shriek',
+    symbol: '\u2620', // ☠
+    schools: ['bestial', 'sonic'],
+    manaCost: 0,
+    minIntelligence: 0,
+    range: 10,
+    radius: 8,
+    confuseTurns: 3,
+    script: 'bat_shriek',
+    targeting: 'self',
+    description: 'An ear-splitting scream that wakes everything on the floor.',
+    effects: [
+      { kind: 'status', status: 'confused', duration: '3 turns to nearby hostiles' },
+      { kind: 'utility', note: 'Alerts all monsters in large radius toward the player' },
+    ],
+  },
   web_spit: {
     id: 'web_spit',
     name: 'Web Spit',
