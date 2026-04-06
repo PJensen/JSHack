@@ -433,8 +433,8 @@ export function ensureStairTooltip(root) {
   Object.assign(tip.style, {
     position: 'fixed',
     left: '50%',
-    bottom: 'calc(var(--jshack-actionbar-height, 48px) + 46px + env(safe-area-inset-bottom, 0px))',
-    transform: 'translateX(-50%)',
+    top: '25%',
+    transform: 'translate(-50%, -50%)',
     minWidth: '112px', maxWidth: '50vw', pointerEvents: 'none', display: 'none',
     background: 'rgba(14,18,26,0.96)', color: '#dbeaff', borderRadius: '7px',
     border: '1px solid #33435f', boxShadow: '0 10px 30px rgba(0,0,0,0.55)',
@@ -504,8 +504,8 @@ export function ensureTrapTooltip(root) {
   Object.assign(tip.style, {
     position: 'fixed',
     left: '50%',
-    bottom: 'calc(var(--jshack-actionbar-height, 48px) + 46px + env(safe-area-inset-bottom, 0px))',
-    transform: 'translateX(-50%)',
+    top: '25%',
+    transform: 'translate(-50%, -50%)',
     minWidth: '112px', maxWidth: '50vw', pointerEvents: 'none', display: 'none',
     background: 'rgba(30,14,14,0.96)', color: '#ffd6cf', borderRadius: '7px',
     border: '1px solid #5f3333', boxShadow: '0 10px 30px rgba(0,0,0,0.55)',

@@ -3127,7 +3127,7 @@ function runGeneratorScript(world, actor, spell, { baseAmount, type, cause, mana
     if (!vit || (vit.hp | 0) <= 0) continue;
     const dist = chebyshevScalar(pos.x | 0, pos.y | 0, apos.x | 0, apos.y | 0);
     if (dist > range) continue;
-    if (!hasSpellLineOfSight({ sourcePos: apos, targetPos: pos, range, isBlocked })) continue;
+    if (!hasSpellLineOfSight(world, { sourcePos: apos, targetPos: pos, range, isBlocked })) continue;
     if (dist < bestDist) { bestDist = dist; bestId = id; }
   }
   if (!bestId) {
