@@ -1090,11 +1090,6 @@ export function initHUD() {
   function syncActionBarHeight() {
     const h = Math.max(44, Math.ceil(bar.getBoundingClientRect().height || 44));
     document.documentElement.style.setProperty('--jshack-actionbar-height', `${h}px`);
-    // Expose spell dock height so the stat line can sit above it on mobile
-    const dockH = (_pinnedSpellDockEl && _pinnedSpellDockEl.style.display !== 'none')
-      ? Math.ceil(_pinnedSpellDockEl.getBoundingClientRect().height || 0)
-      : 0;
-    document.documentElement.style.setProperty('--jshack-spelldock-height', `${dockH}px`);
   }
 
   // Show/hide pet button based on pet existence
@@ -1494,7 +1489,6 @@ export function initHUD() {
 
   window.addEventListener('ui:updatePinnedSpellBar', () => {
     syncQuickSlotPosition();
-    syncActionBarHeight(); // recalc --jshack-spelldock-height for stat line
   });
 
   if (typeof mobileLayoutMq.addEventListener === 'function') {

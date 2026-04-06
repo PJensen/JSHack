@@ -26,7 +26,7 @@ export function initStatusLine() {
   // Stats line (bottom) — existing
   const statsLine = document.createElement('div');
   Object.assign(statsLine.style, lineBase, {
-    bottom: 'calc(var(--jshack-actionbar-height, 48px) + var(--jshack-spelldock-height, 0px) + 18px + env(safe-area-inset-bottom, 0px))',
+    bottom: 'calc(var(--jshack-actionbar-height, 48px) + 60px + env(safe-area-inset-bottom, 0px))',
   });
   root.appendChild(statsLine);
 
