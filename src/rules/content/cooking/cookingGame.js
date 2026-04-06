@@ -93,6 +93,9 @@ export function cookAtFire(world, actor, targetId, corpseItemId) {
     toIdentity: "food_ration",
   });
 
+  // Notify inventory layer so quick chip fires for the new item.
+  world.emit?.("inventory:added", { ownerId: actor, itemId: corpseItemId });
+
   // Refresh the cooking UI with updated inventory.
   emitCookingFireOpen(world, actor, targetId);
 }
