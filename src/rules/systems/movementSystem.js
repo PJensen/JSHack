@@ -36,6 +36,9 @@ import { emitSafe } from "../utils/emitSafe.js";
 
 const NOCLIP_SYM = Symbol.for("jshack:debug:noclip");
 
+/** Tracks per-entity move-attempt counter for the slowed cadence. */
+const slowMoveTicks = new Map();
+
 /** @param {number} x @param {number} y */
 function key(x, y) { return `${x},${y}`; }
 
@@ -178,11 +181,18 @@ export function movementSystem(world) {
         }
       }
 
-      // "Slowed" prevents movement attempts while active.
+      // "Slowed" skips every Nth movement attempt (stacks+1 cadence).
+      // 1 stack → move every 2nd attempt, 2 → every 3rd, 3 → every 4th.
       const slowedStacks = Math.min(3, statusStrength(world, actor, "slowed"));
       if (slowedStacks > 0) {
-        world.emit("movement:slowed", { actor, stacks: slowedStacks, x: pos.x, y: pos.y, dx: mdx, dy: mdy });
-        continue;
+        const tick = (slowMoveTicks.get(actor) || 0) + 1;
+        slowMoveTicks.set(actor, tick);
+        if (tick % (slowedStacks + 1) !== 0) {
+          world.emit("movement:slowed", { actor, stacks: slowedStacks, x: pos.x, y: pos.y, dx: mdx, dy: mdy });
+          continue;
+        }
+      } else {
+        slowMoveTicks.delete(actor);
       }
 
       const nx = pos.x + mdx;
