@@ -362,22 +362,22 @@ Deno.test("poison_blade fizzles with no weapon equipped", () => {
 
 import { CLASS_DEFS } from "../src/rules/data/classes.js";
 
-Deno.test("warden has war_cry, cleave, and bloodthirst", () => {
+Deno.test("warden starts with only savage_strike", () => {
   const spells = CLASS_DEFS.warden.startingSpells;
-  assert(spells.includes('war_cry'));
-  assert(spells.includes('cleave'));
-  assert(spells.includes('bloodthirst'));
+  assert(spells.includes('savage_strike'));
+  assertEquals(spells.length, 1);
 });
 
-Deno.test("cleric has purify, divine_shield, and consecrate", () => {
+Deno.test("cleric starts with holy_strike and smite", () => {
   const spells = CLASS_DEFS.cleric.startingSpells;
-  assert(spells.includes('purify'));
-  assert(spells.includes('divine_shield'));
-  assert(spells.includes('consecrate'));
+  assert(spells.includes('holy_strike'));
+  assert(spells.includes('smite'));
+  assertEquals(spells.length, 2);
 });
 
-Deno.test("outlaw has smoke_bomb and poison_blade", () => {
+Deno.test("outlaw starts with cheap_shot and poison_blade", () => {
   const spells = CLASS_DEFS.outlaw.startingSpells;
-  assert(spells.includes('smoke_bomb'));
+  assert(spells.includes('cheap_shot'));
   assert(spells.includes('poison_blade'));
+  assertEquals(spells.length, 2);
 });

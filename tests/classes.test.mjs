@@ -53,13 +53,12 @@ Deno.test("cleric starts with one vial of holy water", () => {
   assertEquals(holyWater.count, 1);
 });
 
-Deno.test("cleric starts with flash_heal and smite as class spells", () => {
+Deno.test("cleric starts with holy_strike and smite as class spells", () => {
   const cleric = getClass("cleric");
   assert(Array.isArray(cleric.startingSpells), "cleric should expose startingSpells");
-  assert(cleric.startingSpells.includes("flash_heal"), "cleric should start with flash_heal");
+  assert(cleric.startingSpells.includes("holy_strike"), "cleric should start with holy_strike");
   assert(cleric.startingSpells.includes("smite"), "cleric should start with smite");
-  assert(getSpell("flash_heal"), "flash_heal spell definition should exist");
-  assert(getSpell("smite"), "smite spell definition should exist");
+  assertEquals(cleric.startingSpells.length, 2, "cleric should start with exactly 2 spells");
 });
 
 Deno.test("warden has highest maxHp", () => {
@@ -96,35 +95,28 @@ Deno.test("warlock maps to molkhar", () => {
   assertEquals(getClass('warlock').deityId, 'molkhar');
 });
 
-Deno.test("warlock starts with summon_skeleton, shadow_bolt, and drain_life", () => {
+Deno.test("warlock starts with shadow_bolt and lifetap", () => {
   const warlock = getClass('warlock');
   assert(Array.isArray(warlock.startingSpells), 'warlock should have startingSpells array');
-  assert(warlock.startingSpells.includes('summon_skeleton'), 'warlock should start with summon_skeleton');
   assert(warlock.startingSpells.includes('shadow_bolt'), 'warlock should start with shadow_bolt');
-  assert(warlock.startingSpells.includes('drain_life'), 'warlock should start with drain_life');
-  assert(getSpell("summon_skeleton"), "summon_skeleton spell definition should exist");
-  assert(getSpell("shadow_bolt"), "shadow_bolt spell definition should exist");
-  assert(getSpell("drain_life"), "drain_life spell definition should exist");
+  assert(warlock.startingSpells.includes('lifetap'), 'warlock should start with lifetap');
+  assertEquals(warlock.startingSpells.length, 2, "warlock should start with exactly 2 spells");
 });
 
-Deno.test("outlaw starts with shadow_veil in addition to existing class spells", () => {
+Deno.test("outlaw starts with cheap_shot and poison_blade", () => {
   const outlaw = getClass('outlaw');
   assert(Array.isArray(outlaw.startingSpells), 'outlaw should have startingSpells array');
-  assert(outlaw.startingSpells.includes('phase_strike'), 'outlaw should retain phase_strike');
-  assert(outlaw.startingSpells.includes('blind'), 'outlaw should retain blind');
-  assert(outlaw.startingSpells.includes('shadow_veil'), 'outlaw should start with shadow_veil');
-  assert(getSpell('shadow_veil'), 'shadow_veil spell definition should exist');
+  assert(outlaw.startingSpells.includes('cheap_shot'), 'outlaw should start with cheap_shot');
+  assert(outlaw.startingSpells.includes('poison_blade'), 'outlaw should start with poison_blade');
+  assertEquals(outlaw.startingSpells.length, 2, "outlaw should start with exactly 2 spells");
 });
 
-Deno.test("druid starts with harmony_ward in addition to existing class spells", () => {
+Deno.test("druid starts with natures_touch and barkskin", () => {
   const druid = getClass('druid');
   assert(Array.isArray(druid.startingSpells), 'druid should have startingSpells array');
-  assert(druid.startingSpells.includes('heal'), 'druid should start with heal');
-  assert(druid.startingSpells.includes('harmony_ward'), 'druid should start with harmony_ward');
-  assert(druid.startingSpells.includes('entangle'), 'druid should start with entangle');
-  assert(druid.startingSpells.includes('verdant_ward'), 'druid should start with verdant_ward');
-  assert(getSpell('harmony_ward'), 'harmony_ward spell definition should exist');
-  assert(getSpell('entangle'), 'entangle spell definition should exist');
+  assert(druid.startingSpells.includes('natures_touch'), 'druid should start with natures_touch');
+  assert(druid.startingSpells.includes('barkskin'), 'druid should start with barkskin');
+  assertEquals(druid.startingSpells.length, 2, "druid should start with exactly 2 spells");
 });
 
 Deno.test("warlock starts with arcane handwraps for spell hit", () => {
