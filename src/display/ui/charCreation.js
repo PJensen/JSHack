@@ -1128,8 +1128,13 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
   panel.addEventListener('touchmove', onTouchEntropy, { passive: true });
 
   // accelerometer (device motion) — best entropy source on mobile
+  // throttled to ~10Hz so it doesn't fill the entropy pool in <2 seconds
   let accelCleanup = null;
+  let lastAccelT = 0;
   function onDeviceMotion(e) {
+    const now = performance.now();
+    if (now - lastAccelT < 100) return;
+    lastAccelT = now;
     const a = e.accelerationIncludingGravity;
     if (a) feedEntropy(((a.x || 0) * 10000) ^ ((a.y || 0) * 10000) ^ ((a.z || 0) * 10000));
   }
