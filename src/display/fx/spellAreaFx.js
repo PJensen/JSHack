@@ -579,6 +579,7 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
   /** @param {CanvasRenderingContext2D} ctx */
   function drawEvocation(ctx) {
     if (!_evocationChannels.size || typeof getPosition !== "function") return;
+    console.log("[evocation VFX] drawEvocation called, channels:", _evocationChannels.size);
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
     const now = getFxTime();
@@ -2527,9 +2528,12 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
 
     // ── Evocation channel VFX ──────────────────────────────────────────
 
-    world.on("spell:evocation:start", ({ actor }) => {
+    world.on("channeling:start", ({ actor, spellId }) => {
+      console.log("[evocation VFX] channeling:start received, spellId=", spellId);
+      if (String(spellId || "") !== "evocation") return;
       const a = Number(actor || 0) | 0;
       if (!(a > 0)) return;
+      console.log("[evocation VFX] initializing channel state for actor", a);
       _evocationChannels.set(a, {
         actor: a,
         phase: Math.random() * Math.PI * 2,
