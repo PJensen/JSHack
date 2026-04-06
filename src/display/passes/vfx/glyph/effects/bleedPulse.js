@@ -1,6 +1,9 @@
 // Bleed Pulse overlay FX (envelope-aware). Does not render the base glyph.
 // Signature: (ctx, glyph, x, y, size, t, dt, seed, baselineY, env)
+import { isGoreDisabled } from "../../../ui/wiring/goreEngine.js";
+
 export function bleedPulse(ctx, glyph, x, y, size, t, dt, seed, baselineY, env) {
+  if (isGoreDisabled()) return;
   const a = env ? Math.min(1, env.gain * 1.1) : 1;
 
   // Heartbeat "lub-dub": two rapid peaks close together, then a long pause
