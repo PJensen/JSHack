@@ -3115,21 +3115,33 @@ REGISTRY['entangle'] = function entangleScript(world, actor, spell, intent) {
   const actorFaction = String(world.get(actor, Faction)?.key || 'player');
   const range = Number(spell?.range || 7) | 0;
 
-  // Auto-target nearest hostile in range + LOS
-  let bestId = 0, bestD2 = Infinity;
-  for (const [id, pos] of world.query(Position)) {
-    if (id === actor) continue;
-    const fac = /** @type any */ (world.get(id, Faction));
-    if (!fac || !areFactionsHostile(actorFaction, fac.key)) continue;
-    const vit = /** @type any */ (world.get(id, Vitality));
-    if (!vit || (vit.hp | 0) <= 0) continue;
-    // Skip already stunned
-    if (statusStrength(world, id, "stunned") > 0) continue;
-    const dx = (pos.x | 0) - (apos.x | 0), dy = (pos.y | 0) - (apos.y | 0);
-    const d2 = dx * dx + dy * dy;
-    if (d2 > range * range) continue;
-    if (!hasSpellLineOfSight({ sourcePos: apos, targetPos: pos, range, isBlocked: blockedCallback(buildBlocksVisionMap(world)) })) continue;
-    if (d2 < bestD2) { bestD2 = d2; bestId = id; }
+  // Resolve target: prefer intent (enemy-targeting UI), fall back to auto
+  let bestId = intent?.targetId || 0;
+  if (bestId) {
+    // Validate intent target
+    const tpos = /** @type any */ (world.get(bestId, Position));
+    const vit = /** @type any */ (world.get(bestId, Vitality));
+    if (!tpos || !vit || (vit.hp | 0) <= 0) bestId = 0;
+    if (bestId === actor) bestId = 0; // no self-target
+    if (bestId && statusStrength(world, bestId, "stunned") > 0) bestId = 0;
+  }
+
+  if (!bestId) {
+    // Auto-target nearest hostile in range + LOS
+    let bestD2 = Infinity;
+    for (const [id, pos] of world.query(Position)) {
+      if (id === actor) continue;
+      const fac = /** @type any */ (world.get(id, Faction));
+      if (!fac || !areFactionsHostile(actorFaction, fac.key)) continue;
+      const vit = /** @type any */ (world.get(id, Vitality));
+      if (!vit || (vit.hp | 0) <= 0) continue;
+      if (statusStrength(world, id, "stunned") > 0) continue;
+      const dx = (pos.x | 0) - (apos.x | 0), dy = (pos.y | 0) - (apos.y | 0);
+      const d2 = dx * dx + dy * dy;
+      if (d2 > range * range) continue;
+      if (!hasSpellLineOfSight({ sourcePos: apos, targetPos: pos, range, isBlocked: blockedCallback(buildBlocksVisionMap(world)) })) continue;
+      if (d2 < bestD2) { bestD2 = d2; bestId = id; }
+    }
   }
   if (!bestId) return;
 
@@ -3156,10 +3168,11 @@ REGISTRY['thorn_burst'] = function thornBurstScript(world, actor, spell, intent)
   const apos = /** @type any */ (world.get(actor, Position));
   if (!apos) return;
   const actorFaction = String(world.get(actor, Faction)?.key || 'player');
-  const range = Number(spell?.range || 8) | 0;
+  const radius = Number(spell?.radius || 3) | 0;
+  const isBlocked = blockedCallback(buildBlocksVisionMap(world));
 
-  // Auto-target nearest hostile
-  let bestId = 0, bestD2 = Infinity;
+  // Gather all hostiles in radius with LOS
+  const targets = [];
   for (const [id, pos] of world.query(Position)) {
     if (id === actor) continue;
     const fac = /** @type any */ (world.get(id, Faction));
@@ -3168,39 +3181,47 @@ REGISTRY['thorn_burst'] = function thornBurstScript(world, actor, spell, intent)
     if (!vit || (vit.hp | 0) <= 0) continue;
     const dx = (pos.x | 0) - (apos.x | 0), dy = (pos.y | 0) - (apos.y | 0);
     const d2 = dx * dx + dy * dy;
-    if (d2 > range * range) continue;
-    if (!hasSpellLineOfSight({ sourcePos: apos, targetPos: pos, range, isBlocked: blockedCallback(buildBlocksVisionMap(world)) })) continue;
-    if (d2 < bestD2) { bestD2 = d2; bestId = id; }
+    if (d2 > radius * radius) continue;
+    if (!hasSpellLineOfSight({ sourcePos: apos, targetPos: pos, range: radius, isBlocked })) continue;
+    targets.push({ id, x: pos.x | 0, y: pos.y | 0 });
   }
-  if (!bestId) {
+
+  if (targets.length === 0) {
     emitSpellMiss(world, actor, spell);
     return;
   }
 
-  const tpos = /** @type any */ (world.get(bestId, Position));
-  dealDamage(world, buildSpellDamageSpec(world, actor, bestId, {
-    spell,
-    baseAmount: 6,
-    type: 'nature',
-    cause: 'spell:thorn_burst',
-    at: { x: tpos.x, y: tpos.y },
-  }));
+  // Deal damage to every target in radius
+  const impacts = [];
+  for (let i = 0; i < targets.length; i++) {
+    const t = targets[i];
+    dealDamage(world, buildSpellDamageSpec(world, actor, t.id, {
+      spell,
+      baseAmount: 6,
+      type: 'nature',
+      cause: 'spell:thorn_burst',
+      at: { x: t.x, y: t.y },
+      salt: 0xBEEF ^ (t.id * 131) ^ (i + 1),
+    }));
+    impacts.push({ x: t.x, y: t.y });
 
-  // 30% poison proc
-  const rng = mulberry32(combatSeed(world, actor, bestId, 0xBEEF));
-  if (rng() < 0.30) {
-    const ae = ensureActiveEffectList(world, bestId);
-    if (ae) {
-      upsertTimedEffect(ae.effects, {
-        key: 'poison', turnsLeft: 4, potency: 1, stacks: 1, sourceId: actor,
-      });
+    // 30% poison proc per target
+    const rng = mulberry32(combatSeed(world, actor, t.id, 0xBEEF));
+    if (rng() < 0.30) {
+      const ae = ensureActiveEffectList(world, t.id);
+      if (ae) {
+        upsertTimedEffect(ae.effects, {
+          key: 'poison', turnsLeft: 4, potency: 1, stacks: 1, sourceId: actor,
+        });
+      }
     }
   }
 
   emitSafe(world, 'spell:thorn_burst', {
-    actor, targetId: bestId,
+    actor,
     from: { x: apos.x, y: apos.y },
-    to: { x: tpos.x, y: tpos.y },
+    impacts,
+    radius,
   });
 };
 

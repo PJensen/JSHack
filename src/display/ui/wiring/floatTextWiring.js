@@ -546,6 +546,26 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     });
   });
 
+  world.on('spell:entangle', ({ at }) => {
+    if (!at || !canShowAt(at.x, at.y)) return;
+    ftext.addStatus(at.x, at.y - 0.3, 'ENTANGLED!', {
+      color: '#33cc55',
+      life: 1.3,
+      scaleStart: 1.4,
+      scaleEnd: 1.0,
+    });
+  });
+
+  world.on('spell:thorn_burst', ({ from, impacts }) => {
+    if (!from || !canShowAt(from.x, from.y)) return;
+    ftext.addStatus(from.x, from.y - 0.3, 'THORNS!', {
+      color: '#88cc22',
+      life: 1.2,
+      scaleStart: 1.3,
+      scaleEnd: 0.9,
+    });
+  });
+
   // ── Warden ability floats ──
 
   world.on('spell:war_cry', ({ at }) => {

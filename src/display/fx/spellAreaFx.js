@@ -1846,6 +1846,121 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
       startShake(cam, 2, 0.08);
     });
 
+    // Entangle — green vine burst erupting upward around target
+    world.on('spell:entangle', ({ at }) => {
+      if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
+      // Rising vine tendrils
+      const count = PERF.quality === 'low' ? 14 : 22;
+      for (let i = 0; i < count; i++) {
+        const angle = (Math.PI * 2 * i / count) + (Math.random() - 0.5) * 0.4;
+        const speed = 0.15 + Math.random() * 0.5;
+        fx.pool.spawn(new Particle({
+          x: at.x + Math.cos(angle) * (0.1 + Math.random() * 0.25),
+          y: at.y + Math.sin(angle) * (0.1 + Math.random() * 0.25),
+          vx: Math.cos(angle) * speed * 0.3,
+          vy: -(0.4 + Math.random() * 0.6),
+          ay: 0.15,
+          life: 0.4 + Math.random() * 0.35,
+          size0: 0.07 + Math.random() * 0.05,
+          size1: 0.02,
+          r: 30 + ((Math.random() * 40) | 0),
+          g: 160 + ((Math.random() * 80) | 0),
+          b: 40 + ((Math.random() * 30) | 0),
+          a0: 0.9,
+          rotVel: (Math.random() - 0.5) * 2.0,
+        }));
+      }
+      // Ground burst ring
+      const ring = PERF.quality === 'low' ? 6 : 10;
+      for (let i = 0; i < ring; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 0.5 + Math.random() * 0.6;
+        fx.pool.spawn(new Particle({
+          x: at.x, y: at.y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          life: 0.18 + Math.random() * 0.14,
+          size0: 0.06 + Math.random() * 0.03,
+          size1: 0.01,
+          r: 60, g: 200, b: 60,
+          a0: 0.75,
+        }));
+      }
+      startShake(cam, 2, 0.08);
+    });
+
+    // Thorn Burst — radial thorn volley outward from caster + impact splashes
+    world.on('spell:thorn_burst', ({ from, impacts, radius }) => {
+      if (!from || !Number.isFinite(from.x) || !Number.isFinite(from.y)) return;
+      const r = Math.max(1, Number(radius || 3));
+
+      // Radial thorn spray outward from caster
+      const N = PERF.quality === 'low' ? 16 : 28;
+      for (let i = 0; i < N; i++) {
+        const angle = (i / N) * Math.PI * 2 + (Math.random() - 0.5) * 0.35;
+        const spd = 1.0 + Math.random() * r * 0.5;
+        fx.pool.spawn(new Particle({
+          x: from.x + (Math.random() - 0.5) * 0.15,
+          y: from.y + (Math.random() - 0.5) * 0.15,
+          vx: Math.cos(angle) * spd,
+          vy: Math.sin(angle) * spd,
+          ay: 0.08,
+          life: 0.25 + Math.random() * 0.2,
+          size0: 0.07 + Math.random() * 0.04,
+          size1: 0.02,
+          r: 80 + ((Math.random() * 50) | 0),
+          g: 140 + ((Math.random() * 70) | 0),
+          b: 15 + ((Math.random() * 20) | 0),
+          a0: 0.92,
+        }));
+      }
+
+      // Secondary slower poison mist ring
+      const mist = PERF.quality === 'low' ? 8 : 14;
+      for (let i = 0; i < mist; i++) {
+        const angle = (i / mist) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+        const spd = 0.3 + Math.random() * 0.4;
+        fx.pool.spawn(new Particle({
+          x: from.x, y: from.y,
+          vx: Math.cos(angle) * spd,
+          vy: Math.sin(angle) * spd - 0.05,
+          life: 0.4 + Math.random() * 0.3,
+          size0: 0.1 + Math.random() * 0.06,
+          size1: 0.04,
+          r: 40, g: 170 + ((Math.random() * 60) | 0), b: 25,
+          a0: 0.5,
+        }));
+      }
+
+      // Impact splashes at each hit target
+      if (Array.isArray(impacts)) {
+        for (let i = 0; i < impacts.length; i++) {
+          const imp = impacts[i];
+          if (!imp || !Number.isFinite(imp.x) || !Number.isFinite(imp.y)) continue;
+          const splashN = PERF.quality === 'low' ? 4 : 8;
+          for (let j = 0; j < splashN; j++) {
+            const a = Math.random() * Math.PI * 2;
+            const s = 0.2 + Math.random() * 0.4;
+            fx.pool.spawn(new Particle({
+              x: imp.x + (Math.random() - 0.5) * 0.15,
+              y: imp.y + (Math.random() - 0.5) * 0.15,
+              vx: Math.cos(a) * s,
+              vy: Math.sin(a) * s,
+              ay: 0.25,
+              life: 0.15 + Math.random() * 0.15,
+              size0: 0.06 + Math.random() * 0.03,
+              size1: 0.01,
+              r: 120 + ((Math.random() * 40) | 0),
+              g: 50 + ((Math.random() * 30) | 0),
+              b: 20,
+              a0: 0.85,
+            }));
+          }
+        }
+      }
+      startShake(cam, Math.min(5, 2 + (impacts?.length || 0)), 0.10);
+    });
+
     world.on('spell:harmony_ward', ({ at }) => {
       if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
       _smiteFx.push(new RadialFx({ x: at.x, y: at.y, radius: 1.25, ttl: 0.46 }));
