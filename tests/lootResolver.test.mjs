@@ -25,19 +25,17 @@ Deno.test("known spells are suppressed from spellbook drops", () => {
 
 Deno.test("all spells known suppresses entire spellbook sub-table", () => {
   const knownSpells = new Set([
-    "lightning",
-    "meteor",
-    "blastwave",
-    "earthshatter",
-    "heal",
-    "frost",
-    "blizzard",
-    "blink",
-    "firestorm",
-    "blind",
-    "verdant_ward",
-    "harmony_ward",
-    "shadow_veil",
+    "lightning", "meteor", "blastwave", "frost", "blizzard", "firestorm",
+    "fireball", "scorch", "arcane_bolt",
+    "iron_flesh", "bloodthirst", "cleave", "war_cry", "earthshatter",
+    "rampage", "primal_roar",
+    "heal", "barkskin", "thorn_burst", "entangle", "verdant_ward",
+    "harmony_ward", "poison_blade", "plague_swarm",
+    "quicken", "blind", "shadow_veil", "smoke_bomb", "phase_strike",
+    "blink", "ignite_weapons",
+    "shadow_bolt", "agony", "mark_of_death", "drain_life", "summon_skeleton",
+    "flash_heal", "smite", "divine_shield", "purify", "consecrate",
+    "evocation", "homecoming", "hearthstone",
   ]);
   const opts = { knownSpells };
 
