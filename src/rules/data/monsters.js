@@ -20,6 +20,7 @@ import {
   stealAndBlinkOnHit,
   typedDamageOnHit,
   spillLootAndShortBlinkOnDamaged,
+  burrowAndDieOnHit,
 } from "./callbacks/combat.js";
 import { selfThrowNearTargetOnSeen, gazeOnLOS, fireBreathLineOnLOS, castSpellOnLOS } from "./callbacks/ai.js";
 import { spawnPlasmaCloudOnDeath, centipedeSplitOnDeath, spawnFirePuffOnDeath, gasSporeExplodeOnDeath } from "./callbacks/death.js";
@@ -1707,13 +1708,14 @@ export const MONSTERS = [
     sizeClass: 'XS',
     massKg: 0.5,
     resistances: { kinetic: { DR: 0 } },
-    speed: 2,
+    speed: 3,          // fast — lunges at you
     hooks: {
+      onSeen: [selfThrowNearTargetOnSeen({ searchRadius: 1, fallbackSearchRadius: 2, cooldownTurns: 0, chance: 0.70 })],
       onHit: [
-        statusEffectOnHit(80, 0xdead0090, { key: "bleed", turnsLeft: 8, potency: 2 }, "proc:rot_grub:burrow"),
+        burrowAndDieOnHit(80, 0xdead0090, { key: "bleed", turnsLeft: 8, potency: 2 }, "proc:rot_grub:burrow"),
       ],
     },
-    specials: ["Burrows in (heavy bleed 80%)", "Fragile"],
+    specials: ["Leaps at you on sight", "Burrows in and disappears (heavy bleed 80%)"],
     description: 'A writhing pale grub no bigger than a finger. It burrows under the skin on contact.',
   },
   // ── Gas Spore (tier 0, minDepth 4) — explosive mimic ──────────────
