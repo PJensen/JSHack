@@ -3118,18 +3118,17 @@ function runGeneratorScript(world, actor, spell, { baseAmount, type, cause, mana
   const range = Number(spell?.range || 1) | 0;
   const isBlocked = blockedCallback(buildBlocksVisionMap(world));
 
-  let bestId = 0, bestD2 = Infinity;
+  let bestId = 0, bestDist = Infinity;
   for (const [id, pos] of world.query(Position)) {
     if (id === actor) continue;
     const fac = /** @type any */ (world.get(id, Faction));
     if (!fac || !areFactionsHostile(actorFaction, fac.key)) continue;
     const vit = /** @type any */ (world.get(id, Vitality));
     if (!vit || (vit.hp | 0) <= 0) continue;
-    const dx = (pos.x | 0) - (apos.x | 0), dy = (pos.y | 0) - (apos.y | 0);
-    const d2 = dx * dx + dy * dy;
-    if (d2 > range * range) continue;
+    const dist = chebyshevScalar(pos.x | 0, pos.y | 0, apos.x | 0, apos.y | 0);
+    if (dist > range) continue;
     if (!hasSpellLineOfSight({ sourcePos: apos, targetPos: pos, range, isBlocked })) continue;
-    if (d2 < bestD2) { bestD2 = d2; bestId = id; }
+    if (dist < bestDist) { bestDist = dist; bestId = id; }
   }
   if (!bestId) { emitSpellMiss(world, actor, spell); return; }
 
