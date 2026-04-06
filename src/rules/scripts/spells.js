@@ -3193,7 +3193,7 @@ REGISTRY['cheap_shot'] = function(world, actor, spell, intent) {
 };
 
 REGISTRY['evocation'] = function evocationScript(world, actor, spell, intent) {
-  const isChannelTick = !!intent?._channelTick;
+  // Only runs on sustained channel ticks (castSpellSystem skips script on initial cast)
   const apos = /** @type any */ (world.get(actor, Position));
   if (!apos) return;
   const actorVit = /** @type any */ (world.get(actor, Vitality));
@@ -3204,25 +3204,14 @@ REGISTRY['evocation'] = function evocationScript(world, actor, spell, intent) {
   const maxM = effectiveMaxMana(world, actor, mana);
   const currentMana = Number(mana.mana || 0);
 
-  // Already full — cancel channel, no point
+  // Already full — cancel channel
   if (currentMana >= maxM) {
-    if (isChannelTick) {
-      try { world.remove(actor, Channeling); } catch {}
-      emitSafe(world, 'channeling:cancelled', { actor, spellId: spell?.id, reason: 'mana_full' });
-    }
+    try { world.remove(actor, Channeling); } catch {}
+    emitSafe(world, 'channeling:cancelled', { actor, spellId: spell?.id, reason: 'mana_full' });
     return;
   }
 
-  // On initial cast, just emit start event (channel system handles Channeling component)
-  if (!isChannelTick) {
-    emitSafe(world, 'spell:evocation:start', {
-      actor,
-      at: { x: apos.x | 0, y: apos.y | 0 },
-    });
-    return;
-  }
-
-  // Sustained tick — restore mana (INT-scaled)
+  // Restore mana (INT-scaled)
   const intel = Number(getPassiveBonuses(world, actor).intelligence || 10);
   const baseMana = Math.max(1, Number(spell?.manaPerChannelTick || 6));
   const restored = Math.min(
