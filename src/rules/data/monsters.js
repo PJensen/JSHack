@@ -1647,11 +1647,12 @@ export const MONSTERS = [
     speed: 2,
     hooks: {
       onHit: [
-        statusEffectOnHit(40, 0xdead0080, { key: "slowed", turnsLeft: 4, potency: 1 }, "proc:slowed"),
-        statusEffectOnHit(25, 0xdead0081, { key: "confuse", turnsLeft: 3, potency: 1 }, "proc:confused"),
+        statusEffectOnHit(80, 0xdead0080, { key: "slowed", turnsLeft: 6, potency: 2 }, "proc:slowed"),
+        statusEffectOnHit(60, 0xdead0081, { key: "confuse", turnsLeft: 5, potency: 1 }, "proc:confused"),
+        statusEffectOnHit(40, 0xdead0082, { key: "weakened", turnsLeft: 5, potency: 1 }, "proc:weakened"),
       ],
     },
-    specials: ["Petrifying touch (slow 40%)", "Confuse 25%", "Passive"],
+    specials: ["Petrifying touch (slow 80%)", "Confuse 60%", "Weaken 40%", "Passive"],
     description: 'A scaly hen-lizard with dead white eyes. Its touch numbs flesh to stone.',
   },
   // ── Lichen (tier 0) — sessile food source ────────────────────────────
