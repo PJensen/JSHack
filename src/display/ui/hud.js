@@ -111,12 +111,11 @@ export const QUICK_CHIP_DISMISS_LAYOUT = Object.freeze({
 export const MOBILE_ACTION_BAR_GRID_AREAS = Object.freeze({
   character: Object.freeze({ col: '1', row: '1' }),
   pet: Object.freeze({ col: '2', row: '1' }),
-  pray: Object.freeze({ col: '5', row: '1' }),
+  posture: Object.freeze({ col: '3', row: '1' }),
+  pray: Object.freeze({ col: '4', row: '1' }),
+  wait: Object.freeze({ col: '5', row: '1' }),
   shoot: Object.freeze({ col: '6', row: '1' }),
-  quickInteract: Object.freeze({ col: '1', row: '2' }),
-  posture: Object.freeze({ col: '2', row: '2' }),
-  wait: Object.freeze({ col: '6', row: '2' }),
-  pinnedQuickSlots: Object.freeze({ col: '3 / 5', row: '1 / 3' }),
+  mobileRow2: Object.freeze({ col: '1 / 7', row: '2' }),
 });
 
 const STARTER_PIN_PRIORITY = Object.freeze([
@@ -980,15 +979,17 @@ export function initHUD() {
     const gaugeSize = isMobile ? 'min(110px, 26vw)' : 'min(188px, 22vw)';
     vitals.style.width = gaugeSize;
     vitals.style.height = gaugeSize;
-    // Hide spell slots on mobile, show on desktop
-    spellSlotsContainer.style.display = isMobile ? 'none' : 'flex';
+    // Mobile: spell slots inline in row 2; desktop: in bar flex row
+    spellSlotsContainer.style.display = 'flex';
     bagBtn.style.display = isMobile ? 'none' : 'grid';
     castBtn.style.display = isMobile ? 'none' : 'grid';
     spellSelectBtn.style.display = isMobile ? 'none' : 'grid';
-    // Hide main radial — pinned spell dock replaces it
+    // Door button hidden on mobile (replaced by row 2 spells+items)
+    quickInteractBtn.style.display = isMobile ? 'none' : 'grid';
+    // Hide radial and pinned spell dock — spell slots are now inline on mobile
     if (_mobileRadialEl) _mobileRadialEl.style.display = 'none';
-    if (_pinnedSpellDockEl) _pinnedSpellDockEl.style.display = isMobile ? 'flex' : 'none';
-    if (_pinnedSpellDockFanEl) _pinnedSpellDockFanEl.style.display = isMobile ? '' : 'none';
+    if (_pinnedSpellDockEl) _pinnedSpellDockEl.style.display = 'none';
+    if (_pinnedSpellDockFanEl) _pinnedSpellDockFanEl.style.display = 'none';
 
     if (isMobile) {
       Object.assign(bar.style, {
@@ -1014,19 +1015,50 @@ export function initHUD() {
       petBtn.style.gridRow = area.pet.row;
       prayBtn.style.gridColumn = area.pray.col;
       prayBtn.style.gridRow = area.pray.row;
-      quickInteractBtn.style.gridColumn = area.quickInteract.col;
-      quickInteractBtn.style.gridRow = area.quickInteract.row;
       postureBtn.style.gridColumn = area.posture.col;
       postureBtn.style.gridRow = area.posture.row;
       waitBtn.style.gridColumn = area.wait.col;
       waitBtn.style.gridRow = area.wait.row;
       shootBtn.style.gridColumn = area.shoot.col;
       shootBtn.style.gridRow = area.shoot.row;
-      setPinSlotsGridPlacement(area.pinnedQuickSlots.col, area.pinnedQuickSlots.row);
+
+      // Row 2: spell slots (first 4) + pinned quick items in a single flex row
+      Object.assign(mobileRow2.style, {
+        display: 'flex',
+        gap: '4px',
+        gridColumn: area.mobileRow2.col,
+        gridRow: area.mobileRow2.row,
+      });
+      // Show first 4 spell slots, hide 5 & 6
+      Object.assign(spellSlotsContainer.style, {
+        flex: '1', gap: '4px',
+      });
+      for (let i = 0; i < SPELL_SLOT_COUNT; i++) {
+        _slotBtns[i].style.display = i < 4 ? 'grid' : 'none';
+        _slotBtns[i].style.flex = '1';
+        _slotBtns[i].style.minWidth = '0';
+      }
+      // Pinned items: switch from 2×2 grid to 1×4 flex row
+      Object.assign(pinSlots.el.style, {
+        display: 'flex',
+        flex: '1',
+        gap: '4px',
+        gridTemplateColumns: '',
+        gridTemplateRows: '',
+        gridColumn: '',
+        gridRow: '',
+      });
+      for (const btn of pinSlots.el.children) {
+        btn.style.flex = '1';
+        btn.style.minWidth = '0';
+      }
+
       refreshCommandLabels();
       return;
     }
 
+    // Desktop layout
+    mobileRow2.style.display = 'contents';
     Object.assign(bar.style, {
       display: 'flex',
       gridTemplateColumns: '',
@@ -1044,6 +1076,24 @@ export function initHUD() {
       btn.style.textOverflow = '';
       btn.style.gridColumn = '';
       btn.style.gridRow = '';
+    }
+    // Restore spell slot visibility and sizing for desktop
+    for (let i = 0; i < SPELL_SLOT_COUNT; i++) {
+      _slotBtns[i].style.display = 'grid';
+      _slotBtns[i].style.flex = '';
+      _slotBtns[i].style.minWidth = '44px';
+    }
+    spellSlotsContainer.style.flex = '';
+    // Restore pinned items to 2×2 grid
+    Object.assign(pinSlots.el.style, {
+      display: 'grid',
+      flex: '',
+      gridTemplateColumns: 'repeat(2, 44px)',
+      gridTemplateRows: 'repeat(2, 44px)',
+    });
+    for (const btn of pinSlots.el.children) {
+      btn.style.flex = '';
+      btn.style.minWidth = '';
     }
     setPinSlotsGridPlacement('', '');
     refreshCommandLabels();
@@ -1399,7 +1449,6 @@ export function initHUD() {
   window.addEventListener('ui:updateSpellBar', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
-    if (mobileLayoutMq.matches) return;
     refreshSpellSlots(e?.detail);
     syncActionBarHeight();
   });
@@ -1410,6 +1459,13 @@ export function initHUD() {
     onPinItem: (item) => pinSlots.pinItem(item),
   });
   pinSlots.setPresenter((item) => quick.presentItem(item));
+  // Row 2 wrapper: on desktop display:contents makes children act as direct bar children;
+  // on mobile it becomes a flex row holding spell slots + pinned items.
+  const mobileRow2 = document.createElement('div');
+  mobileRow2.style.display = 'contents';
+  mobileRow2.appendChild(spellSlotsContainer);
+  mobileRow2.appendChild(pinSlots.el);
+
   bar.appendChild(charBtn);
   bar.appendChild(bagBtn);
   bar.appendChild(petBtn);
@@ -1417,8 +1473,7 @@ export function initHUD() {
   bar.appendChild(spellSelectBtn);
   bar.appendChild(quickInteractBtn);
   bar.appendChild(postureBtn);
-  bar.appendChild(pinSlots.el);
-  bar.appendChild(spellSlotsContainer);
+  bar.appendChild(mobileRow2);
   bar.appendChild(prayBtn);
   bar.appendChild(waitBtn);
   bar.appendChild(shootBtn);
