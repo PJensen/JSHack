@@ -99,7 +99,7 @@ Deno.test("warlock starts with shadow_bolt and lifetap", () => {
   const warlock = getClass('warlock');
   assert(Array.isArray(warlock.startingSpells), 'warlock should have startingSpells array');
   assert(warlock.startingSpells.includes('shadow_bolt'), 'warlock should start with shadow_bolt');
-  assert(warlock.startingSpells.includes('lifetap'), 'warlock should start with lifetap');
+  assert(warlock.startingSpells.includes('agony'), 'warlock should start with agony');
   assertEquals(warlock.startingSpells.length, 2, "warlock should start with exactly 2 spells");
 });
 
