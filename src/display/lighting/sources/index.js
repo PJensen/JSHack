@@ -270,7 +270,9 @@ export function collectLightSources(view, opts = {}) {
       }
 
       // Tag-driven emissive lights — each magical school gets its own pattern.
-      if (tags.includes('stasis')) {
+      if (tags.includes('sunlight')) {
+        emitPatterned(out, 'holy', t, e.id, ex, ey, 4, [255, 245, 200], 10);
+      } else if (tags.includes('stasis')) {
         emitPatterned(out, 'breathe', t, e.id, ex, ey, 3.5, [136, 221, 255], 8);
       } else if (tags.includes('invulnerable')) {
         emitPatterned(out, 'holy', t, e.id, ex, ey, 5, HOLY_GOLD, 10);

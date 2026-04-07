@@ -2038,6 +2038,69 @@ world.on('wand:stasis', ({ actor }) => {
   } catch (e) { console.debug('[main] messageLog failed:', e); }
 });
 
+// Sunsword blinding ray → targeted holy beam that blinds an enemy
+world.on('sunsword:ray', ({ actor }) => {
+  const _pe = playerEntity(world);
+  if (!_pe) return;
+  const px = _pe.pos.x | 0;
+  const py = _pe.pos.y | 0;
+  const range = 6;
+  const blocked = buildBlocksVisionMap(world);
+  const isBlocked = blockedCallback(blocked);
+
+  const enemies = [];
+  forEachInRadius(world, px, py, range, (eid, pos) => {
+    if (eid === _pe.id) return;
+    const fac = world.get(eid, Faction);
+    if (!fac || fac.key !== 'enemy') return;
+    const vit = world.get(eid, Vitality);
+    if (!vit || (vit.hp | 0) <= 0) return;
+    if (!hasLOS(px, py, pos.x | 0, pos.y | 0, isBlocked)) return;
+    if (!isTileVisible(pos.x | 0, pos.y | 0)) return;
+    enemies.push({ id: eid, x: pos.x | 0, y: pos.y | 0 });
+  });
+
+  if (enemies.length === 0) {
+    try { messageLog.log({ text: 'No visible enemies to blind.', type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
+    return;
+  }
+
+  enemies.sort((a, b) => chebyshevScalar(a.x, a.y, px, py) - chebyshevScalar(b.x, b.y, px, py));
+
+  _pendingEnemyTargeting = {
+    spellId: '__sunsword_ray__',
+    spellName: 'Sunsword — Blinding Ray',
+    range,
+    enemies,
+    index: 0,
+    onConfirm: (enemyId) => {
+      const ae = world.get(enemyId, ActiveEffects);
+      const blindEffect = { key: 'blinded', turnsLeft: 5, stacks: 1, potency: 1 };
+      if (ae) {
+        ae.effects.push(blindEffect);
+      } else {
+        try { world.add(enemyId, ActiveEffects, { effects: [blindEffect] }); } catch {}
+      }
+      const ni = world.get(enemyId, NamedIdentity);
+      const name = ni?.name || 'creature';
+      world.emit?.('message', { text: `A searing ray of light strikes the ${name} — it is blinded!`, type: 'system' });
+      const pos = world.get(enemyId, Position);
+      if (pos) {
+        world.emit?.('sunsword:ray:vfx', { x: pos.x | 0, y: pos.y | 0, fromX: px, fromY: py });
+      }
+    },
+  };
+  _targetCursor = { x: enemies[0].x, y: enemies[0].y };
+  _pendingSpellTargeting = null;
+  _pendingThrowTargeting = null;
+  try {
+    messageLog.log({
+      text: 'Choose target for Blinding Ray. Tab to cycle enemies, Enter to confirm, Esc to cancel.',
+      type: 'system',
+    });
+  } catch (e) { console.debug('[main] messageLog failed:', e); }
+});
+
 // Scroll of Aggravation → set all living enemies to hunting with player's position
 world.on('scroll:aggravation', ({ actor }) => {
   const pe = playerEntity(world);

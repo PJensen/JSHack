@@ -53,4 +53,5 @@ export const weapons = {
   never_sated_warclub:{ glyph:"T",  fg:"#b08f62", glow:"#7a5f3f", baseScale: S_WEAPON_L },
   blood_covenant_rapier: { glyph:"/", fg:"#d06c6c", glow:"#9a3f3f", baseScale: S_WEAPON_M },
   cataclysm_warspear: { glyph:"/",  fg:"#c9b27e", glow:"#8e774c", baseScale: S_WEAPON_L },
+  sunsword:           { glyph:"/",  fg:"#ffffff", glow:"#ffe8a0", baseScale: S_WEAPON_M },
 };

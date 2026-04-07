@@ -1964,6 +1964,31 @@ export const EQUIPMENT_ITEMS = {
     weight: 0.06,
   },
 
+  sunsword: {
+    id: "sunsword",
+    catalogKind: "equipment",
+    name: "Sunsword",
+    type: "equip",
+    slot: "weapon",
+    material: "gold",
+    rarity: 4,
+    rarityName: "epic",
+    bonuses: { attack: 2, damagePower: 2 },
+    damageDice: "1d8",
+    damageType: "slash",
+    staminaCost: 8,
+    tags: ["sunlight"],
+    description: "A blade of living light, warm to the touch. Undead recoil at its radiance.",
+    weight: 1.6,
+    hooks: {
+      on_use: (ctx, state) => {
+        const actor = Number(state?.actor || ctx.actor || 0) | 0;
+        ctx.io.emit("sunsword:ray", { actor });
+        return { consumed: false };
+      },
+    },
+  },
+
   // Legendary proc gear (tier 3+)
   stormcaller_blade: {
     id: "stormcaller_blade",

@@ -2350,6 +2350,9 @@ export function installMessageWiring({
   // === Wild Interactions ===
 
   // Blessed weapon vs undead/demon
+  world.on('combat:holy_strike', () => {
+    log('Your blade blazes with holy light — the undead recoils!', 'system');
+  });
   world.on('combat:blessed_strike', ({ creatureType }) => {
     const label = creatureType === 'undead' ? 'undead' : 'demon';
     log(`Your blessed weapon sears the ${label}!`, 'system');

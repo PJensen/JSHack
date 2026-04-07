@@ -396,6 +396,14 @@ function projectEquipmentDisplayTags(world, id, rec) {
 			rec.tags.push("torch");
 		}
 	}
+	// Sunlight-tagged weapons emit holy light when wielded.
+	const weaponSlotId = Number(eq.weapon || 0) | 0;
+	if (weaponSlotId > 0) {
+		const wInfo = /** @type any */ (world.get(weaponSlotId, ItemInfo));
+		if (wInfo && Array.isArray(wInfo.tags) && wInfo.tags.includes("sunlight") && !rec.tags.includes("sunlight")) {
+			rec.tags.push("sunlight");
+		}
+	}
 	const resolved = resolveEquippedWeaponVfx(world, id, { slots: ["weapon", "offhand"] });
 	if (resolved.length > 0) rec.weaponVfx = resolved;
 

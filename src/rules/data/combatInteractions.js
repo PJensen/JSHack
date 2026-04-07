@@ -12,6 +12,7 @@
 
 import { Beatitude, BUC_BLESSED } from "../components/Beatitude.js";
 import { CreatureType, CREATURE_TYPES } from "../components/CreatureType.js";
+import { ItemInfo } from "../components/ItemInfo.js";
 import { Vitality } from "../components/Vitality.js";
 import { ActiveEffects } from "../components/ActiveEffects.js";
 import { emitSafe } from "../utils/emitSafe.js";
@@ -65,6 +66,26 @@ export const COMBAT_INTERACTION_RULES = [
       emitSafe(world, "combat:blessed_strike", {
         attacker: ctx.attacker, defender: ctx.defender,
         weaponId: ctx.weaponId, creatureType: CREATURE_TYPES.demon, bonusDmg: 2,
+      });
+    },
+  },
+
+  // Sunlight weapon vs undead: +4 flat damage (holy radiance)
+  {
+    id: "sunlight_weapon_vs_undead",
+    phase: "beforeHit",
+    gate(world, ctx) {
+      if (!(ctx.weaponId > 0)) return false;
+      const info = world.get(ctx.weaponId, ItemInfo);
+      if (!info || !Array.isArray(info.tags) || !info.tags.includes("sunlight")) return false;
+      const ct = world.get(ctx.defender, CreatureType);
+      return ct?.type === CREATURE_TYPES.undead;
+    },
+    apply(world, ctx) {
+      ctx.damage += 4;
+      emitSafe(world, "combat:holy_strike", {
+        attacker: ctx.attacker, defender: ctx.defender,
+        weaponId: ctx.weaponId, creatureType: CREATURE_TYPES.undead, bonusDmg: 4,
       });
     },
   },
