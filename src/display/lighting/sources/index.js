@@ -59,6 +59,11 @@ const _gazeBeams = new Map();
 /** @type {Array<{x:number, y:number, age:number, maxAge:number, color:[number,number,number]}>} */
 const _chestBlooms = [];
 
+// Holy beams — brief transient light beams (sunsword blinding ray).
+/** @type {Array<{fx:number, fy:number, tx:number, ty:number, age:number, maxAge:number}>} */
+const _holyBeams = [];
+const HOLY_BEAM_COLOR = [255, 245, 200];
+
 /**
  * Apply a named temporal pattern to a light definition and push it.
  * Evaluates the pattern waveform, applies intensity to radius/flicker,
@@ -400,6 +405,51 @@ export function collectLightSources(view, opts = {}) {
     }
   }
 
+  // ---- Holy beams (sunsword blinding ray — brief transient) --------------
+  for (let i = _holyBeams.length - 1; i >= 0; i--) {
+    const hb = _holyBeams[i];
+    hb.age += dt;
+    if (hb.age >= hb.maxAge) { _holyBeams.splice(i, 1); continue; }
+    const progress = hb.age / hb.maxAge;
+    // Fade: bright onset, taper in second half
+    const fade = progress < 0.4 ? 1.0 : 1.0 - (progress - 0.4) / 0.6;
+    const dx = hb.tx - hb.fx, dy = hb.ty - hb.fy;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < 0.5) continue;
+    const nx = dx / dist, ny = dy / dist;
+    const spacing = 0.4;
+    const steps = Math.min(20, Math.floor(dist / spacing));
+    // Source bloom
+    out.push({ x: hb.fx, y: hb.fy, radius: 2.0 * fade, color: [
+      HOLY_BEAM_COLOR[0] * fade, HOLY_BEAM_COLOR[1] * fade, HOLY_BEAM_COLOR[2] * fade,
+    ], softness: 8 });
+    // Beam samples
+    for (let s = 1; s <= steps; s++) {
+      const frac = (s * spacing) / dist;
+      const falloff = 1.0 - frac * 0.1;
+      const sp = evaluatePattern('holy', t, (hb.fx * 53 + hb.fy * 31 + s * 17) | 0);
+      const shimmer = 0.85 + 0.15 * sp.intensity;
+      const bi = fade * falloff * shimmer * 1.3;
+      out.push({
+        x: hb.fx + nx * s * spacing,
+        y: hb.fy + ny * s * spacing,
+        radius: 0.6,
+        color: [
+          Math.min(255, HOLY_BEAM_COLOR[0] * bi),
+          Math.min(255, HOLY_BEAM_COLOR[1] * bi),
+          Math.min(255, HOLY_BEAM_COLOR[2] * bi),
+        ],
+        softness: 4,
+      });
+    }
+    // Impact bloom
+    out.push({ x: hb.tx, y: hb.ty, radius: 2.5 * fade, color: [
+      Math.min(255, 255 * fade * 1.2),
+      Math.min(255, 245 * fade * 1.2),
+      Math.min(255, 180 * fade * 1.2),
+    ], softness: 6 });
+  }
+
   // ---- Chest reveal blooms (one-shot fading flashes) --------------------
   for (let i = _chestBlooms.length - 1; i >= 0; i--) {
     const bl = _chestBlooms[i];
@@ -481,10 +531,21 @@ export function installLightEventListeners(world, getPosition) {
     _gazeBeams.delete(Number(actor) | 0);
   });
 
+  // Sunsword blinding ray — brief holy beam from player to target
+  world.on('sunsword:ray:vfx', ({ x, y, fromX, fromY }) => {
+    if (!Number.isFinite(fromX) || !Number.isFinite(fromY)) return;
+    _holyBeams.push({
+      fx: fromX + 0.5, fy: fromY + 0.5,
+      tx: Number(x) + 0.5, ty: Number(y) + 0.5,
+      age: 0, maxAge: 0.45,
+    });
+  });
+
   // Clear gaze beams on level transition
   world.on('dungeon:transitioned', () => {
     _gazeBeams.clear();
     _chestBlooms.length = 0;
+    _holyBeams.length = 0;
   });
 
   // Chest reveal bloom — brief upward light flash on open
