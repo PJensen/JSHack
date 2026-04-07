@@ -41,6 +41,10 @@ import {
   TELEPORT_DISTANCE,
 } from "./petConstants.js";
 import { chebyshevScalar, manhattanScalar } from "../utils/distance.js";
+import { getMonster } from "../data/monsters.js";
+import { SeenCallbackContext } from "../data/callbacks/ai.js";
+import { runCallbackList } from "../interaction/dispatch.js";
+import { canActThisTurn as speedGateCheck } from "../utils/speedGate.js";
 
 const AGGRESSIVE_RADIUS = 8;
 const PET_CORPSE_HEAL_THRESHOLD = 0.75;
@@ -55,6 +59,72 @@ const FELINE_TOXIC_IMMUNITY = 0.85;
 const FLEE_CORPSE_SEARCH_RADIUS = 8;
 const FLEE_CORPSE_THREAT_RADIUS = 2;
 const FELINE_LAVA_MISSTEP_CHANCE = 0.05;
+const PET_ABILITY_SIGHT_RANGE = 8;
+
+const PET_SEEN_KEY = Symbol.for("jshack:pet:seenEnemies");
+
+/** @param {any} world @returns {Map<number, Set<number>>} petId → Set of enemy ids already "first sighted" */
+function ensurePetSeenState(world) {
+  if (world[PET_SEEN_KEY] instanceof Map) return world[PET_SEEN_KEY];
+  const m = new Map();
+  world[PET_SEEN_KEY] = m;
+  return m;
+}
+
+/**
+ * Fire whileLOS / onSeen hooks for a pet that has LOS to a hostile target.
+ * Returns true if a hook consumed the pet's turn (setHandled).
+ */
+function tryPetAbilityHooks(world, petId, petPos, targetId, targetPos) {
+  if (!speedGateCheck(world, petId)) return false;
+  if (world.has(petId, MoveIntent)) return false;
+
+  const ni = world.get(petId, NamedIdentity);
+  const def = ni ? getMonster(String(ni.identity || "")) : null;
+  if (!def?.hooks) return false;
+
+  const onSeenHooks = def.hooks.onSeen;
+  const whileLOSHooks = def.hooks.whileLOS;
+  if (!Array.isArray(onSeenHooks) && !Array.isArray(whileLOSHooks)) return false;
+  if ((!onSeenHooks || onSeenHooks.length === 0) &&
+      (!whileLOSHooks || whileLOSHooks.length === 0)) return false;
+
+  // onSeen: fire once per enemy
+  const seenState = ensurePetSeenState(world);
+  let seenSet = seenState.get(petId);
+  if (!seenSet) { seenSet = new Set(); seenState.set(petId, seenSet); }
+
+  const firstSighting = !seenSet.has(targetId);
+  if (firstSighting) seenSet.add(targetId);
+
+  if (firstSighting && Array.isArray(onSeenHooks) && onSeenHooks.length > 0) {
+    const ctx = new SeenCallbackContext(world, {
+      actor: petId,
+      target: targetId,
+      actorPos: { x: petPos.x | 0, y: petPos.y | 0 },
+      targetPos: { x: targetPos.x | 0, y: targetPos.y | 0 },
+      canActThisTurn: true,
+      hasQueuedMove: false,
+    });
+    runCallbackList(onSeenHooks, ctx);
+    if (ctx.handled) return true;
+  }
+
+  if (Array.isArray(whileLOSHooks) && whileLOSHooks.length > 0) {
+    const ctx = new SeenCallbackContext(world, {
+      actor: petId,
+      target: targetId,
+      actorPos: { x: petPos.x | 0, y: petPos.y | 0 },
+      targetPos: { x: targetPos.x | 0, y: targetPos.y | 0 },
+      canActThisTurn: true,
+      hasQueuedMove: false,
+    });
+    runCallbackList(whileLOSHooks, ctx);
+    if (ctx.handled) return true;
+  }
+
+  return false;
+}
 
 /**
  * petBehaviorSystem - state-aware pet AI
@@ -694,10 +764,17 @@ function behaviorGuarding(world, petId, petState, petPos, playerPos) {
     }
   }
 
-  // Move toward closest enemy (bump resolution handles melee attack when adjacent)
+  // Try ability hooks if enemy in LOS (spells, breath, gaze, etc.)
   if (closestEnemy) {
     const enemyPos = world.get(closestEnemy, Position);
     if (enemyPos) {
+      const isBlocked = blockedCallback(buildBlocksVisionMap(world));
+      const visible = computeFOV(petPos.x | 0, petPos.y | 0, PET_ABILITY_SIGHT_RANGE, isBlocked);
+      if (visible.has(`${enemyPos.x | 0},${enemyPos.y | 0}`)) {
+        if (tryPetAbilityHooks(world, petId, petPos, closestEnemy, enemyPos)) {
+          return; // ability consumed the turn
+        }
+      }
       moveToward(world, petId, enemyPos.x, enemyPos.y);
     }
   }
@@ -710,9 +787,19 @@ function behaviorGuarding(world, petId, petState, petPos, playerPos) {
 function behaviorAggressive(world, petId, petPos, playerPos, playerId) {
   const petFaction = world.get(petId, Faction)?.key || "";
 
+  // Build FOV for ability hook LOS checks
+  const isBlocked = blockedCallback(buildBlocksVisionMap(world));
+  const visible = computeFOV(
+    petPos.x | 0,
+    petPos.y | 0,
+    PET_ABILITY_SIGHT_RANGE,
+    isBlocked,
+  );
+
   // Find nearest hostile within radius
   let closestEnemy = 0;
   let closestDist = AGGRESSIVE_RADIUS + 1;
+  let closestHasLOS = false;
 
   for (const [enemyId, fac, enemyPos, evit] of queryFactionActors(world)) {
     if (!evit || (evit.hp | 0) <= 0) continue;
@@ -723,6 +810,15 @@ function behaviorAggressive(world, petId, petPos, playerPos, playerId) {
     if (edist < closestDist) {
       closestEnemy = enemyId;
       closestDist = edist;
+      closestHasLOS = visible.has(`${enemyPos.x | 0},${enemyPos.y | 0}`);
+    }
+  }
+
+  // If enemy found with LOS, try ability hooks first (spells, breath, gaze, etc.)
+  if (closestEnemy && closestHasLOS) {
+    const enemyPos = world.get(closestEnemy, Position);
+    if (enemyPos && tryPetAbilityHooks(world, petId, petPos, closestEnemy, enemyPos)) {
+      return; // ability consumed the turn
     }
   }
 
