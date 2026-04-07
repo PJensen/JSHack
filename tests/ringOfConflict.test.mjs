@@ -8,8 +8,10 @@ import { Equipment } from '../src/rules/components/Equipment.js';
 import { MoveIntent } from '../src/rules/components/Intents/MoveIntent.js';
 import { Vitality } from '../src/rules/components/Vitality.js';
 import { AggroState, AGGRO_LEVELS, SEARCH_TURNS_HUNTING_GRACE } from '../src/rules/components/AggroState.js';
+import { ItemInfo } from '../src/rules/components/ItemInfo.js';
 import { aiChaseSystem } from '../src/rules/systems/aiChaseSystem.js';
 import { areFactionsHostile } from '../src/rules/utils/factionHostility.js';
+import { hasEquippedTag } from '../src/rules/utils/equipTags.js';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -35,6 +37,7 @@ function makePlayer(world, x, y) {
 function equipConflictRing(world, playerId) {
   const ringId = world.create();
   world.add(ringId, NamedIdentity, { name: 'Ring of Conflict', identity: 'ring_conflict' });
+  world.add(ringId, ItemInfo, { type: 'equip', slot: 'ring', tags: ['conflict'] });
   const eq = world.get(playerId, Equipment);
   eq.ring1 = ringId;
   return ringId;
@@ -49,6 +52,21 @@ function makeEnemy(world, x, y, identity, playerX, playerY) {
   addHuntingAggro(world, id, playerX, playerY);
   return id;
 }
+
+// ── hasEquippedTag utility ───────────────────────────────────────────────────
+
+Deno.test("hasEquippedTag returns true when ring with tag is equipped", () => {
+  const world = new World({ seed: 1 });
+  const player = makePlayer(world, 5, 5);
+  equipConflictRing(world, player);
+  assert(hasEquippedTag(world, player, "conflict"), "should detect conflict tag");
+});
+
+Deno.test("hasEquippedTag returns false when no tagged item equipped", () => {
+  const world = new World({ seed: 1 });
+  const player = makePlayer(world, 5, 5);
+  assert(!hasEquippedTag(world, player, "conflict"), "no ring = no conflict");
+});
 
 // ── Faction hostility ───────────────────────────────────────────────────────
 

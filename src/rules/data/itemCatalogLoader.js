@@ -50,6 +50,7 @@ export function buildCatalogItem(world, itemId, opts = {}) {
     range: def.range || null,
     identified: def.identified === true,
     noQuickChip: def.noQuickChip === true,
+    tags: Array.isArray(def.tags) ? def.tags.slice() : [],
   };
   world.add(id, ItemInfo, info);
 

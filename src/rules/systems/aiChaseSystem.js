@@ -35,6 +35,7 @@ import {
 } from "../components/AggroState.js";
 import { CreatureType, CREATURE_TYPES } from "../components/CreatureType.js";
 import { getMonster }        from "../data/monsters.js";
+import { hasEquippedTag }    from "../utils/equipTags.js";
 import { SeenCallbackContext } from "../data/callbacks/ai.js";
 import { runCallbackList }   from "../interaction/dispatch.js";
 import { playerEntity }      from "../utils/queries.js";
@@ -53,21 +54,9 @@ import { CentipedeSegment } from "../components/CentipedeSegment.js";
 
 const ACTIVE_RADIUS = 32; // tiles; keep AI work bounded to nearby entities
 
-/**
- * Returns true when the player has a Ring of Conflict equipped in either ring
- * slot, causing enemies to target each other instead of the player.
- */
+/** Returns true when any of the player's equipped items carries the "conflict" tag. */
 function playerHasConflict(world, playerId) {
-  const eq = world.get(playerId, Equipment);
-  if (!eq) return false;
-  for (const slot of ["ring1", "ring2"]) {
-    const ringId = Number(eq[slot] || 0) | 0;
-    if (ringId > 0) {
-      const identity = String(world.get(ringId, NamedIdentity)?.identity || "");
-      if (identity === "ring_conflict") return true;
-    }
-  }
-  return false;
+  return hasEquippedTag(world, playerId, "conflict");
 }
 
 /**
