@@ -672,9 +672,11 @@ export function buildWorldView(world) {
 	}
 	_view.isOverworld = _isOverworld;
 	_view.currentDepth = currentDepth;
-	for (const [, ws] of world.query(WeatherState)) {
-		_view.weather = ws.current || "clear";
-		break;
+	if (_isOverworld) {
+		for (const [, ws] of world.query(WeatherState)) {
+			_view.weather = ws.current || "clear";
+			break;
+		}
 	}
 
 	// Compute night darkness (overworld only, derived from PHASE_BOUNDS)
