@@ -9,9 +9,11 @@ import { ItemInfo } from '../src/rules/components/ItemInfo.js';
 import { Vitality } from '../src/rules/components/Vitality.js';
 import { CreatureType, CREATURE_TYPES } from '../src/rules/components/CreatureType.js';
 import { ActiveEffects } from '../src/rules/components/ActiveEffects.js';
+import { ItemCooldown } from '../src/rules/components/ItemCooldown.js';
 import { hasEquippedTag } from '../src/rules/utils/equipTags.js';
 import { COMBAT_INTERACTION_RULES } from '../src/rules/data/combatInteractions.js';
 import { statusStrength } from '../src/rules/utils/statusFacade.js';
+import { getItemHooksByIdentity } from '../src/rules/content/items/itemHooks.js';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -131,4 +133,33 @@ Deno.test("sunsword: blinding ray applies blinded effect", () => {
 
   const strength = statusStrength(world, enemy, "blinded");
   assert(strength > 0, "enemy should have blinded status after ray");
+});
+
+Deno.test("sunsword: on_use is blocked while cooldown is active", () => {
+  const hooks = getItemHooksByIdentity('sunsword');
+  const emits = [];
+  const messages = [];
+  const cd = { turnsRemaining: 4, turnsMax: 12 };
+  const result = hooks.onUse({
+    actor: 1,
+    query: {
+      get(entityId, Comp) {
+        if ((entityId | 0) === 42 && Comp === ItemCooldown) return cd;
+        return null;
+      },
+    },
+    io: {
+      emit(name, payload) { emits.push({ name, payload }); },
+      message(text, type) { messages.push({ text, type }); },
+    },
+  }, {
+    actor: 1,
+    itemId: 42,
+    identity: 'sunsword',
+  });
+
+  assertEquals(result?.cancelled, true);
+  assertEquals(result?.code, 'ITEM_ON_COOLDOWN');
+  assertEquals(messages.length, 1);
+  assertEquals(emits.length, 0);
 });

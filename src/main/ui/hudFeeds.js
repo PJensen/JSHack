@@ -5,6 +5,7 @@ import { Equipment, NON_AMMO_GEAR_SLOTS } from "../../rules/components/Equipment
 import { ActiveEffects } from "../../rules/components/ActiveEffects.js";
 import { Status } from "../../rules/components/Status.js";
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
+import { ItemCooldown } from "../../rules/components/ItemCooldown.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 import { inventoryItems } from "../../rules/utils/inventoryFacade.js";
 import { getAffixName } from "../../rules/data/affixes.js";
@@ -23,6 +24,7 @@ import { resolveCanonicalStats } from "../../rules/utils/canonicalStats.js";
 import { getSpell } from "../../rules/data/spells.js";
 import { getSpellCooldown } from "../../rules/utils/spellCooldowns.js";
 import { spellCost, spellCostResource } from "../../rules/data/spells.js";
+import { SUNSWORD_RAY_COOLDOWN_TURNS } from "../../rules/data/itemAbilityConstants.js";
 import { impactTracker } from "../../display/fx/projectileImpactTracker.js";
 
 /**
@@ -71,6 +73,28 @@ export function createHudFeeds(world, deps) {
       total += Math.max(0, Number(info.count || 0) | 0);
     }
     return Math.max(0, total | 0);
+  }
+
+  function resolveSunswordPinnedAction(playerId) {
+    const eq = /** @type any */ (world.get(playerId, Equipment));
+    const itemId = Number(eq?.weapon || 0) | 0;
+    if (!(itemId > 0)) return null;
+    const identity = String(world.get(itemId, NamedIdentity)?.identity || '').toLowerCase();
+    if (identity !== 'sunsword') return null;
+    const cd = /** @type any */ (world.get(itemId, ItemCooldown));
+    return {
+      kind: 'item-use',
+      id: `item-use:sunsword:${itemId}`,
+      itemId,
+      identity: 'sunsword',
+      name: 'Blinding Ray',
+      symbol: '☼',
+      cost: 0,
+      costKind: 'item',
+      cdRemaining: cd ? Math.max(0, Number(cd.remaining || cd.turnsRemaining || 0) | 0) : 0,
+      cdMax: cd ? Math.max(0, Number(cd.max || cd.turnsMax || 0) | 0) : SUNSWORD_RAY_COOLDOWN_TURNS,
+      auto: true,
+    };
   }
 
   function updateVitalsHUD() {
@@ -369,28 +393,42 @@ export function createHudFeeds(world, deps) {
     // Dispatch pinned spell bar state for mobile spell dock
     if (typeof deps.getPinnedSpellSlots === 'function') {
       const pSlots = deps.getPinnedSpellSlots();
-      const pCdParts = [];
-      for (let i = 0; i < pSlots.length; i++) {
-        const cd = pSlots[i] ? getSpellCooldown(world, pSlots[i]) : null;
-        pCdParts.push(cd ? cd.remaining : 0);
-      }
       const hasSpells = typeof deps.knownSpellIds === 'function' && deps.knownSpellIds().length > 0;
-      const pSig = pSlots.join(',') + '|' + mana + '|' + pCdParts.join(',') + '|' + hasSpells;
+      const resolved = [];
+      const equippedAction = pe ? resolveSunswordPinnedAction(pe.id) : null;
+      if (equippedAction) resolved.push(equippedAction);
+      for (let i = 0; i < pSlots.length && resolved.length < pSlots.length; i++) {
+        const id = pSlots[i];
+        if (!id) {
+          resolved.push(null);
+          continue;
+        }
+        const def = getSpell(id);
+        if (!def) {
+          resolved.push(null);
+          continue;
+        }
+        const cd = getSpellCooldown(world, id);
+        const resource = spellCostResource(def);
+        const cost = spellCost(def);
+        resolved.push({
+          kind: 'spell',
+          id,
+          name: def.name,
+          symbol: def.symbol,
+          cost,
+          costKind: resource,
+          cdRemaining: cd ? cd.remaining : 0,
+          cdMax: cd ? cd.max : 0,
+        });
+      }
+      while (resolved.length < pSlots.length) resolved.push(null);
+      const pSig = resolved.map((entry) => {
+        if (!entry) return 'empty';
+        return `${entry.kind}:${entry.id}:${Number(entry.cdRemaining || 0)}`;
+      }).join(',') + '|' + mana + '|' + stamina + '|' + hasSpells;
       if (pSig !== _lastPinnedSpellBarSig) {
         _lastPinnedSpellBarSig = pSig;
-        const resolved = pSlots.map(id => {
-          if (!id) return null;
-          const def = getSpell(id);
-          if (!def) return null;
-          const cd = getSpellCooldown(world, id);
-          const resource = spellCostResource(def);
-          const cost = spellCost(def);
-          return {
-            id, name: def.name, symbol: def.symbol, cost, costKind: resource,
-            cdRemaining: cd ? cd.remaining : 0,
-            cdMax: cd ? cd.max : 0,
-          };
-        });
         try {
           window.dispatchEvent(new CustomEvent('ui:updatePinnedSpellBar', {
             detail: { pinnedSlots: resolved, mana, stamina, hasLearnedSpells: hasSpells }

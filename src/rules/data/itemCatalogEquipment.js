@@ -1,5 +1,7 @@
 // Equipment entries for the item catalog.
 import { createTorchThrowHook } from "./itemCatalogHooks.js";
+import { ItemCooldown } from "../components/ItemCooldown.js";
+import { SUNSWORD_RAY_COOLDOWN_TURNS } from "./itemAbilityConstants.js";
 
 export const EQUIPMENT_ITEMS = {
   staff_oak: {
@@ -1982,8 +1984,21 @@ export const EQUIPMENT_ITEMS = {
     weight: 1.6,
     hooks: {
       on_use: (ctx, state) => {
+        const cd = ctx.query.get(state?.itemId | 0, ItemCooldown);
+        if (cd && Number(cd.turnsRemaining || 0) > 0) {
+          const turns = Math.max(0, Number(cd.turnsRemaining || 0) | 0);
+          ctx.io.message(`The Sunsword is still cooling down (${turns} turns).`, 'warning');
+          return {
+            consumed: false,
+            cancelled: true,
+            consumesTurn: false,
+            code: 'ITEM_ON_COOLDOWN',
+            message: 'Sunsword is on cooldown.',
+          };
+        }
         const actor = Number(state?.actor || ctx.actor || 0) | 0;
-        ctx.io.emit("sunsword:ray", { actor });
+        const itemId = Number(state?.itemId || 0) | 0;
+        ctx.io.emit("sunsword:ray", { actor, itemId, cooldownTurns: SUNSWORD_RAY_COOLDOWN_TURNS });
         return { consumed: false };
       },
     },

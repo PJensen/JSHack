@@ -1,0 +1,1 @@
+export const SUNSWORD_RAY_COOLDOWN_TURNS = 12;

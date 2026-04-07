@@ -3091,7 +3091,7 @@ function createPinnedSpellDock(mobileLayoutMq) {
     zIndex: '919',
   });
 
-  /** @type {{ spellId: string|null, btn: HTMLButtonElement, glyphSpan: HTMLSpanElement, manaBadge: HTMLSpanElement, cdOverlay: HTMLDivElement, cdLabel: HTMLSpanElement, holdTimer: number|null, isHold: boolean }[]} */
+  /** @type {{ entry: any, spellId: string|null, btn: HTMLButtonElement, glyphSpan: HTMLSpanElement, manaBadge: HTMLSpanElement, cdOverlay: HTMLDivElement, cdLabel: HTMLSpanElement, holdTimer: number|null, isHold: boolean }[]} */
   const slots = [];
 
   /** @type {any[]|null} cached spell data from last ui:spellData response */
@@ -3368,12 +3368,13 @@ function createPinnedSpellDock(mobileLayoutMq) {
     });
     btn.appendChild(cdLabel);
 
-    const slot = { spellId: null, btn, glyphSpan, manaBadge, cdOverlay, cdLabel, holdTimer: null, isHold: false };
+    const slot = { entry: null, spellId: null, btn, glyphSpan, manaBadge, cdOverlay, cdLabel, holdTimer: null, isHold: false };
     slots.push(slot);
     el.appendChild(btn);
 
     // Gesture: tap = cast, hold = open fan picker
     function onPressStart() {
+      if (slot.entry?.kind === 'item-use') return;
       slot.isHold = false;
       slot.holdTimer = setTimeout(() => {
         slot.isHold = true;
@@ -3399,6 +3400,11 @@ function createPinnedSpellDock(mobileLayoutMq) {
           }));
         }
         closeFan();
+      } else if (slot.entry?.kind === 'item-use' && Number(slot.entry?.itemId || 0) > 0) {
+        window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: slot.entry.itemId } }));
+        btn.style.animation = 'none';
+        void btn.offsetWidth;
+        btn.style.animation = 'jshackPinnedSpellBump 200ms cubic-bezier(0.2, 0.9, 0.2, 1)';
       } else if (slot.spellId) {
         // Short tap — cast this pinned spell
         window.dispatchEvent(new CustomEvent('ui:castPinnedSpell', { detail: { slot: i } }));
@@ -3436,25 +3442,49 @@ function createPinnedSpellDock(mobileLayoutMq) {
 
     let anyAssigned = false;
     for (let i = 0; i < SLOT_COUNT; i++) {
-      const spell = (i < pinnedSlots.length) ? pinnedSlots[i] : null;
+      const entry = (i < pinnedSlots.length) ? pinnedSlots[i] : null;
       const s = slots[i];
-      s.spellId = spell?.id || null;
+      s.entry = entry || null;
+      s.spellId = entry?.kind === 'spell' ? (entry?.id || null) : null;
 
-      if (spell && spell.id) {
+      if (entry?.kind === 'item-use' && entry?.id) {
         anyAssigned = true;
-        s.glyphSpan.textContent = spell.symbol || '\u2726';
+        s.glyphSpan.textContent = entry.symbol || '!';
         s.glyphSpan.style.opacity = '1';
-        const cost = Number(spell.cost || 0);
-        const resource = String(spell.costKind || 'mana');
+        const cdRemaining = Number(entry.cdRemaining || 0);
+        const cdMax = Number(entry.cdMax || 0);
+        const onCooldown = cdRemaining > 0 && cdMax > 0;
+
+        s.btn.style.opacity = onCooldown ? '0.5' : '1';
+        s.btn.style.borderColor = '#6e5f2b';
+        s.btn.title = `${entry.name || entry.id}${onCooldown ? ` [${cdRemaining}]` : ''}`;
+        s.manaBadge.style.display = 'none';
+
+        if (onCooldown) {
+          const pct = (1 - cdRemaining / cdMax) * 100;
+          s.cdOverlay.style.background = `conic-gradient(from 0deg, transparent ${pct}%, rgba(0,0,0,0.55) ${pct}%)`;
+          s.cdOverlay.style.display = 'block';
+          s.cdLabel.textContent = String(cdRemaining);
+          s.cdLabel.style.display = 'block';
+        } else {
+          s.cdOverlay.style.display = 'none';
+          s.cdLabel.style.display = 'none';
+        }
+      } else if (entry && entry.id) {
+        anyAssigned = true;
+        s.glyphSpan.textContent = entry.symbol || '\u2726';
+        s.glyphSpan.style.opacity = '1';
+        const cost = Number(entry.cost || 0);
+        const resource = String(entry.costKind || 'mana');
         const canAfford = (resource === 'stamina' ? stamina : mana) >= cost;
-        const cdRemaining = Number(spell.cdRemaining || 0);
-        const cdMax = Number(spell.cdMax || 0);
+        const cdRemaining = Number(entry.cdRemaining || 0);
+        const cdMax = Number(entry.cdMax || 0);
         const onCooldown = cdRemaining > 0 && cdMax > 0;
 
         s.btn.style.opacity = (canAfford && !onCooldown) ? '1' : '0.5';
         s.btn.style.borderColor = '#2d3b52';
         const label = resource === 'stamina' ? 'stamina' : resource === 'life' ? 'life' : 'mana';
-        s.btn.title = `${spell.name || spell.id} (${cost} ${label})${onCooldown ? ` [${cdRemaining}]` : ''}`;
+        s.btn.title = `${entry.name || entry.id} (${cost} ${label})${onCooldown ? ` [${cdRemaining}]` : ''}`;
 
         s.manaBadge.textContent = cost > 0 ? String(cost) : '';
         s.manaBadge.style.display = cost > 0 ? 'block' : 'none';
@@ -3475,6 +3505,7 @@ function createPinnedSpellDock(mobileLayoutMq) {
         s.btn.style.opacity = '0.35';
         s.btn.style.borderColor = '#1a2030';
         s.btn.title = 'Pin a spell (hold to choose)';
+        s.entry = null;
         s.manaBadge.style.display = 'none';
         s.cdOverlay.style.display = 'none';
         s.cdLabel.style.display = 'none';
