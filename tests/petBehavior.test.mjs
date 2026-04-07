@@ -13,6 +13,8 @@ import { Consumable } from "../src/rules/components/Consumable.js";
 import { FoodDecay } from "../src/rules/components/FoodDecay.js";
 import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
 import { Faction } from "../src/rules/components/Faction.js";
+import { CastSpellIntent } from "../src/rules/components/Intents/CastSpellIntent.js";
+import { Speed } from "../src/rules/components/Speed.js";
 import {
   clearAll,
   loadChunk,
@@ -351,6 +353,207 @@ Deno.test("pet flees at 50% threshold and seeks safe corpse to heal", () => {
     move?.dx === 1 && move?.dy === 0,
     "fleeing pet should step toward safe corpse",
   );
+});
+
+Deno.test("tamed dragon_whelp uses fire breath on hostile in LOS", () => {
+  loadFloorChunk();
+  try {
+    const world = new World({ seed: 42 });
+
+    const playerId = world.create();
+    world.add(playerId, Player, {});
+    world.add(playerId, Position, { x: 0, y: 0 });
+
+    // Tamed dragon whelp in aggressive mode, at (3,3)
+    const petId = world.create();
+    world.add(petId, Pet);
+    world.add(petId, Position, { x: 3, y: 3 });
+    world.add(petId, Vitality, { hp: 24, maxHp: 24 });
+    world.add(petId, NamedIdentity, { name: "Dragon Whelp", identity: "dragon_whelp" });
+    world.add(petId, Faction, { key: "pet" });
+    world.add(petId, Speed, { actEvery: 1 });
+    world.add(petId, PetState, {
+      state: "aggressive",
+      targetX: null,
+      targetY: null,
+      targetItemId: 0,
+      stateEnteredTurn: 0,
+      lastPlayerX: 0,
+      lastPlayerY: 0,
+      commandCooldown: 0,
+      rangedCooldown: 0,
+    });
+
+    // Enemy 4 tiles away — within fire breath range (2-6)
+    const enemyId = world.create();
+    world.add(enemyId, Position, { x: 7, y: 3 });
+    world.add(enemyId, Vitality, { hp: 10, maxHp: 10 });
+    world.add(enemyId, Faction, { key: "enemy" });
+
+    const firebreathEvents = [];
+    world.on("monster:firebreath", (ev) => firebreathEvents.push(ev));
+
+    const damagedEvents = [];
+    world.on("damaged", (ev) => damagedEvents.push(ev));
+
+    world.step = 1;
+    petBehaviorSystem(world);
+
+    assert(
+      firebreathEvents.length >= 1,
+      "tamed dragon whelp should fire breath at enemy in LOS",
+    );
+    assert(
+      firebreathEvents[0].actor === petId,
+      "fire breath source should be the pet",
+    );
+    // Pet should NOT also move (ability consumed the turn)
+    assert(
+      !world.has(petId, MoveIntent),
+      "fire breath should consume the pet's turn (no MoveIntent)",
+    );
+  } finally {
+    clearAll();
+  }
+});
+
+Deno.test("tamed cave_spider leaps at enemy on first sight via onSeen", () => {
+  loadFloorChunk();
+  try {
+    const world = new World({ seed: 1 });
+
+    const playerId = world.create();
+    world.add(playerId, Player, {});
+    world.add(playerId, Position, { x: 0, y: 0 });
+
+    // Tamed spider in aggressive mode
+    const petId = world.create();
+    world.add(petId, Pet);
+    world.add(petId, Position, { x: 5, y: 5 });
+    world.add(petId, Vitality, { hp: 6, maxHp: 6 });
+    world.add(petId, NamedIdentity, { name: "Cave Spider", identity: "cave_spider" });
+    world.add(petId, Faction, { key: "pet" });
+    world.add(petId, Speed, { actEvery: 1 });
+    world.add(petId, PetState, {
+      state: "aggressive",
+      targetX: null,
+      targetY: null,
+      targetItemId: 0,
+      stateEnteredTurn: 0,
+      lastPlayerX: 0,
+      lastPlayerY: 0,
+      commandCooldown: 0,
+      rangedCooldown: 0,
+    });
+
+    // Enemy 2 tiles away
+    const enemyId = world.create();
+    world.add(enemyId, Position, { x: 7, y: 5 });
+    world.add(enemyId, Vitality, { hp: 10, maxHp: 10 });
+    world.add(enemyId, Faction, { key: "enemy" });
+
+    const throwEvents = [];
+    world.on("item:thrown", (ev) => throwEvents.push(ev));
+
+    world.step = 1;
+    // Run several times with different seeds to find one where the 25% chance triggers
+    let thrown = false;
+    for (let seed = 1; seed <= 50 && !thrown; seed++) {
+      const w2 = new World({ seed });
+      // Rebuild world for each seed
+      const pid2 = w2.create();
+      w2.add(pid2, Player, {});
+      w2.add(pid2, Position, { x: 0, y: 0 });
+
+      const spider = w2.create();
+      w2.add(spider, Pet);
+      w2.add(spider, Position, { x: 5, y: 5 });
+      w2.add(spider, Vitality, { hp: 6, maxHp: 6 });
+      w2.add(spider, NamedIdentity, { name: "Cave Spider", identity: "cave_spider" });
+      w2.add(spider, Faction, { key: "pet" });
+      w2.add(spider, Speed, { actEvery: 1 });
+      w2.add(spider, PetState, {
+        state: "aggressive",
+        targetX: null,
+        targetY: null,
+        targetItemId: 0,
+        stateEnteredTurn: 0,
+        lastPlayerX: 0,
+        lastPlayerY: 0,
+        commandCooldown: 0,
+        rangedCooldown: 0,
+      });
+
+      const eid2 = w2.create();
+      w2.add(eid2, Position, { x: 7, y: 5 });
+      w2.add(eid2, Vitality, { hp: 10, maxHp: 10 });
+      w2.add(eid2, Faction, { key: "enemy" });
+
+      const events = [];
+      w2.on("item:thrown", (ev) => events.push(ev));
+
+      w2.step = 1;
+      petBehaviorSystem(w2);
+
+      if (events.length > 0) {
+        thrown = true;
+        assert(events[0].source === "monster:onSeen", "thrown event should come from onSeen");
+        // Spider should have moved near the enemy
+        const spiderPos = w2.get(spider, Position);
+        const dist = Math.abs(spiderPos.x - 7) + Math.abs(spiderPos.y - 5);
+        assert(dist <= 2, "spider should have leaped near the enemy");
+      }
+    }
+    assert(thrown, "cave_spider onSeen leap should trigger within 50 different seeds (25% chance each)");
+  } finally {
+    clearAll();
+  }
+});
+
+Deno.test("pet ability hooks do not fire when pet has no monster def hooks", () => {
+  loadFloorChunk();
+  try {
+    const world = new World({ seed: 42 });
+
+    const playerId = world.create();
+    world.add(playerId, Player, {});
+    world.add(playerId, Position, { x: 0, y: 0 });
+
+    // Pet with identity that has no hooks (kitty is not a monster)
+    const petId = world.create();
+    world.add(petId, Pet);
+    world.add(petId, Position, { x: 3, y: 3 });
+    world.add(petId, Vitality, { hp: 10, maxHp: 10 });
+    world.add(petId, NamedIdentity, { name: "Kitty", identity: "kitty" });
+    world.add(petId, Faction, { key: "pet" });
+    world.add(petId, PetState, {
+      state: "aggressive",
+      targetX: null,
+      targetY: null,
+      targetItemId: 0,
+      stateEnteredTurn: 0,
+      lastPlayerX: 0,
+      lastPlayerY: 0,
+      commandCooldown: 0,
+      rangedCooldown: 0,
+    });
+
+    const enemyId = world.create();
+    world.add(enemyId, Position, { x: 5, y: 3 });
+    world.add(enemyId, Vitality, { hp: 10, maxHp: 10 });
+    world.add(enemyId, Faction, { key: "enemy" });
+
+    world.step = 1;
+    petBehaviorSystem(world);
+
+    // Kitty should just move toward enemy (no ability hooks)
+    assert(
+      world.has(petId, MoveIntent),
+      "pet without hooks should move toward enemy normally",
+    );
+  } finally {
+    clearAll();
+  }
 });
 
 Deno.test("fleeing pet ignores unsafe corpse and retreats toward player", () => {
