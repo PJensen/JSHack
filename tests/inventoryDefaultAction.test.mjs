@@ -1,5 +1,6 @@
 import { assertEquals } from "jsr:@std/assert";
-import { getInventoryDefaultAction } from "../src/display/ui/inventoryUtils.js";
+import { getInventoryDefaultAction, isInventoryItemUsable } from "../src/display/ui/inventoryUtils.js";
+import { getQuickChipPrimaryAction } from "../src/display/ui/hud.js";
 
 Deno.test("inventory default action: equippable items prioritize equip", () => {
   const sword = {
@@ -10,6 +11,19 @@ Deno.test("inventory default action: equippable items prioritize equip", () => {
     applyTargetCount: 2,
   };
   assertEquals(getInventoryDefaultAction(sword), "equip");
+});
+
+Deno.test("inventory use classification: equippable hook-backed items expose use without changing default action", () => {
+  const sunsword = {
+    id: 111,
+    type: "equip",
+    slot: "weapon",
+    canUse: true,
+    equipped: true,
+  };
+  assertEquals(isInventoryItemUsable(sunsword), true);
+  assertEquals(getInventoryDefaultAction(sunsword), "equip");
+  assertEquals(getQuickChipPrimaryAction(sunsword), "use");
 });
 
 Deno.test("inventory default action: usable non-slot items prioritize use over apply", () => {

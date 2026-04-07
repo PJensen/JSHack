@@ -37,6 +37,7 @@ export function getQuickChipPrimaryAction(it) {
   if (identity === 'scroll_identify') return 'apply';
   if (it?.canApply) return 'apply';
   const t = String(it?.type || '');
+  if (it?.canUse && !!it?.equipped) return 'use';
   if (t === 'gem') return 'apply';
   if (t === 'equip' || t === 'ammo' || t === 'wand') return 'equip';
   if (t === 'potion') return 'drink';

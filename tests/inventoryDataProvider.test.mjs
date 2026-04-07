@@ -15,6 +15,7 @@ import { getCalendarDate, TURNS_PER_DAY } from "../src/rules/data/calendar.js";
 import { addToInventory } from "../src/rules/utils/inventoryFacade.js";
 import { clearAll, loadChunk } from "../src/rules/environment/dungeon/tileMap.js";
 import { CHUNK_SIZE, TILE_FLOOR } from "../src/rules/environment/dungeon/constants.js";
+import { buildCatalogItem } from "../src/rules/data/itemCatalogLoader.js";
 
 function makeEquipItem(world, identity, name, slot) {
   const id = world.create();
@@ -174,6 +175,46 @@ Deno.test("inventory data provider keeps bagItems unfiltered when slot-filtering
   assertEquals(String(payload?.items?.[0]?.identity || ""), "sword_plain");
   const bagItems = Array.isArray(payload.bagItems) ? payload.bagItems : [];
   assertEquals(bagItems.length, 2, "bagItems should remain full inventory payload for quick-slot reconciliation");
+});
+
+Deno.test("inventory data provider marks hook-backed equipment as usable", () => {
+  const world = new World({ seed: 2468 });
+  const player = world.create();
+  world.add(player, Player, {});
+  world.add(player, Position, { x: 0, y: 0 });
+  world.add(player, Inventory, { items: [], capacity: 20 });
+  world.add(player, Equipment, {});
+  world.add(player, Brain, { learnedSpellIds: [], itemKnowledgeIdentities: [], seenTiles: new Uint8Array(), intelligence: 10, visionRange: 8 });
+
+  const sunsword = buildCatalogItem(world, "sunsword");
+  addToInventory(world, player, sunsword);
+
+  installInventoryDataProvider({
+    world,
+    getActiveSpellId: () => null,
+    isSimUiBlocked: () => false,
+    getMessageLog: () => ({ getEntries: () => [] }),
+    tombstoneRepo: { getAll: () => [] },
+  });
+
+  /** @type {any[]} */
+  const payloads = [];
+  const onInventoryData = (ev) => {
+    payloads.push(ev?.detail || null);
+  };
+  addEventListener("ui:inventoryData", onInventoryData);
+  dispatchEvent(new CustomEvent("ui:requestInventoryData"));
+  removeEventListener("ui:inventoryData", onInventoryData);
+
+  const payload = payloads.find((detail) => {
+    const bag = Array.isArray(detail?.bagItems) ? detail.bagItems : [];
+    return bag.some((it) => String(it?.identity || "") === "sunsword");
+  }) || null;
+  assert(payload, "expected ui:inventoryData payload");
+  const bagItems = Array.isArray(payload?.bagItems) ? payload.bagItems : [];
+  const sword = bagItems.find((it) => String(it?.identity || "") === "sunsword") || null;
+  assert(sword, "expected sunsword in bag payload");
+  assertEquals(!!sword.canUse, true);
 });
 
 Deno.test("character data dedupes effect/status aliases into one active effect row", () => {
