@@ -1959,6 +1959,7 @@ export const EQUIPMENT_ITEMS = {
     rarity: 4,
     rarityName: "epic",
     bonuses: {},
+    tags: ["conflict"],
     description: "A jagged band of blackened iron that hums with discord. Nearby creatures turn on each other in blind rage.",
     weight: 0.06,
   },

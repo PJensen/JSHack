@@ -21,6 +21,7 @@ export const ItemInfo = defineComponent(
     sockets: [], // gem ids socketed into this item (e.g. ['gem_ruby'])
     maxSockets: 0, // maximum number of gem sockets this item can hold
     noQuickChip: false, // suppress pickup quick-chip UI for this item
+    tags: [], // behavioral flags: "conflict", "sunlight", "levitate", etc.
   },
   {
     validate(rec) {
@@ -50,6 +51,8 @@ export const ItemInfo = defineComponent(
         throw new Error("ItemInfo.validate(): affixes must be an array");
       if (typeof rec.noQuickChip !== "boolean")
         throw new Error("ItemInfo.validate(): noQuickChip must be a boolean");
+      if (!Array.isArray(rec.tags))
+        throw new Error("ItemInfo.validate(): tags must be an array");
       return true;
     },
   }
