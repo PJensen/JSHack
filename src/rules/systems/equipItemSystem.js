@@ -93,26 +93,47 @@ export function equipItemSystem(world) {
     };
 
     if (slot === 'weapon') {
-      // Auto-cascade: if weapon slot is occupied by a 1H, offhand is empty,
-      // and new item is also 1H, cascade to offhand for dual-wielding.
-      const mainOccupied = Number.isInteger(eq.weapon) && eq.weapon > 0;
-      const offhandEmpty = !Number.isInteger(eq.offhand) || eq.offhand <= 0;
-      const isOneHanded = !info.twoHanded;
+      const chosenSlot = (intent.targetSlot === 'weapon' || intent.targetSlot === 'offhand')
+        ? intent.targetSlot : '';
 
-      if (mainOccupied && offhandEmpty && isOneHanded) {
-        const mainInfo = world.get(eq.weapon, ItemInfo);
-        if (mainInfo && !mainInfo.twoHanded) {
-          equipSingleSlot('offhand');
-        } else {
-          // Main hand is 2H — replace it, not cascade
-          equipSingleSlot('weapon');
-        }
-      } else {
-        equipSingleSlot('weapon');
-        // two-handers occupy both hands — kick out any equipped offhand
-        if (info.twoHanded && Number.isInteger(eq.offhand) && eq.offhand > 0) {
+      if (chosenSlot) {
+        // Player explicitly chose a slot — honour it directly.
+        equipSingleSlot(chosenSlot);
+        // If they put a 2H in weapon, kick offhand
+        if (chosenSlot === 'weapon' && info.twoHanded && Number.isInteger(eq.offhand) && eq.offhand > 0) {
           pushToInventory(eq.offhand);
           eq.offhand = null;
+        }
+        // If they put a 1H in offhand while weapon is 2H, kick the 2H
+        if (chosenSlot === 'offhand' && Number.isInteger(eq.weapon) && eq.weapon > 0) {
+          const weaponInfo = world.get(eq.weapon, ItemInfo);
+          if (weaponInfo?.twoHanded) {
+            pushToInventory(eq.weapon);
+            eq.weapon = null;
+          }
+        }
+      } else {
+        // Auto-cascade: if weapon slot is occupied by a 1H, offhand is empty,
+        // and new item is also 1H, cascade to offhand for dual-wielding.
+        const mainOccupied = Number.isInteger(eq.weapon) && eq.weapon > 0;
+        const offhandEmpty = !Number.isInteger(eq.offhand) || eq.offhand <= 0;
+        const isOneHanded = !info.twoHanded;
+
+        if (mainOccupied && offhandEmpty && isOneHanded) {
+          const mainInfo = world.get(eq.weapon, ItemInfo);
+          if (mainInfo && !mainInfo.twoHanded) {
+            equipSingleSlot('offhand');
+          } else {
+            // Main hand is 2H — replace it, not cascade
+            equipSingleSlot('weapon');
+          }
+        } else {
+          equipSingleSlot('weapon');
+          // two-handers occupy both hands — kick out any equipped offhand
+          if (info.twoHanded && Number.isInteger(eq.offhand) && eq.offhand > 0) {
+            pushToInventory(eq.offhand);
+            eq.offhand = null;
+          }
         }
       }
     } else if (slot === 'ring') {
