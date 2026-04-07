@@ -1586,6 +1586,25 @@ export const MAGIC_ITEMS = {
       }),
     },
   },
+  scroll_taming: {
+    id: "scroll_taming",
+    catalogKind: "magic",
+    name: "Scroll of Taming",
+    type: "scroll",
+    slot: "bag",
+    material: "paper",
+    rarity: 3,
+    rarityName: "rare",
+    description: "Soft whispers curl from the parchment. A creature that hears them becomes your devoted ally.",
+    weight: 0.1,
+    hooks: {
+      on_use: (ctx, state) => {
+        const actor = Number(state?.actor || ctx.actor || 0) | 0;
+        ctx.io.emit("scroll:taming", { actor });
+        return { consumed: true };
+      },
+    },
+  },
   scroll_mapping: {
     id: "scroll_mapping",
     catalogKind: "magic",
@@ -1688,6 +1707,26 @@ export const MAGIC_ITEMS = {
         effectKey: "frozen",
         effectDurationPerCharge: 2,
       }),
+    },
+  },
+  wand_stasis: {
+    id: "wand_stasis",
+    catalogKind: "magic",
+    name: "Wand of Stasis",
+    type: "wand",
+    slot: "ranged",
+    material: "wood",
+    charges: 3,
+    rarity: 3,
+    rarityName: "rare",
+    description: "A pale crystalline rod that hums with temporal energy. Freezes a creature outside of time.",
+    weight: 0.4,
+    hooks: {
+      on_use: (ctx, state) => {
+        const actor = Number(state?.actor || ctx.actor || 0) | 0;
+        ctx.io.emit("wand:stasis", { actor });
+        return { consumed: true };
+      },
     },
   },
   wand_heal: {

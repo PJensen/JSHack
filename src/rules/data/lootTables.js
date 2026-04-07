@@ -217,6 +217,7 @@ export const LOOT_TABLES = {
       { type: "item",      weight: 5,  itemId: "scroll_homecoming" },
       { type: "item",      weight: 5,  itemId: "scroll_polymorph" },
       { type: "item",      weight: 3,  itemId: "scroll_genocide" },
+      { type: "item",      weight: 5,  itemId: "scroll_taming" },
     ],
   },
 
@@ -284,6 +285,7 @@ export const LOOT_TABLES = {
       { type: "item", weight: 35, itemId: "wand_meteor" },
       { type: "item", weight: 30, itemId: "wand_heal" },
       { type: "item", weight: 25, itemId: "wand_frost" },
+      { type: "item", weight: 15, itemId: "wand_stasis" },
     ],
   },
 

@@ -75,6 +75,7 @@ import { installPolymorphListener } from "../rules/systems/polymorphSystem.js";
 import { installCurseHooks } from "../rules/systems/curseHooks.js";
 import { channelingSystem, installDrainLifeDamageInterruptListener } from "../rules/systems/channelingSystem.js";
 import { installGenocideListener } from "../rules/systems/genocideSystem.js";
+import { installTamingListener } from "../rules/systems/tamingSystem.js";
 import { workstationStateSystem } from "../rules/systems/workstationStateSystem.js";
 import { defineInventoryVirtuals, installVirtuals } from "../rules/utils/inventoryVirtuals.js";
 import { defineDerivedStatVirtuals } from "../rules/utils/derivedStats.js";
@@ -139,6 +140,7 @@ export function configureWorld(world) {
   installPolymorphListener(world);
   installCurseHooks(world);
   installGenocideListener(world);
+  installTamingListener(world);
   // Elevate enemy AggroState when they take damage (even off-screen).
   installAggroFromDamageListener(world);
   // Witnesses react to stealth offense and enter hunting with attacker last-known position.

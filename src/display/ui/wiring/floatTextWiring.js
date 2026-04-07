@@ -926,6 +926,60 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     }
   });
 
+  world.on('scroll:taming:vfx', ({ x, y }) => {
+    if (!canShowAt(x, y)) return;
+    ftext.addStatus(x, y - 0.45, 'TAMED!', {
+      color: '#7BFF7B',
+      life: 1.4,
+      scaleStart: 1.5,
+      scaleEnd: 1.0,
+    });
+    for (let i = 0; i < 6; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 0.2 + Math.random() * 0.4;
+      fx.pool.spawn(new Particle({
+        x,
+        y: y - 0.1,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 0.15,
+        life: 0.3 + Math.random() * 0.2,
+        size0: 0.08,
+        size1: 0.02,
+        r: 123,
+        g: 255,
+        b: 123,
+        a0: 0.85,
+      }));
+    }
+  });
+
+  world.on('wand:stasis:vfx', ({ x, y }) => {
+    if (!canShowAt(x, y)) return;
+    ftext.addStatus(x, y - 0.45, 'FROZEN IN TIME!', {
+      color: '#88ddff',
+      life: 1.6,
+      scaleStart: 1.5,
+      scaleEnd: 1.0,
+    });
+    for (let i = 0; i < 8; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 0.15 + Math.random() * 0.3;
+      fx.pool.spawn(new Particle({
+        x,
+        y: y - 0.1,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 0.05,
+        life: 0.4 + Math.random() * 0.3,
+        size0: 0.10,
+        size1: 0.03,
+        r: 136,
+        g: 221,
+        b: 255,
+        a0: 0.9,
+      }));
+    }
+  });
+
   world.on('nymph:stole', ({ at }) => {
     if (!at || !canShowAt(at.x, at.y)) return;
     ftext.addStatus(at.x, at.y - 0.45, 'STOLEN!', {
