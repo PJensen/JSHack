@@ -116,6 +116,7 @@ const DISPLAY_STATUS_TAGS = new Set([
 	'resist_poison',
 	'resist_electric',
 	'resist_acid',
+	'stasis',
 ]);
 const PROC_STATE_INFO_BY_KEY = (() => {
 	/** @type {Map<string, {name:string, description:string}>} */
