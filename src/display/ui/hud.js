@@ -1295,6 +1295,8 @@ export function initHUD() {
   const SPELL_SLOT_COUNT = 6;
   /** @type {HTMLButtonElement[]} */
   const _slotBtns = [];
+  /** @type {any[]} */
+  const _slotEntries = new Array(SPELL_SLOT_COUNT).fill(null);
   /** @type {string} */
   let _lastSlotFingerprint = '';
 
@@ -1311,13 +1313,25 @@ export function initHUD() {
       touchAction: 'manipulation', opacity: '0.4',
     });
     btn.addEventListener('click', () => {
+      const entry = _slotEntries[index] || null;
+      if (entry?.kind === 'item-use' && Number(entry?.itemId || 0) > 0) {
+        window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: entry.itemId } }));
+        return;
+      }
       window.dispatchEvent(new CustomEvent('ui:castSpellSlot', { detail: { slot: index } }));
     });
     btn.addEventListener('contextmenu', (e) => {
+      const entry = _slotEntries[index] || null;
+      if (entry?.kind === 'item-use') {
+        e.preventDefault();
+        return;
+      }
       e.preventDefault();
       window.dispatchEvent(new CustomEvent('ui:openSpellPicker', { detail: { bindSlot: index } }));
     });
     btn.addEventListener('mousedown', (e) => {
+      const entry = _slotEntries[index] || null;
+      if (entry?.kind === 'item-use') return;
       if (e.shiftKey && e.button === 0) {
         e.preventDefault();
         window.dispatchEvent(new CustomEvent('ui:openSpellPicker', { detail: { bindSlot: index } }));
@@ -1349,6 +1363,7 @@ export function initHUD() {
     for (let i = 0; i < SPELL_SLOT_COUNT; i++) {
       const btn = _slotBtns[i];
       const spell = (i < slots.length) ? slots[i] : null;
+      _slotEntries[i] = spell || null;
       btn.textContent = '';
 
       const iconSpan = document.createElement('span');
@@ -1360,15 +1375,23 @@ export function initHUD() {
 
       if (spell && spell.id) {
         iconSpan.textContent = spell.symbol || ACTION_ICONS.cast;
-        const resource = String(spell.costKind || 'mana');
-        const canAfford = (resource === 'stamina' ? stamina : mana) >= Number(spell.cost || 0);
-        btn.style.opacity = (canAfford && !onCooldown) ? '1' : '0.5';
-        const isActive = spell.id === activeId;
-        btn.style.borderColor = isActive ? '#6b8fbf' : '#2d3b52';
-        btn.style.background = isActive ? '#152035' : '#101626';
-        const cdTip = onCooldown ? ` [${cdRemaining} turns]` : '';
-        const label = resource === 'stamina' ? 'stamina' : resource === 'life' ? 'life' : 'mana';
-        btn.title = `${spell.name || spell.id} (${spell.cost || 0} ${label})${cdTip}`;
+        if (spell.kind === 'item-use') {
+          btn.style.opacity = onCooldown ? '0.5' : '1';
+          btn.style.borderColor = '#6e5f2b';
+          btn.style.background = '#16120a';
+          const cdTip = onCooldown ? ` [${cdRemaining} turns]` : '';
+          btn.title = `${spell.name || spell.id}${cdTip}`;
+        } else {
+          const resource = String(spell.costKind || 'mana');
+          const canAfford = (resource === 'stamina' ? stamina : mana) >= Number(spell.cost || 0);
+          btn.style.opacity = (canAfford && !onCooldown) ? '1' : '0.5';
+          const isActive = spell.id === activeId;
+          btn.style.borderColor = isActive ? '#6b8fbf' : '#2d3b52';
+          btn.style.background = isActive ? '#152035' : '#101626';
+          const cdTip = onCooldown ? ` [${cdRemaining} turns]` : '';
+          const label = resource === 'stamina' ? 'stamina' : resource === 'life' ? 'life' : 'mana';
+          btn.title = `${spell.name || spell.id} (${spell.cost || 0} ${label})${cdTip}`;
+        }
         btn.setAttribute('aria-label', btn.title);
         btn.disabled = false;
       } else {
@@ -1416,7 +1439,7 @@ export function initHUD() {
         Object.assign(labelSpan.style, {
           position: 'absolute', bottom: '0', left: '0', right: '0',
           textAlign: 'center', fontSize: '11px', lineHeight: '1',
-          color: '#cfe8ff', background: '#1a2744', borderRadius: '0 0 6px 6px',
+          color: '#cfe8ff', background: spell.kind === 'item-use' ? '#3b2f12' : '#1a2744', borderRadius: '0 0 6px 6px',
           padding: '2px 0', opacity: '0.95', letterSpacing: '0.3px', pointerEvents: 'none',
           zIndex: '3',
         });

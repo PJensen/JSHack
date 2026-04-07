@@ -360,28 +360,41 @@ export function createHudFeeds(world, deps) {
     // Dispatch spell bar state for desktop HUD
     if (typeof deps.getActionBarSlots === 'function') {
       const slots = deps.getActionBarSlots();
-      // Build cooldown suffix so sig changes each tick while any CD is active
-      const cdParts = [];
-      for (let i = 0; i < slots.length; i++) {
-        const cd = slots[i] ? getSpellCooldown(world, slots[i]) : null;
-        cdParts.push(cd ? cd.remaining : 0);
+      const resolved = [];
+      const equippedAction = pe ? resolveSunswordPinnedAction(pe.id) : null;
+      if (equippedAction) resolved.push(equippedAction);
+      for (let i = 0; i < slots.length && resolved.length < slots.length; i++) {
+        const id = slots[i];
+        if (!id) {
+          resolved.push(null);
+          continue;
+        }
+        const def = getSpell(id);
+        if (!def) {
+          resolved.push(null);
+          continue;
+        }
+        const cd = getSpellCooldown(world, id);
+        const resource = spellCostResource(def);
+        const cost = spellCost(def);
+        resolved.push({
+          kind: 'spell',
+          id,
+          name: def.name,
+          symbol: def.symbol,
+          cost,
+          costKind: resource,
+          cdRemaining: cd ? cd.remaining : 0,
+          cdMax: cd ? cd.max : 0,
+        });
       }
-      const sig = slots.join(',') + '|' + (activeId || '') + '|' + mana + '|' + cdParts.join(',');
+      while (resolved.length < slots.length) resolved.push(null);
+      const sig = resolved.map((entry) => {
+        if (!entry) return 'empty';
+        return `${entry.kind}:${entry.id}:${Number(entry.cdRemaining || 0)}`;
+      }).join(',') + '|' + (activeId || '') + '|' + mana + '|' + stamina;
       if (sig !== _lastSpellBarSig) {
         _lastSpellBarSig = sig;
-        const resolved = slots.map(id => {
-          if (!id) return null;
-          const def = getSpell(id);
-          if (!def) return null;
-          const cd = getSpellCooldown(world, id);
-          const resource = spellCostResource(def);
-          const cost = spellCost(def);
-          return {
-            id, name: def.name, symbol: def.symbol, cost, costKind: resource,
-            cdRemaining: cd ? cd.remaining : 0,
-            cdMax: cd ? cd.max : 0,
-          };
-        });
         try {
           window.dispatchEvent(new CustomEvent('ui:updateSpellBar', {
             detail: { slots: resolved, activeSpellId: activeId, mana, stamina }
