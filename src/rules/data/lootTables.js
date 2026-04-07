@@ -114,6 +114,7 @@ export const LOOT_TABLES = {
       { type: "equip", weight: 11, pool: ["conduction_lens", "echo_grimoire"], affixChance: 0 },
       { type: "equip", weight: 12, pool: ["bow_composite"], affixChance: 0 },
       { type: "equip", weight: 12, pool: ["wardkeeper_shield"], affixChance: 0 },
+      { type: "equip", weight: 8,  pool: ["ring_conflict"], affixChance: 0 },
       { type: "equip", weight: 12, pool: ["serpent_ring"], affixChance: 0 },
       { type: "equip", weight: 12, pool: ["helm_warhelm", "helm_visionary"], affixChance: 0 },
       { type: "equip", weight: 12, pool: ["pendant_soulkeeper", "pendant_stormward"], affixChance: 0 },

@@ -2117,6 +2117,10 @@ export function installMessageWiring({
   world.on('item:equipped', ({ actor, itemId, slot, name }) => {
     const label = name ? bracketizeName(name) : `item ${itemId}`;
     log(`You equip ${label}${slot ? ' (' + slot + ')' : ''}.`, 'system');
+    const ni = compGet(itemId, NamedIdentity);
+    if (ni?.identity === 'ring_conflict') {
+      log('The dungeon erupts in discord — creatures turn on each other!', 'danger');
+    }
   });
   world.on('item:unequipped', ({ actor, itemId, slot, name }) => {
     const label = name ? bracketizeName(name) : `item ${itemId}`;
