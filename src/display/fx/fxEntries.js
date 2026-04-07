@@ -33,11 +33,12 @@ export class RadialFx extends FxEntry {
 // Line endpoints (spell bolt, frost beam).
 // ---------------------------------------------------------------------------
 export class LineFx extends FxEntry {
-  constructor({ from, to, ttl, chainIndex = 0 }) {
+  constructor({ from, to, ttl, chainIndex = 0, style = 'bolt' }) {
     super(ttl);
     this.from = from;
     this.to = to;
     this.chainIndex = chainIndex;
+    this.style = style;
   }
 }
 

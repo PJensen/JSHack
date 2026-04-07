@@ -13,6 +13,37 @@ const FIRE_BREATH_MIN_TRAVEL_SEC = 0.36;
 const FIRE_BREATH_MAX_TRAVEL_SEC = 1.05;
 const FIRE_BREATH_LINGER_SEC = 0.18;
 
+const LINE_FX_STYLE = Object.freeze({
+  bolt: Object.freeze({
+    outer: 'rgba(120,200,255,ALPHA)',
+    mid: 'rgba(160,220,255,ALPHA)',
+    core: 'rgba(230,255,255,ALPHA)',
+    pulseOuter: 'rgba(180,240,255,ALPHA)',
+    pulseCore: 'rgba(255,255,220,ALPHA)',
+    light: Object.freeze([200, 210, 255]),
+    pulseLight: Object.freeze([220, 230, 255]),
+    shake: 4,
+  }),
+  holy: Object.freeze({
+    outer: 'rgba(255,226,150,ALPHA)',
+    mid: 'rgba(255,241,186,ALPHA)',
+    core: 'rgba(255,252,236,ALPHA)',
+    pulseOuter: 'rgba(255,236,170,ALPHA)',
+    pulseCore: 'rgba(255,249,220,ALPHA)',
+    light: Object.freeze([255, 240, 180]),
+    pulseLight: Object.freeze([255, 246, 205]),
+    shake: 2,
+  }),
+});
+
+function getLineFxStyle(style) {
+  return LINE_FX_STYLE[String(style || '').toLowerCase()] || LINE_FX_STYLE.bolt;
+}
+
+function alphaColor(template, alpha) {
+  return template.replace('ALPHA', String(alpha));
+}
+
 const DEITY_WRATH_VFX = Object.freeze({
   default: Object.freeze({
     behavior: 'lightning_bolt',
@@ -373,6 +404,17 @@ export function createBoltFxController({ world, cam, fx, getPosition }) {
         startShake(cam, 4, 0.18);
       }
     });
+    world.on('sunsword:ray:vfx', ({ x, y, fromX, fromY }) => {
+      if (!Number.isFinite(fromX) || !Number.isFinite(fromY) || !Number.isFinite(x) || !Number.isFinite(y)) return;
+      _boltFx.push(new LineFx({
+        from: { x: Number(fromX) + 0.5, y: Number(fromY) + 0.5 },
+        to: { x: Number(x) + 0.5, y: Number(y) + 0.5 },
+        ttl: 0.12,
+        style: 'holy',
+      }));
+      _lightPulses.push(new PulseFx({ x: Number(x) + 0.5, y: Number(y) + 0.5, ttl: 0.14, color: [255, 246, 205] }));
+      startShake(cam, 2, 0.10);
+    });
     world.on('deity:wrath', ({ playerId, deityId, intensity, severityScale, wrathDebt }) => {
       _spawnDeityWrath({
         playerId: Number(playerId || 0),
@@ -548,23 +590,31 @@ export function createBoltFxController({ world, cam, fx, getPosition }) {
     ctx.globalCompositeOperation = 'lighter';
     for (const p of _lightPulses) {
       const a = p.alpha;
-      ctx.fillStyle = `rgba(180,240,255,${0.18 * a})`;
+      const pulseColor = Array.isArray(p.color) ? p.color : null;
+      const pulseOuter = pulseColor
+        ? `rgba(${pulseColor[0]},${pulseColor[1]},${pulseColor[2]},${0.18 * a})`
+        : `rgba(180,240,255,${0.18 * a})`;
+      const pulseCore = pulseColor
+        ? `rgba(255,255,220,${0.10 * a})`
+        : `rgba(255,255,220,${0.10 * a})`;
+      ctx.fillStyle = pulseOuter;
       ctx.beginPath(); ctx.arc(p.x, p.y, 0.6, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = `rgba(255,255,220,${0.10 * a})`;
+      ctx.fillStyle = pulseCore;
       ctx.beginPath(); ctx.arc(p.x, p.y, 0.35, 0, Math.PI * 2); ctx.fill();
     }
     for (const eff of _boltFx) {
       const alpha = eff.alpha;
+      const style = getLineFxStyle(eff.style);
       const pts = jitterLine(eff.from, eff.to, 11, 0.10 * alpha);
       ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-      ctx.strokeStyle = `rgba(120,200,255,${0.18 * alpha})`;
+      ctx.strokeStyle = alphaColor(style.outer, 0.18 * alpha);
       ctx.lineWidth = 0.22;
       pathPolyline(ctx, pts); ctx.stroke();
-      ctx.strokeStyle = `rgba(160,220,255,${0.35 * alpha})`;
+      ctx.strokeStyle = alphaColor(style.mid, 0.35 * alpha);
       ctx.lineWidth = 0.10;
       pathPolyline(ctx, pts); ctx.stroke();
       const core = jitterLine(eff.from, eff.to, 13, 0.05 * alpha);
-      ctx.strokeStyle = `rgba(230,255,255,${0.9 * alpha})`;
+      ctx.strokeStyle = alphaColor(style.core, 0.9 * alpha);
       ctx.lineWidth = 0.045;
       pathPolyline(ctx, core); ctx.stroke();
     }
@@ -730,17 +780,18 @@ export function createBoltFxController({ world, cam, fx, getPosition }) {
     for (let i = 0; i < _boltFx.length; i++) {
       const b = _boltFx[i];
       const u = b.progress;
+      const style = getLineFxStyle(b.style);
       out.push({
         x: b.from.x + (b.to.x - b.from.x) * u,
         y: b.from.y + (b.to.y - b.from.y) * u,
         radius: 8 * b.alpha,
-        color: [200, 210, 255],
+        color: style.light,
       });
-      out.push({ x: b.to.x, y: b.to.y, radius: 5 * b.alpha, color: [200, 210, 255] });
+      out.push({ x: b.to.x, y: b.to.y, radius: 5 * b.alpha, color: style.light });
     }
     for (let i = 0; i < _lightPulses.length; i++) {
       const p = _lightPulses[i];
-      out.push({ x: p.x, y: p.y, radius: 6 * p.alpha, color: [220, 230, 255] });
+      out.push({ x: p.x, y: p.y, radius: 6 * p.alpha, color: Array.isArray(p.color) ? p.color : [220, 230, 255] });
     }
     for (let i = 0; i < _fireBreathFx.length; i++) {
       const fb = _fireBreathFx[i];

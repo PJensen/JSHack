@@ -2,6 +2,7 @@ import { assertEquals } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";
 import { createBoltFxController } from "../src/display/fx/boltFxController.js";
 import { isInputLocked } from "../src/display/input/inputLock.js";
+import { assert } from "jsr:@std/assert";
 
 function installTestWindow() {
   const hadWindow = Object.prototype.hasOwnProperty.call(globalThis, "window");
@@ -62,6 +63,41 @@ Deno.test("boltFx fire breath is a blocking slow-travel VFX window", () => {
     controller.tick(0.15);
     assertEquals(controller.isBlocking(), false);
     assertEquals(isInputLocked(), false);
+  } finally {
+    restoreWindow();
+  }
+});
+
+Deno.test("boltFx renders sunsword holy beam as non-blocking styled line light", () => {
+  const restoreWindow = installTestWindow();
+
+  try {
+    const world = new World({ seed: 9 });
+    const controller = createBoltFxController({
+      world,
+      cam: {},
+      fx: { pool: { spawn() {} } },
+      getPosition: () => null,
+    });
+    controller.installListeners();
+
+    world.emit("sunsword:ray:vfx", {
+      fromX: 1,
+      fromY: 1,
+      x: 4,
+      y: 1,
+    });
+
+    assertEquals(controller.isBlocking(), false);
+    const lights = controller.getActiveLights();
+    assert(lights.length >= 2, "expected holy beam to contribute active lights");
+    assertEquals(lights.some((light) => Array.isArray(light.color)
+      && light.color[0] === 255
+      && light.color[1] === 240
+      && light.color[2] === 180), true);
+
+    controller.tick(0.2);
+    assertEquals(controller.getActiveLights().length, 0);
   } finally {
     restoreWindow();
   }
