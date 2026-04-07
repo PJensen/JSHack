@@ -119,9 +119,9 @@ export function makeRulesDispatcher(world, getActorId, opts = {}) {
         break;
       }
       case "rules.equipItem": {
-        const { itemId = 0 } = action.payload || {};
+        const { itemId = 0, targetSlot = '' } = action.payload || {};
         if (!Number.isInteger(itemId) || itemId <= 0) break;
-        world?.add?.(actorId, EquipIntent, { itemId });
+        world?.add?.(actorId, EquipIntent, { itemId, targetSlot });
         world?.tick?.(1);
         break;
       }

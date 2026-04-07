@@ -2736,6 +2736,93 @@ export function renderApplyTargetChooser(panel, targets, toolId, onSelect) {
   obs.observe(panel, { attributes: true, attributeFilter: ['style'] });
 }
 
+/**
+ * renderSlotChooser — asks player to pick Main Hand or Off-Hand when equipping a 1H weapon
+ * with an ambiguous target slot.
+ * @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel
+ * @param {{itemId:number, itemName:string, mainName:string, offName:string, offhandOccupied:boolean}} opts
+ */
+export function renderSlotChooser(panel, opts) {
+  const el = /** @type {HTMLDivElement} */ (/** @type {any} */(panel)._inner);
+  el.innerHTML = '';
+
+  const title = document.createElement('div');
+  title.textContent = `Wield ${bracketize(sanitize(opts.itemName))} where?`;
+  title.style.fontWeight = 'bold';
+  title.style.marginBottom = '8px';
+  el.appendChild(title);
+
+  const mainLabel = opts.offhandOccupied
+    ? `Main Hand  (replace ${bracketize(sanitize(opts.mainName))})`
+    : `Main Hand  (replace ${bracketize(sanitize(opts.mainName))})`;
+  const offLabel = opts.offhandOccupied
+    ? `Off-Hand  (replace ${bracketize(sanitize(opts.offName))})`
+    : `Off-Hand  (dual wield)`;
+
+  const choices = [
+    { label: mainLabel, slot: 'weapon' },
+    { label: offLabel, slot: 'offhand' },
+  ];
+
+  let sel = 0;
+  const rows = choices.map((ch, idx) => {
+    const row = document.createElement('div');
+    Object.assign(row.style, {
+      display: 'flex', alignItems: 'center', gap: '8px',
+      padding: '8px 10px', border: '1px solid #2d3b52', borderRadius: '6px',
+      background: '#0f1421', cursor: 'pointer', marginBottom: '4px',
+    });
+    row.textContent = ch.label;
+    row.addEventListener('mouseenter', () => { setSel(idx); });
+    row.addEventListener('click', () => { pick(idx); });
+    el.appendChild(row);
+    return row;
+  });
+
+  const hint = document.createElement('div');
+  hint.style.marginTop = '8px';
+  hint.style.opacity = '0.85';
+  hint.textContent = '\u2191/\u2193 select \u00b7 Enter=Confirm \u00b7 Esc=Cancel';
+  el.appendChild(hint);
+
+  function setSel(i) {
+    sel = Math.max(0, Math.min(choices.length - 1, i | 0));
+    rows.forEach((r, j) => {
+      r.style.outline = (j === sel) ? '2px solid #55aaff' : 'none';
+      r.style.background = (j === sel) ? '#0b1323' : '#0f1421';
+    });
+  }
+
+  function pick(i) {
+    const slot = choices[i]?.slot;
+    if (!slot) return;
+    hide(panel);
+    window.dispatchEvent(new CustomEvent('ui:requestEquip', {
+      detail: { itemId: opts.itemId, targetSlot: slot }
+    }));
+  }
+
+  /** @param {KeyboardEvent} e */
+  function onKey(e) {
+    if (panel.style.display !== 'block') return;
+    const k = e.key;
+    if (k === 'ArrowUp') { setSel(sel - 1); e.preventDefault(); }
+    else if (k === 'ArrowDown') { setSel(sel + 1); e.preventDefault(); }
+    else if (k === 'Enter') { pick(sel); e.preventDefault(); }
+    else if (k === 'Escape') { hide(panel); e.preventDefault(); }
+  }
+
+  setSel(0);
+  window.addEventListener('keydown', onKey);
+  const obs = new MutationObserver(() => {
+    if (panel.style.display === 'none') {
+      window.removeEventListener('keydown', onKey);
+      obs.disconnect();
+    }
+  });
+  obs.observe(panel, { attributes: true, attributeFilter: ['style'] });
+}
+
 /** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Object} data @param {{shopkeeperId:number, buyMarkup:number, sellDiscount:number, mode:string, activeTab?:string}} state */
 export function renderShop(panel, data, state) {
   const prevDetach = /** @type {any} */ (panel)._shopDetach;

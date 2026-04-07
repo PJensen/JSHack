@@ -606,3 +606,135 @@ Deno.test("dual wield: venomous main-hand + flaming off-hand both proc on 1000HP
   assert(bothInSameRound > 0,
     `both affixes should proc in the same round at least once across ${ITERATIONS} seeds (got ${bothInSameRound})`);
 });
+
+// ── targetSlot Tests ────────────────────────────────────────────────
+
+Deno.test("targetSlot 'weapon': replaces main hand even when offhand is empty", () => {
+  const world = new World({ seed: 1 });
+  const actor = world.create();
+  world.add(actor, Inventory, { capacity: 100 });
+  world.add(actor, Equipment, {});
+
+  const sword = makeWeapon(world, { id: 'sword', name: 'Sword' });
+  const dagger = makeWeapon(world, { id: 'dagger', name: 'Dagger', damageDice: '1d4', staminaCost: 5 });
+  addToInventory(world, actor, sword);
+  addToInventory(world, actor, dagger);
+
+  // Equip sword to main hand (no targetSlot needed, empty hands)
+  world.add(actor, EquipIntent, { itemId: sword });
+  equipItemSystem(world);
+  assertEquals(world.get(actor, Equipment).weapon, sword);
+
+  // Now equip dagger with explicit targetSlot 'weapon' — should replace main, NOT cascade
+  world.add(actor, EquipIntent, { itemId: dagger, targetSlot: 'weapon' });
+  equipItemSystem(world);
+  const eq = world.get(actor, Equipment);
+  assertEquals(eq.weapon, dagger, 'dagger should be in main hand');
+  assertEquals(eq.offhand, null, 'offhand should remain empty');
+  assert(inventoryContains(world, actor, sword), 'sword should be back in inventory');
+});
+
+Deno.test("targetSlot 'offhand': sends weapon to offhand directly", () => {
+  const world = new World({ seed: 1 });
+  const actor = world.create();
+  world.add(actor, Inventory, { capacity: 100 });
+  world.add(actor, Equipment, {});
+
+  const sword = makeWeapon(world, { id: 'sword', name: 'Sword' });
+  const dagger = makeWeapon(world, { id: 'dagger', name: 'Dagger', damageDice: '1d4', staminaCost: 5 });
+  addToInventory(world, actor, sword);
+  addToInventory(world, actor, dagger);
+
+  // Equip sword to main hand
+  world.add(actor, EquipIntent, { itemId: sword });
+  equipItemSystem(world);
+
+  // Equip dagger with targetSlot 'offhand'
+  world.add(actor, EquipIntent, { itemId: dagger, targetSlot: 'offhand' });
+  equipItemSystem(world);
+  const eq = world.get(actor, Equipment);
+  assertEquals(eq.weapon, sword, 'sword stays in main hand');
+  assertEquals(eq.offhand, dagger, 'dagger goes to offhand');
+});
+
+Deno.test("targetSlot 'offhand': replaces existing offhand weapon", () => {
+  const world = new World({ seed: 1 });
+  const actor = world.create();
+  world.add(actor, Inventory, { capacity: 100 });
+  world.add(actor, Equipment, {});
+
+  const sword = makeWeapon(world, { id: 'sword', name: 'Sword' });
+  const dagger1 = makeWeapon(world, { id: 'dagger1', name: 'Old Dagger', damageDice: '1d4', staminaCost: 5 });
+  const dagger2 = makeWeapon(world, { id: 'dagger2', name: 'New Dagger', damageDice: '1d4', staminaCost: 5 });
+  addToInventory(world, actor, sword);
+  addToInventory(world, actor, dagger1);
+  addToInventory(world, actor, dagger2);
+
+  // Set up dual wield: sword + dagger1
+  world.add(actor, EquipIntent, { itemId: sword });
+  equipItemSystem(world);
+  world.add(actor, EquipIntent, { itemId: dagger1 });
+  equipItemSystem(world);
+  assertEquals(world.get(actor, Equipment).offhand, dagger1);
+
+  // Replace offhand with dagger2
+  world.add(actor, EquipIntent, { itemId: dagger2, targetSlot: 'offhand' });
+  equipItemSystem(world);
+  const eq = world.get(actor, Equipment);
+  assertEquals(eq.weapon, sword, 'sword stays in main hand');
+  assertEquals(eq.offhand, dagger2, 'new dagger replaces offhand');
+  assert(inventoryContains(world, actor, dagger1), 'old dagger goes to inventory');
+});
+
+Deno.test("targetSlot 'weapon': replaces main hand when both slots occupied", () => {
+  const world = new World({ seed: 1 });
+  const actor = world.create();
+  world.add(actor, Inventory, { capacity: 100 });
+  world.add(actor, Equipment, {});
+
+  const sword = makeWeapon(world, { id: 'sword', name: 'Sword' });
+  const dagger = makeWeapon(world, { id: 'dagger', name: 'Dagger', damageDice: '1d4', staminaCost: 5 });
+  const axe = makeWeapon(world, { id: 'axe', name: 'Axe', damageDice: '1d8', staminaCost: 10 });
+  addToInventory(world, actor, sword);
+  addToInventory(world, actor, dagger);
+  addToInventory(world, actor, axe);
+
+  // Set up dual wield: sword + dagger
+  world.add(actor, EquipIntent, { itemId: sword });
+  equipItemSystem(world);
+  world.add(actor, EquipIntent, { itemId: dagger });
+  equipItemSystem(world);
+
+  // Replace main hand with axe
+  world.add(actor, EquipIntent, { itemId: axe, targetSlot: 'weapon' });
+  equipItemSystem(world);
+  const eq = world.get(actor, Equipment);
+  assertEquals(eq.weapon, axe, 'axe goes to main hand');
+  assertEquals(eq.offhand, dagger, 'dagger stays in offhand');
+  assert(inventoryContains(world, actor, sword), 'sword goes back to inventory');
+});
+
+Deno.test("targetSlot 'offhand': kicks 2H main hand when placing 1H in offhand", () => {
+  const world = new World({ seed: 1 });
+  const actor = world.create();
+  world.add(actor, Inventory, { capacity: 100 });
+  world.add(actor, Equipment, {});
+
+  const greatsword = makeWeapon(world, { id: 'greatsword', name: 'Greatsword', twoHanded: true });
+  const dagger = makeWeapon(world, { id: 'dagger', name: 'Dagger', damageDice: '1d4', staminaCost: 5 });
+  addToInventory(world, actor, greatsword);
+  addToInventory(world, actor, dagger);
+
+  // Equip 2H weapon
+  world.add(actor, EquipIntent, { itemId: greatsword });
+  equipItemSystem(world);
+  assertEquals(world.get(actor, Equipment).weapon, greatsword);
+
+  // Force dagger into offhand — should kick the 2H
+  world.add(actor, EquipIntent, { itemId: dagger, targetSlot: 'offhand' });
+  equipItemSystem(world);
+  const eq = world.get(actor, Equipment);
+  assertEquals(eq.offhand, dagger, 'dagger in offhand');
+  assertEquals(eq.weapon, null, '2H weapon kicked out');
+  assert(inventoryContains(world, actor, greatsword), 'greatsword back in inventory');
+});

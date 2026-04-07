@@ -35,7 +35,7 @@ import {
   renderInventory, renderSettings, renderQuestJournal, renderTownBoard,
   renderCharacterSheet, renderEquipment, renderSpellPicker, renderMessageLog,
   renderAltarOfferChooser, renderPickupChooser, renderUseChooser,
-  renderThrowChooser, renderApplyToolChooser, renderApplyTargetChooser,
+  renderThrowChooser, renderApplyToolChooser, renderApplyTargetChooser, renderSlotChooser,
   renderShop, renderChest, renderBookReader, renderDeathLog, renderRack,
 } from './overlayRenders.js';
 
@@ -59,6 +59,7 @@ export function initOverlays() {
   const chest = ensurePanel('chest');
   const rack = ensurePanel('rack');
   const altar = ensurePanel('altar');
+  const slotChooser = ensurePanel('slotChooser');
   const groundTip = ensureGroundTooltip(root);
   setItemTooltip(ensureItemTooltip(root));
   const stairTip = ensureStairTooltip(root);
@@ -536,6 +537,15 @@ export function initOverlays() {
     const e = ev;
     const items = (e?.detail?.items) || [];
     renderThrowChooser(throwPanel, items);
+  });
+
+  // Slot chooser for dual-wield weapon placement
+  window.addEventListener('ui:openSlotChooser', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const detail = e?.detail || {};
+    renderSlotChooser(slotChooser, detail);
+    show(slotChooser);
   });
 
   window.addEventListener('ui:openDialog', (ev) => {

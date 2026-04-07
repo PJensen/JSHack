@@ -3809,8 +3809,38 @@ addEventListener('ui:requestEquip', (ev) => {
   /** @type {CustomEvent} */ // @ts-ignore
   const e = ev;
   const itemId = e?.detail?.itemId;
+  const targetSlot = e?.detail?.targetSlot || '';
   if (!Number.isInteger(itemId)) return;
-  const action = { type: 'rules.equipItem', payload: { itemId } };
+
+  // If no explicit slot, check for dual-wield ambiguity before equipping.
+  if (!targetSlot) {
+    const pe = playerEntity(world);
+    if (pe) {
+      const info = world.get(itemId, ItemInfo);
+      const eq = world.get(pe.id, Equipment);
+      if (info && eq && (info.slot === 'weapon' || info.slot === 'Weapon') && !info.twoHanded) {
+        const mainId = eq.weapon;
+        const mainOccupied = Number.isInteger(mainId) && mainId > 0;
+        if (mainOccupied) {
+          const mainInfo = world.get(mainId, ItemInfo);
+          if (mainInfo && !mainInfo.twoHanded) {
+            // Ambiguous: main hand has 1H, equipping another 1H — ask the player.
+            const itemName = world.get(itemId, NamedIdentity)?.name || 'weapon';
+            const mainName = world.get(mainId, NamedIdentity)?.name || 'weapon';
+            const offId = eq.offhand;
+            const offhandOccupied = Number.isInteger(offId) && offId > 0;
+            const offName = offhandOccupied ? (world.get(offId, NamedIdentity)?.name || 'weapon') : '';
+            window.dispatchEvent(new CustomEvent('ui:openSlotChooser', {
+              detail: { itemId, itemName, mainName, offName, offhandOccupied }
+            }));
+            return;
+          }
+        }
+      }
+    }
+  }
+
+  const action = { type: 'rules.equipItem', payload: { itemId, targetSlot } };
   const rulesHandler = makeRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
   rulesHandler(action);
 });
