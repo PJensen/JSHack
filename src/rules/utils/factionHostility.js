@@ -20,7 +20,7 @@ const HOSTILITY = Object.freeze({
   pet: Object.freeze(new Set(["enemy"])),
   summoned: Object.freeze(new Set(["enemy"])),
   stone_taunter: Object.freeze(new Set(["enemy"])),
-  enemy: Object.freeze(new Set(["player", "pet", "summoned", "stone_taunter"])),
+  enemy: Object.freeze(new Set(["player", "pet", "summoned", "stone_taunter", "enemy"])),
   neutral: Object.freeze(new Set()),
   shopkeeper: Object.freeze(new Set()),
   townfolk: Object.freeze(new Set()),
@@ -38,10 +38,14 @@ export function areFactionsHostile(attackerFaction, defenderFaction) {
 
   // Preserve legacy behavior for entities with no faction metadata.
   if (!attacker || !defender) return true;
-  if (attacker === defender) return false;
 
+  // Check explicit table first — allows same-faction hostility (e.g. enemy vs
+  // enemy when Ring of Conflict is active).
   const explicit = HOSTILITY[attacker];
-  if (explicit) return explicit.has(defender);
+  if (explicit && explicit.has(defender)) return true;
+
+  if (attacker === defender) return false;
+  if (explicit) return false; // in table but not hostile
 
   // Legacy fallback for unknown factions.
   return true;

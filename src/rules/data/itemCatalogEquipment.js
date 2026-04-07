@@ -1949,6 +1949,20 @@ export const EQUIPMENT_ITEMS = {
     weight: 0.05,
   },
 
+  ring_conflict: {
+    id: "ring_conflict",
+    catalogKind: "equipment",
+    name: "Ring of Conflict",
+    type: "equip",
+    slot: "ring",
+    material: "iron",
+    rarity: 4,
+    rarityName: "epic",
+    bonuses: {},
+    description: "A jagged band of blackened iron that hums with discord. Nearby creatures turn on each other in blind rage.",
+    weight: 0.06,
+  },
+
   // Legendary proc gear (tier 3+)
   stormcaller_blade: {
     id: "stormcaller_blade",

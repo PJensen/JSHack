@@ -53,6 +53,46 @@ import { CentipedeSegment } from "../components/CentipedeSegment.js";
 
 const ACTIVE_RADIUS = 32; // tiles; keep AI work bounded to nearby entities
 
+/**
+ * Returns true when the player has a Ring of Conflict equipped in either ring
+ * slot, causing enemies to target each other instead of the player.
+ */
+function playerHasConflict(world, playerId) {
+  const eq = world.get(playerId, Equipment);
+  if (!eq) return false;
+  for (const slot of ["ring1", "ring2"]) {
+    const ringId = Number(eq[slot] || 0) | 0;
+    if (ringId > 0) {
+      const identity = String(world.get(ringId, NamedIdentity)?.identity || "");
+      if (identity === "ring_conflict") return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Find the nearest *other* enemy entity to (ox, oy) that is alive and within
+ * sight range, excluding `selfId`. Returns { id, x, y } or null.
+ */
+function findNearestRival(world, selfId, ox, oy, sightRange, isBlocked) {
+  let best = null;
+  let bestDist = Infinity;
+  forEachInRadius(world, ox, oy, sightRange, (id, pos) => {
+    if (id === selfId) return;
+    const fac = world.get(id, Faction);
+    if (!fac || fac.key !== "enemy") return;
+    const vit = world.get(id, Vitality);
+    if (!vit || vit.hp <= 0) return;
+    const dist = chebyshevScalar(ox, oy, pos.x, pos.y);
+    if (dist >= bestDist) return;
+    // Quick LOS check — rival must be visible to attacker
+    if (!hasLOS(ox | 0, oy | 0, pos.x | 0, pos.y | 0, isBlocked)) return;
+    bestDist = dist;
+    best = { id, x: pos.x | 0, y: pos.y | 0 };
+  });
+  return best;
+}
+
 function isSmartPathingMonster(brain, def) {
   return Number(brain?.intelligence ?? def?.intelligence ?? 10) > 3;
 }
@@ -206,6 +246,9 @@ export function aiChaseSystem(world) {
     if (!_isBlocked) _isBlocked = blockedCallback(buildBlocksVisionMap(world));
     return _isBlocked;
   };
+
+  // Ring of Conflict: enemies target each other instead of the player.
+  const conflictActive = playerHasConflict(world, playerId);
 
   forEachInRadius(world, playerPos.x, playerPos.y, ACTIVE_RADIUS, (id, pos) => {
     const fac = world.get(id, Faction);
@@ -389,12 +432,26 @@ export function aiChaseSystem(world) {
     }
 
     // ── Choose movement target ──────────────────────────────────────
-    const targetX = aggro.alertLevel === AGGRO_LEVELS.hunting
-      ? playerPos.x | 0
-      : aggro.lastKnownX;
-    const targetY = aggro.alertLevel === AGGRO_LEVELS.hunting
-      ? playerPos.y | 0
-      : aggro.lastKnownY;
+    let targetX, targetY;
+    let conflictRivalId = 0; // entity id of rival when conflict-redirected
+    if (aggro.alertLevel === AGGRO_LEVELS.hunting && conflictActive) {
+      const rival = findNearestRival(world, id, pos.x | 0, pos.y | 0, sightRange, ensureBlockedMap());
+      if (rival) {
+        targetX = rival.x;
+        targetY = rival.y;
+        conflictRivalId = rival.id;
+      } else {
+        // No rival in sight — fall back to normal player targeting
+        targetX = playerPos.x | 0;
+        targetY = playerPos.y | 0;
+      }
+    } else if (aggro.alertLevel === AGGRO_LEVELS.hunting) {
+      targetX = playerPos.x | 0;
+      targetY = playerPos.y | 0;
+    } else {
+      targetX = aggro.lastKnownX;
+      targetY = aggro.lastKnownY;
+    }
 
     const dxt = targetX - (pos.x | 0);
     const dyt = targetY - (pos.y | 0);
@@ -411,7 +468,9 @@ export function aiChaseSystem(world) {
     }
 
     // ── Ranged attack: prefer shooting when hunting and in LOS ──────
-    if (aggro.alertLevel === AGGRO_LEVELS.hunting && canSee && !aggro.retreating) {
+    const rangedTargetId = conflictRivalId || playerId;
+    const canSeeRangedTarget = conflictRivalId ? true : canSee; // rival already LOS-checked
+    if (aggro.alertLevel === AGGRO_LEVELS.hunting && canSeeRangedTarget && !aggro.retreating) {
       const eq = world.get(id, Equipment);
       if (eq && eq.ranged && eq.ammo && world.isAlive(eq.ammo)) {
         const weaponInfo = eq.ranged ? world.get(eq.ranged, ItemInfo) : null;
@@ -421,12 +480,12 @@ export function aiChaseSystem(world) {
           try {
             world.emit?.('combat:telegraph', {
               actor: id,
-              target: playerId,
+              target: rangedTargetId,
               mode: 'ranged',
               turns: 0,
             });
           } catch {}
-          try { world.add(id, RangedAttackIntent, { targetId: playerId }); } catch {}
+          try { world.add(id, RangedAttackIntent, { targetId: rangedTargetId }); } catch {}
           return;
         }
       }
