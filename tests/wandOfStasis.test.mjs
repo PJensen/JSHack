@@ -76,7 +76,7 @@ Deno.test("stasis blocks damage", () => {
   const result = dealDamage(world, {
     source: player,
     target: enemy,
-    rawAmount: 5,
+    amount: 5,
     type: "physical",
   });
 
@@ -93,7 +93,7 @@ Deno.test("damage works normally after stasis expires", () => {
   const result = dealDamage(world, {
     source: player,
     target: enemy,
-    rawAmount: 5,
+    amount: 5,
     type: "physical",
   });
 
