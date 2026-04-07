@@ -370,7 +370,7 @@ export const basePalette = {
   market_stall:  { glyph: "⌂", fg: "#c4a060", glow: "#8a6830" },
   bench: {
     layers: [
-      { glyph: "▬", fg: "#8a6d6d", glow: "#aaaaaa", dy: 0.064, scale: 1.18 },
+      { glyph: "▬", fg: "#6b4a2c", glow: "#aaaaaa", dy: 0.064, scale: 1.18 },
       { glyph: "┄", fg: "#7a5e5e", glow: "#aaaaaa", dy: 0.016, scale: 0.9 },
     ]
   },
