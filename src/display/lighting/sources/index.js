@@ -276,7 +276,19 @@ export function collectLightSources(view, opts = {}) {
 
       // Tag-driven emissive lights — each magical school gets its own pattern.
       if (tags.includes('sunlight')) {
-        emitPatterned(out, 'holy', t, e.id, ex, ey, 4, [255, 245, 200], 10);
+        const hasHolyWeaponVfx = Array.isArray(e.weaponVfx)
+          && e.weaponVfx.some((fx) => String(fx?.id || '') === 'holy_weapon');
+        emitPatterned(
+          out,
+          'holy',
+          t,
+          e.id,
+          ex,
+          ey,
+          hasHolyWeaponVfx ? 2.2 : 4,
+          [255, 245, 200],
+          hasHolyWeaponVfx ? 6 : 10,
+        );
       } else if (tags.includes('stasis')) {
         emitPatterned(out, 'breathe', t, e.id, ex, ey, 3.5, [136, 221, 255], 8);
       } else if (tags.includes('invulnerable')) {
@@ -417,12 +429,12 @@ export function collectLightSources(view, opts = {}) {
     const dist = Math.sqrt(dx * dx + dy * dy);
     if (dist < 0.5) continue;
     const nx = dx / dist, ny = dy / dist;
-    const spacing = 0.4;
+    const spacing = 0.5;
     const steps = Math.min(20, Math.floor(dist / spacing));
     // Source bloom
-    out.push({ x: hb.fx, y: hb.fy, radius: 2.0 * fade, color: [
+    out.push({ x: hb.fx, y: hb.fy, radius: 1.6 * fade, color: [
       HOLY_BEAM_COLOR[0] * fade, HOLY_BEAM_COLOR[1] * fade, HOLY_BEAM_COLOR[2] * fade,
-    ], softness: 8 });
+    ], softness: 6 });
     // Beam samples
     for (let s = 1; s <= steps; s++) {
       const frac = (s * spacing) / dist;
@@ -433,7 +445,7 @@ export function collectLightSources(view, opts = {}) {
       out.push({
         x: hb.fx + nx * s * spacing,
         y: hb.fy + ny * s * spacing,
-        radius: 0.6,
+        radius: 0.5,
         color: [
           Math.min(255, HOLY_BEAM_COLOR[0] * bi),
           Math.min(255, HOLY_BEAM_COLOR[1] * bi),
@@ -443,11 +455,11 @@ export function collectLightSources(view, opts = {}) {
       });
     }
     // Impact bloom
-    out.push({ x: hb.tx, y: hb.ty, radius: 2.5 * fade, color: [
+    out.push({ x: hb.tx, y: hb.ty, radius: 1.9 * fade, color: [
       Math.min(255, 255 * fade * 1.2),
       Math.min(255, 245 * fade * 1.2),
       Math.min(255, 180 * fade * 1.2),
-    ], softness: 6 });
+    ], softness: 5 });
   }
 
   // ---- Chest reveal blooms (one-shot fading flashes) --------------------
