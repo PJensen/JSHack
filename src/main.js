@@ -1925,6 +1925,119 @@ world.on('scroll:polymorph', ({ actor }) => {
   } catch (e) { console.debug('[main] messageLog failed:', e); }
 });
 
+// Scroll of Taming → enemy targeting reticle, then convert to pet
+world.on('scroll:taming', ({ actor }) => {
+  const _pe = playerEntity(world);
+  if (!_pe) return;
+  const px = _pe.pos.x | 0;
+  const py = _pe.pos.y | 0;
+  const range = 8;
+  const blocked = buildBlocksVisionMap(world);
+  const isBlocked = blockedCallback(blocked);
+
+  const enemies = [];
+  forEachInRadius(world, px, py, range, (eid, pos) => {
+    if (eid === _pe.id) return;
+    const fac = world.get(eid, Faction);
+    if (!fac || fac.key !== 'enemy') return;
+    const vit = world.get(eid, Vitality);
+    if (!vit || (vit.hp | 0) <= 0) return;
+    if (!hasLOS(px, py, pos.x | 0, pos.y | 0, isBlocked)) return;
+    if (!isTileVisible(pos.x | 0, pos.y | 0)) return;
+    enemies.push({ id: eid, x: pos.x | 0, y: pos.y | 0 });
+  });
+
+  if (enemies.length === 0) {
+    try { messageLog.log({ text: 'No visible enemies to tame.', type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
+    return;
+  }
+
+  enemies.sort((a, b) => chebyshevScalar(a.x, a.y, px, py) - chebyshevScalar(b.x, b.y, px, py));
+
+  _pendingEnemyTargeting = {
+    spellId: '__scroll_taming__',
+    spellName: 'Scroll of Taming',
+    range,
+    enemies,
+    index: 0,
+    onConfirm: (enemyId) => {
+      world.emit?.('scroll:taming:apply', { actor, target: enemyId });
+    },
+  };
+  _targetCursor = { x: enemies[0].x, y: enemies[0].y };
+  _pendingSpellTargeting = null;
+  _pendingThrowTargeting = null;
+  try {
+    messageLog.log({
+      text: 'Choose target for Scroll of Taming. Tab to cycle enemies, Enter to confirm, Esc to cancel.',
+      type: 'system',
+    });
+  } catch (e) { console.debug('[main] messageLog failed:', e); }
+});
+
+// Wand of Stasis → enemy targeting reticle, then freeze in time
+world.on('wand:stasis', ({ actor }) => {
+  const _pe = playerEntity(world);
+  if (!_pe) return;
+  const px = _pe.pos.x | 0;
+  const py = _pe.pos.y | 0;
+  const range = 6;
+  const blocked = buildBlocksVisionMap(world);
+  const isBlocked = blockedCallback(blocked);
+
+  const enemies = [];
+  forEachInRadius(world, px, py, range, (eid, pos) => {
+    if (eid === _pe.id) return;
+    const fac = world.get(eid, Faction);
+    if (!fac || fac.key !== 'enemy') return;
+    const vit = world.get(eid, Vitality);
+    if (!vit || (vit.hp | 0) <= 0) return;
+    if (!hasLOS(px, py, pos.x | 0, pos.y | 0, isBlocked)) return;
+    if (!isTileVisible(pos.x | 0, pos.y | 0)) return;
+    enemies.push({ id: eid, x: pos.x | 0, y: pos.y | 0 });
+  });
+
+  if (enemies.length === 0) {
+    try { messageLog.log({ text: 'No visible enemies to freeze.', type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
+    return;
+  }
+
+  enemies.sort((a, b) => chebyshevScalar(a.x, a.y, px, py) - chebyshevScalar(b.x, b.y, px, py));
+
+  _pendingEnemyTargeting = {
+    spellId: '__wand_stasis__',
+    spellName: 'Wand of Stasis',
+    range,
+    enemies,
+    index: 0,
+    onConfirm: (enemyId) => {
+      const ae = world.get(enemyId, ActiveEffects);
+      const stasisEffect = { key: 'stasis', turnsLeft: 8, stacks: 1, potency: 1 };
+      if (ae) {
+        ae.effects.push(stasisEffect);
+      } else {
+        try { world.add(enemyId, ActiveEffects, { effects: [stasisEffect] }); } catch {}
+      }
+      const ni = world.get(enemyId, NamedIdentity);
+      const name = ni?.name || 'creature';
+      world.emit?.('message', { text: `The ${name} is frozen outside of time!`, type: 'system' });
+      const pos = world.get(enemyId, Position);
+      if (pos) {
+        world.emit?.('wand:stasis:vfx', { id: enemyId, x: pos.x | 0, y: pos.y | 0 });
+      }
+    },
+  };
+  _targetCursor = { x: enemies[0].x, y: enemies[0].y };
+  _pendingSpellTargeting = null;
+  _pendingThrowTargeting = null;
+  try {
+    messageLog.log({
+      text: 'Choose target for Wand of Stasis. Tab to cycle enemies, Enter to confirm, Esc to cancel.',
+      type: 'system',
+    });
+  } catch (e) { console.debug('[main] messageLog failed:', e); }
+});
+
 // Scroll of Aggravation → set all living enemies to hunting with player's position
 world.on('scroll:aggravation', ({ actor }) => {
   const pe = playerEntity(world);

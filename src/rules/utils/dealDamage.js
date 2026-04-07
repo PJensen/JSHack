@@ -283,10 +283,14 @@ export function dealDamage(world, spec) {
     return { ...ZERO_RESULT, rawAmount, reason: 'missed' };
   }
 
-  // Step 2: Invulnerability gate
+  // Step 2: Invulnerability / stasis gate
   if (!spec.bypassInvuln && isEntityInvulnerable(world, target)) {
     emitSafe(world, 'status', createStatusEvent({ id: target, kind: 'immune', source }));
     return { ...ZERO_RESULT, rawAmount, reason: 'invulnerable' };
+  }
+  if (statusStrength(world, target, "stasis") > 0) {
+    emitSafe(world, 'status', createStatusEvent({ id: target, kind: 'immune', source }));
+    return { ...ZERO_RESULT, rawAmount, reason: 'stasis' };
   }
 
   // Step 3: Resistance resolution

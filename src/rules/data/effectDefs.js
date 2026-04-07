@@ -406,4 +406,10 @@ export const EFFECT_DEFS = [
     operation: "none",
     statuses: ["marked"],
   },
+  {
+    id: "stasis",
+    keys: ["stasis"],
+    operation: "none",
+    statuses: ["stasis"],
+  },
 ];

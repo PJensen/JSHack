@@ -87,12 +87,15 @@ export function intentValidationSystem(world) {
       continue;
     }
 
-    // Stunned actors may only wait
-    if (statusStrength(world, id, "stunned") > 0) {
+    // Stunned or stasis actors may only wait
+    const stunned = statusStrength(world, id, "stunned") > 0;
+    const inStasis = statusStrength(world, id, "stasis") > 0;
+    if (stunned || inStasis) {
+      const reason = inStasis ? "stasis" : "stunned";
       const blocked = stripIntents(world, id, STUNNED_BLOCKED);
       if (blocked) {
         try {
-          world.emit?.("intent:blocked", { actor: id, reason: "stunned" });
+          world.emit?.("intent:blocked", { actor: id, reason });
         } catch (e) {
           console.debug("[intentValidationSystem] emit intent:blocked failed:", e);
         }
