@@ -87,7 +87,9 @@ import { PHASE_TURNS } from "./rules/data/calendar.js";
 import { Inventory } from "./rules/components/Inventory.js";
 import { Equipment, GEAR_SLOTS } from "./rules/components/Equipment.js";
 import { ItemInfo } from "./rules/components/ItemInfo.js";
+import { ItemCooldown } from "./rules/components/ItemCooldown.js";
 import { NamedIdentity } from "./rules/components/NamedIdentity.js";
+import { SUNSWORD_RAY_COOLDOWN_TURNS } from "./rules/data/itemAbilityConstants.js";
 import { Position } from "./rules/components/Position.js";
 import { Player } from "./rules/components/Player.js";
 import { Trap } from "./rules/components/Trap.js";
@@ -2039,7 +2041,7 @@ world.on('wand:stasis', ({ actor }) => {
 });
 
 // Sunsword blinding ray → targeted holy beam that blinds an enemy
-world.on('sunsword:ray', ({ actor }) => {
+world.on('sunsword:ray', ({ actor, itemId, cooldownTurns }) => {
   const _pe = playerEntity(world);
   if (!_pe) return;
   const px = _pe.pos.x | 0;
@@ -2083,6 +2085,19 @@ world.on('sunsword:ray', ({ actor }) => {
       }
       const ni = world.get(enemyId, NamedIdentity);
       const name = ni?.name || 'creature';
+      const resolvedItemId = Number(itemId || 0) | 0;
+      const resolvedCooldown = Math.max(1, Number.isFinite(cooldownTurns) ? (Number(cooldownTurns) | 0) : SUNSWORD_RAY_COOLDOWN_TURNS);
+      if (resolvedItemId > 0) {
+        let cd = /** @type any */ (world.get(resolvedItemId, ItemCooldown));
+        if (!cd) {
+          try { world.add(resolvedItemId, ItemCooldown, { turnsRemaining: resolvedCooldown, turnsMax: resolvedCooldown }); } catch {}
+          cd = /** @type any */ (world.get(resolvedItemId, ItemCooldown));
+        }
+        if (cd) {
+          cd.turnsRemaining = resolvedCooldown;
+          cd.turnsMax = resolvedCooldown;
+        }
+      }
       world.emit?.('message', { text: `A searing ray of light strikes the ${name} — it is blinded!`, type: 'system' });
       const pos = world.get(enemyId, Position);
       if (pos) {
