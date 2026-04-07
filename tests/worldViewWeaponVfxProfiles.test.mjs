@@ -118,3 +118,25 @@ Deno.test("worldView projects carry VFX for real catalog smoldering_club equipme
   assertEquals(playerView.weaponVfx[0].id, "flame_weapon");
   assertEquals(playerView.weaponVfx[0].slot, "weapon");
 });
+
+Deno.test("worldView projects dedicated holy carry VFX for sunsword", () => {
+  const world = new World({ seed: 34 });
+  const player = world.create();
+  world.add(player, Player, {});
+  world.add(player, Position, { x: 1, y: 1 });
+  world.add(player, NamedIdentity, { name: "Hero", identity: "player" });
+  world.add(player, Brain, { learnedSpellIds: [], itemKnowledgeIdentities: [], seenTiles: new Uint8Array(), intelligence: 10, visionRange: 8 });
+  world.add(player, Equipment, {});
+
+  const sword = buildCatalogItem(world, "sunsword");
+  world.get(player, Equipment).weapon = sword;
+
+  const view = buildWorldView(world);
+  const playerView = view.entities.find((entity) => entity.id === player);
+  assert(playerView, "expected player in world view");
+  assert(Array.isArray(playerView.weaponVfx), "expected weaponVfx projection for sunsword");
+  assertEquals(playerView.weaponVfx.length, 1);
+  assertEquals(playerView.weaponVfx[0].id, "holy_weapon");
+  assertEquals(playerView.weaponVfx[0].slot, "weapon");
+  assert(playerView.tags.includes("sunlight"), "expected sunlight tag to remain projected for sunsword");
+});

@@ -45,6 +45,36 @@ const CAUSTIC_AFFIXES = Object.freeze(["caustic1"]);
 /** @type {readonly WeaponVfxProfile[]} */
 const WEAPON_VFX_PROFILES = Object.freeze([
   Object.freeze({
+    id: "holy_weapon",
+    priority: 360,
+    match: Object.freeze({
+      identities: Object.freeze(["sunsword"]),
+    }),
+    carryAnchor: Object.freeze({ forward: 0.40, lateral: 0.18, vertical: -0.05 }),
+    carryEmitter: Object.freeze({
+      rate: 7,
+      angle: -Math.PI / 2,
+      spread: Math.PI / 4,
+      speed: 0.18,
+      speedJitter: 0.10,
+      ax: 0,
+      ay: -0.03,
+      life: 0.70,
+      lifeJitter: 0.18,
+      size: 0.055,
+      sizeEnd: 0.014,
+      color: "#fff4be",
+      alpha0: 0.42,
+      alpha1: 0.0,
+    }),
+    carryLight: Object.freeze({
+      radius: 1.18,
+      color: Object.freeze([255, 243, 190]),
+      flicker: Object.freeze({ mode: "sin", base: 0.93, amp: 0.07, speed: 7.1, phase: 0.17 }),
+    }),
+    projectileEmitter: Object.freeze({ style: "holy" }),
+  }),
+  Object.freeze({
     id: "flame_weapon",
     priority: 320,
     match: Object.freeze({

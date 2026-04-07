@@ -46,6 +46,7 @@ import { Encumbrance } from "../../rules/components/Encumbrance.js";
 import { Traits } from "../../rules/components/Traits.js";
 import { getQuestDef } from "../../rules/quests/registry.js";
 import { buildPalette } from "../../display/palette/index.js";
+import { getItemHooksByIdentity } from "../../rules/content/items/itemHooks.js";
 
 const TRAIT_DISPLAY = Object.freeze({
   iron_stomach:  { label: "Iron Stomach",  description: "Halves sickness chance from spoiled food." },
@@ -99,9 +100,14 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
       coating: null,
     };
     const identity = String(base?.identity || world.get(itemId, NamedIdentity)?.identity || "");
+    const hooks = getItemHooksByIdentity(identity);
+    const canUse = typeof hooks.beforeUse === "function"
+      || typeof hooks.onUse === "function"
+      || typeof hooks.afterUse === "function";
     const p = _itemPalette[identity] || null;
     return {
       ...base,
+      canUse,
       glyph: String(base?.glyph || p?.glyph || ""),
       glyphColor: String(base?.glyphColor || p?.fg || "#cfe8ff"),
     };

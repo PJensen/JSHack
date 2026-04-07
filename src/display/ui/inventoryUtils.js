@@ -16,6 +16,7 @@ export function isInventoryItemEquippable(it) {
  */
 export function isInventoryItemUsable(it) {
   if (!it) return false;
+  if (it.canUse) return true;
   return it.type === 'potion'
     || it.type === 'learn'
     || it.type === 'book'
