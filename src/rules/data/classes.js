@@ -171,8 +171,8 @@ export const CLASS_DEFS = {
       { itemId: 'scroll_identify', count: 4 },
     ],
     startingSpells: [
-      'shadow_bolt',     // core ranged damage
-      'lifetap',         // generator: sacrifice HP → mana
+      'agony',     // core ranged damage
+      'shadow_bolt',         // generator: sacrifice HP → mana
     ],
   },
 
