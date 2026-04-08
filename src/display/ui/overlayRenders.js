@@ -2752,9 +2752,7 @@ export function renderSlotChooser(panel, opts) {
   title.style.marginBottom = '8px';
   el.appendChild(title);
 
-  const mainLabel = opts.offhandOccupied
-    ? `Main Hand  (replace ${bracketize(sanitize(opts.mainName))})`
-    : `Main Hand  (replace ${bracketize(sanitize(opts.mainName))})`;
+  const mainLabel = `Main Hand  (replace ${bracketize(sanitize(opts.mainName))})`;
   const offLabel = opts.offhandOccupied
     ? `Off-Hand  (replace ${bracketize(sanitize(opts.offName))})`
     : `Off-Hand  (dual wield)`;
