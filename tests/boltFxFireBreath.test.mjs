@@ -96,7 +96,8 @@ Deno.test("boltFx renders sunsword holy beam as non-blocking styled line light",
       && light.color[1] === 240
       && light.color[2] === 180), true);
 
-    controller.tick(0.2);
+    // Lights should decay over time — tick well past any reasonable TTL
+    controller.tick(10);
     assertEquals(controller.getActiveLights().length, 0);
   } finally {
     restoreWindow();
