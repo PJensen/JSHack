@@ -40,4 +40,11 @@ export const rings = {
   pendulum_of_three_tolls: { glyph:"\"", fg:"#8a72b6", glow:"#5f4a85", baseScale: S_AMULET },
   tithekeeper_choker:      { glyph:"\"", fg:"#c98a6b", glow:"#8d5b41", baseScale: S_AMULET },
   eclipse_torc:            { glyph:"\"", fg:"#cfba7a", glow:"#8f7a45", baseScale: S_AMULET },
+  // Missing rings
+  ring_conflict:           { glyph:"◌", fg:"#dd5544", glow:"#aa2222", baseScale: S_RING },
+  bloodward_signet:        { glyph:"◌", fg:"#c86060", glow:"#8a3030", baseScale: S_RING },
+  // Missing amulets
+  pendant_lucky:           { glyph:"\"", fg:"#e8d46a", glow:"#b8a44a", baseScale: S_AMULET },
+  echo_pendant:            { glyph:"\"", fg:"#7ab0d8", glow:"#4a7aa0", baseScale: S_AMULET },
+  deathascendant_medallion: { glyph:"\"", fg:"#c86a8a", glow:"#8a3a5a", baseScale: S_AMULET },
 };
