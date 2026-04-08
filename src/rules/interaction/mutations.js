@@ -114,10 +114,7 @@ export function applyMutation(world, op, resolvers = {}) {
       // DOT semantics are refresh-only across all entry points.
       if (isDotEffectKey(key)) {
         upsertTimedEffect(ae.effects, normalized);
-        break;
-      }
-
-      if (stack === "refresh" && existing.length > 0) {
+      } else if (stack === "refresh" && existing.length > 0) {
         for (let i = 0; i < existing.length; i++) {
           const rec = existing[i];
           rec.potency = normalized.potency;
@@ -128,10 +125,7 @@ export function applyMutation(world, op, resolvers = {}) {
           rec.sourceId = normalized.sourceId;
           rec.meta = normalized.meta;
         }
-        break;
-      }
-
-      if (stack === "cap" && existing.length >= maxStacks) {
+      } else if (stack === "cap" && existing.length >= maxStacks) {
         let strongest = existing[0];
         for (let i = 1; i < existing.length; i++) {
           const rec = existing[i];
@@ -139,10 +133,9 @@ export function applyMutation(world, op, resolvers = {}) {
         }
         strongest.turnsLeft = normalized.turnsLeft;
         strongest.startedAtTurn = normalized.startedAtTurn;
-        break;
+      } else {
+        ae.effects.push(normalized);
       }
-
-      ae.effects.push(normalized);
       break;
     }
     case "appendDamageChannels": {

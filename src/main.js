@@ -2083,6 +2083,7 @@ world.on('sunsword:ray', ({ actor, itemId, cooldownTurns }) => {
       } else {
         try { world.add(enemyId, ActiveEffects, { effects: [blindEffect] }); } catch {}
       }
+      blind(world, enemyId, 0, 0, 5, 0);
       const ni = world.get(enemyId, NamedIdentity);
       const name = ni?.name || 'creature';
       const resolvedItemId = Number(itemId || 0) | 0;
