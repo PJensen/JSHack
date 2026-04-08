@@ -1170,6 +1170,98 @@ export function decorateButton(btn) {
   });
 }
 
+// --- Shared chooser helpers ------------------------------------------------
+
+/** Standard colors used across chooser/overlay panels. */
+export const UI = Object.freeze({
+  SEL_OUTLINE: '2px solid #55aaff',
+  SEL_BG:      '#0b1323',
+  DEFAULT_BG:  '#0f1421',
+  BORDER:      '1px solid #2d3b52',
+  TEXT:        '#cfe8ff',
+  RADIUS:      '6px',
+});
+
+/**
+ * Create a standard chooser-list row element.
+ * @param {Record<string,string>} [extraStyle] — overrides merged on top of defaults
+ * @returns {HTMLDivElement}
+ */
+export function createChooserRow(extraStyle) {
+  const row = document.createElement('div');
+  Object.assign(row.style, {
+    display: 'flex', alignItems: 'center', gap: '8px',
+    width: '100%', padding: '6px 8px',
+    background: UI.DEFAULT_BG, color: UI.TEXT, border: UI.BORDER, borderRadius: UI.RADIUS,
+    cursor: 'pointer',
+  });
+  if (extraStyle) Object.assign(row.style, extraStyle);
+  return row;
+}
+
+/**
+ * Build a setSel() + getter for a simple row-highlight chooser.
+ * @param {HTMLDivElement[]} rows
+ * @param {number} count — total item count (used for clamping)
+ * @param {(index:number)=>void} [onSelect] — optional callback after highlight changes (e.g. show tooltip)
+ * @returns {{ getSel:()=>number, setSel:(i:number)=>void }}
+ */
+export function createSimpleSel(rows, count, onSelect) {
+  let sel = 0;
+  function setSel(i) {
+    sel = Math.max(0, Math.min(count - 1, i | 0));
+    for (let j = 0; j < rows.length; j++) {
+      rows[j].style.outline = (j === sel) ? UI.SEL_OUTLINE : 'none';
+      rows[j].style.background = (j === sel) ? UI.SEL_BG : UI.DEFAULT_BG;
+    }
+    if (onSelect) onSelect(sel);
+  }
+  return { getSel() { return sel; }, setSel };
+}
+
+/**
+ * Attach a keydown listener that auto-cleans up when `panel` is hidden.
+ * @param {HTMLDivElement} panel
+ * @param {(e:KeyboardEvent)=>void} onKey
+ */
+export function installKeyHandler(panel, onKey) {
+  const handler = (/** @type {KeyboardEvent} */ e) => onKey(e);
+  window.addEventListener('keydown', handler);
+  const obs = new MutationObserver(() => {
+    if (panel.style.display === 'none') {
+      window.removeEventListener('keydown', handler);
+      obs.disconnect();
+    }
+  });
+  obs.observe(panel, { attributes: true, attributeFilter: ['style'] });
+}
+
+/**
+ * Like installKeyHandler but returns a detach function and stores it on `panel[propName]`.
+ * Used by inventory / equipment / shop which call detach on re-render.
+ * @param {HTMLDivElement} panel
+ * @param {string} propName — e.g. '_inventoryDetach'
+ * @param {(e:KeyboardEvent)=>void} onKey
+ * @returns {()=>void} detach
+ */
+export function installDetachableKeyHandler(panel, propName, onKey) {
+  const handler = (/** @type {KeyboardEvent} */ e) => onKey(e);
+  const obs = new MutationObserver(() => {
+    if (panel.style.display === 'none') detach();
+  });
+  function detach() {
+    window.removeEventListener('keydown', handler);
+    obs.disconnect();
+    if (/** @type {any} */ (panel)[propName] === detach) {
+      /** @type {any} */ (panel)[propName] = null;
+    }
+  }
+  window.addEventListener('keydown', handler);
+  obs.observe(panel, { attributes: true, attributeFilter: ['style'] });
+  /** @type {any} */ (panel)[propName] = detach;
+  return detach;
+}
+
 // --- Always-on message ticker ---------------------------------------------
 /** @param {HTMLElement} root */
 export function ensureMessageTicker(root) {
