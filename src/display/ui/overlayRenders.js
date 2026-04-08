@@ -7,6 +7,7 @@ import {
   show, hide, showItemTooltip, hideItemTooltip,
   rarityStyle, formatMessageLine, getMessageColor,
   CHARACTER_SLOT_ORDER, renderItemDetails,
+  UI, createChooserRow, createSimpleSel, installKeyHandler, installDetachableKeyHandler,
 } from './overlayUtils.js';
 import { getInventoryDefaultAction, isInventoryItemEquippable, isInventoryItemUsable } from './inventoryUtils.js';
 import {
@@ -100,14 +101,6 @@ export function renderInventory(panel, items, ground, slotFilter = '', scrollOfI
   });
 
   let sel = 0;
-  /** @param {string} rarityName */
-  function rarityStyle(rarityName) {
-    const rn = String(rarityName || 'common').toLowerCase();
-    if (rn === 'rare' || rn === 'magic') return { color: '#55aaff', weight: 'bold' };
-    if (rn === 'epic') return { color: '#c47bff', weight: 'bold' };
-    if (rn === 'legendary') return { color: '#ff9f3b', weight: 'bold' };
-    return { color: '#ffffff', weight: 'bold' }; // common
-  }
 
   const rows = items.map((it, idx) => {
     const row = document.createElement('div');
@@ -141,7 +134,7 @@ export function renderInventory(panel, items, ground, slotFilter = '', scrollOfI
     const name = document.createElement('span');
     const rs = rarityStyle(it.rarityName);
     name.textContent = bracketize(sanitize(it.name || it.description || it.type));
-    name.style.color = rs.color; name.style.fontWeight = rs.weight;
+    Object.assign(name.style, rs);
     name.style.flex = '1 1 auto';
     name.style.minWidth = '0';
     name.style.overflow = 'hidden';
@@ -603,26 +596,7 @@ export function renderInventory(panel, items, ground, slotFilter = '', scrollOfI
     initialSel = Math.max(0, Math.min(items.length - 1, savedSelectionIndex | 0));
   }
   setSel(initialSel, { ensureVisible: false });
-  /** @param {KeyboardEvent} e */
-  /** @param {KeyboardEvent} e */
-  const keyHandler = (e) => onKey(e);
-  const obs = new MutationObserver(() => {
-    if (panel.style.display === 'none') {
-      detach();
-    }
-  });
-
-  const detach = () => {
-    window.removeEventListener('keydown', keyHandler);
-    obs.disconnect();
-    if ((/** @type {any} */ (panel))._inventoryDetach === detach) {
-      (/** @type {any} */ (panel))._inventoryDetach = null;
-    }
-  };
-
-  window.addEventListener('keydown', keyHandler);
-  obs.observe(panel, { attributes: true, attributeFilter: ['style'] });
-  (/** @type {any} */ (panel))._inventoryDetach = detach;
+  installDetachableKeyHandler(panel, '_inventoryDetach', (e) => onKey(e));
 }
 
 // ---------------------------------------------------------------------------
@@ -1582,24 +1556,7 @@ export function renderCharacterSheet(panel, data) {
     }
   }
 
-  const keyHandler = (/** @type {KeyboardEvent} */ e) => onKey(e);
-  const obs = new MutationObserver(() => {
-    if (panel.style.display === 'none') {
-      detach();
-    }
-  });
-
-  const detach = () => {
-    window.removeEventListener('keydown', keyHandler);
-    obs.disconnect();
-    if ((/** @type {any} */ (panel))._characterSheetDetach === detach) {
-      (/** @type {any} */ (panel))._characterSheetDetach = null;
-    }
-  };
-
-  window.addEventListener('keydown', keyHandler);
-  obs.observe(panel, { attributes: true, attributeFilter: ['style'] });
-  (/** @type {any} */ (panel))._characterSheetDetach = detach;
+  installDetachableKeyHandler(panel, '_characterSheetDetach', (e) => onKey(e));
 }
 
 /** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Record<string, any>|null} equippedBySlot @param {string|null} playerName @param {number} [scrollOfIdentifyId] */
@@ -1694,13 +1651,6 @@ export function renderEquipment(panel, equippedBySlot, playerName, scrollOfIdent
     window.dispatchEvent(new CustomEvent('ui:openSpellPicker'));
   }
 
-  function localRarityStyle(rarityName) {
-    const rn = String(rarityName || 'common').toLowerCase();
-    if (rn === 'rare' || rn === 'magic') return { color: '#55aaff', weight: 'bold' };
-    if (rn === 'epic') return { color: '#c47bff', weight: 'bold' };
-    if (rn === 'legendary') return { color: '#ff9f3b', weight: 'bold' };
-    return { color: '#ffffff', weight: 'bold' };
-  }
 
   const rows = rowsData.map((rowData, idx) => {
     const row = document.createElement('div');
@@ -1731,10 +1681,9 @@ export function renderEquipment(panel, equippedBySlot, playerName, scrollOfIdent
     name.style.textOverflow = 'ellipsis';
     name.style.whiteSpace = 'nowrap';
     if (rowData.item) {
-      const rs = localRarityStyle(rowData.item.rarityName);
+      const rs = rarityStyle(rowData.item.rarityName);
       name.textContent = bracketize(sanitize(rowData.item.name || rowData.item.description || rowData.item.type || 'item'));
-      name.style.color = rs.color;
-      name.style.fontWeight = rs.weight;
+      Object.assign(name.style, rs);
     } else {
       name.textContent = '(empty)';
       name.style.opacity = '0.65';
@@ -1922,24 +1871,7 @@ export function renderEquipment(panel, equippedBySlot, playerName, scrollOfIdent
   }
 
   setSel(sel);
-  const keyHandler = (/** @type {KeyboardEvent} */ e) => onKey(e);
-  const obs = new MutationObserver(() => {
-    if (panel.style.display === 'none') {
-      detach();
-    }
-  });
-
-  const detach = () => {
-    window.removeEventListener('keydown', keyHandler);
-    obs.disconnect();
-    if ((/** @type {any} */ (panel))._equipmentDetach === detach) {
-      (/** @type {any} */ (panel))._equipmentDetach = null;
-    }
-  };
-
-  window.addEventListener('keydown', keyHandler);
-  obs.observe(panel, { attributes: true, attributeFilter: ['style'] });
-  (/** @type {any} */ (panel))._equipmentDetach = detach;
+  installDetachableKeyHandler(panel, '_equipmentDetach', (e) => onKey(e));
 }
 
 /** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Array<{id:string,name:string,symbol?:string,cost?:number,description?:string,targetEffects?:string[]}>} spells @param {string|null} activeId */
@@ -2104,21 +2036,12 @@ export function renderAltarOfferChooser(panel, items, altarId) {
   list.style.gap = '4px';
   el.appendChild(list);
 
-  let sel = 0;
   const rows = items.map((it, idx) => {
-    const row = document.createElement('div');
-    Object.assign(row.style, {
-      display: 'flex', alignItems: 'center', gap: '8px',
-      width: '100%', padding: '6px 8px',
-      background: '#0f1421', color: '#cfe8ff', border: '1px solid #2d3b52', borderRadius: '6px',
-      cursor: 'pointer'
-    });
+    const row = createChooserRow();
 
     const name = document.createElement('span');
-    const rn = String(it.rarityName || 'common').toLowerCase();
-    const rs = rarityStyle(rn);
+    Object.assign(name.style, rarityStyle(it.rarityName));
     name.textContent = bracketize(sanitize(it.name || it.description || it.type || 'item'));
-    Object.assign(name.style, rs);
 
     const qty = document.createElement('span');
     qty.style.opacity = '0.8';
@@ -2166,17 +2089,12 @@ export function renderAltarOfferChooser(panel, items, altarId) {
   actionsEl.appendChild(cancelBtn);
   el.appendChild(actionsEl);
 
-  function setSel(i) {
-    sel = Math.max(0, Math.min(items.length - 1, i | 0));
-    rows.forEach((r, j) => {
-      r.style.outline = (j === sel) ? '2px solid #55aaff' : 'none';
-      r.style.background = (j === sel) ? '#0b1323' : '#0f1421';
-    });
-    showItemTooltip(items[sel], rows[sel]);
-  }
+  const { getSel, setSel } = createSimpleSel(rows, items.length, (i) => {
+    showItemTooltip(items[i], rows[i]);
+  });
 
   function offerSelected() {
-    const it = items[sel];
+    const it = items[getSel()];
     if (!it) return;
     window.dispatchEvent(new CustomEvent('ui:requestAltarOffer', {
       detail: { altarId, itemId: it.id }
@@ -2186,27 +2104,16 @@ export function renderAltarOfferChooser(panel, items, altarId) {
 
   setSel(0);
 
-  /** @param {KeyboardEvent} e */
-  function onKey(e) {
+  installKeyHandler(panel, (e) => {
     if (panel.style.display !== 'block') return;
     const k = e.key;
-    if (k === 'ArrowUp') { setSel(sel - 1); e.preventDefault(); }
-    else if (k === 'ArrowDown') { setSel(sel + 1); e.preventDefault(); }
+    if (k === 'ArrowUp') { setSel(getSel() - 1); e.preventDefault(); }
+    else if (k === 'ArrowDown') { setSel(getSel() + 1); e.preventDefault(); }
     else if (k === 'Home') { setSel(0); e.preventDefault(); }
     else if (k === 'End') { setSel(items.length - 1); e.preventDefault(); }
     else if (k === 'Enter') { offerSelected(); e.preventDefault(); }
     else if (k === 'Escape') { hide(panel); e.preventDefault(); }
-  }
-
-  const keyHandler = (/** @type {KeyboardEvent} */ e) => onKey(e);
-  window.addEventListener('keydown', keyHandler);
-  const obs = new MutationObserver(() => {
-    if (panel.style.display === 'none') {
-      window.removeEventListener('keydown', keyHandler);
-      obs.disconnect();
-    }
   });
-  obs.observe(panel, { attributes: true, attributeFilter: ['style'] });
 }
 
 /** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Array<any>} items */
@@ -2232,15 +2139,13 @@ export function renderPickupChooser(panel, items) {
   list.style.gap = '6px';
 
   const selections = new Set();
-  let sel = 0;
-
   const checkboxes = [];
   const rows = items.map((it, idx) => {
     const row = document.createElement('label');
     Object.assign(row.style, {
       display: 'flex', alignItems: 'center', gap: '8px',
-      padding: '6px 8px', border: '1px solid #2d3b52', borderRadius: '6px',
-      background: '#0f1421'
+      padding: '6px 8px', border: UI.BORDER, borderRadius: UI.RADIUS,
+      background: UI.DEFAULT_BG,
     });
     row.tabIndex = 0;
     const cb = document.createElement('input');
@@ -2253,11 +2158,9 @@ export function renderPickupChooser(panel, items) {
       }
     });
     checkboxes.push(cb);
-  const name = document.createElement('span');
-    const rn = String(it.rarityName || 'common').toLowerCase();
-    name.style.color = (rn === 'rare' || rn === 'magic') ? '#55aaff' : rn === 'epic' ? '#c47bff' : rn === 'legendary' ? '#ff9f3b' : '#ffffff';
-    name.style.fontWeight = 'bold';
-  name.textContent = bracketize(sanitize(it.name || it.type || 'item'));
+    const name = document.createElement('span');
+    Object.assign(name.style, rarityStyle(it.rarityName));
+    name.textContent = bracketize(sanitize(it.name || it.type || 'item'));
     const desc = document.createElement('span');
     desc.style.opacity = '0.85';
     desc.textContent = `x${it.count ?? 1}`;
@@ -2316,39 +2219,23 @@ export function renderPickupChooser(panel, items) {
   actionsEl.appendChild(btnCancel);
   el.appendChild(actionsEl);
 
-  /** @param {number} i */
-  function setSel(i) {
-    sel = Math.max(0, Math.min(items.length - 1, i|0));
-    rows.forEach((r, j) => {
-      r.style.outline = (j === sel) ? '2px solid #55aaff' : 'none';
-      r.style.background = (j === sel) ? '#0b1323' : '#0f1421';
-    });
-    showItemTooltip(items[sel], rows[sel]);
-  }
+  const { getSel, setSel } = createSimpleSel(rows, items.length, (i) => {
+    showItemTooltip(items[i], rows[i]);
+  });
+  setSel(0);
 
-  /** @param {KeyboardEvent} e */
-  function onKey(e) {
+  installKeyHandler(panel, (e) => {
     if (panel.style.display !== 'block') return;
+    const s = getSel();
     const k = e.key;
-    if (k === 'ArrowUp') { setSel(sel - 1); e.preventDefault(); }
-    else if (k === 'ArrowDown') { setSel(sel + 1); e.preventDefault(); }
+    if (k === 'ArrowUp') { setSel(s - 1); e.preventDefault(); }
+    else if (k === 'ArrowDown') { setSel(s + 1); e.preventDefault(); }
     else if (k === 'Home') { setSel(0); e.preventDefault(); }
     else if (k === 'End') { setSel(items.length - 1); e.preventDefault(); }
-    else if (k === ' ') { checkboxes[sel].checked = !checkboxes[sel].checked; checkboxes[sel].dispatchEvent(new Event('change')); e.preventDefault(); }
+    else if (k === ' ') { checkboxes[s].checked = !checkboxes[s].checked; checkboxes[s].dispatchEvent(new Event('change')); e.preventDefault(); }
     else if (k === 'Escape') { hide(panel); e.preventDefault(); }
     else if (k === 'Enter') { selections.size ? takeSelected() : takeAll(); e.preventDefault(); }
-  }
-
-  setSel(0);
-  const keyHandler = (/** @type {KeyboardEvent} */ e) => onKey(e);
-  window.addEventListener('keydown', keyHandler);
-  const obs = new MutationObserver(() => {
-    if (panel.style.display === 'none') {
-      window.removeEventListener('keydown', keyHandler);
-      obs.disconnect();
-    }
   });
-  obs.observe(panel, { attributes: true, attributeFilter: ['style'] });
 }
 
 /** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Array<any>} items */
@@ -2374,22 +2261,12 @@ export function renderUseChooser(panel, items) {
   list.style.gap = '4px';
   el.appendChild(list);
 
-  let sel = 0;
-
   const rows = items.map((it, idx) => {
-    const row = document.createElement('div');
-    Object.assign(row.style, {
-      display: 'flex', alignItems: 'center', gap: '8px',
-      width: '100%', padding: '6px 8px',
-      background: '#0f1421', color: '#cfe8ff', border: '1px solid #2d3b52', borderRadius: '6px',
-      cursor: 'pointer'
-    });
+    const row = createChooserRow();
 
     const name = document.createElement('span');
-    const rn = String(it.rarityName || 'common').toLowerCase();
-    const rs = rarityStyle(rn);
+    Object.assign(name.style, rarityStyle(it.rarityName));
     name.textContent = bracketize(sanitize(it.name || it.description || it.type));
-    Object.assign(name.style, rs);
 
     const typeLabel = document.createElement('span');
     typeLabel.style.opacity = '0.6';
@@ -2415,17 +2292,12 @@ export function renderUseChooser(panel, items) {
   hint.textContent = '\u2191/\u2193 select \u00b7 Enter=Use \u00b7 T=Throw \u00b7 Esc=Close';
   el.appendChild(hint);
 
-  function setSel(i) {
-    sel = Math.max(0, Math.min(items.length - 1, i | 0));
-    rows.forEach((r, j) => {
-      r.style.outline = (j === sel) ? '2px solid #55aaff' : 'none';
-      r.style.background = (j === sel) ? '#0b1323' : '#0f1421';
-    });
-    showItemTooltip(items[sel], rows[sel]);
-  }
+  const { getSel, setSel } = createSimpleSel(rows, items.length, (i) => {
+    showItemTooltip(items[i], rows[i]);
+  });
 
   function useSelected() {
-    const it = items[sel]; if (!it) return;
+    const it = items[getSel()]; if (!it) return;
     if (it.type === 'potion') {
       window.dispatchEvent(new CustomEvent('ui:requestDrink', { detail: { itemId: it.id } }));
     } else {
@@ -2436,32 +2308,22 @@ export function renderUseChooser(panel, items) {
 
   setSel(0);
 
-  /** @param {KeyboardEvent} e */
-  function onKey(e) {
+  installKeyHandler(panel, (e) => {
     if (panel.style.display !== 'block') return;
     const k = e.key;
-    if (k === 'ArrowUp') { setSel(sel - 1); e.preventDefault(); }
-    else if (k === 'ArrowDown') { setSel(sel + 1); e.preventDefault(); }
+    if (k === 'ArrowUp') { setSel(getSel() - 1); e.preventDefault(); }
+    else if (k === 'ArrowDown') { setSel(getSel() + 1); e.preventDefault(); }
     else if (k === 'Escape') { hide(panel); e.preventDefault(); }
     else if (k === 'Enter') { useSelected(); e.preventDefault(); }
     else if (k === 't' || k === 'T') {
-      const it = items[sel];
+      const it = items[getSel()];
       if (it && Number.isInteger(it.id) && it.id > 0) {
         window.dispatchEvent(new CustomEvent('ui:requestThrow', { detail: { itemId: it.id } }));
         hide(panel);
         e.preventDefault();
       }
     }
-  }
-
-  window.addEventListener('keydown', onKey);
-  const obs = new MutationObserver(() => {
-    if (panel.style.display === 'none') {
-      window.removeEventListener('keydown', onKey);
-      obs.disconnect();
-    }
   });
-  obs.observe(panel, { attributes: true, attributeFilter: ['style'] });
 }
 
 /** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Array<any>} items */
@@ -2487,22 +2349,12 @@ export function renderThrowChooser(panel, items) {
   list.style.gap = '4px';
   el.appendChild(list);
 
-  let sel = 0;
-
   const rows = items.map((it, idx) => {
-    const row = document.createElement('div');
-    Object.assign(row.style, {
-      display: 'flex', alignItems: 'center', gap: '8px',
-      width: '100%', padding: '6px 8px',
-      background: '#0f1421', color: '#cfe8ff', border: '1px solid #2d3b52', borderRadius: '6px',
-      cursor: 'pointer'
-    });
+    const row = createChooserRow();
 
     const name = document.createElement('span');
-    const rn = String(it.rarityName || 'common').toLowerCase();
-    const rs = rarityStyle(rn);
+    Object.assign(name.style, rarityStyle(it.rarityName));
     name.textContent = bracketize(sanitize(it.name || it.description || it.type));
-    Object.assign(name.style, rs);
 
     const typeLabel = document.createElement('span');
     typeLabel.style.opacity = '0.6';
@@ -2528,41 +2380,26 @@ export function renderThrowChooser(panel, items) {
   hint.textContent = '\u2191/\u2193 select \u00b7 Enter=Select item \u00b7 then tap target \u00b7 Esc=Close';
   el.appendChild(hint);
 
-  function setSel(i) {
-    sel = Math.max(0, Math.min(items.length - 1, i | 0));
-    rows.forEach((r, j) => {
-      r.style.outline = (j === sel) ? '2px solid #55aaff' : 'none';
-      r.style.background = (j === sel) ? '#0b1323' : '#0f1421';
-    });
-    showItemTooltip(items[sel], rows[sel]);
-  }
+  const { getSel, setSel } = createSimpleSel(rows, items.length, (i) => {
+    showItemTooltip(items[i], rows[i]);
+  });
 
   function throwSelected() {
-    const it = items[sel]; if (!it) return;
+    const it = items[getSel()]; if (!it) return;
     window.dispatchEvent(new CustomEvent('ui:requestThrow', { detail: { itemId: it.id } }));
     hide(panel);
   }
 
   setSel(0);
 
-  /** @param {KeyboardEvent} e */
-  function onKey(e) {
+  installKeyHandler(panel, (e) => {
     if (panel.style.display !== 'block') return;
     const k = e.key;
-    if (k === 'ArrowUp') { setSel(sel - 1); e.preventDefault(); }
-    else if (k === 'ArrowDown') { setSel(sel + 1); e.preventDefault(); }
+    if (k === 'ArrowUp') { setSel(getSel() - 1); e.preventDefault(); }
+    else if (k === 'ArrowDown') { setSel(getSel() + 1); e.preventDefault(); }
     else if (k === 'Escape') { hide(panel); e.preventDefault(); }
     else if (k === 'Enter') { throwSelected(); e.preventDefault(); }
-  }
-
-  window.addEventListener('keydown', onKey);
-  const obs = new MutationObserver(() => {
-    if (panel.style.display === 'none') {
-      window.removeEventListener('keydown', onKey);
-      obs.disconnect();
-    }
   });
-  obs.observe(panel, { attributes: true, attributeFilter: ['style'] });
 }
 
 /** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Array<any>} tools @param {(toolId:number)=>void} onSelect */
@@ -2588,15 +2425,8 @@ export function renderApplyToolChooser(panel, tools, onSelect) {
   list.style.gap = '4px';
   el.appendChild(list);
 
-  let sel = 0;
   const rows = tools.map((it, idx) => {
-    const row = document.createElement('div');
-    Object.assign(row.style, {
-      display: 'flex', alignItems: 'center', gap: '8px',
-      width: '100%', padding: '6px 8px',
-      background: '#0f1421', color: '#cfe8ff', border: '1px solid #2d3b52', borderRadius: '6px',
-      cursor: 'pointer'
-    });
+    const row = createChooserRow();
     const name = document.createElement('span');
     name.textContent = bracketize(sanitize(it.name || 'tool'));
     row.appendChild(name);
@@ -2615,35 +2445,21 @@ export function renderApplyToolChooser(panel, tools, onSelect) {
   hint.textContent = '\u2191/\u2193 select \u00b7 Enter=Apply \u00b7 Esc=Close';
   el.appendChild(hint);
 
-  function setSel(i) {
-    sel = Math.max(0, Math.min(tools.length - 1, i | 0));
-    rows.forEach((r, j) => {
-      r.style.outline = (j === sel) ? '2px solid #55aaff' : 'none';
-      r.style.background = (j === sel) ? '#0b1323' : '#0f1421';
-    });
-  }
+  const { getSel, setSel } = createSimpleSel(rows, tools.length);
   function pickTool() {
-    const it = tools[sel]; if (!it) return;
+    const it = tools[getSel()]; if (!it) return;
     onSelect(it.id);
   }
   setSel(0);
 
-  function onKey(e) {
+  installKeyHandler(panel, (e) => {
     if (panel.style.display !== 'block') return;
     const k = e.key;
-    if (k === 'ArrowUp') { setSel(sel - 1); e.preventDefault(); }
-    else if (k === 'ArrowDown') { setSel(sel + 1); e.preventDefault(); }
+    if (k === 'ArrowUp') { setSel(getSel() - 1); e.preventDefault(); }
+    else if (k === 'ArrowDown') { setSel(getSel() + 1); e.preventDefault(); }
     else if (k === 'Escape') { hide(panel); e.preventDefault(); }
     else if (k === 'Enter') { pickTool(); e.preventDefault(); }
-  }
-  window.addEventListener('keydown', onKey);
-  const obs = new MutationObserver(() => {
-    if (panel.style.display === 'none') {
-      window.removeEventListener('keydown', onKey);
-      obs.disconnect();
-    }
   });
-  obs.observe(panel, { attributes: true, attributeFilter: ['style'] });
 }
 
 /** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Array<any>} targets @param {number} toolId @param {(targetId:number)=>void} onSelect */
@@ -2669,15 +2485,8 @@ export function renderApplyTargetChooser(panel, targets, toolId, onSelect) {
   list.style.gap = '4px';
   el.appendChild(list);
 
-  let sel = 0;
   const rows = targets.map((it, idx) => {
-    const row = document.createElement('div');
-    Object.assign(row.style, {
-      display: 'flex', alignItems: 'center', gap: '8px',
-      width: '100%', padding: '6px 8px',
-      background: '#0f1421', color: '#cfe8ff', border: '1px solid #2d3b52', borderRadius: '6px',
-      cursor: 'pointer'
-    });
+    const row = createChooserRow();
     const name = document.createElement('span');
     name.textContent = bracketize(sanitize(it.name || 'item'));
     row.appendChild(name);
@@ -2705,35 +2514,21 @@ export function renderApplyTargetChooser(panel, targets, toolId, onSelect) {
   hint.textContent = '\u2191/\u2193 select \u00b7 Enter=Apply \u00b7 Esc=Close';
   el.appendChild(hint);
 
-  function setSel(i) {
-    sel = Math.max(0, Math.min(targets.length - 1, i | 0));
-    rows.forEach((r, j) => {
-      r.style.outline = (j === sel) ? '2px solid #55aaff' : 'none';
-      r.style.background = (j === sel) ? '#0b1323' : '#0f1421';
-    });
-  }
+  const { getSel, setSel } = createSimpleSel(rows, targets.length);
   function pickTarget() {
-    const it = targets[sel]; if (!it) return;
+    const it = targets[getSel()]; if (!it) return;
     onSelect(it.id);
   }
   setSel(0);
 
-  function onKey(e) {
+  installKeyHandler(panel, (e) => {
     if (panel.style.display !== 'block') return;
     const k = e.key;
-    if (k === 'ArrowUp') { setSel(sel - 1); e.preventDefault(); }
-    else if (k === 'ArrowDown') { setSel(sel + 1); e.preventDefault(); }
+    if (k === 'ArrowUp') { setSel(getSel() - 1); e.preventDefault(); }
+    else if (k === 'ArrowDown') { setSel(getSel() + 1); e.preventDefault(); }
     else if (k === 'Escape') { hide(panel); e.preventDefault(); }
     else if (k === 'Enter') { pickTarget(); e.preventDefault(); }
-  }
-  window.addEventListener('keydown', onKey);
-  const obs = new MutationObserver(() => {
-    if (panel.style.display === 'none') {
-      window.removeEventListener('keydown', onKey);
-      obs.disconnect();
-    }
   });
-  obs.observe(panel, { attributes: true, attributeFilter: ['style'] });
 }
 
 /**
@@ -2762,14 +2557,8 @@ export function renderSlotChooser(panel, opts) {
     { label: offLabel, slot: 'offhand' },
   ];
 
-  let sel = 0;
   const rows = choices.map((ch, idx) => {
-    const row = document.createElement('div');
-    Object.assign(row.style, {
-      display: 'flex', alignItems: 'center', gap: '8px',
-      padding: '8px 10px', border: '1px solid #2d3b52', borderRadius: '6px',
-      background: '#0f1421', cursor: 'pointer', marginBottom: '4px',
-    });
+    const row = createChooserRow({ padding: '8px 10px', marginBottom: '4px' });
     row.textContent = ch.label;
     row.addEventListener('mouseenter', () => { setSel(idx); });
     row.addEventListener('click', () => { pick(idx); });
@@ -2783,13 +2572,7 @@ export function renderSlotChooser(panel, opts) {
   hint.textContent = '\u2191/\u2193 select \u00b7 Enter=Confirm \u00b7 Esc=Cancel';
   el.appendChild(hint);
 
-  function setSel(i) {
-    sel = Math.max(0, Math.min(choices.length - 1, i | 0));
-    rows.forEach((r, j) => {
-      r.style.outline = (j === sel) ? '2px solid #55aaff' : 'none';
-      r.style.background = (j === sel) ? '#0b1323' : '#0f1421';
-    });
-  }
+  const { getSel, setSel } = createSimpleSel(rows, choices.length);
 
   function pick(i) {
     const slot = choices[i]?.slot;
@@ -2800,25 +2583,16 @@ export function renderSlotChooser(panel, opts) {
     }));
   }
 
-  /** @param {KeyboardEvent} e */
-  function onKey(e) {
+  setSel(0);
+
+  installKeyHandler(panel, (e) => {
     if (panel.style.display !== 'block') return;
     const k = e.key;
-    if (k === 'ArrowUp') { setSel(sel - 1); e.preventDefault(); }
-    else if (k === 'ArrowDown') { setSel(sel + 1); e.preventDefault(); }
-    else if (k === 'Enter') { pick(sel); e.preventDefault(); }
+    if (k === 'ArrowUp') { setSel(getSel() - 1); e.preventDefault(); }
+    else if (k === 'ArrowDown') { setSel(getSel() + 1); e.preventDefault(); }
+    else if (k === 'Enter') { pick(getSel()); e.preventDefault(); }
     else if (k === 'Escape') { hide(panel); e.preventDefault(); }
-  }
-
-  setSel(0);
-  window.addEventListener('keydown', onKey);
-  const obs = new MutationObserver(() => {
-    if (panel.style.display === 'none') {
-      window.removeEventListener('keydown', onKey);
-      obs.disconnect();
-    }
   });
-  obs.observe(panel, { attributes: true, attributeFilter: ['style'] });
 }
 
 /** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Object} data @param {{shopkeeperId:number, buyMarkup:number, sellDiscount:number, mode:string, activeTab?:string}} state */
@@ -2906,13 +2680,7 @@ export function renderShop(panel, data, state) {
       hint.textContent = 'P=Pay bill \u00b7 Esc=Close';
     } else {
       unpaidItems.forEach((it, idx) => {
-        const row = document.createElement('div');
-        Object.assign(row.style, {
-          display: 'flex', alignItems: 'center', gap: '8px',
-          width: '100%', padding: '6px 8px',
-          background: '#0f1421', color: '#cfe8ff', border: '1px solid #2d3b52', borderRadius: '6px',
-          cursor: 'pointer', marginBottom: '4px',
-        });
+        const row = createChooserRow({ marginBottom: '4px' });
 
         const name = document.createElement('span');
         name.textContent = bracketize(sanitize(it.name || 'item'));
@@ -2954,14 +2722,9 @@ export function renderShop(panel, data, state) {
       setSel(0);
     }
 
-    function setSel(i) {
-      sel = Math.max(0, Math.min(unpaidItems.length - 1, i | 0));
-      rows.forEach((r, j) => {
-        r.style.outline = (j === sel) ? '2px solid #55aaff' : 'none';
-        r.style.background = (j === sel) ? '#0b1323' : '#0f1421';
-      });
-      showItemTooltip(unpaidItems[sel], rows[sel]);
-    }
+    const { getSel, setSel } = createSimpleSel(rows, unpaidItems.length, (i) => {
+      showItemTooltip(unpaidItems[i], rows[i]);
+    });
 
     function payBill() {
       window.dispatchEvent(new CustomEvent('ui:payBill', {
@@ -2970,7 +2733,7 @@ export function renderShop(panel, data, state) {
     }
 
     function returnSelected() {
-      returnByIndex(sel);
+      returnByIndex(getSel());
     }
 
     /**
@@ -2989,26 +2752,15 @@ export function renderShop(panel, data, state) {
     payBtn.addEventListener('click', payBill);
     returnBtn.addEventListener('click', returnSelected);
 
-    /** @param {KeyboardEvent} e */
-    function onKey(e) {
+    installDetachableKeyHandler(panel, '_shopDetach', (e) => {
       if (panel.style.display !== 'block') return;
       const k = e.key;
-      if (k === 'ArrowUp') { setSel(sel - 1); e.preventDefault(); }
-      else if (k === 'ArrowDown') { setSel(sel + 1); e.preventDefault(); }
+      if (k === 'ArrowUp') { setSel(getSel() - 1); e.preventDefault(); }
+      else if (k === 'ArrowDown') { setSel(getSel() + 1); e.preventDefault(); }
       else if (k === 'Escape') { hide(panel); e.preventDefault(); }
       else if (k === 'Enter') { returnSelected(); e.preventDefault(); }
       else if (k === 'p' || k === 'P') { payBill(); e.preventDefault(); }
-    }
-
-    window.addEventListener('keydown', onKey);
-    const obs = new MutationObserver(() => {
-      if (panel.style.display === 'none') {
-        window.removeEventListener('keydown', onKey);
-        obs.disconnect();
-      }
     });
-    obs.observe(panel, { attributes: true, attributeFilter: ['style'] });
-    /** @type {any} */ (panel)._shopDetach = () => { window.removeEventListener('keydown', onKey); obs.disconnect(); };
     return;
   }
 
@@ -3077,19 +2829,11 @@ export function renderShop(panel, data, state) {
     }
 
     const rows = currentItems.map((it, idx) => {
-      const row = document.createElement('div');
-      Object.assign(row.style, {
-        display: 'flex', alignItems: 'center', gap: '8px',
-        width: '100%', padding: '6px 8px',
-        background: '#0f1421', color: '#cfe8ff', border: '1px solid #2d3b52', borderRadius: '6px',
-        cursor: 'pointer', marginBottom: '4px',
-      });
+      const row = createChooserRow({ marginBottom: '4px' });
 
       const name = document.createElement('span');
-      const rn = String(it.rarityName || 'common').toLowerCase();
-      const rs = rarityStyle(rn);
+      Object.assign(name.style, rarityStyle(it.rarityName));
       name.textContent = bracketize(sanitize(it.name || 'item'));
-      Object.assign(name.style, rs);
 
       const price = document.createElement('span');
       price.style.marginLeft = 'auto';
@@ -3116,14 +2860,9 @@ export function renderShop(panel, data, state) {
       return row;
     });
 
-    function setSel(i) {
-      sel = Math.max(0, Math.min(currentItems.length - 1, i | 0));
-      rows.forEach((r, j) => {
-        r.style.outline = (j === sel) ? '2px solid #55aaff' : 'none';
-        r.style.background = (j === sel) ? '#0b1323' : '#0f1421';
-      });
-      showItemTooltip(currentItems[sel], rows[sel]);
-    }
+    const { getSel, setSel } = createSimpleSel(rows, currentItems.length, (i) => {
+      showItemTooltip(currentItems[i], rows[i]);
+    });
 
     setSel(0);
     hint.textContent = activeTab === 'buy'
@@ -3133,7 +2872,7 @@ export function renderShop(panel, data, state) {
         : '\u2191/\u2193 select \u00b7 Enter=Appraise \u00b7 Tab=Buy tab \u00b7 Esc=Close';
 
     function doTransaction() {
-      const it = currentItems[sel]; if (!it) return;
+      const it = currentItems[getSel()]; if (!it) return;
       const ids = getUiItemEntityIds(it);
       if (!ids.length) return;
       if (activeTab === 'buy') {
@@ -3155,12 +2894,11 @@ export function renderShop(panel, data, state) {
       }
     }
 
-    /** @param {KeyboardEvent} e */
-    function onKey(e) {
+    _listDetach = installDetachableKeyHandler(panel, '_shopListDetach', (e) => {
       if (panel.style.display !== 'block') return;
       const k = e.key;
-      if (k === 'ArrowUp') { setSel(sel - 1); e.preventDefault(); }
-      else if (k === 'ArrowDown') { setSel(sel + 1); e.preventDefault(); }
+      if (k === 'ArrowUp') { setSel(getSel() - 1); e.preventDefault(); }
+      else if (k === 'ArrowDown') { setSel(getSel() + 1); e.preventDefault(); }
       else if (k === 'Escape') { hide(panel); e.preventDefault(); }
       else if (k === 'Enter') { doTransaction(); e.preventDefault(); }
       else if (k === 'Tab') {
@@ -3172,17 +2910,7 @@ export function renderShop(panel, data, state) {
         updateTabStyle();
         renderList();
       }
-    }
-
-    window.addEventListener('keydown', onKey);
-    const obs = new MutationObserver(() => {
-      if (panel.style.display === 'none') {
-        window.removeEventListener('keydown', onKey);
-        obs.disconnect();
-      }
     });
-    obs.observe(panel, { attributes: true, attributeFilter: ['style'] });
-    _listDetach = () => { window.removeEventListener('keydown', onKey); obs.disconnect(); };
   }
 
   /** @type {any} */ (panel)._shopDetach = () => { if (typeof _listDetach === 'function') _listDetach(); };
@@ -3276,19 +3004,11 @@ export function renderChest(panel, data, state) {
     }
 
     const rows = currentItems.map((it, idx) => {
-      const row = document.createElement('div');
-      Object.assign(row.style, {
-        display: 'flex', alignItems: 'center', gap: '8px',
-        width: '100%', padding: '6px 8px',
-        background: '#0f1421', color: '#cfe8ff', border: '1px solid #2d3b52', borderRadius: '6px',
-        cursor: 'pointer', marginBottom: '4px',
-      });
+      const row = createChooserRow({ marginBottom: '4px' });
 
       const name = document.createElement('span');
-      const rn = String(it.rarityName || 'common').toLowerCase();
-      const rs = rarityStyle(rn);
+      Object.assign(name.style, rarityStyle(it.rarityName));
       name.textContent = bracketize(sanitize(it.name || 'item'));
-      Object.assign(name.style, rs);
 
       row.appendChild(name);
       if (it.coating && it.coating.kind) {
@@ -3310,14 +3030,9 @@ export function renderChest(panel, data, state) {
       return row;
     });
 
-    function setSel(i) {
-      sel = Math.max(0, Math.min(currentItems.length - 1, i | 0));
-      rows.forEach((r, j) => {
-        r.style.outline = (j === sel) ? '2px solid #55aaff' : 'none';
-        r.style.background = (j === sel) ? '#0b1323' : '#0f1421';
-      });
-      showItemTooltip(currentItems[sel], rows[sel], { pinBottomOnMobile: true });
-    }
+    const { getSel, setSel } = createSimpleSel(rows, currentItems.length, (i) => {
+      showItemTooltip(currentItems[i], rows[i], { pinBottomOnMobile: true });
+    });
 
     setSel(0);
     hint.textContent = activeTab === 'take'
@@ -3325,7 +3040,7 @@ export function renderChest(panel, data, state) {
       : '\u2191/\u2193 select \u00b7 Enter=Put \u00b7 Tab=Take tab \u00b7 Esc=Close';
 
     function doTransaction() {
-      const it = currentItems[sel]; if (!it) return;
+      const it = currentItems[getSel()]; if (!it) return;
       const chestId = Number(state.chestId || 0) | 0;
       const itemId = Number(it.id || 0) | 0;
       if (!(chestId > 0) || !(itemId > 0)) return;
@@ -3340,12 +3055,11 @@ export function renderChest(panel, data, state) {
       }
     }
 
-    /** @param {KeyboardEvent} e */
-    function onKey(e) {
+    installKeyHandler(panel, (e) => {
       if (panel.style.display !== 'block') return;
       const k = e.key;
-      if (k === 'ArrowUp') { setSel(sel - 1); e.preventDefault(); }
-      else if (k === 'ArrowDown') { setSel(sel + 1); e.preventDefault(); }
+      if (k === 'ArrowUp') { setSel(getSel() - 1); e.preventDefault(); }
+      else if (k === 'ArrowDown') { setSel(getSel() + 1); e.preventDefault(); }
       else if (k === 'Escape') { hide(panel); e.preventDefault(); }
       else if (k === 'Enter') { doTransaction(); e.preventDefault(); }
       else if (k === 'a' && activeTab === 'take') { doTakeAll(); e.preventDefault(); }
@@ -3355,16 +3069,7 @@ export function renderChest(panel, data, state) {
         updateTabStyle();
         renderList();
       }
-    }
-
-    window.addEventListener('keydown', onKey);
-    const obs = new MutationObserver(() => {
-      if (panel.style.display === 'none') {
-        window.removeEventListener('keydown', onKey);
-        obs.disconnect();
-      }
     });
-    obs.observe(panel, { attributes: true, attributeFilter: ['style'] });
   }
 
   takeTab.addEventListener('click', () => { activeTab = 'take'; updateTabStyle(); renderList(); });
@@ -3542,16 +3247,16 @@ export function renderDeathLog(panel, records) {
 
   function setSel(i) {
     sel = Math.max(0, Math.min(records.length - 1, i | 0));
-    rows.forEach((r, j) => {
-      r.style.outline = (j === sel) ? '1px solid #55aaff' : 'none';
-      r.style.background = (j === sel) ? '#0b1323' : '#0f1421';
-    });
-    // Scroll selected row into view
+    for (let j = 0; j < rows.length; j++) {
+      rows[j].style.outline = (j === sel) ? '1px solid #55aaff' : 'none';
+      rows[j].style.background = (j === sel) ? UI.SEL_BG : UI.DEFAULT_BG;
+    }
     rows[sel]?.scrollIntoView?.({ block: 'nearest' });
   }
 
-  /** @param {KeyboardEvent} e */
-  function onKey(e) {
+  setSel(0);
+
+  installDetachableKeyHandler(panel, '_deathLogDetach', (e) => {
     if (panel.style.display !== 'block') return;
     const k = e.key;
     if (k === 'ArrowUp') { setSel(sel - 1); e.preventDefault(); }
@@ -3559,25 +3264,7 @@ export function renderDeathLog(panel, records) {
     else if (k === 'Home') { setSel(0); e.preventDefault(); }
     else if (k === 'End') { setSel(records.length - 1); e.preventDefault(); }
     else if (k === 'Escape') { hide(panel); e.preventDefault(); }
-  }
-
-  setSel(0);
-  const keyHandler = (/** @type {KeyboardEvent} */ e) => onKey(e);
-
-  const detach = () => {
-    window.removeEventListener('keydown', keyHandler);
-    obs.disconnect();
-    if ((/** @type {any} */ (panel))._deathLogDetach === detach) {
-      (/** @type {any} */ (panel))._deathLogDetach = null;
-    }
-  };
-
-  window.addEventListener('keydown', keyHandler);
-  const obs = new MutationObserver(() => {
-    if (panel.style.display === 'none') detach();
   });
-  obs.observe(panel, { attributes: true, attributeFilter: ['style'] });
-  (/** @type {any} */ (panel))._deathLogDetach = detach;
 }
 
 /** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Object} data @param {{rackId:number}} state */
@@ -3612,21 +3299,12 @@ export function renderRack(panel, data, state) {
     return;
   }
 
-  let sel = 0;
   const rows = rackItems.map((it, idx) => {
-    const row = document.createElement('div');
-    Object.assign(row.style, {
-      display: 'flex', alignItems: 'center', gap: '8px',
-      width: '100%', padding: '6px 8px',
-      background: '#0f1421', color: '#cfe8ff', border: '1px solid #2d3b52', borderRadius: '6px',
-      cursor: 'pointer', marginBottom: '4px',
-    });
+    const row = createChooserRow({ marginBottom: '4px' });
 
     const name = document.createElement('span');
-    const rn = String(it.rarityName || 'common').toLowerCase();
-    const rs = rarityStyle(rn);
+    Object.assign(name.style, rarityStyle(it.rarityName));
     name.textContent = bracketize(sanitize(it.name || 'item'));
-    Object.assign(name.style, rs);
     row.appendChild(name);
 
     if ((it.count || 1) > 1) {
@@ -3648,42 +3326,27 @@ export function renderRack(panel, data, state) {
     return row;
   });
 
-  function setSel(/** @type {number} */ i) {
-    sel = Math.max(0, Math.min(rackItems.length - 1, i | 0));
-    rows.forEach((r, j) => {
-      r.style.outline = (j === sel) ? '2px solid #55aaff' : 'none';
-      r.style.background = (j === sel) ? '#0b1323' : '#0f1421';
-    });
-    showItemTooltip(rackItems[sel], rows[sel]);
-  }
+  const { getSel, setSel } = createSimpleSel(rows, rackItems.length, (i) => {
+    showItemTooltip(rackItems[i], rows[i]);
+  });
 
   setSel(0);
   hint.textContent = '\u2191/\u2193 select \u00b7 Enter=Take \u00b7 Esc=Close';
 
   function doTake() {
-    const it = rackItems[sel]; if (!it) return;
+    const it = rackItems[getSel()]; if (!it) return;
     const rackId = Number(state.rackId || 0) | 0;
     const itemId = Number(it.id || 0) | 0;
     if (!(rackId > 0) || !(itemId > 0)) return;
     window.dispatchEvent(new CustomEvent('ui:requestRackTake', { detail: { rackId, itemId } }));
   }
 
-  /** @param {KeyboardEvent} e */
-  function onKey(e) {
+  installKeyHandler(panel, (e) => {
     if (panel.style.display !== 'block') return;
     const k = e.key;
-    if (k === 'ArrowUp') { setSel(sel - 1); e.preventDefault(); }
-    else if (k === 'ArrowDown') { setSel(sel + 1); e.preventDefault(); }
+    if (k === 'ArrowUp') { setSel(getSel() - 1); e.preventDefault(); }
+    else if (k === 'ArrowDown') { setSel(getSel() + 1); e.preventDefault(); }
     else if (k === 'Escape') { hide(panel); e.preventDefault(); }
     else if (k === 'Enter') { doTake(); e.preventDefault(); }
-  }
-
-  window.addEventListener('keydown', onKey);
-  const obs = new MutationObserver(() => {
-    if (panel.style.display === 'none') {
-      window.removeEventListener('keydown', onKey);
-      obs.disconnect();
-    }
   });
-  obs.observe(panel, { attributes: true, attributeFilter: ['style'] });
 }
