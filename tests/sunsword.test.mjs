@@ -168,7 +168,7 @@ Deno.test("sunsword: on_use is blocked while cooldown is active", () => {
 
 // ── Permanent blindness on hit ─────────────────────────────────────────────
 
-Deno.test("sunsword: melee hit permanently blinds target (vision → 0)", () => {
+Deno.test("sunsword: melee hit dazzles target (temporary vision reduction, not permanent)", () => {
   const world = makeWorld();
   const player = makePlayer(world, 5, 5);
   const swordId = equipSunsword(world, player);
@@ -194,7 +194,9 @@ Deno.test("sunsword: melee hit permanently blinds target (vision → 0)", () => 
   assert(rule.gate(world, ctx), "gate should pass for sunlight weapon");
   rule.apply(world, ctx);
 
-  assertEquals(getEffectiveVisionRange(world, skeleton), 0, "vision should be permanently 0 after sunsword hit");
+  const reduced = getEffectiveVisionRange(world, skeleton);
+  assert(reduced < 8, "vision should be reduced after sunsword melee hit");
+  assert(reduced > 0, "melee dazzle should not fully blind — that's the ray's job");
 });
 
 Deno.test("sunsword: permanent blindness does not apply without sunlight tag", () => {

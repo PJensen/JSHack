@@ -16,7 +16,7 @@ import { ItemInfo } from "../components/ItemInfo.js";
 import { Vitality } from "../components/Vitality.js";
 import { ActiveEffects } from "../components/ActiveEffects.js";
 import { emitSafe } from "../utils/emitSafe.js";
-import { blind } from "../utils/blind.js";
+import { blind, getEffectiveVisionRange } from "../utils/blind.js";
 import { statusStrength } from "../utils/statusFacade.js";
 import { upsertTimedEffect } from "../utils/effectSemantics.js";
 import { ensureActiveEffects } from "../utils/effects.js";
@@ -104,7 +104,9 @@ export const COMBAT_INTERACTION_RULES = [
       return !!(info && Array.isArray(info.tags) && info.tags.includes("sunlight"));
     },
     apply(world, ctx) {
-      blind(world, ctx.defender, 0, 0, 1, 0, 0);
+      const curVision = getEffectiveVisionRange(world, ctx.defender);
+      const rampOut = (world.rand() < 0.5) ? 2 : 3;
+      blind(world, ctx.defender, Math.max(1, curVision - 2), 0, 0, rampOut, undefined, { stack: true });
       emitSafe(world, "combat:sunblind", {
         attacker: ctx.attacker, defender: ctx.defender, weaponId: ctx.weaponId,
       });
