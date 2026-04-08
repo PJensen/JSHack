@@ -10,9 +10,11 @@ import { Vitality } from '../src/rules/components/Vitality.js';
 import { CreatureType, CREATURE_TYPES } from '../src/rules/components/CreatureType.js';
 import { ActiveEffects } from '../src/rules/components/ActiveEffects.js';
 import { ItemCooldown } from '../src/rules/components/ItemCooldown.js';
+import { Brain } from '../src/rules/components/Brain.js';
 import { hasEquippedTag } from '../src/rules/utils/equipTags.js';
 import { COMBAT_INTERACTION_RULES } from '../src/rules/data/combatInteractions.js';
 import { statusStrength } from '../src/rules/utils/statusFacade.js';
+import { getEffectiveVisionRange } from '../src/rules/utils/blind.js';
 import { getItemHooksByIdentity } from '../src/rules/content/items/itemHooks.js';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -162,4 +164,64 @@ Deno.test("sunsword: on_use is blocked while cooldown is active", () => {
   assertEquals(result?.code, 'ITEM_ON_COOLDOWN');
   assertEquals(messages.length, 1);
   assertEquals(emits.length, 0);
+});
+
+// ── Permanent blindness on hit ─────────────────────────────────────────────
+
+Deno.test("sunsword: melee hit permanently blinds target (vision → 0)", () => {
+  const world = makeWorld();
+  const player = makePlayer(world, 5, 5);
+  const swordId = equipSunsword(world, player);
+  const skeleton = makeUndead(world, 6, 5);
+  world.add(skeleton, Brain, { visionRange: 8 });
+  world.add(skeleton, ActiveEffects, { effects: [] });
+
+  assertEquals(getEffectiveVisionRange(world, skeleton), 8, "baseline vision should be 8");
+
+  const rule = COMBAT_INTERACTION_RULES.find(r => r.id === "sunlight_weapon_blind");
+  assert(rule, "sunlight_weapon_blind rule should exist");
+  assert(rule.phase === "hit", "rule should fire on hit phase");
+
+  const ctx = {
+    attacker: player,
+    defender: skeleton,
+    weaponId: swordId,
+    damage: 5,
+    damageType: "slash",
+    world,
+  };
+
+  assert(rule.gate(world, ctx), "gate should pass for sunlight weapon");
+  rule.apply(world, ctx);
+
+  assertEquals(getEffectiveVisionRange(world, skeleton), 0, "vision should be permanently 0 after sunsword hit");
+});
+
+Deno.test("sunsword: permanent blindness does not apply without sunlight tag", () => {
+  const world = makeWorld();
+  const player = makePlayer(world, 5, 5);
+
+  // Plain sword without sunlight tag
+  const swordId = world.create();
+  world.add(swordId, NamedIdentity, { name: 'Iron Sword', identity: 'iron_sword' });
+  world.add(swordId, ItemInfo, { type: 'equip', slot: 'weapon', damageDice: '1d6', damageType: 'slash', tags: [] });
+  const eq = world.get(player, Equipment);
+  eq.weapon = swordId;
+
+  const skeleton = makeUndead(world, 6, 5);
+  world.add(skeleton, Brain, { visionRange: 8 });
+  world.add(skeleton, ActiveEffects, { effects: [] });
+
+  const rule = COMBAT_INTERACTION_RULES.find(r => r.id === "sunlight_weapon_blind");
+  const ctx = {
+    attacker: player,
+    defender: skeleton,
+    weaponId: swordId,
+    damage: 5,
+    damageType: "slash",
+    world,
+  };
+
+  assert(!rule.gate(world, ctx), "gate should NOT pass for non-sunlight weapon");
+  assertEquals(getEffectiveVisionRange(world, skeleton), 8, "vision should remain unchanged");
 });

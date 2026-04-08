@@ -2365,6 +2365,11 @@ export function installMessageWiring({
     log('Your blessed weapon banishes the demon back to the abyss!', 'danger');
   });
 
+  // Sunlight weapon permanent blindness
+  world.on('combat:sunblind', () => {
+    log('The Sunsword\'s radiance burns away all sight!', 'system');
+  });
+
   // Frozen shatter combo
   world.on('combat:shatter', ({ damageType, mult }) => {
     if (damageType === 'blunt') {

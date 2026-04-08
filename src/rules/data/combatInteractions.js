@@ -16,6 +16,7 @@ import { ItemInfo } from "../components/ItemInfo.js";
 import { Vitality } from "../components/Vitality.js";
 import { ActiveEffects } from "../components/ActiveEffects.js";
 import { emitSafe } from "../utils/emitSafe.js";
+import { blind } from "../utils/blind.js";
 import { statusStrength } from "../utils/statusFacade.js";
 
 // ── Rule definitions ─────────────────────────────────────────────────
@@ -86,6 +87,23 @@ export const COMBAT_INTERACTION_RULES = [
       emitSafe(world, "combat:holy_strike", {
         attacker: ctx.attacker, defender: ctx.defender,
         weaponId: ctx.weaponId, creatureType: CREATURE_TYPES.undead, bonusDmg: 4,
+      });
+    },
+  },
+
+  // Sunlight weapon on hit: permanent blindness (vision → 0)
+  {
+    id: "sunlight_weapon_blind",
+    phase: "hit",
+    gate(world, ctx) {
+      if (!(ctx.weaponId > 0)) return false;
+      const info = world.get(ctx.weaponId, ItemInfo);
+      return !!(info && Array.isArray(info.tags) && info.tags.includes("sunlight"));
+    },
+    apply(world, ctx) {
+      blind(world, ctx.defender, 0, 0, 1, 0, 0);
+      emitSafe(world, "combat:sunblind", {
+        attacker: ctx.attacker, defender: ctx.defender, weaponId: ctx.weaponId,
       });
     },
   },
