@@ -5,6 +5,7 @@ import { ScriptRef } from "../../components/ScriptRef.js";
 import { findThrowPayload } from "../../content/items/throwPayloads.js";
 import { ScriptVerb } from "../../scripting.js";
 import { areFactionsHostile } from "../../utils/factionHostility.js";
+import { computeProjectileDelay } from "../../utils/projectileKinematics.js";
 
 /**
  * @param {any} value
@@ -61,15 +62,6 @@ function normalizePoint(point, fallback) {
     x: Number.isFinite(x) ? (x | 0) : (fallback.x | 0),
     y: Number.isFinite(y) ? (y | 0) : (fallback.y | 0),
   };
-}
-
-function computeProjectileDelay(from, to, speed, minDuration, maxDuration) {
-  const dx = Number(to?.x || 0) - Number(from?.x || 0);
-  const dy = Number(to?.y || 0) - Number(from?.y || 0);
-  const dist = Math.hypot(dx, dy);
-  if (!(dist > 0) || !(speed > 0)) return Number(minDuration) || 0;
-  const raw = dist / speed;
-  return Math.max(Number(minDuration) || 0, Math.min(Number(maxDuration) || raw, raw));
 }
 
 /**

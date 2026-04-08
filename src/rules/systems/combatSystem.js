@@ -39,16 +39,10 @@ import { getPositionalAttackBonus, hasOffhandShield } from '../utils/combatPosit
 import { setCombatPosture } from '../utils/posture.js';
 import { upsertTimedEffect } from '../utils/effectSemantics.js';
 import { emitSafe } from '../utils/emitSafe.js';
+import { ensureActiveEffects } from '../utils/effects.js';
+import { computeImpactVector } from '../utils/projectileKinematics.js';
 
 const BUMP_ATTACK_INSTALLED = Symbol.for('jshack:combat:bumpAttack:installed');
-
-function computeImpactVector(from, to) {
-    const dx = Number(to?.x || 0) - Number(from?.x || 0);
-    const dy = Number(to?.y || 0) - Number(from?.y || 0);
-    const mag = Math.hypot(dx, dy);
-    if (!(mag > 0)) return { dx: 0, dy: 1 };
-    return { dx: dx / mag, dy: dy / mag };
-}
 
 function resolveWeaponClass(world, weaponId, damageType) {
     if (!(weaponId > 0) || !world.isAlive(weaponId)) return 'unarmed';
@@ -124,19 +118,11 @@ function makeCombatFrame(world, base) {
     });
 }
 
-function ensureEffects(world, entityId) {
-    let ae = world.get(entityId, ActiveEffects);
-    if (ae && Array.isArray(ae.effects)) return ae;
-    try { world.add(entityId, ActiveEffects, { effects: [] }); } catch {}
-    ae = world.get(entityId, ActiveEffects);
-    return (ae && Array.isArray(ae.effects)) ? ae : null;
-}
-
 function applyDamageTextureEffects(world, {
     attacker, defender, damageType, appliedDamage, critical,
 }) {
     if (!(appliedDamage > 0) || !world.isAlive(defender)) return;
-    const ae = ensureEffects(world, defender);
+    const ae = ensureActiveEffects(world, defender);
     if (!ae) return;
 
     if (damageType === 'blunt' && appliedDamage >= 4) {

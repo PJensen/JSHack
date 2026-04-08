@@ -9,10 +9,10 @@
 import { Position } from "../components/Position.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { DoorState } from "../components/DoorState.js";
-import { DungeonState } from "../components/DungeonState.js";
 import { Web } from "../archetypes/RoomFeatures.js";
 import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { getTileQuerySnapshot } from "../utils/tileQueryCache.js";
+import { attachEntityToCurrentFloor } from "./floorEntities.js";
 
 function cellKey(x, y) { return `${x},${y}`; }
 
@@ -42,11 +42,7 @@ export function spawnWeb(world, x, y) {
   // ── create & attach to floor ──
   const webId = createFrom(world, Web, { x, y });
 
-  for (const [, ds] of world.query(DungeonState)) {
-    if (!ds || !Array.isArray(ds.floorEntityIds)) break;
-    if (!ds.floorEntityIds.includes(webId)) ds.floorEntityIds.push(webId);
-    break;
-  }
+  attachEntityToCurrentFloor(world, webId);
 
   return webId;
 }

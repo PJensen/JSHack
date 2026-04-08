@@ -9,19 +9,8 @@
 
 import { Interactable } from "../components/Interactable.js";
 import { InteractIntent } from "../components/Intents/InteractIntent.js";
-import { DungeonState } from "../components/DungeonState.js";
 import { runInteractHooks } from "../interaction/interactRunner.js";
-
-function isEntityOnCurrentFloor(world, entityId) {
-  const id = Number(entityId || 0) | 0;
-  if (!(id > 0) || !world.isAlive(id)) return false;
-  let sawDungeonState = false;
-  for (const [, ds] of world.query(DungeonState)) {
-    sawDungeonState = true;
-    return Array.isArray(ds?.floorEntityIds) && ds.floorEntityIds.includes(id);
-  }
-  return !sawDungeonState;
-}
+import { isEntityOnCurrentFloor } from "../utils/floorEntities.js";
 
 /**
  * Dispatch a single interaction between actor and targetId.
@@ -34,7 +23,7 @@ function isEntityOnCurrentFloor(world, entityId) {
  * @returns {boolean}
  */
 export function InteractionSystem(world, actor, targetId, intent = null) {
-  if (!isEntityOnCurrentFloor(world, targetId)) return false;
+  if (!isEntityOnCurrentFloor(world, targetId, { fallbackWhenNoDungeonState: true })) return false;
   const inter = world.get(targetId, Interactable);
   if (!inter) return false;
   return runInteractHooks(inter.action, world, actor, targetId, inter.params, intent);

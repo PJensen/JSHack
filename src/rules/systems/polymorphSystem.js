@@ -1,13 +1,13 @@
-import { creatureTypeFromTags } from "../components/CreatureType.js";
 import { Inventory } from "../components/Inventory.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Polymorph } from "../components/Polymorph.js";
 import { Position } from "../components/Position.js";
-import { getMonster, resolveMonsterMaxHp } from "../data/monsters.js";
+import { getMonster } from "../data/monsters.js";
 import { spawnMonsterEntity } from "../utils/spawnMonsterEntity.js";
 import { invalidateTileQueryCache } from "../utils/tileQueryCache.js";
 import { addToInventory, destroyInventoryRoot, inventoryItems } from "../utils/inventoryFacade.js";
 import { emitSafe } from "../utils/emitSafe.js";
+import { toMonsterSpawnParams } from "../utils/monsterSpawnParams.js";
 
 const POLYMORPH_LISTENER_INSTALLED = Symbol.for("jshack:polymorph:listener:installed");
 
@@ -41,31 +41,6 @@ function runPolymorphHooks(phase, ctx) {
   for (const fn of POLYMORPH_HOOKS[phase]) {
     try { fn(ctx); } catch (e) { console.debug("[polymorphSystem] hook failed:", e); }
   }
-}
-
-function toMonsterSpawnParams(def, depth) {
-  return {
-    name: def.name,
-    identity: def.id,
-    maxHp: resolveMonsterMaxHp(def, depth),
-    faction: "enemy",
-    accuracyDerived: def.attack,
-    damagePowerDerived: def.attack,
-    evadeDerived: def.defense,
-    naturalDamageDice: def.damageDice,
-    sizeClass: def.sizeClass,
-    massKg: def.massKg,
-    resistances: def.resistances,
-    speed: def.speed,
-    equipment: def.equipment || null,
-    wielding: Array.isArray(def.wielding) ? def.wielding.slice() : [],
-    equipped: Array.isArray(def.equipped) ? def.equipped.slice() : [],
-    inventory: Array.isArray(def.inventory) ? def.inventory.slice() : [],
-    learnedSpellIds: Array.isArray(def.learnedSpellIds) ? def.learnedSpellIds.slice() : [],
-    maxMana: Number.isFinite(def.maxMana) ? Number(def.maxMana) : 0,
-    manaRegen: Number.isFinite(def.manaRegen) ? Number(def.manaRegen) : 0,
-    creatureType: creatureTypeFromTags(def.tags || []),
-  };
 }
 
 /**
