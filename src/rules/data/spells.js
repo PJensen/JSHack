@@ -358,6 +358,7 @@ export const SPELL_DEFS = {
     script: 'bat_shriek',
     targeting: 'self',
     description: 'A piercing cry that stirs nearby hostiles toward the player.',
+    confuseTurns: 0,
     effects: [
       { kind: 'utility', note: 'Nearby same-faction enemies are alerted toward the player' },
     ],
