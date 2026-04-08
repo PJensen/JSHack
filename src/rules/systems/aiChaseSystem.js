@@ -50,6 +50,7 @@ import { getTile, isFlyable, isWalkable } from "../environment/dungeon/tileMap.j
 import { TILE_STAIR_DOWN, TILE_STAIR_UP } from "../environment/dungeon/constants.js";
 import { getEffectiveVisionRange } from "../utils/blind.js";
 import { chebyshevScalar } from "../utils/distance.js";
+import { CARDINAL_DIRS } from "../utils/directions.js";
 import { CentipedeSegment } from "../components/CentipedeSegment.js";
 
 const ACTIVE_RADIUS = 32; // tiles; keep AI work bounded to nearby entities
@@ -513,6 +514,13 @@ export function aiChaseSystem(world) {
     if (aggro.retreating) {
       dx = -dx;
       dy = -dy;
+    }
+
+    // Blinded creatures stumble: random direction instead of intended path.
+    if (sightRange <= 0 && (dx !== 0 || dy !== 0)) {
+      const dir = CARDINAL_DIRS[Math.floor(world.rand() * CARDINAL_DIRS.length)];
+      dx = dir.dx;
+      dy = dir.dy;
     }
 
     try { world.add(id, MoveIntent, { dx, dy }); } catch {}
