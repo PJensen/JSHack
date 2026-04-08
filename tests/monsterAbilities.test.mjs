@@ -243,7 +243,7 @@ Deno.test("early tier-0 enemies expose active ability kits", () => {
   assert(Array.isArray(caveSpider?.learnedSpellIds) && caveSpider.learnedSpellIds.includes("spider_lunge"), "cave_spider should know spider_lunge");
 });
 
-Deno.test("bat_shriek confuses nearby hostiles and alerts nearby allies", () => {
+Deno.test("bat_shriek alerts nearby allies without confusing hostiles", () => {
   loadFlatFloor();
   try {
     const world = new World({ seed: 0xBA7 });
@@ -274,7 +274,7 @@ Deno.test("bat_shriek confuses nearby hostiles and alerts nearby allies", () => 
     runSpellScript(world, bat, getSpell("bat_shriek"), {});
 
     const effects = world.get(player, ActiveEffects)?.effects || [];
-    assert(effects.some((e) => String(e?.key || "") === "confused"));
+    assert(!effects.some((e) => String(e?.key || "") === "confused"), "bat shriek should not confuse");
     assertEquals(world.get(ally, AggroState)?.alertLevel, AGGRO_LEVELS.alerted);
   } finally {
     clearAll();

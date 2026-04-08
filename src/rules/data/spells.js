@@ -357,10 +357,9 @@ export const SPELL_DEFS = {
     radius: 4,
     script: 'bat_shriek',
     targeting: 'self',
-    description: 'A piercing cry that rattles minds and stirs nearby hostiles.',
+    description: 'A piercing cry that stirs nearby hostiles toward the player.',
     effects: [
-      { kind: 'status', status: 'confused', duration: '2 turns to nearby hostiles' },
-      { kind: 'utility', note: 'Nearby enemies are alerted toward the player' },
+      { kind: 'utility', note: 'Nearby same-faction enemies are alerted toward the player' },
     ],
   },
   shrieker_scream: {
