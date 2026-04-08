@@ -424,7 +424,7 @@ export function aiChaseSystem(world) {
     // ── Choose movement target ──────────────────────────────────────
     let targetX, targetY;
     let conflictRivalId = 0; // entity id of rival when conflict-redirected
-    if (aggro.alertLevel === AGGRO_LEVELS.hunting && conflictActive) {
+    if (aggro.alertLevel === AGGRO_LEVELS.hunting && conflictActive && canSee) {
       const rival = findNearestRival(world, id, pos.x | 0, pos.y | 0, sightRange, ensureBlockedMap());
       if (rival) {
         targetX = rival.x;
