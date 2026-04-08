@@ -409,10 +409,10 @@ export function createBoltFxController({ world, cam, fx, getPosition }) {
       _boltFx.push(new LineFx({
         from: { x: Number(fromX) + 0.5, y: Number(fromY) + 0.5 },
         to: { x: Number(x) + 0.5, y: Number(y) + 0.5 },
-        ttl: 0.12,
+        ttl: 0.36,
         style: 'holy',
       }));
-      _lightPulses.push(new PulseFx({ x: Number(x) + 0.5, y: Number(y) + 0.5, ttl: 0.14, color: [255, 246, 205] }));
+      _lightPulses.push(new PulseFx({ x: Number(x) + 0.5, y: Number(y) + 0.5, ttl: 0.42, color: [255, 246, 205] }));
       startShake(cam, 2, 0.10);
     });
     world.on('deity:wrath', ({ playerId, deityId, intensity, severityScale, wrathDebt }) => {
