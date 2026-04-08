@@ -2,7 +2,7 @@ import { HUNGER_COMBAT_LEVELS } from "../data/hungerCombatLevels.js";
 import { resolveResistance } from "./dealDamage.js";
 import { resolveCanonicalStats } from "./canonicalStats.js";
 import { statusStrength } from "./statusFacade.js";
-import { getBlindedDefensePenalty } from "./blindnessExposure.js";
+import { getBlindedDefensePenalty, getBlindedAttackPenalty } from "./blindnessExposure.js";
 import { COMBAT_POSTURES, CombatPosture } from "../components/CombatPosture.js";
 
 const MODE_RULES = Object.freeze({
@@ -127,6 +127,9 @@ export function resolveCombatSnapshot(world, entityId, context = {}) {
     pushModifier(modifiers, "attack", "status:battle_fury", statusTotals.battle_fury * 2, "battle-fury-bonus");
     pushModifier(modifiers, "attack", "status:staggered", -statusTotals.staggered, "staggered-penalty");
 
+    const blindedAtkPenalty = getBlindedAttackPenalty(statusTotals.blinded);
+    pushModifier(modifiers, "attack", "status:blinded", -blindedAtkPenalty, "blinded-attack-penalty");
+
     attackBonus += (
       -statusTotals.disease
       -statusTotals.hunger
@@ -141,6 +144,7 @@ export function resolveCombatSnapshot(world, entityId, context = {}) {
       +(statusTotals.dark_sight * 2)
       +(statusTotals.battle_fury * 2)
       -statusTotals.staggered
+      -blindedAtkPenalty
     );
   }
 

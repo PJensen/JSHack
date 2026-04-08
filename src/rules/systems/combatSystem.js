@@ -32,6 +32,7 @@ import {
     calculateBlindedPhysicalDamage,
     getBlindedCritChanceBonusPct,
     getBlindedCritMultBonus,
+    getBlindedFumbleChancePct,
 } from '../utils/blindnessExposure.js';
 import { getEntityFacingConeDegrees, getNormalizedEntityFacing, isPointInFacingCone } from '../utils/facing.js';
 import { getPositionalAttackBonus, hasOffhandShield } from '../utils/combatPositioning.js';
@@ -202,6 +203,25 @@ function resolveHitRoll(world, {
     const atkSnapshot = resolveCombatSnapshot(world, source, { mode: 'melee' });
     const defSnapshot = resolveCombatSnapshot(world, target, { mode: 'melee' });
     const blindExposure = Math.max(0, Number(defSnapshot?.status?.blinded || 0));
+
+    // Blinded attacker fumble: swinging without sight
+    const atkBlinded = Math.max(0, Number(atkSnapshot?.status?.blinded || 0));
+    if (atkBlinded > 0) {
+        const blindFumblePct = getBlindedFumbleChancePct(atkBlinded);
+        if (blindFumblePct > 0) {
+            const bfSeed = combatSeed(world.seed, world.step, source, target, fumbleSalt ^ 0xB11D);
+            const bfRng = mulberry32(bfSeed);
+            if (pct(bfRng, blindFumblePct)) {
+                world.emit?.('combat:fumble', {
+                    attacker: source, defender: target, weaponId,
+                    name: world.get(weaponId, NamedIdentity)?.name || 'weapon',
+                    reason: 'blinded',
+                });
+                return true;
+            }
+        }
+    }
+
     breakStealthOnOffense(world, source, { reason: 'attack', mode: 'melee', targetId: target });
     const positional = getPositionalAttackBonus(world, source, target);
     const actionTags = Array.isArray(tags) ? [...tags, `relation:${positional.relation}`] : [`relation:${positional.relation}`];
