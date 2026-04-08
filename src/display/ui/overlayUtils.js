@@ -1170,6 +1170,40 @@ export function decorateButton(btn) {
   });
 }
 
+// --- Row pulse micro-UX ----------------------------------------------------
+
+/** Color presets for action feedback pulses. */
+const PULSE_COLORS = Object.freeze({
+  equip:   '#1a3a5c',
+  unequip: '#2a2a35',
+  use:     '#1a3a2a',
+  drop:    '#3a2a10',
+  throw:   '#3a2a10',
+  pin:     '#1a2a3a',
+  cursed:  '#3a1040',
+  default: '#1a2a3a',
+});
+
+/**
+ * Flash a row element to confirm an action was taken.
+ * Pure CSS transition — no timers needed.
+ * @param {HTMLElement} row
+ * @param {string} [actionKey] — maps to a color preset
+ * @param {string} [restoreBg] — background to return to after pulse
+ */
+export function pulseRow(row, actionKey, restoreBg) {
+  if (!row || !row.style) return;
+  const color = PULSE_COLORS[actionKey] || PULSE_COLORS.default;
+  const bg = restoreBg || row.style.background || '#0f1421';
+  // Remove any existing transition so we start clean
+  row.style.transition = 'none';
+  row.style.background = color;
+  // Force reflow so the "snap to color" takes before the fade
+  void row.offsetWidth;
+  row.style.transition = 'background 0.45s ease-out';
+  row.style.background = bg;
+}
+
 // --- Shared chooser helpers ------------------------------------------------
 
 /** Standard colors used across chooser/overlay panels. */
