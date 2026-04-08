@@ -87,5 +87,26 @@ export const armor = {
   hollow_tide_boots:      { glyph:"u", fg:"#9e8a70", glow:"#6d5d49", baseScale: S_BOOTS },
   portent_focus:          { glyph:"*", fg:"#8e89d9", glow:"#5d58a8", baseScale: S_GEM },
   cataclysm_aegis:        { glyph:"[", fg:"#c4b084", glow:"#86744f", baseScale: S_SHIELD },
-  bloodpact_orb:          { glyph:"*", fg:"#cc6666", glow:"#913b3b", baseScale: S_GEM }
+  bloodpact_orb:          { glyph:"*", fg:"#cc6666", glow:"#913b3b", baseScale: S_GEM },
+  // Set armor
+  tithekeeper_breastplate: { glyph:"[", fg:"#c8a870", glow:"#8a7040", baseScale: S_ARMOR },
+  blood_covenant_plate:    { glyph:"[", fg:"#c86a6a", glow:"#8a3a3a", baseScale: S_ARMOR },
+  // Set helms
+  tolling_greathelm:       { glyph:"^", fg:"#8a7ab6", glow:"#5a4a85", baseScale: S_HELM },
+  hollow_tide_helm:        { glyph:"^", fg:"#9a8a70", glow:"#6a5a40", baseScale: S_HELM },
+  // Set belts
+  jesters_cord:            { glyph:"=", fg:"#e0b040", glow:"#b08020", baseScale: S_BELT },
+  hungering_girdle:        { glyph:"=", fg:"#b09060", glow:"#7a5a30", baseScale: S_BELT },
+  // Set gloves
+  plague_gauntlets:        { glyph:"\"", fg:"#6abf50", glow:"#408a2a", baseScale: S_GLOVES },
+  predator_wraps:          { glyph:"\"", fg:"#8aae64", glow:"#5e7a40", baseScale: S_GLOVES },
+  // Set legs
+  cataclysm_greaves:       { glyph:"]", fg:"#c0a870", glow:"#8a7040", baseScale: S_LEGS },
+  soul_debt_greaves:       { glyph:"]", fg:"#8a7aa8", glow:"#5d4f77", baseScale: S_LEGS },
+  // Set boots
+  eclipse_sabatons:        { glyph:"u", fg:"#d0b070", glow:"#9a7a40", baseScale: S_BOOTS },
+  thundergod_greaves:      { glyph:"u", fg:"#7aaae8", glow:"#4a78b8", baseScale: S_BOOTS },
+  // Set shields
+  soulascendant_shield:    { glyph:"[", fg:"#d8a0e0", glow:"#a070b0", baseScale: S_SHIELD },
+  predator_buckler:        { glyph:"[", fg:"#8aae64", glow:"#5e7a40", baseScale: S_SHIELD },
 };
