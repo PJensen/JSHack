@@ -1214,6 +1214,7 @@ export function createSimpleSel(rows, count, onSelect) {
       rows[j].style.outline = (j === sel) ? UI.SEL_OUTLINE : 'none';
       rows[j].style.background = (j === sel) ? UI.SEL_BG : UI.DEFAULT_BG;
     }
+    rows[sel]?.scrollIntoView?.({ block: 'nearest' });
     if (onSelect) onSelect(sel);
   }
   return { getSel() { return sel; }, setSel };
