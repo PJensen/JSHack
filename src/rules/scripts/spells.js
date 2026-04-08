@@ -1633,13 +1633,12 @@ REGISTRY["spider_lunge"] = function spiderLungeScript(world, actor, spell, inten
   });
 };
 
-// Bat Shriek — short confusion pulse plus nearby aggro wake-up.
+// Bat Shriek — piercing cry that alerts nearby same-faction monsters toward the player.
 REGISTRY["bat_shriek"] = function batShriekScript(world, actor, spell, _intent) {
   const apos = /** @type any */ (world.get(actor, Position));
   if (!apos) return;
   const actorFaction = String(world.get(actor, Faction)?.key || "").trim();
   const radius = Math.max(1, Number(spell?.radius || 4) | 0);
-  const confuseTurns = Math.max(1, Number(spell?.confuseTurns || 2) | 0);
 
   let playerPos = null;
   for (const [id, _player, p] of world.query(Player, Position)) {
@@ -1649,34 +1648,12 @@ REGISTRY["bat_shriek"] = function batShriekScript(world, actor, spell, _intent) 
   }
 
   /** @type {number[]} */
-  const affectedIds = [];
-  /** @type {number[]} */
   const alertedIds = [];
   for (const [id, pos, fac, vit] of world.query(Position, Faction, Vitality)) {
     if (id === actor) continue;
     if (!fac || !vit || (vit.hp | 0) <= 0) continue;
     const dist = Math.max(Math.abs((pos.x | 0) - (apos.x | 0)), Math.abs((pos.y | 0) - (apos.y | 0)));
     if (dist > radius) continue;
-
-    if (areFactionsHostile(actorFaction, String(fac.key || ""))) {
-      let ae = /** @type any */ (world.get(id, ActiveEffects));
-      if (!ae || !Array.isArray(ae.effects)) {
-        try { world.add(id, ActiveEffects, { effects: [] }); } catch {}
-        ae = /** @type any */ (world.get(id, ActiveEffects));
-      }
-      if (ae?.effects) {
-        upsertTimedEffect(ae.effects, {
-          key: "confused",
-          turnsLeft: confuseTurns,
-          potency: 1,
-          stacks: 1,
-          startedAtTurn: world.step,
-          sourceId: actor,
-        });
-        try { world.set(id, ActiveEffects, ae); } catch {}
-      }
-      affectedIds.push(id | 0);
-    }
 
     if (String(fac.key || "") === actorFaction) {
       const aggro = world.get(id, AggroState);
@@ -1696,7 +1673,7 @@ REGISTRY["bat_shriek"] = function batShriekScript(world, actor, spell, _intent) 
     actor,
     at: { x: apos.x | 0, y: apos.y | 0 },
     radius,
-    affectedIds,
+    affectedIds: [],
     alertedIds,
   });
 };
