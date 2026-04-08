@@ -2126,6 +2126,10 @@ export function installMessageWiring({
     const label = name ? bracketizeName(name) : `item ${itemId}`;
     log(`You unequip ${label}${slot ? ' (' + slot + ')' : ''}.`, 'system');
   });
+  world.on('item:welded', ({ actor, itemId, slot, name }) => {
+    const label = name ? bracketizeName(name) : `item ${itemId}`;
+    log(`You try to remove ${label}, but it is welded to you!`, 'danger');
+  });
 
   // === Urn events ===
   world.on('urn:broken', () => {

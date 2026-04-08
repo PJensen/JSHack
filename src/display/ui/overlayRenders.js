@@ -8,6 +8,7 @@ import {
   rarityStyle, formatMessageLine, getMessageColor,
   CHARACTER_SLOT_ORDER, renderItemDetails,
   UI, createChooserRow, createSimpleSel, installKeyHandler, installDetachableKeyHandler,
+  pulseRow,
 } from './overlayUtils.js';
 import { getInventoryDefaultAction, isInventoryItemEquippable, isInventoryItemUsable } from './inventoryUtils.js';
 import {
@@ -406,11 +407,16 @@ export function renderInventory(panel, items, ground, slotFilter = '', scrollOfI
    */
   function dispatchInventoryAction(it, actionKey) {
     if (!it) return;
+    const row = rows[sel];
+    const unpaid = !!it.unpaid;
+    const restoreBg = unpaid ? 'rgba(65, 35, 10, 0.75)' : (row === rows[sel] && row?.style.outline !== 'none') ? '#0b1323' : '#0f1421';
+
     if (actionKey === 'identify') {
       if (scrollOfIdentifyId > 0 && Number.isInteger(it.id) && it.id > 0) {
         window.dispatchEvent(new CustomEvent('ui:requestApply', {
           detail: { toolId: scrollOfIdentifyId, targetItemId: it.id },
         }));
+        pulseRow(row, 'use', restoreBg);
       }
       return;
     }
@@ -430,11 +436,13 @@ export function renderInventory(panel, items, ground, slotFilter = '', scrollOfI
     if (actionKey === 'equip') {
       if (isInventoryItemEquippable(it) && Number.isInteger(it.id) && it.id > 0) {
         window.dispatchEvent(new CustomEvent('ui:requestEquip', { detail: { itemId: it.id } }));
+        pulseRow(row, it.equipped ? 'unequip' : 'equip', restoreBg);
       }
       return;
     }
     if (actionKey === 'use') {
       if (!isInventoryItemUsable(it) || !Number.isInteger(it.id) || it.id <= 0) return;
+      pulseRow(row, 'use', restoreBg);
       if (it.type === 'potion') {
         window.dispatchEvent(new CustomEvent('ui:requestDrink', { detail: { itemId: it.id } }));
       } else {
@@ -447,11 +455,13 @@ export function renderInventory(panel, items, ground, slotFilter = '', scrollOfI
       const spellId = String(it.id || '').replace(/^spell:/, '');
       if (spellId) {
         window.dispatchEvent(new CustomEvent('ui:selectActiveSpell', { detail: { spellId } }));
+        pulseRow(row, 'equip', restoreBg);
       }
       return;
     }
     if (actionKey === 'throw') {
       if (Number.isInteger(it.id) && it.id > 0) {
+        pulseRow(row, 'throw', restoreBg);
         window.dispatchEvent(new CustomEvent('ui:requestThrow', { detail: { itemId: it.id } }));
         hide(panel);
       }
@@ -459,12 +469,14 @@ export function renderInventory(panel, items, ground, slotFilter = '', scrollOfI
     }
     if (actionKey === 'drop') {
       if (Number.isInteger(it.id) && it.id > 0) {
+        pulseRow(row, 'drop', restoreBg);
         window.dispatchEvent(new CustomEvent('ui:requestDrop', { detail: { itemId: it.id } }));
       }
       return;
     }
     if (actionKey === 'pin') {
       if (Number.isInteger(it.id) && it.id > 0) {
+        pulseRow(row, 'pin', restoreBg);
         window.dispatchEvent(new CustomEvent('ui:requestPinQuickItem', { detail: { item: it } }));
       }
     }
@@ -551,12 +563,13 @@ export function renderInventory(panel, items, ground, slotFilter = '', scrollOfI
     else if (k === 'End') { setSel(items.length - 1); e.preventDefault(); }
     else if (k === 'Enter' || e.code === 'NumpadEnter') { defaultAction(); e.preventDefault(); }
     else if (k === 'a' || k === 'A') { const it = items[sel]; if (it?.canApply && Number(it?.applyTargetCount || 0) > 0) { triggerApplyForTool(it); e.preventDefault(); } }
-    else if (k === ',' || e.code === 'Comma') { const it = items[sel]; if (it && Number.isInteger(it.id) && it.id > 0) { window.dispatchEvent(new CustomEvent('ui:requestDrop', { detail: { itemId: it.id } })); e.preventDefault(); } }
-    else if (k === 'e' || k === 'E') { const it = items[sel]; if (isInventoryItemEquippable(it)) { window.dispatchEvent(new CustomEvent('ui:requestEquip', { detail: { itemId: it.id } })); e.preventDefault(); } }
-    else if (k === 'd' || k === 'D') { const it = items[sel]; if (it?.type === 'potion') { window.dispatchEvent(new CustomEvent('ui:requestDrink', { detail: { itemId: it.id } })); e.preventDefault(); } }
+    else if (k === ',' || e.code === 'Comma') { const it = items[sel]; if (it && Number.isInteger(it.id) && it.id > 0) { pulseRow(rows[sel], 'drop'); window.dispatchEvent(new CustomEvent('ui:requestDrop', { detail: { itemId: it.id } })); e.preventDefault(); } }
+    else if (k === 'e' || k === 'E') { const it = items[sel]; if (isInventoryItemEquippable(it)) { pulseRow(rows[sel], it.equipped ? 'unequip' : 'equip'); window.dispatchEvent(new CustomEvent('ui:requestEquip', { detail: { itemId: it.id } })); e.preventDefault(); } }
+    else if (k === 'd' || k === 'D') { const it = items[sel]; if (it?.type === 'potion') { pulseRow(rows[sel], 'use'); window.dispatchEvent(new CustomEvent('ui:requestDrink', { detail: { itemId: it.id } })); e.preventDefault(); } }
     else if (k === 'u' || k === 'U') {
       const it = items[sel];
       if (isInventoryItemUsable(it)) {
+        pulseRow(rows[sel], 'use');
         if (it.type === 'potion') {
           window.dispatchEvent(new CustomEvent('ui:requestDrink', { detail: { itemId: it.id } }));
         } else {
@@ -570,13 +583,14 @@ export function renderInventory(panel, items, ground, slotFilter = '', scrollOfI
       const it = items[sel];
       const pinKey = quickPinKeyForItem(it);
       if (it && pinKey && !pinnedSet.has(pinKey)) {
+        pulseRow(rows[sel], 'pin');
         window.dispatchEvent(new CustomEvent('ui:requestPinQuickItem', { detail: { item: it } }));
         e.preventDefault();
       }
     }
     else if (k === 'Escape') { hide(panel); e.preventDefault(); }
-    else if (k === 't' || k === 'T') { const it = items[sel]; if (it && Number.isInteger(it.id) && it.id > 0) { window.dispatchEvent(new CustomEvent('ui:requestThrow', { detail: { itemId: it.id } })); hide(panel); e.preventDefault(); } }
-    else if (k === 's' || k === 'S') { const it = items[sel]; if (it?.type === 'spell') { const spellId = String(it.id || '').replace(/^spell:/, ''); if (spellId) { window.dispatchEvent(new CustomEvent('ui:selectActiveSpell', { detail: { spellId } })); e.preventDefault(); } } }
+    else if (k === 't' || k === 'T') { const it = items[sel]; if (it && Number.isInteger(it.id) && it.id > 0) { pulseRow(rows[sel], 'throw'); window.dispatchEvent(new CustomEvent('ui:requestThrow', { detail: { itemId: it.id } })); hide(panel); e.preventDefault(); } }
+    else if (k === 's' || k === 'S') { const it = items[sel]; if (it?.type === 'spell') { const spellId = String(it.id || '').replace(/^spell:/, ''); if (spellId) { pulseRow(rows[sel], 'equip'); window.dispatchEvent(new CustomEvent('ui:selectActiveSpell', { detail: { spellId } })); e.preventDefault(); } } }
     else if (k === 'p' || k === 'P') {
       const groundAction = resolveGroundPickupAction();
       if (groundAction) {
@@ -1794,6 +1808,7 @@ export function renderEquipment(panel, equippedBySlot, playerName, scrollOfIdent
       }
       if (row.slot !== 'brain' && Number.isInteger(row.item.id) && row.item.id > 0) {
         actions.appendChild(createActionButton('Unequip', () => {
+          pulseRow(rows[sel], 'unequip');
           window.dispatchEvent(new CustomEvent('ui:requestEquip', { detail: { itemId: row.item.id } }));
         }));
         if (row.item.identified === false) {
@@ -1852,6 +1867,7 @@ export function renderEquipment(panel, equippedBySlot, playerName, scrollOfIdent
         openSpellPicker();
         e.preventDefault();
       } else if (Number.isInteger(row?.item?.id) && row.item.id > 0) {
+        pulseRow(rows[sel], 'unequip');
         window.dispatchEvent(new CustomEvent('ui:requestEquip', { detail: { itemId: row.item.id } }));
         e.preventDefault();
       } else if (row && !row.blocked) {
@@ -2094,8 +2110,10 @@ export function renderAltarOfferChooser(panel, items, altarId) {
   });
 
   function offerSelected() {
-    const it = items[getSel()];
+    const i = getSel();
+    const it = items[i];
     if (!it) return;
+    pulseRow(rows[i], 'use');
     window.dispatchEvent(new CustomEvent('ui:requestAltarOffer', {
       detail: { altarId, itemId: it.id }
     }));
@@ -2297,7 +2315,9 @@ export function renderUseChooser(panel, items) {
   });
 
   function useSelected() {
-    const it = items[getSel()]; if (!it) return;
+    const i = getSel();
+    const it = items[i]; if (!it) return;
+    pulseRow(rows[i], 'use');
     if (it.type === 'potion') {
       window.dispatchEvent(new CustomEvent('ui:requestDrink', { detail: { itemId: it.id } }));
     } else {
@@ -2385,7 +2405,9 @@ export function renderThrowChooser(panel, items) {
   });
 
   function throwSelected() {
-    const it = items[getSel()]; if (!it) return;
+    const i = getSel();
+    const it = items[i]; if (!it) return;
+    pulseRow(rows[i], 'throw');
     window.dispatchEvent(new CustomEvent('ui:requestThrow', { detail: { itemId: it.id } }));
     hide(panel);
   }
@@ -2447,7 +2469,9 @@ export function renderApplyToolChooser(panel, tools, onSelect) {
 
   const { getSel, setSel } = createSimpleSel(rows, tools.length);
   function pickTool() {
-    const it = tools[getSel()]; if (!it) return;
+    const i = getSel();
+    const it = tools[i]; if (!it) return;
+    pulseRow(rows[i], 'use');
     onSelect(it.id);
   }
   setSel(0);
@@ -2516,7 +2540,9 @@ export function renderApplyTargetChooser(panel, targets, toolId, onSelect) {
 
   const { getSel, setSel } = createSimpleSel(rows, targets.length);
   function pickTarget() {
-    const it = targets[getSel()]; if (!it) return;
+    const i = getSel();
+    const it = targets[i]; if (!it) return;
+    pulseRow(rows[i], 'use');
     onSelect(it.id);
   }
   setSel(0);
@@ -2577,6 +2603,7 @@ export function renderSlotChooser(panel, opts) {
   function pick(i) {
     const slot = choices[i]?.slot;
     if (!slot) return;
+    pulseRow(rows[i], 'equip');
     hide(panel);
     window.dispatchEvent(new CustomEvent('ui:requestEquip', {
       detail: { itemId: opts.itemId, targetSlot: slot }
@@ -2742,6 +2769,7 @@ export function renderShop(panel, data, state) {
     function returnByIndex(idx) {
       const it = unpaidItems[idx];
       if (!it) return;
+      pulseRow(rows[idx], 'drop');
       for (const itemId of getUiItemEntityIds(it)) {
         window.dispatchEvent(new CustomEvent('ui:removeFromInvoice', {
           detail: { shopkeeperId: state.shopkeeperId, itemId }
@@ -2872,9 +2900,11 @@ export function renderShop(panel, data, state) {
         : '\u2191/\u2193 select \u00b7 Enter=Appraise \u00b7 Tab=Buy tab \u00b7 Esc=Close';
 
     function doTransaction() {
-      const it = currentItems[getSel()]; if (!it) return;
+      const i = getSel();
+      const it = currentItems[i]; if (!it) return;
       const ids = getUiItemEntityIds(it);
       if (!ids.length) return;
+      pulseRow(rows[i], activeTab === 'buy' ? 'use' : activeTab === 'sell' ? 'drop' : 'default');
       if (activeTab === 'buy') {
         for (const itemId of ids) {
           window.dispatchEvent(new CustomEvent('ui:requestBuy', {
@@ -3040,10 +3070,12 @@ export function renderChest(panel, data, state) {
       : '\u2191/\u2193 select \u00b7 Enter=Put \u00b7 Tab=Take tab \u00b7 Esc=Close';
 
     function doTransaction() {
-      const it = currentItems[getSel()]; if (!it) return;
+      const idx = getSel();
+      const it = currentItems[idx]; if (!it) return;
       const chestId = Number(state.chestId || 0) | 0;
       const itemId = Number(it.id || 0) | 0;
       if (!(chestId > 0) || !(itemId > 0)) return;
+      pulseRow(rows[idx], activeTab === 'take' ? 'use' : 'drop');
       if (activeTab === 'take') {
         window.dispatchEvent(new CustomEvent('ui:requestChestTake', {
           detail: { chestId, itemId }
@@ -3334,10 +3366,12 @@ export function renderRack(panel, data, state) {
   hint.textContent = '\u2191/\u2193 select \u00b7 Enter=Take \u00b7 Esc=Close';
 
   function doTake() {
-    const it = rackItems[getSel()]; if (!it) return;
+    const i = getSel();
+    const it = rackItems[i]; if (!it) return;
     const rackId = Number(state.rackId || 0) | 0;
     const itemId = Number(it.id || 0) | 0;
     if (!(rackId > 0) || !(itemId > 0)) return;
+    pulseRow(rows[i], 'equip');
     window.dispatchEvent(new CustomEvent('ui:requestRackTake', { detail: { rackId, itemId } }));
   }
 
