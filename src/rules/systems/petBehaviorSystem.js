@@ -644,6 +644,34 @@ function behaviorFollowing(world, petId, petPos, playerPos, playerId) {
     deliverItemsToPlayer(world, petId, playerId, playerPos);
   }
 
+  // Try ability hooks on nearby enemies while following
+  const petFaction = world.get(petId, Faction)?.key || "";
+  const isBlocked = blockedCallback(buildBlocksVisionMap(world));
+  const visible = computeFOV(petPos.x | 0, petPos.y | 0, PET_ABILITY_SIGHT_RANGE, isBlocked);
+
+  let closestEnemy = 0;
+  let closestDist = PET_ABILITY_SIGHT_RANGE + 1;
+  let closestHasLOS = false;
+
+  for (const [enemyId, fac, enemyPos, evit] of queryFactionActors(world)) {
+    if (!evit || (evit.hp | 0) <= 0) continue;
+    if (!areFactionsHostile(petFaction, fac?.key)) continue;
+
+    const edist = manhattanScalar(enemyPos.x, enemyPos.y, petPos.x, petPos.y);
+    if (edist < closestDist) {
+      closestEnemy = enemyId;
+      closestDist = edist;
+      closestHasLOS = visible.has(`${enemyPos.x | 0},${enemyPos.y | 0}`);
+    }
+  }
+
+  if (closestEnemy && closestHasLOS) {
+    const enemyPos = world.get(closestEnemy, Position);
+    if (enemyPos && tryPetAbilityHooks(world, petId, petPos, closestEnemy, enemyPos)) {
+      return; // ability consumed the turn
+    }
+  }
+
   // Already close enough - stay put
   if (dist <= FOLLOW_DISTANCE) return;
 
