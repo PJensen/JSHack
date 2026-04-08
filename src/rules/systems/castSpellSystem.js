@@ -16,6 +16,7 @@ import { isTargetHiddenByInvisibility } from "../utils/spellTargeting.js";
 import { getChannelInterruptionReason } from "../utils/channelInterruptionPolicy.js";
 import { hasEquippedProcPackageInSlot } from "../utils/spellProcGear.js";
 import { emitSafe } from "../utils/emitSafe.js";
+import { ensureActiveEffects } from "../utils/effects.js";
 import { Vitality } from "../components/Vitality.js";
 import { Devotion } from "../components/Devotion.js";
 import { effectiveMaxHp } from "../utils/passiveBonuses.js";
@@ -62,14 +63,6 @@ function normalizedLearnedSpellIds(brain) {
     out.push(id);
   }
   return out;
-}
-
-function ensureActiveEffects(world, actorId) {
-  let ae = world.get(actorId, ActiveEffects);
-  if (ae && Array.isArray(ae.effects)) return ae;
-  try { world.add(actorId, ActiveEffects, { effects: [] }); } catch {}
-  ae = world.get(actorId, ActiveEffects);
-  return (ae && Array.isArray(ae.effects)) ? ae : null;
 }
 
 function readEchoGrimoireState(world, actorId) {

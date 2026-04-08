@@ -45,6 +45,7 @@ import { getMonster } from "../data/monsters.js";
 import { SeenCallbackContext } from "../data/callbacks/ai.js";
 import { runCallbackList } from "../interaction/dispatch.js";
 import { canActThisTurn as speedGateCheck } from "../utils/speedGate.js";
+import { computeProjectileDelay } from "../utils/projectileKinematics.js";
 
 const AGGRESSIVE_RADIUS = 8;
 const PET_CORPSE_HEAL_THRESHOLD = 0.75;
@@ -373,18 +374,6 @@ function addActiveEffect(world, entityId, effect) {
 function isFamiliar(world, petId) {
   const ni = world.get(petId, NamedIdentity);
   return String(ni?.identity || "").toLowerCase() === "familiar";
-}
-
-function computeProjectileDelay(from, to, speed, minDuration, maxDuration) {
-  const dx = Number(to?.x || 0) - Number(from?.x || 0);
-  const dy = Number(to?.y || 0) - Number(from?.y || 0);
-  const dist = Math.hypot(dx, dy);
-  if (!(dist > 0) || !(speed > 0)) return Number(minDuration) || 0;
-  const raw = dist / speed;
-  return Math.max(
-    Number(minDuration) || 0,
-    Math.min(Number(maxDuration) || raw, raw),
-  );
 }
 
 /**

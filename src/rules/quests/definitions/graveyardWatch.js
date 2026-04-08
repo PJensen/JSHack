@@ -8,6 +8,7 @@ import { Player } from "../../components/Player.js";
 import { Position } from "../../components/Position.js";
 import { emitSafe } from "../../utils/emitSafe.js";
 import { consumeInventoryIdentity, inventoryHasIdentity } from "../../utils/townEconomy.js";
+import { attachEntityToCurrentFloor } from "../../utils/floorEntities.js";
 import { emit, setVar } from "../actions.js";
 import { registerQuest } from "../registry.js";
 import { STARTER_PRIEST_FETCH_QUEST_ID, getQuestRecord } from "../runtime.js";
@@ -50,15 +51,6 @@ function findBookEntity(world) {
   return 0;
 }
 
-function attachToCurrentFloor(world, entityId) {
-  if (!(entityId > 0)) return;
-  for (const [, ds] of world.query(DungeonState)) {
-    if (!Array.isArray(ds?.floorEntityIds)) break;
-    if (!ds.floorEntityIds.includes(entityId)) ds.floorEntityIds.push(entityId);
-    break;
-  }
-}
-
 function firstPlayerId(world) {
   for (const [id] of world.query(Player)) return id;
   return 0;
@@ -83,7 +75,7 @@ export function ensureStarterFetchQuestItem(world) {
 
   const itemId = buildCatalogItem(world, STARTER_FETCH_ITEM_ID, { count: 1 });
   world.add(itemId, Position, at);
-  attachToCurrentFloor(world, itemId);
+  attachEntityToCurrentFloor(world, itemId);
   return itemId;
 }
 

@@ -1,39 +1,9 @@
 // rules/environment/dungeon/tables.js
 // Loot tables and monster pools for depth-scaled entity placement.
 
-import { getMonster, getMonstersByTier, isGenocided, resolveMonsterMaxHp } from '../../data/monsters.js';
+import { getMonster, getMonstersByTier, isGenocided } from '../../data/monsters.js';
 import { resolveLootTable } from '../../data/lootResolver.js';
-import { creatureTypeFromTags } from '../../components/CreatureType.js';
-
-/**
- * Convert a monster definition into spawn-time params.
- * @param {import('../../data/monsters.js').MonsterDef} def
- * @param {number} depth
- */
-function toMonsterSpawnParams(def, depth) {
-  return {
-    name: def.name,
-    identity: def.id,
-    maxHp: resolveMonsterMaxHp(def, depth),
-    faction: 'enemy',
-    accuracyDerived: def.attack,
-    damagePowerDerived: def.attack,
-    evadeDerived: def.defense,
-    naturalDamageDice: def.damageDice,
-    sizeClass: def.sizeClass,
-    massKg: def.massKg,
-    resistances: def.resistances,
-    speed: def.speed,
-    equipment: def.equipment || null,
-    wielding: Array.isArray(def.wielding) ? [...def.wielding] : [],
-    equipped: Array.isArray(def.equipped) ? [...def.equipped] : [],
-    inventory: Array.isArray(def.inventory) ? [...def.inventory] : [],
-    learnedSpellIds: Array.isArray(def.learnedSpellIds) ? [...def.learnedSpellIds] : [],
-    maxMana: Number.isFinite(def.maxMana) ? Number(def.maxMana) : 0,
-    manaRegen: Number.isFinite(def.manaRegen) ? Number(def.manaRegen) : 0,
-    creatureType: creatureTypeFromTags(def.tags || []),
-  };
-}
+import { toMonsterSpawnParams } from '../../utils/monsterSpawnParams.js';
 
 /**
  * Pick monster parameters based on depth.

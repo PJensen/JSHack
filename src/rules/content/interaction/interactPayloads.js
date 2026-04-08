@@ -88,6 +88,7 @@ import { ensureActiveEffects } from "../../utils/effects.js";
 import { upsertTimedEffect } from "../../utils/effectSemantics.js";
 import { spawnMonsterEntity } from "../../utils/spawnMonsterEntity.js";
 import { findNearestValidTileAround } from "../../utils/queries.js";
+import { isEntityOnCurrentFloor } from "../../utils/floorEntities.js";
 
 // Maps catalog item IDs → archetypes for harvest yield entity creation.
 const CATALOG_ARCHETYPES = {
@@ -110,14 +111,6 @@ const CATALOG_ARCHETYPES = {
 const HARVEST_SEED_SALT = 0x48415256;
 const SEED_DROP_SALT = 0x5345ED01;
 
-function isEntityOnCurrentFloor(world, entityId) {
-  const id = Number(entityId || 0) | 0;
-  if (!(id > 0) || !world.isAlive(id)) return false;
-  for (const [, ds] of world.query(DungeonState)) {
-    return Array.isArray(ds?.floorEntityIds) && ds.floorEntityIds.includes(id);
-  }
-  return false;
-}
 const SEED_ITEM_IDS = Object.freeze({
   wheat: "seed_wheat",
   carrot: "seed_carrot",

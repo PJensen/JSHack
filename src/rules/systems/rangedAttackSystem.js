@@ -38,6 +38,7 @@ import { getEntityFacingConeDegrees, getNormalizedEntityFacing, isPointInFacingC
 import { getPositionalAttackBonus } from '../utils/combatPositioning.js';
 import { setCombatPosture } from '../utils/posture.js';
 import { chebyshevScalar } from '../utils/distance.js';
+import { computeImpactVectorXY, computeProjectileDelay } from '../utils/projectileKinematics.js';
 
 const RANGED_PROJECTILE_SPEED = 18;
 const RANGED_PROJECTILE_MIN_DURATION = 0.06;
@@ -45,23 +46,6 @@ const RANGED_PROJECTILE_MAX_DURATION = 0.4;
 const EMBEDDED_ARROW_RECOVERY_CHANCE = 0.22;
 const BLUNT_ARROW_SPEED_MULT = 0.9;
 const PIERCING_ARROW_SPEED_MULT = 1.1;
-
-function computeProjectileDelay(from, to, speed, minDuration, maxDuration) {
-  const dx = Number(to?.x || 0) - Number(from?.x || 0);
-  const dy = Number(to?.y || 0) - Number(from?.y || 0);
-  const dist = Math.hypot(dx, dy);
-  if (!(dist > 0) || !(speed > 0)) return Number(minDuration) || 0;
-  const raw = dist / speed;
-  return Math.max(Number(minDuration) || 0, Math.min(Number(maxDuration) || raw, raw));
-}
-
-function computeImpactVector(fromX, fromY, toX, toY) {
-  const dx = Number(toX || 0) - Number(fromX || 0);
-  const dy = Number(toY || 0) - Number(fromY || 0);
-  const dist = Math.hypot(dx, dy);
-  if (!(dist > 0)) return { dx: 0, dy: 1 };
-  return { dx: dx / dist, dy: dy / dist };
-}
 
 /** @param {import('../../lib/ecs-js/index.js').World} world */
 export function rangedAttackSystem(world) {
@@ -361,7 +345,7 @@ export function rangedAttackSystem(world) {
         RANGED_PROJECTILE_MIN_DURATION,
         RANGED_PROJECTILE_MAX_DURATION,
       ),
-      impactVector: computeImpactVector(ax, ay, tx, ty),
+      impactVector: computeImpactVectorXY(ax, ay, tx, ty),
       projectileKind: 'arrow',
     });
     if (actorImpactCtx) {

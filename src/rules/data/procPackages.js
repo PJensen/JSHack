@@ -9,6 +9,7 @@ import { ProcPackageNode } from "../components/ProcPackageNode.js";
 import { Vitality } from "../components/Vitality.js";
 import { isOpaque } from "../environment/dungeon/tileMap.js";
 import { registerScript, getScriptHandlers, ScriptVerb } from "../scripting.js";
+import { ensureActiveEffects } from "../utils/effects.js";
 import { upsertTimedEffect } from "../utils/effectSemantics.js";
 import { areFactionsHostile } from "../utils/factionHostility.js";
 import { chebyshevScalar } from "../utils/distance.js";
@@ -43,17 +44,6 @@ export const PROC_PACKAGE_KEYS = Object.freeze({
   ConductionLens: "procPackage:conductionLens",
   EchoGrimoire: "procPackage:echoGrimoire",
 });
-
-function ensureActiveEffects(world, entityId) {
-  let activeEffects = world.get(entityId, ActiveEffects);
-  if (activeEffects && Array.isArray(activeEffects.effects)) return activeEffects;
-  try {
-    world.add(entityId, ActiveEffects, { effects: [] });
-  } catch {
-    activeEffects = world.get(entityId, ActiveEffects);
-  }
-  return world.get(entityId, ActiveEffects) || null;
-}
 
 function getEffect(world, entityId, key) {
   const activeEffects = world.get(entityId, ActiveEffects);

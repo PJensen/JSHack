@@ -1,7 +1,6 @@
 import { NamedIdentity } from "../components/NamedIdentity.js";
-import { DungeonState } from "../components/DungeonState.js";
-import { Player } from "../components/Player.js";
 import { getDialog } from "./registry.js";
+import { isEntityOnCurrentFloor } from "../utils/floorEntities.js";
 
 const DIALOG_RUNTIME_KEY = Symbol.for("jshack:dialog:runtime:installed");
 const DIALOG_SESSIONS_KEY = Symbol.for("jshack:dialog:sessions");
@@ -21,19 +20,6 @@ function nextSessionId(world) {
 function speakerName(world, targetId) {
   const ni = world.get(targetId, NamedIdentity);
   return String(ni?.name || "Someone");
-}
-
-function isEntityOnCurrentFloor(world, entityId) {
-  const id = Number(entityId || 0) | 0;
-  if (!(id > 0) || !world.isAlive(id)) return false;
-  if (world.has(id, Player)) return true;
-  let sawDungeonState = false;
-  for (const [, ds] of world.query(DungeonState)) {
-    sawDungeonState = true;
-    if (!Array.isArray(ds?.floorEntityIds)) return false;
-    return ds.floorEntityIds.includes(id);
-  }
-  return !sawDungeonState;
 }
 
 function buildContext(world, session, choice = null) {
@@ -134,8 +120,9 @@ function openDialog(world, payload) {
 
   const actorId = Number(payload?.actorId || 0) | 0;
   const targetId = Number(payload?.targetId || 0) | 0;
-  if (actorId > 0 && !isEntityOnCurrentFloor(world, actorId)) return;
-  if (!isEntityOnCurrentFloor(world, targetId)) return;
+  const floorOpts = { treatPlayerAsOnFloor: true, fallbackWhenNoDungeonState: true };
+  if (actorId > 0 && !isEntityOnCurrentFloor(world, actorId, floorOpts)) return;
+  if (!isEntityOnCurrentFloor(world, targetId, floorOpts)) return;
 
   // Only one live session per actor. Re-opening the same NPC should refresh state;
   // opening a different NPC should replace the older conversation cleanly.
@@ -165,7 +152,7 @@ function chooseDialog(world, payload) {
   if (!(sessionId > 0)) return;
   const session = getSessions(world).get(sessionId);
   if (!session) return;
-  if (!isEntityOnCurrentFloor(world, session.targetId)) {
+  if (!isEntityOnCurrentFloor(world, session.targetId, { treatPlayerAsOnFloor: true, fallbackWhenNoDungeonState: true })) {
     closeDialog(world, sessionId, "off_floor");
     return;
   }

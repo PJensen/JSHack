@@ -1,7 +1,7 @@
 import { HazardArea } from "../components/HazardArea.js";
-import { DungeonState } from "../components/DungeonState.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Position } from "../components/Position.js";
+import { attachEntityToCurrentFloor } from "./floorEntities.js";
 
 const DEFAULT_TURNS = 3;
 const DEFAULT_RADIUS = 1;
@@ -30,15 +30,6 @@ function titleCase(text) {
  * @param {import('../../lib/ecs-js/index.js').World} world
  * @param {number} entityId
  */
-function attachToCurrentFloor(world, entityId) {
-  if (!(entityId > 0)) return;
-  for (const [, ds] of world.query(DungeonState)) {
-    if (!ds || !Array.isArray(ds.floorEntityIds)) break;
-    if (!ds.floorEntityIds.includes(entityId)) ds.floorEntityIds.push(entityId);
-    break;
-  }
-}
-
 /**
  * Generic hazard spawner for air/floor AoE entities.
  * @param {import('../../lib/ecs-js/index.js').World} world
@@ -99,7 +90,7 @@ export function spawnHazard(world, params) {
     meta,
   });
   try { world.add(hazardId, NamedIdentity, { name, identity }); } catch { /* */ }
-  attachToCurrentFloor(world, hazardId);
+  attachEntityToCurrentFloor(world, hazardId);
 
   try {
     world.emit?.("hazard:spawned", {
