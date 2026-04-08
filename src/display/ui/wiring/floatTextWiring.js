@@ -1195,6 +1195,17 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     });
   });
 
+  world.on('combat:sunblind', ({ defender }) => {
+    const pos = getPosition(Number(defender || 0));
+    if (!pos || !canShowAt(pos.x, pos.y)) return;
+    ftext.addStatus(pos.x, pos.y - 0.45, 'BLINDED!', {
+      color: '#ffffff',
+      life: 1.2,
+      scaleStart: 1.6,
+      scaleEnd: 1.0,
+    });
+  });
+
   world.on('combat:blessed_strike', ({ defender }) => {
     const pos = getPosition(Number(defender || 0));
     if (!pos || !canShowAt(pos.x, pos.y)) return;
