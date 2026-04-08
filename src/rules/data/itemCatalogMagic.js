@@ -2444,12 +2444,48 @@ export const MAGIC_ITEMS = {
         ctx.io.emit("potion:blindness", { actor });
         return { consumed: true };
       },
-      on_throw: createPotionSplashThrowHook({
-        effectKey: "blinded",
-        duration: 10,
-        potency: 1,
-        sourceKind: "potion_blindness",
-      }),
+      on_throw: (ctx, state) => {
+        const actorId = Number(state?.actor || ctx.actor || 0) | 0;
+        const itemId = Number(state?.itemId || ctx.primary || 0) | 0;
+        const throwSpec = (state?.throw && typeof state.throw === "object") ? state.throw : null;
+        const fallback = ctx.helpers.adjacentPoint(actorId);
+        const at = {
+          x: Number.isFinite(Number(throwSpec?.to?.x)) ? (Number(throwSpec.to.x) | 0) : (fallback.x | 0),
+          y: Number.isFinite(Number(throwSpec?.to?.y)) ? (Number(throwSpec.to.y) | 0) : (fallback.y | 0),
+        };
+        const hitIds = ctx.query.livingAt(at.x, at.y, {});
+        for (const hitId of (Array.isArray(hitIds) ? hitIds : [])) {
+          const duration = 10;
+          ctx.helpers.addEffect(hitId, {
+            key: "blinded",
+            potency: 1,
+            turnsLeft: duration,
+            onsetLeft: 0,
+            peakLeft: 0,
+            stack: "refresh",
+            maxStacks: 1,
+            sourceId: itemId,
+            meta: { source: "potion_blindness", delivery: "splash" },
+          });
+          const startValue = Number(ctx.query.effectiveVisionRange(hitId) || 0);
+          ctx.mutate.pushEffect(hitId, {
+            key: "stat_envelope",
+            stat: "visionRange",
+            turnsLeft: duration,
+            potency: 1,
+            startValue,
+            toValue: 0,
+            endValue: startValue,
+            rampIn: 0,
+            hold: duration,
+            rampOut: 0,
+            sourceId: itemId,
+            stack: "refresh",
+          });
+        }
+        ctx.io.emit("potion:splash", { at, actorId, sourceKind: "potion_blindness" });
+        return { consumed: true };
+      },
     },
   },
   potion_weakness: {
