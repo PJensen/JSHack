@@ -1672,7 +1672,7 @@ export const MONSTERS = [
     damageDice: '1d2',
     sizeClass: 'M',
     massKg: 30,
-    resistances: { kinetic: { DR: 0 }, chemical: { toxMult: 0 } },
+    resistances: { kinetic: { DR: 0 }, chemical: { toxMult: 0 }, thermal: { burnMult: 3.0 } },
     speed: 1,          // very slow (actEvery = 3)
     learnedSpellIds: ['shrieker_scream'],
     hooks: {
@@ -1735,7 +1735,7 @@ export const MONSTERS = [
     damageDice: '1d2',
     sizeClass: 'M',
     massKg: 5,
-    resistances: { kinetic: { DR: 0 } },
+    resistances: { kinetic: { DR: 0 }, thermal: { burnMult: 3.0 } },
     speed: 1,          // very slow drifter
     hooks: {
       onDeath: [gasSporeExplodeOnDeath({ turnsLeft: 3, tickDamage: 6, radius: 2 })],
@@ -1760,7 +1760,7 @@ export const MONSTERS = [
     damageDice: '1d2',
     sizeClass: 'XS',
     massKg: 5,
-    resistances: { kinetic: { DR: 0 }, chemical: { toxMult: 0.5 } },
+    resistances: { kinetic: { DR: 0 }, chemical: { toxMult: 0.5 }, thermal: { burnMult: 3.0 } },
     speed: 1,          // very slow (actEvery = 3)
     hooks: null,
     specials: [],

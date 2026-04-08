@@ -1215,6 +1215,15 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     });
   });
 
+  world.on('combat:torch_ignite', ({ defender }) => {
+    const pos = getPosition(Number(defender || 0));
+    if (!pos || !canShowAt(pos.x, pos.y)) return;
+    ftext.addStatus(pos.x, pos.y - 0.3, 'IGNITE!', {
+      color: '#ff6600',
+      life: 1.0,
+    });
+  });
+
   world.on('spell:heal:undead', ({ targetId, at }) => {
     const pos = at || getPosition(Number(targetId || 0));
     if (!pos || !canShowAt(pos.x, pos.y)) return;

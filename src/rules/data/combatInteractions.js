@@ -18,6 +18,9 @@ import { ActiveEffects } from "../components/ActiveEffects.js";
 import { emitSafe } from "../utils/emitSafe.js";
 import { blind } from "../utils/blind.js";
 import { statusStrength } from "../utils/statusFacade.js";
+import { upsertTimedEffect } from "../utils/effectSemantics.js";
+import { ensureActiveEffects } from "../utils/effects.js";
+import { combatSeed, mulberry32 } from "../utils/rng.js";
 
 // ── Rule definitions ─────────────────────────────────────────────────
 
@@ -139,6 +142,30 @@ export const COMBAT_INTERACTION_RULES = [
         attacker: ctx.attacker, defender: ctx.defender,
         damageType: "pierce", mult: 1.5,
       });
+    },
+  },
+
+  // Torch hit: +2 fire damage, 35% chance to apply burning (3 turns)
+  {
+    id: "torch_ignite",
+    phase: "hit",
+    gate(world, ctx) {
+      if (!(ctx.weaponId > 0)) return false;
+      const info = world.get(ctx.weaponId, ItemInfo);
+      return info?.id === "torch";
+    },
+    apply(world, ctx) {
+      const seed = combatSeed(world.seed, world.step, ctx.attacker, ctx.defender, 0x70FC4);
+      const roll = mulberry32(seed)();
+      if (roll < 0.35) {
+        const ae = ensureActiveEffects(world, ctx.defender);
+        if (ae) {
+          upsertTimedEffect(ae.effects, { key: "burn", turnsLeft: 3, potency: 1, stacks: 1 });
+          emitSafe(world, "combat:torch_ignite", {
+            attacker: ctx.attacker, defender: ctx.defender, weaponId: ctx.weaponId,
+          });
+        }
+      }
     },
   },
 

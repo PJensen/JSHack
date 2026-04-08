@@ -2379,6 +2379,11 @@ export function installMessageWiring({
     }
   });
 
+  // Torch ignites enemy
+  world.on('combat:torch_ignite', () => {
+    log('Your torch sets the enemy ablaze!', 'system');
+  });
+
   // Heal damages undead
   world.on('spell:heal:undead', () => {
     log('Healing energy sears through the undead!', 'system');

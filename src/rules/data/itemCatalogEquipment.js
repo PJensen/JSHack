@@ -1022,7 +1022,10 @@ export const EQUIPMENT_ITEMS = {
     rarityName: "common",
     weight: 1,
     value: 2,
-    bonuses: {},
+    damageDice: "1d3",
+    damageType: "blunt",
+    staminaCost: 6,
+    bonuses: { visionRange: 2 },
     description: "A burning torch with a steady flame. It does not seem likely to run out any time soon.",
     hooks: {
       on_throw: createTorchThrowHook({
