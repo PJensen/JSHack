@@ -366,6 +366,11 @@ function projectDisplayTags(world, id, rec) {
 		}
 	}
 
+	// Entities with effective visionRange 0 are blinded regardless of source
+	if (getEffectiveVisionRange(world, id) <= 0 && !rec.tags.includes('blinded')) {
+		rec.tags.push('blinded');
+	}
+
 	/** @type {any} */ const ae = /** @type any */ (world.get(id, ActiveEffects));
 	if (!ae || !Array.isArray(ae.effects)) return;
 	for (let i = 0; i < ae.effects.length; i++) {
