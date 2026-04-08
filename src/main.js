@@ -1566,7 +1566,8 @@ addEventListener('keydown', (ev) => {
       targeting.index = (targeting.index + 1) % targeting.enemies.length;
     }
     const enemy = targeting.enemies[targeting.index];
-    _targetCursor = { x: enemy.x, y: enemy.y };
+    const _livePos = world.get(enemy.id, Position);
+    _targetCursor = _livePos ? { x: _livePos.x | 0, y: _livePos.y | 0 } : { x: enemy.x, y: enemy.y };
     return;
   }
 
@@ -2083,7 +2084,7 @@ world.on('sunsword:ray', ({ actor, itemId, cooldownTurns }) => {
       } else {
         try { world.add(enemyId, ActiveEffects, { effects: [blindEffect] }); } catch {}
       }
-      blind(world, enemyId, 0, 0, 5, 0);
+      blind(world, enemyId, 0, 0, 5, 0, 0);
       const ni = world.get(enemyId, NamedIdentity);
       const name = ni?.name || 'creature';
       const resolvedItemId = Number(itemId || 0) | 0;
