@@ -5703,29 +5703,38 @@ function drawBlindEye(ctx, e, fxTime, scale = 1) {
 }
 
 /**
- * Draw orbiting ❓ marks above confused entities.
+ * Draw ? marks bubbling up from a confused entity's head — spawn staggered,
+ * drift upward with a lazy wobble, grow then fade out.
  * @param {CanvasRenderingContext2D} ctx
  * @param {{ id:number, pos:{x:number,y:number} }} e
  * @param {number} fxTime
  */
 function drawConfusedMark(ctx, e, fxTime, scale = 1) {
   const cx = e.pos.x;
-  const cy = e.pos.y - 0.52 * scale;
+  const headY = e.pos.y - 0.45 * scale;
 
   ctx.save();
   ctx.globalCompositeOperation = 'source-over';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.font = `${0.22 * scale}px sans-serif`;
 
-  for (let j = 0; j < 3; j++) {
-    const ang = _fxTime * 1.8 + (j / 3) * Math.PI * 2;
-    const sx = cx + Math.cos(ang) * 0.32 * scale;
-    const sy = cy + Math.sin(ang) * 0.12 * scale;
-    const pulse = 0.7 + 0.3 * Math.sin(_fxTime * 3.0 + j * 2.1);
-    ctx.globalAlpha = 0.9 * pulse;
-    ctx.fillStyle = '#f0c030';
-    ctx.fillText('?', sx, sy);
+  const COUNT = 4;
+  const CYCLE = 2.4;
+  for (let j = 0; j < COUNT; j++) {
+    const phase = (fxTime + j * (CYCLE / COUNT)) % CYCLE;
+    const t = phase / CYCLE; // 0→1 over lifetime
+    // Rise from head
+    const rise = t * 0.65 * scale;
+    // Wobble side to side
+    const wobble = Math.sin(t * Math.PI * 3 + j * 1.7) * 0.15 * scale;
+    // Grow in, then shrink out
+    const sz = t < 0.15 ? (t / 0.15) : t > 0.75 ? (1 - t) / 0.25 : 1.0;
+    const alpha = t < 0.1 ? (t / 0.1) : t > 0.6 ? Math.max(0, (1 - t) / 0.4) : 0.85;
+
+    ctx.globalAlpha = alpha;
+    ctx.font = `${(0.2 + sz * 0.08) * scale}px sans-serif`;
+    ctx.fillStyle = j % 2 === 0 ? '#f0c030' : '#ffe680';
+    ctx.fillText('?', cx + wobble, headY - rise);
   }
 
   ctx.restore();
