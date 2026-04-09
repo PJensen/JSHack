@@ -1738,9 +1738,9 @@ export const MONSTERS = [
     resistances: { kinetic: { DR: 0 }, thermal: { burnMult: 3.0 } },
     speed: 1,          // very slow drifter
     hooks: {
-      onDeath: [gasSporeExplodeOnDeath({ turnsLeft: 3, tickDamage: 6, radius: 2 })],
+      onDeath: [gasSporeExplodeOnDeath({ turnsLeft: 10, tickDamage: 6, radius: 2 })],
     },
-    specials: ["Ruptures on death into volatile spore gas (radius 2)", "Fragile"],
+    specials: ["Ruptures on death into lingering volatile gas (radius 2, 10 turns)", "Fragile"],
     description: 'A bloated, pulsing sphere that drifts in silence. It looks just like a floating eye — until you pop it.',
   },
   // ── Lichen (tier 0) — sessile food source ────────────────────────────

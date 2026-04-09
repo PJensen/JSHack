@@ -124,10 +124,13 @@ Deno.test("equipped torch ignites explosive gas cloud", () => {
   hazardSystem(world);
 
   const atCell = [];
+  let fireTurns = 0;
   for (const [, pos, hazard] of world.query(Position, HazardArea)) {
     if ((pos.x | 0) !== 8 || (pos.y | 0) !== 8) continue;
     atCell.push(String(hazard.kind || ""));
+    if (String(hazard.kind || "") === "fire") fireTurns = Number(hazard.turnsLeft || 0) | 0;
   }
   assert(!atCell.includes("gas"), "gas should ignite when torch carrier is inside cloud");
   assert(atCell.includes("fire"), "ignition should leave fire hazard at the cloud origin");
+  assertEquals(fireTurns, 4, "explosive gas ignition should preserve area-denial duration");
 });
