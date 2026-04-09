@@ -1,0 +1,650 @@
+import {
+  appendCharacterMenuTabs, markScrollable,
+  decorateButton, humanize, sanitize, bracketize,
+  show, hide, hideItemTooltip, rarityStyle, renderItemDetails,
+  CHARACTER_SLOT_ORDER, installDetachableKeyHandler, pulseRow,
+} from './overlayUtils.js';
+
+/**
+ * @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel
+ * @param {{ playerName?: string, stats?: Record<string, any>, activeEffects?: Array<any> }} data
+ */
+export function renderCharacterSheet(panel, data) {
+  const SEASON_COLORS = {
+    spring: '#7ec87a',
+    summer: '#f0c95a',
+    autumn: '#d4834a',
+    winter: '#8ab4d6',
+  };
+  const existingDetach = /** @type {any} */ (panel)._characterSheetDetach;
+  if (typeof existingDetach === 'function') {
+    try { existingDetach(); } catch (e) { console.debug('[overlay] character sheet detach failed:', e); }
+  }
+
+  const el = /** @type {HTMLDivElement} */ (/** @type {any} */ (panel)._inner);
+  el.innerHTML = '';
+  el.style.overflowX = 'hidden';
+  appendCharacterMenuTabs(el, 'character');
+
+  const playerName = String(data?.playerName || 'Hero').trim() || 'Hero';
+  const stats = data?.stats && typeof data.stats === 'object' ? data.stats : {};
+  const activeEffects = Array.isArray(data?.activeEffects) ? data.activeEffects : [];
+  const traits = Array.isArray(data?.traits) ? data.traits : [];
+  const calendar = data?.calendar && typeof data.calendar === 'object' ? data.calendar : null;
+
+  const title = document.createElement('div');
+  title.textContent = `${playerName} \u00b7 Character Sheet`;
+  title.style.fontWeight = 'bold';
+  title.style.marginBottom = '8px';
+  el.appendChild(title);
+
+  if (calendar?.formatted) {
+    const calendarCard = document.createElement('div');
+    Object.assign(calendarCard.style, {
+      marginBottom: '10px',
+      padding: '8px 10px',
+      border: '1px solid #2d3b52',
+      borderRadius: '6px',
+      background: '#0a111f',
+      fontSize: '13px',
+      lineHeight: '1.4',
+      color: SEASON_COLORS[String(calendar?.season || '')] || '#cfe8ff',
+      wordBreak: 'break-word',
+    });
+    const moonEmoji = String(calendar?.moonEmoji || '');
+    const moonLabel = String(calendar?.moonLabel || '');
+    calendarCard.textContent = `${moonEmoji ? `${moonEmoji} ` : ''}${String(calendar.formatted)}${moonLabel ? ` \u00b7 ${moonLabel}` : ''}`;
+    el.appendChild(calendarCard);
+  }
+
+  const statCard = document.createElement('div');
+  Object.assign(statCard.style, {
+    padding: '8px',
+    border: '1px solid #2d3b52',
+    borderRadius: '6px',
+    background: '#0a111f',
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+    gap: '6px 12px',
+    fontSize: '13px',
+  });
+  el.appendChild(statCard);
+
+  function deltaColor(value, baseline = 0) {
+    const n = Number(value || 0);
+    if (n > baseline) return '#64c87a';
+    if (n < baseline) return '#e06a6a';
+    return null;
+  }
+
+  // [label, value, color|null]  — null = default text color
+  const statRows = [
+    ['Strength', `${Number(stats.strength || 0)}`, deltaColor(stats.strength)],
+    ['Dexterity', `${Number(stats.dexterity || 0)}`, deltaColor(stats.dexterity)],
+    ['Intelligence', `${Number(stats.intelligence || 0)}`, deltaColor(stats.intelligence)],
+    ['Vitality', `${Number(stats.vitalityStat || 0)}`, deltaColor(stats.vitalityStat)],
+    ['HP', `${Number(stats.hp || 0)}/${Number(stats.maxHp || 0)}`],
+    ['Mana', `${Number(stats.mana || 0)}/${Number(stats.maxMana || 0)}`],
+    ['Stamina', `${Number(stats.stamina || 0)}/${Number(stats.maxStamina || 0)}`],
+    ['Attack', `${Number(stats.attack || 0)}`, deltaColor(stats.attack)],
+    ['Defense', `${Number(stats.defense || 0)}`, deltaColor(stats.defense)],
+    ['Accuracy', `${Number(stats.accuracy || 0)}`, deltaColor(stats.accuracy)],
+    ['Damage Power', `${Number(stats.damagePower || 0)}`, deltaColor(stats.damagePower)],
+    ['Evade', `${Number(stats.evade || 0)}`, deltaColor(stats.evade)],
+    ['Mitigation', `${Number(stats.mitigation || 0)}`, deltaColor(stats.mitigation)],
+    ['Spell Power', `${Number(stats.spellPower || 0)}`, deltaColor(stats.spellPower)],
+    ['Armor Class', `${Number(stats.armorClass || 0)}`, deltaColor(stats.armorClass, 10)],
+    ['Luck', `${Number(stats.luck || 0)}`, deltaColor(stats.luck)],
+    ['Crit %', `${Number(stats.critChancePercent || 0).toFixed(1)}`, deltaColor(stats.critChancePercent)],
+    ['Crit Mult', `\u00d7${Number(stats.critMult || 0).toFixed(1)}`, deltaColor(stats.critMult)],
+    ['Dmg Bonus', `${Number(stats.damageFlatBonus || 0)}`, deltaColor(stats.damageFlatBonus)],
+    ['Mana Regen', `${Number(stats.manaRegen || 0).toFixed(2)}/t`, deltaColor(stats.manaRegenDerived)],
+    ['Stam Regen', `${Number(stats.staminaRegen || 0).toFixed(1)}/t`, deltaColor(stats.staminaRegenDerived)],
+    ['Max HP Bonus', `${Number(stats.maxHpDerived || 0)}`, deltaColor(stats.maxHpDerived)],
+    ['Speed', `${Number(stats.speed || 1)}`, deltaColor(stats.speed, 1) === '#64c87a' ? '#e06a6a' : deltaColor(stats.speed, 1) === '#e06a6a' ? '#64c87a' : null],
+    ['Gold', `${Number(stats.gold || 0)}`],
+    ['Hunger', `${humanize(String(stats.hungerLevel || 'normal'))} (${Number(stats.hunger || 0)})`],
+    ['Depth', `${Number(stats.depth || 0)}`],
+    ['Turn', `${Number(stats.turn || 0)}`],
+  ];
+  for (const [label, value, color] of statRows) {
+    const row = document.createElement('div');
+    const lbl = document.createElement('span');
+    lbl.textContent = `${label}: `;
+    const val = document.createElement('span');
+    val.textContent = value;
+    if (color) val.style.color = color;
+    row.appendChild(lbl);
+    row.appendChild(val);
+    statCard.appendChild(row);
+  }
+
+  // Resistances — only show non-zero entries
+  const resistRows = [
+    ['Kinetic DR', Number(stats.kineticDR || 0)],
+    ['Fire Resist', Number(stats.fireResist || 0)],
+    ['Poison Resist', Number(stats.poisonResist || 0)],
+    ['Acid Resist', Number(stats.acidResist || 0)],
+    ['Rad Resist', Number(stats.radiationResist || 0)],
+    ['Elec Resist', Number(stats.electricResist || 0)],
+    ['Blunt Resist', Number(stats.bluntResist || 0)],
+    ['Slash Resist', Number(stats.slashResist || 0)],
+    ['Pierce Resist', Number(stats.pierceResist || 0)],
+  ].filter(([, v]) => v !== 0);
+
+  if (resistRows.length) {
+    const resistHeader = document.createElement('div');
+    resistHeader.textContent = 'Resistances';
+    resistHeader.style.marginTop = '10px';
+    resistHeader.style.fontWeight = 'bold';
+    el.appendChild(resistHeader);
+
+    const resistCard = document.createElement('div');
+    Object.assign(resistCard.style, {
+      marginTop: '6px',
+      padding: '8px',
+      border: '1px solid #2d3b52',
+      borderRadius: '6px',
+      background: '#0a111f',
+      display: 'grid',
+      gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+      gap: '6px 12px',
+      fontSize: '13px',
+    });
+    for (const [label, v] of resistRows) {
+      const row = document.createElement('div');
+      const lbl = document.createElement('span');
+      lbl.textContent = `${label}: `;
+      const val = document.createElement('span');
+      val.textContent = `${v}`;
+      val.style.color = deltaColor(v) || '#cfe8ff';
+      row.appendChild(lbl);
+      row.appendChild(val);
+      resistCard.appendChild(row);
+    }
+    el.appendChild(resistCard);
+  }
+
+  if (traits.length > 0) {
+    const traitsTitle = document.createElement('div');
+    traitsTitle.textContent = 'Traits';
+    traitsTitle.style.marginTop = '10px';
+    traitsTitle.style.fontWeight = 'bold';
+    el.appendChild(traitsTitle);
+
+    const traitsCard = document.createElement('div');
+    Object.assign(traitsCard.style, {
+      marginTop: '6px',
+      padding: '8px',
+      border: '1px solid #2d3b52',
+      borderRadius: '6px',
+      background: '#0a111f',
+      fontSize: '13px',
+    });
+    for (const t of traits) {
+      const row = document.createElement('div');
+      row.style.marginBottom = '4px';
+      const lbl = document.createElement('span');
+      lbl.textContent = String(t.label || t.key || '');
+      lbl.style.color = '#ffd966';
+      lbl.style.fontWeight = 'bold';
+      const desc = document.createElement('span');
+      desc.textContent = ` \u2014 ${String(t.description || '')}`;
+      desc.style.opacity = '0.85';
+      row.appendChild(lbl);
+      row.appendChild(desc);
+      traitsCard.appendChild(row);
+    }
+    el.appendChild(traitsCard);
+  }
+
+  const effectsTitle = document.createElement('div');
+  effectsTitle.textContent = 'Active Effects';
+  effectsTitle.style.marginTop = '10px';
+  effectsTitle.style.fontWeight = 'bold';
+  el.appendChild(effectsTitle);
+
+  const effects = document.createElement('div');
+  Object.assign(effects.style, {
+    marginTop: '6px',
+    padding: '8px',
+    border: '1px solid #2d3b52',
+    borderRadius: '6px',
+    background: '#0a111f',
+    maxHeight: '24vh',
+    overflowY: 'auto',
+    fontSize: '13px',
+  });
+  if (!activeEffects.length) {
+    const empty = document.createElement('div');
+    empty.textContent = '(none)';
+    empty.style.opacity = '0.75';
+    effects.appendChild(empty);
+  } else {
+    for (const status of activeEffects) {
+      const row = document.createElement('div');
+      const key = humanize(String(status?.key || '').trim());
+      const turns = Math.max(0, Number(status?.turns || 0) | 0);
+      const stacks = Math.max(1, Number(status?.stacks || 1) | 0);
+      row.textContent = `${key} \u00b7 ${turns}t${stacks > 1 ? ` \u00b7 x${stacks}` : ''}`;
+      row.style.marginBottom = '4px';
+      effects.appendChild(row);
+    }
+  }
+  el.appendChild(effects);
+
+  const actions = document.createElement('div');
+  Object.assign(actions.style, {
+    marginTop: '10px',
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '8px',
+  });
+  const engraveBtn = document.createElement('button');
+  engraveBtn.textContent = '\u270E Engrave';
+  decorateButton(engraveBtn);
+  engraveBtn.style.minHeight = '44px';
+  engraveBtn.style.padding = '8px 12px';
+  engraveBtn.addEventListener('click', () => {
+    window.dispatchEvent(new CustomEvent('ui:engrave'));
+  });
+  actions.appendChild(engraveBtn);
+
+  const spellBtn = document.createElement('button');
+  spellBtn.textContent = '\u{1F9E0} Select Spell';
+  decorateButton(spellBtn);
+  spellBtn.style.minHeight = '44px';
+  spellBtn.style.padding = '8px 12px';
+  spellBtn.addEventListener('click', () => {
+    window.dispatchEvent(new CustomEvent('ui:openSpellPicker'));
+  });
+  actions.appendChild(spellBtn);
+
+  const bugBtn = document.createElement('button');
+  bugBtn.textContent = '\u{1F47E} Bug Report';
+  decorateButton(bugBtn);
+  bugBtn.style.minHeight = '44px';
+  bugBtn.style.padding = '8px 12px';
+  bugBtn.addEventListener('click', () => {
+    const version = /** @type {any} */ (window).VERSION || 'unknown';
+    const ua = navigator.userAgent;
+    function openWithData(d) {
+      const gearLines = (d?.gear || []).map(g => `  - ${g.slot}: ${g.name}`).join('\n') || '  (none)';
+      const invLines = (d?.inv || []).map(i => `  - ${i}`).join('\n') || '  (none)';
+      const effectsLine = (d?.effects || []).join(', ') || 'none';
+      const s = d?.stats || {};
+      const snapshot = d
+        ? [
+          `**Character:** ${d.playerName} (${d.playerClass})`,
+          `**Seed:** ${d.seed ? (d.seed >>> 0).toString(16).toUpperCase() : '???'}`,
+          `**Depth:** ${s.depth ?? '?'}  |  **Turn:** ${s.turn ?? '?'}`,
+          `**HP:** ${s.hp}  |  **Mana:** ${s.mana}  |  **Stamina:** ${s.stamina}`,
+          `**Attack:** ${s.attack}  |  **Defense:** ${s.defense}  |  **AC:** ${s.armorClass}  |  **Luck:** ${s.luck}`,
+          `**Gold:** ${s.gold}  |  **Hunger:** ${s.hungerLevel}`,
+          `**Active effects:** ${effectsLine}`,
+          `**Gear:**\n${gearLines}`,
+          `**Inventory:**\n${invLines}`,
+        ].join('\n')
+        : '(no game state available)';
+      const body = encodeURIComponent(
+        `**Steps to reproduce:**\n\n**Expected:**\n\n**Actual:**\n\n---\n\n<details>\n<summary>Game state snapshot</summary>\n\n**Version:** ${version}\n**Browser:** ${ua}\n\n${snapshot}\n</details>`
+      );
+      const title = encodeURIComponent('[Bug] ');
+      window.open(
+        `https://github.com/pjensen/JSHack/issues/new?title=${title}&body=${body}&labels=bug`,
+        '_blank', 'noopener'
+      );
+    }
+    const onData = (ev) => {
+      window.removeEventListener('ui:bugReportData', onData);
+      openWithData(ev?.detail);
+    };
+    window.addEventListener('ui:bugReportData', onData);
+    try { window.dispatchEvent(new CustomEvent('ui:requestBugReportData')); } catch (e) {
+      window.removeEventListener('ui:bugReportData', onData);
+      openWithData(null);
+    }
+  });
+  actions.appendChild(bugBtn);
+
+  el.appendChild(actions);
+
+  const hint = document.createElement('div');
+  hint.style.marginTop = '8px';
+  hint.style.opacity = '0.85';
+  hint.textContent = 'Tab=Next tab \u00b7 I=Inventory \u00b7 E=Equipment \u00b7 Esc=Close';
+  el.appendChild(hint);
+
+  function onKey(e) {
+    if (panel.style.display !== 'block') return;
+    const k = e.key;
+    if (k === 'i' || k === 'I') {
+      window.dispatchEvent(new CustomEvent('ui:openInventory'));
+      e.preventDefault();
+    }
+    else if (k === 'Escape') { hide(panel); e.preventDefault(); }
+    else if (k === 'e' || k === 'E') {
+      window.dispatchEvent(new CustomEvent('ui:openEquipment'));
+      e.preventDefault();
+    }
+  }
+
+  installDetachableKeyHandler(panel, '_characterSheetDetach', (e) => onKey(e));
+}
+
+/** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Record<string, any>|null} equippedBySlot @param {string|null} playerName @param {number} [scrollOfIdentifyId] */
+export function renderEquipment(panel, equippedBySlot, playerName, scrollOfIdentifyId = 0) {
+  const existingDetach = /** @type {any} */ (panel)._equipmentDetach;
+  if (typeof existingDetach === 'function') {
+    try { existingDetach(); } catch (e) { console.debug('[overlay] equipment detach failed:', e); }
+  }
+
+  const el = /** @type {HTMLDivElement} */ (/** @type {any} */ (panel)._inner);
+  el.innerHTML = '';
+  el.style.overflowX = 'hidden';
+  appendCharacterMenuTabs(el, 'equipment');
+
+  const title = document.createElement('div');
+  const pn = String(playerName || 'Hero').trim() || 'Hero';
+  title.textContent = `${pn} \u00b7 Equipment`;
+  title.style.fontWeight = 'bold';
+  title.style.marginBottom = '8px';
+  el.appendChild(title);
+
+  const _hideVal = (/** @type {any} */ (panel))._hideEmptySlots;
+  let hideEmpty = _hideVal !== undefined ? _hideVal : true;
+  const cbWrap = document.createElement('label');
+  Object.assign(cbWrap.style, {
+    display: 'flex', alignItems: 'center', gap: '6px',
+    marginBottom: '8px', cursor: 'pointer', opacity: '0.85',
+  });
+  const cb = document.createElement('input');
+  cb.type = 'checkbox';
+  cb.checked = hideEmpty;
+  cb.style.cursor = 'pointer';
+  cbWrap.appendChild(cb);
+  cbWrap.appendChild(document.createTextNode('Hide Empty Slots'));
+  el.appendChild(cbWrap);
+
+  const rowsData = CHARACTER_SLOT_ORDER.map((slot) => {
+    const state = (equippedBySlot && typeof equippedBySlot === 'object') ? (equippedBySlot[slot] || {}) : {};
+    const item = state?.item && typeof state.item === 'object' ? state.item : null;
+    return {
+      slot,
+      item,
+      blocked: !!state?.blocked,
+      reason: String(state?.reason || ''),
+    };
+  });
+
+  const list = document.createElement('div');
+  list.style.display = 'flex';
+  list.style.flexDirection = 'column';
+  list.style.gap = '4px';
+  list.style.maxHeight = '40vh';
+  list.style.overflowY = 'auto';
+  list.style.overflowX = 'hidden';
+  markScrollable(list);
+  el.appendChild(list);
+
+  const detail = document.createElement('div');
+  Object.assign(detail.style, {
+    marginTop: '8px',
+    padding: '8px',
+    border: '1px solid #2d3b52',
+    borderRadius: '6px',
+    background: '#0a111f',
+    minHeight: '52px',
+  });
+  el.appendChild(detail);
+
+  const actions = document.createElement('div');
+  Object.assign(actions.style, {
+    marginTop: '8px',
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '8px',
+    minHeight: '44px',
+    alignItems: 'center',
+  });
+  el.appendChild(actions);
+
+  const hint = document.createElement('div');
+  hint.style.marginTop = '8px';
+  hint.style.opacity = '0.85';
+  hint.textContent = '\u2191/\u2193 select slot \u00b7 Enter=Equip/Unequip \u00b7 I=Open Inventory \u00b7 C=Character Sheet \u00b7 Esc=Close';
+  el.appendChild(hint);
+
+  function openInventoryForSlot(slotName) {
+    const slotFilter = String(slotName || '').trim().toLowerCase();
+    window.dispatchEvent(new CustomEvent('ui:openInventory', { detail: { slotFilter } }));
+  }
+
+  function openSpellPicker() {
+    window.dispatchEvent(new CustomEvent('ui:openSpellPicker'));
+  }
+
+
+  const rows = rowsData.map((rowData, idx) => {
+    const row = document.createElement('div');
+    Object.assign(row.style, {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      width: '100%',
+      padding: '6px 8px',
+      boxSizing: 'border-box',
+      background: '#0f1421',
+      color: '#cfe8ff',
+      border: '1px solid #2d3b52',
+      borderRadius: '6px',
+      cursor: 'pointer',
+    });
+
+    const slot = document.createElement('span');
+    slot.style.opacity = '0.75';
+    slot.style.minWidth = '84px';
+    const slotText = humanize(rowData.slot);
+    slot.textContent = slotText ? `${slotText.charAt(0).toUpperCase()}${slotText.slice(1)}:` : `${rowData.slot}:`;
+
+    const name = document.createElement('span');
+    name.style.flex = '1 1 auto';
+    name.style.minWidth = '0';
+    name.style.overflow = 'hidden';
+    name.style.textOverflow = 'ellipsis';
+    name.style.whiteSpace = 'nowrap';
+    if (rowData.item) {
+      const rs = rarityStyle(rowData.item.rarityName);
+      name.textContent = bracketize(sanitize(rowData.item.name || rowData.item.description || rowData.item.type || 'item'));
+      Object.assign(name.style, rs);
+    } else {
+      name.textContent = '(empty)';
+      name.style.opacity = '0.65';
+    }
+
+    row.appendChild(slot);
+    row.appendChild(name);
+    if (rowData.blocked) {
+      const blocked = document.createElement('span');
+      blocked.textContent = rowData.reason ? `Blocked: ${rowData.reason}` : 'Blocked';
+      blocked.style.fontSize = '11px';
+      blocked.style.color = '#ffbf5a';
+      row.appendChild(blocked);
+    }
+
+    row.addEventListener('click', () => setSel(idx));
+    list.appendChild(row);
+    return row;
+  });
+
+  function applyFilter() {
+    rowsData.forEach((rd, i) => {
+      const empty = !rd.item && !rd.blocked;
+      rows[i].style.display = (hideEmpty && empty) ? 'none' : 'flex';
+    });
+  }
+
+  function findNextVisible(from, dir) {
+    let i = from + dir;
+    while (i >= 0 && i < rows.length) {
+      if (rows[i].style.display !== 'none') return i;
+      i += dir;
+    }
+    return null;
+  }
+
+  applyFilter();
+
+  cb.addEventListener('change', () => {
+    hideEmpty = cb.checked;
+    (/** @type {any} */ (panel))._hideEmptySlots = hideEmpty;
+    applyFilter();
+    if (rows[sel]?.style.display === 'none') {
+      const next = findNextVisible(sel, 1) ?? findNextVisible(sel, -1);
+      if (next !== null) setSel(next);
+    }
+  });
+
+  let sel = 0;
+  const savedSlot = String((/** @type {any} */ (panel))._equipmentSelectionSlot || '');
+  const savedIdx = rowsData.findIndex((row) => row.slot === savedSlot);
+  if (savedIdx >= 0) sel = savedIdx;
+  if (rows[sel]?.style.display === 'none') {
+    const vis = findNextVisible(sel, 1) ?? findNextVisible(sel, -1);
+    if (vis !== null) sel = vis;
+  }
+
+  function createActionButton(label, onClick, disabled = false) {
+    const btn = document.createElement('button');
+    btn.textContent = label;
+    decorateButton(btn);
+    btn.style.minHeight = '44px';
+    btn.style.padding = '8px 12px';
+    if (disabled) {
+      btn.disabled = true;
+      btn.style.opacity = '0.5';
+      btn.style.cursor = 'not-allowed';
+    }
+    btn.addEventListener('click', onClick);
+    return btn;
+  }
+
+  function updateDetail() {
+    const row = rowsData[sel];
+    detail.innerHTML = '';
+    actions.innerHTML = '';
+    if (!row) return;
+
+    (/** @type {any} */ (panel))._equipmentSelectionSlot = row.slot;
+
+    const slotTitle = document.createElement('div');
+    slotTitle.style.fontWeight = 'bold';
+    slotTitle.style.marginBottom = '4px';
+    const slotText = humanize(row.slot);
+    slotTitle.textContent = slotText ? `${slotText.charAt(0).toUpperCase()}${slotText.slice(1)}` : row.slot;
+    detail.appendChild(slotTitle);
+
+    if (row.blocked) {
+      const blockedLine = document.createElement('div');
+      blockedLine.style.color = '#ffbf5a';
+      blockedLine.style.marginBottom = '4px';
+      blockedLine.textContent = row.reason ? `Blocked: ${row.reason}` : 'Blocked';
+      detail.appendChild(blockedLine);
+    }
+
+    if (row.item) {
+      if (row.slot === 'brain') {
+        const itemBody = document.createElement('div');
+        detail.appendChild(itemBody);
+        renderItemDetails(itemBody, row.item);
+        actions.appendChild(createActionButton('Change Spell', () => {
+          openSpellPicker();
+        }));
+      } else {
+        const itemBody = document.createElement('div');
+        detail.appendChild(itemBody);
+        renderItemDetails(itemBody, row.item);
+      }
+      if (row.slot !== 'brain' && Number.isInteger(row.item.id) && row.item.id > 0) {
+        actions.appendChild(createActionButton('Unequip', () => {
+          pulseRow(rows[sel], 'unequip');
+          window.dispatchEvent(new CustomEvent('ui:requestEquip', { detail: { itemId: row.item.id } }));
+        }));
+        if (row.item.identified === false) {
+          const hasScroll = scrollOfIdentifyId > 0;
+          actions.appendChild(createActionButton('Identify', () => {
+            if (hasScroll) {
+              window.dispatchEvent(new CustomEvent('ui:requestApply', {
+                detail: { toolId: scrollOfIdentifyId, targetItemId: row.item.id },
+              }));
+            }
+          }, !hasScroll));
+        }
+      }
+      hideItemTooltip();
+    } else {
+      const empty = document.createElement('div');
+      empty.textContent = '(nothing equipped)';
+      empty.style.opacity = '0.75';
+      detail.appendChild(empty);
+      const canEquip = !row.blocked;
+      if (row.slot === 'brain') {
+        actions.appendChild(createActionButton('Choose Spell', () => {
+          openSpellPicker();
+        }));
+      } else {
+        actions.appendChild(createActionButton('Equip', () => {
+          openInventoryForSlot(row.slot);
+        }, !canEquip));
+      }
+      hideItemTooltip();
+    }
+
+  }
+
+  function setSel(next) {
+    sel = Math.max(0, Math.min(rowsData.length - 1, next | 0));
+    rows.forEach((row, i) => {
+      row.style.outline = (i === sel) ? '2px solid #55aaff' : 'none';
+      row.style.background = (i === sel) ? '#0b1323' : '#0f1421';
+    });
+    rows[sel]?.scrollIntoView({ block: 'nearest' });
+    updateDetail();
+  }
+
+  function onKey(e) {
+    if (panel.style.display !== 'block') return;
+    if (e.target === cb) return;
+    const k = e.key;
+    if (k === 'ArrowUp') { const n = findNextVisible(sel, -1); if (n !== null) setSel(n); e.preventDefault(); }
+    else if (k === 'ArrowDown') { const n = findNextVisible(sel, 1); if (n !== null) setSel(n); e.preventDefault(); }
+    else if (k === 'Home') { const n = findNextVisible(-1, 1); if (n !== null) setSel(n); e.preventDefault(); }
+    else if (k === 'End') { const n = findNextVisible(rowsData.length, -1); if (n !== null) setSel(n); e.preventDefault(); }
+    else if (k === 'Enter' || k === 'e' || k === 'E') {
+      const row = rowsData[sel];
+      if (row?.slot === 'brain') {
+        openSpellPicker();
+        e.preventDefault();
+      } else if (Number.isInteger(row?.item?.id) && row.item.id > 0) {
+        pulseRow(rows[sel], 'unequip');
+        window.dispatchEvent(new CustomEvent('ui:requestEquip', { detail: { itemId: row.item.id } }));
+        e.preventDefault();
+      } else if (row && !row.blocked) {
+        openInventoryForSlot(row.slot);
+        e.preventDefault();
+      }
+    }
+    else if (k === 'i' || k === 'I') {
+      window.dispatchEvent(new CustomEvent('ui:openInventory'));
+      e.preventDefault();
+    }
+    else if (k === 'Escape') { hide(panel); e.preventDefault(); }
+    else if (k === 'c' || k === 'C') {
+      window.dispatchEvent(new CustomEvent('ui:openCharacter'));
+      e.preventDefault();
+    }
+  }
+
+  setSel(sel);
+  installDetachableKeyHandler(panel, '_equipmentDetach', (e) => onKey(e));
+}
