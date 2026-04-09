@@ -5703,39 +5703,30 @@ function drawBlindEye(ctx, e, fxTime, scale = 1) {
 }
 
 /**
- * Draw a ❓ icon above confused entities.
+ * Draw orbiting ❓ marks above confused entities.
  * @param {CanvasRenderingContext2D} ctx
  * @param {{ id:number, pos:{x:number,y:number} }} e
  * @param {number} fxTime
  */
 function drawConfusedMark(ctx, e, fxTime, scale = 1) {
   const cx = e.pos.x;
-  const cy = e.pos.y - 0.72 * scale;
-
-  // Gentle pulse
-  const pulse = 0.85 + Math.sin(fxTime * 2.5) * 0.15;
-  const dy = cy + Math.sin(fxTime * 1.8) * 0.025;
+  const cy = e.pos.y - 0.52 * scale;
 
   ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-
-  // Soft yellow-orange glow halo
-  const haloR = 0.2 * scale;
-  const halo = ctx.createRadialGradient(cx, dy, 0, cx, dy, haloR);
-  halo.addColorStop(0, `rgba(240,192,48,${(0.25 * pulse).toFixed(2)})`);
-  halo.addColorStop(1, 'rgba(220,170,30,0)');
-  ctx.fillStyle = halo;
-  ctx.beginPath();
-  ctx.arc(cx, dy, haloR, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Question mark glyph
   ctx.globalCompositeOperation = 'source-over';
-  ctx.globalAlpha = 0.9 * pulse;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.font = `${0.32 * scale}px sans-serif`;
-  ctx.fillText('\u2753', cx, dy);
+  ctx.font = `${0.22 * scale}px sans-serif`;
+
+  for (let j = 0; j < 3; j++) {
+    const ang = _fxTime * 1.8 + (j / 3) * Math.PI * 2;
+    const sx = cx + Math.cos(ang) * 0.32 * scale;
+    const sy = cy + Math.sin(ang) * 0.12 * scale;
+    const pulse = 0.7 + 0.3 * Math.sin(_fxTime * 3.0 + j * 2.1);
+    ctx.globalAlpha = 0.9 * pulse;
+    ctx.fillStyle = '#f0c030';
+    ctx.fillText('?', sx, sy);
+  }
 
   ctx.restore();
 }
