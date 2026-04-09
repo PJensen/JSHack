@@ -152,29 +152,27 @@ export function gasSporeExplodeOnDeath(params = {}) {
     const turnsLeft = Math.max(1, Number(cfg.turnsLeft ?? 3) | 0);
     const radius = Math.max(0, Number(cfg.radius ?? 2) | 0);
     const tickDamage = Math.max(0, Number(cfg.tickDamage ?? 6) | 0);
-    // Spawn per-tile radius-0 hazards in a circular (Euclidean) pattern.
-    for (let dy = -radius; dy <= radius; dy++) {
-      for (let dx = -radius; dx <= radius; dx++) {
-        if (dx * dx + dy * dy > radius * radius) continue;
-        spawnHazard(ctx.world, {
-          x: x + dx,
-          y: y + dy,
-          kind: "fire",
-          medium: "air",
-          turnsLeft,
-          radius: 0,
-          tickDamage,
-          damageType: "fire",
-          cause: "monster:death:gas_spore",
-          sourceId: ctx.deadId | 0,
-          sourceKind: "gas_spore",
-          identity: "gas_spore_blast",
-          name: "Spore Blast",
-        });
-      }
-    }
+    const sourceId = ctx.deadId | 0;
+    spawnHazard(ctx.world, {
+      x,
+      y,
+      kind: "gas",
+      medium: "air",
+      turnsLeft,
+      radius,
+      tickDamage,
+      damageType: "poison",
+      cause: "monster:death:gas_spore",
+      sourceId,
+      sourceKind: "gas_spore",
+      identity: "explosive_gas",
+      name: "Explosive Gas",
+      meta: {
+        distanceMetric: "euclidean",
+      },
+    });
     emitSafe(ctx.world, "monster:death:gas_spore", {
-      id: ctx.deadId | 0,
+      id: sourceId,
       at: { x, y },
       radius,
     });

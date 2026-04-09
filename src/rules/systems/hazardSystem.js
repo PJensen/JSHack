@@ -6,12 +6,14 @@ import { Flying } from "../components/Flying.js";
 import { Pet } from "../components/Pet.js";
 import { Player } from "../components/Player.js";
 import { ActiveEffects } from "../components/ActiveEffects.js";
+import { Equipment, NON_AMMO_GEAR_SLOTS } from "../components/Equipment.js";
 import { Burned } from "../components/Burned.js";
 import { Collider } from "../components/Collider.js";
 import { Interactable } from "../components/Interactable.js";
 import { Material } from "../components/Material.js";
 import { DungeonState } from "../components/DungeonState.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
+import { ItemInfo } from "../components/ItemInfo.js";
 import {
   TILE_DOOR,
   TILE_FENCE,
@@ -25,6 +27,7 @@ import { dealDamage } from "../utils/dealDamage.js";
 import { MATERIAL_CATALOG } from "../data/materials.js";
 import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { Ashes } from "../archetypes/Items.js";
+import { spawnHazard } from "../utils/hazardSpawn.js";
 import {
   getDestroyedTileRecord,
   markDestroyedTile,
@@ -147,6 +150,62 @@ function getFireSpreadTurns(hazard, turnsBefore) {
   return clampInt(hazard?.meta?.fireSpreadTurns, Math.max(1, turnsBefore - 1), 1);
 }
 
+function hasEquippedTorch(world, actorId) {
+  const eq = world.get(actorId, Equipment);
+  if (!eq) return false;
+  for (let i = 0; i < NON_AMMO_GEAR_SLOTS.length; i++) {
+    const itemId = Number(eq[NON_AMMO_GEAR_SLOTS[i]] || 0) | 0;
+    if (!(itemId > 0)) continue;
+    const info = world.get(itemId, ItemInfo);
+    if (String(info?.id || "") === "torch") return true;
+  }
+  return false;
+}
+
+function hazardMetric(hazard, identity) {
+  const metric = String(hazard?.meta?.distanceMetric || "").toLowerCase();
+  if (metric === "euclidean") return "euclidean";
+  if (String(identity || "") === "explosive_gas") return "euclidean";
+  return "chebyshev";
+}
+
+function inHazardRadius(x, y, cx, cy, radius, metric) {
+  const dx = Math.abs((x | 0) - (cx | 0));
+  const dy = Math.abs((y | 0) - (cy | 0));
+  if (metric === "euclidean") return (dx * dx + dy * dy) <= (radius * radius);
+  return Math.max(dx, dy) <= radius;
+}
+
+function hasBurningEffect(effects) {
+  if (!effects || !Array.isArray(effects.effects)) return false;
+  for (let i = 0; i < effects.effects.length; i++) {
+    const key = String(effects.effects[i]?.key || "").toLowerCase();
+    if (key === "burn" || key === "burning") return true;
+  }
+  return false;
+}
+
+function gasHazardShouldIgnite(world, x, y, radius, metric) {
+  const gasRadius = Math.max(0, radius | 0);
+  for (const [, firePos, fireHazard] of world.query(Position, HazardArea)) {
+    if (!firePos || !fireHazard) continue;
+    if (String(fireHazard.kind || "").toLowerCase() !== "fire") continue;
+    if ((Number(fireHazard.turnsLeft || 0) | 0) <= 0) continue;
+    const fireRadius = clampInt(fireHazard.radius, 0, 0);
+    if (inHazardRadius(firePos.x, firePos.y, x, y, gasRadius + fireRadius + 1, metric)) return true;
+  }
+  for (const [, actorPos, effects] of world.query(Position, ActiveEffects)) {
+    if (!actorPos || !hasBurningEffect(effects)) continue;
+    if (inHazardRadius(actorPos.x, actorPos.y, x, y, gasRadius, metric)) return true;
+  }
+  for (const [actorId, actorPos] of world.query(Position, Equipment)) {
+    if (!actorPos) continue;
+    if (!hasEquippedTorch(world, actorId)) continue;
+    if (inHazardRadius(actorPos.x, actorPos.y, x, y, gasRadius, metric)) return true;
+  }
+  return false;
+}
+
 /**
  * Generic hazard resolver for persistent AoE entities.
  * `medium` is metadata only for now (`air` vs `floor`).
@@ -168,6 +227,8 @@ export function hazardSystem(world) {
 
   /** @type {Array<{ x:number, y:number, turnsLeft:number, tickDamage:number, damageType:string, cause:string, sourceId:number, sourceKind:string, meta:Record<string, unknown>|null }>} */
   const pendingFireSpreads = [];
+  /** @type {Array<{ x:number, y:number, radius:number, turnsLeft:number, tickDamage:number, cause:string, sourceId:number, sourceKind:string, identity:string, meta:Record<string, unknown>|null }>} */
+  const pendingGasIgnitions = [];
 
   for (const [hazardId, pos, hazard] of world.query(Position, HazardArea)) {
     if (!pos || !hazard) continue;
@@ -182,6 +243,39 @@ export function hazardSystem(world) {
     const sourceId = clampInt(hazard.sourceId, 0, 0);
     const sourceKind = typeof hazard.sourceKind === "string" ? hazard.sourceKind : "";
     const source = sourceId > 0 ? sourceId : hazardId;
+    const identity = String(world.get(hazardId, NamedIdentity)?.identity || "");
+    const metric = hazardMetric(hazard, identity);
+
+    if (kind === "gas" && gasHazardShouldIgnite(world, pos.x, pos.y, radius, metric)) {
+      pendingGasIgnitions.push({
+        x: pos.x | 0,
+        y: pos.y | 0,
+        radius,
+        turnsLeft: turnsBefore,
+        tickDamage,
+        cause,
+        sourceId,
+        sourceKind,
+        identity,
+        meta: (hazard.meta && typeof hazard.meta === "object" && !Array.isArray(hazard.meta))
+          ? { ...hazard.meta }
+          : null,
+      });
+      try {
+        world.emit?.("hazard:ignited", {
+          hazardId,
+          fromKind: "gas",
+          toKind: "fire",
+          at: { x: pos.x | 0, y: pos.y | 0 },
+          radius,
+          sourceId,
+          sourceKind,
+          cause,
+        });
+      } catch { /* */ }
+      world.destroy(hazardId);
+      continue;
+    }
 
     /** @type {number[]} */
     const affectedIds = [];
@@ -303,9 +397,7 @@ export function hazardSystem(world) {
         if ((vit.hp | 0) <= 0) continue;
         if (world.has(id, Flying)) continue;
         if (world.has(id, Pet) && world.has(sourceId, Player)) continue;
-        const ddx = Math.abs((tpos.x | 0) - (pos.x | 0));
-        const ddy = Math.abs((tpos.y | 0) - (pos.y | 0));
-        if (Math.max(ddx, ddy) > radius) continue;
+        if (!inHazardRadius(tpos.x, tpos.y, pos.x, pos.y, radius, metric)) continue;
         let ae = /** @type any */ (world.get(id, ActiveEffects));
         if (!ae) {
           try { world.add(id, ActiveEffects, { effects: [] }); } catch { /* */ }
@@ -332,9 +424,7 @@ export function hazardSystem(world) {
         if (kind === "quake" && id === sourceId) continue;
         if (kind === "quake" && world.has(id, Pet) && world.has(sourceId, Player)) continue;
 
-        const dx = Math.abs((tpos.x | 0) - (pos.x | 0));
-        const dy = Math.abs((tpos.y | 0) - (pos.y | 0));
-        if (Math.max(dx, dy) > radius) continue;
+        if (!inHazardRadius(tpos.x, tpos.y, pos.x, pos.y, radius, metric)) continue;
 
         const hit = dealDamage(world, {
           target: id,
@@ -429,6 +519,9 @@ export function hazardSystem(world) {
   for (const spread of pendingFireSpreads) {
     spawnFireSpreadHazard(world, spread);
   }
+  for (const ignition of pendingGasIgnitions) {
+    igniteGasHazard(world, ignition);
+  }
 }
 
 /**
@@ -467,4 +560,46 @@ function spawnFireSpreadHazard(world, spread) {
       name: "Wildfire",
     });
   } catch { /* */ }
+}
+
+/**
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ * @param {{ x:number, y:number, radius:number, turnsLeft:number, tickDamage:number, cause:string, sourceId:number, sourceKind:string, identity:string, meta:Record<string, unknown>|null }} ignition
+ */
+function igniteGasHazard(world, ignition) {
+  const meta = ignition.meta && typeof ignition.meta === "object" ? ignition.meta : null;
+  const isExplosiveGas = String(ignition.identity || "") === "explosive_gas";
+  const kind = String(meta?.igniteKind || "fire").toLowerCase() || "fire";
+  const medium = String(meta?.igniteMedium || "air").toLowerCase() === "floor" ? "floor" : "air";
+  const turnsLeft = clampInt(
+    meta?.igniteTurnsLeft,
+    isExplosiveGas ? Math.max(1, Math.min(3, ignition.turnsLeft)) : Math.max(1, ignition.turnsLeft),
+    1,
+  );
+  const radius = clampInt(ignition.radius, 0, 0);
+  const tickDamage = clampInt(
+    meta?.igniteTickDamage,
+    isExplosiveGas ? Math.max(2, ignition.tickDamage) : Math.max(1, ignition.tickDamage),
+    0,
+  );
+  const damageType = String(meta?.igniteDamageType || "fire").toLowerCase() || "fire";
+  const cause = String(meta?.igniteCause || `${ignition.cause}:ignited`);
+  const identity = String(meta?.igniteIdentity || `${kind}_cloud`) || `${kind}_cloud`;
+  const name = String(meta?.igniteName || "Ignited Cloud") || "Ignited Cloud";
+
+  spawnHazard(world, {
+    x: ignition.x,
+    y: ignition.y,
+    kind,
+    medium,
+    turnsLeft,
+    radius,
+    tickDamage,
+    damageType,
+    cause,
+    sourceId: ignition.sourceId,
+    sourceKind: ignition.sourceKind,
+    identity,
+    name,
+  });
 }

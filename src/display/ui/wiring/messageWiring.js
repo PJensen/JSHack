@@ -1152,7 +1152,7 @@ export function installMessageWiring({
 
   world.on('monster:death:gas_spore', ({ at }) => {
     if (!at || !canSeeAt(at.x, at.y)) return;
-    log('The gas spore ruptures — a massive explosion tears through the air!', 'danger');
+    log('The gas spore ruptures — volatile spores billow out!', 'danger');
   });
 
   world.on('proc:rot_grub:burrow', ({ actor, target }) => {
