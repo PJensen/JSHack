@@ -2,15 +2,11 @@ import { HazardArea } from "../components/HazardArea.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Position } from "../components/Position.js";
 import { attachEntityToCurrentFloor } from "./floorEntities.js";
+import { clampInt } from "./numberCoerce.js";
 
 const DEFAULT_TURNS = 3;
 const DEFAULT_RADIUS = 1;
 const DEFAULT_TICK_DAMAGE = 0;
-
-function clampInt(value, fallback, min = 0) {
-  const n = Number.isFinite(value) ? (value | 0) : fallback;
-  return Math.max(min, n | 0);
-}
 
 function normalizeMedium(value) {
   const medium = String(value || "").toLowerCase();

@@ -1,6 +1,5 @@
 import { ScriptRef as EcsScriptRef, installScriptsAPI } from "../../lib/ecs-js/index.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
-import { Player } from "../components/Player.js";
 import { Position } from "../components/Position.js";
 import { QuestBindings } from "../components/QuestBindings.js";
 import { QuestDefRef } from "../components/QuestDefRef.js";
@@ -9,6 +8,7 @@ import { QuestState } from "../components/QuestState.js";
 import { QuestVars } from "../components/QuestVars.js";
 import { compileQuest, listQuestEventNames } from "./registry.js";
 import { chebyshevScalar } from "../utils/distance.js";
+import { firstPlayerId } from "../utils/worldAccess.js";
 
 const QUEST_RUNTIME_KEY = Symbol.for("jshack:quests:runtime:installed");
 const QUEST_EVENT_ROUTES_KEY = Symbol.for("jshack:quests:runtime:eventRoutes");
@@ -199,11 +199,7 @@ export function getQuestRecord(world, questId, playerId = 0) {
 }
 
 export function ensureStarterQuests(world) {
-  let playerId = 0;
-  for (const [id] of world.query(Player)) {
-    playerId = id;
-    break;
-  }
+  const playerId = firstPlayerId(world, 0);
   if (!(playerId > 0)) return 0;
 
   if (findQuestEntity(world, STARTER_PRIEST_FETCH_QUEST_ID, playerId) > 0) {

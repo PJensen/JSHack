@@ -1,8 +1,6 @@
-import { DungeonState } from "../components/DungeonState.js";
 import { Faction } from "../components/Faction.js";
 import { Position } from "../components/Position.js";
 import { TownState } from "../components/TownState.js";
-import { WeatherState } from "../components/WeatherState.js";
 import { Unpaid } from "../components/Unpaid.js";
 import { getDestroyedTileLedger } from "../utils/destroyedTiles.js";
 import {
@@ -15,21 +13,13 @@ import {
 import { SMITH_RECIPES, chooseSmithRecipe } from "../data/smithRecipes.js";
 import { clamp } from "../../shared/math/math.js";
 import { chebyshevScalar } from "../utils/distance.js";
+import { currentDepth } from "../utils/worldAccess.js";
+import { getWeather } from "../utils/townStateAccess.js";
 
 const PULSE_BASE = 12;
 const LOW_FOOD_THRESHOLD = 4;
 const LOW_MATERIAL_THRESHOLD = 3;
 const LOW_MEDICINE_THRESHOLD = 3;
-
-function getDepth(world) {
-  for (const [, ds] of world.query(DungeonState)) return ds.currentDepth ?? 1;
-  return 1;
-}
-
-function getWeather(world) {
-  for (const [, ws] of world.query(WeatherState)) return String(ws.current || "clear");
-  return "clear";
-}
 
 export function getTownEconomyData(world) {
   for (const [, ts] of world.query(TownState)) {
@@ -150,7 +140,7 @@ function pulseIndustry(world, state, storage, weather) {
 }
 
 export function townSimulationSystem(world) {
-  if (getDepth(world) !== 0) return;
+  if (currentDepth(world, 1) !== 0) return;
 
   const [stateId, state] = ensureTownState(world);
   const weather = getWeather(world);

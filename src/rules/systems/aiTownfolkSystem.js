@@ -19,8 +19,6 @@ import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Inventory } from "../components/Inventory.js";
 import { Equipment } from "../components/Equipment.js";
 import { ObjectState } from "../components/ObjectState.js";
-import { TownState } from "../components/TownState.js";
-import { WeatherState } from "../components/WeatherState.js";
 import { RoomMetadata } from "../components/RoomMetadata.js";
 import { createItemById } from "../utils/itemFactory.js";
 import { forEachInRadius } from "../utils/spatialIndex.js";
@@ -52,6 +50,7 @@ import { SMITH_RECIPES, chooseSmithRecipe } from "../data/smithRecipes.js";
 import { CARDINAL_DIRS } from "../utils/directions.js";
 import { getQuestRecord } from "../quests/runtime.js";
 import { RAT_INFESTATION_QUEST_ID } from "../quests/definitions/ratInfestation.js";
+import { getTownState, getWeather } from "../utils/townStateAccess.js";
 
 const TOWNFOLK_RADIUS = 40;
 const MAX_STUCK_TURNS = 5;
@@ -325,16 +324,6 @@ function depleteNode(world, nodeId) {
 
 // getTownPhase is now imported from ../data/calendar.js
 export { getTownPhase } from "../data/calendar.js";
-
-function getTownState(world) {
-  for (const [, state] of world.query(TownState)) return state;
-  return null;
-}
-
-function getWeather(world) {
-  for (const [, ws] of world.query(WeatherState)) return String(ws.current || "clear");
-  return "clear";
-}
 
 function isStormShelterRole(role) {
   return role === TOWNFOLK_ROLES.farmer

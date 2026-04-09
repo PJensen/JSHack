@@ -2,13 +2,13 @@ import { createFrom } from "../../../lib/ecs-js/archetype.js";
 import { GoldStack } from "../../archetypes/Items.js";
 import { ItemInfo } from "../../components/ItemInfo.js";
 import { NamedIdentity } from "../../components/NamedIdentity.js";
-import { Player } from "../../components/Player.js";
 import { Position } from "../../components/Position.js";
 import { QuestVars } from "../../components/QuestVars.js";
 import { getMonster } from "../../data/monsters.js";
 import { createItemById } from "../../utils/itemFactory.js";
 import { spawnMonsterEntity } from "../../utils/spawnMonsterEntity.js";
 import { emitSafe } from "../../utils/emitSafe.js";
+import { firstPlayerId } from "../../utils/worldAccess.js";
 import { isWalkable } from "../../environment/dungeon/tileMap.js";
 import { emit, incVar, setVar } from "../actions.js";
 import { registerQuest } from "../registry.js";
@@ -19,11 +19,6 @@ export const REQUIRED_RAT_KILLS = 5;
 const REWARD_GOLD = 75;
 
 const RAT_HOOKS_KEY = Symbol.for("jshack:quests:ratInfestation:installed");
-
-function firstPlayerId(world) {
-  for (const [id] of world.query(Player)) return id;
-  return 0;
-}
 
 function isRat(world, entityId) {
   const ni = world.get(entityId, NamedIdentity);

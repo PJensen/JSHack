@@ -13,8 +13,7 @@ import { Web } from "../archetypes/RoomFeatures.js";
 import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { getTileQuerySnapshot } from "../utils/tileQueryCache.js";
 import { attachEntityToCurrentFloor } from "./floorEntities.js";
-
-function cellKey(x, y) { return `${x},${y}`; }
+import { xyKey } from "./gridKey.js";
 
 /**
  * Spawn a canonical web entity at (x, y).
@@ -27,7 +26,7 @@ function cellKey(x, y) { return `${x},${y}`; }
 export function spawnWeb(world, x, y) {
   // ── door guard ──
   const snap = getTileQuerySnapshot(world);
-  const ids = snap.byCell.get(cellKey(x, y));
+  const ids = snap.byCell.get(xyKey(x, y));
   if (ids) {
     for (const eid of ids) {
       if (world.has(eid, DoorState)) return 0;

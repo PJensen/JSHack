@@ -18,18 +18,7 @@ import { spawnHazard } from "../utils/hazardSpawn.js";
 import { HazardArea } from "../components/HazardArea.js";
 import { emitSafe } from "../utils/emitSafe.js";
 import { forEachInRadius } from "../utils/spatialIndex.js";
-
-function clamp01(value, fallback) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return fallback;
-  return Math.max(0, Math.min(1, n));
-}
-
-function clampInt(value, fallback, min = 0) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return fallback;
-  return Math.max(min, n | 0);
-}
+import { clamp01Or, clampInt } from "../utils/numberCoerce.js";
 
 function pushTimedEffect(world, target, effect) {
   if (!(target > 0) || !effect || typeof effect !== "object") return;
@@ -174,7 +163,7 @@ registerScript("trap_pit", {
     if (!trapPos || !from) return;
 
     const dropDepth = clampInt(ctx?.params?.dropDepth, 1, 1);
-    const damagePct = clamp01(ctx?.params?.percent, 0.08);
+    const damagePct = clamp01Or(ctx?.params?.percent, 0.08);
     const radius = Math.max(2, dropDepth * 3);
 
     const candidate = findNearestValidTileAround(world, trapPos, {
@@ -222,7 +211,7 @@ registerScript("trap_siphon", {
     if (!(trapId > 0) || !(target > 0) || !world.isAlive(target)) return;
 
     const resource = String(ctx?.params?.resource || "hp").toLowerCase();
-    const pct = clamp01(ctx?.params?.percent, 0.15);
+    const pct = clamp01Or(ctx?.params?.percent, 0.15);
     const healNearestEnemy = ctx?.params?.healNearestEnemy !== false;
 
     let drained = 0;

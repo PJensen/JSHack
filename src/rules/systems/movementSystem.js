@@ -33,14 +33,12 @@ import { isFacingTurnCostEnabled, normalizeFacingVector } from "../utils/facing.
 import { markMovedThisTurn } from "../utils/posture.js";
 import { ALL_DIRS } from "../utils/directions.js";
 import { emitSafe } from "../utils/emitSafe.js";
+import { xyKey } from "../utils/gridKey.js";
 
 const NOCLIP_SYM = Symbol.for("jshack:debug:noclip");
 
 /** Tracks per-entity move-attempt counter for the slowed cadence. */
 const slowMoveTicks = new Map();
-
-/** @param {number} x @param {number} y */
-function key(x, y) { return `${x},${y}`; }
 
 /** @param {any} world @param {number} id */
 function hasIdentity(world, id, identity) {
@@ -52,7 +50,7 @@ function hasIdentity(world, id, identity) {
 
 /** @param {any} world @param {import('../utils/tileQueryCache.js').TileQueryState} tiles @param {number} x @param {number} y */
 function isBlockedOnlyByWebs(world, tiles, x, y) {
-  const ids = tiles.byCell.get(key(x, y));
+  const ids = tiles.byCell.get(xyKey(x, y));
   if (!ids || ids.length === 0) return false;
 
   let foundBlocking = false;
@@ -197,7 +195,7 @@ export function movementSystem(world) {
 
       const nx = pos.x + mdx;
       const ny = pos.y + mdy;
-      const k = key(nx, ny);
+      const k = xyKey(nx, ny);
       const target = tiles.livingByCell.get(k) || 0;
 
       // Record facing direction on every move attempt (successful or not)
@@ -274,7 +272,7 @@ export function movementSystem(world) {
         // creature stepped onto it earlier in the same movement pass).
         const actorVit = world.get(actor, Vitality);
         if (actorVit && (actorVit.hp | 0) > 0 && !world.has(actor, Flying)) {
-          const fromKey = key(from.x, from.y);
+          const fromKey = xyKey(from.x, from.y);
           if (tiles.livingByCell.get(fromKey) === actor) {
             tiles.livingByCell.delete(fromKey);
           }

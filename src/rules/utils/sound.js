@@ -1,6 +1,6 @@
 import { HEARING_HL_THRESHOLD, HEARING_TIERS } from "../components/Anatomy.js";
 import { chebyshev } from "./distance.js";
-
+import { toInt } from "./numberCoerce.js";
 export const HEARING_TIER_THRESHOLDS = Object.freeze({
   [HEARING_TIERS.super]: HEARING_HL_THRESHOLD.super,
   [HEARING_TIERS.far]: HEARING_HL_THRESHOLD.far,
@@ -11,10 +11,6 @@ export const HEARING_TIER_THRESHOLDS = Object.freeze({
 
 function log2(x) {
   return Math.log(x) / Math.LN2;
-}
-
-function toInt(n) {
-  return Number(n) | 0;
 }
 
 function countWallsOnLine(x0, y0, x1, y1, getTile, isWall) {

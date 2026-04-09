@@ -1,28 +1,12 @@
-import { DungeonState } from "../components/DungeonState.js";
 import { EntranceProfile } from "../components/EntranceProfile.js";
 import { EntranceState } from "../components/EntranceState.js";
 import { Faction } from "../components/Faction.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Position } from "../components/Position.js";
-import { TownState } from "../components/TownState.js";
-import { WeatherState } from "../components/WeatherState.js";
 import { clamp01, ensureTownInterpretationEntities } from "../utils/townInterpretation.js";
 import { chebyshevScalar } from "../utils/distance.js";
-
-function getDepth(world) {
-  for (const [, ds] of world.query(DungeonState)) return ds.currentDepth ?? 1;
-  return 1;
-}
-
-function getTownState(world) {
-  for (const [, state] of world.query(TownState)) return state;
-  return null;
-}
-
-function getWeather(world) {
-  for (const [, weather] of world.query(WeatherState)) return String(weather.current || "clear");
-  return "clear";
-}
+import { currentDepth } from "../utils/worldAccess.js";
+import { getTownState, getWeather } from "../utils/townStateAccess.js";
 
 function hostileCountNear(world, x, y, radius) {
   let total = 0;
@@ -44,7 +28,7 @@ function tombstoneCountNear(world, x, y, radius) {
 }
 
 export function entrancePressureSystem(world) {
-  if (getDepth(world) !== 0) return;
+  if (currentDepth(world, 1) !== 0) return;
   ensureTownInterpretationEntities(world);
 
   const town = getTownState(world);
