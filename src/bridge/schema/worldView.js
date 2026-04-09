@@ -625,11 +625,6 @@ function projectProcStateTags(world, id, rec) {
 			description: String(info?.description || ""),
 		});
 	}
-	// Status-driven badges (confused → ❓ above head)
-	if (rec.tags.includes('confused')) {
-		if (!rec.procStates) rec.procStates = [];
-		rec.procStates.push({ key: 'confused', stacks: 1, turnsLeft: 0, potency: 1, name: 'Confused', description: '' });
-	}
 }
 
 /**
