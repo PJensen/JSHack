@@ -15,7 +15,7 @@ export const HealthPotion = defineArchetype(
         channels: [],
         effects: [
             // Regeneration-over-time; potency resolved as % of max HP at use time (see drinkSystem)
-            { key: "regen", potency: 0, onset: 0, peak: 0, duration: 20, stack: "refresh", meta: { percentOfMaxHp: 0.03 } }
+            { key: "regen", potency: 0, onset: 0, peak: 0, duration: 12, stack: "refresh", meta: { percentOfMaxHp: 0.02 } }
         ],
         feel: "A gentle warmth spreads through your body.",
     }],

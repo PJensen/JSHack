@@ -174,7 +174,7 @@ export const LOOT_TABLES = {
   "sub:potions": {
     rolls: { min: 1, max: 1 },
     entries: [
-      { type: "archetype", weight: 30, archetype: "HealthPotion" },
+      { type: "archetype", weight: 18, archetype: "HealthPotion" },
       { type: "item",      weight: 18, itemId: "potion_vigor" },
       { type: "item",      weight: 20, itemId: "potion_endurance" },
       { type: "item",      weight: 15, itemId: "potion_second_wind" },
@@ -352,7 +352,7 @@ export const LOOT_TABLES = {
     entries: [
       { type: "nothing",   weight: 40 },
       { type: "gold",      weight: 40, count: { base: 10, perDepth: 6 } },
-      { type: "archetype", weight: 22, archetype: "HealthPotion" },
+      { type: "archetype", weight: 10, archetype: "HealthPotion" },
       { type: "item",      weight: 15, itemId: "scroll_identify" },
       { type: "item",      weight: 12, itemId: "potion_mana" },
       { type: "table",     weight: 20, tableId: "sub:potions" },

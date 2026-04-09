@@ -87,7 +87,7 @@ function stampGroundTop(world, itemId) {
   world.add(itemId, GroundStackOrder, { seq: nextGroundStackSeq(world) });
 }
 
-function collectDropItemIds(world, actorId) {
+function collectDropItemIds(world, actorId, monsterDef) {
   const out = [];
   const seen = new Set();
   const push = (itemId) => {
@@ -99,11 +99,29 @@ function collectDropItemIds(world, actorId) {
     out.push(id);
   };
 
+  // Non-equipped inventory items always drop (picked-up loot, table results)
   for (const itemId of inventoryItems(world, actorId)) push(itemId);
 
+  // Equipped gear: monsters only drop each piece with a tier-scaled chance.
+  // Players and pets always drop everything.
   const eq = world.get(actorId, Equipment);
   if (eq && typeof eq === "object") {
-    for (const value of Object.values(eq)) push(value);
+    if (!monsterDef || world.has(actorId, Player)) {
+      for (const value of Object.values(eq)) push(value);
+    } else {
+      const tier = Number(monsterDef.tier || 0);
+      const dropChance = Math.min(0.60, 0.15 + tier * 0.10);
+      const rng = createRng((world.seed ^ (world.step | 0) ^ actorId) >>> 0);
+      for (const value of Object.values(eq)) {
+        const id = Number(value || 0) | 0;
+        if (!(id > 0) || !world.isAlive(id) || seen.has(id)) continue;
+        if (!world.has(id, ItemInfo)) continue;
+        if (rng.next() < dropChance) {
+          seen.add(id);
+          out.push(id);
+        }
+      }
+    }
   }
   return out;
 }
@@ -170,7 +188,7 @@ export function cleanupSystem(world) {
         : null;
 
       if (pos) {
-        const items = collectDropItemIds(world, id);
+        const items = collectDropItemIds(world, id, monsterDef);
         const dx = pos.x | 0;
         const dy = pos.y | 0;
         for (let i = 0; i < items.length; i++) {

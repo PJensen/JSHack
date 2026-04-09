@@ -41,6 +41,9 @@ const ALL_INTENTS = [
 /** Intents stripped while stunned (WaitIntent is allowed to burn the turn). */
 const STUNNED_BLOCKED = ALL_INTENTS.filter(c => c !== WaitIntent);
 
+/** Intents stripped while rooted (can act but cannot move). */
+const ROOTED_BLOCKED = [MoveIntent, FlyIntent];
+
 /** Intents stripped during channeling (everything except WaitIntent). */
 const CHANNELING_BLOCKED = ALL_INTENTS.filter(c => c !== WaitIntent);
 
@@ -101,6 +104,19 @@ export function intentValidationSystem(world) {
         }
       }
       continue;
+    }
+
+    // Rooted actors can act but cannot move
+    const rooted = statusStrength(world, id, "rooted") > 0;
+    if (rooted) {
+      const blocked = stripIntents(world, id, ROOTED_BLOCKED);
+      if (blocked) {
+        try {
+          world.emit?.("intent:blocked", { actor: id, reason: "rooted" });
+        } catch (e) {
+          console.debug("[intentValidationSystem] emit intent:blocked failed:", e);
+        }
+      }
     }
 
     // Channeling actors can only wait — strip everything else

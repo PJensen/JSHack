@@ -122,6 +122,7 @@ export function installSpellMessages(ctx) {
   world.on('intent:blocked', ({ actor, reason }) => {
     if (nameOfEntity(actor) !== 'You') return;
     if (reason === 'stunned') { log('You are stunned and can only wait.', 'system'); return; }
+    if (reason === 'rooted') { log('Vines hold you fast — you cannot move!', 'system'); return; }
     log('You cannot act right now.', 'system');
   });
 
