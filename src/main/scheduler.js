@@ -155,6 +155,7 @@ export function configureWorld(world) {
 
   // Phase: ai (intent producers — added intents are visible to later phases
   // in the same tick because ecs-js add() is intratick-immediate)
+
   // Flying AI claims the action with FlyIntent before scurry/chase.
   registerSystem(aiFlyingSystem, 'ai');
   // Scurry before chase: dumb idle creatures set a random MoveIntent which
@@ -172,7 +173,6 @@ export function configureWorld(world) {
   registerSystem(petBehaviorSystem, 'ai');
 
   // Phase: intents (intent consumers + steering)
-  // Validate intents AFTER all AI producers — strips intents from stunned/rooted/dead actors.
   registerSystem(intentValidationSystem, 'intents');
   // Knockback resolves before standard movement so positions are committed first.
   registerSystem(knockbackSystem, 'intents', { before: [movementSystem] });
