@@ -1,26 +1,16 @@
 import { DistrictProfile } from "../components/DistrictProfile.js";
 import { DistrictState } from "../components/DistrictState.js";
-import { DungeonState } from "../components/DungeonState.js";
 import { EntranceProfile } from "../components/EntranceProfile.js";
 import { EntranceState } from "../components/EntranceState.js";
 import { Position } from "../components/Position.js";
-import { TownState } from "../components/TownState.js";
 import { clamp01, ensureTownInterpretationEntities } from "../utils/townInterpretation.js";
 import { chebyshevScalar } from "../utils/distance.js";
+import { currentDepth } from "../utils/worldAccess.js";
+import { getTownState } from "../utils/townStateAccess.js";
 
 const SHORTAGE_ORDER = Object.freeze(["stable", "tight", "strained", "scarce", "panic"]);
 const DANGER_ORDER = Object.freeze(["safe", "uneasy", "dangerous", "closed"]);
 const PRESSURE_ORDER = Object.freeze(["quiet", "rumbling", "active", "bleeding"]);
-
-function getDepth(world) {
-  for (const [, ds] of world.query(DungeonState)) return ds.currentDepth ?? 1;
-  return 1;
-}
-
-function getTownState(world) {
-  for (const [, state] of world.query(TownState)) return state;
-  return null;
-}
 
 function pickBand(prev, value, bands) {
   const current = bands.find((band) => band.name === prev) || bands[0];
@@ -68,7 +58,7 @@ function influenceFor(districtPos, districtRadius, entrancePos, entranceState, e
 }
 
 export function districtConditionSystem(world) {
-  if (getDepth(world) !== 0) return;
+  if (currentDepth(world, 1) !== 0) return;
   ensureTownInterpretationEntities(world);
 
   const town = getTownState(world);

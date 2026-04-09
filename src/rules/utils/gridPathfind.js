@@ -8,10 +8,7 @@ import { TILE_STAIR_DOWN, TILE_STAIR_UP } from "../environment/dungeon/constants
 
 import { CARDINAL_DIRS } from "./directions.js";
 import { manhattanScalar } from "./distance.js";
-
-function key(x, y) {
-  return `${x},${y}`;
-}
+import { xyKey as key } from "./gridKey.js";
 
 function heuristic(x, y, tx, ty) {
   return manhattanScalar(x, y, tx, ty);

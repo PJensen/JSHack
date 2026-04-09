@@ -1,15 +1,11 @@
 import { HazardArea } from "../components/HazardArea.js";
 import { PlasmaCloud } from "../components/PlasmaCloud.js";
 import { spawnHazard } from "./hazardSpawn.js";
+import { clampInt } from "./numberCoerce.js";
 
 const DEFAULT_TURNS = 3;
 const DEFAULT_RADIUS = 1;
 const DEFAULT_DAMAGE = 2;
-
-function clampInt(value, fallback, min = 0) {
-  const n = Number.isFinite(value) ? (value | 0) : fallback;
-  return Math.max(min, n | 0);
-}
 
 /**
  * Compatibility wrapper that spawns a plasma hazard via generic hazard spawning.

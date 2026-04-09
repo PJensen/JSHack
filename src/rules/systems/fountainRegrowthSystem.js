@@ -1,6 +1,6 @@
-import { DungeonState } from "../components/DungeonState.js";
 import { Interactable } from "../components/Interactable.js";
 import { Position } from "../components/Position.js";
+import { currentDepth } from "../utils/worldAccess.js";
 
 const FOUNTAIN_SOURCE_DB_AT_1_TILE = 80;
 
@@ -10,14 +10,6 @@ const FOUNTAIN_CLARITY = Object.freeze({
   near: "you hear water gushing to life",
 });
 
-function getCurrentDepth(world) {
-  for (const [, ds] of world.query(DungeonState)) {
-    const depth = Number(ds?.currentDepth);
-    return Number.isFinite(depth) ? (depth | 0) : 0;
-  }
-  return 0;
-}
-
 /**
  * Refill dry fountains as soon as cooldown expires.
  *
@@ -25,7 +17,7 @@ function getCurrentDepth(world) {
  */
 export function fountainRegrowthSystem(world) {
   const nowStep = Number(world.step || 0) | 0;
-  const depth = getCurrentDepth(world);
+  const depth = currentDepth(world, 0);
 
   for (const [targetId, inter, pos] of world.query(Interactable, Position)) {
     if (String(inter?.action || "") !== "drinkFountain") continue;

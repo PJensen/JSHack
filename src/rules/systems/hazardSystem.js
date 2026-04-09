@@ -31,6 +31,7 @@ import {
   ROOF_BURN_TURNS,
   tickDestroyedTileLedger,
 } from "../utils/destroyedTiles.js";
+import { clamp01Or, clampInt } from "../utils/numberCoerce.js";
 
 const DEFAULT_TURNS = 3;
 const DEFAULT_RADIUS = 1;
@@ -134,14 +135,8 @@ function burnFlammableEntitiesAt(world, x, y, source, hazardId, cause, sourceId,
   }
 }
 
-function clampInt(value, fallback, min = 0) {
-  const n = Number.isFinite(value) ? (value | 0) : fallback;
-  return Math.max(min, n | 0);
-}
-
 function clampChance(value, fallback) {
-  const n = Number.isFinite(value) ? Number(value) : fallback;
-  return Math.max(0, Math.min(1, n));
+  return clamp01Or(value, fallback);
 }
 
 function getFireSpreadChance(hazard) {

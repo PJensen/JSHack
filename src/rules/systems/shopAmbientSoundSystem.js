@@ -1,9 +1,9 @@
-import { DungeonState } from "../components/DungeonState.js";
 import { Position } from "../components/Position.js";
 import { RoomMetadata } from "../components/RoomMetadata.js";
 import { playerEntity } from "../utils/queries.js";
 import { createRng } from "../../lib/ecs-js/rng.js";
 import { chebyshevScalar } from "../utils/distance.js";
+import { currentDepth } from "../utils/worldAccess.js";
 
 const SHOP_AMBIENT_STATE_KEY = Symbol.for("jshack:shopAmbientSoundSystem:state");
 const COOLDOWN_TURNS = 10;
@@ -78,14 +78,6 @@ function createShopSoundRng(worldSeed, turn, roomX, roomY) {
   return createRng(seed);
 }
 
-function getCurrentDepth(world) {
-  for (const [, ds] of world.query(DungeonState)) {
-    const depth = Number(ds?.currentDepth);
-    return Number.isFinite(depth) ? (depth | 0) : 0;
-  }
-  return 0;
-}
-
 /**
  * Emit structured `ambient:sound` events for nearby shop rooms.
  * This is shop-only ambient authoring; audibility and message selection are
@@ -104,13 +96,13 @@ export function shopAmbientSoundSystem(world) {
   if (!_player) return;
   const playerPos = _player.pos;
 
-  const currentDepth = getCurrentDepth(world);
+  const depthNow = currentDepth(world, 0);
   const currentTurn = world.step | 0;
 
   for (const [entityId, metadata] of world.query(RoomMetadata)) {
     if (metadata.roomType !== "shop") continue;
 
-    const locationKey = `shop_${currentDepth}_${metadata.x}_${metadata.y}`;
+    const locationKey = `shop_${depthNow}_${metadata.x}_${metadata.y}`;
     const roomState = getOrCreateRoomState(state, locationKey);
     const insideNow = isInsideRoom(metadata, playerPos);
     const enteredNow = insideNow && !roomState.wasInside;
@@ -148,7 +140,7 @@ export function shopAmbientSoundSystem(world) {
     world.emit?.("ambient:sound", {
       source: "shop",
       at: { x: centerX, y: centerY },
-      depth: currentDepth,
+      depth: depthNow,
       sourceDbAt1Tile: SHOP_SOURCE_DB_AT_1_TILE,
       clarity,
       targetId: entityId,

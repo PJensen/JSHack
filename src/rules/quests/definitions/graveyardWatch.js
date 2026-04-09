@@ -4,11 +4,11 @@ import { buildCatalogItem } from "../../data/itemCatalogLoader.js";
 import { DungeonState } from "../../components/DungeonState.js";
 import { ItemInfo } from "../../components/ItemInfo.js";
 import { NamedIdentity } from "../../components/NamedIdentity.js";
-import { Player } from "../../components/Player.js";
 import { Position } from "../../components/Position.js";
 import { emitSafe } from "../../utils/emitSafe.js";
 import { consumeInventoryIdentity, inventoryHasIdentity } from "../../utils/townEconomy.js";
 import { attachEntityToCurrentFloor } from "../../utils/floorEntities.js";
+import { currentDepth, firstPlayerId } from "../../utils/worldAccess.js";
 import { emit, setVar } from "../actions.js";
 import { registerQuest } from "../registry.js";
 import { STARTER_PRIEST_FETCH_QUEST_ID, getQuestRecord } from "../runtime.js";
@@ -24,11 +24,6 @@ function playerHasBook(world, playerId) {
 function pickedUpBook(world, itemId) {
   const ni = world.get(itemId, NamedIdentity);
   return String(ni?.identity || "") === STARTER_FETCH_ITEM_ID;
-}
-
-function currentDepth(world) {
-  for (const [, ds] of world.query(DungeonState)) return Number(ds?.currentDepth ?? 0) | 0;
-  return 0;
 }
 
 function currentDownStairPos(world) {
@@ -51,13 +46,8 @@ function findBookEntity(world) {
   return 0;
 }
 
-function firstPlayerId(world) {
-  for (const [id] of world.query(Player)) return id;
-  return 0;
-}
-
 export function ensureStarterFetchQuestItem(world) {
-  if (currentDepth(world) !== 1) return 0;
+  if (currentDepth(world, 0) !== 1) return 0;
 
   const playerId = firstPlayerId(world);
   if (!(playerId > 0)) return 0;

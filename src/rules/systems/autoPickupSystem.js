@@ -8,6 +8,7 @@ import { ItemInfo } from "../components/ItemInfo.js";
 import { Player } from "../components/Player.js";
 import { addToInventory } from "../utils/inventoryFacade.js";
 import { emitSafe } from "../utils/emitSafe.js";
+import { xyKey } from "../utils/gridKey.js";
 
 export function autoPickupSystem(world) {
   // Build a lookup from tile -> item ids for currency only
@@ -15,14 +16,14 @@ export function autoPickupSystem(world) {
   for (const [id, pos] of world.query(Position)) {
     const info = world.get(id, ItemInfo);
     if (!info || info.type !== "currency") continue;
-    const k = key(pos.x, pos.y);
+    const k = xyKey(pos.x, pos.y);
     let arr = itemsAt.get(k);
     if (!arr) itemsAt.set(k, (arr = []));
     arr.push(id);
   }
 
   for (const [actor, pos, inv] of world.query(Player, Position, Inventory)) {
-    const k = key(pos.x, pos.y);
+    const k = xyKey(pos.x, pos.y);
     const list = itemsAt.get(k);
     if (!list || list.length === 0) continue;
 
@@ -36,5 +37,3 @@ export function autoPickupSystem(world) {
     }
   }
 }
-
-function key(x, y) { return `${x},${y}`; }

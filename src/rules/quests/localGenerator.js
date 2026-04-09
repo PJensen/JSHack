@@ -1,7 +1,5 @@
-import { DungeonState } from "../components/DungeonState.js";
 import { DistrictProfile } from "../components/DistrictProfile.js";
 import { DistrictState } from "../components/DistrictState.js";
-import { Player } from "../components/Player.js";
 import { QuestBindings } from "../components/QuestBindings.js";
 import { QuestDefRef } from "../components/QuestDefRef.js";
 import { QuestState } from "../components/QuestState.js";
@@ -10,6 +8,7 @@ import { incVar, emit, setVar } from "./actions.js";
 import { getQuestDef } from "./registry.js";
 import { registerQuest } from "./registry.js";
 import { createRng } from "../utils/rng.js";
+import { currentDepth, firstPlayerId } from "../utils/worldAccess.js";
 import { ensureQuestRuntimeEventRoutes, findQuestEntity, instantiateQuest } from "./runtime.js";
 import { getDistrictBulletinVirtual, getPlayerOpportunityViewVirtual } from "../utils/townInterpretationVirtuals.js";
 
@@ -96,16 +95,6 @@ const FALLBACK_OFFER_POOL = Object.freeze([
     urgency: "low",
   }),
 ]);
-
-function firstPlayerId(world) {
-  for (const [id] of world.query(Player)) return id;
-  return 0;
-}
-
-function currentDepth(world) {
-  for (const [, ds] of world.query(DungeonState)) return Number(ds?.currentDepth ?? 1) | 0;
-  return 1;
-}
 
 function selectWeightedTemplate(rng) {
   let total = 0;

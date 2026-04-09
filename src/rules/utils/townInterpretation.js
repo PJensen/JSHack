@@ -1,6 +1,5 @@
 import { DistrictProfile } from "../components/DistrictProfile.js";
 import { DistrictState } from "../components/DistrictState.js";
-import { DungeonState } from "../components/DungeonState.js";
 import { EntranceProfile } from "../components/EntranceProfile.js";
 import { EntranceState } from "../components/EntranceState.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
@@ -8,14 +7,15 @@ import { Position } from "../components/Position.js";
 import { TOWN_DISTRICT_DEFS } from "../data/townDistricts.js";
 import { TOWN_ENTRANCE_DEFS } from "../data/townEntrances.js";
 import { chebyshev } from "./distance.js";
+import { currentDepth } from "./worldAccess.js";
+import { clamp01 as clamp01Number } from "./numberCoerce.js";
 
 function keyOf(identity) {
   return `jshack:${identity}`;
 }
 
 export function getDepth(world) {
-  for (const [, ds] of world.query(DungeonState)) return ds.currentDepth ?? 1;
-  return 1;
+  return currentDepth(world, 1);
 }
 
 export function findIdentityPosition(world, identity) {
@@ -130,7 +130,7 @@ export function getDistrictEntityByKey(world, key) {
 }
 
 export function clamp01(value) {
-  return Math.max(0, Math.min(1, Number(value || 0)));
+  return clamp01Number(value);
 }
 
 export function namedLookupKey(identity) {

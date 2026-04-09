@@ -12,7 +12,6 @@ import { Beatitude } from "../../components/Beatitude.js";
 import { NamedIdentity } from "../../components/NamedIdentity.js";
 import { Player } from "../../components/Player.js";
 import { Position } from "../../components/Position.js";
-import { DungeonState } from "../../components/DungeonState.js";
 import { degradeExplored } from "../../environment/dungeon/exploredMap.js";
 import { combatSeed, createRng, mulberry32, rngInt } from "../../utils/rng.js";
 import { createCombatStatFacade } from "../../utils/resolveCombatSnapshot.js";
@@ -22,6 +21,7 @@ import { findNearestValidTileAround } from "../../utils/queries.js";
 import { inventoryItems, addToInventory, removeFromInventory } from "../../utils/inventoryFacade.js";
 import { dealDamage } from "../../utils/dealDamage.js";
 import { emitSafe } from "../../utils/emitSafe.js";
+import { currentDepth } from "../../utils/worldAccess.js";
 import { dropLoot } from "../lootResolver.js";
 
 // ── CombatCallbackContext ──────────────────────────────────────────
@@ -602,13 +602,6 @@ export function stealAndBlinkOnHit(opts = {}) {
 
 const LOOT_GOBLIN_SPILL_STATE_KEY = Symbol.for("jshack:combat:lootGoblinSpill:state");
 
-function currentDepth(world) {
-  for (const [, ds] of world.query(DungeonState)) {
-    return Math.max(1, Number(ds?.currentDepth || 1) | 0);
-  }
-  return 1;
-}
-
 /**
  * On damaged: spill loot at current tile and optionally short-blink.
  * Intended for loot goblins.
@@ -648,7 +641,7 @@ export function spillLootAndShortBlinkOnDamaged(opts = {}) {
     if ((now - rec.dropTurn) >= dropCooldownTurns && ctx.roll(dropChancePct, seedSalt)) {
       const lootSeed = combatSeed(ctx.world.seed, now, ctx.attacker, defender, seedSalt ^ 0x51f15e);
       const rng = createRng(lootSeed >>> 0);
-      dropLoot(ctx.world, dropTable, rng, currentDepth(ctx.world), at);
+      dropLoot(ctx.world, dropTable, rng, Math.max(1, currentDepth(ctx.world, 1)), at);
       rec.dropTurn = now;
       ctx.emit("loot_goblin:spilled", { id: defender, at });
     }

@@ -5,15 +5,11 @@ import { ItemInfo } from "../components/ItemInfo.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Stamina } from "../components/Stamina.js";
 import { STAMINA_REGEN_COOLDOWN } from "../data/regenConstants.js";
+import { toInt } from "./numberCoerce.js";
 
 export const SHIELD_GUARD_KEY = "shield_guard";
 export const SHIELD_BROKEN_KEY = "shield_broken";
 export const SHIELD_MAX_GUARD_STACKS = 2;
-
-function toInt(value, fallback = 0) {
-  const n = Number(value);
-  return Number.isFinite(n) ? (n | 0) : fallback;
-}
 
 function isActiveTimedEffect(effect) {
   if (!effect || typeof effect !== "object") return false;

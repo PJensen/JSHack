@@ -32,6 +32,7 @@ import {
 } from "./constants.js";
 import { setRoofed } from "./tileMap.js";
 import { chebyshevScalar } from "../../utils/distance.js";
+import { xyKey } from "../../utils/gridKey.js";
 
 export const OVERWORLD_EXTENT = Object.freeze({
   minCX: -2,
@@ -209,10 +210,6 @@ export function addSpawn(chunks, x, y, kind, params = {}) {
   const chunk = chunks.get(chunkKey(cx, cy));
   if (!chunk) return;
   chunk.spawns.push({ x, y, kind, params });
-}
-
-function xyKey(x, y) {
-  return `${x},${y}`;
 }
 
 function setStructureTile(chunks, x, y, tile, roofed = false) {
