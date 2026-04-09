@@ -2,6 +2,8 @@ import { Position } from "../components/Position.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { GroundStackOrder } from "../components/GroundStackOrder.js";
 import { Player } from "../components/Player.js";
+import { Inventory } from "../components/Inventory.js";
+import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Collider } from "../components/Collider.js";
 import { Vitality } from "../components/Vitality.js";
 import { Faction } from "../components/Faction.js";
@@ -22,6 +24,10 @@ const _qCache = new WeakMap();
 
 function _buildHandles(world) {
   return {
+    allPositions:     world.defineQuery(Position),
+    namedPositions:   world.defineQuery(Position, NamedIdentity),
+    playerPosInv:     world.defineQuery(Player, Position, Inventory),
+    positionFaction:  world.defineQuery(Position, Faction),
     playerPos:       world.defineQuery(Player, Position),
     factionActors:   world.defineQuery(Faction, Position, Vitality),
     aggroPositioned: world.defineQuery(AggroState, Position, Not(Player)),
@@ -40,6 +46,18 @@ function _q(world) {
 
 /** All entities with Player + Position. */
 export function queryPlayerPos(world)       { return _q(world).playerPos(); }
+
+/** All entities with Position. */
+export function queryAllPositions(world)    { return _q(world).allPositions(); }
+
+/** All entities with Position + NamedIdentity. */
+export function queryNamedPositions(world)  { return _q(world).namedPositions(); }
+
+/** All players with Position + Inventory. */
+export function queryPlayerPosInv(world)    { return _q(world).playerPosInv(); }
+
+/** All entities with Position + Faction. */
+export function queryPositionFaction(world) { return _q(world).positionFaction(); }
 
 /** All entities with Faction + Position + Vitality. */
 export function queryFactionActors(world)   { return _q(world).factionActors(); }
