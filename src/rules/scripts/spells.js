@@ -3293,7 +3293,7 @@ REGISTRY['entangle'] = function entangleScript(world, actor, spell, intent) {
       const dx = (pos.x | 0) - (apos.x | 0), dy = (pos.y | 0) - (apos.y | 0);
       const d2 = dx * dx + dy * dy;
       if (d2 > range * range) continue;
-      if (!hasSpellLineOfSight({ sourcePos: apos, targetPos: pos, range, isBlocked: blockedCallback(buildBlocksVisionMap(world)) })) continue;
+      if (!hasSpellLineOfSight(world, { sourcePos: apos, targetPos: pos, range, isBlocked: blockedCallback(buildBlocksVisionMap(world)) })) continue;
       if (d2 < bestD2) { bestD2 = d2; bestId = id; }
     }
   }
@@ -3336,7 +3336,7 @@ REGISTRY['thorn_burst'] = function thornBurstScript(world, actor, spell, intent)
     const dx = (pos.x | 0) - (apos.x | 0), dy = (pos.y | 0) - (apos.y | 0);
     const d2 = dx * dx + dy * dy;
     if (d2 > radius * radius) continue;
-    if (!hasSpellLineOfSight({ sourcePos: apos, targetPos: pos, range: radius, isBlocked })) continue;
+    if (!hasSpellLineOfSight(world, { sourcePos: apos, targetPos: pos, range: radius, isBlocked })) continue;
     targets.push({ id, x: pos.x | 0, y: pos.y | 0 });
   }
 
@@ -3726,7 +3726,7 @@ REGISTRY['mark_of_death'] = function markOfDeathScript(world, actor, spell, inte
       const dx = (pos.x | 0) - (apos.x | 0), dy = (pos.y | 0) - (apos.y | 0);
       const d2 = dx * dx + dy * dy;
       if (d2 > range * range) continue;
-      if (!hasSpellLineOfSight({ sourcePos: apos, targetPos: pos, range, isBlocked: blockedCallback(buildBlocksVisionMap(world)) })) continue;
+      if (!hasSpellLineOfSight(world, { sourcePos: apos, targetPos: pos, range, isBlocked: blockedCallback(buildBlocksVisionMap(world)) })) continue;
       if (d2 < bestD2) { bestD2 = d2; targetId = id; }
     }
   }
