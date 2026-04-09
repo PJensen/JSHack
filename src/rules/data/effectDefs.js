@@ -57,6 +57,12 @@ export const EFFECT_DEFS = [
     statuses: ["stunned"],
   },
   {
+    id: "rooted",
+    keys: ["rooted", "root"],
+    operation: "none",
+    statuses: ["rooted"],
+  },
+  {
     id: "stagger",
     keys: ["stagger", "staggered"],
     operation: "none",

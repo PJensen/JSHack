@@ -396,6 +396,14 @@ export function initOverlays() {
     }
   });
 
+  // Pulse guard: defer inventory re-render while a row pulse animation is active
+  // so equip/drop/use feedback isn't immediately wiped by a data refresh.
+  let invPulseUntil = 0;
+  let invDeferredRender = 0;
+  window.addEventListener('ui:inventoryPulse', () => {
+    invPulseUntil = performance.now() + 480;
+  });
+
   // Data feeds
   window.addEventListener('ui:inventoryData', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
@@ -416,10 +424,21 @@ export function initOverlays() {
     const pinnedKeys = Array.isArray((/** @type {any} */ (inv))._inventoryPinnedKeys)
       ? (/** @type {any} */ (inv))._inventoryPinnedKeys
       : [];
-    if (inv.style.display === 'block') renderInventory(inv, items, ground, slotFilter, scrollOfIdentifyId, encumbrance, pinnedKeys);
-    if (equip.style.display === 'block') {
-      const cachedPlayerName = String((/** @type {any} */ (equip))._equipmentPlayerName || 'Hero');
-      renderEquipment(equip, equippedBySlot, cachedPlayerName, scrollOfIdentifyId);
+
+    const doRender = () => {
+      if (inv.style.display === 'block') renderInventory(inv, items, ground, slotFilter, scrollOfIdentifyId, encumbrance, pinnedKeys);
+      if (equip.style.display === 'block') {
+        const cachedPlayerName = String((/** @type {any} */ (equip))._equipmentPlayerName || 'Hero');
+        renderEquipment(equip, equippedBySlot, cachedPlayerName, scrollOfIdentifyId);
+      }
+    };
+
+    const now = performance.now();
+    if (now < invPulseUntil) {
+      clearTimeout(invDeferredRender);
+      invDeferredRender = setTimeout(doRender, invPulseUntil - now);
+    } else {
+      doRender();
     }
   });
   window.addEventListener('ui:pinnedQuickItems', (ev) => {

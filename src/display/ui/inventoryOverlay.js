@@ -399,13 +399,14 @@ export function renderInventory(panel, items, ground, slotFilter = '', scrollOfI
     const row = rows[sel];
     const unpaid = !!it.unpaid;
     const restoreBg = unpaid ? 'rgba(65, 35, 10, 0.75)' : (row === rows[sel] && row?.style.outline !== 'none') ? '#0b1323' : '#0f1421';
+    const signalPulse = () => window.dispatchEvent(new CustomEvent('ui:inventoryPulse'));
 
     if (actionKey === 'identify') {
       if (scrollOfIdentifyId > 0 && Number.isInteger(it.id) && it.id > 0) {
         window.dispatchEvent(new CustomEvent('ui:requestApply', {
           detail: { toolId: scrollOfIdentifyId, targetItemId: it.id },
         }));
-        pulseRow(row, 'use', restoreBg);
+        signalPulse(); pulseRow(row, 'use', restoreBg);
       }
       return;
     }
@@ -425,13 +426,13 @@ export function renderInventory(panel, items, ground, slotFilter = '', scrollOfI
     if (actionKey === 'equip') {
       if (isInventoryItemEquippable(it) && Number.isInteger(it.id) && it.id > 0) {
         window.dispatchEvent(new CustomEvent('ui:requestEquip', { detail: { itemId: it.id } }));
-        pulseRow(row, it.equipped ? 'unequip' : 'equip', restoreBg);
+        signalPulse(); pulseRow(row, it.equipped ? 'unequip' : 'equip', restoreBg);
       }
       return;
     }
     if (actionKey === 'use') {
       if (!isInventoryItemUsable(it) || !Number.isInteger(it.id) || it.id <= 0) return;
-      pulseRow(row, 'use', restoreBg);
+      signalPulse(); pulseRow(row, 'use', restoreBg);
       if (it.type === 'potion') {
         window.dispatchEvent(new CustomEvent('ui:requestDrink', { detail: { itemId: it.id } }));
       } else {
@@ -444,13 +445,13 @@ export function renderInventory(panel, items, ground, slotFilter = '', scrollOfI
       const spellId = String(it.id || '').replace(/^spell:/, '');
       if (spellId) {
         window.dispatchEvent(new CustomEvent('ui:selectActiveSpell', { detail: { spellId } }));
-        pulseRow(row, 'equip', restoreBg);
+        signalPulse(); pulseRow(row, 'equip', restoreBg);
       }
       return;
     }
     if (actionKey === 'throw') {
       if (Number.isInteger(it.id) && it.id > 0) {
-        pulseRow(row, 'throw', restoreBg);
+        signalPulse(); pulseRow(row, 'throw', restoreBg);
         window.dispatchEvent(new CustomEvent('ui:requestThrow', { detail: { itemId: it.id } }));
         hide(panel);
       }
@@ -458,14 +459,14 @@ export function renderInventory(panel, items, ground, slotFilter = '', scrollOfI
     }
     if (actionKey === 'drop') {
       if (Number.isInteger(it.id) && it.id > 0) {
-        pulseRow(row, 'drop', restoreBg);
+        signalPulse(); pulseRow(row, 'drop', restoreBg);
         window.dispatchEvent(new CustomEvent('ui:requestDrop', { detail: { itemId: it.id } }));
       }
       return;
     }
     if (actionKey === 'pin') {
       if (Number.isInteger(it.id) && it.id > 0) {
-        pulseRow(row, 'pin', restoreBg);
+        signalPulse(); pulseRow(row, 'pin', restoreBg);
         window.dispatchEvent(new CustomEvent('ui:requestPinQuickItem', { detail: { item: it } }));
       }
     }

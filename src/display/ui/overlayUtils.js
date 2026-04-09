@@ -1174,14 +1174,14 @@ export function decorateButton(btn) {
 
 /** Color presets for action feedback pulses. */
 const PULSE_COLORS = Object.freeze({
-  equip:   '#1a3a5c',
-  unequip: '#2a2a35',
-  use:     '#1a3a2a',
-  drop:    '#3a2a10',
-  throw:   '#3a2a10',
-  pin:     '#1a2a3a',
-  cursed:  '#3a1040',
-  default: '#1a2a3a',
+  equip:   '#1e4f7a',
+  unequip: '#3a3545',
+  use:     '#1e5535',
+  drop:    '#6a4a18',
+  throw:   '#6a4a18',
+  pin:     '#1a3a5c',
+  cursed:  '#5a1860',
+  default: '#1a3a5c',
 });
 
 /**

@@ -3270,6 +3270,7 @@ REGISTRY['entangle'] = function entangleScript(world, actor, spell, intent) {
     if (!tpos || !vit || (vit.hp | 0) <= 0) bestId = 0;
     if (bestId === actor) bestId = 0; // no self-target
     if (bestId && statusStrength(world, bestId, "stunned") > 0) bestId = 0;
+    if (bestId && statusStrength(world, bestId, "rooted") > 0) bestId = 0;
   }
 
   if (!bestId) {
@@ -3282,6 +3283,7 @@ REGISTRY['entangle'] = function entangleScript(world, actor, spell, intent) {
       const vit = /** @type any */ (world.get(id, Vitality));
       if (!vit || (vit.hp | 0) <= 0) continue;
       if (statusStrength(world, id, "stunned") > 0) continue;
+      if (statusStrength(world, id, "rooted") > 0) continue;
       const dx = (pos.x | 0) - (apos.x | 0), dy = (pos.y | 0) - (apos.y | 0);
       const d2 = dx * dx + dy * dy;
       if (d2 > range * range) continue;
@@ -3296,12 +3298,12 @@ REGISTRY['entangle'] = function entangleScript(world, actor, spell, intent) {
   if (!ae) return;
 
   const STUN_TURNS = 3;
-  const DOT_TURNS = 3;
+  const ROOT_TURNS = 15;
   upsertTimedEffect(ae.effects, {
     key: 'stun', turnsLeft: STUN_TURNS + 1, potency: 1, stacks: 1, sourceId: actor,
   });
   upsertTimedEffect(ae.effects, {
-    key: 'poison', turnsLeft: DOT_TURNS, potency: 2, stacks: 1, sourceId: actor,
+    key: 'rooted', turnsLeft: STUN_TURNS + ROOT_TURNS + 1, potency: 1, stacks: 1, sourceId: actor,
   });
 
   emitSafe(world, 'spell:entangle', {
