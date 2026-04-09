@@ -1,0 +1,276 @@
+/**
+ * Item pickup, equip, drink, potion, scroll, wand, corpse-trait, food wiring.
+ * Lines ~332-376, ~1408-1492, ~1685-1739, ~2070-2137, ~2431-2479 from original.
+ */
+export function installItemMessages(ctx) {
+  const { world, log, nameOfEntity, nameOfItem, bracketizeName, playerEntity,
+          compGet, compHas, ItemInfo, NamedIdentity, Player, Pet, Owner, Devotion } = ctx;
+
+  // === Item events ===
+  world.on('drank', ({ actor, itemId, target, feel, identified }) => {
+    const who = nameOfEntity(actor);
+    const tgt = nameOfEntity(target || actor);
+    if (identified === false && feel) {
+      if (who === 'You') log(`You drink an unknown vial. ${feel}`, 'system');
+      else log(`${who} drinks an unknown vial.`, 'system');
+      return;
+    }
+    const it = nameOfItem(itemId);
+    if (tgt === 'You' && who === 'You') log(`You drink ${it}.`, 'system');
+    else if (who === tgt) log(`${who} drinks ${it}.`, 'system');
+    else log(`${who} uses ${it} on ${tgt}.`, 'system');
+  });
+
+  world.on('item:pickup', ({ actor, itemId, count }) => {
+    const pe = playerEntity(world);
+    if (!pe || pe.id !== actor) {
+      const petName = nameOfEntity(actor);
+      const it = nameOfItem(itemId);
+      log(`${petName} picks up ${it}.`, 'system');
+    }
+  });
+
+  world.on('item:transformed', ({ itemId, ownerId, scope, from, to, cause }) => {
+    const pe = playerEntity(world);
+    if (!pe) return;
+    if (scope !== 'inventory' || Number(ownerId || 0) !== pe.id) return;
+    const fromLabel = bracketizeName(String(from?.name || nameOfItem(itemId)));
+    const toLabel = bracketizeName(String(to?.name || 'something else'));
+    if (String(cause || '') === 'burning') {
+      log(`${fromLabel} in your pack burns into ${toLabel}.`, 'system');
+      return;
+    }
+    log(`${fromLabel} in your pack transforms into ${toLabel}.`, 'system');
+  });
+
+  // === Corpse events ===
+  world.on('corpse:desecrated', ({ actor, ownerId, corpseName }) => {
+    const pe = playerEntity(world);
+    const playerId = Number(pe?.id || 0) | 0;
+    const actorId = Number(actor || 0) | 0;
+    if (!(playerId > 0) || actorId !== playerId) return;
+    const label = bracketizeName(String(corpseName || "pet corpse"));
+    const desecratedOwnPet = (Number(ownerId || 0) | 0) === playerId;
+    if (desecratedOwnPet) {
+      log(`You consume ${label}. It is horrifying. The heavens will remember this.`, 'deity');
+      return;
+    }
+    log(`You desecrate ${label}.`, 'deity');
+  });
+
+  world.on('corpse:trait-gained', ({ actor, trait, name }) => {
+    const pe = playerEntity(world);
+    if (!pe || Number(actor || 0) !== pe.id) return;
+    const label = String(name || trait || 'unknown');
+    const TRAIT_MESSAGES = {
+      iron_stomach: `Your stomach hardens \u2014 you've developed an ${label}!`,
+      serpent_blood: `Venom runs cold through your veins \u2014 you've gained ${label}!`,
+      venom_tolerance: `Your body shrugs off toxins \u2014 you've gained ${label}!`,
+      thick_hide: `Your skin toughens like bark \u2014 you've gained ${label}!`,
+      deathless: `Undeath whispers through your bones \u2014 you are ${label}.`,
+      third_eye: `A third eye opens in your mind \u2014 you sense life beyond walls.`,
+      demon_fire: `Hellfire smolders in your fists \u2014 ${label} is yours.`,
+      dragonheart: `Scales shimmer beneath your skin \u2014 the ${label} beats within you!`,
+    };
+    log(TRAIT_MESSAGES[trait] || `Something fundamental shifts \u2014 you've gained ${label}!`, 'legendary');
+  });
+
+  world.on('corpse:buff-gained', ({ actor, effect, description }) => {
+    const pe = playerEntity(world);
+    if (!pe || Number(actor || 0) !== pe.id) return;
+    log(`You feel ${String(description || effect || 'something stirs within you')}.`, 'system');
+  });
+
+  world.on('corpse:debuff-gained', ({ actor, effect, description }) => {
+    const pe = playerEntity(world);
+    if (!pe || Number(actor || 0) !== pe.id) return;
+    log(`You feel ${String(description || effect || 'something is wrong')}.`, 'danger');
+  });
+
+  world.on('corpse:resistance-gained', ({ actor, type }) => {
+    const pe = playerEntity(world);
+    if (!pe || Number(actor || 0) !== pe.id) return;
+    log(`Your body adapts \u2014 ${String(type || 'unknown')} resistance gained.`, 'legendary');
+  });
+
+  world.on('corpse:resist-building', ({ actor, type, pct }) => {
+    const pe = playerEntity(world);
+    if (!pe || Number(actor || 0) !== pe.id) return;
+    const label = String(type || 'unknown');
+    const p = Number(pct || 0);
+    if (p > 0) log(`Your ${label} resistance hardens \u2014 ${p}% resilient.`, 'system');
+    else log(`Your body toughens against ${label}.`, 'system');
+  });
+
+  world.on('corpse:progression', ({ actor, name, count, threshold }) => {
+    const pe = playerEntity(world);
+    if (!pe || Number(actor || 0) !== pe.id) return;
+    log(`Your body adapts... (${String(name || 'unknown')}: ${Number(count || 0)}/${Number(threshold || 0)})`, 'system');
+  });
+
+  world.on('corpse:misdirect', ({ actor, identity, misdirectedCount, isUndead }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    const label = String(identity || '').replace(/^corpse_/, '').replace(/_/g, ' ');
+    if (isUndead) {
+      log(`You hurl the ${label} corpse \u2014 nearby undead hesitate, recognising their own.`, 'system');
+    } else if (misdirectedCount > 0) {
+      log(`The ${label} corpse hits the ground with a meaty thud \u2014 ${misdirectedCount} creature${misdirectedCount !== 1 ? 's investigate' : ' investigates'} the noise!`, 'system');
+    }
+  });
+
+  // === Bad potion messages ===
+  world.on('potion:paralysis', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log("Your body goes rigid. You can't move!", 'danger');
+  });
+  world.on('potion:hallucination', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('The world dissolves into swirling colours. Nothing looks real anymore.', 'danger');
+  });
+  world.on('potion:blindness', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log("Everything goes dark. You can't see a thing!", 'danger');
+  });
+  world.on('potion:weakness', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('A wave of lethargy washes over you. You feel permanently diminished.', 'danger');
+  });
+  world.on('potion:confusion', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('Your head spins. Which way is which?', 'danger');
+  });
+  world.on('potion:sickness', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('Your stomach lurches violently. You feel poisoned!', 'danger');
+  });
+  world.on('potion:lethargy', ({ actorId }) => {
+    if (nameOfEntity(actorId) !== 'You') return;
+    log('A wave of exhaustion washes over you. Your stamina recovery slows to a crawl.', 'danger');
+  });
+
+  // === Bad scroll messages ===
+  world.on('scroll:cursing', ({ actor, count }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    if (count > 0) {
+      log(`Dark words slither off the page. ${count} piece${count > 1 ? 's' : ''} of your equipment turn${count === 1 ? 's' : ''} black!`, 'danger');
+    } else {
+      log('Dark words slither off the page, but find nothing to corrupt.', 'system');
+    }
+  });
+  world.on('scroll:summoning', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('Shapes claw their way out of the parchment! Hostile creatures surround you!', 'danger');
+  });
+  world.on('scroll:decay', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('The scroll crumbles and a wave of rot spreads through your pack!', 'danger');
+  });
+  world.on('scroll:aggravation', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('A terrible shriek fills the dungeon! Every monster is now alert!', 'danger');
+  });
+  world.on('scroll:teleportation', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('Reality lurches. You blink and find yourself somewhere else entirely.', 'system');
+  });
+
+  // === Apply events ===
+  world.on('item:applied', ({ targetId, result }) => {
+    if (!result) return;
+    const targetName = nameOfItem(targetId);
+    if (result.type === 'touchstone') {
+      const touchstoneName = targetName || result.appearance || 'gem';
+      if (result.hardness === 'hard') log(`You rub ${touchstoneName} on the touchstone... it makes a hard white streak!`, 'system');
+      else log(`You rub ${touchstoneName} on the touchstone... it leaves a dull scratch.`, 'system');
+    } else if (typeof result.message === 'string' && result.message.trim().length > 0) {
+      log(result.message, 'system');
+    } else if (result.type === 'nothing') {
+      log(`Nothing happens.`, 'system');
+    } else {
+      log(`A cryptic sheen crawls over ${targetName}, then vanishes.`, 'system');
+    }
+  });
+
+  world.on('gem:socketed', ({ actor, weaponId, gemId }) => {
+    const pe = playerEntity(world);
+    if (!pe || pe.id !== actor) return;
+    const weaponName = nameOfItem(weaponId);
+    const gName = String(gemId || '').replace(/_/g, ' ').replace(/^gem /, '');
+    log(`You socket the ${gName} into ${weaponName}.`, 'system');
+  });
+
+  world.on('item:identified', ({ identity, name, appearance, category }) => {
+    const displayName = bracketizeName(name);
+    log(`You identify the ${appearance}: it's ${displayName}!`, 'system');
+    try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch (e) { console.debug('[messageWiring] dispatch ui:requestInventoryData:', e); }
+  });
+
+  world.on('food:decayed', ({ ownerId, itemId, stage, itemName }) => {
+    const pe = playerEntity(world);
+    if (!pe || pe.id !== ownerId) return;
+    const label = bracketizeName(itemName);
+    if (stage === 'off')    log(`Your ${label} smells off.`, 'system');
+    if (stage === 'rancid') log(`Your ${label} reeks!`, 'system');
+    if (stage === 'putrid') log(`Your ${label} is putrid!`, 'system');
+  });
+
+  world.on('item:equipped', ({ actor, itemId, slot, name }) => {
+    const label = name ? bracketizeName(name) : `item ${itemId}`;
+    log(`You equip ${label}${slot ? ' (' + slot + ')' : ''}.`, 'system');
+    const info = compGet(itemId, ItemInfo);
+    if (Array.isArray(info?.tags) && info.tags.includes('conflict')) {
+      log('The dungeon erupts in discord \u2014 creatures turn on each other!', 'danger');
+    }
+  });
+  world.on('item:unequipped', ({ actor, itemId, slot, name }) => {
+    const label = name ? bracketizeName(name) : `item ${itemId}`;
+    log(`You unequip ${label}${slot ? ' (' + slot + ')' : ''}.`, 'system');
+  });
+  world.on('item:welded', ({ actor, itemId, slot, name }) => {
+    const label = name ? bracketizeName(name) : `item ${itemId}`;
+    log(`You try to remove ${label}, but it is welded to you!`, 'danger');
+  });
+
+  world.on('urn:broken', () => {
+    log('The urn shatters, scattering ashes on the floor.', 'system');
+  });
+
+  // === Wild Throw Interactions ===
+  const WAND_SHATTER_MSG = Object.freeze({
+    electric: 'The wand explodes in a storm of lightning!',
+    fire:     'The wand detonates in a ball of flame!',
+    cold:     'The wand shatters in a wave of frost!',
+    holy:     'The wand bursts in a pulse of healing light!',
+  });
+  world.on('wand:shatter', ({ actor, element, charges, hitCount }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    const msg = WAND_SHATTER_MSG[element] || 'The wand shatters violently!';
+    log(`${msg} (${charges} charge${charges !== 1 ? 's' : ''} released, ${hitCount} hit)`, 'legendary');
+  });
+
+  const SPLASH_EFFECT_MSG = Object.freeze({
+    stun:           'The potion shatters \u2014 paralytic liquid drenches the area!',
+    hallucinating:  'The potion shatters \u2014 iridescent fumes swirl outward!',
+    blinded:        'The potion shatters \u2014 inky darkness splashes across the ground!',
+    weakened:       'The potion shatters \u2014 a grey mist saps the air!',
+    poison:         'The potion shatters \u2014 toxic sludge splashes everywhere!',
+    confused:       'The potion shatters \u2014 disorienting vapour billows out!',
+    lethargic:      'The potion shatters \u2014 a thick grey fog clings to the ground!',
+    berserk:        'The potion shatters \u2014 liquid adrenaline sprays everywhere!',
+    resist_fire:    'The potion shatters \u2014 a shimmering heat ward splashes outward!',
+    resist_poison:  'The potion shatters \u2014 emerald tonic coats the area!',
+    resist_electric:'The potion shatters \u2014 crackling energy grounds outward!',
+    resist_acid:    'The potion shatters \u2014 thick amber syrup coats the area!',
+    mana_drain:     'The potion shatters \u2014 arcane static crackles through the air!',
+  });
+  world.on('potion:splash', ({ actor, effectKey, hitCount }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    const msg = SPLASH_EFFECT_MSG[effectKey] || 'The potion shatters on impact!';
+    const hitSuffix = hitCount > 0 ? ` (${hitCount} drenched)` : '';
+    log(`${msg}${hitSuffix}`, effectKey && effectKey.startsWith('resist') ? 'system' : 'danger');
+  });
+  world.on('potion:splash:dud', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('The potion shatters harmlessly \u2014 the oily liquid just pools on the ground.', 'system');
+  });
+}
