@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "reflect-js": {
+      "command": "node",
+      "args": [
+        "/home/pjensen/Repos/reflect-js/dist/server.js",
+        "/home/pjensen/Repos/JSHack"
+      ]
+    }
+  }
+}
