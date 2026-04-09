@@ -1,5 +1,3 @@
-import { Faction } from "../components/Faction.js";
-import { Position } from "../components/Position.js";
 import { TownState } from "../components/TownState.js";
 import { Unpaid } from "../components/Unpaid.js";
 import { getDestroyedTileLedger } from "../utils/destroyedTiles.js";
@@ -15,6 +13,7 @@ import { clamp } from "../../shared/math/math.js";
 import { chebyshevScalar } from "../utils/distance.js";
 import { currentDepth } from "../utils/worldAccess.js";
 import { getWeather } from "../utils/townStateAccess.js";
+import { queryPositionFaction } from "../utils/queries.js";
 
 const PULSE_BASE = 12;
 const LOW_FOOD_THRESHOLD = 4;
@@ -43,7 +42,7 @@ function ensureTownState(world) {
 
 function hostileThreatNearTown(world, anchor) {
   let threat = 0;
-  for (const [, pos, fac] of world.query(Position, Faction)) {
+  for (const [, pos, fac] of queryPositionFaction(world)) {
     const key = String(fac.key || "");
     if (!key || key === "townfolk" || key === "shopkeeper" || key === "neutral" || key === "player") continue;
     const dist = chebyshevScalar(pos.x, pos.y, anchor.x, anchor.y);

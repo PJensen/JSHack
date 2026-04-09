@@ -1,16 +1,15 @@
 import { EntranceProfile } from "../components/EntranceProfile.js";
 import { EntranceState } from "../components/EntranceState.js";
-import { Faction } from "../components/Faction.js";
-import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Position } from "../components/Position.js";
 import { clamp01, ensureTownInterpretationEntities } from "../utils/townInterpretation.js";
 import { chebyshevScalar } from "../utils/distance.js";
 import { currentDepth } from "../utils/worldAccess.js";
 import { getTownState, getWeather } from "../utils/townStateAccess.js";
+import { queryNamedPositions, queryPositionFaction } from "../utils/queries.js";
 
 function hostileCountNear(world, x, y, radius) {
   let total = 0;
-  for (const [, pos, fac] of world.query(Position, Faction)) {
+  for (const [, pos, fac] of queryPositionFaction(world)) {
     const key = String(fac.key || "");
     if (!key || key === "townfolk" || key === "shopkeeper" || key === "neutral" || key === "player" || key === "pet") continue;
     if (chebyshevScalar(pos.x, pos.y, x, y) <= radius) total++;
@@ -20,7 +19,7 @@ function hostileCountNear(world, x, y, radius) {
 
 function tombstoneCountNear(world, x, y, radius) {
   let total = 0;
-  for (const [, pos, ni] of world.query(Position, NamedIdentity)) {
+  for (const [, pos, ni] of queryNamedPositions(world)) {
     if (String(ni.identity || "") !== "grave_tombstone") continue;
     if (chebyshevScalar(pos.x, pos.y, x, y) <= radius) total++;
   }
