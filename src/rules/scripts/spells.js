@@ -3111,8 +3111,9 @@ REGISTRY['earthshatter'] = function earthshatterScript(world, actor, spell, inte
 
 // ─── Generators (resource builders) ─────────────────────────────────────────
 
-/** Shared helper: auto-target nearest hostile in range + LOS, deal damage, restore resources. */
-function runGeneratorScript(world, actor, spell, { baseAmount, type, cause, manaRestore, staminaRestore }) {
+/** Shared helper: auto-target nearest hostile in range + LOS, deal damage, restore resources.
+ *  manaPct / staminaPct are fractions of the actor's derived max pool (e.g. 0.06 = 6%). */
+function runGeneratorScript(world, actor, spell, { baseAmount, type, cause, manaPct, staminaPct }) {
   const apos = /** @type any */ (world.get(actor, Position));
   if (!apos) return;
   const actorFaction = String(world.get(actor, Faction)?.key || 'player');
@@ -3142,22 +3143,27 @@ function runGeneratorScript(world, actor, spell, { baseAmount, type, cause, mana
     at: { x: tpos.x, y: tpos.y },
   }));
 
-  // Restore resources on hit
+  // Restore resources on hit — % of derived max pool
+  let manaRestored = 0, staminaRestored = 0;
   if (result.applied) {
-    if (manaRestore > 0) {
+    if (manaPct > 0) {
       const mana = /** @type any */ (world.get(actor, Mana));
       if (mana) {
         const maxM = effectiveMaxMana(world, actor, mana);
+        const amount = Math.max(1, Math.round(maxM * manaPct));
         const before = Number(mana.mana || 0);
-        mana.mana = Math.min(maxM, before + manaRestore);
+        mana.mana = Math.min(maxM, before + amount);
+        manaRestored = mana.mana - before;
       }
     }
-    if (staminaRestore > 0) {
+    if (staminaPct > 0) {
       const stam = /** @type any */ (world.get(actor, Stamina));
       if (stam) {
         const maxS = effectiveMaxStamina(world, actor, stam);
+        const amount = Math.max(1, Math.round(maxS * staminaPct));
         const before = Number(stam.stamina || 0);
-        stam.stamina = Math.min(maxS, before + staminaRestore);
+        stam.stamina = Math.min(maxS, before + amount);
+        staminaRestored = stam.stamina - before;
       }
     }
   }
@@ -3167,29 +3173,29 @@ function runGeneratorScript(world, actor, spell, { baseAmount, type, cause, mana
     from: { x: apos.x, y: apos.y },
     at: { x: tpos.x, y: tpos.y },
     hit: result.applied,
-    manaRestored: result.applied ? manaRestore : 0,
-    staminaRestored: result.applied ? staminaRestore : 0,
+    manaRestored,
+    staminaRestored,
   });
 }
 
 REGISTRY['savage_strike'] = function(world, actor, spell, intent) {
   runGeneratorScript(world, actor, spell, {
     baseAmount: 4, type: 'physical', cause: 'spell:savage_strike',
-    manaRestore: 0, staminaRestore: 20,
+    manaPct: 0, staminaPct: 0.08,
   });
 };
 
 REGISTRY['natures_touch'] = function(world, actor, spell, intent) {
   runGeneratorScript(world, actor, spell, {
     baseAmount: 2, type: 'nature', cause: 'spell:natures_touch',
-    manaRestore: 8, staminaRestore: 0,
+    manaPct: 0.06, staminaPct: 0,
   });
 };
 
 REGISTRY['cheap_shot'] = function(world, actor, spell, intent) {
   runGeneratorScript(world, actor, spell, {
     baseAmount: 3, type: 'physical', cause: 'spell:cheap_shot',
-    manaRestore: 10, staminaRestore: 0,
+    manaPct: 0.07, staminaPct: 0,
   });
 };
 
@@ -3235,21 +3241,21 @@ REGISTRY['evocation'] = function evocationScript(world, actor, spell, intent) {
 REGISTRY['arcane_bolt'] = function(world, actor, spell, intent) {
   runGeneratorScript(world, actor, spell, {
     baseAmount: 3, type: 'arcane', cause: 'spell:arcane_bolt',
-    manaRestore: 6, staminaRestore: 0,
+    manaPct: 0.05, staminaPct: 0,
   });
 };
 
 REGISTRY['leech_spores'] = function(world, actor, spell, intent) {
   runGeneratorScript(world, actor, spell, {
     baseAmount: 2, type: 'nature', cause: 'spell:leech_spores',
-    manaRestore: 6, staminaRestore: 10,
+    manaPct: 0.05, staminaPct: 0.05,
   });
 };
 
 REGISTRY['holy_strike'] = function(world, actor, spell, intent) {
   runGeneratorScript(world, actor, spell, {
     baseAmount: 3, type: 'holy', cause: 'spell:holy_strike',
-    manaRestore: 8, staminaRestore: 0,
+    manaPct: 0.06, staminaPct: 0,
   });
 };
 
