@@ -1027,6 +1027,30 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
       }
     });
 
+    world.on('hazard:ignited', ({ hazardId, fromKind, toKind, at, radius }) => {
+      if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
+      const from = String(fromKind || '').toLowerCase();
+      const to = String(toKind || '').toLowerCase();
+      if (from !== 'gas' || to !== 'fire') return;
+      const id = Number(hazardId || 0) | 0;
+      const r = Math.max(0, Number(radius || 0) | 0);
+
+      // End any lingering gas/poison cloud entry immediately.
+      if (id > 0) _poisonCloudFx.delete(id);
+
+      // Ignition burst at the conversion point so it reads as a detonation.
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) > r) continue;
+          const px = at.x + dx;
+          const py = at.y + dy;
+          spawnFireCloudEmbers(px, py, 4);
+          if (Math.random() < 0.6) spawnPoisonCloudMotes(px, py, 2);
+        }
+      }
+      startShake(cam, Math.max(2, 2 + r), 0.12);
+    });
+
     world.on('tile:burned', ({ x, y, burnedKind }) => {
       if (!Number.isFinite(x) || !Number.isFinite(y)) return;
       const kind = String(burnedKind || 'tree');

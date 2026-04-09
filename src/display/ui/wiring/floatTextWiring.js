@@ -1243,6 +1243,18 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     });
   });
 
+  world.on('hazard:ignited', ({ at, fromKind, toKind }) => {
+    if (!at || !canShowAt(at.x, at.y)) return;
+    if (String(fromKind || '').toLowerCase() !== 'gas') return;
+    if (String(toKind || '').toLowerCase() !== 'fire') return;
+    ftext.addStatus(at.x, at.y - 0.45, 'WHOOMPH!', {
+      color: '#ff6a00',
+      life: 1.2,
+      scaleStart: 1.9,
+      scaleEnd: 1.0,
+    });
+  });
+
   // ── Gas Spore explosion ──────────────────────────────────────────────
   world.on('monster:death:gas_spore', ({ at }) => {
     if (!at || !canShowAt(at.x, at.y)) return;

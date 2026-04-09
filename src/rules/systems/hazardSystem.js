@@ -573,7 +573,7 @@ function igniteGasHazard(world, ignition) {
   const medium = String(meta?.igniteMedium || "air").toLowerCase() === "floor" ? "floor" : "air";
   const turnsLeft = clampInt(
     meta?.igniteTurnsLeft,
-    isExplosiveGas ? Math.max(1, Math.min(3, ignition.turnsLeft)) : Math.max(1, ignition.turnsLeft),
+    Math.max(1, ignition.turnsLeft),
     1,
   );
   const radius = clampInt(ignition.radius, 0, 0);
