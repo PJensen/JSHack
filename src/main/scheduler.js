@@ -173,7 +173,9 @@ export function configureWorld(world) {
   registerSystem(petBehaviorSystem, 'ai');
 
   // Phase: intents (intent consumers + steering)
-  registerSystem(intentValidationSystem, 'intents');
+  registerSystem(intentValidationSystem, 'intents', {
+    before: [knockbackSystem, flyIntentSystem, waitSystem, movementSystem, combatSystem],
+  });
   // Knockback resolves before standard movement so positions are committed first.
   registerSystem(knockbackSystem, 'intents', { before: [movementSystem] });
   registerSystem(flyIntentSystem, 'intents');
