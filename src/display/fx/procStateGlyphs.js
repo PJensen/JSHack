@@ -29,7 +29,6 @@ export const PROC_STATE_VIS = {
 	eclipse_phase:      { glyph: '\u25D0',       r: 180, g: 160, b: 230 },  // ◐ eclipse phase
 	arrow_instinct:     { glyph: '\u27B3',       r: 120, g: 210, b: 235 },  // ➳ ready shot
 	tollwarden_count:   { glyph: '\u{1F514}',    r: 250, g: 185, b: 100 },  // 🔔 toll count
-	confused:           { glyph: '\u2753',       r: 240, g: 192, b: 48  },  // ❓ confused
 };
 
 const DEFAULT_PROC_VIS = Object.freeze({ glyph: '\u2736', r: 170, g: 185, b: 220 });
