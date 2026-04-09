@@ -811,7 +811,8 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
         }
         return;
       }
-      if (String(kind || '').toLowerCase() !== 'poison') return;
+      const hazardKind = String(kind || '').toLowerCase();
+      if (hazardKind !== 'poison' && hazardKind !== 'gas') return;
       if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y)) return;
       const id = Number(hazardId || 0) | 0;
       if (!(id > 0)) return;
@@ -917,7 +918,8 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
         }
         return;
       }
-      if (String(kind || '').toLowerCase() !== 'poison') return;
+      const hazardKind = String(kind || '').toLowerCase();
+      if (hazardKind !== 'poison' && hazardKind !== 'gas') return;
       const id = Number(hazardId || 0) | 0;
       if (!(id > 0)) return;
       const r = Math.max(0, Number(radius || 1) | 0);
@@ -1003,7 +1005,8 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
         spawnFireCloudEmbers(cloud.x, cloud.y, 4);
         return;
       }
-      if (String(kind || '').toLowerCase() !== 'poison') return;
+      const hazardKind = String(kind || '').toLowerCase();
+      if (hazardKind !== 'poison' && hazardKind !== 'gas') return;
       const id = Number(hazardId || 0) | 0;
       if (!(id > 0)) return;
       const cloud = _poisonCloudFx.get(id);

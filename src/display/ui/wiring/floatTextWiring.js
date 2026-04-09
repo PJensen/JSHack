@@ -1246,11 +1246,11 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
   // ── Gas Spore explosion ──────────────────────────────────────────────
   world.on('monster:death:gas_spore', ({ at }) => {
     if (!at || !canShowAt(at.x, at.y)) return;
-    ftext.addStatus(at.x, at.y - 0.55, 'BOOM!', {
-      color: '#ff3300',
-      life: 1.8,
-      scaleStart: 2.5,
-      scaleEnd: 1.2,
+    ftext.addStatus(at.x, at.y - 0.55, 'SPORES!', {
+      color: '#88ff55',
+      life: 1.4,
+      scaleStart: 2.1,
+      scaleEnd: 1.1,
     });
     // Big radial fire burst
     for (let i = 0; i < 28; i++) {

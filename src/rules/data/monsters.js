@@ -1740,7 +1740,7 @@ export const MONSTERS = [
     hooks: {
       onDeath: [gasSporeExplodeOnDeath({ turnsLeft: 3, tickDamage: 6, radius: 2 })],
     },
-    specials: ["Explodes on death (radius 2, 6 fire dmg)", "Fragile"],
+    specials: ["Ruptures on death into volatile spore gas (radius 2)", "Fragile"],
     description: 'A bloated, pulsing sphere that drifts in silence. It looks just like a floating eye — until you pop it.',
   },
   // ── Lichen (tier 0) — sessile food source ────────────────────────────
