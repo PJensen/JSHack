@@ -5724,15 +5724,15 @@ function drawConfusedMark(ctx, e, fxTime, scale = 1) {
     const phase = (fxTime + j * (CYCLE / COUNT)) % CYCLE;
     const t = phase / CYCLE; // 0→1 over lifetime
     // Rise from head
-    const rise = t * 0.65 * scale;
+    const rise = t * 0.35 * scale;
     // Wobble side to side
-    const wobble = Math.sin(t * Math.PI * 3 + j * 1.7) * 0.15 * scale;
-    // Grow in, then shrink out
-    const sz = t < 0.15 ? (t / 0.15) : t > 0.75 ? (1 - t) / 0.25 : 1.0;
+    const wobble = Math.sin(t * Math.PI * 3 + j * 1.7) * 0.12 * scale;
+    // Start small, grow to full, then shrink out
+    const sz = t < 0.2 ? (t / 0.2) * 0.6 : t > 0.75 ? 0.6 + 0.4 * ((1 - t) / 0.25) : 0.6 + 0.4 * Math.min(1, (t - 0.2) / 0.3);
     const alpha = t < 0.1 ? (t / 0.1) : t > 0.6 ? Math.max(0, (1 - t) / 0.4) : 0.85;
 
     ctx.globalAlpha = alpha;
-    ctx.font = `${(0.2 + sz * 0.08) * scale}px sans-serif`;
+    ctx.font = `${(0.14 + sz * 0.1) * scale}px sans-serif`;
     ctx.fillStyle = j % 2 === 0 ? '#f0c030' : '#ffe680';
     ctx.fillText('?', cx + wobble, headY - rise);
   }
