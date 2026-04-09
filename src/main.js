@@ -6481,8 +6481,8 @@ function render(worldView) {
       g.restore();
     }
 
-    // Glyph-FX: spinning 4-point stars above confused/stunned entities
-    if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && (renderEntity.tags.includes('confused') || renderEntity.tags.includes('stunned'))) {
+    // Glyph-FX: spinning 4-point stars above stunned entities
+    if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && renderEntity.tags.includes('stunned')) {
       bctx.save();
       bctx.globalCompositeOperation = 'lighter';
       bctx.lineWidth = 0.035;
