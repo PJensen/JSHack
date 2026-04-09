@@ -169,6 +169,12 @@ import { AggroState, AGGRO_LEVELS, SEARCH_TURNS_HUNTING_GRACE } from "./rules/co
 import { spawnMonsterEntity } from "./rules/utils/spawnMonsterEntity.js";
 import { pickMonster } from "./rules/environment/dungeon/tables.js";
 import { isApplyTool, listApplyTargetsForTool } from "./rules/content/items/applyPayloads.js";
+import { createTargetingController, scanVisibleEnemies, clampTargetToRange, worldToTile, bracketizeName } from "./main/targeting/targetingController.js";
+import { installScrollWandWiring } from "./main/wiring/scrollWandWiring.js";
+import { installPetWiring } from "./main/wiring/petWiring.js";
+import { createDeathLootArcFx } from "./display/fx/deathLootArcFx.js";
+import { createBubbleDialogController } from "./display/ui/bubbleDialog.js";
+import { createTransitionController } from "./main/wiring/transitionWiring.js";
 
 // ---- Config & canvas -------------------------------------------------------
 const runtimeConfig = readRuntimeConfig();
@@ -332,233 +338,12 @@ updateBootProgress("Game data loaded", _bootDoneUnits);
 // Only app/scenes step the sim (deterministic). We'll keep it paused here.
 function stepSim(dtTurns = 0) { if (dtTurns > 0) { world.tick(dtTurns); } }
 
-function getSpeakerBubbleLiftPx() {
-  const scale = Math.max(1, Number(cam?.scale) || 1);
-  return Math.max(32, Math.min(96, Math.round(scale * 1.15)));
-}
+// Bubble dialog controller — created after camera (needs cam/canvas refs).
+// Placeholder; initialized below after cam is created.
+/** @type {ReturnType<typeof createBubbleDialogController>|null} */
+let bubbleDialog = null;
 
-function getSpeakerBubbleAnchorPos(pos) {
-  return {
-    x: Number(pos?.x || 0),
-    y: Number(pos?.y || 0) - 0.68,
-  };
-}
-
-let _bubbleDialogState = {
-  open: false,
-  sessionId: 0,
-  actorId: 0,
-  targetId: 0,
-  maxDistance: 2,
-};
-
-function createBubbleDialogUi() {
-  const el = document.createElement("div");
-  const title = document.createElement("div");
-  const body = document.createElement("div");
-  const choices = document.createElement("div");
-  const tail = document.createElement("div");
-  const connector = document.createElement("div");
-  const speakerDot = document.createElement("div");
-
-  el.id = "speech-bubble-dialog";
-  Object.assign(el.style, {
-    position: "fixed",
-    left: "0",
-    top: "0",
-    zIndex: "90",
-    display: "none",
-    pointerEvents: "auto",
-    minWidth: "220px",
-    maxWidth: "min(78vw, 360px)",
-    padding: "10px 12px 12px",
-    borderRadius: "16px",
-    border: "2px solid rgba(75,62,43,0.9)",
-    background: "rgba(252,248,238,0.98)",
-    boxShadow: "0 10px 28px rgba(0,0,0,0.28)",
-    transform: "translate(-9999px, -9999px)",
-    overflow: "visible",
-  });
-  Object.assign(tail.style, {
-    position: "absolute",
-    left: "50%",
-    bottom: "-14px",
-    width: "20px",
-    height: "20px",
-    background: "rgba(252,248,238,0.98)",
-    borderRight: "2px solid rgba(75,62,43,0.9)",
-    borderBottom: "2px solid rgba(75,62,43,0.9)",
-    transform: "translateX(-50%) rotate(45deg)",
-    borderBottomRightRadius: "4px",
-    pointerEvents: "none",
-    boxShadow: "4px 4px 10px rgba(0,0,0,0.10)",
-  });
-  Object.assign(connector.style, {
-    position: "fixed",
-    left: "0",
-    top: "0",
-    width: "0",
-    height: "3px",
-    display: "none",
-    pointerEvents: "none",
-    transformOrigin: "0 50%",
-    backgroundImage: "repeating-linear-gradient(90deg, rgba(90,74,48,0.92) 0 7px, rgba(90,74,48,0) 7px 13px)",
-    filter: "drop-shadow(0 0 1px rgba(255,250,240,0.85))",
-    zIndex: "91",
-  });
-  Object.assign(speakerDot.style, {
-    position: "fixed",
-    left: "0",
-    top: "0",
-    width: "10px",
-    height: "10px",
-    display: "none",
-    pointerEvents: "none",
-    borderRadius: "999px",
-    border: "2px solid rgba(75,62,43,0.95)",
-    background: "rgba(252,248,238,1)",
-    boxShadow: "0 0 0 2px rgba(255,250,240,0.65)",
-    zIndex: "92",
-  });
-  Object.assign(title.style, {
-    font: "700 14px 'Trebuchet MS', sans-serif",
-    color: "#4b3e2b",
-    marginBottom: "6px",
-  });
-  Object.assign(body.style, {
-    font: "400 15px 'Trebuchet MS', sans-serif",
-    lineHeight: "1.35",
-    color: "#261f16",
-    marginBottom: "10px",
-  });
-  Object.assign(choices.style, {
-    display: "grid",
-    gap: "8px",
-  });
-
-  el.appendChild(title);
-  el.appendChild(body);
-  el.appendChild(choices);
-  el.appendChild(tail);
-  document.body.appendChild(connector);
-  document.body.appendChild(speakerDot);
-  document.body.appendChild(el);
-  return { el, title, body, choices, tail, connector, speakerDot };
-}
-
-const bubbleDialogUi = createBubbleDialogUi();
-
-function closeBubbleDialog() {
-  _bubbleDialogState = { open: false, sessionId: 0, actorId: 0, targetId: 0, maxDistance: 2 };
-  bubbleDialogUi.el.style.display = "none";
-  bubbleDialogUi.el.style.transform = "translate(-9999px, -9999px)";
-  bubbleDialogUi.connector.style.display = "none";
-  bubbleDialogUi.connector.style.width = "0";
-  bubbleDialogUi.speakerDot.style.display = "none";
-  bubbleDialogUi.choices.innerHTML = "";
-}
-
-function openBubbleDialog(detail = {}) {
-  const choices = Array.isArray(detail?.choices) ? detail.choices : [];
-  _bubbleDialogState = {
-    open: true,
-    sessionId: Number(detail?.sessionId || 0) | 0,
-    actorId: Number(detail?.actorId || 0) | 0,
-    targetId: Number(detail?.targetId || 0) | 0,
-    maxDistance: Math.max(1, Number(detail?.maxDistance || 2) | 0),
-  };
-  bubbleDialogUi.title.textContent = String(detail?.speakerName || "Someone");
-  bubbleDialogUi.body.textContent = String(detail?.text || "...");
-  bubbleDialogUi.choices.innerHTML = "";
-  for (const choice of choices) {
-    const btn = document.createElement("button");
-    btn.textContent = String(choice?.label || choice?.id || "Continue");
-    Object.assign(btn.style, {
-      minHeight: "40px",
-      padding: "8px 10px",
-      borderRadius: "10px",
-      border: "1px solid rgba(75,62,43,0.35)",
-      background: "rgba(255,255,255,0.96)",
-      color: "#241d15",
-      font: "600 14px 'Trebuchet MS', sans-serif",
-      textAlign: "left",
-      cursor: "pointer",
-      touchAction: "manipulation",
-    });
-    btn.addEventListener("click", () => {
-      window.dispatchEvent(new CustomEvent("ui:requestDialogChoice", {
-        detail: {
-          sessionId: _bubbleDialogState.sessionId,
-          choiceId: String(choice?.id || ""),
-        },
-      }));
-    });
-    bubbleDialogUi.choices.appendChild(btn);
-  }
-  bubbleDialogUi.el.style.display = "block";
-}
-
-function layoutBubbleDialog() {
-  if (!_bubbleDialogState.open) return;
-  const speakerPos = getPosition(_bubbleDialogState.targetId || _bubbleDialogState.actorId);
-  const pe = playerEntity(world);
-  if (speakerPos && pe) {
-    const dist = Math.max(
-      Math.abs((speakerPos.x | 0) - (pe.pos.x | 0)),
-      Math.abs((speakerPos.y | 0) - (pe.pos.y | 0)),
-    );
-    if (dist > (_bubbleDialogState.maxDistance | 0)) {
-      window.dispatchEvent(new CustomEvent("ui:requestDialogClose", {
-        detail: { sessionId: _bubbleDialogState.sessionId },
-      }));
-      return;
-    }
-  }
-  const targetId = _bubbleDialogState.targetId || _bubbleDialogState.actorId;
-  const pos = getPosition(targetId);
-  if (!pos) {
-    closeBubbleDialog();
-    return;
-  }
-  const anchor = getSpeakerBubbleAnchorPos(pos);
-  const rect = typeof canvas.getBoundingClientRect === "function"
-    ? canvas.getBoundingClientRect()
-    : { left: 0, top: 0, width: canvas.offsetWidth || _canvasSetup.cssW, height: canvas.offsetHeight || _canvasSetup.cssH };
-  const logicalCanvas = {
-    width: canvas.offsetWidth || _canvasSetup.cssW,
-    height: canvas.offsetHeight || _canvasSetup.cssH,
-  };
-  const [localX, localY] = worldToScreen(cam, anchor.x, anchor.y, logicalCanvas);
-  const rxScale = rect.width / logicalCanvas.width;
-  const ryScale = rect.height / logicalCanvas.height;
-  const sx = rect.left + localX * rxScale;
-  const sy = rect.top + localY * ryScale;
-  const boxW = bubbleDialogUi.el.offsetWidth || 280;
-  const boxH = bubbleDialogUi.el.offsetHeight || 120;
-  const lift = getSpeakerBubbleLiftPx();
-  const viewportW = typeof window !== "undefined" ? window.innerWidth : logicalCanvas.width;
-  const viewportH = typeof window !== "undefined" ? window.innerHeight : logicalCanvas.height;
-  const left = Math.max(10, Math.min(viewportW - boxW - 10, Math.round(sx - (boxW / 2))));
-  const top = Math.max(10, Math.min(viewportH - boxH - 30, Math.round(sy - boxH - 12 - lift)));
-  bubbleDialogUi.el.style.transform = `translate(${left}px, ${top}px)`;
-
-  const tailTipX = left + (boxW * 0.5);
-  const tailTipY = top + boxH + 18;
-  const dx = sx - tailTipX;
-  const dy = sy - tailTipY;
-  const dist = Math.hypot(dx, dy);
-  if (dist > 6) {
-    bubbleDialogUi.connector.style.display = "block";
-    bubbleDialogUi.connector.style.width = `${Math.round(dist)}px`;
-    bubbleDialogUi.connector.style.transform = `translate(${Math.round(tailTipX)}px, ${Math.round(tailTipY)}px) rotate(${Math.atan2(dy, dx)}rad)`;
-    bubbleDialogUi.speakerDot.style.display = "block";
-    bubbleDialogUi.speakerDot.style.transform = `translate(${Math.round(sx - 5)}px, ${Math.round(sy - 5)}px)`;
-  } else {
-    bubbleDialogUi.connector.style.display = "none";
-    bubbleDialogUi.connector.style.width = "0";
-    bubbleDialogUi.speakerDot.style.display = "none";
-  }
-}
+// (Bubble dialog DOM + logic extracted to display/ui/bubbleDialog.js)
 
 // Post-mortem: keep the simulation ticking after the player dies so the world
 // continues to evolve (fires spread, monsters roam, etc.) for a fixed number
@@ -633,14 +418,20 @@ const TARGETED_SPELL_CONFIG = Object.freeze({
     },
   }),
 });
-/** @type {{ spellId: string, spellName: string, range: number, requiresLOS: boolean, requiresVisible?: boolean }|null} */
-let _pendingSpellTargeting = null;
-/** @type {{ actorId: number, itemId: number, itemName: string, range: number }|null} */
-let _pendingThrowTargeting = null;
-/** @type {{ spellId: string, spellName: string, range: number, enemies: Array<{id:number,x:number,y:number}>, index: number }|null} */
-let _pendingEnemyTargeting = null;
-/** @type {{ x: number, y: number }|null} Keyboard targeting cursor (tile coords) */
-let _targetCursor = null;
+
+// Targeting controller — created early, keyboard handlers installed below.
+// Pointer handlers require cam/canvas and are installed after camera init.
+// The consolidated rules dispatcher is a single shared instance used everywhere.
+const _sharedRulesDispatcher = makeRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
+
+// Shim: targeting state accessors for code that still reads old variables directly.
+// These are getters/setters that delegate to the targeting controller (created later).
+// This avoids a flag-day rewrite of every reference in the render() function.
+// TODO: migrate remaining consumers to use `targeting.*` directly.
+function get_pendingEnemyTargeting() { return targeting?.getEnemy() ?? null; }
+function get_pendingSpellTargeting() { return targeting?.getSpell() ?? null; }
+function get_pendingThrowTargeting() { return targeting?.getThrow() ?? null; }
+function get_targetCursor() { return targeting?.getCursor() ?? null; }
 const throwFx = createThrowFxController({
   world,
   resolveItemMeta: (itemId) => {
@@ -676,43 +467,6 @@ function getTargetedSpellConfig(spellId) {
 function computeThrowRange(weight) { return throwFx.computeThrowRange(weight); }
 function isSimUiBlocked() { return isInputLocked(); }
 
-/**
- * Convert world-space coordinate to nearest tile center index.
- * World uses integer-centered tile coordinates.
- * @param {number} value
- */
-function worldToTile(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return 0;
-  return Math.round(n);
-}
-
-/**
- * Clamp a tile target to Chebyshev range from an origin.
- * @param {number} fromX
- * @param {number} fromY
- * @param {number} toX
- * @param {number} toY
- * @param {number} maxRange
- */
-function clampTargetToRange(fromX, fromY, toX, toY, maxRange) {
-  const ox = Number(fromX) | 0;
-  const oy = Number(fromY) | 0;
-  const tx = Number(toX) | 0;
-  const ty = Number(toY) | 0;
-  const range = Math.max(0, Number(maxRange) | 0);
-
-  const dx = tx - ox;
-  const dy = ty - oy;
-  const dist = chebyshevScalar(ox, oy, tx, ty);
-  if (dist <= range || range <= 0) return { x: tx, y: ty };
-
-  const scale = range / Math.max(1, dist);
-  const cx = ox + Math.round(dx * scale);
-  const cy = oy + Math.round(dy * scale);
-  return { x: cx, y: cy };
-}
-
 function getPlayerVisionRange() {
   const pe = playerEntity(world);
   if (!pe?.id) return 0;
@@ -742,8 +496,8 @@ function ensureActiveSpell() {
 function setActiveSpell(id) {
   spellCtrl.setActiveSpell(id);
   _activeSpellId = spellCtrl.getActiveSpellId();
-  if (_pendingSpellTargeting && _pendingSpellTargeting.spellId !== _activeSpellId) {
-    _pendingSpellTargeting = null;
+  if (targeting && get_pendingSpellTargeting()?.spellId !== _activeSpellId) {
+    targeting.cancelAll();
   }
 }
 
@@ -1418,7 +1172,7 @@ addEventListener('ui:castActiveSpell', () => {
     try { window.dispatchEvent(new CustomEvent('ui:openSpellPicker')); } catch (e) { console.debug('[main] dispatch ui:openSpellPicker:', e); }
     return;
   }
-  _pendingThrowTargeting = null;
+  targeting.cancelAll();
 
   const targetedCfg = getTargetedSpellConfig(id);
   if (targetedCfg) {
@@ -1429,28 +1183,14 @@ addEventListener('ui:castActiveSpell', () => {
       Number.isFinite(spell?.range) ? (Number(spell.range) | 0) : (Number(targetedCfg.fallbackRange) | 0),
     );
     const range = targetedCfg.useVisionRange === true ? getPlayerVisionRange() : configuredRange;
-    if (_pendingSpellTargeting?.spellId === id) {
-      _pendingSpellTargeting = null;
-      _targetCursor = null;
-      try { messageLog.log({ text: `${spellName} targeting cancelled.`, type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
-      return;
-    }
-    _pendingSpellTargeting = {
+    if (targeting.toggleSpellOff(id)) return;
+    targeting.openSpellTargeting({
       spellId: id,
       spellName,
       range,
       requiresLOS: targetedCfg.requiresLOS === true,
       requiresVisible: targetedCfg.requiresVisible === true,
-    };
-    // Initialize keyboard cursor at player position
-    const _pe = playerEntity(world);
-    if (_pe) _targetCursor = { x: _pe.pos.x | 0, y: _pe.pos.y | 0 };
-    try {
-      messageLog.log({
-        text: targetedCfg.describePrompt(range),
-        type: 'system',
-      });
-    } catch (e) { console.debug('[main] messageLog failed:', e); }
+    }, targetedCfg.describePrompt(range));
     return;
   }
 
@@ -1462,23 +1202,9 @@ addEventListener('ui:castActiveSpell', () => {
     const px = _pe.pos.x | 0;
     const py = _pe.pos.y | 0;
     const range = Math.max(1, Number(enemySpellDef.range || 8));
-    const blocked = buildBlocksVisionMap(world);
-    const isBlocked = blockedCallback(blocked);
-
-    /** @type {Array<{id:number,x:number,y:number}>} */
-    const enemies = [];
-    if (enemySpellDef.selfTargetable) {
-      enemies.push({ id: _pe.id, x: px, y: py });
-    }
-    forEachInRadius(world, px, py, range, (eid, pos) => {
-      if (eid === _pe.id) return;
-      const fac = world.get(eid, Faction);
-      if (!fac || fac.key !== 'enemy') return;
-      const vit = /** @type any */ (world.get(eid, Vitality));
-      if (!vit || (vit.hp | 0) <= 0) return;
-      if (!hasLOS(px, py, pos.x | 0, pos.y | 0, isBlocked)) return;
-      if (!isTileVisible(pos.x | 0, pos.y | 0)) return;
-      enemies.push({ id: eid, x: pos.x | 0, y: pos.y | 0 });
+    const enemies = scanVisibleEnemies(world, px, py, range, {
+      playerId: _pe.id,
+      includeSelf: !!enemySpellDef.selfTargetable,
     });
 
     if (enemies.length === 0) {
@@ -1486,213 +1212,23 @@ addEventListener('ui:castActiveSpell', () => {
       return;
     }
 
-    // Sort by Chebyshev distance (nearest first)
-    enemies.sort((a, b) => {
-      const da = chebyshevScalar(a.x, a.y, px, py);
-      const db = chebyshevScalar(b.x, b.y, px, py);
-      return da - db;
-    });
-
-    // Toggle off if already targeting same spell
-    if (_pendingEnemyTargeting?.spellId === id) {
-      _pendingEnemyTargeting = null;
-      _targetCursor = null;
-      try { messageLog.log({ text: `${enemySpellDef.name} targeting cancelled.`, type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
-      return;
-    }
-
-    _pendingEnemyTargeting = {
+    if (targeting.toggleEnemyOff(id)) return;
+    targeting.openEnemyTargeting({
       spellId: id,
       spellName: enemySpellDef.name,
       range,
       enemies,
-      index: 0,
-    };
-    _targetCursor = { x: enemies[0].x, y: enemies[0].y };
-    _pendingSpellTargeting = null;
-    _pendingThrowTargeting = null;
-    try {
-      messageLog.log({
-        text: `Choose target for ${enemySpellDef.name}. Tab to cycle enemies, Enter to confirm, Esc to cancel.`,
-        type: 'system',
-      });
-    } catch (e) { console.debug('[main] messageLog failed:', e); }
-    return;
-  }
-
-  _pendingSpellTargeting = null;
-  const rulesHandler = makeRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
-  rulesHandler({ type: 'rules.castActiveSpell', payload: { spellId: id } });
-});
-
-addEventListener('keydown', (ev) => {
-  if (ev.key !== 'Escape') return;
-  if (_pendingEnemyTargeting) {
-    const spellName = _pendingEnemyTargeting.spellName;
-    _pendingEnemyTargeting = null;
-    _targetCursor = null;
-    ev.preventDefault();
-    try { messageLog.log({ text: `${spellName} targeting cancelled.`, type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
-    return;
-  }
-  if (_pendingSpellTargeting) {
-    const spellName = _pendingSpellTargeting.spellName;
-    _pendingSpellTargeting = null;
-    _targetCursor = null;
-    ev.preventDefault();
-    try { messageLog.log({ text: `${spellName} targeting cancelled.`, type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
-    return;
-  }
-  if (_pendingThrowTargeting) {
-    const itemName = _pendingThrowTargeting.itemName;
-    _pendingThrowTargeting = null;
-    _targetCursor = null;
-    ev.preventDefault();
-    try { messageLog.log({ text: `${bracketizeName(itemName)} throw cancelled.`, type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
-  }
-});
-
-// Enemy targeting: Tab cycles enemies, Enter confirms
-addEventListener('keydown', (ev) => {
-  if (!_pendingEnemyTargeting) return;
-
-  if (ev.key === 'Tab') {
-    ev.preventDefault();
-    ev.stopPropagation();
-    const targeting = _pendingEnemyTargeting;
-    if (ev.shiftKey) {
-      targeting.index = (targeting.index - 1 + targeting.enemies.length) % targeting.enemies.length;
-    } else {
-      targeting.index = (targeting.index + 1) % targeting.enemies.length;
-    }
-    const enemy = targeting.enemies[targeting.index];
-    const _livePos = world.get(enemy.id, Position);
-    _targetCursor = _livePos ? { x: _livePos.x | 0, y: _livePos.y | 0 } : { x: enemy.x, y: enemy.y };
-    return;
-  }
-
-  if (ev.key === 'Enter') {
-    ev.preventDefault();
-    ev.stopPropagation();
-    const pe = playerEntity(world);
-    if (!pe) { _pendingEnemyTargeting = null; _targetCursor = null; return; }
-    const targeting = _pendingEnemyTargeting;
-    const enemy = targeting.enemies[targeting.index];
-    _pendingEnemyTargeting = null;
-    _targetCursor = null;
-    if (typeof targeting.onConfirm === 'function') {
-      targeting.onConfirm(enemy.id);
-      return;
-    }
-    const rulesHandler = makeRulesDispatcher(world, () => pe.id);
-    rulesHandler({
-      type: 'rules.castActiveSpell',
-      payload: {
-        spellId: targeting.spellId,
-        targetId: enemy.id,
-        x: enemy.x,
-        y: enemy.y,
-      },
     });
     return;
   }
 
-  // Swallow direction keys so they don't become movement while targeting
-  const _DIR_KEYS = ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','a','d','w','s','h','j','k','l','y','u','b','n'];
-  if (_DIR_KEYS.includes(ev.key)) {
-    ev.preventDefault();
-    ev.stopPropagation();
-    return;
-  }
-}, { capture: true });
+  targeting.cancelAll();
+  _sharedRulesDispatcher({ type: 'rules.castActiveSpell', payload: { spellId: id } });
+});
 
-// Keyboard targeting: arrow/vim/numpad keys move cursor, Enter confirms target
-addEventListener('keydown', (ev) => {
-  if (!_pendingSpellTargeting && !_pendingThrowTargeting) return;
-  if (!_targetCursor) return;
+// (Escape/Tab/Enter/direction keyboard handlers for targeting are now in targetingController)
 
-  // Direction keys → dx/dy
-  /** @type {Record<string, number[]>} */
-  const KEY_DIR = {
-    ArrowLeft:  [-1,  0], ArrowRight: [1,  0],
-    ArrowUp:    [ 0, -1], ArrowDown:  [0,  1],
-    h: [-1,  0], l: [1,  0], k: [ 0, -1], j: [0,  1],
-    y: [-1, -1], u: [1, -1], b: [-1,  1], n: [1,  1],
-  };
-  const dir = KEY_DIR[ev.key];
-  if (dir && _targetCursor) {
-    const pe = playerEntity(world);
-    if (!pe) return;
-    ev.preventDefault();
-    ev.stopPropagation();
-    const nx = _targetCursor.x + dir[0];
-    const ny = _targetCursor.y + dir[1];
-    const activeRange = _pendingSpellTargeting?.range ?? _pendingThrowTargeting?.range ?? 0;
-    const clamped = clampTargetToRange(pe.pos.x, pe.pos.y, nx, ny, activeRange);
-    _targetCursor.x = clamped.x | 0;
-    _targetCursor.y = clamped.y | 0;
-    return;
-  }
-
-  // Enter confirms the target
-  if (ev.key === 'Enter') {
-    ev.preventDefault();
-    ev.stopPropagation();
-    const pe = playerEntity(world);
-    if (!pe) { _pendingSpellTargeting = null; _pendingThrowTargeting = null; _targetCursor = null; return; }
-    const tx = _targetCursor.x | 0;
-    const ty = _targetCursor.y | 0;
-    const px = pe.pos.x | 0;
-    const py = pe.pos.y | 0;
-
-    if (_pendingSpellTargeting?.spellId) {
-      const pending = _pendingSpellTargeting;
-      const clamped = clampTargetToRange(px, py, tx, ty, pending.range);
-      const finalTx = clamped.x | 0;
-      const finalTy = clamped.y | 0;
-      const dist = chebyshevScalar(finalTx, finalTy, px, py);
-      if (!(dist > 0)) {
-        try { messageLog.log({ text: `${pending.spellName} needs another tile.`, type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
-        return;
-      }
-      if (pending.requiresLOS) {
-        const blocked = buildBlocksVisionMap(world);
-        const isBlocked = blockedCallback(blocked);
-        if (!hasLOS(px, py, finalTx, finalTy, isBlocked)) {
-          try { messageLog.log({ text: `${pending.spellName} target must be in line of sight.`, type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
-          return;
-        }
-      }
-      if (pending.requiresVisible && !isVisibleAt(finalTx, finalTy)) {
-        try { messageLog.log({ text: `${pending.spellName} target must be visible.`, type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
-        return;
-      }
-      _pendingSpellTargeting = null;
-      _targetCursor = null;
-      const rulesHandler = makeRulesDispatcher(world, () => pe.id);
-      rulesHandler({ type: 'rules.castActiveSpell', payload: { spellId: pending.spellId, targetId: pe.id, x: finalTx, y: finalTy } });
-      return;
-    }
-
-    if (_pendingThrowTargeting?.itemId) {
-      const pending = _pendingThrowTargeting;
-      if ((pending.actorId | 0) !== (pe.id | 0)) { _pendingThrowTargeting = null; _targetCursor = null; return; }
-      const clamped = clampTargetToRange(px, py, tx, ty, pending.range);
-      const finalTx = clamped.x | 0;
-      const finalTy = clamped.y | 0;
-      const dist = chebyshevScalar(finalTx, finalTy, px, py);
-      if (!(dist > 0)) {
-        try { messageLog.log({ text: `${bracketizeName(pending.itemName)} must target another tile.`, type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
-        return;
-      }
-      _pendingThrowTargeting = null;
-      _targetCursor = null;
-      const rulesHandler = makeRulesDispatcher(world, () => pe.id);
-      rulesHandler({ type: 'rules.throwItem', payload: { itemId: pending.itemId, x: finalTx, y: finalTy } });
-      return;
-    }
-  }
-}, { capture: true });
+// (Enemy targeting keyboard + tile targeting keyboard handlers now in targetingController)
 
 // When user taps "Open Chest" on the ground tooltip
 addEventListener('ui:tapOpenChest', (e) => {
@@ -1813,467 +1349,51 @@ addEventListener('ui:engrave', () => {
   rulesHandler({ type: 'rules.engrave', payload: { text: text.trim() } });
 });
 
-// Scroll of Genocide → prompt for monster name, kill all matching, prevent future spawns
-world.on('scroll:genocide', ({ actor }) => {
-  const input = prompt('Which monster do you want to genocide?');
-  if (!input || !input.trim()) {
-    world.emit?.('message', { text: 'The scroll crumbles to dust, unused.', type: 'system' });
-    return;
-  }
-  world.emit?.('scroll:genocide:request', { actor, query: input.trim() });
-});
+// (Scroll/wand handlers extracted to main/wiring/scrollWandWiring.js)
 
-// Scroll of Polymorph → enemy targeting reticle, then transform
-world.on('scroll:polymorph', ({ actor }) => {
-  const _pe = playerEntity(world);
-  if (!_pe) return;
-  const px = _pe.pos.x | 0;
-  const py = _pe.pos.y | 0;
-  const range = 8;
-  const blocked = buildBlocksVisionMap(world);
-  const isBlocked = blockedCallback(blocked);
-
-  /** @type {Array<{id:number,x:number,y:number}>} */
-  const enemies = [];
-  forEachInRadius(world, px, py, range, (eid, pos) => {
-    if (eid === _pe.id) return;
-    const fac = world.get(eid, Faction);
-    if (!fac || fac.key !== 'enemy') return;
-    const vit = /** @type any */ (world.get(eid, Vitality));
-    if (!vit || (vit.hp | 0) <= 0) return;
-    if (!hasLOS(px, py, pos.x | 0, pos.y | 0, isBlocked)) return;
-    if (!isTileVisible(pos.x | 0, pos.y | 0)) return;
-    enemies.push({ id: eid, x: pos.x | 0, y: pos.y | 0 });
-  });
-
-  if (enemies.length === 0) {
-    try { messageLog.log({ text: 'No visible enemies to polymorph.', type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
-    return;
-  }
-
-  enemies.sort((a, b) => {
-    const da = chebyshevScalar(a.x, a.y, px, py);
-    const db = chebyshevScalar(b.x, b.y, px, py);
-    return da - db;
-  });
-
-  _pendingEnemyTargeting = {
-    spellId: '__scroll_polymorph__',
-    spellName: 'Scroll of Polymorph',
-    range,
-    enemies,
-    index: 0,
-    onConfirm: (enemyId) => {
-      let targetIdentity;
-      const traits = world.get(actor, Traits);
-      if (traits?.polymorph_control) {
-        const input = prompt('Polymorph into which creature?');
-        if (!input || !input.trim()) {
-          world.emit?.('message', { text: 'The scroll fizzles.', type: 'system' });
-          return;
-        }
-        const query = input.trim().toLowerCase();
-        let best = null;
-        let bestScore = Infinity;
-        for (const monster of MONSTERS) {
-          const name = monster.name.toLowerCase();
-          if (name === query) { best = monster; bestScore = 0; break; }
-          const score = name.startsWith(query) ? 1
-            : name.includes(query) ? 2
-            : query.startsWith(name) ? 3
-            : Infinity;
-          if (score < bestScore) { bestScore = score; best = monster; }
-        }
-        if (!best || bestScore > 4) {
-          world.emit?.('message', { text: 'You cannot picture such a creature. The scroll fizzles.', type: 'system' });
-          return;
-        }
-        targetIdentity = best.id;
-      } else {
-        const allIds = listAllMonsterIds();
-        targetIdentity = allIds[Math.floor(world.rand() * allIds.length)];
-      }
-
-      let depth = 1;
-      for (const [, ds] of world.query(DungeonState)) { depth = ds.currentDepth ?? 1; }
-
-      const fromIdent = world.get(enemyId, NamedIdentity);
-      const fromName = fromIdent?.identity ? (getMonster(fromIdent.identity)?.name || fromIdent.identity) : 'creature';
-
-      try {
-        world.add(enemyId, Polymorph, { targetIdentity, depth, trigger: 'scroll', once: true, revealed: false, hookKey: '' });
-      } catch {
-        world.mutate(enemyId, Polymorph, (r) => { r.targetIdentity = targetIdentity; r.depth = depth; r.revealed = false; });
-      }
-
-      const spawnedId = resolvePolymorph(world, { entityId: enemyId, targetIdentity, depth, actorId: actor, trigger: 'scroll', reason: 'scroll_polymorph' });
-      const toName = getMonster(targetIdentity)?.name || targetIdentity;
-      if (spawnedId > 0) {
-        world.emit?.('message', { text: `The ${fromName} shudders and transforms into a ${toName}!`, type: 'system' });
-        const pos = world.get(spawnedId, Position);
-        if (pos) world.emit?.('scroll:polymorph:vfx', { x: pos.x | 0, y: pos.y | 0 });
-      } else {
-        world.emit?.('message', { text: 'The scroll fizzles.', type: 'system' });
-      }
-    },
-  };
-  _targetCursor = { x: enemies[0].x, y: enemies[0].y };
-  _pendingSpellTargeting = null;
-  _pendingThrowTargeting = null;
-  try {
-    messageLog.log({
-      text: 'Choose target for Scroll of Polymorph. Tab to cycle enemies, Enter to confirm, Esc to cancel.',
-      type: 'system',
-    });
-  } catch (e) { console.debug('[main] messageLog failed:', e); }
-});
-
-// Scroll of Taming → enemy targeting reticle, then convert to pet
-world.on('scroll:taming', ({ actor }) => {
-  const _pe = playerEntity(world);
-  if (!_pe) return;
-  const px = _pe.pos.x | 0;
-  const py = _pe.pos.y | 0;
-  const range = 8;
-  const blocked = buildBlocksVisionMap(world);
-  const isBlocked = blockedCallback(blocked);
-
-  const enemies = [];
-  forEachInRadius(world, px, py, range, (eid, pos) => {
-    if (eid === _pe.id) return;
-    const fac = world.get(eid, Faction);
-    if (!fac || fac.key !== 'enemy') return;
-    const vit = world.get(eid, Vitality);
-    if (!vit || (vit.hp | 0) <= 0) return;
-    if (!hasLOS(px, py, pos.x | 0, pos.y | 0, isBlocked)) return;
-    if (!isTileVisible(pos.x | 0, pos.y | 0)) return;
-    enemies.push({ id: eid, x: pos.x | 0, y: pos.y | 0 });
-  });
-
-  if (enemies.length === 0) {
-    try { messageLog.log({ text: 'No visible enemies to tame.', type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
-    return;
-  }
-
-  enemies.sort((a, b) => chebyshevScalar(a.x, a.y, px, py) - chebyshevScalar(b.x, b.y, px, py));
-
-  _pendingEnemyTargeting = {
-    spellId: '__scroll_taming__',
-    spellName: 'Scroll of Taming',
-    range,
-    enemies,
-    index: 0,
-    onConfirm: (enemyId) => {
-      world.emit?.('scroll:taming:apply', { actor, target: enemyId });
-    },
-  };
-  _targetCursor = { x: enemies[0].x, y: enemies[0].y };
-  _pendingSpellTargeting = null;
-  _pendingThrowTargeting = null;
-  try {
-    messageLog.log({
-      text: 'Choose target for Scroll of Taming. Tab to cycle enemies, Enter to confirm, Esc to cancel.',
-      type: 'system',
-    });
-  } catch (e) { console.debug('[main] messageLog failed:', e); }
-});
-
-// Wand of Stasis → enemy targeting reticle, then freeze in time
-world.on('wand:stasis', ({ actor }) => {
-  const _pe = playerEntity(world);
-  if (!_pe) return;
-  const px = _pe.pos.x | 0;
-  const py = _pe.pos.y | 0;
-  const range = 6;
-  const blocked = buildBlocksVisionMap(world);
-  const isBlocked = blockedCallback(blocked);
-
-  const enemies = [];
-  forEachInRadius(world, px, py, range, (eid, pos) => {
-    if (eid === _pe.id) return;
-    const fac = world.get(eid, Faction);
-    if (!fac || fac.key !== 'enemy') return;
-    const vit = world.get(eid, Vitality);
-    if (!vit || (vit.hp | 0) <= 0) return;
-    if (!hasLOS(px, py, pos.x | 0, pos.y | 0, isBlocked)) return;
-    if (!isTileVisible(pos.x | 0, pos.y | 0)) return;
-    enemies.push({ id: eid, x: pos.x | 0, y: pos.y | 0 });
-  });
-
-  if (enemies.length === 0) {
-    try { messageLog.log({ text: 'No visible enemies to freeze.', type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
-    return;
-  }
-
-  enemies.sort((a, b) => chebyshevScalar(a.x, a.y, px, py) - chebyshevScalar(b.x, b.y, px, py));
-
-  _pendingEnemyTargeting = {
-    spellId: '__wand_stasis__',
-    spellName: 'Wand of Stasis',
-    range,
-    enemies,
-    index: 0,
-    onConfirm: (enemyId) => {
-      const ae = world.get(enemyId, ActiveEffects);
-      const stasisEffect = { key: 'stasis', turnsLeft: 8, stacks: 1, potency: 1 };
-      if (ae) {
-        ae.effects.push(stasisEffect);
-      } else {
-        try { world.add(enemyId, ActiveEffects, { effects: [stasisEffect] }); } catch {}
-      }
-      const ni = world.get(enemyId, NamedIdentity);
-      const name = ni?.name || 'creature';
-      world.emit?.('message', { text: `The ${name} is frozen outside of time!`, type: 'system' });
-      const pos = world.get(enemyId, Position);
-      if (pos) {
-        world.emit?.('wand:stasis:vfx', { id: enemyId, x: pos.x | 0, y: pos.y | 0 });
-      }
-    },
-  };
-  _targetCursor = { x: enemies[0].x, y: enemies[0].y };
-  _pendingSpellTargeting = null;
-  _pendingThrowTargeting = null;
-  try {
-    messageLog.log({
-      text: 'Choose target for Wand of Stasis. Tab to cycle enemies, Enter to confirm, Esc to cancel.',
-      type: 'system',
-    });
-  } catch (e) { console.debug('[main] messageLog failed:', e); }
-});
-
-// Sunsword blinding ray → targeted holy beam that blinds an enemy
-world.on('sunsword:ray', ({ actor, itemId, cooldownTurns }) => {
-  const _pe = playerEntity(world);
-  if (!_pe) return;
-  const px = _pe.pos.x | 0;
-  const py = _pe.pos.y | 0;
-  const range = 6;
-  const blocked = buildBlocksVisionMap(world);
-  const isBlocked = blockedCallback(blocked);
-
-  const enemies = [];
-  forEachInRadius(world, px, py, range, (eid, pos) => {
-    if (eid === _pe.id) return;
-    const fac = world.get(eid, Faction);
-    if (!fac || fac.key !== 'enemy') return;
-    const vit = world.get(eid, Vitality);
-    if (!vit || (vit.hp | 0) <= 0) return;
-    if (!hasLOS(px, py, pos.x | 0, pos.y | 0, isBlocked)) return;
-    if (!isTileVisible(pos.x | 0, pos.y | 0)) return;
-    enemies.push({ id: eid, x: pos.x | 0, y: pos.y | 0 });
-  });
-
-  if (enemies.length === 0) {
-    try { messageLog.log({ text: 'No visible enemies to blind.', type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
-    return;
-  }
-
-  enemies.sort((a, b) => chebyshevScalar(a.x, a.y, px, py) - chebyshevScalar(b.x, b.y, px, py));
-
-  _pendingEnemyTargeting = {
-    spellId: '__sunsword_ray__',
-    spellName: 'Sunsword — Blinding Ray',
-    range,
-    enemies,
-    index: 0,
-    onConfirm: (enemyId) => {
-      const ae = world.get(enemyId, ActiveEffects);
-      const blindEffect = { key: 'blinded', turnsLeft: 5, stacks: 1, potency: 1 };
-      if (ae) {
-        ae.effects.push(blindEffect);
-      } else {
-        try { world.add(enemyId, ActiveEffects, { effects: [blindEffect] }); } catch {}
-      }
-      blind(world, enemyId, 0, 0, 5, 0, 0);
-      const ni = world.get(enemyId, NamedIdentity);
-      const name = ni?.name || 'creature';
-      const resolvedItemId = Number(itemId || 0) | 0;
-      const resolvedCooldown = Math.max(1, Number.isFinite(cooldownTurns) ? (Number(cooldownTurns) | 0) : SUNSWORD_RAY_COOLDOWN_TURNS);
-      if (resolvedItemId > 0) {
-        let cd = /** @type any */ (world.get(resolvedItemId, ItemCooldown));
-        if (!cd) {
-          try { world.add(resolvedItemId, ItemCooldown, { turnsRemaining: resolvedCooldown, turnsMax: resolvedCooldown }); } catch {}
-          cd = /** @type any */ (world.get(resolvedItemId, ItemCooldown));
-        }
-        if (cd) {
-          cd.turnsRemaining = resolvedCooldown;
-          cd.turnsMax = resolvedCooldown;
-        }
-      }
-      world.emit?.('message', { text: `A searing ray of light strikes the ${name} — it is blinded!`, type: 'system' });
-      const pos = world.get(enemyId, Position);
-      if (pos) {
-        world.emit?.('sunsword:ray:vfx', { x: pos.x | 0, y: pos.y | 0, fromX: px, fromY: py });
-      }
-    },
-  };
-  _targetCursor = { x: enemies[0].x, y: enemies[0].y };
-  _pendingSpellTargeting = null;
-  _pendingThrowTargeting = null;
-  try {
-    messageLog.log({
-      text: 'Choose target for Blinding Ray. Tab to cycle enemies, Enter to confirm, Esc to cancel.',
-      type: 'system',
-    });
-  } catch (e) { console.debug('[main] messageLog failed:', e); }
-});
-
-// Scroll of Aggravation → set all living enemies to hunting with player's position
-world.on('scroll:aggravation', ({ actor }) => {
-  const pe = playerEntity(world);
-  if (!pe) return;
-  const px = pe.pos.x | 0;
-  const py = pe.pos.y | 0;
-  for (const [eid, aggro, fac] of world.query(AggroState, Faction)) {
-    if (fac.key !== 'enemy') continue;
-    const vit = world.get(eid, Vitality);
-    if (!vit || (vit.hp | 0) <= 0) continue;
-    aggro.alertLevel = AGGRO_LEVELS.hunting;
-    aggro.lastKnownX = px;
-    aggro.lastKnownY = py;
-    aggro.searchTurnsLeft = SEARCH_TURNS_HUNTING_GRACE;
-  }
-});
-
-// Scroll of Teleportation → move player to a random walkable tile on this floor
-world.on('scroll:teleportation', ({ actor }) => {
-  const pos = world.get(actor, Position);
-  if (!pos) return;
-  const from = { x: pos.x | 0, y: pos.y | 0 };
-  const candidates = [];
-  forEachLoadedTile((x, y) => {
-    if (!isWalkable(x, y)) return;
-    const dist = chebyshevScalar(x, y, from.x, from.y);
-    if (dist < 6) return;
-    candidates.push({ x, y });
-  });
-  if (candidates.length === 0) {
-    world.emit?.('message', { text: 'The scroll fizzles.', type: 'system' });
-    return;
-  }
-  const to = candidates[Math.floor(world.rand() * candidates.length)];
-  world.set(actor, Position, { x: to.x, y: to.y });
-  emitSafe(world, 'moved', { id: actor, from, to });
-});
-
-// Scroll of Summoning → spawn hostile monsters near player
-world.on('scroll:summoning', ({ actor }) => {
-  const pos = world.get(actor, Position);
-  if (!pos) return;
-  let depth = 1;
-  for (const [, ds] of world.query(DungeonState)) { depth = ds.currentDepth ?? 1; }
-  const rng = createRng(((world.seed ^ (world.step * 0x1337 + 0xDEAD)) >>> 0));
-  const count = 2 + (world.rand() * 3 | 0); // 2-4 monsters
-  for (let i = 0; i < count; i++) {
-    const params = pickMonster(rng, Math.max(1, depth));
-    const tile = findNearestValidTileAround(world, pos, { maxDistance: 5, exclude: [pos] });
-    if (!tile) continue;
-    const eid = spawnMonsterEntity(world, { ...params, x: tile.x, y: tile.y });
-    if (eid > 0) {
-      const aggro = world.get(eid, AggroState);
-      if (aggro) {
-        aggro.alertLevel = AGGRO_LEVELS.hunting;
-        aggro.lastKnownX = pos.x | 0;
-        aggro.lastKnownY = pos.y | 0;
-        aggro.searchTurnsLeft = SEARCH_TURNS_HUNTING_GRACE;
-      }
-    }
-  }
-});
-
-// Scroll of Decay → destroy organic items (scrolls, potions, food) in player's pack
-world.on('scroll:decay', ({ actor }) => {
-  const items = inventoryItems(world, actor);
-  const organic = [];
-  for (const itemId of items) {
-    const info = world.get(itemId, ItemInfo);
-    if (!info) continue;
-    if (info.type === 'scroll' || info.type === 'potion' || info.type === 'food') {
-      organic.push(itemId);
-    }
-  }
-  if (organic.length === 0) return;
-  // Destroy 1-3 random organic items using world.rand() shuffle
-  for (let i = organic.length - 1; i > 0; i--) {
-    const j = world.rand() * (i + 1) | 0;
-    [organic[i], organic[j]] = [organic[j], organic[i]];
-  }
-  const destroyCount = Math.min(organic.length, 1 + (world.rand() * 3 | 0));
-  for (let i = 0; i < destroyCount; i++) {
-    removeFromInventory(world, actor, organic[i]);
-    try { world.destroy(organic[i]); } catch {}
-  }
-});
+// Scroll of Polymorph — REMOVED (handled by scrollWandWiring)
+// Scroll of Taming — REMOVED (handled by scrollWandWiring)
+// Wand of Stasis — REMOVED (handled by scrollWandWiring)
+// Sunsword Blinding Ray — REMOVED (handled by scrollWandWiring)
+// Scroll of Aggravation — REMOVED (handled by scrollWandWiring)
+// Scroll of Teleportation — REMOVED (handled by scrollWandWiring)
+// Scroll of Summoning — REMOVED (handled by scrollWandWiring)
+// Scroll of Decay — REMOVED (handled by scrollWandWiring)
+// Scroll of Genocide — REMOVED (handled by scrollWandWiring)
 
 // Wait button → dispatch wait action
 addEventListener('ui:wait', () => {
   if (isSimUiBlocked()) return;
-  const pe = playerEntity(world);
-  if (!pe) return;
-  const rulesHandler = makeRulesDispatcher(world, () => pe.id);
-  rulesHandler({ type: 'rules.wait', payload: {} });
+  _sharedRulesDispatcher({ type: 'rules.wait', payload: {} });
 });
 
 // Search button → dispatch search action
 addEventListener('ui:search', () => {
   if (isSimUiBlocked()) return;
-  const pe = playerEntity(world);
-  if (!pe) return;
-  const rulesHandler = makeRulesDispatcher(world, () => pe.id);
-  rulesHandler({ type: 'rules.search', payload: {} });
+  _sharedRulesDispatcher({ type: 'rules.search', payload: {} });
 });
 
 // Posture button → cycle combat posture as a turn action
 addEventListener('ui:cyclePosture', () => {
   if (isSimUiBlocked()) return;
-  const pe = playerEntity(world);
-  if (!pe) return;
-  const rulesHandler = makeRulesDispatcher(world, () => pe.id);
-  rulesHandler({ type: 'rules.cyclePosture', payload: {} });
+  _sharedRulesDispatcher({ type: 'rules.cyclePosture', payload: {} });
 });
 
 addEventListener('ui:quickInteract', () => {
   if (isSimUiBlocked()) return;
-  const pe = playerEntity(world);
-  if (!pe) return;
-  const rulesHandler = makeRulesDispatcher(world, () => pe.id);
-  rulesHandler({ type: 'rules.quickInteract', payload: {} });
+  _sharedRulesDispatcher({ type: 'rules.quickInteract', payload: {} });
 });
 
 // Pray button → dispatch pray action
 addEventListener('ui:pray', () => {
   if (isSimUiBlocked()) return;
-  const pe = playerEntity(world);
-  if (!pe) return;
-  const rulesHandler = makeRulesDispatcher(world, () => pe.id);
-  rulesHandler({ type: 'rules.pray', payload: {} });
+  _sharedRulesDispatcher({ type: 'rules.pray', payload: {} });
 });
 
-addEventListener("ui:openBubbleDialog", (ev) => {
-  const detail = /** @type {CustomEvent} */ (ev).detail || {};
-  openBubbleDialog(detail);
-});
-
-addEventListener("ui:closeBubbleDialog", () => {
-  closeBubbleDialog();
-});
-
-world.on("dungeon:transitioned", () => {
-  closeBubbleDialog();
-});
-
-world.on("dungeon:teleport-depth", () => {
-  closeBubbleDialog();
-});
-
-addEventListener("keydown", (ev) => {
-  if (!_bubbleDialogState.open) return;
-  if (ev.key !== "Escape") return;
-  window.dispatchEvent(new CustomEvent("ui:requestDialogClose", {
-    detail: { sessionId: _bubbleDialogState.sessionId },
-  }));
-  ev.preventDefault();
-});
+// Bubble dialog event listeners now handled by bubbleDialogController.
+// Close dialog on floor transitions.
+world.on("dungeon:transitioned", () => { bubbleDialog?.close(); });
+world.on("dungeon:teleport-depth", () => { bubbleDialog?.close(); });
 
 // Spell picker data feed and selection
 addEventListener('ui:requestSpellData', () => {
@@ -2382,6 +1502,21 @@ installMessageWiring({
   },
 });
 
+// ---- Targeting controller (after messageLog is ready) -----------------------
+// `isVisibleAt` is defined further down (display section) — forward-ref via closure.
+const targeting = createTargetingController({
+  world,
+  messageLog,
+  playerEntity: () => playerEntity(world),
+  dispatchRules: (action) => _sharedRulesDispatcher(action),
+  isVisibleAt: (x, y) => isVisibleAt(x, y),
+});
+targeting.installKeyboardHandlers();
+
+// ---- Extracted wiring modules -----------------------------------------------
+installScrollWandWiring({ world, targeting, playerEntity: () => playerEntity(world) });
+installPetWiring({ world, playerEntity: () => playerEntity(world) });
+
 function buildQuickItemPinDetailFromWorld(itemId) {
   const id = Number(itemId || 0) | 0;
   const identity = String(world.get(id, NamedIdentity)?.identity || '');
@@ -2480,7 +1615,7 @@ pickupFx.installListeners();
 
 world.on('item:pickup', ({ actor, itemId, count }) => {
   const id = Number(itemId || 0) | 0;
-  if (id > 0) { _deathLootArcs.delete(id); _deathLootRestPos.delete(id); }
+  if (id > 0) { deathLootArcFx.removeItem(id); }
   const info = world.get(itemId, ItemInfo);
   if (!info || info.type !== 'currency') return;
   const pos = world.get(actor, Position);
@@ -2502,10 +1637,13 @@ function lootRarityColorHex(itemInfo) {
   return "#c2c2c2";
 }
 
-/** @type {Map<number, {fromX:number,fromY:number,toX:number,toY:number,start:number,duration:number,peak:number}>} */
-const _deathLootArcs = new Map();
-/** @type {Map<number, {x:number,y:number}>} Persistent visual rest positions after arc completes */
-const _deathLootRestPos = new Map();
+// Death loot arc FX controller (extracted to display/fx/deathLootArcFx.js)
+const deathLootArcFx = createDeathLootArcFx({
+  world,
+  getItemInfo: (id) => world.get(Number(id || 0), ItemInfo) || null,
+  getFxTime: () => _fxTime,
+  isWalkable,
+});
 world.on("damaged", ({ target, amount, projectileDelay }) => {
   const tid = Number(target || 0) | 0;
   const d = Number(projectileDelay || 0);
@@ -2518,218 +1656,12 @@ world.on("damaged", ({ target, amount, projectileDelay }) => {
   }
 });
 
-function seededUnit(seed) {
-  const s = (Math.imul((seed | 0) ^ 0x9e3779b9, 0x85ebca6b) ^ 0xc2b2ae35) >>> 0;
-  return (s & 0xffff) / 0xffff;
-}
-
+// (Death loot arc physics extracted to display/fx/deathLootArcFx.js)
 function scheduleDeathLootArc(itemId, origin, at, delayOffset, impulse) {
-  const id = Number(itemId || 0) | 0;
-  if (!(id > 0)) return;
-  const fx = _fxTime + (Number(delayOffset) || 0);
-  const fromX = Number(origin?.x);
-  const fromY = Number(origin?.y);
-  let toX = Number(at?.x);
-  let toY = Number(at?.y);
-  if (![fromX, fromY, toX, toY].every(Number.isFinite)) return;
-
-  // Per-item deterministic jitter (two independent axes)
-  const j1 = seededUnit(id ^ (world.step | 0));
-  const j2 = seededUnit((id * 0x9e3779b9) ^ (world.step | 0));
-
-  // ── Weight physics ──────────────────────────────────────────────
-  // Steep curve: coins/scrolls SAIL, swords slide, corpses crater.
-  // Feather items (< 0.3) get a boost so they feel airborne.
-  const itemInfo = world.get(id, ItemInfo);
-  const weight = Math.max(0, Number(itemInfo?.weight || 0));
-  const wRaw = 1 / (1 + weight * 0.7);             // steeper falloff
-  const feather = weight < 0.3 ? 1.3 - weight : 1; // light = extra floaty
-  const wt = Math.min(1.5, wRaw * feather);         // cap at 1.5
-
-  // Separate multipliers for different physics aspects:
-  // wScatter  — how far it travels horizontally
-  // wLift     — how high the arc peaks (feathers get extra hangtime)
-  // wHang     — how long the flight lasts (feathers linger)
-  //
-  // Crits HAMMER everything — bigger scatter, taller arcs, more hang.
-  // Even heavy armor gets launched on a crit. Coins go orbital.
-  const crit = !!(impulse?.critical);
-  const critAmp = crit ? 1.55 : 1;            // raw distance/spread boost
-  const critLift = crit ? 1.7 : 1;            // arcs POP higher
-  const critHang = crit ? 1.35 : 1;           // linger in the air longer
-  const wScatter = wt * critAmp;
-  const wLift    = Math.min(2.8, wt * (weight < 0.5 ? 1.4 : 1.0) * critLift);
-  const wHang    = Math.min(2.2, wt * (weight < 0.5 ? 1.3 : weight > 5 ? 0.7 : 1.0) * critHang);
-
-  // ── Impulse ────────────────────────────────────────────────────
-  const idx = Number(impulse?.dx || 0);
-  const idy = Number(impulse?.dy || 0);
-  const force = Math.max(0, Math.min(3, Number(impulse?.force || 0)));
-  const cause = String(impulse?.cause || '');
-
-  // ── Scatter profiles ───────────────────────────────────────────
-  // push     = directional travel along impulse vector
-  // fan      = perpendicular spread (items don't stack on a line)
-  // drift    = random scatter when there's no directional impulse
-  // All values are BASE + PER_FORCE * force, then * wScatter.
-  // Tuned HOT: a frost bolt on a coin should send it 2+ tiles.
-  let pushBase = 0.60, pushPerF = 0.45;
-  let fanBase  = 0.80, fanPerF  = 0.55;
-  let drift    = 0.25;
-
-  if (cause === 'melee' || cause === 'retaliation') {
-    // Melee: beefy directional whack, wide fan on crits
-    pushBase = 0.70; pushPerF = 0.55;
-    fanBase  = 1.00; fanPerF  = 0.70;
-  } else if (cause === 'ranged') {
-    // Arrow: TIGHT cone, punches hard forward, minimal fan
-    pushBase = 1.00; pushPerF = 0.65;
-    fanBase  = 0.35; fanPerF  = 0.20;
-  } else if (cause === 'spell:phase_strike') {
-    // Phase strike: EXPLOSIVE. Everything flies. Arcade mode.
-    pushBase = 1.20; pushPerF = 0.80;
-    fanBase  = 1.30; fanPerF  = 0.90;
-  } else if (cause === 'spell:smite' || cause === 'spell:meteor') {
-    // From above: radial starburst, no directional bias
-    const angle = (j1 * 2 - 1) * Math.PI;
-    const radial = (0.80 + 0.70 * force) * wScatter;
-    toX += Math.cos(angle) * radial;
-    toY += Math.sin(angle) * radial;
-    // Extra random wobble so items don't form a perfect ring
-    toX += (j2 - 0.5) * 0.4 * wScatter;
-    toY += (j1 - 0.5) * 0.4 * wScatter;
-    pushBase = 0; pushPerF = 0; fanBase = 0; fanPerF = 0;
-  } else if (cause === 'spell:agony' || cause === 'spell:drain_life:tick') {
-    // Agony: slow ooze, items barely shift
-    pushBase = 0.15; pushPerF = 0.08;
-    fanBase  = 0.20; fanPerF  = 0.10;
-    drift = 0.12;
-  } else if (cause.startsWith('spell:')) {
-    // Generic spell (frost, shadow_bolt, lightning, scorch, blastwave)
-    // Strong directional blast — frost bolt sends coins flying
-    pushBase = 0.85; pushPerF = 0.60;
-    fanBase  = 0.90; fanPerF  = 0.60;
-  } else if (!cause || cause === 'starvation') {
-    // Crumple: items just... fall out
-    pushBase = 0; pushPerF = 0;
-    fanBase  = 0; fanPerF  = 0;
-    drift = 0.15;
-  }
-
-  // Burn/trap: very low, items slump
-  if (cause.includes('burn') || cause === 'spike_trap' || cause === 'shock_trap') {
-    pushBase = 0.10; pushPerF = 0.05;
-    fanBase  = 0.15; fanPerF  = 0.08;
-    drift = 0.10;
-  }
-
-  // Apply directional scatter
-  if ((idx || idy) && (pushBase > 0 || fanBase > 0)) {
-    const push = (pushBase + pushPerF * force) * wScatter;
-    toX += idx * push;
-    toY += idy * push;
-    // Perpendicular fan: both sides of the impulse line
-    const perpX = -idy;
-    const perpY = idx;
-    const fan = (j1 - 0.5) * (fanBase + fanPerF * force) * wScatter;
-    toX += perpX * fan;
-    toY += perpY * fan;
-  }
-  // Random drift (always applied — gives urn/chest loot some spread too)
-  toX += (j1 - 0.5) * drift * wScatter;
-  toY += (j2 - 0.5) * drift * wScatter;
-
-  // ── Wall clamping ──────────────────────────────────────────────
-  // Binary search along the flight path to find last walkable point.
-  const landTileX = Math.round(toX);
-  const landTileY = Math.round(toY);
-  if (!isWalkable(landTileX, landTileY)) {
-    let lo = 0, hi = 1;
-    for (let step = 0; step < 8; step++) {
-      const mid = (lo + hi) * 0.5;
-      const mx = Math.round(fromX + (toX - fromX) * mid);
-      const my = Math.round(fromY + (toY - fromY) * mid);
-      if (isWalkable(mx, my)) lo = mid; else hi = mid;
-    }
-    toX = fromX + (toX - fromX) * lo;
-    toY = fromY + (toY - fromY) * lo;
-  }
-
-  const fdx = toX - fromX;
-  const fdy = toY - fromY;
-  const dist = Math.sqrt(fdx * fdx + fdy * fdy);
-  if (dist > 5) return; // raised cap for big scatter
-
-  // ── Arc timing ─────────────────────────────────────────────────
-  // Duration = how long the item is in the air (wHang makes feathers linger)
-  // Peak     = max height of the parabola (wLift makes feathers soar)
-  let durBase = 0.30, durDist = 0.12, durForce = 0.05;
-  let pkBase  = 0.30, pkDist  = 0.25, pkForce  = 0.12;
-
-  if (cause === 'spell:phase_strike') {
-    // Snappy launch, huge peak — items POP upward
-    durBase = 0.22; durDist = 0.08; durForce = 0.03;
-    pkBase  = 0.50; pkDist  = 0.35; pkForce  = 0.20;
-  } else if (cause === 'spell:smite' || cause === 'spell:meteor') {
-    // Dramatic eruption: tall arcs, moderate duration
-    durBase = 0.28; durDist = 0.10; durForce = 0.04;
-    pkBase  = 0.55; pkDist  = 0.40; pkForce  = 0.18;
-  } else if (cause === 'spell:agony' || cause === 'spell:drain_life:tick') {
-    // Slow, heavy, low arcs — items ooze out
-    durBase = 0.55; durDist = 0.18; durForce = 0.08;
-    pkBase  = 0.12; pkDist  = 0.08; pkForce  = 0.04;
-  } else if (cause.includes('burn')) {
-    // Crumble: barely lifts, slow settle
-    durBase = 0.45; durDist = 0.14; durForce = 0.05;
-    pkBase  = 0.10; pkDist  = 0.06; pkForce  = 0.03;
-  } else if (cause === 'ranged') {
-    // Arrow: FAST, flat trajectory — items punch forward low
-    durBase = 0.18; durDist = 0.07; durForce = 0.03;
-    pkBase  = 0.20; pkDist  = 0.15; pkForce  = 0.06;
-  } else if (cause === 'melee' || cause === 'retaliation') {
-    // Melee: satisfying medium arc
-    durBase = 0.28; durDist = 0.10; durForce = 0.04;
-    pkBase  = 0.35; pkDist  = 0.28; pkForce  = 0.14;
-  } else if (cause.startsWith('spell:')) {
-    // Generic spell: generous arcs
-    durBase = 0.30; durDist = 0.10; durForce = 0.04;
-    pkBase  = 0.40; pkDist  = 0.30; pkForce  = 0.14;
-  }
-
-  const duration = (durBase + dist * durDist + j1 * 0.08 + force * durForce) * wHang;
-  const peak = (pkBase + dist * pkDist + j2 * 0.12 + force * pkForce) * wLift;
-  _deathLootArcs.set(id, {
-    fromX,
-    fromY,
-    toX,
-    toY,
-    start: fx,
-    duration,
-    peak,
-  });
+  deathLootArcFx.schedule(itemId, origin, at, delayOffset, impulse);
 }
-
 function deathLootArcPos(itemId) {
-  const id = Number(itemId || 0) | 0;
-  if (!(id > 0)) return null;
-  const rec = _deathLootArcs.get(id);
-  if (!rec) {
-    const rest = _deathLootRestPos.get(id);
-    return rest ? { x: rest.x, y: rest.y, airborne: false } : null;
-  }
-  const t = (Math.max(0, _fxTime - rec.start)) / Math.max(0.001, rec.duration);
-  if (t >= 1) {
-    _deathLootArcs.delete(id);
-    _deathLootRestPos.set(id, { x: rec.toX, y: rec.toY });
-    return { x: rec.toX, y: rec.toY, airborne: false };
-  }
-  const ease = 1 - Math.pow(1 - t, 3);
-  const lift = 4 * rec.peak * ease * (1 - ease);
-  return {
-    x: rec.fromX + (rec.toX - rec.fromX) * ease,
-    y: rec.fromY + (rec.toY - rec.fromY) * ease - lift,
-    airborne: true,
-  };
+  return deathLootArcFx.getPosition(itemId);
 }
 
 world.on("item:dropped", ({ itemId, actor, source, origin, at, targetId, impulse }) => {
@@ -3725,12 +2657,6 @@ world.on('item:pickup', ({ actor, itemId }) => {
 });
 
 /** @param {string} s */
-function bracketizeName(s) {
-  const str = String(s ?? '');
-  if (str.startsWith('[') && str.endsWith(']')) return str;
-  return `[${str}]`;
-}
-
 /**
  * @param {string} key
  */
@@ -3920,7 +2846,7 @@ addEventListener('ui:requestThrow', (ev) => {
   if (!pe) return;
   const rulesHandler = makeRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
   if (hasTileTarget || (Number.isInteger(targetId) && targetId > 0)) {
-    _pendingThrowTargeting = null;
+    targeting.cancelAll();
     const payload = { itemId };
     if (Number.isInteger(targetId) && targetId > 0) payload.targetId = targetId;
     if (hasTileTarget) {
@@ -3949,9 +2875,7 @@ addEventListener('ui:requestThrow', (ev) => {
   const itemName = resolveItemDisplayName(world, itemId) || 'item';
   const info = world.get(itemId, ItemInfo);
   const range = computeThrowRange(Number(info?.weight));
-  _pendingSpellTargeting = null;
-  _pendingThrowTargeting = { actorId: pe.id, itemId, itemName, range };
-  _targetCursor = { x: pe.pos.x | 0, y: pe.pos.y | 0 };
+  targeting.openThrowTargeting({ actorId: pe.id, itemId, itemName, range });
   try {
     messageLog.log({
       text: `Throw ${bracketizeName(itemName)} where? Tap/click a tile or use arrow keys + Enter (up to ${range}). Press Esc to cancel.`,
@@ -3990,176 +2914,27 @@ cam.scale = CAMERA_START_SCALE;
 cam.targetScale = CAMERA_START_SCALE;
 if (PERF.cameraLerp !== null && Number.isFinite(PERF.cameraLerp)) cam.lerpSpeed = Math.max(0, PERF.cameraLerp);
 
-// Enemy-targeted spell casts: tap selects nearest enemy, tap selected enemy confirms.
-canvas.addEventListener('pointerdown', (ev) => {
-  if (!_pendingEnemyTargeting) return;
-  const pe = playerEntity(world);
-  if (!pe) { _pendingEnemyTargeting = null; _targetCursor = null; return; }
+// ---- Bubble dialog controller (needs cam + canvas) -------------------------
+bubbleDialog = createBubbleDialogController({
+  getPosition: (id) => world.get(Number(id || 0), Position) || null,
+  playerEntity: () => playerEntity(world),
+  canvas,
+  getCam: () => cam,
+  worldToScreen,
+  getCanvasSetup: () => _canvasSetup,
+});
 
-  const [wx, wy] = cameraClientToWorld(cam, ev.clientX, ev.clientY, canvas);
-  const tapX = worldToTile(wx);
-  const tapY = worldToTile(wy);
+// ---- Targeting pointer handlers (needs cam + canvas) ------------------------
+targeting.installPointerHandlers(canvas, (ev) => cameraClientToWorld(cam, ev.clientX, ev.clientY, canvas));
 
-  ev.preventDefault();
-  ev.stopPropagation();
-  if (typeof ev.stopImmediatePropagation === 'function') ev.stopImmediatePropagation();
-
-  const targeting = _pendingEnemyTargeting;
-
-  // Find enemy nearest to the tap point (Manhattan distance)
-  let bestIdx = -1;
-  let bestDist = Infinity;
-  for (let i = 0; i < targeting.enemies.length; i++) {
-    const e = targeting.enemies[i];
-    const d = manhattanScalar(e.x, e.y, tapX, tapY);
-    if (d < bestDist) { bestIdx = i; bestDist = d; }
-  }
-  if (bestIdx < 0) return;
-
-  const selected = targeting.enemies[bestIdx];
-
-  // If tapping the already-selected enemy → confirm and cast
-  if (targeting.index === bestIdx) {
-    _pendingEnemyTargeting = null;
-    _targetCursor = null;
-    if (typeof targeting.onConfirm === 'function') {
-      targeting.onConfirm(selected.id);
-      return;
-    }
-    const rulesHandler = makeRulesDispatcher(world, () => pe.id);
-    rulesHandler({
-      type: 'rules.castActiveSpell',
-      payload: {
-        spellId: targeting.spellId,
-        targetId: selected.id,
-        x: selected.x,
-        y: selected.y,
-      },
-    });
-    return;
-  }
-
-  // Otherwise → select this enemy (snap reticle)
-  targeting.index = bestIdx;
-  _targetCursor = { x: selected.x, y: selected.y };
-}, { capture: true });
-
-// Tile-targeted spell casts and throws capture the next tap on the stage.
-canvas.addEventListener('pointerdown', (ev) => {
-  const pendingSpell = _pendingSpellTargeting;
-  const pendingThrow = _pendingThrowTargeting;
-  if (!pendingSpell?.spellId && !pendingThrow?.itemId) return;
-
-  const pe = playerEntity(world);
-  if (!pe) {
-    _pendingSpellTargeting = null;
-    _pendingThrowTargeting = null;
-    _targetCursor = null;
-    return;
-  }
-
-  const [wx, wy] = cameraClientToWorld(cam, ev.clientX, ev.clientY, canvas);
-  const rawTx = worldToTile(wx);
-  const rawTy = worldToTile(wy);
-
-  ev.preventDefault();
-  ev.stopPropagation();
-  if (typeof ev.stopImmediatePropagation === 'function') ev.stopImmediatePropagation();
-
-  if (pendingSpell?.spellId) {
-    const px = pe.pos.x | 0;
-    const py = pe.pos.y | 0;
-    const clamped = clampTargetToRange(px, py, rawTx, rawTy, pendingSpell.range);
-    const tx = clamped.x | 0;
-    const ty = clamped.y | 0;
-    const dist = chebyshevScalar(tx, ty, px, py);
-    if (!(dist > 0)) {
-      try {
-        messageLog.log({
-          text: `${pendingSpell.spellName} needs another tile.`,
-          type: 'system',
-        });
-      } catch (e) { console.debug('[main] messageLog failed:', e); }
-      return;
-    }
-    if (pendingSpell.requiresLOS) {
-      const blocked = buildBlocksVisionMap(world);
-      const isBlocked = blockedCallback(blocked);
-      if (!hasLOS(px, py, tx, ty, isBlocked)) {
-        try {
-          messageLog.log({
-            text: `${pendingSpell.spellName} target must be in line of sight.`,
-            type: 'system',
-          });
-        } catch (e) { console.debug('[main] messageLog failed:', e); }
-        return;
-      }
-    }
-    if (pendingSpell.requiresVisible && !isVisibleAt(tx, ty)) {
-      try {
-        messageLog.log({
-          text: `${pendingSpell.spellName} target must be visible.`,
-          type: 'system',
-        });
-      } catch (e) { console.debug('[main] messageLog failed:', e); }
-      return;
-    }
-
-    _pendingSpellTargeting = null;
-    _targetCursor = null;
-
-    const rulesHandler = makeRulesDispatcher(world, () => pe.id);
-    rulesHandler({
-      type: 'rules.castActiveSpell',
-      payload: {
-        spellId: pendingSpell.spellId,
-        targetId: pe.id,
-        x: tx,
-        y: ty,
-      },
-    });
-    return;
-  }
-
-  if (!pendingThrow?.itemId) return;
-  if ((pendingThrow.actorId | 0) !== (pe.id | 0)) {
-    _pendingThrowTargeting = null;
-    _targetCursor = null;
-    return;
-  }
-
-  const px = pe.pos.x | 0;
-  const py = pe.pos.y | 0;
-  const clamped = clampTargetToRange(px, py, rawTx, rawTy, pendingThrow.range);
-  const tx = clamped.x | 0;
-  const ty = clamped.y | 0;
-  const dist = chebyshevScalar(tx, ty, px, py);
-  if (!(dist > 0)) {
-    try {
-      messageLog.log({
-        text: `${bracketizeName(pendingThrow.itemName)} must target another tile.`,
-        type: 'system',
-      });
-    } catch (e) { console.debug('[main] messageLog failed:', e); }
-    return;
-  }
-
-  _pendingThrowTargeting = null;
-  _targetCursor = null;
-  const rulesHandler = makeRulesDispatcher(world, () => pe.id);
-  rulesHandler({
-    type: 'rules.throwItem',
-    payload: {
-      itemId: pendingThrow.itemId,
-      x: tx,
-      y: ty,
-    },
-  });
-}, { capture: true });
+// Legacy pointer handler: was inline enemy-targeted spell casts
+// Now handled by targeting.installPointerHandlers above.
+// REMOVED: canvas.addEventListener('pointerdown') for enemy targeting
+// REMOVED: canvas.addEventListener('pointerdown') for tile/throw targeting
 
 // Proc-state badges are touchable: tap a badge to inspect stack/turn/potency details.
 canvas.addEventListener('pointerdown', (ev) => {
-  if (_pendingEnemyTargeting || _pendingSpellTargeting || _pendingThrowTargeting) return;
+  if (targeting.isActive()) return;
   const [wx, wy] = cameraClientToWorld(cam, ev.clientX, ev.clientY, canvas);
   const hit = findTappedProcBadge(wx, wy);
   if (!hit) return;
@@ -4180,7 +2955,7 @@ canvas.addEventListener('pointerdown', (ev) => {
 // Walk-mode tap interaction: if the tapped tile is a valid pickup/interact target,
 // consume the tap and route it through the canonical rules.worldTap path.
 canvas.addEventListener('pointerdown', (ev) => {
-  if (_pendingEnemyTargeting || _pendingSpellTargeting || _pendingThrowTargeting) return;
+  if (targeting.isActive()) return;
   if (isSimUiBlocked()) return;
   if (readInputMode() !== 'walk') return;
   if (ev.pointerType === 'mouse' && ev.button !== 0) return;
@@ -6745,10 +5520,10 @@ function render(worldView) {
 
   drawTargetingReticle({
     bctx,
-    targetCursor: _targetCursor,
-    hasPendingSpellTargeting: !!_pendingSpellTargeting,
-    hasPendingThrowTargeting: !!_pendingThrowTargeting,
-    hasPendingEnemyTargeting: !!_pendingEnemyTargeting,
+    targetCursor: get_targetCursor(),
+    hasPendingSpellTargeting: !!get_pendingSpellTargeting(),
+    hasPendingThrowTargeting: !!get_pendingThrowTargeting(),
+    hasPendingEnemyTargeting: !!get_pendingEnemyTargeting(),
     fxTime: _fxTime,
   });
 
@@ -6852,7 +5627,7 @@ function frame(now) {
   hudFeeds.updatePetHUD();
   hudFeeds.updateActiveSpellHUD();
   hudFeeds.updateCalendarHUD();
-  layoutBubbleDialog();
+  bubbleDialog?.layout();
 
   // Render
   const rawView = getCachedView();
