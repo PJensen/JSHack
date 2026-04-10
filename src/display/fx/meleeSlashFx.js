@@ -2,15 +2,16 @@
 // Melee attack visual language: sweeps, stabs, impacts, parry sparks, dodge whiffs.
 // Each weapon class + attack kind maps to a distinct visual primitive so combat
 // reads expressively — no two consecutive swings should look identical.
+// Only fires for weapon-wielding melee (impactProfile.weaponClass !== 'unarmed').
 
 import { MeleeSlashFx } from "./fxEntries.js";
 
 // ── Timing ─────────────────────────────────────────────────────────────────
-const SWEEP_TTL       = 0.14;   // sword/axe arc lifetime
-const STAB_TTL        = 0.11;   // dagger thrust
-const IMPACT_TTL      = 0.13;   // mace/blunt burst
-const PARRY_TTL       = 0.10;   // metallic spark
-const WHIFF_TTL       = 0.18;   // ghostly miss trail (lingers slightly)
+const SWEEP_TTL       = 0.32;   // sword/axe arc lifetime
+const STAB_TTL        = 0.25;   // dagger thrust
+const IMPACT_TTL      = 0.28;   // mace/blunt burst
+const PARRY_TTL       = 0.22;   // metallic spark
+const WHIFF_TTL       = 0.36;   // ghostly miss trail (lingers slightly)
 const OFFHAND_DELAY   = 0.15;   // match bump/gore offhand delay
 
 // ── Weapon colour palettes [r, g, b] ──────────────────────────────────────
@@ -22,26 +23,47 @@ const COL_DEFAULT = [230, 230, 230]; // neutral
 const COL_PARRY   = [255, 255, 220]; // bright metallic yellow-white
 const COL_WHIFF   = [180, 190, 210]; // ghostly blue-grey
 
+// ── Element tint overrides ────────────────────────────────────────────────
+const ELEMENT_TINTS = {
+  fire:   [255, 140, 60],   // hot orange
+  poison: [120, 220, 80],   // sickly green
+  frost:  [140, 200, 255],  // icy blue
+};
+
 // ── Damage colour shift ───────────────────────────────────────────────────
 // Lerps the base weapon colour toward hot white/red as damage increases.
 const DMG_SCALE_CAP = 12;
 
-function lerpColor(base, t) {
-  // t: 0 = base colour, 1 = hot red-white [255, 180, 160]
-  const hot = [255, 180, 160];
+function lerpColor(base, target, t) {
   return [
-    base[0] + (hot[0] - base[0]) * t,
-    base[1] + (hot[1] - base[1]) * t,
-    base[2] + (hot[2] - base[2]) * t,
+    base[0] + (target[0] - base[0]) * t,
+    base[1] + (target[1] - base[1]) * t,
+    base[2] + (target[2] - base[2]) * t,
   ];
+}
+
+function resolveBaseColor(weaponClass, elementTint) {
+  // Element enchants override the weapon's base colour
+  if (elementTint && ELEMENT_TINTS[elementTint]) {
+    return ELEMENT_TINTS[elementTint];
+  }
+  switch (weaponClass) {
+    case 'sword':       return COL_BLADE;
+    case 'axe':         return COL_AXE;
+    case 'mace':        return COL_BLUNT;
+    case 'morningstar': return COL_BLUNT;
+    case 'dagger':      return COL_DAGGER;
+    default:            return COL_DEFAULT;
+  }
 }
 
 function damageColorShift(baseColor, amount, critical) {
   const t = Math.min(1, (amount || 0) / DMG_SCALE_CAP);
-  const shifted = lerpColor(baseColor, t * 0.6);
+  const hot = [255, 180, 160];
+  const shifted = lerpColor(baseColor, hot, t * 0.6);
   if (critical) {
     // Crits push further toward white
-    return lerpColor(shifted, 0.35);
+    return lerpColor(shifted, [255, 255, 250], 0.35);
   }
   return shifted;
 }
@@ -53,7 +75,6 @@ function damageRadiusScale(amount) {
 }
 
 function damageSweepScale(amount) {
-  // Wider sweep for bigger hits
   if (!(amount > 0)) return 1.0;
   return 1.0 + Math.min(0.3, amount / DMG_SCALE_CAP * 0.3);
 }
@@ -64,28 +85,22 @@ function damageLineWidthScale(amount) {
 }
 
 // ── Angle helpers ─────────────────────────────────────────────────────────
-function impactAngle(iv) {
-  if (!iv) return 0;
-  return Math.atan2(iv.dy || 0, iv.dx || 0);
+
+// Resolve the primary direction for the slash VFX.
+// facingVector (attacker's facing) takes priority; impactVector is the fallback.
+function resolveBaseAngle(facingVec, impactVec) {
+  if (facingVec && Number.isFinite(facingVec.dx) && Number.isFinite(facingVec.dy)) {
+    const mag = Math.hypot(facingVec.dx, facingVec.dy);
+    if (mag > 0) return Math.atan2(facingVec.dy, facingVec.dx);
+  }
+  if (impactVec) return Math.atan2(impactVec.dy || 0, impactVec.dx || 0);
+  return 0;
 }
 
 // Simple deterministic jitter from a counter
 function jitter(counter) {
-  // Returns a value in [-0.25, 0.25] radians
   const x = Math.sin(counter * 7.31 + 2.17) * 0.5 + 0.5; // 0..1
-  return (x - 0.5) * 0.5;
-}
-
-// ── Weapon class → base colour ────────────────────────────────────────────
-function baseColorForWeapon(weaponClass) {
-  switch (weaponClass) {
-    case 'sword':       return COL_BLADE;
-    case 'axe':         return COL_AXE;
-    case 'mace':        return COL_BLUNT;
-    case 'morningstar': return COL_BLUNT;
-    case 'dagger':      return COL_DAGGER;
-    default:            return COL_DEFAULT;
-  }
+  return (x - 0.5) * 0.5; // [-0.25, 0.25] radians
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -110,9 +125,9 @@ export function createMeleeSlashFxController() {
 
   // ── Spawn helpers ─────────────────────────────────────────────────────
 
-  function spawnSweep(x, y, impactVec, weaponClass, amount, critical, attackerId, offhand) {
+  function spawnSweep(x, y, facingVec, impactVec, weaponClass, elementTint, amount, critical, attackerId, offhand) {
     const n = nextSwing(attackerId);
-    const baseAngle = impactAngle(impactVec);
+    const baseAngle = resolveBaseAngle(facingVec, impactVec);
     const isAxe = (weaponClass === 'axe' || weaponClass === 'morningstar');
 
     // Alternate: even swings go CW (positive sweep), odd go CCW (negative)
@@ -122,10 +137,10 @@ export function createMeleeSlashFxController() {
     const baseSweep = isAxe ? (130 * Math.PI / 180) : (100 * Math.PI / 180);
     const sweep = baseSweep * damageSweepScale(amount) * direction;
 
-    // Start angle: perpendicular to impact direction, offset by half sweep + jitter
+    // Start angle: perpendicular to facing, offset by half sweep + jitter
     const startAngle = baseAngle - sweep / 2 + jitter(n) + (offhand ? Math.PI * 0.15 : 0);
 
-    const baseCol = baseColorForWeapon(weaponClass);
+    const baseCol = resolveBaseColor(weaponClass, elementTint);
     const color = damageColorShift(baseCol, amount, critical);
     const radius = damageRadiusScale(amount) * (isAxe ? 1.1 : 1.0);
     const lw = (isAxe ? 0.18 : 0.13) * damageLineWidthScale(amount);
@@ -142,17 +157,18 @@ export function createMeleeSlashFxController() {
     });
   }
 
-  function spawnStab(x, y, impactVec, amount, critical, attackerId, offhand) {
+  function spawnStab(x, y, facingVec, impactVec, elementTint, amount, critical, attackerId, offhand) {
     const n = nextSwing(attackerId);
-    const baseAngle = impactAngle(impactVec);
+    const baseAngle = resolveBaseAngle(facingVec, impactVec);
 
-    // Stab: very narrow arc (20-30°) in the impact direction
+    // Stab: very narrow arc (20-30°) in the facing direction
     // Alternate slightly left/right of center
     const sideOffset = (n % 2 === 0) ? 0.15 : -0.15;
     const sweep = (25 * Math.PI / 180) * damageSweepScale(amount);
     const startAngle = baseAngle - sweep / 2 + sideOffset + jitter(n) * 0.5;
 
-    const color = damageColorShift(COL_DAGGER, amount, critical);
+    const baseCol = resolveBaseColor('dagger', elementTint);
+    const color = damageColorShift(baseCol, amount, critical);
     const radius = damageRadiusScale(amount) * 1.15; // stabs reach a bit further
     const lw = 0.10 * damageLineWidthScale(amount);
 
@@ -168,18 +184,18 @@ export function createMeleeSlashFxController() {
     });
   }
 
-  function spawnImpact(x, y, impactVec, weaponClass, amount, critical, attackerId) {
+  function spawnImpact(x, y, facingVec, impactVec, weaponClass, elementTint, amount, critical, attackerId) {
     const n = nextSwing(attackerId);
-    const baseAngle = impactAngle(impactVec);
+    const baseAngle = resolveBaseAngle(facingVec, impactVec);
 
-    // Impact: wide but short burst — 160-200° centered on impact direction
+    // Impact: wide but short burst — 160-200° centered on facing direction
     // Alternate the center offset
     const offsetAngle = (n % 3 === 0) ? 0 : ((n % 3 === 1) ? 0.3 : -0.3);
     const baseSweep = 170 * Math.PI / 180;
     const sweep = baseSweep * damageSweepScale(amount);
     const startAngle = baseAngle - sweep / 2 + offsetAngle;
 
-    const baseCol = baseColorForWeapon(weaponClass);
+    const baseCol = resolveBaseColor(weaponClass, elementTint);
     const color = damageColorShift(baseCol, amount, critical);
     const radius = damageRadiusScale(amount) * 0.75; // shorter radius — compact burst
     const lw = 0.22 * damageLineWidthScale(amount); // thicker lines
@@ -197,12 +213,10 @@ export function createMeleeSlashFxController() {
   }
 
   function spawnParry(x, y, attackerPos) {
-    // Spark burst at the contact point
     const dx = (attackerPos?.x ?? x) - x;
     const dy = (attackerPos?.y ?? y) - y;
     const angle = Math.atan2(dy, dx);
 
-    // Parry: small starburst of 3 short arcs radiating from contact
     return new MeleeSlashFx({
       x, y,
       startAngle: angle - Math.PI * 0.5,
@@ -220,7 +234,6 @@ export function createMeleeSlashFxController() {
     const dy = y - (attackerPos?.y ?? y);
     const angle = Math.atan2(dy, dx);
 
-    // Whiff: wide faint arc sweeping through the dodge location
     return new MeleeSlashFx({
       x, y,
       startAngle: angle - Math.PI * 0.4,
@@ -313,12 +326,11 @@ export function createMeleeSlashFxController() {
     const alpha = fx.alpha;
     const [cr, cg, cb] = fx.color;
 
-    // Stab: a quick thrust line that extends then fades
+    // Stab: thrust line extends then fades
     const thrustT = Math.min(1, t * (1 / 0.25)); // fully extended at 25% lifetime
     const centerAngle = fx.startAngle + fx.sweepAngle / 2;
     const len = fx.radius * thrustT;
 
-    // Thrust line from source toward target
     const x0 = fx.x + Math.cos(centerAngle) * 0.15;
     const y0 = fx.y + Math.sin(centerAngle) * 0.15;
     const x1 = fx.x + Math.cos(centerAngle) * len;
@@ -373,7 +385,7 @@ export function createMeleeSlashFxController() {
     ctx.arc(fx.x, fx.y, R * 0.7, fx.startAngle, fx.startAngle + fx.sweepAngle);
     ctx.stroke();
 
-    // Radial impact lines (4-5 short lines bursting outward)
+    // Radial impact lines bursting outward
     const centerAngle = fx.startAngle + fx.sweepAngle / 2;
     const lineCount = 5;
     const spread = fx.sweepAngle * 0.6;
@@ -410,15 +422,13 @@ export function createMeleeSlashFxController() {
     const spreadAngle = fx.sweepAngle;
     const centerAngle = fx.startAngle + spreadAngle / 2;
 
-    // Spark lines radiate outward
-    const expandT = Math.min(1, t * (1 / 0.20));
+    const expandT = Math.min(1, t * (1 / 0.25));
     ctx.lineCap = 'round';
     for (let j = 0; j < sparkCount; j++) {
       const a = centerAngle - spreadAngle / 2 + (spreadAngle / (sparkCount - 1)) * j;
       const r0 = 0.05 + expandT * 0.08;
       const r1 = 0.15 + expandT * fx.radius * (0.6 + 0.4 * Math.sin(j * 2.3 + 1.7));
 
-      // Each spark gets slightly different brightness
       const sparkAlpha = alpha * (0.6 + 0.4 * Math.sin(j * 3.1));
       ctx.strokeStyle = `rgba(${cr|0},${cg|0},${cb|0},${(0.8 * sparkAlpha).toFixed(3)})`;
       ctx.lineWidth = 0.05 + 0.03 * (1 - t);
@@ -444,7 +454,6 @@ export function createMeleeSlashFxController() {
     const [cr, cg, cb] = fx.color;
 
     // Whiff: faint, ghostly arc that sweeps through empty air
-    // Faster sweep, lower opacity, slightly wavy
     const sweepT = Math.min(1, t * (1 / 0.30));
     const currentSweep = fx.sweepAngle * sweepT;
     const R = fx.radius * (0.8 + t * 0.2);
@@ -456,10 +465,10 @@ export function createMeleeSlashFxController() {
     ctx.arc(fx.x, fx.y, R + 0.06, fx.startAngle, fx.startAngle + currentSweep, currentSweep < 0);
     ctx.stroke();
 
-    // Inner whisp — slightly brighter but still ghostly
+    // Inner whisp — dashed for "through air" feel
     ctx.strokeStyle = `rgba(${cr|0},${cg|0},${cb|0},${(0.25 * alpha * (1 - t * 0.4)).toFixed(3)})`;
     ctx.lineWidth = fx.lineWidth;
-    ctx.setLineDash([0.08, 0.06]); // dashed for that "through air" feel
+    ctx.setLineDash([0.08, 0.06]);
     ctx.beginPath();
     ctx.arc(fx.x, fx.y, R, fx.startAngle, fx.startAngle + currentSweep, currentSweep < 0);
     ctx.stroke();
@@ -472,9 +481,13 @@ export function createMeleeSlashFxController() {
     // Melee hit: spawn weapon-appropriate slash VFX
     world.on('damaged', (ev) => {
       const { source, target, amount, critical, impactProfile, impactVector, offhand, cause } = ev;
-      // Only fire for melee weapon hits (impactProfile present)
+      // Only fire for melee weapon hits (impactProfile present, cause is melee)
       if (!impactProfile) return;
       if (cause !== 'melee') return;
+
+      // Skip unarmed — this visual language is for weapon-wielders only
+      const weaponClass = impactProfile.weaponClass || 'weapon';
+      if (weaponClass === 'unarmed') return;
 
       const a = Number(source || 0) | 0;
       const t = Number(target || 0) | 0;
@@ -483,23 +496,24 @@ export function createMeleeSlashFxController() {
       const tpos = getPosition(t);
       if (!tpos) return;
 
-      const weaponClass = impactProfile.weaponClass || 'weapon';
       const attackKind = impactProfile.attackKind || 'strike';
+      const facingVec = impactProfile.facingVector || null;
+      const elementTint = impactProfile.elementTint || null;
 
-      let fx;
+      let fxEntry;
       if (attackKind === 'stab') {
-        fx = spawnStab(tpos.x, tpos.y, impactVector, amount, critical, a, offhand);
+        fxEntry = spawnStab(tpos.x, tpos.y, facingVec, impactVector, elementTint, amount, critical, a, offhand);
       } else if (attackKind === 'blunt') {
-        fx = spawnImpact(tpos.x, tpos.y, impactVector, weaponClass, amount, critical, a);
+        fxEntry = spawnImpact(tpos.x, tpos.y, facingVec, impactVector, weaponClass, elementTint, amount, critical, a);
       } else {
         // slash / strike → sweep
-        fx = spawnSweep(tpos.x, tpos.y, impactVector, weaponClass, amount, critical, a, offhand);
+        fxEntry = spawnSweep(tpos.x, tpos.y, facingVec, impactVector, weaponClass, elementTint, amount, critical, a, offhand);
       }
 
       if (offhand) {
-        _pending.push({ fx, delay: OFFHAND_DELAY });
+        _pending.push({ fx: fxEntry, delay: OFFHAND_DELAY });
       } else {
-        _active.push(fx);
+        _active.push(fxEntry);
       }
     });
 
