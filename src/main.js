@@ -4093,6 +4093,9 @@ function drawEntityHealthBar(ctx, e) {
   ctx.restore();
 }
 
+// Reusable Set for per-entity tag checks in the render loop (avoids alloc per frame)
+const _renderTagSet = new Set();
+
 function render(worldView) {
   const W = _canvasSetup.cssW;
   const H = _canvasSetup.cssH;
@@ -4286,49 +4289,52 @@ function render(worldView) {
       const paletteBase = (glyphAtlas.get(itemKind) || glyphAtlas.get('default') || {}).baseScale || 1;
       const finalItemScale = (e.itemScale || 1) * paletteBase;
       drawKindScaled(glyphAtlas, bctx, itemKind, itemRender.pos.x, itemRender.pos.y, finalItemScale, e.rotation || 0);
-      if (PERF.quality !== 'low' && Array.isArray(itemRender.tags) && itemRender.tags.includes('glowing')) {
+      // Build tag set once — avoids 15+ O(n) .includes() scans per item
+      _renderTagSet.clear();
+      if (Array.isArray(itemRender.tags)) for (let _t = 0; _t < itemRender.tags.length; _t++) _renderTagSet.add(itemRender.tags[_t]);
+      if (PERF.quality !== 'low' && _renderTagSet.has('glowing')) {
         drawGlowingTagAura(bctx, itemRender, _fxTime, finalItemScale);
       }
-      if (Array.isArray(itemRender.tags) && itemRender.tags.includes('venom_glowing')) {
+      if (_renderTagSet.has('venom_glowing')) {
         drawVenomTagAura(bctx, itemRender, _fxTime, finalItemScale);
       }
-      if (PERF.quality !== 'low' && Array.isArray(itemRender.tags) && itemRender.tags.includes('frost_glowing')) {
+      if (PERF.quality !== 'low' && _renderTagSet.has('frost_glowing')) {
         drawFrostTagAura(bctx, itemRender, _fxTime, finalItemScale);
       }
-      if (PERF.quality !== 'low' && Array.isArray(itemRender.tags) && itemRender.tags.includes('storm_glowing')) {
+      if (PERF.quality !== 'low' && _renderTagSet.has('storm_glowing')) {
         drawStormTagAura(bctx, itemRender, _fxTime, finalItemScale);
       }
-      if (PERF.quality !== 'low' && Array.isArray(itemRender.tags) && itemRender.tags.includes('soul_glowing')) {
+      if (PERF.quality !== 'low' && _renderTagSet.has('soul_glowing')) {
         drawSoulTagAura(bctx, itemRender, _fxTime, finalItemScale);
       }
-      if (PERF.quality !== 'low' && Array.isArray(itemRender.tags) && itemRender.tags.includes('blood_glowing')) {
+      if (PERF.quality !== 'low' && _renderTagSet.has('blood_glowing')) {
         drawBloodTagAura(bctx, itemRender, _fxTime, finalItemScale);
       }
-      if (PERF.quality !== 'low' && Array.isArray(itemRender.tags) && itemRender.tags.includes('caustic_glowing')) {
+      if (PERF.quality !== 'low' && _renderTagSet.has('caustic_glowing')) {
         drawCausticTagAura(bctx, itemRender, _fxTime, finalItemScale);
       }
-      if (Array.isArray(itemRender.tags) && itemRender.tags.includes('legendary_glowing')) {
+      if (_renderTagSet.has('legendary_glowing')) {
         drawLegendaryChestAura(bctx, itemRender, _fxTime, finalItemScale);
       }
-      if (Array.isArray(itemRender.tags) && itemRender.tags.includes('epic_glowing')) {
+      if (_renderTagSet.has('epic_glowing')) {
         drawEpicChestAura(bctx, itemRender, _fxTime, finalItemScale);
       }
-      if (Array.isArray(itemRender.tags) && itemRender.tags.includes('rare_glowing')) {
+      if (_renderTagSet.has('rare_glowing')) {
         drawRareGlowAura(bctx, itemRender, _fxTime, finalItemScale);
       }
-      if (Array.isArray(itemRender.tags) && itemRender.tags.includes('potion_glow')) {
+      if (_renderTagSet.has('potion_glow')) {
         drawPotionGlyphAura(bctx, itemRender, _fxTime, finalItemScale);
       }
-      if (PERF.quality !== 'low' && Array.isArray(itemRender.tags) && itemRender.tags.includes('rare')) {
+      if (PERF.quality !== 'low' && _renderTagSet.has('rare')) {
         drawRareStar(bctx, itemRender, _fxTime, finalItemScale);
       }
-      if (PERF.quality !== 'low' && Array.isArray(itemRender.tags) && itemRender.tags.includes('quest_giver')) {
+      if (PERF.quality !== 'low' && _renderTagSet.has('quest_giver')) {
         drawQuestBang(bctx, itemRender, _fxTime, finalItemScale);
       }
-      if (PERF.quality !== 'low' && Array.isArray(itemRender.tags) && itemRender.tags.includes('blinded')) {
+      if (PERF.quality !== 'low' && _renderTagSet.has('blinded')) {
         drawBlindEye(bctx, itemRender, _fxTime, finalItemScale);
       }
-      if (PERF.quality !== 'low' && Array.isArray(itemRender.tags) && itemRender.tags.includes('confused')) {
+      if (PERF.quality !== 'low' && _renderTagSet.has('confused')) {
         drawConfusedMark(bctx, itemRender, _fxTime, finalItemScale);
       }
       const topItemId = stackMeta.get(`${e.pos.x},${e.pos.y}`) || 0;
@@ -4379,17 +4385,21 @@ function render(worldView) {
     const entityScale = flyingPresentation.glyphScale * sizeScale;
     const entityRotation = recoilOff.rotation || 0;
 
-    if (hasTag(renderEntity, 'thermal_sensed')) {
+    // Build tag set once — avoids 20+ O(n) .includes() scans per actor
+    _renderTagSet.clear();
+    if (Array.isArray(renderEntity.tags)) for (let _t = 0; _t < renderEntity.tags.length; _t++) _renderTagSet.add(renderEntity.tags[_t]);
+
+    if (_renderTagSet.has('thermal_sensed')) {
       drawThermalSensePing(bctx, renderEntity, _fxTime);
       continue;
     }
 
     drawFlyingShadow(bctx, flyingPresentation);
     drawEntityGlyph(glyphAtlas, bctx, renderEntity, entityScale, entityRotation);
-    if (hasTag(renderEntity, 'esp_sensed')) {
+    if (_renderTagSet.has('esp_sensed')) {
       drawEspSenseHalo(bctx, renderEntity, _fxTime);
     }
-    if ((renderEntity.layer | 0) >= 300 && !hasTag(renderEntity, 'memory_recent') && !hasTag(renderEntity, 'esp_sensed')) {
+    if ((renderEntity.layer | 0) >= 300 && !_renderTagSet.has('memory_recent') && !_renderTagSet.has('esp_sensed')) {
       drawFacingDot(bctx, renderEntity);
     }
     if (shouldShowHealthBar(renderEntity, _fxTime)) {
@@ -4400,9 +4410,9 @@ function render(worldView) {
     if (
       (renderEntity.layer | 0) === 300
       && renderEntity.showHealthBar
-      && !hasTag(renderEntity, 'memory_recent')
-      && !hasTag(renderEntity, 'esp_sensed')
-      && !hasTag(renderEntity, 'thermal_sensed')
+      && !_renderTagSet.has('memory_recent')
+      && !_renderTagSet.has('esp_sensed')
+      && !_renderTagSet.has('thermal_sensed')
       && (!worldView?.isVisible || worldView.isVisible(renderEntity.pos.x, renderEntity.pos.y))
     ) {
       const label = monsterLabelFromKind(renderEntity.kind);
@@ -4437,61 +4447,61 @@ function render(worldView) {
     }
 
     // Glyph-FX: passive glow aura for entities tagged "glowing"
-    if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && renderEntity.tags.includes('glowing')) {
+    if (PERF.quality !== 'low' && _renderTagSet.has('glowing')) {
       drawGlowingTagAura(bctx, renderEntity, _fxTime);
     }
-    if (Array.isArray(renderEntity.tags) && renderEntity.tags.includes('venom_glowing')) {
+    if (_renderTagSet.has('venom_glowing')) {
       drawVenomTagAura(bctx, renderEntity, _fxTime);
     }
-    if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && renderEntity.tags.includes('frost_glowing')) {
+    if (PERF.quality !== 'low' && _renderTagSet.has('frost_glowing')) {
       drawFrostTagAura(bctx, renderEntity, _fxTime);
     }
-    if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && renderEntity.tags.includes('storm_glowing')) {
+    if (PERF.quality !== 'low' && _renderTagSet.has('storm_glowing')) {
       drawStormTagAura(bctx, renderEntity, _fxTime);
     }
-    if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && renderEntity.tags.includes('soul_glowing')) {
+    if (PERF.quality !== 'low' && _renderTagSet.has('soul_glowing')) {
       drawSoulTagAura(bctx, renderEntity, _fxTime);
     }
-    if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && renderEntity.tags.includes('blood_glowing')) {
+    if (PERF.quality !== 'low' && _renderTagSet.has('blood_glowing')) {
       drawBloodTagAura(bctx, renderEntity, _fxTime);
     }
-    if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && renderEntity.tags.includes('caustic_glowing')) {
+    if (PERF.quality !== 'low' && _renderTagSet.has('caustic_glowing')) {
       drawCausticTagAura(bctx, renderEntity, _fxTime);
     }
-    if (Array.isArray(renderEntity.tags) && renderEntity.tags.includes('legendary_glowing')) {
+    if (_renderTagSet.has('legendary_glowing')) {
       drawLegendaryChestAura(bctx, renderEntity, _fxTime);
     }
-    if (Array.isArray(renderEntity.tags) && renderEntity.tags.includes('epic_glowing')) {
+    if (_renderTagSet.has('epic_glowing')) {
       drawEpicChestAura(bctx, renderEntity, _fxTime);
     }
-    if (Array.isArray(renderEntity.tags) && renderEntity.tags.includes('rare_glowing')) {
+    if (_renderTagSet.has('rare_glowing')) {
       drawRareGlowAura(bctx, renderEntity, _fxTime);
     }
-    if (Array.isArray(renderEntity.tags) && renderEntity.tags.includes('potion_glow')) {
+    if (_renderTagSet.has('potion_glow')) {
       drawPotionGlyphAura(bctx, renderEntity, _fxTime);
     }
-    if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && renderEntity.tags.includes('rare')) {
+    if (PERF.quality !== 'low' && _renderTagSet.has('rare')) {
       drawRareStar(bctx, renderEntity, _fxTime);
     }
-    if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && renderEntity.tags.includes('quest_giver')) {
+    if (PERF.quality !== 'low' && _renderTagSet.has('quest_giver')) {
       drawQuestBang(bctx, renderEntity, _fxTime);
     }
-    if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && renderEntity.tags.includes('blinded')) {
+    if (PERF.quality !== 'low' && _renderTagSet.has('blinded')) {
       drawBlindEye(bctx, renderEntity, _fxTime);
     }
-    if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && renderEntity.tags.includes('confused')) {
+    if (PERF.quality !== 'low' && _renderTagSet.has('confused')) {
       drawConfusedMark(bctx, renderEntity, _fxTime);
     }
-    if (PERF.quality !== 'low' && hasTag(renderEntity, 'invisible')) {
-      drawInvisibleVeil(bctx, renderEntity, _fxTime, hasTag(renderEntity, 'shadow_cloak'));
+    if (PERF.quality !== 'low' && _renderTagSet.has('invisible')) {
+      drawInvisibleVeil(bctx, renderEntity, _fxTime, _renderTagSet.has('shadow_cloak'));
     }
-    if (PERF.quality !== 'low' && hasTag(renderEntity, 'stoneskin')) {
+    if (PERF.quality !== 'low' && _renderTagSet.has('stoneskin')) {
       drawStoneskinWardAura(bctx, renderEntity, _fxTime);
     }
-    if (PERF.quality !== 'low' && hasAnyTag(renderEntity, ['resist_fire', 'resist_poison', 'resist_electric', 'resist_acid'])) {
+    if (PERF.quality !== 'low' && (_renderTagSet.has('resist_fire') || _renderTagSet.has('resist_poison') || _renderTagSet.has('resist_electric') || _renderTagSet.has('resist_acid'))) {
       drawHarmonyWardGlowAura(bctx, renderEntity, _fxTime);
     }
-    if (PERF.quality !== 'low' && hasTag(renderEntity, WARD_BUBBLE_RESERVED_TAG)) {
+    if (PERF.quality !== 'low' && _renderTagSet.has(WARD_BUBBLE_RESERVED_TAG)) {
       drawWardBubbleAura(bctx, renderEntity, _fxTime);
     }
 
@@ -4518,7 +4528,7 @@ function render(worldView) {
     }
 
     // Glyph-FX: invulnerability aegis ward
-    if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && renderEntity.tags.includes('invulnerable')) {
+    if (PERF.quality !== 'low' && _renderTagSet.has('invulnerable')) {
       drawAegisWardGlyphFx(
         bctx,
         '@',
@@ -4534,7 +4544,7 @@ function render(worldView) {
     }
 
     // Glyph-FX: frozen — pulsing icy blue radial glow (outer halo + bright inner core)
-    if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && renderEntity.tags.includes('frozen')) {
+    if (PERF.quality !== 'low' && _renderTagSet.has('frozen')) {
       bctx.save();
       bctx.globalCompositeOperation = 'lighter';
       const pulse = 0.5 + 0.5 * Math.sin(_fxTime * 1.4);
@@ -4563,7 +4573,7 @@ function render(worldView) {
 
     // Glyph-FX: electric shock — soft aura with sparks orbiting outside the glyph
     // Glyph-FX: electric shock — chaotic arcs from center, geometry rerolled every discharge
-    if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && renderEntity.tags.includes('shocked')) {
+    if (PERF.quality !== 'low' && _renderTagSet.has('shocked')) {
       bctx.save();
       const cx = renderEntity.pos.x, cy = renderEntity.pos.y;
       const _sid = (renderEntity.id || 0) | 0;
@@ -4638,7 +4648,7 @@ function render(worldView) {
     }
 
     // Glyph-FX: simple green thorn spikes ring when wearing Thorns gear
-    if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && renderEntity.tags.includes('thorns')) {
+    if (PERF.quality !== 'low' && _renderTagSet.has('thorns')) {
       /** @type {CanvasRenderingContext2D} */
       const g = /** @type any */ (bctx);
       g.save();
@@ -4669,7 +4679,7 @@ function render(worldView) {
     }
 
     // Glyph-FX: flickering fire aura (unused — burning uses particles only)
-    if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && renderEntity.tags.includes('_fire_aura')) {
+    if (PERF.quality !== 'low' && _renderTagSet.has('_fire_aura')) {
       /** @type {CanvasRenderingContext2D} */
       const g = /** @type any */ (bctx);
       g.save();
@@ -4707,7 +4717,7 @@ function render(worldView) {
     }
 
     // Glyph-FX: spinning 4-point stars above stunned entities
-    if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && renderEntity.tags.includes('stunned')) {
+    if (PERF.quality !== 'low' && _renderTagSet.has('stunned')) {
       bctx.save();
       bctx.globalCompositeOperation = 'lighter';
       bctx.lineWidth = 0.035;
@@ -4729,7 +4739,7 @@ function render(worldView) {
     }
 
     // Glyph-FX: bleeding wound — pulsing red aura (particles handle the trail)
-    if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && renderEntity.tags.includes('bleeding')) {
+    if (PERF.quality !== 'low' && _renderTagSet.has('bleeding')) {
       bctx.save();
       const pulse = 0.5 + 0.5 * Math.sin(_fxTime * 7.0 + renderEntity.id * 0.3);
       bctx.globalCompositeOperation = 'source-over';
@@ -4741,7 +4751,7 @@ function render(worldView) {
     }
 
     // Glyph-FX: poisoned — pulsing green glow
-    if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && renderEntity.tags.includes('poisoned')) {
+    if (PERF.quality !== 'low' && _renderTagSet.has('poisoned')) {
       bctx.save();
       bctx.globalCompositeOperation = 'lighter';
       const pulse = 0.5 + 0.5 * Math.sin(_fxTime * 3.5 + renderEntity.id * 1.3);
@@ -4771,7 +4781,7 @@ function render(worldView) {
     }
 
     // Glyph-FX: agony — pulsing dark purple shadow aura
-    if (PERF.quality !== 'low' && Array.isArray(renderEntity.tags) && renderEntity.tags.includes('agony')) {
+    if (PERF.quality !== 'low' && _renderTagSet.has('agony')) {
       bctx.save();
       bctx.globalCompositeOperation = 'lighter';
       const pulse = 0.5 + 0.5 * Math.sin(_fxTime * 4.0 + renderEntity.id * 0.7);
@@ -4805,7 +4815,7 @@ function render(worldView) {
       drawProcStateBadges(bctx, renderEntity.pos.x, renderEntity.pos.y, renderEntity.procStates, _fxTime, renderEntity.id);
     }
 
-    if (Array.isArray(renderEntity.tags) && renderEntity.tags.includes('rooted')) {
+    if (_renderTagSet.has('rooted')) {
       drawRootedVines(bctx, renderEntity.pos.x, renderEntity.pos.y, _fxTime, renderEntity.id);
     }
 
@@ -5093,7 +5103,7 @@ function frame(now) {
 
   // Feed player HP ratio to death VFX (low-HP heartbeat warning)
   if (view.player) {
-    const pe = view.entities.find(e => e.id === view.player.id);
+    const pe = view.playerEntity || null;
     if (pe && pe.maxHp > 0) deathVfx.setPlayerHpRatio(pe.hp / pe.maxHp);
   }
 

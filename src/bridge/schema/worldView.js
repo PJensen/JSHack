@@ -367,12 +367,29 @@ function projectDisplayTags(world, id, rec) {
 		}
 	}
 
-	// Entities with effective visionRange 0 are blinded regardless of source
-	if (getEffectiveVisionRange(world, id) <= 0 && !rec.tags.includes('blinded')) {
-		rec.tags.push('blinded');
+	/** @type {any} */ const ae = /** @type any */ (world.get(id, ActiveEffects));
+	// Stash on rec so projectProcStateTags can reuse without a second world.get
+	rec._ae = ae;
+
+	// Entities with effective visionRange 0 are blinded regardless of source.
+	// Gate behind a cheap check: only call the expensive getEffectiveVisionRange
+	// (which resolves all equipment passives) when the entity has a
+	// vision-affecting envelope or already has a blinding status/effect.
+	if (!rec.tags.includes('blinded')) {
+		let maybeBlinded = false;
+		if (ae && Array.isArray(ae.effects)) {
+			for (let i = 0; i < ae.effects.length; i++) {
+				const e = ae.effects[i];
+				if (e && e.key === 'stat_envelope' && e.stat === 'visionRange') {
+					maybeBlinded = true; break;
+				}
+			}
+		}
+		if (maybeBlinded && getEffectiveVisionRange(world, id) <= 0) {
+			rec.tags.push('blinded');
+		}
 	}
 
-	/** @type {any} */ const ae = /** @type any */ (world.get(id, ActiveEffects));
 	if (!ae || !Array.isArray(ae.effects)) return;
 	for (let i = 0; i < ae.effects.length; i++) {
 		const e = ae.effects[i];
@@ -410,7 +427,7 @@ function projectEquipmentDisplayTags(world, id, rec) {
 			rec.tags.push("sunlight");
 		}
 	}
-	const resolved = resolveEquippedWeaponVfx(world, id, { slots: ["weapon", "offhand"] });
+	const resolved = resolveEquippedWeaponVfx(world, id, { slots: ["weapon", "offhand"], _eq: eq });
 	if (resolved.length > 0) rec.weaponVfx = resolved;
 
 	// Equipment corner badges — right: melee weapon(s), bottom-left: ranged/zap, top-left: shield
@@ -607,7 +624,9 @@ function projectCombatUi(world, id, rec, playerFactionKey) {
 
 /** Populate rec.procStates with any active proc state effects on the entity (enemy-side). */
 function projectProcStateTags(world, id, rec) {
-	const ae = /** @type any */ (world.get(id, ActiveEffects));
+	// Reuse ActiveEffects already fetched by projectDisplayTags when available
+	const ae = /** @type any */ (rec._ae !== undefined ? rec._ae : world.get(id, ActiveEffects));
+	rec._ae = undefined; // clean up transient field
 	if (!ae || !Array.isArray(ae.effects)) return;
 	for (const e of ae.effects) {
 		const key = String(e?.key || '');
@@ -657,6 +676,7 @@ export function buildWorldView(world) {
 	_view.turn = world.step | 0;
 	_view.seed = world.seed >>> 0;
 	_view.player = null;
+	_view.playerEntity = null;
 	_view.entities.length = 0;
 	_view.solids.length = 0;
 	_view.emissives.length = 0;
@@ -885,6 +905,7 @@ export function buildWorldView(world) {
 
 			_allEntities.push(rec);
 			collectedIds.add(id);
+			if (isPlayer) _view.playerEntity = rec;
 
 			// solids list for display/collision readers (entity-based only: doors)
 			if (col && col.solid) {
@@ -980,6 +1001,7 @@ export function buildWorldView(world) {
 			if (isPlayer) {
 				if (!_view.player) _view.player = { id, pos: { x: pos.x, y: pos.y } };
 				else { _view.player.id = id; _view.player.pos.x = pos.x; _view.player.pos.y = pos.y; }
+				_view.playerEntity = rec;
 			}
 
 			// solids list for display/collision readers (entity-based only: doors)
