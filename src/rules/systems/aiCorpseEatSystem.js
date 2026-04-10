@@ -21,26 +21,19 @@ import { forEachInRadius } from "../utils/spatialIndex.js";
 import { chebyshevScalar } from "../utils/distance.js";
 import { canActThisTurn } from "../utils/speedGate.js";
 import { emitSafe } from "../utils/emitSafe.js";
+import { isAiOnCooldown, startAiCooldown } from "../utils/aiCooldowns.js";
 
 const ACTIVE_RADIUS = 24;
 const COOLDOWN_DEFAULT = 5;
-const COOLDOWN_KEY = Symbol.for("jshack:ai:corpseEat:lastTurn");
-
-/** @param {any} world @returns {Map<number, number>} */
-function ensureCooldownState(world) {
-  if (world[COOLDOWN_KEY] instanceof Map) return world[COOLDOWN_KEY];
-  const m = new Map();
-  world[COOLDOWN_KEY] = m;
-  return m;
-}
+const COOLDOWN_KEY = Symbol.for("jshack:ai:corpseEat:cooldownDueTurn");
 
 function isOnCooldown(world, id, cooldownTurns) {
-  const last = ensureCooldownState(world).get(id) ?? -1e9;
-  return ((world.step | 0) - last) < cooldownTurns;
+  if (!(cooldownTurns > 0)) return false;
+  return isAiOnCooldown(world, COOLDOWN_KEY, String(id | 0));
 }
 
-function markUsed(world, id) {
-  ensureCooldownState(world).set(id, world.step | 0);
+function markUsed(world, id, cooldownTurns) {
+  startAiCooldown(world, COOLDOWN_KEY, String(id | 0), cooldownTurns | 0);
 }
 
 function isCorpseOnFloor(world, itemId) {
@@ -154,7 +147,7 @@ export function aiCorpseEatSystem(world) {
     }
 
     try { world.destroy(corpseId); } catch {}
-    markUsed(world, id);
+    markUsed(world, id, config.cooldownTurns ?? COOLDOWN_DEFAULT);
 
     emitSafe(world, "monster:corpse-eat", {
       monsterId: id,
