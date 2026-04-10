@@ -9,7 +9,6 @@ import {
   applyPlayerClassLoadout,
 } from "./main/runtime/gameRuntime.js";
 import { playerEntity, findNearestValidTileAround } from "./rules/utils/queries.js";
-import { emitSafe } from "./rules/utils/emitSafe.js";
 import { getEffectiveVisionRange, blind } from "./rules/utils/blind.js";
 import { FOV_CONE_DISABLED_KEY, getEntityFacingConeDegrees, getNormalizedEntityFacing, setFacingTurnCostEnabled } from "./rules/utils/facing.js";
 
@@ -131,7 +130,7 @@ import { isChestIdentity } from "./shared/chests.js";
 import { buildBlocksVisionMap, blockedCallback } from "./rules/utils/vision.js";
 import {
   inventoryItems, inventoryContains,
-  hasCapacityForItem, transferItem, removeFromInventory,
+  removeFromInventory,
 } from "./rules/utils/inventoryFacade.js";
 import { Engraving } from "./rules/components/Engraving.js";
 import { Pet } from "./rules/components/Pet.js";
@@ -1178,21 +1177,7 @@ addEventListener('ui:requestPickup', (e) => {
   const rulesHandler = makeRulesDispatcher(world, () => pe.id);
   for (const id of arr) {
     if (!Number.isInteger(id) || id <= 0) continue;
-    // Check if the item is inside a chest inventory (no Position)
-    if (!world.get(id, Position)) {
-      if (!hasCapacityForItem(world, pe.id, id)) continue;
-      // Find and remove from the chest that holds it
-      for (const [cid, , ni] of world.query(Position, NamedIdentity)) {
-        if (!isChestIdentity(ni.identity)) continue;
-        if (!inventoryContains(world, cid, id)) continue;
-        transferItem(world, id, cid, pe.id);
-        const count = world.get(id, ItemInfo)?.count || 1;
-        emitSafe(world, 'item:pickup', { actor: pe.id, itemId: id, count });
-        break;
-      }
-    } else {
-      rulesHandler({ type: 'rules.pickupItem', payload: { itemId: id } });
-    }
+    rulesHandler({ type: 'rules.pickupItem', payload: { itemId: id } });
   }
 });
 

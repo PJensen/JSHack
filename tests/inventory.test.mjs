@@ -2,6 +2,7 @@ import { assert } from "jsr:@std/assert";
 import { World } from '../src/lib/ecs-js/index.js';
 import { createFrom } from "../src/lib/ecs-js/archetype.js";
 import { Player } from '../src/rules/components/Player.js';
+import { Inventory } from '../src/rules/components/Inventory.js';
 import { Position } from '../src/rules/components/Position.js';
 import { ItemInfo } from '../src/rules/components/ItemInfo.js';
 import { NamedIdentity } from '../src/rules/components/NamedIdentity.js';
@@ -179,4 +180,65 @@ Deno.test("inventory: dropping equipped ammo merges into matching ground ammo st
   assert(ammoOnTile.length === 1, "matching ground ammo should be represented by one entity");
   assert(ammoOnTile[0] === groundAmmo, "existing ground ammo should remain as the merged stack carrier");
   assert(world.get(groundAmmo, ItemInfo).count === (groundBefore + equippedBefore), "ground ammo count should increase by dropped count");
+});
+
+Deno.test("inventory: pickup intent can take a chest item without main-layer transfer logic", () => {
+  const world = new World({ seed: 87 });
+  world.setScheduler((w) => scheduler(w));
+
+  const player = createPlayer(world, { x: 5, y: 6, capacity: 20, weightLimit: 99 });
+  const pos = world.get(player, Position);
+
+  const chest = world.create();
+  world.add(chest, Position, { x: pos.x, y: pos.y });
+  world.add(chest, NamedIdentity, { name: "Chest", identity: "chest" });
+  world.add(chest, Inventory, { capacity: 20 });
+
+  const chestItem = makeItem(world, {
+    name: "Scroll of Insight",
+    identity: "scroll_insight",
+    count: 1,
+    x: pos.x,
+    y: pos.y,
+  });
+  addToInventory(world, chest, chestItem);
+
+  world.add(player, PickupIntent, { targetId: chestItem });
+  world.tick(1);
+
+  assert(inventoryContains(world, chest, chestItem) === false, "item should no longer be in chest");
+  assert(inventoryContains(world, player, chestItem), "item should move into player inventory");
+});
+
+Deno.test("inventory: pickup intent can split a chest stack by count", () => {
+  const world = new World({ seed: 88 });
+  world.setScheduler((w) => scheduler(w));
+
+  const player = createPlayer(world, { x: 7, y: 4, capacity: 20, weightLimit: 99 });
+  const pos = world.get(player, Position);
+
+  const chest = world.create();
+  world.add(chest, Position, { x: pos.x, y: pos.y });
+  world.add(chest, NamedIdentity, { name: "Chest", identity: "chest" });
+  world.add(chest, Inventory, { capacity: 20 });
+
+  const chestItem = makeItem(world, {
+    name: "Arrow",
+    identity: "arrow_basic",
+    count: 5,
+    x: pos.x,
+    y: pos.y,
+  });
+  addToInventory(world, chest, chestItem);
+
+  world.add(player, PickupIntent, { targetId: chestItem, count: 2 });
+  world.tick(1);
+
+  assert(inventoryContains(world, chest, chestItem), "source stack should remain in chest");
+  assert(world.get(chestItem, ItemInfo).count === 3, "chest stack should keep remainder");
+
+  const carried = inventoryItems(world, player);
+  assert(carried.length === 1, "player should receive one split stack");
+  assert(carried[0] !== chestItem, "split stack should be a new entity");
+  assert(world.get(carried[0], ItemInfo).count === 2, "carried split stack should match requested count");
 });
