@@ -1047,6 +1047,34 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
 
   // ── Corpse consumption ──────────────────────────────────────────────
 
+  world.on('corpse:shocked', ({ actor }) => {
+    const pos = getPosition(Number(actor || 0));
+    if (!pos || !canShowAt(pos.x, pos.y)) return;
+    ftext.addStatus(pos.x, pos.y - 0.5, 'SHOCKED!', {
+      color: '#70c0ff',
+      life: 1.2,
+      scaleStart: 1.4,
+      scaleEnd: 0.8,
+    });
+    for (let i = 0; i < 12; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 0.5 + Math.random() * 0.8;
+      fx.pool.spawn(new Particle({
+        x: pos.x,
+        y: pos.y - 0.1,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 0.3,
+        life: 0.15 + Math.random() * 0.2,
+        size0: 0.08,
+        size1: 0.01,
+        r: 112,
+        g: 192,
+        b: 255,
+        a0: 1.0,
+      }));
+    }
+  });
+
   world.on('corpse:trait-gained', ({ actor, name }) => {
     const pos = getPosition(Number(actor || 0));
     if (!pos || !canShowAt(pos.x, pos.y)) return;
