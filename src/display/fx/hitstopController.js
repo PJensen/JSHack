@@ -55,7 +55,6 @@ export function createHitstopController() {
     if (dur > _remaining) {
       _remaining = dur;
       _duration = dur;
-      console.log(`[HITSTOP] requested ${(dur * 1000).toFixed(0)}ms`);
     }
   }
 
@@ -91,7 +90,6 @@ export function createHitstopController() {
   function scale(realDt) {
     if (_remaining <= 0) return realDt;
 
-    console.log(`[HITSTOP] active: ${(_remaining * 1000).toFixed(0)}ms left, scaling ${(realDt * 1000).toFixed(1)}ms frame`);
     _remaining -= realDt;
 
     if (_remaining <= 0) {
