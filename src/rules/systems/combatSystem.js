@@ -54,10 +54,10 @@ function resolveWeaponClass(world, weaponId, damageType) {
         || ''
     ).toLowerCase();
     if (identity.includes('morningstar')) return 'morningstar';
-    if (identity.includes('dagger') || identity.includes('shiv') || identity.includes('athame') || identity.includes('knife')) return 'dagger';
-    if (identity.includes('sword') || identity.includes('blade') || identity.includes('sabre') || identity.includes('rapier') || identity.includes('katana')) return 'sword';
-    if (identity.includes('mace') || identity.includes('maul') || identity.includes('club') || identity.includes('hammer') || identity.includes('flail')) return 'mace';
-    if (identity.includes('axe') || identity.includes('hatchet')) return 'axe';
+    if (identity.includes('dagger') || identity.includes('shiv') || identity.includes('athame') || identity.includes('knife') || identity.includes('stiletto') || identity.includes('fang')) return 'dagger';
+    if (identity.includes('sword') || identity.includes('blade') || identity.includes('sabre') || identity.includes('rapier') || identity.includes('katana') || identity.includes('edge') || identity.includes('flametongue')) return 'sword';
+    if (identity.includes('mace') || identity.includes('maul') || identity.includes('club') || identity.includes('hammer') || identity.includes('flail') || identity.includes('staff') || identity.includes('debtbringer')) return 'mace';
+    if (identity.includes('axe') || identity.includes('hatchet') || identity.includes('reaver') || identity.includes('cleaver') || identity.includes('scythe')) return 'axe';
     if (damageType === 'blunt') return 'mace';
     if (damageType === 'slash') return 'sword';
     if (damageType === 'pierce') return 'dagger';
