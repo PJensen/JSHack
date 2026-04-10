@@ -148,6 +148,7 @@ export function movementSystem(world) {
       // the entity's position between the flush and the cleanup.
       const vit = world.get(actor, Vitality);
       if (vit && (vit.hp | 0) <= 0) { world.remove(actor, MoveIntent); continue; }
+      if (statusStrength(world, actor, "stunned") > 0 || statusStrength(world, actor, "rooted") > 0) { world.remove(actor, MoveIntent); continue; }
 
       const intendedDx = intent.dx | 0;
       const intendedDy = intent.dy | 0;
