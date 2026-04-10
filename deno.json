@@ -4,6 +4,7 @@
   },
   "tasks": {
     "test": "deno test --no-check --allow-read",
-    "coverage": "deno test --no-check --allow-read --coverage=coverage/ && deno coverage coverage/ --lcov --output=coverage.lcov"
+    "coverage": "deno test --no-check --allow-read --coverage=coverage/ && deno coverage coverage/ --lcov --output=coverage.lcov",
+    "bench": "deno bench --no-check --allow-read tests/perf/*.bench.mjs"
   }
 }
