@@ -88,6 +88,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
   let runeRotation = 0;
 
   function feedEntropy(rawVal) {
+    if (entropyPool.length >= ENTROPY_TARGET) return;
     const val = (rawVal ^ (Date.now() & 0xFFFF)) >>> 0;
     entropyPool.push(val);
     for (let shift = 0; shift < 32; shift += 8) {
