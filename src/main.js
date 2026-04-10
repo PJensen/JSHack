@@ -10,8 +10,10 @@ import {
   initializeRunItemState,
   reinitializeRunItemStateForFreshStart,
   reseedRunGemPricing,
+  ensurePlayerDeityState,
+  spawnStarterPet,
 } from "./main/runtime/gameRuntime.js";
-import { playerEntity, findNearestValidTileAround } from "./rules/utils/queries.js";
+import { playerEntity } from "./rules/utils/queries.js";
 import { getEffectiveVisionRange, blind } from "./rules/utils/blind.js";
 import { FOV_CONE_DISABLED_KEY, getEntityFacingConeDegrees, getNormalizedEntityFacing, setFacingTurnCostEnabled } from "./rules/utils/facing.js";
 
@@ -38,6 +40,7 @@ import { isInputLocked } from "./display/input/inputLock.js";
 import { enableInputLockdown } from "./display/input/lockdown.js";
 import { readInputMode } from "./display/input/inputSettings.js";
 import { makeRulesDispatcher } from "./main/input/rulesDispatch.js";
+import { shouldConsumeWorldTap } from "./main/input/worldTapGate.js";
 // simple UI overlays
 import { initOverlays } from "./display/ui/overlay.js";
 import { initHUD } from "./display/ui/hud.js";
@@ -105,7 +108,6 @@ import { ActiveEffects } from "./rules/components/ActiveEffects.js";
 import { getSpell, describeSpellDetailLines, describeSpellTargetEffects } from "./rules/data/spells.js";
 import { getSpellCooldown } from "./rules/utils/spellCooldowns.js";
 import { buildPalette } from "./display/palette/index.js";
-import { itemsAt } from "./rules/utils/queries.js";
 import { createGlyphAtlas, drawKind, drawKindScaled } from "./display/passes/glyphs/atlas.js";
 import { aegisWard as drawAegisWardGlyphFx } from "./display/passes/vfx/glyph/effects/aegisWard.js";
 import { Settings } from "./rules/components/Settings.js";
@@ -113,13 +115,12 @@ import { Vitality } from "./rules/components/Vitality.js";
 import { Devotion } from "./rules/components/Devotion.js";
 import { Anatomy, HEARING_TIERS } from "./rules/components/Anatomy.js";
 import { Status } from "./rules/components/Status.js";
-import { initDeity, getDeityInstance } from "./rules/systems/deitySystem.js";
+import { getDeityInstance } from "./rules/systems/deitySystem.js";
 import { DungeonState } from "./rules/components/DungeonState.js";
 import { getTownEconomyData } from "./rules/systems/townSimulationSystem.js";
 import { CastSpellIntent } from "./rules/components/Intents/CastSpellIntent.js";
 import { Channeling } from "./rules/components/Channeling.js";
 import { Interactable } from "./rules/components/Interactable.js";
-import { Faction } from "./rules/components/Faction.js";
 import { TombstoneRepository } from "./rules/repositories/TombstoneRepository.js";
 import { installTombstoneDeathListener } from "./rules/systems/tombstoneSystem.js";
 import { Tombstone as TombstoneComponent } from "./rules/components/Tombstone.js";
@@ -128,7 +129,6 @@ import { installProofWiring } from "./main/proof/proofWiring.js";
 import { postVerifiedScore } from "./shared/tombstoneApi.js";
 import { forEachInRadius } from "./rules/utils/spatialIndex.js";
 import { chebyshevScalar, manhattanScalar } from "./rules/utils/distance.js";
-import { isChestIdentity } from "./shared/chests.js";
 import { buildBlocksVisionMap, blockedCallback } from "./rules/utils/vision.js";
 import {
   inventoryItems, inventoryContains,
@@ -136,7 +136,6 @@ import {
 } from "./rules/utils/inventoryFacade.js";
 import { Engraving } from "./rules/components/Engraving.js";
 import { Pet } from "./rules/components/Pet.js";
-import { PetState } from "./rules/components/PetState.js";
 import { PetCommandIntent } from "./rules/components/Intents/PetCommandIntent.js";
 import { Owner } from "./rules/components/Owner.js";
 import { getHungerLevel } from "./rules/data/food.js";
@@ -706,50 +705,14 @@ function _finalizeNewGame(classData) {
     const { classSpells } = applyPlayerClassLoadout(world, pe.id, classDef, { identifyStarterItems: true });
     if (classSpells.length > 0) setActiveSpell(classSpells[0]);
 
-    // Spawn pet next to the player (familiar for warlock, kitty otherwise)
-    {
-      const pe = playerEntity(world);
-      if (pe) {
-        const ppos = world.get(pe.id, Position);
-        const spawnTile = findNearestValidTileAround(world, ppos, {
-          maxDistance: 1,
-          exclude: [{ x: ppos.x, y: ppos.y }],
-        });
-        const isWarlock = classDef?.id === 'warlock';
-        const petId = world.create();
-        world.add(petId, Pet);
-        world.add(petId, Position, spawnTile || { x: ppos.x, y: ppos.y });
-        world.add(petId, NamedIdentity, {
-          name: isWarlock ? "Familiar" : "Kitty",
-          identity: isWarlock ? "familiar" : "kitty",
-        });
-        world.add(petId, Faction, { key: "pet" });
-        world.add(petId, Owner, { ownerId: pe.id });
-        world.add(petId, Inventory, { items: [], capacity: 1 });
-        world.add(petId, Settings, { autoPickup: true, autoPickupKinds: ['currency', 'potion', 'ammo', 'scroll', 'equip'] });
-        world.add(petId, Vitality, { maxHp: 30, hp: 30 });
-        world.add(petId, Equipment, {
-          accuracyDerived: 2,
-          damagePowerDerived: 2,
-          evadeDerived: 2
-        });
-        world.add(petId, PetState, {
-          state: 'following',
-          targetX: null,
-          targetY: null,
-          targetItemId: 0,
-          stateEnteredTurn: world.step,
-          lastPlayerX: ppos.x,
-          lastPlayerY: ppos.y,
-          commandCooldown: 0,
-          rangedCooldown: 0,
-        });
-        try {
-          window.dispatchEvent(new CustomEvent('ui:petExists', {
-            detail: { exists: true }
-          }));
-        } catch (e) { console.debug('[main] dispatch ui:petExists:', e); }
-      }
+    // Spawn pet next to the player (familiar for warlock, kitty otherwise).
+    const starterPetId = spawnStarterPet(world, pe.id, classDef);
+    if (starterPetId > 0) {
+      try {
+        window.dispatchEvent(new CustomEvent('ui:petExists', {
+          detail: { exists: true }
+        }));
+      } catch (e) { console.debug('[main] dispatch ui:petExists:', e); }
     }
 
     applyDebugCommands({ world, runtimeConfig });
@@ -766,18 +729,10 @@ function _finalizeNewGame(classData) {
   }
 
   // Ensure deity state is initialized for current player (new game or loaded save).
-  {
-    const pe = playerEntity(world);
-    if (pe) {
-      const dev = world.get(pe.id, Devotion);
-      const deityId = String(dev?.deityId || classDef?.deityId || chosenDeityId || "");
-      if (deityId) {
-        if (!dev) world.add(pe.id, Devotion, { deityId, pantheon: true });
-        else if (dev?.pantheon == null) dev.pantheon = true;
-        initDeity(deityId, world);
-      }
-    }
-  }
+  ensurePlayerDeityState(world, pe.id, {
+    classDef,
+    fallbackDeityId: chosenDeityId,
+  });
 
   ensureStarterQuests(world);
   ensureLocalGeneratedQuest(world);
@@ -878,79 +833,11 @@ const inputDisposers = [];
         break;
       }
       case "display.openPickupChooser": {
-        // Contextual get/interact key:
-        // 1) Pick up floor items first (even on a chest tile).
-        // 2) If no floor items and standing on a chest, open chest UI.
-        const p = playerEntity(world);
-        if (!p) break;
-
-        // Gather items at player's position, then nearby tiles (death scatter).
-        // Pickup radius of 3 lets the player hoover a death pile from adjacent.
-        let _pickupIds = itemsAt(world, p.pos.x, p.pos.y);
-        if (_pickupIds.length === 0) {
-          const _PICKUP_SCAN = 3;
-          for (let _pr = 1; _pr <= _PICKUP_SCAN && _pickupIds.length === 0; _pr++) {
-            for (let _pdy = -_pr; _pdy <= _pr; _pdy++) {
-              for (let _pdx = -_pr; _pdx <= _pr; _pdx++) {
-                if (Math.abs(_pdx) !== _pr && Math.abs(_pdy) !== _pr) continue;
-                const nearby = itemsAt(world, (p.pos.x | 0) + _pdx, (p.pos.y | 0) + _pdy);
-                for (const nid of nearby) _pickupIds.push(nid);
-              }
-            }
-          }
-        }
-        if (_pickupIds.length > 0) {
-          const top = _pickupIds[0];
-          if (top > 0) {
-            rulesHandler({ type: 'rules.pickupItem', payload: { itemId: top } });
-          }
-          break;
-        }
-
-        let chestId = 0;
-        for (const [eid, pos, ni] of world.query(Position, NamedIdentity)) {
-          if (!isChestIdentity(ni.identity)) continue;
-          if (pos.x === p.pos.x && pos.y === p.pos.y) {
-            chestId = eid;
-            break;
-          }
-        }
-        if (chestId) {
-          const chestPos = world.get(chestId, Position);
-          if (chestPos) {
-            rulesHandler({ type: 'rules.worldTap', payload: { x: chestPos.x, y: chestPos.y } });
-          }
-        }
+        rulesHandler({ type: 'rules.openPickupChooser', payload: {} });
         break;
       }
       case "display.traverseStairs": {
-        const p = playerEntity(world);
-        if (!p) break;
-
-        // Contextual Enter behavior: pick up first (classic convenience),
-        // then traverse stairs when nothing is available to pick up.
-        const underfoot = itemsAt(world, p.pos.x, p.pos.y);
-        if (Array.isArray(underfoot) && underfoot.length > 0) {
-          rulesHandler({ type: 'rules.pickupItem', payload: {} });
-          break;
-        }
-
-        const target = findNearestTraversalTarget(world, p.pos.x, p.pos.y);
-        if (!target) break;
-        if (target.identity === 'return_portal') {
-          world.emit?.('portal:return', {
-            actor: p.id,
-            portalId: target.id,
-            targetId: target.id,
-          });
-          break;
-        }
-        const direction = target.identity === 'stair_down' ? 'down' : 'up';
-        world.emit?.('stair:traverse', {
-          actor: p.id,
-          targetId: target.id,
-          direction,
-        });
+        rulesHandler({ type: 'rules.traverseStairs', payload: {} });
         break;
       }
       case "display.openApplyChooser":
@@ -1669,24 +1556,9 @@ addEventListener('ui:requestStairTraverse', (ev) => {
   if (isSimUiBlocked()) return;
   /** @type {CustomEvent} */ // @ts-ignore
   const e = ev;
-  const stairId = e?.detail?.stairId;
+  const stairId = Number(e?.detail?.stairId || 0) | 0;
   const direction = e?.detail?.direction || 'down';
-  const pe = playerEntity(world);
-  if (!pe) return;
-
-  if (direction === 'return') {
-    world.emit?.('portal:return', {
-      actor: pe.id,
-      targetId: stairId,
-      portalId: stairId,
-    });
-  } else {
-    world.emit?.('stair:traverse', {
-      actor: pe.id,
-      targetId: stairId,
-      direction
-    });
-  }
+  _sharedRulesDispatcher({ type: 'rules.traverseStairs', payload: { targetId: stairId, direction } });
 });
 
 addEventListener('ui:requestTownBoardAccept', (ev) => {
@@ -2251,39 +2123,7 @@ canvas.addEventListener('pointerdown', (ev) => {
   const [wx, wy] = cameraClientToWorld(cam, ev.clientX, ev.clientY, canvas);
   const tx = worldToTile(wx);
   const ty = worldToTile(wy);
-
-  const set = world.get(pe.id, Settings);
-  const pickupRange = Math.max(3, Number(set?.pickupRange ?? 0));
-  const nearbyOffsets = [
-    { x: 0, y: 0 },
-    { x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 },
-    { x: 1, y: 1 }, { x: -1, y: 1 }, { x: 1, y: -1 }, { x: -1, y: -1 },
-  ];
-
-  const hasTapPickup = nearbyOffsets.some((off) => {
-    const cx = (tx | 0) + (off.x | 0);
-    const cy = (ty | 0) + (off.y | 0);
-    const dist = Math.max(Math.abs((pe.pos.x | 0) - cx), Math.abs((pe.pos.y | 0) - cy));
-    return dist <= pickupRange && itemsAt(world, cx, cy).length > 0;
-  });
-
-  let hasTapInteract = false;
-  for (const off of nearbyOffsets) {
-    const cx = (tx | 0) + (off.x | 0);
-    const cy = (ty | 0) + (off.y | 0);
-    for (const [, pos, inter] of world.query(Position, Interactable)) {
-      if (!inter) continue;
-      if ((pos.x | 0) !== cx || (pos.y | 0) !== cy) continue;
-      const dist = Math.abs((pe.pos.x | 0) - cx) + Math.abs((pe.pos.y | 0) - cy);
-      if (dist <= 1) {
-        hasTapInteract = true;
-        break;
-      }
-    }
-    if (hasTapInteract) break;
-  }
-
-  if (!hasTapPickup && !hasTapInteract) return;
+  if (!shouldConsumeWorldTap(world, pe, tx, ty)) return;
 
   const rulesHandler = makeRulesDispatcher(world, () => pe.id);
   rulesHandler({ type: 'rules.worldTap', payload: { x: tx, y: ty } });
