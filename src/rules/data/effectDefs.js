@@ -405,6 +405,7 @@ export const EFFECT_DEFS = [
     keys: ["fire_weapon"],
     operation: "none",
     statuses: ["fire_weapon"],
+    elementTint: "fire",
   },
   {
     id: "marked",

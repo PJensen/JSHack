@@ -14,6 +14,7 @@ import { forEachInRadius } from "../utils/spatialIndex.js";
 import { areFactionsHostile } from "../utils/factionHostility.js";
 import { upsertTimedEffect } from "../utils/effectSemantics.js";
 import { effectiveMaxMana, effectiveMaxStamina } from "../utils/passiveBonuses.js";
+import { ELEMENT_TINT_FIRE, ELEMENT_TINT_POISON, ELEMENT_TINT_FROST, ELEMENT_TINT_ACID, ELEMENT_TINT_ELECTRIC } from "./elementTints.js";
 
 const AFFIX_THORNS = "affix:thorns1";
 const AFFIX_VAMP = "affix:vamp1";
@@ -735,6 +736,7 @@ function normalizeAffixRecord(id, spec) {
     description: String(spec?.description || ""),
     slots: Object.freeze(slots),
     weight: Number(spec?.weight || 0),
+    elementTint: spec?.elementTint || null,
     passiveRefs: Object.freeze(passiveRefs),
     triggerScripts: Object.freeze(Object.fromEntries(
       Object.entries(triggerScripts).map(([trigger, refs]) => [trigger, Object.freeze(refs.slice())]),
@@ -762,13 +764,13 @@ export function unregisterAffixDefinition(id) {
   ["fireWard1", { name: "Flame Ward", slots: ["armor", "offhand"], weight: 18, passiveRefs: [AFFIX_FIRE_WARD] }],
   ["poisonWard1", { name: "Venom Ward", slots: ["armor", "ring"], weight: 18, passiveRefs: [AFFIX_POISON_WARD] }],
   ["kineticWard1", { name: "Fortified", slots: ["armor", "offhand"], weight: 15, passiveRefs: [AFFIX_KINETIC_WARD] }],
-  ["caustic1", { name: "Caustic", slots: ["weapon"], weight: 16, triggerScripts: { onHit: [AFFIX_CAUSTIC] } }],
-  ["capacitive1", { name: "Capacitive", slots: ["weapon"], weight: 15, triggerScripts: { onHit: [AFFIX_CAPACITIVE] } }],
+  ["caustic1", { name: "Caustic", slots: ["weapon"], weight: 16, elementTint: ELEMENT_TINT_ACID, triggerScripts: { onHit: [AFFIX_CAUSTIC] } }],
+  ["capacitive1", { name: "Capacitive", slots: ["weapon"], weight: 15, elementTint: ELEMENT_TINT_ELECTRIC, triggerScripts: { onHit: [AFFIX_CAPACITIVE] } }],
   ["insulated1", { name: "Insulated", slots: ["armor", "offhand"], weight: 16, passiveRefs: [AFFIX_INSULATED] }],
   ["lucky1", { name: "Lucky", slots: ["ring", "armor"], weight: 18, passiveRefs: [AFFIX_LUCKY] }],
-  ["venomous1", { name: "Venomous", slots: ["weapon"], weight: 14, triggerScripts: { onHit: [AFFIX_VENOMOUS] } }],
-  ["chainLightning1", { name: "Chain Lightning", slots: ["weapon"], weight: 8, triggerScripts: { onHit: [AFFIX_CHAIN_LIGHTNING] } }],
-  ["firestorm1", { name: "Firestorm", slots: ["weapon"], weight: 10, triggerScripts: { onHit: [AFFIX_FIRESTORM] } }],
+  ["venomous1", { name: "Venomous", slots: ["weapon"], weight: 14, elementTint: ELEMENT_TINT_POISON, triggerScripts: { onHit: [AFFIX_VENOMOUS] } }],
+  ["chainLightning1", { name: "Chain Lightning", slots: ["weapon"], weight: 8, elementTint: ELEMENT_TINT_ELECTRIC, triggerScripts: { onHit: [AFFIX_CHAIN_LIGHTNING] } }],
+  ["firestorm1", { name: "Firestorm", slots: ["weapon"], weight: 10, elementTint: ELEMENT_TINT_FIRE, triggerScripts: { onHit: [AFFIX_FIRESTORM] } }],
   ["soulDrain1", { name: "Soul Drain", slots: ["weapon"], weight: 7, triggerScripts: { onHit: [AFFIX_SOUL_DRAIN] } }],
   ["berserk1", { name: "Berserking", slots: ["weapon", "ring"], weight: 8, triggerScripts: { onHit: [AFFIX_BERSERK] } }],
   ["shieldWall1", { name: "Stoneskin Proc", slots: ["armor", "offhand"], weight: 10, triggerScripts: { onDamaged: [AFFIX_SHIELD_WALL] } }],
@@ -776,17 +778,17 @@ export function unregisterAffixDefinition(id) {
   ["helmAttuned1", { name: "Helm of Attunement", slots: ["head"], weight: 14, passiveRefs: [AFFIX_ATTUNED] }],
   ["manaSurge1", { name: "Mana Surge", slots: ["ring", "weapon"], weight: 10, triggerScripts: { onHit: [AFFIX_MANA_SURGE] } }],
   ["executioner1", { name: "Executioner", slots: ["weapon"], weight: 6, triggerScripts: { onBeforeHit: [AFFIX_EXECUTIONER] } }],
-  ["frostbite1", { name: "Frostbite", slots: ["weapon"], weight: 10, triggerScripts: { onHit: [AFFIX_FROSTBITE] } }],
+  ["frostbite1", { name: "Frostbite", slots: ["weapon"], weight: 10, elementTint: ELEMENT_TINT_FROST, triggerScripts: { onHit: [AFFIX_FROSTBITE] } }],
   ["hemorrhage1", { name: "Hemorrhage", slots: ["weapon"], weight: 12, triggerScripts: { onHit: [AFFIX_HEMORRHAGE] } }],
   ["secondWind1", { name: "Second Wind", slots: ["armor", "offhand"], weight: 8, triggerScripts: { onDamaged: [AFFIX_SECOND_WIND] } }],
-  ["flaming", { name: "Flaming", slots: ["weapon"], weight: 8, triggerScripts: { onHit: [AFFIX_FLAMING] } }],
+  ["flaming", { name: "Flaming", slots: ["weapon"], weight: 8, elementTint: ELEMENT_TINT_FIRE, triggerScripts: { onHit: [AFFIX_FLAMING] } }],
   ["stunning1", { name: "Stunning", slots: ["weapon"], weight: 0, triggerScripts: { onHit: [AFFIX_STUNNING] } }],
   ["earthshaker", { name: "Earthshaker", slots: ["weapon", "gloves", "feet"], weight: 6, description: "Earthshatter erupts with volcanic fury" }],
   ["weaken1", { name: "Weakening", slots: ["weapon"], weight: 9, triggerScripts: { onHit: [AFFIX_WEAKEN] } }],
   ["agony1", { name: "Agony", slots: ["weapon"], weight: 8, triggerScripts: { onHit: [AFFIX_AGONY] } }],
   ["cripple1", { name: "Crippling", slots: ["weapon"], weight: 7, triggerScripts: { onHit: [AFFIX_CRIPPLE] } }],
-  ["plague1", { name: "Plague", slots: ["weapon"], weight: 6, triggerScripts: { onHit: [AFFIX_PLAGUE] } }],
-  ["soulfire1", { name: "Soulfire", slots: ["weapon"], weight: 7, triggerScripts: { onHit: [AFFIX_SOULFIRE] } }],
+  ["plague1", { name: "Plague", slots: ["weapon"], weight: 6, elementTint: ELEMENT_TINT_POISON, triggerScripts: { onHit: [AFFIX_PLAGUE] } }],
+  ["soulfire1", { name: "Soulfire", slots: ["weapon"], weight: 7, elementTint: ELEMENT_TINT_FIRE, triggerScripts: { onHit: [AFFIX_SOULFIRE] } }],
 ].forEach(([id, spec]) => {
   registerAffixDefinition(id, spec);
 });
@@ -797,6 +799,7 @@ export function listAffixEntries() { return Array.from(AFFIX_REGISTRY.values()).
 export function listAffixIds() { return Array.from(AFFIX_REGISTRY.keys()); }
 export function getAffixName(id) { return String(getAffix(id)?.name || id || ""); }
 export function getAffixDescription(id) { return String(getAffix(id)?.description || ""); }
+export function getAffixElementTint(id) { return getAffix(id)?.elementTint || null; }
 export function getAffixWeight(id) { return Number(getAffix(id)?.weight || 0); }
 export function getAffixPassiveRefs(id) {
   const refs = getAffix(id)?.passiveRefs;

@@ -17,7 +17,7 @@ import { mulberry32, rngInt, rollDice, combatSeed, pct } from '../utils/rng.js';
 import { dealDamage } from '../utils/dealDamage.js';
 import { areFactionsHostile } from '../utils/factionHostility.js';
 import { resolveCombatSnapshot } from '../utils/resolveCombatSnapshot.js';
-import { applyWeaponCoatingOnHit } from '../data/weaponCoatings.js';
+import { applyWeaponCoatingOnHit, WEAPON_COATING_DEFS } from '../data/weaponCoatings.js';
 import { createStatusEvent } from '../../shared/events/statusEvent.js';
 import { Beatitude, BUC_CURSED } from '../components/Beatitude.js';
 import { Traits } from '../components/Traits.js';
@@ -41,6 +41,8 @@ import { upsertTimedEffect } from '../utils/effectSemantics.js';
 import { emitSafe } from '../utils/emitSafe.js';
 import { ensureActiveEffects } from '../utils/effects.js';
 import { computeImpactVector } from '../utils/projectileKinematics.js';
+import { getAffixElementTint } from '../data/affixes.js';
+import { EFFECT_DEFS } from '../data/effectDefs.js';
 
 const BUMP_ATTACK_INSTALLED = Symbol.for('jshack:combat:bumpAttack:installed');
 
@@ -87,19 +89,36 @@ function buildDamageSignature(info, damageType) {
 }
 
 function resolveElementTint(world, sourceId, weaponId) {
-    // Check attacker ActiveEffects for weapon enchants
+    // 1. Weapon affixes — first affix with a declared elementTint wins
+    if (weaponId > 0 && world.isAlive(weaponId)) {
+        const info = world.get(weaponId, ItemInfo);
+        if (info) {
+            const affixes = info.affixes;
+            if (Array.isArray(affixes)) {
+                for (let i = 0; i < affixes.length; i++) {
+                    const tint = getAffixElementTint(affixes[i]);
+                    if (tint) return tint;
+                }
+            }
+            // 2. Weapon coating
+            const coating = info.coating;
+            if (coating && (coating.charges | 0) > 0) {
+                const def = WEAPON_COATING_DEFS[coating.kind];
+                if (def?.elementTint) return def.elementTint;
+            }
+        }
+    }
+    // 3. Attacker active effects (spell-based enchants like Ignite Weapons)
     const ae = world.get(sourceId, ActiveEffects);
     if (ae && Array.isArray(ae.effects)) {
         for (let i = 0; i < ae.effects.length; i++) {
             const e = ae.effects[i];
             if (!e || !((e.turnsLeft | 0) > 0)) continue;
-            if (e.key === 'fire_weapon') return 'fire';
+            for (let d = 0; d < EFFECT_DEFS.length; d++) {
+                const def = EFFECT_DEFS[d];
+                if (def.elementTint && def.keys.includes(e.key)) return def.elementTint;
+            }
         }
-    }
-    // Check weapon coating (poison blade spell)
-    if (weaponId > 0 && world.isAlive(weaponId)) {
-        const info = world.get(weaponId, ItemInfo);
-        if (info?.coating?.kind === 'poison' && (info.coating.charges | 0) > 0) return 'poison';
     }
     return null;
 }

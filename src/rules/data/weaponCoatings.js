@@ -2,6 +2,7 @@ import { ItemInfo } from '../components/ItemInfo.js';
 import { combatSeed, mulberry32, rngInt } from '../utils/rng.js';
 import { upsertTimedEffect } from '../utils/effectSemantics.js';
 import { ensureActiveEffects } from '../utils/effects.js';
+import { ELEMENT_TINT_POISON } from './elementTints.js';
 
 export const WEAPON_COATING_DEFS = Object.freeze({
   poison: Object.freeze({
@@ -11,6 +12,7 @@ export const WEAPON_COATING_DEFS = Object.freeze({
     consumeOnHit: true,
     seedSalt: 0xc0470001,
     emitEvent: 'proc:poisoned',
+    elementTint: ELEMENT_TINT_POISON,
     effect: Object.freeze({ key: 'poison', turnsLeft: 4, potency: 2, stacks: 1 }),
   }),
   paralysis: Object.freeze({
@@ -18,6 +20,7 @@ export const WEAPON_COATING_DEFS = Object.freeze({
     consumeOnHit: true,
     seedSalt: 0xc0470002,
     emitEvent: 'proc:paralyzed',
+    elementTint: null,
     effect: Object.freeze({ key: 'stun', turnsLeft: 4, potency: 1, stacks: 1 }),
   }),
 });
