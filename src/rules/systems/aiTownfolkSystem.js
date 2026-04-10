@@ -55,6 +55,11 @@ import { getTownState, getWeather } from "../utils/townStateAccess.js";
 const TOWNFOLK_RADIUS = 40;
 const MAX_STUCK_TURNS = 5;
 const WORK_RANGE = 15;
+
+// Per-tick cached result of findTownContainers — set once at the start of
+// aiTownfolkSystem and reused by all helper functions that need storage IDs.
+// Avoids 11 redundant full-world NamedIdentity scans per tick.
+let _cachedStorage = null;
 const TOWNFOLK_DOOR_INSTALLED = Symbol.for("jshack:townfolkDoors:installed");
 
 const CROP_KINDS = new Set(["wheat", "carrot", "corn"]);
@@ -215,7 +220,7 @@ function deliverNear(pos) {
 }
 
 function chooseVillagerHaul(world) {
-  const storage = findTownContainers(world);
+  const storage = _cachedStorage;
   const mill = storage.mill > 0 ? countInventoryByIdentity(world, storage.mill) : {};
   const lumber = storage.lumber > 0 ? countInventoryByIdentity(world, storage.lumber) : {};
   const smith = storage.smithy > 0 ? countInventoryByIdentity(world, storage.smithy) : {};
@@ -783,7 +788,7 @@ function handleWorking(world, id, pos, job) {
       return;
     }
     case "repair": {
-      const storage = findTownContainers(world);
+      const storage = _cachedStorage;
       const lumberSpent =
         consumeInventoryIdentity(world, storage.lumber, "material_lumber", 1)
         || consumeInventoryIdentity(world, storage.smithy, "material_lumber", 1);
@@ -836,7 +841,7 @@ function handleWorking(world, id, pos, job) {
       return;
     }
     case "mill": {
-      const storage = findTownContainers(world);
+      const storage = _cachedStorage;
       if (storage.mill > 0) depositCarriedItems(world, id, storage.mill, job);
       const stock = storage.mill > 0 ? countInventoryByIdentity(world, storage.mill) : {};
       if ((stock.food_wheat || 0) > 0 && storage.mill > 0) {
@@ -851,7 +856,7 @@ function handleWorking(world, id, pos, job) {
       return;
     }
     case "forge_tools": {
-      const storage = findTownContainers(world);
+      const storage = _cachedStorage;
       const smithyCounts = storage.smithy > 0 ? countInventoryByIdentity(world, storage.smithy) : {};
       if (storage.smithy > 0 && (smithyCounts.ore_iron || 0) > 0 && (smithyCounts.ore_coal || 0) > 0) {
         consumeInventoryIdentity(world, storage.smithy, "ore_iron", 1);
@@ -875,7 +880,7 @@ function handleWorking(world, id, pos, job) {
       return;
     }
     case "cook": {
-      const storage = findTownContainers(world);
+      const storage = _cachedStorage;
       const tavern = storage.tavern;
       const stock = tavern > 0 ? countInventoryByIdentity(world, tavern) : {};
       if (!(tavern > 0) || (stock.food_flour || 0) <= 0 || (stock.water_bucket || 0) <= 0 || (stock.fuel_firewood || 0) <= 0 || (stock.tool_kitchen_knife || 0) <= 0) {
@@ -899,7 +904,7 @@ function handleWorking(world, id, pos, job) {
       return;
     }
     case "haul_flour": {
-      const storage = findTownContainers(world);
+      const storage = _cachedStorage;
       if (moveChestItemToActor(world, storage.mill, id, "food_flour")) {
         setCarry(job, "flour");
         emitSafe(world, "townfolk:carrying", { actor: id, resource: "flour" });
@@ -910,7 +915,7 @@ function handleWorking(world, id, pos, job) {
       return;
     }
     case "haul_firewood": {
-      const storage = findTownContainers(world);
+      const storage = _cachedStorage;
       if (moveChestItemToActor(world, storage.lumber, id, "fuel_firewood")) {
         setCarry(job, "firewood");
         emitSafe(world, "townfolk:carrying", { actor: id, resource: "firewood" });
@@ -921,7 +926,7 @@ function handleWorking(world, id, pos, job) {
       return;
     }
     case "haul_lumber": {
-      const storage = findTownContainers(world);
+      const storage = _cachedStorage;
       if (moveChestItemToActor(world, storage.lumber, id, "material_lumber")) {
         setCarry(job, "lumber");
         emitSafe(world, "townfolk:carrying", { actor: id, resource: "lumber" });
@@ -932,7 +937,7 @@ function handleWorking(world, id, pos, job) {
       return;
     }
     case "brew": {
-      const storage = findTownContainers(world);
+      const storage = _cachedStorage;
       const herbChest = storage.herb;
       const stock = herbChest > 0 ? countInventoryByIdentity(world, herbChest) : {};
       const herbCount = Number(stock.food_wild_herbs || 0);
@@ -1167,7 +1172,7 @@ function getRoleWorkTarget(world, job) {
       return { x: job.workAuxX, y: job.workAuxY, kind: "sort_herbs", state: TOWNFOLK_STATES.working, radius: 1 };
     }
     case TOWNFOLK_ROLES.alchemist: {
-      const storage = findTownContainers(world);
+      const storage = _cachedStorage;
       const herbChest = storage.herb;
       const herbStock = herbChest > 0 ? countInventoryByIdentity(world, herbChest) : {};
       const canBrew = (herbStock.food_wild_herbs || 0) > 0
@@ -1364,6 +1369,9 @@ export function aiTownfolkSystem(world) {
     break;
   }
   if (depth !== 0) return;
+
+  // Cache storage container IDs for this tick (avoids 11 redundant world scans)
+  _cachedStorage = findTownContainers(world);
 
   // Auto-toggle lanterns on phase transitions
   const phase = getTownPhase(world.step);
