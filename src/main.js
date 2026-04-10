@@ -4754,16 +4754,18 @@ function frame(now) {
   flushPendingStairTransition();
 
   // Advance display-only systems (fx.step moved below — needs worldView for emitter origins)
+  // Camera / shake / zoom use real dt so they stay responsive during hitstop
   updateCamera(cam, dtSec);
   updateShake(cam, dtSec);
   updateZoomPunch(cam, dtSec);
-  tickDisplayEffects({ dtSec, boltFx, spellAreaFx, projectileFx, throwFx, pickupFx, cloudFx, spiritWispFx, deathEssenceFx, meleeSlashFx, ftext, goreTick });
-  delayedDeathFx.tick(dtSec);
-  flyingFx.tick(dtSec);
-  slideFx.tick(dtSec);
-  bumpFx.tick(dtSec);
-  recoilFx.tick(dtSec);
-  tickHitTints(dtSec);
+  // Combat VFX use hitstop-scaled dt so swings, bumps, gore all freeze in unison
+  tickDisplayEffects({ dtSec: displayDt, boltFx, spellAreaFx, projectileFx, throwFx, pickupFx, cloudFx, spiritWispFx, deathEssenceFx, meleeSlashFx, ftext, goreTick });
+  delayedDeathFx.tick(displayDt);
+  flyingFx.tick(displayDt);
+  slideFx.tick(displayDt);
+  bumpFx.tick(displayDt);
+  recoilFx.tick(displayDt);
+  tickHitTints(displayDt);
   deathVfx.tick(dtSec);
   sceneRuntime.tick(dtSec);
 
