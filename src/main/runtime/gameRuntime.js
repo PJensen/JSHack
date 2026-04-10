@@ -9,7 +9,7 @@ import { createPlayer } from "../../rules/archetypes/Player.js";
 import { getClass } from "../../rules/data/classes.js";
 import { createItemById } from "../../rules/utils/itemFactory.js";
 import { addToInventory } from "../../rules/utils/inventoryFacade.js";
-import { playerEntity } from "../../rules/utils/queries.js";
+import { playerEntity, findNearestValidTileAround } from "../../rules/utils/queries.js";
 import { initDeity } from "../../rules/systems/deitySystem.js";
 
 import { Equipment } from "../../rules/components/Equipment.js";
@@ -21,6 +21,13 @@ import { Devotion } from "../../rules/components/Devotion.js";
 import { Vitality } from "../../rules/components/Vitality.js";
 import { DungeonState } from "../../rules/components/DungeonState.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
+import { Position } from "../../rules/components/Position.js";
+import { Faction } from "../../rules/components/Faction.js";
+import { Owner } from "../../rules/components/Owner.js";
+import { Inventory } from "../../rules/components/Inventory.js";
+import { Settings } from "../../rules/components/Settings.js";
+import { Pet } from "../../rules/components/Pet.js";
+import { PetState } from "../../rules/components/PetState.js";
 import { effectiveMaxHp } from "../../rules/utils/passiveBonuses.js";
 import {
   identify,
@@ -245,6 +252,76 @@ export function applyPlayerClassLoadout(world, playerId, classDef, opts = {}) {
     initDeity(deityId, world);
   }
   return { classSpells };
+}
+
+/**
+ * Ensure player devotion/deity state is initialized for this run.
+ *
+ * @param {import("../../lib/ecs-js/index.js").World} world
+ * @param {number} playerId
+ * @param {{ classDef?: any, fallbackDeityId?: string }} [opts]
+ */
+export function ensurePlayerDeityState(world, playerId, opts = {}) {
+  if (!(playerId > 0)) return;
+  const classDef = opts?.classDef || null;
+  const fallbackDeityId = String(opts?.fallbackDeityId || "");
+  const dev = world.get(playerId, Devotion);
+  const deityId = String(dev?.deityId || classDef?.deityId || fallbackDeityId || "");
+  if (!deityId) return;
+  if (!dev) {
+    upsert(world, playerId, Devotion, { deityId, pantheon: true });
+  } else if (dev?.pantheon == null) {
+    dev.pantheon = true;
+  }
+  initDeity(deityId, world);
+}
+
+/**
+ * Spawn the default companion near the player.
+ *
+ * @param {import("../../lib/ecs-js/index.js").World} world
+ * @param {number} playerId
+ * @param {any} classDef
+ * @returns {number}
+ */
+export function spawnStarterPet(world, playerId, classDef) {
+  if (!(playerId > 0)) return 0;
+  const playerPos = world.get(playerId, Position);
+  if (!playerPos) return 0;
+  const spawnTile = findNearestValidTileAround(world, playerPos, {
+    maxDistance: 1,
+    exclude: [{ x: playerPos.x, y: playerPos.y }],
+  });
+  const isWarlock = classDef?.id === "warlock";
+  const petId = world.create();
+  world.add(petId, Pet);
+  world.add(petId, Position, spawnTile || { x: playerPos.x, y: playerPos.y });
+  world.add(petId, NamedIdentity, {
+    name: isWarlock ? "Familiar" : "Kitty",
+    identity: isWarlock ? "familiar" : "kitty",
+  });
+  world.add(petId, Faction, { key: "pet" });
+  world.add(petId, Owner, { ownerId: playerId });
+  world.add(petId, Inventory, { items: [], capacity: 1 });
+  world.add(petId, Settings, { autoPickup: true, autoPickupKinds: ["currency", "potion", "ammo", "scroll", "equip"] });
+  world.add(petId, Vitality, { maxHp: 30, hp: 30 });
+  world.add(petId, Equipment, {
+    accuracyDerived: 2,
+    damagePowerDerived: 2,
+    evadeDerived: 2,
+  });
+  world.add(petId, PetState, {
+    state: "following",
+    targetX: null,
+    targetY: null,
+    targetItemId: 0,
+    stateEnteredTurn: world.step,
+    lastPlayerX: playerPos.x,
+    lastPlayerY: playerPos.y,
+    commandCooldown: 0,
+    rangedCooldown: 0,
+  });
+  return petId;
 }
 
 /**

@@ -263,6 +263,119 @@ export function makeRulesDispatcher(world, getActorId, opts = {}) {
         world?.tick?.(1);
         break;
       }
+      case "rules.openPickupChooser": {
+        const actorPos = world?.get?.(actorId, Position);
+        if (!actorPos) break;
+
+        // Gather items at actor position, then nearby tiles (death-scatter convenience).
+        let pickupIds = itemsAt(world, actorPos.x, actorPos.y);
+        if (pickupIds.length === 0) {
+          const PICKUP_SCAN = 3;
+          for (let radius = 1; radius <= PICKUP_SCAN && pickupIds.length === 0; radius++) {
+            for (let dy = -radius; dy <= radius; dy++) {
+              for (let dx = -radius; dx <= radius; dx++) {
+                if (Math.abs(dx) !== radius && Math.abs(dy) !== radius) continue;
+                const nearby = itemsAt(world, (actorPos.x | 0) + dx, (actorPos.y | 0) + dy);
+                for (const id of nearby) pickupIds.push(id);
+              }
+            }
+          }
+        }
+
+        if (pickupIds.length > 0) {
+          const top = Number(pickupIds[0] || 0) | 0;
+          if (top > 0) {
+            world?.add?.(actorId, PickupIntent, { targetId: top });
+            world?.tick?.(1);
+          }
+          break;
+        }
+
+        // If no floor pickup is available, open a nearby chest (same behavior as old main.js path).
+        let chestTargetId = 0;
+        for (const [id, pos, inter] of world.query(Position, Interactable)) {
+          if ((pos.x | 0) !== (actorPos.x | 0) || (pos.y | 0) !== (actorPos.y | 0)) continue;
+          if (String(inter?.action || "") !== "openChest") continue;
+          if (inventoryItems(world, id).length <= 0) continue;
+          chestTargetId = Number(id || 0) | 0;
+          break;
+        }
+        if (chestTargetId > 0) {
+          world?.add?.(actorId, InteractIntent, { targetId: chestTargetId });
+          world?.tick?.(1);
+        }
+        break;
+      }
+      case "rules.traverseStairs": {
+        const explicitTargetId = Number(action?.payload?.targetId || 0) | 0;
+        const explicitDirection = String(action?.payload?.direction || "").trim().toLowerCase();
+
+        if (explicitTargetId > 0) {
+          if (explicitDirection === "return") {
+            world?.emit?.("portal:return", {
+              actor: actorId,
+              targetId: explicitTargetId,
+              portalId: explicitTargetId,
+            });
+          } else {
+            const direction = explicitDirection === "up" ? "up" : "down";
+            world?.emit?.("stair:traverse", {
+              actor: actorId,
+              targetId: explicitTargetId,
+              direction,
+            });
+          }
+          break;
+        }
+
+        const actorPos = world?.get?.(actorId, Position);
+        if (!actorPos) break;
+
+        // Contextual Enter behavior: pickup first, traverse when no pickup exists.
+        const underfoot = itemsAt(world, actorPos.x, actorPos.y);
+        if (Array.isArray(underfoot) && underfoot.length > 0) {
+          const nonCurrency = underfoot.filter((id) => {
+            const info = world.get(id, ItemInfo);
+            return info && info.type !== "currency";
+          });
+          const targetId = Number(nonCurrency[0] ?? underfoot[0] ?? 0) | 0;
+          if (targetId > 0) {
+            world?.add?.(actorId, PickupIntent, { targetId });
+            world?.tick?.(1);
+          }
+          break;
+        }
+
+        let nearest = null;
+        let nearestDist = Infinity;
+        for (const [id, pos, ni] of world.query(Position, NamedIdentity)) {
+          const ident = String(ni?.identity || "");
+          if (ident !== "stair_down" && ident !== "stair_up" && ident !== "return_portal") continue;
+          const dist = chebyshevScalar(pos.x, pos.y, actorPos.x, actorPos.y);
+          if (dist > 0) continue;
+          const prefer = dist < nearestDist
+            || (dist === nearestDist && ident === "return_portal" && nearest?.identity !== "return_portal");
+          if (prefer) {
+            nearestDist = dist;
+            nearest = { id: Number(id || 0) | 0, identity: ident };
+          }
+        }
+        if (!nearest?.id) break;
+        if (nearest.identity === "return_portal") {
+          world?.emit?.("portal:return", {
+            actor: actorId,
+            targetId: nearest.id,
+            portalId: nearest.id,
+          });
+        } else {
+          world?.emit?.("stair:traverse", {
+            actor: actorId,
+            targetId: nearest.id,
+            direction: nearest.identity === "stair_down" ? "down" : "up",
+          });
+        }
+        break;
+      }
       case "rules.pickupItem": {
         // Determine which item to pick up: prefer payload.itemId; otherwise choose a ground item at actor's tile.
         const { itemId = 0, count = null } = action.payload || {};
