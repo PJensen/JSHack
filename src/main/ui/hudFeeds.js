@@ -5,7 +5,6 @@ import { Equipment, NON_AMMO_GEAR_SLOTS } from "../../rules/components/Equipment
 import { ActiveEffects } from "../../rules/components/ActiveEffects.js";
 import { Status } from "../../rules/components/Status.js";
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
-import { ItemCooldown } from "../../rules/components/ItemCooldown.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 import { inventoryItems } from "../../rules/utils/inventoryFacade.js";
 import { getAffixName } from "../../rules/data/affixes.js";
@@ -23,6 +22,7 @@ import { getPassiveBonuses, effectiveMaxHp, effectiveMaxMana } from "../../rules
 import { resolveCanonicalStats } from "../../rules/utils/canonicalStats.js";
 import { getSpell } from "../../rules/data/spells.js";
 import { getSpellCooldown } from "../../rules/utils/spellCooldowns.js";
+import { getItemCooldown } from "../../rules/utils/itemCooldowns.js";
 import { spellCost, spellCostResource } from "../../rules/data/spells.js";
 import { SUNSWORD_RAY_COOLDOWN_TURNS } from "../../rules/data/itemAbilityConstants.js";
 import { impactTracker } from "../../display/fx/projectileImpactTracker.js";
@@ -81,7 +81,7 @@ export function createHudFeeds(world, deps) {
     if (!(itemId > 0)) return null;
     const identity = String(world.get(itemId, NamedIdentity)?.identity || '').toLowerCase();
     if (identity !== 'sunsword') return null;
-    const cd = /** @type any */ (world.get(itemId, ItemCooldown));
+    const cd = getItemCooldown(world, itemId);
     return {
       kind: 'item-use',
       id: `item-use:sunsword:${itemId}`,
@@ -91,8 +91,8 @@ export function createHudFeeds(world, deps) {
       symbol: '☼',
       cost: 0,
       costKind: 'item',
-      cdRemaining: cd ? Math.max(0, Number(cd.remaining || cd.turnsRemaining || 0) | 0) : 0,
-      cdMax: cd ? Math.max(0, Number(cd.max || cd.turnsMax || 0) | 0) : SUNSWORD_RAY_COOLDOWN_TURNS,
+      cdRemaining: cd ? Math.max(0, Number(cd.remaining || 0) | 0) : 0,
+      cdMax: cd ? Math.max(0, Number(cd.max || 0) | 0) : SUNSWORD_RAY_COOLDOWN_TURNS,
       auto: true,
     };
   }

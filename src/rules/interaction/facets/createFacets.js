@@ -128,6 +128,9 @@ export function createFacets(init) {
     has(entityId, Comp) {
       return world.has(entityId | 0, Comp);
     },
+    worldStep() {
+      return world.step | 0;
+    },
     get(entityId, Comp) {
       return world.get(entityId | 0, Comp);
     },

@@ -30,6 +30,7 @@ import { ActiveEffects } from "../components/ActiveEffects.js";
 import { createStatusEvent } from "../../shared/events/statusEvent.js";
 import { getPassiveBonuses } from "../utils/passiveBonuses.js";
 import { attachDerivedExpression, exprAddConst } from "../utils/statProcAuthoring.js";
+import { resolveItemCooldownRemaining } from "../utils/itemCooldowns.js";
 
 /**
  * Destroy any existing DerivedExpression entity owned by an active effect
@@ -1512,8 +1513,9 @@ export const MAGIC_ITEMS = {
       return {
         on_use: (ctx, state) => {
           const cd = ctx.query.get(state.itemId, ItemCooldown);
-          if (cd && cd.turnsRemaining > 0) {
-            ctx.io.message(`The hearthstone is still cooling down (${cd.turnsRemaining} turns).`, 'warning');
+          const turns = resolveItemCooldownRemaining(cd, ctx.query.worldStep());
+          if (turns > 0) {
+            ctx.io.message(`The hearthstone is still cooling down (${turns} turns).`, 'warning');
             return { consumed: false, cancelled: true, consumesTurn: false, code: 'ITEM_ON_COOLDOWN', message: 'Hearthstone is on cooldown.' };
           }
           return _castHook(ctx, state);

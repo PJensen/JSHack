@@ -12,7 +12,7 @@ import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 import { Position } from "../../rules/components/Position.js";
 import { Traits } from "../../rules/components/Traits.js";
 import { Vitality } from "../../rules/components/Vitality.js";
-import { ItemCooldown } from "../../rules/components/ItemCooldown.js";
+import { setItemCooldown } from "../../rules/utils/itemCooldowns.js";
 import { SUNSWORD_RAY_COOLDOWN_TURNS } from "../../rules/data/itemAbilityConstants.js";
 import { listAllMonsterIds, MONSTERS, getMonster } from "../../rules/data/monsters.js";
 import { Polymorph } from "../../rules/components/Polymorph.js";
@@ -210,15 +210,7 @@ export function installScrollWandWiring({ world, targeting, playerEntity }) {
         const resolvedItemId = Number(itemId || 0) | 0;
         const resolvedCooldown = Math.max(1, Number.isFinite(cooldownTurns) ? (Number(cooldownTurns) | 0) : SUNSWORD_RAY_COOLDOWN_TURNS);
         if (resolvedItemId > 0) {
-          let cd = /** @type any */ (world.get(resolvedItemId, ItemCooldown));
-          if (!cd) {
-            try { world.add(resolvedItemId, ItemCooldown, { turnsRemaining: resolvedCooldown, turnsMax: resolvedCooldown }); } catch {}
-            cd = /** @type any */ (world.get(resolvedItemId, ItemCooldown));
-          }
-          if (cd) {
-            cd.turnsRemaining = resolvedCooldown;
-            cd.turnsMax = resolvedCooldown;
-          }
+          setItemCooldown(world, resolvedItemId, resolvedCooldown);
         }
         world.emit?.('message', { text: `A searing ray of light strikes the ${name} — it is blinded!`, type: 'system' });
         const pos = world.get(enemyId, Position);

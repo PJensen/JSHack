@@ -11,7 +11,6 @@ import { attach } from "../../lib/ecs-js/index.js";
 import { ActiveEffects } from "../components/ActiveEffects.js";
 import { CorpseAdaptation } from "../components/CorpseAdaptation.js";
 import { DerivedExpression } from "../components/DerivedExpression.js";
-import { ItemCooldown } from "../components/ItemCooldown.js";
 import { EffectImmunities } from "../components/EffectImmunities.js";
 import { Equipment } from "../components/Equipment.js";
 import { Hunger } from "../components/Hunger.js";
@@ -33,6 +32,7 @@ import { isDotEffectKey, upsertTimedEffect } from "../utils/effectSemantics.js";
 import { ensureActiveEffects } from "../utils/effects.js";
 import { spawnHazard } from "../utils/hazardSpawn.js";
 import { spawnMonsterEntity } from "../utils/spawnMonsterEntity.js";
+import { setItemCooldown } from "../utils/itemCooldowns.js";
 import { Traits } from "../components/Traits.js";
 import { getHungerLevel } from "../data/food.js";
 import { effectiveMaxHp } from "../utils/passiveBonuses.js";
@@ -467,16 +467,7 @@ export function applyMutation(world, op, resolvers = {}) {
     }
     case "setItemCooldown": {
       const turns = Math.max(0, Number(op.turns || 0) | 0);
-      if (!(turns > 0)) break;
-      let cd = /** @type any */ (world.get(op.entityId, ItemCooldown));
-      if (!cd) {
-        try { world.add(op.entityId, ItemCooldown, { turnsRemaining: turns, turnsMax: turns }); } catch {} // ECS: may already exist
-        cd = /** @type any */ (world.get(op.entityId, ItemCooldown));
-      }
-      if (cd) {
-        cd.turnsRemaining = turns;
-        cd.turnsMax = turns;
-      }
+      setItemCooldown(world, op.entityId | 0, turns);
       break;
     }
     case "destroy": {
