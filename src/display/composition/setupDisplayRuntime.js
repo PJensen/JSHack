@@ -97,7 +97,7 @@ export function setupDisplayRuntime({
   recoilFx.installListeners({ world, getPosition, isPlayer });
 
   const hitstopFx = createHitstopController();
-  hitstopFx.installListeners({ world, isPlayer });
+  hitstopFx.installListeners({ world, isPlayer, bumpFx });
 
   const deathVfx = createDeathVfxController();
 
