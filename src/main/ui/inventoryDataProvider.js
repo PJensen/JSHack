@@ -35,7 +35,7 @@ import { addToInventory } from "../../rules/utils/inventoryFacade.js";
 import { listAllMonsterIds } from "../../rules/data/monsters.js";
 import { Pet } from "../../rules/components/Pet.js";
 import { FOV_CONE_DISABLED_KEY, isFacingTurnCostEnabled, setFacingTurnCostEnabled } from "../../rules/utils/facing.js";
-import { ItemCooldown } from "../../rules/components/ItemCooldown.js";
+import { getItemCooldown } from "../../rules/utils/itemCooldowns.js";
 import { groupDisplayItems } from "./itemGrouping.js";
 import { spawnDebugMonsterNearPlayer } from "../debug/spawnDebugMonster.js";
 import { isChestIdentity } from "../../shared/chests.js";
@@ -342,6 +342,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
         const applyTargetIds = listApplyTargetsForTool(world, p.id, id);
         const applyTargetCount = applyTargetIds.length;
         const canApply = isApplyTool(world, p.id, id);
+        const cooldown = getItemCooldown(world, id);
         items.push({
           ...buildItemDisplayData(info, id),
           equipped: Boolean(equippedSlot),
@@ -352,8 +353,8 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
           unpaidShopkeeperId: world.get(id, Unpaid)?.shopkeeperId || 0,
           canApply,
           applyTargetCount,
-          cooldownTurnsRemaining: world.get(id, ItemCooldown)?.turnsRemaining ?? 0,
-          cooldownTurnsMax: world.get(id, ItemCooldown)?.turnsMax ?? 0,
+          cooldownTurnsRemaining: cooldown?.remaining ?? 0,
+          cooldownTurnsMax: cooldown?.max ?? 0,
         });
       }
       // Attach comparison data for unequipped equippable items

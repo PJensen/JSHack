@@ -5,4 +5,5 @@ import { defineComponent } from "../../lib/ecs-js/index.js";
 export const ItemCooldown = defineComponent('ItemCooldown', {
   turnsRemaining: 0,
   turnsMax: 0,
+  dueTurn: 0,
 });

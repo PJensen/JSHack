@@ -141,10 +141,11 @@ Deno.test("sunsword: on_use is blocked while cooldown is active", () => {
   const hooks = getItemHooksByIdentity('sunsword');
   const emits = [];
   const messages = [];
-  const cd = { turnsRemaining: 4, turnsMax: 12 };
+  const cd = { dueTurn: 4, turnsMax: 12 };
   const result = hooks.onUse({
     actor: 1,
     query: {
+      worldStep() { return 0; },
       get(entityId, Comp) {
         if ((entityId | 0) === 42 && Comp === ItemCooldown) return cd;
         return null;

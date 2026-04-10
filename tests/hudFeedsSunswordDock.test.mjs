@@ -53,7 +53,7 @@ Deno.test("hudFeeds prepends equipped Sunsword action into the mobile dock and c
       rarityName: "epic",
       affixes: [],
     });
-    world.add(sunsword, ItemCooldown, { turnsRemaining: 7, turnsMax: 12 });
+    world.add(sunsword, ItemCooldown, { turnsRemaining: 7, turnsMax: 12, dueTurn: 7 });
     world.get(player, Equipment).weapon = sunsword;
 
     const pinnedSpellSlots = ["heal", "fireball", "arcane_bolt", "shadow_bolt"];
@@ -113,7 +113,7 @@ Deno.test("hudFeeds prepends equipped Sunsword action into the desktop spell doc
       rarityName: "epic",
       affixes: [],
     });
-    world.add(sunsword, ItemCooldown, { turnsRemaining: 5, turnsMax: 12 });
+    world.add(sunsword, ItemCooldown, { turnsRemaining: 5, turnsMax: 12, dueTurn: 5 });
     world.get(player, Equipment).weapon = sunsword;
 
     const actionBarSlots = ["heal", "fireball", "arcane_bolt", "shadow_bolt", "lightning", "smite"];

@@ -2,6 +2,7 @@
 import { createTorchThrowHook } from "./itemCatalogHooks.js";
 import { ItemCooldown } from "../components/ItemCooldown.js";
 import { SUNSWORD_RAY_COOLDOWN_TURNS } from "./itemAbilityConstants.js";
+import { resolveItemCooldownRemaining } from "../utils/itemCooldowns.js";
 
 export const EQUIPMENT_ITEMS = {
   staff_oak: {
@@ -1988,8 +1989,8 @@ export const EQUIPMENT_ITEMS = {
     hooks: {
       on_use: (ctx, state) => {
         const cd = ctx.query.get(state?.itemId | 0, ItemCooldown);
-        if (cd && Number(cd.turnsRemaining || 0) > 0) {
-          const turns = Math.max(0, Number(cd.turnsRemaining || 0) | 0);
+        const turns = resolveItemCooldownRemaining(cd, ctx.query.worldStep());
+        if (turns > 0) {
           ctx.io.message(`The Sunsword is still cooling down (${turns} turns).`, 'warning');
           return {
             consumed: false,
