@@ -41,20 +41,30 @@ const EASE_OUT_FRAC = 0.35;
 
 // ── Controller ──────────────────────────────────────────────────────
 
+/** Frames-per-second at which durations are tuned (desktop baseline) */
+const BASELINE_FPS = 60;
+/** Minimum scale factor so mobile still gets some hitstop */
+const MIN_PERF_SCALE = 0.4;
+
 export function createHitstopController() {
   let _remaining = 0;   // real-time seconds left in current hitstop
   let _duration = 0;     // total duration of current hitstop (for ease-out calc)
+  let _fpsEMA = BASELINE_FPS; // smoothed FPS estimate for adaptive scaling
 
   /**
    * Request a hitstop. If one is already active, extends duration to whichever
    * is longer (remaining vs new). Does not stack/compound.
-   * @param {number} dur  Duration in real-time seconds
+   * Duration is scaled down on slower devices so hitstop feels consistent.
+   * @param {number} dur  Duration in real-time seconds (tuned for 60fps)
    */
   function request(dur) {
     if (dur <= 0) return;
-    if (dur > _remaining) {
-      _remaining = dur;
-      _duration = dur;
+    // Scale duration: at 60fps use full duration, at 30fps use ~50%
+    const perfScale = Math.max(MIN_PERF_SCALE, Math.min(1, _fpsEMA / BASELINE_FPS));
+    const scaled = dur * perfScale;
+    if (scaled > _remaining) {
+      _remaining = scaled;
+      _duration = scaled;
     }
   }
 
@@ -88,6 +98,11 @@ export function createHitstopController() {
    * @returns {number} Scaled dt for display systems
    */
   function scale(realDt) {
+    // Track smoothed FPS for adaptive duration scaling
+    if (realDt > 0) {
+      const instFps = 1 / realDt;
+      _fpsEMA = _fpsEMA * 0.93 + instFps * 0.07;
+    }
     if (_remaining <= 0) return realDt;
 
     _remaining -= realDt;
