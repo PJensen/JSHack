@@ -3,8 +3,11 @@
 
 // ---- Imports ---------------------------------------------------------------
 // rules/ (app owns lifecycle only; no display code here)
-import { World } from "./lib/ecs-js/index.js";            // ECS World
-import { configureWorld } from "./main/scheduler.js";
+import {
+  createConfiguredWorld,
+  ensurePlayerSpawned,
+  applyPlayerClassLoadout,
+} from "./main/runtime/gameRuntime.js";
 import { playerEntity, findNearestValidTileAround } from "./rules/utils/queries.js";
 import { emitSafe } from "./rules/utils/emitSafe.js";
 import { getEffectiveVisionRange, blind } from "./rules/utils/blind.js";
@@ -95,12 +98,8 @@ import { Position } from "./rules/components/Position.js";
 import { Player } from "./rules/components/Player.js";
 import { Trap } from "./rules/components/Trap.js";
 import { buildWorldView } from "./bridge/schema/worldView.js";
-import { createPlayer } from "./rules/archetypes/Player.js";
 import { followEntity } from "./display/camera/follow.js";
 import { ActiveEffects } from "./rules/components/ActiveEffects.js";
-import { Brain } from "./rules/components/Brain.js";
-import { BaseStats } from "./rules/components/BaseStats.js";
-import { Mana } from "./rules/components/Mana.js";
 import { getSpell, describeSpellDetailLines, describeSpellTargetEffects } from "./rules/data/spells.js";
 import { getSpellCooldown } from "./rules/utils/spellCooldowns.js";
 import { buildPalette } from "./display/palette/index.js";
@@ -125,14 +124,13 @@ import { Tombstone as TombstoneComponent } from "./rules/components/Tombstone.js
 import { installDeathShareWiring } from "./main/wiring/deathShareWiring.js";
 import { installProofWiring } from "./main/proof/proofWiring.js";
 import { postVerifiedScore } from "./shared/tombstoneApi.js";
-import { createItemById } from "./rules/utils/itemFactory.js";
 import { forEachInRadius } from "./rules/utils/spatialIndex.js";
 import { chebyshevScalar, manhattanScalar } from "./rules/utils/distance.js";
 import { hasLOS } from "./shared/math/gridLOS.js";
 import { isChestIdentity } from "./shared/chests.js";
 import { buildBlocksVisionMap, blockedCallback } from "./rules/utils/vision.js";
 import {
-  inventoryItems, inventoryContains, addToInventory,
+  inventoryItems, inventoryContains,
   hasCapacityForItem, transferItem, removeFromInventory,
 } from "./rules/utils/inventoryFacade.js";
 import { Engraving } from "./rules/components/Engraving.js";
@@ -140,7 +138,6 @@ import { Pet } from "./rules/components/Pet.js";
 import { PetState } from "./rules/components/PetState.js";
 import { PetCommandIntent } from "./rules/components/Intents/PetCommandIntent.js";
 import { Owner } from "./rules/components/Owner.js";
-import { Hunger } from "./rules/components/Hunger.js";
 import { getHungerLevel } from "./rules/data/food.js";
 import { resolveItemDisplayName, buildItemDisplayData, resolveAffixes } from "./main/wiring/itemName.js";
 import { evaluateSound, thresholdForTier } from "./rules/utils/sound.js";
@@ -279,11 +276,10 @@ installPluralizationExtensions();
 
 // ---- App wires rules/ (no display logic here) ------------------------------
 const _bootSeed = runtimeConfig.seed ?? (_hasFloorOverride ? null : readSavedSeed(_pendingSavegame)) ?? pickRandomSeed();
-const world = new World({ seed: _bootSeed });
+const world = createConfiguredWorld(_bootSeed);
 setFovDisabled(runtimeConfig.disableFov === true);
 world[FOV_CONE_DISABLED_KEY] = runtimeConfig.disableFovCone === true;
 setFacingTurnCostEnabled(world, runtimeConfig.facingTurnCost === true);
-configureWorld(world);
 import { installChannelingController } from "./main/channelingController.js";
 installChannelingController(world, () => (playerEntity(world)?.id || 0));
 bootAdvance("Configured ECS systems");
@@ -712,88 +708,16 @@ function _finalizeNewGame(classData) {
     // Start new games at dawn (start of "work" phase, ~7 AM)
     world.step = PHASE_TURNS.sleep + PHASE_TURNS.breakfast;
     clearFloorCache();
-    const stats = classDef?.stats ?? {};
-
-    // Create player at the spawn position with class stats
-    if (!playerEntity(world)) {
-      createPlayer(world, {
-        x: spawnPos.x, y: spawnPos.y,
-        name: classData?.name ?? "Hero",
-        identity: classDef ? `player_${classDef.id}` : "player",
-        maxHp: stats.maxHp ?? 20,
-        maxStamina: stats.maxStamina ?? 100,
-        staminaRegen: stats.staminaRegen ?? 3.0,
-      });
-    }
-
-    const pe = playerEntity(world);
-    if (pe) {
-      // Mana from class
-      world.add(pe.id, Mana, {
-        mana: stats.maxMana ?? 50,
-        maxMana: stats.maxMana ?? 50,
-        manaRegen: stats.manaRegen ?? 0.1,
-      });
-      // Hunger: start with 100 turns of satiation ("you ate before entering the dungeon")
-      world.add(pe.id, Hunger, { hunger: 0, satiation: 100 });
-
-      // Brain stats from class (intelligence, visionRange)
-      const brain = /** @type {{ learnedSpellIds?: string[], intelligence?: number, visionRange?: number }|null } */ (world.get(pe.id, Brain));
-      if (brain) {
-        if (stats.intelligence != null) brain.intelligence = stats.intelligence;
-        if (stats.visionRange != null) brain.visionRange = stats.visionRange;
-      }
-
-      // Base stats from class (strength, dexterity, vitality, intelligence, perception)
-      world.add(pe.id, BaseStats, {
-        strength: stats.strength ?? 10,
-        intelligence: stats.intelligence ?? 10,
-        dexterity: stats.dexterity ?? 10,
-        vitality: stats.vitality ?? 10,
-        perception: stats.perception ?? 5,
-      });
-
-      // Class-driven loadout
-      const inv = world.get(pe.id, Inventory);
-      const eq = world.get(pe.id, Equipment);
-      const addStarterItem = (itemId, opts = {}) => {
-        if (!inv) return 0;
-        const createdId = createItemById(world, itemId, opts);
-        if (!(createdId > 0)) return 0;
-        if (!addToInventory(world, pe.id, createdId, { silent: true })) return 0;
-        // Starting gear is always identified
-        identify(itemId);
-        return createdId;
-      };
-
-      if (eq && classDef) {
-        for (const [slot, itemId] of Object.entries(classDef.equipment || {})) {
-          if (!(slot in eq)) continue;
-          eq[slot] = itemId ? (addStarterItem(itemId) || null) : null;
-        }
-      }
-      if (classDef) {
-        for (const { itemId, count } of classDef.inventoryItems) {
-          addStarterItem(itemId, { count });
-        }
-      }
-      // Starting spell(s) from class — supports both startingSpell (string) and startingSpells (array)
-      /** @type {string[]} */
-      const classSpells = [];
-      if (Array.isArray(classDef?.startingSpells)) {
-        for (const s of classDef.startingSpells) { if (s) classSpells.push(String(s)); }
-      } else if (classDef?.startingSpell) {
-        classSpells.push(String(classDef.startingSpell));
-      }
-      if (brain && classSpells.length > 0) {
-        if (!Array.isArray(brain.learnedSpellIds)) brain.learnedSpellIds = [];
-        // Prepend class spells in order, deduplicating
-        const existing = brain.learnedSpellIds.filter((id) => !classSpells.includes(id));
-        brain.learnedSpellIds = [...classSpells, ...existing];
-        setActiveSpell(classSpells[0]);
-      }
-
-    }
+    const pe = ensurePlayerSpawned(world, {
+      x: spawnPos.x,
+      y: spawnPos.y,
+      classDef,
+      playerName: classData?.name ?? "Hero",
+    });
+    const { classSpells } = applyPlayerClassLoadout(world, pe.id, classDef, {
+      onStarterItem: (itemId) => identify(itemId),
+    });
+    if (classSpells.length > 0) setActiveSpell(classSpells[0]);
 
     // Spawn pet next to the player (familiar for warlock, kitty otherwise)
     {

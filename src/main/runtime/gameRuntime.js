@@ -36,8 +36,74 @@ function upsert(world, entityId, component, value) {
   }
 }
 
-function applyClassLoadout(world, playerId, classDef) {
+function normalizeClassSpells(classDef) {
+  /** @type {string[]} */
+  const classSpells = [];
+  if (Array.isArray(classDef?.startingSpells)) {
+    for (const s of classDef.startingSpells) {
+      if (s) classSpells.push(String(s));
+    }
+  } else if (classDef?.startingSpell) {
+    classSpells.push(String(classDef.startingSpell));
+  }
+  return classSpells;
+}
+
+/**
+ * @param {number} seed
+ * @returns {import("../../lib/ecs-js/index.js").World}
+ */
+export function createConfiguredWorld(seed = 0xC0FFEE) {
+  const world = new World({ seed: Number(seed) >>> 0 });
+  configureWorld(world);
+  return world;
+}
+
+/**
+ * Ensure the player entity exists at spawn using class-facing vitals defaults.
+ *
+ * @param {import("../../lib/ecs-js/index.js").World} world
+ * @param {{
+ *   x: number,
+ *   y: number,
+ *   classDef?: any,
+ *   playerName?: string,
+ * }} opts
+ * @returns {{ id:number, pos:{x:number,y:number} }}
+ */
+export function ensurePlayerSpawned(world, opts) {
+  const existing = playerEntity(world);
+  if (existing) return existing;
+  const classDef = opts?.classDef || null;
   const stats = classDef?.stats || {};
+  createPlayer(world, {
+    x: Number(opts?.x || 0) | 0,
+    y: Number(opts?.y || 0) | 0,
+    name: String(opts?.playerName || "Hero"),
+    identity: classDef ? `player_${classDef.id}` : "player",
+    maxHp: stats.maxHp ?? 20,
+    maxStamina: stats.maxStamina ?? 100,
+    staminaRegen: stats.staminaRegen ?? 3.0,
+  });
+  const pe = playerEntity(world);
+  if (!pe) throw new Error("ensurePlayerSpawned: failed to create player entity");
+  return pe;
+}
+
+/**
+ * Apply canonical class-derived runtime loadout to an existing player.
+ *
+ * @param {import("../../lib/ecs-js/index.js").World} world
+ * @param {number} playerId
+ * @param {any} classDef
+ * @param {{
+ *   onStarterItem?: (itemId:string, createdId:number)=>void,
+ * }} [opts]
+ * @returns {{ classSpells: string[] }}
+ */
+export function applyPlayerClassLoadout(world, playerId, classDef, opts = {}) {
+  const stats = classDef?.stats || {};
+  const onStarterItem = typeof opts?.onStarterItem === "function" ? opts.onStarterItem : null;
 
   upsert(world, playerId, Mana, {
     mana: stats.maxMana ?? 50,
@@ -60,10 +126,20 @@ function applyClassLoadout(world, playerId, classDef) {
     perception: stats.perception ?? baseStats.perception ?? 5,
   });
 
+  const brain = world.get(playerId, Brain);
+  if (brain) {
+    if (stats.intelligence != null) brain.intelligence = stats.intelligence;
+    if (stats.visionRange != null) brain.visionRange = stats.visionRange;
+    upsert(world, playerId, Brain, brain);
+  }
+
   const addStarterItem = (itemId, opts = {}) => {
     const createdId = createItemById(world, itemId, opts);
     if (!(createdId > 0)) return 0;
     const ok = addToInventory(world, playerId, createdId, { silent: true });
+    if (ok && onStarterItem) {
+      try { onStarterItem(String(itemId || ""), createdId); } catch {}
+    }
     return ok ? createdId : 0;
   };
 
@@ -80,9 +156,7 @@ function applyClassLoadout(world, playerId, classDef) {
     addStarterItem(row.itemId, { count: coerceInt(row.count, 1) || 1 });
   }
 
-  const classSpells = Array.isArray(classDef?.startingSpells)
-    ? classDef.startingSpells.filter(Boolean).map((s) => String(s))
-    : [];
+  const classSpells = normalizeClassSpells(classDef);
   if (classSpells.length > 0) {
     const brain = world.get(playerId, Brain);
     if (brain) {
@@ -102,60 +176,23 @@ function applyClassLoadout(world, playerId, classDef) {
     });
     initDeity(deityId, world);
   }
+  return { classSpells };
 }
 
 /**
- * Create a headless-capable runtime facade around the live world.
+ * Build a shared runtime facade around an existing world.
  *
+ * @param {import("../../lib/ecs-js/index.js").World} world
  * @param {{
- *   seed?: number,
- *   classId?: string,
- *   playerName?: string,
- *   startDepth?: number,
- *   dungeonType?: string | null,
+ *   getActorId?: ()=>number,
  *   onAction?: (turn:number, type:string, payload:object)=>void,
  * }} [opts]
  */
-export function createGameRuntime(opts = {}) {
-  const seed = Number.isFinite(Number(opts.seed)) ? (Number(opts.seed) >>> 0) : 0xC0FFEE;
-  const classId = String(opts.classId || "outlaw");
-  const classDef = getClass(classId) || getClass("outlaw");
-  const playerName = String(opts.playerName || "Headless Hero");
-  const startDepth = Math.max(0, coerceInt(opts.startDepth, 1));
-
-  const world = new World({ seed });
-  configureWorld(world);
-
-  const spawnPos = initDungeon(world, {
-    startDepth,
-    dungeonType: opts.dungeonType ?? null,
-    tombstoneRepo: null,
-  });
-
-  world.step = PHASE_TURNS.sleep + PHASE_TURNS.breakfast;
-
-  if (!playerEntity(world)) {
-    const stats = classDef?.stats || {};
-    createPlayer(world, {
-      x: spawnPos.x,
-      y: spawnPos.y,
-      name: playerName,
-      identity: classDef ? `player_${classDef.id}` : "player",
-      maxHp: stats.maxHp ?? 20,
-      maxStamina: stats.maxStamina ?? 100,
-      staminaRegen: stats.staminaRegen ?? 3.0,
-    });
-  }
-
-  const pe = playerEntity(world);
-  if (!pe) throw new Error("createGameRuntime: failed to create player entity");
-
-  applyClassLoadout(world, pe.id, classDef);
-
-  // Initial resolve pass for derived systems before first external step.
-  world.tick(1);
-
-  const dispatch = makeRulesDispatcher(world, () => (playerEntity(world)?.id || 0), {
+export function createRuntimeFacade(world, opts = {}) {
+  const getActorId = typeof opts.getActorId === "function"
+    ? opts.getActorId
+    : (() => (playerEntity(world)?.id || 0));
+  const dispatch = makeRulesDispatcher(world, getActorId, {
     onAction: typeof opts.onAction === "function" ? opts.onAction : undefined,
   });
 
@@ -201,4 +238,49 @@ export function createGameRuntime(opts = {}) {
       return playerEntity(world);
     },
   };
+}
+
+/**
+ * Create a headless-capable runtime facade around the live world.
+ *
+ * @param {{
+ *   seed?: number,
+ *   classId?: string,
+ *   playerName?: string,
+ *   startDepth?: number,
+ *   dungeonType?: string | null,
+ *   onAction?: (turn:number, type:string, payload:object)=>void,
+ * }} [opts]
+ */
+export function createGameRuntime(opts = {}) {
+  const seed = Number.isFinite(Number(opts.seed)) ? (Number(opts.seed) >>> 0) : 0xC0FFEE;
+  const classId = String(opts.classId || "outlaw");
+  const classDef = getClass(classId) || getClass("outlaw");
+  const playerName = String(opts.playerName || "Headless Hero");
+  const startDepth = Math.max(0, coerceInt(opts.startDepth, 1));
+
+  const world = createConfiguredWorld(seed);
+
+  const spawnPos = initDungeon(world, {
+    startDepth,
+    dungeonType: opts.dungeonType ?? null,
+    tombstoneRepo: null,
+  });
+
+  world.step = PHASE_TURNS.sleep + PHASE_TURNS.breakfast;
+
+  const pe = ensurePlayerSpawned(world, {
+    x: spawnPos.x,
+    y: spawnPos.y,
+    classDef,
+    playerName,
+  });
+  applyPlayerClassLoadout(world, pe.id, classDef);
+
+  // Initial resolve pass for derived systems before first external step.
+  world.tick(1);
+  return createRuntimeFacade(world, {
+    getActorId: () => (playerEntity(world)?.id || 0),
+    onAction: typeof opts.onAction === "function" ? opts.onAction : undefined,
+  });
 }
