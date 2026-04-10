@@ -86,7 +86,25 @@ function buildDamageSignature(info, damageType) {
     };
 }
 
-function buildMeleeImpactProfile(world, weaponId, damageType, offhand, facingVector) {
+function resolveElementTint(world, sourceId, weaponId) {
+    // Check attacker ActiveEffects for weapon enchants
+    const ae = world.get(sourceId, ActiveEffects);
+    if (ae && Array.isArray(ae.effects)) {
+        for (let i = 0; i < ae.effects.length; i++) {
+            const e = ae.effects[i];
+            if (!e || !((e.turnsLeft | 0) > 0)) continue;
+            if (e.key === 'fire_weapon') return 'fire';
+        }
+    }
+    // Check weapon coating (poison blade spell)
+    if (weaponId > 0 && world.isAlive(weaponId)) {
+        const info = world.get(weaponId, ItemInfo);
+        if (info?.coating?.kind === 'poison' && (info.coating.charges | 0) > 0) return 'poison';
+    }
+    return null;
+}
+
+function buildMeleeImpactProfile(world, sourceId, weaponId, damageType, offhand, facingVector) {
     const info = (weaponId > 0 && world.isAlive(weaponId)) ? world.get(weaponId, ItemInfo) : null;
     const weaponClass = resolveWeaponClass(world, weaponId, damageType);
     const attackKind = damageType === 'pierce'
@@ -98,6 +116,7 @@ function buildMeleeImpactProfile(world, weaponId, damageType, offhand, facingVec
         offhand: !!offhand,
         signature: buildDamageSignature(info, damageType),
         facingVector: facingVector || undefined,
+        elementTint: resolveElementTint(world, sourceId, weaponId),
     };
 }
 
@@ -370,6 +389,7 @@ function resolveHitRoll(world, {
             impactVector: computeImpactVector(srcPos, dstPos),
             impactProfile: buildMeleeImpactProfile(
                 world,
+                source,
                 weaponId,
                 damageType,
                 offhand,
