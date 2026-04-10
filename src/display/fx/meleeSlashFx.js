@@ -24,10 +24,13 @@ const COL_PARRY   = [255, 255, 220]; // bright metallic yellow-white
 const COL_WHIFF   = [180, 190, 210]; // ghostly blue-grey
 
 // ── Element tint overrides ────────────────────────────────────────────────
+// Keys must match the canonical tint ids from rules/data/elementTints.js
 const ELEMENT_TINTS = {
-  fire:   [255, 140, 60],   // hot orange
-  poison: [120, 220, 80],   // sickly green
-  frost:  [140, 200, 255],  // icy blue
+  fire:     [255, 140, 60],   // hot orange
+  poison:   [120, 220, 80],   // sickly green
+  frost:    [140, 200, 255],  // icy blue
+  acid:     [180, 255, 40],   // caustic yellow-green
+  electric: [160, 180, 255],  // crackling blue-white
 };
 
 // ── Damage colour shift ───────────────────────────────────────────────────
