@@ -1562,6 +1562,7 @@ function ensureEffectsStack(container) {
     poisoned:     { name: 'Poison',    glyph: '\u2620\uFE0F',    hue: 120 },
     regen:        { name: 'Regen',     glyph: '\u{1F49A}',       hue: 140 },
     stunned:      { name: 'Stunned',   glyph: '\u{1F4AB}',       hue: 45  },
+    rooted:       { name: 'Rooted',    glyph: '\u{1FAB4}',       hue: 130 },
     thorns:       { name: 'Thorns',    glyph: '\u{1F339}',       hue: 110 },
     disease:      { name: 'Disease',   glyph: '\u{1F9A0}',       hue: 55  },
     bleeding:     { name: 'Bleed',     glyph: '\u{1FA78}',       hue: 350 },
