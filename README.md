@@ -475,6 +475,16 @@ deno test --allow-read tests/
 deno run tests/movementSystem.test.js
 ```
 
+Performance and headless simulation:
+
+```bash
+deno task bench
+deno task headless --turns 500 --report-every 100
+```
+
+Headless runtime details and action-schedule format:
+- [docs/headless-runtime.md](docs/headless-runtime.md)
+
 Tests are simple:
 
 ```js

@@ -240,7 +240,3 @@ Deno.bench({
     buildWorldView(worldView.world);
   },
 });
-
-Deno.test("perf bench teardown", () => {
-  clearAll();
-});
