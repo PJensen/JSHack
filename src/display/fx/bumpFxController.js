@@ -173,6 +173,9 @@ export function createBumpFxController() {
    */
   const active = new Map();
 
+  /** @type {((b: BumpState) => void) | null} */
+  let _onContact = null;
+
   /**
    * Start a lunge animation for `attackerId` toward `targetX, targetY`.
    * @param {number} attackerId
@@ -222,7 +225,18 @@ export function createBumpFxController() {
       let i = 0;
       while (i < queue.length) {
         const b = queue[i];
+        const prevT = b.elapsed - b.delay;
         b.elapsed += dt;
+        const currT = b.elapsed - b.delay;
+        // Fire contact callback when lunge crosses apex (progress reaches 1.0)
+        // For main-hand: apex is at LUNGE_OUT; offhand: at OH_LUNGE_OUT
+        if (!b.contacted && !b.struggle && !b.whiff && _onContact && currT >= 0) {
+          const apexTime = b.offhand ? OH_LUNGE_OUT : LUNGE_OUT;
+          if (prevT < apexTime && currT >= apexTime) {
+            b.contacted = true;
+            _onContact(b);
+          }
+        }
         if (b.elapsed - b.delay >= b.duration) {
           queue.splice(i, 1);
         } else {
@@ -381,7 +395,10 @@ export function createBumpFxController() {
     active.delete(id);
   }
 
-  return { trigger, convertToWhiff, tick, getOffset, isActive, installListeners, remove };
+  /** Register a callback fired when a lunge reaches its contact point (apex). */
+  function onContact(fn) { _onContact = fn; }
+
+  return { trigger, convertToWhiff, tick, getOffset, isActive, installListeners, remove, onContact };
 }
 
 const _ZERO = Object.freeze({ dx: 0, dy: 0 });

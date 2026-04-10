@@ -120,14 +120,16 @@ export function createHitstopController() {
 
   /**
    * Wire up event listeners.
-   * @param {{ world:any, isPlayer:(id:number)=>boolean }} deps
+   * @param {{ world:any, isPlayer:(id:number)=>boolean, bumpFx?:any }} deps
    */
-  function installListeners({ world, isPlayer }) {
-    // Freeze mid-swing: bump:attack fires when the lunge starts, so hitstop
-    // kicks in while the weapon arc is still in motion — not after damage lands.
-    world.on('bump:attack', () => {
-      request(BASE_DURATION);
-    });
+  function installListeners({ world, isPlayer, bumpFx }) {
+    // Freeze mid-swing: bumpFx fires onContact when the lunge reaches apex,
+    // so hitstop kicks in at the moment of impact — not at start or end.
+    if (bumpFx && typeof bumpFx.onContact === 'function') {
+      bumpFx.onContact(() => {
+        request(BASE_DURATION);
+      });
+    }
 
     // Upgrade the freeze when damage actually resolves (crits/big hits extend it)
     world.on('damaged', ({ target, amount, critical, projectileDelay }) => {
