@@ -2811,6 +2811,7 @@ const _healthBarState = new Map();
 const _healthBarSeen = new Set();
 /** @type {Set<string>} */
 const _roofCoverKeys = new Set();
+const _aboveRoofEntities = [];  // entities tagged flying/above_roof, collected during main loop
 /** @type {Map<string, number>} */
 const _roofParticleStamp = new Map();
 /** Separate stamp for large smoldering smoke particles (slower rate). @type {Map<string, number>} */
@@ -4271,6 +4272,7 @@ function render(worldView) {
 
   // Draw order: doors/stairs (200) → items (250) → actors (300) → player (400)
   // Entities are sorted by layer, so drawing inline gives correct z-order.
+  _aboveRoofEntities.length = 0;
 
   for (let i = 0; i < renderEntities.length; i++) {
     const e = renderEntities[i];
@@ -4388,6 +4390,9 @@ function render(worldView) {
     // Build tag set once — avoids 20+ O(n) .includes() scans per actor
     _renderTagSet.clear();
     if (Array.isArray(renderEntity.tags)) for (let _t = 0; _t < renderEntity.tags.length; _t++) _renderTagSet.add(renderEntity.tags[_t]);
+
+    // Collect candidates for post-roof redraw (tiny list — avoids full re-scan later)
+    if (_renderTagSet.has('flying') || _renderTagSet.has('above_roof')) _aboveRoofEntities.push(e);
 
     if (_renderTagSet.has('thermal_sensed')) {
       drawThermalSensePing(bctx, renderEntity, _fxTime);
@@ -4948,13 +4953,13 @@ function render(worldView) {
   }
 
   if (_roofCoverKeys.size > 0) {
-    for (let i = 0; i < renderEntities.length; i++) {
-      const e = renderEntities[i];
+    for (let i = 0; i < _aboveRoofEntities.length; i++) {
+      const e = _aboveRoofEntities[i];
       if (e.pos.x < vx0 || e.pos.x > vx1 || e.pos.y < vy0 || e.pos.y > vy1) continue;
-      if (!Array.isArray(e.tags)) continue;
       if (!_roofCoverKeys.has(roofCellKey(e.pos.x, e.pos.y))) continue;
+      const eTags = Array.isArray(e.tags) ? e.tags : [];
 
-      if (e.tags.includes('flying')) {
+      if (eTags.includes('flying')) {
         const slidePos2 = slideFx.getPosition(e.id, e.pos.x, e.pos.y);
         const slidEntity2 = slidePos2.sliding ? { ...e, pos: { x: slidePos2.x, y: slidePos2.y } } : e;
         const bumpOff2 = bumpFx.getOffset(e.id);
@@ -4977,7 +4982,7 @@ function render(worldView) {
         if (shouldShowHealthBar(renderEntity, _fxTime)) {
           drawEntityHealthBar(bctx, renderEntity);
         }
-      } else if (e.tags.includes('above_roof')) {
+      } else if (eTags.includes('above_roof')) {
         drawEntityGlyph(glyphAtlas, bctx, e);
       }
     }

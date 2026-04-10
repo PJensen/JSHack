@@ -15,6 +15,10 @@ import {
 const _chunks = new Map();
 // chunk key: "cx,cy" -> Uint8Array (1 = roofed by a JSON building, 0 = not)
 const _roofed = new Map();
+// Monotonic version counter — bumped by setRoofed/clearAll so consumers can
+// cache derived structures (e.g. roof bitmap Set) and invalidate cheaply.
+let _roofedVersion = 0;
+export function roofedVersion() { return _roofedVersion; }
 
 // Precomputed walkability per tile type (indexed by TILE_* constants)
 const _walkable = new Uint8Array(32);
@@ -89,6 +93,7 @@ export function unloadChunk(cx, cy) {
 export function clearAll() {
   _chunks.clear();
   _roofed.clear();
+  _roofedVersion++;
 }
 
 /**
@@ -207,7 +212,9 @@ export function setRoofed(x, y, val) {
   }
   const lx = xi - cx * CHUNK_SIZE;
   const ly = yi - cy * CHUNK_SIZE;
-  arr[ly * CHUNK_SIZE + lx] = val ? 1 : 0;
+  const prev = arr[ly * CHUNK_SIZE + lx];
+  const next = val ? 1 : 0;
+  if (prev !== next) { arr[ly * CHUNK_SIZE + lx] = next; _roofedVersion++; }
 }
 
 /**

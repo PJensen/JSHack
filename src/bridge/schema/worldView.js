@@ -10,7 +10,7 @@ import { Status } from "../../rules/components/Status.js";
 import { Equipment } from "../../rules/components/Equipment.js";
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
 import { ObjectState } from "../../rules/components/ObjectState.js";
-import { getTile, forEachTileInRect, forEachLoadedTile, isRoofed } from '../../rules/environment/dungeon/tileMap.js';
+import { getTile, forEachTileInRect, forEachLoadedTile, isRoofed, roofedVersion } from '../../rules/environment/dungeon/tileMap.js';
 import { TILE_DOOR, TILE_FLOOR, TILE_STAIR_DOWN, TILE_WALL } from "../../rules/environment/dungeon/constants.js";
 import { buildBlocksVisionMap, blockedCallback } from '../../rules/utils/vision.js';
 import { updateFOV, isVisible, isExplored } from '../../rules/environment/dungeon/exploredMap.js';
@@ -214,6 +214,61 @@ function keyWithinRadius(key, candidates, radius = 1) {
 	return false;
 }
 
+// ── Roof bitmap + BFS component cache ────────────────────────────────
+// The roofed bitmap (Set of "x,y" keys) and its BFS-derived connected
+// components only change when tileMap roofed state changes (generation time).
+// Cache them behind roofedVersion() and skip the expensive forEachLoadedTile +
+// flood-fill on every tick.
+let _roofBitmapCache = null;       // Set<string> of roofed tile keys
+let _roofComponentsCache = null;   // Array<{ keys: Set<string>, renderKeys: string[], minY, maxY, shadowCutoff }>
+let _roofCacheVersion = -1;
+
+function _ensureRoofCache() {
+	const ver = roofedVersion();
+	if (_roofCacheVersion === ver && _roofBitmapCache) return;
+	_roofCacheVersion = ver;
+
+	// 1. Build bitmap Set from all loaded tiles (only runs when version changes)
+	const bitmapKeys = new Set();
+	forEachLoadedTile((x, y) => {
+		if (isRoofed(x, y)) bitmapKeys.add(xyKey(x, y));
+	});
+	_roofBitmapCache = bitmapKeys;
+
+	// 2. BFS flood-fill to find connected components
+	const components = [];
+	const used = new Set();
+	for (const startKey of bitmapKeys) {
+		if (used.has(startKey)) continue;
+		const comp = new Set();
+		const q = [startKey];
+		comp.add(startKey);
+		for (let i = 0; i < q.length; i++) {
+			const { x, y } = keyToXY(q[i]);
+			for (let j = 0; j < CARDINAL_STEPS.length; j++) {
+				const nk = xyKey(x + CARDINAL_STEPS[j][0], y + CARDINAL_STEPS[j][1]);
+				if (!comp.has(nk) && bitmapKeys.has(nk)) { comp.add(nk); q.push(nk); }
+			}
+		}
+		for (const k of comp) used.add(k);
+
+		const renderKeys = [];
+		let minY = Infinity;
+		let maxY = -Infinity;
+		for (const key of comp) {
+			const { x, y } = keyToXY(key);
+			if (!isRoofBearingTile(getTile(x, y))) continue;
+			renderKeys.push(key);
+			if (y < minY) minY = y;
+			if (y > maxY) maxY = y;
+		}
+		if (!renderKeys.length) continue;
+		const shadowCutoff = minY + Math.floor((maxY - minY) * 0.5);
+		components.push({ keys: comp, renderKeys, minY, maxY, shadowCutoff });
+	}
+	_roofComponentsCache = components;
+}
+
 /**
  * @param {import('../../lib/ecs-js/index.js').World} world
  * @param {{ x:number, y:number } | null} playerPos
@@ -225,7 +280,12 @@ function collectOverworldRoofs(world, playerPos) {
 		break;
 	}
 	if (!isOverworld) return [];
+	if (!playerPos) return [];
 
+	// Ensure cached bitmap + BFS components are up to date
+	_ensureRoofCache();
+
+	// Per-tick volatile state: destroyed tiles, fire positions, smoldering
 	const destroyedTiles = getDestroyedTileLedger(world);
 	const activeFireKeys = new Set();
 	for (const [, pos, hazard] of world.query(Position, HazardArea)) {
@@ -234,8 +294,7 @@ function collectOverworldRoofs(world, playerPos) {
 		if (String(hazard.medium || "air").toLowerCase() !== "floor") continue;
 		activeFireKeys.add(xyKey(pos.x, pos.y));
 	}
-	const playerKey = playerPos ? xyKey(playerPos.x, playerPos.y) : "";
-	const roofs = [];
+	const playerKey = xyKey(playerPos.x, playerPos.y);
 	const destroyedTileKeys = new Set();
 	const smolderingRoofKeys = new Set();
 	for (const [key, rec] of Object.entries(destroyedTiles || {})) {
@@ -246,87 +305,59 @@ function collectOverworldRoofs(world, playerPos) {
 		}
 	}
 
-	if (playerPos) {
-		const bitmapKeys = new Set();
-		forEachLoadedTile((x, y) => {
-			if (isRoofed(x, y)) bitmapKeys.add(xyKey(x, y));
-		});
-		const bitmapUsed = new Set();
-		for (const startKey of bitmapKeys) {
-			if (bitmapUsed.has(startKey)) continue;
-			const comp = new Set();
-			const q = [startKey];
-			comp.add(startKey);
-			for (let i = 0; i < q.length; i++) {
-				const { x, y } = keyToXY(q[i]);
+	const roofs = [];
+	const components = _roofComponentsCache;
+	for (let ci = 0; ci < components.length; ci++) {
+		const { keys: comp, renderKeys, shadowCutoff } = components[ci];
+
+		// Player inside this building — determine shelter, skip drawing this component
+		if (comp.has(playerKey)) {
+			const playerTile = getTile(playerPos.x, playerPos.y);
+			const nearDestroyed = keyWithinRadius(playerKey, destroyedTileKeys, 1);
+			const nearFire = keyWithinRadius(playerKey, activeFireKeys, 1);
+			_view.playerSheltered = isRoofBearingTile(playerTile) && !nearDestroyed && !nearFire;
+			continue;
+		}
+
+		for (let ri = 0; ri < renderKeys.length; ri++) {
+			const key = renderKeys[ri];
+			const { x, y } = keyToXY(key);
+			const tile = getTile(x, y);
+			const destroyedHere = destroyedTileKeys.has(key);
+			const nearFire = keyWithinRadius(key, activeFireKeys, 1);
+			const singed = keyWithinRadius(key, destroyedTileKeys, 1);
+			if (tile === TILE_FLOOR) {
+				let exposed = false;
+				let adjacentDestroyed = false;
 				for (let j = 0; j < CARDINAL_STEPS.length; j++) {
-					const nk = xyKey(x + CARDINAL_STEPS[j][0], y + CARDINAL_STEPS[j][1]);
-					if (!comp.has(nk) && bitmapKeys.has(nk)) { comp.add(nk); q.push(nk); }
-				}
-			}
-			for (const k of comp) bitmapUsed.add(k);
-
-			const renderKeys = [];
-			let minY = Infinity;
-			let maxY = -Infinity;
-			for (const key of comp) {
-				const { x, y } = keyToXY(key);
-				if (!isRoofBearingTile(getTile(x, y))) continue;
-				renderKeys.push(key);
-				if (y < minY) minY = y;
-				if (y > maxY) maxY = y;
-			}
-			if (!renderKeys.length) continue;
-
-			if (playerKey && comp.has(playerKey)) {
-				const playerTile = getTile(playerPos.x, playerPos.y);
-				const nearDestroyed = keyWithinRadius(playerKey, destroyedTileKeys, 1);
-				const nearFire = keyWithinRadius(playerKey, activeFireKeys, 1);
-				_view.playerSheltered = isRoofBearingTile(playerTile) && !nearDestroyed && !nearFire;
-				continue;
-			}
-
-			const shadowCutoff = minY + Math.floor((maxY - minY) * 0.5);
-
-			for (const key of renderKeys) {
-				const { x, y } = keyToXY(key);
-				const tile = getTile(x, y);
-				const destroyedHere = destroyedTileKeys.has(key);
-				const nearFire = keyWithinRadius(key, activeFireKeys, 1);
-				const singed = keyWithinRadius(key, destroyedTileKeys, 1);
-				if (tile === TILE_FLOOR) {
-					let exposed = false;
-					let adjacentDestroyed = false;
-					for (let j = 0; j < CARDINAL_STEPS.length; j++) {
-						const nx = x + CARDINAL_STEPS[j][0];
-						const ny = y + CARDINAL_STEPS[j][1];
-						if (destroyedTileKeys.has(xyKey(nx, ny))) adjacentDestroyed = true;
-						if (!comp.has(xyKey(nx, ny))) continue;
-						if (!isRoofBearingTile(getTile(nx, ny))) {
-							exposed = true;
-							break;
-						}
+					const nx = x + CARDINAL_STEPS[j][0];
+					const ny = y + CARDINAL_STEPS[j][1];
+					if (destroyedTileKeys.has(xyKey(nx, ny))) adjacentDestroyed = true;
+					if (!comp.has(xyKey(nx, ny))) continue;
+					if (!isRoofBearingTile(getTile(nx, ny))) {
+						exposed = true;
+						break;
 					}
-					if (exposed || ((destroyedHere || adjacentDestroyed) && !nearFire)) continue;
 				}
-				const isDoor = tile === TILE_DOOR;
-				let kind = y <= shadowCutoff ? "roof_thatch_shadow" : "roof_thatch_lit";
-				let alpha = isDoor ? 0.4 : 1.0;
-				let burning = false;
-				let smoking = false;
-				if (singed) {
-					kind += "_charred";
-					if (nearFire) {
-						burning = true;
-					} else {
-						alpha *= 0.45;
-						smoking = keyWithinRadius(key, smolderingRoofKeys, 1);
-					}
-				} else if (nearFire) {
+				if (exposed || ((destroyedHere || adjacentDestroyed) && !nearFire)) continue;
+			}
+			const isDoor = tile === TILE_DOOR;
+			let kind = y <= shadowCutoff ? "roof_thatch_shadow" : "roof_thatch_lit";
+			let alpha = isDoor ? 0.4 : 1.0;
+			let burning = false;
+			let smoking = false;
+			if (singed) {
+				kind += "_charred";
+				if (nearFire) {
 					burning = true;
+				} else {
+					alpha *= 0.45;
+					smoking = keyWithinRadius(key, smolderingRoofKeys, 1);
 				}
-				roofs.push({ x, y, kind, alpha, burning, smoking });
+			} else if (nearFire) {
+				burning = true;
 			}
+			roofs.push({ x, y, kind, alpha, burning, smoking });
 		}
 	}
 
