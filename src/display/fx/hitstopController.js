@@ -21,17 +21,17 @@ const FREEZE_SCALE = 0.03;
 const SLOW_SCALE = 0.12;
 
 /** Duration (seconds of REAL time) for a baseline hit (1 damage) */
-const BASE_DURATION = 0.035;
+const BASE_DURATION = 0.07;
 
 /** Duration for a critical hit */
-const CRIT_DURATION = 0.065;
+const CRIT_DURATION = 0.14;
 
 /** Duration for a killing blow */
-const KILL_DURATION = 0.10;
+const KILL_DURATION = 0.20;
 
 /** Extra duration per point of damage (log-scaled, caps out) */
-const DMG_DURATION_SCALE = 0.004;
-const DMG_DURATION_CAP = 0.05;
+const DMG_DURATION_SCALE = 0.008;
+const DMG_DURATION_CAP = 0.08;
 
 /** Minimum damage to trigger hitstop (ignore chip/dot) */
 const MIN_DAMAGE = 2;
@@ -123,11 +123,17 @@ export function createHitstopController() {
    * @param {{ world:any, isPlayer:(id:number)=>boolean }} deps
    */
   function installListeners({ world, isPlayer }) {
+    // Freeze mid-swing: bump:attack fires when the lunge starts, so hitstop
+    // kicks in while the weapon arc is still in motion — not after damage lands.
+    world.on('bump:attack', () => {
+      request(BASE_DURATION);
+    });
+
+    // Upgrade the freeze when damage actually resolves (crits/big hits extend it)
     world.on('damaged', ({ target, amount, critical, projectileDelay }) => {
       // Skip deferred projectile hits — hitstop fires when projectile arrives,
       // handled by the deferred tint/gore path (we catch it on the 'died' event
       // or when the delayed damage visually resolves).
-      // For immediate hits (melee, instant spells): fire now.
       if (Number(projectileDelay) > 0) return;
 
       const dmg = Number(amount) || 0;
