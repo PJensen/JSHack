@@ -7,11 +7,11 @@
 import { MeleeSlashFx } from "./fxEntries.js";
 
 // ── Timing ─────────────────────────────────────────────────────────────────
-const SWEEP_TTL       = 0.32;   // sword/axe arc lifetime
-const STAB_TTL        = 0.25;   // dagger thrust
-const IMPACT_TTL      = 0.28;   // mace/blunt burst
-const PARRY_TTL       = 0.22;   // metallic spark
-const WHIFF_TTL       = 0.36;   // ghostly miss trail (lingers slightly)
+const SWEEP_TTL       = 0.40;   // sword/axe arc lifetime
+const STAB_TTL        = 0.32;   // dagger thrust
+const IMPACT_TTL      = 0.35;   // mace/blunt burst
+const PARRY_TTL       = 0.28;   // metallic spark
+const WHIFF_TTL       = 0.44;   // ghostly miss trail (lingers slightly)
 const OFFHAND_DELAY   = 0.15;   // match bump/gore offhand delay
 
 // ── Weapon colour palettes [r, g, b] ──────────────────────────────────────
@@ -70,8 +70,8 @@ function damageColorShift(baseColor, amount, critical) {
 
 // ── Size scaling ──────────────────────────────────────────────────────────
 function damageRadiusScale(amount) {
-  if (!(amount > 0)) return 0.85;
-  return 0.85 + Math.min(0.45, Math.log(1 + amount / 3) * 0.25);
+  if (!(amount > 0)) return 0.55;
+  return 0.55 + Math.min(0.25, Math.log(1 + amount / 3) * 0.15);
 }
 
 function damageSweepScale(amount) {
@@ -142,7 +142,7 @@ export function createMeleeSlashFxController() {
 
     const baseCol = resolveBaseColor(weaponClass, elementTint);
     const color = damageColorShift(baseCol, amount, critical);
-    const radius = damageRadiusScale(amount) * (isAxe ? 1.1 : 1.0);
+    const radius = damageRadiusScale(amount) * (isAxe ? 1.0 : 0.9);
     const lw = (isAxe ? 0.18 : 0.13) * damageLineWidthScale(amount);
 
     return new MeleeSlashFx({
@@ -169,7 +169,7 @@ export function createMeleeSlashFxController() {
 
     const baseCol = resolveBaseColor('dagger', elementTint);
     const color = damageColorShift(baseCol, amount, critical);
-    const radius = damageRadiusScale(amount) * 1.15; // stabs reach a bit further
+    const radius = damageRadiusScale(amount) * 0.85; // stabs are compact thrusts
     const lw = 0.10 * damageLineWidthScale(amount);
 
     return new MeleeSlashFx({
@@ -197,7 +197,7 @@ export function createMeleeSlashFxController() {
 
     const baseCol = resolveBaseColor(weaponClass, elementTint);
     const color = damageColorShift(baseCol, amount, critical);
-    const radius = damageRadiusScale(amount) * 0.75; // shorter radius — compact burst
+    const radius = damageRadiusScale(amount) * 0.65; // shorter radius — compact burst
     const lw = 0.22 * damageLineWidthScale(amount); // thicker lines
 
     return new MeleeSlashFx({
@@ -238,7 +238,7 @@ export function createMeleeSlashFxController() {
       x, y,
       startAngle: angle - Math.PI * 0.4,
       sweepAngle: Math.PI * 0.8,  // 144° ghostly sweep
-      radius: 0.9,
+      radius: 0.65,
       ttl: WHIFF_TTL,
       color: COL_WHIFF,
       lineWidth: 0.08,
@@ -331,8 +331,8 @@ export function createMeleeSlashFxController() {
     const centerAngle = fx.startAngle + fx.sweepAngle / 2;
     const len = fx.radius * thrustT;
 
-    const x0 = fx.x + Math.cos(centerAngle) * 0.15;
-    const y0 = fx.y + Math.sin(centerAngle) * 0.15;
+    const x0 = fx.x + Math.cos(centerAngle) * 0.08;
+    const y0 = fx.y + Math.sin(centerAngle) * 0.08;
     const x1 = fx.x + Math.cos(centerAngle) * len;
     const y1 = fx.y + Math.sin(centerAngle) * len;
 
