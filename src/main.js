@@ -2745,6 +2745,7 @@ const {
   surfaceAreaFx,
   spiritWispFx,
   bumpFx,
+  meleeSlashFx,
   recoilFx,
   hitstopFx,
   deathEssenceFx,
@@ -4910,6 +4911,7 @@ function render(worldView) {
     cloudFx,
     spiritWispFx,
     deathEssenceFx,
+    meleeSlashFx,
     fx,
     PERF,
   });
@@ -5061,7 +5063,7 @@ function frame(now) {
   updateCamera(cam, dtSec);
   updateShake(cam, dtSec);
   updateZoomPunch(cam, dtSec);
-  tickDisplayEffects({ dtSec, boltFx, spellAreaFx, projectileFx, throwFx, pickupFx, cloudFx, spiritWispFx, deathEssenceFx, ftext, goreTick });
+  tickDisplayEffects({ dtSec, boltFx, spellAreaFx, projectileFx, throwFx, pickupFx, cloudFx, spiritWispFx, deathEssenceFx, meleeSlashFx, ftext, goreTick });
   delayedDeathFx.tick(dtSec);
   flyingFx.tick(dtSec);
   slideFx.tick(dtSec);

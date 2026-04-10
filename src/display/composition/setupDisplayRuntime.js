@@ -11,6 +11,7 @@ import { createStatusPresentationDelayController } from "../fx/statusPresentatio
 import { createBumpFxController } from "../fx/bumpFxController.js";
 import { createRecoilFxController } from "../fx/recoilFxController.js";
 import { createHitstopController } from "../fx/hitstopController.js";
+import { createMeleeSlashFxController } from "../fx/meleeSlashFx.js";
 import { createDeathEssenceFxController } from "../fx/deathEssenceFxController.js";
 import { startShake } from "../camera/shake.js";
 import { startZoomPunch } from "../camera/zoomPunch.js";
@@ -89,6 +90,9 @@ export function setupDisplayRuntime({
   const bumpFx = createBumpFxController();
   bumpFx.installListeners({ world, getPosition, isPlayer });
 
+  const meleeSlashFx = createMeleeSlashFxController();
+  meleeSlashFx.installListeners({ world, getPosition, isPlayer });
+
   const recoilFx = createRecoilFxController();
   recoilFx.installListeners({ world, getPosition, isPlayer });
 
@@ -137,5 +141,5 @@ export function setupDisplayRuntime({
     getDepth: getDepth || (() => 0),
   });
 
-  return { statusEmitterFx, statusPresentationDelayFx, boltFx, delayedDeathFx, projectileFx, spellAreaFx, cloudFx, surfaceAreaFx, spiritWispFx, bumpFx, recoilFx, hitstopFx, deathEssenceFx, deathVfx, ftext, goreTick };
+  return { statusEmitterFx, statusPresentationDelayFx, boltFx, delayedDeathFx, projectileFx, spellAreaFx, cloudFx, surfaceAreaFx, spiritWispFx, bumpFx, meleeSlashFx, recoilFx, hitstopFx, deathEssenceFx, deathVfx, ftext, goreTick };
 }

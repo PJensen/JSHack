@@ -1,7 +1,7 @@
 /**
  * Advance display-only effect lifetimes.
  */
-export function tickDisplayEffects({ dtSec, boltFx, spellAreaFx, projectileFx, throwFx, pickupFx, cloudFx, spiritWispFx, deathEssenceFx, ftext, goreTick }) {
+export function tickDisplayEffects({ dtSec, boltFx, spellAreaFx, projectileFx, throwFx, pickupFx, cloudFx, spiritWispFx, deathEssenceFx, meleeSlashFx, ftext, goreTick }) {
   boltFx.tick(dtSec);
   spellAreaFx.tick(dtSec);
   projectileFx.tick(dtSec);
@@ -11,13 +11,14 @@ export function tickDisplayEffects({ dtSec, boltFx, spellAreaFx, projectileFx, t
   if (spiritWispFx) spiritWispFx.tick(dtSec);
   if (deathEssenceFx) deathEssenceFx.tick(dtSec);
   ftext.step(dtSec);
+  if (meleeSlashFx) meleeSlashFx.tick(dtSec);
   if (goreTick) goreTick(dtSec);
 }
 
 /**
  * Draw world-space effects in the canonical pass order.
  */
-export function drawWorldEffects({ bctx, worldView, glyphAtlas, boltFx, spellAreaFx, projectileFx, throwFx, pickupFx, cloudFx, spiritWispFx, deathEssenceFx, fx, PERF }) {
+export function drawWorldEffects({ bctx, worldView, glyphAtlas, boltFx, spellAreaFx, projectileFx, throwFx, pickupFx, cloudFx, spiritWispFx, deathEssenceFx, meleeSlashFx, fx, PERF }) {
   if (!bctx) return;
   throwFx.draw(bctx, worldView, glyphAtlas);
   if (pickupFx) pickupFx.draw(bctx, worldView, glyphAtlas);
@@ -62,6 +63,8 @@ export function drawWorldEffects({ bctx, worldView, glyphAtlas, boltFx, spellAre
   if (typeof spellAreaFx.drawSmokeBomb === "function") {
     spellAreaFx.drawSmokeBomb(bctx);
   }
+  // Melee weapon slash / stab / impact / parry / whiff VFX
+  if (meleeSlashFx) meleeSlashFx.draw(bctx);
   projectileFx.draw(bctx);
   if (spiritWispFx) spiritWispFx.draw(bctx);
   if (deathEssenceFx) deathEssenceFx.draw(bctx);
