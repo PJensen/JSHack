@@ -23,23 +23,12 @@ import { worldChance } from "../../utils/rng.js";
 import { chebyshev, manhattan } from "../../utils/distance.js";
 import { emitSafe } from "../../utils/emitSafe.js";
 import { spellCost, spellCostResource } from "../../data/spells.js";
+import { isAiOnCooldown, startAiCooldown } from "../../utils/aiCooldowns.js";
 
 const SELF_THROW_COOLDOWN_KEY = Symbol.for("jshack:ai:selfThrowNearTargetOnSeen:cooldown");
 const FIRE_BREATH_COOLDOWN_KEY = Symbol.for("jshack:ai:fireBreathLineOnLOS:cooldown");
 const SPELL_CAST_COOLDOWN_KEY = Symbol.for("jshack:ai:castSpellOnLOS:cooldown");
 const ABILITY_WINDUP_KEY = Symbol.for("jshack:ai:abilityWindup:state");
-
-/**
- * @param {import("../../../lib/ecs-js/index.js").World} world
- * @returns {Map<string, number>}
- */
-function ensureSelfThrowCooldownState(world) {
-  const rec = world[SELF_THROW_COOLDOWN_KEY];
-  if (rec instanceof Map) return rec;
-  const created = new Map();
-  world[SELF_THROW_COOLDOWN_KEY] = created;
-  return created;
-}
 
 /**
  * @param {number} actor
@@ -54,12 +43,12 @@ function selfThrowCooldownSlot(actor, target) {
  * @param {import("../../../lib/ecs-js/index.js").World} world
  * @param {number} actor
  * @param {number} target
- * @returns {number}
+ * @param {number} cooldownTurns
+ * @returns {boolean}
  */
-function getSelfThrowLastTurn(world, actor, target) {
-  const store = ensureSelfThrowCooldownState(world);
-  const last = Number(store.get(selfThrowCooldownSlot(actor, target)));
-  return Number.isFinite(last) ? (last | 0) : -1e9;
+function selfThrowOnCooldown(world, actor, target, cooldownTurns) {
+  if (!(cooldownTurns > 0)) return false;
+  return isAiOnCooldown(world, SELF_THROW_COOLDOWN_KEY, selfThrowCooldownSlot(actor, target));
 }
 
 /**
@@ -67,46 +56,9 @@ function getSelfThrowLastTurn(world, actor, target) {
  * @param {number} actor
  * @param {number} target
  * @param {number} cooldownTurns
- * @returns {boolean}
  */
-function selfThrowOnCooldown(world, actor, target, cooldownTurns) {
-  if (!(cooldownTurns > 0)) return false;
-  const now = Number(world.step || 0) | 0;
-  const last = getSelfThrowLastTurn(world, actor, target);
-  return (now - last) < cooldownTurns;
-}
-
-/**
- * @param {import("../../../lib/ecs-js/index.js").World} world
- * @param {number} actor
- * @param {number} target
- */
-function markSelfThrowUsed(world, actor, target) {
-  const store = ensureSelfThrowCooldownState(world);
-  store.set(selfThrowCooldownSlot(actor, target), Number(world.step || 0) | 0);
-}
-
-/**
- * @param {import("../../../lib/ecs-js/index.js").World} world
- * @returns {Map<number, number>}
- */
-function ensureFireBreathCooldownState(world) {
-  const rec = world[FIRE_BREATH_COOLDOWN_KEY];
-  if (rec instanceof Map) return rec;
-  const created = new Map();
-  world[FIRE_BREATH_COOLDOWN_KEY] = created;
-  return created;
-}
-
-/**
- * @param {import("../../../lib/ecs-js/index.js").World} world
- * @param {number} actor
- * @returns {number}
- */
-function getFireBreathLastTurn(world, actor) {
-  const store = ensureFireBreathCooldownState(world);
-  const last = Number(store.get(actor | 0));
-  return Number.isFinite(last) ? (last | 0) : -1e9;
+function markSelfThrowUsed(world, actor, target, cooldownTurns) {
+  startAiCooldown(world, SELF_THROW_COOLDOWN_KEY, selfThrowCooldownSlot(actor, target), cooldownTurns);
 }
 
 /**
@@ -117,30 +69,16 @@ function getFireBreathLastTurn(world, actor) {
  */
 function fireBreathOnCooldown(world, actor, cooldownTurns) {
   if (!(cooldownTurns > 0)) return false;
-  const now = Number(world.step || 0) | 0;
-  const last = getFireBreathLastTurn(world, actor);
-  return (now - last) < cooldownTurns;
+  return isAiOnCooldown(world, FIRE_BREATH_COOLDOWN_KEY, String(actor | 0));
 }
 
 /**
  * @param {import("../../../lib/ecs-js/index.js").World} world
  * @param {number} actor
+ * @param {number} cooldownTurns
  */
-function markFireBreathUsed(world, actor) {
-  const store = ensureFireBreathCooldownState(world);
-  store.set(actor | 0, Number(world.step || 0) | 0);
-}
-
-/**
- * @param {import("../../../lib/ecs-js/index.js").World} world
- * @returns {Map<string, number>}
- */
-function ensureSpellCastCooldownState(world) {
-  const rec = world[SPELL_CAST_COOLDOWN_KEY];
-  if (rec instanceof Map) return rec;
-  const created = new Map();
-  world[SPELL_CAST_COOLDOWN_KEY] = created;
-  return created;
+function markFireBreathUsed(world, actor, cooldownTurns) {
+  startAiCooldown(world, FIRE_BREATH_COOLDOWN_KEY, String(actor | 0), cooldownTurns);
 }
 
 /**
@@ -156,12 +94,12 @@ function spellCastCooldownSlot(actor, spellId) {
  * @param {import("../../../lib/ecs-js/index.js").World} world
  * @param {number} actor
  * @param {string} spellId
- * @returns {number}
+ * @param {number} cooldownTurns
+ * @returns {boolean}
  */
-function getSpellCastLastTurn(world, actor, spellId) {
-  const store = ensureSpellCastCooldownState(world);
-  const last = Number(store.get(spellCastCooldownSlot(actor, spellId)));
-  return Number.isFinite(last) ? (last | 0) : -1e9;
+function spellCastOnCooldown(world, actor, spellId, cooldownTurns) {
+  if (!(cooldownTurns > 0)) return false;
+  return isAiOnCooldown(world, SPELL_CAST_COOLDOWN_KEY, spellCastCooldownSlot(actor, spellId));
 }
 
 /**
@@ -169,23 +107,9 @@ function getSpellCastLastTurn(world, actor, spellId) {
  * @param {number} actor
  * @param {string} spellId
  * @param {number} cooldownTurns
- * @returns {boolean}
  */
-function spellCastOnCooldown(world, actor, spellId, cooldownTurns) {
-  if (!(cooldownTurns > 0)) return false;
-  const now = Number(world.step || 0) | 0;
-  const last = getSpellCastLastTurn(world, actor, spellId);
-  return (now - last) < cooldownTurns;
-}
-
-/**
- * @param {import("../../../lib/ecs-js/index.js").World} world
- * @param {number} actor
- * @param {string} spellId
- */
-function markSpellCastUsed(world, actor, spellId) {
-  const store = ensureSpellCastCooldownState(world);
-  store.set(spellCastCooldownSlot(actor, spellId), Number(world.step || 0) | 0);
+function markSpellCastUsed(world, actor, spellId, cooldownTurns) {
+  startAiCooldown(world, SPELL_CAST_COOLDOWN_KEY, spellCastCooldownSlot(actor, spellId), cooldownTurns);
 }
 
 /**
@@ -324,7 +248,7 @@ export function selfThrowNearTargetOnSeen(opts = {}) {
     if (!landing) {
       if (manhattan(from, target) === 1) {
         ctx.emit("bump:attack", { attacker: ctx.actor, target: ctx.target, via: "onSeen:self-throw" });
-        markSelfThrowUsed(ctx.world, ctx.actor, ctx.target);
+        markSelfThrowUsed(ctx.world, ctx.actor, ctx.target, cooldownTurns);
         ctx.setHandled(true);
       }
       return;
@@ -348,7 +272,7 @@ export function selfThrowNearTargetOnSeen(opts = {}) {
     if (manhattan(landing, target) === 1) {
       ctx.emit("bump:attack", { attacker: ctx.actor, target: ctx.target, via: "onSeen:self-throw" });
     }
-    markSelfThrowUsed(ctx.world, ctx.actor, ctx.target);
+    markSelfThrowUsed(ctx.world, ctx.actor, ctx.target, cooldownTurns);
     ctx.setHandled(true);
   };
 }
@@ -492,7 +416,7 @@ export function fireBreathLineOnLOS(opts = {}) {
       if (hazardId > 0) hazardIds.push(hazardId);
     }
 
-    markFireBreathUsed(ctx.world, ctx.actor);
+    markFireBreathUsed(ctx.world, ctx.actor, cooldownTurns);
     ctx.emit("monster:firebreath", {
       actor: ctx.actor,
       target: ctx.target,
@@ -733,7 +657,7 @@ export function castSpellOnLOS(opts) {
       return;
     }
 
-    markSpellCastUsed(ctx.world, ctx.actor, spellId);
+    markSpellCastUsed(ctx.world, ctx.actor, spellId, cooldownTurns);
     if (pendingWindup) windupStore.delete(windupKey);
     ctx.emit("monster:castSpellIntent", {
       actor: ctx.actor,

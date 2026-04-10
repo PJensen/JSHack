@@ -53,7 +53,6 @@ import { deitySystem } from "../rules/systems/deitySystem.js";
 import { engraveSystem, installEngraveListeners } from "../rules/systems/engraveSystem.js";
 import { installBumpInteractListener } from "../rules/systems/interactionSystem.js";
 import { hungerSystem } from "../rules/systems/hungerSystem.js";
-import { shopAmbientSoundSystem } from "../rules/systems/shopAmbientSoundSystem.js";
 import { hazardSystem } from "../rules/systems/hazardSystem.js";
 import { installMonsterDeathHooks } from "../rules/systems/monsterDeathHookSystem.js";
 import { installScoreListener } from "../rules/systems/scoreSystem.js";
@@ -64,7 +63,6 @@ import { spellCooldownSystem } from "../rules/systems/spellCooldownSystem.js";
 import { harvestRegrowthSystem } from "../rules/systems/harvestRegrowthSystem.js";
 import { plantGrowthSystem } from "../rules/systems/plantGrowthSystem.js";
 import { fountainRegrowthSystem } from "../rules/systems/fountainRegrowthSystem.js";
-import { overworldAmbientSystem } from "../rules/systems/overworldAmbientSystem.js";
 import { weatherSystem } from "../rules/systems/weatherSystem.js";
 import { calendarSystem } from "../rules/systems/calendarSystem.js";
 import { townSimulationSystem } from "../rules/systems/townSimulationSystem.js";
@@ -246,7 +244,6 @@ export function configureWorld(world) {
   registerSystem(townSimulationSystem, 'effects');
   registerSystem(entrancePressureSystem, 'effects');
   registerSystem(districtConditionSystem, 'effects');
-  registerSystem(overworldAmbientSystem, 'effects');
   registerSystem(workstationStateSystem, 'effects');
   // Post-move auto-pickup runs after intents, within the same tick
   registerSystem(autoPickupPostMoveSystem, 'effects');
@@ -254,8 +251,6 @@ export function configureWorld(world) {
   registerSystem(monsterSpawnerSystem, 'effects');
   // Deity mood ticks in the effects phase (after combat results are emitted)
   registerSystem(deitySystem, 'effects');
-  // Shop ambient sound cues resolve in effects.
-  registerSystem(shopAmbientSoundSystem, 'effects');
   registerSystem(perceptionMemorySystem, 'effects');
 
   // Phase: cleanup (end-of-turn removals like killing entities with hp <= 0)
