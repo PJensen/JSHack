@@ -96,7 +96,7 @@ export function renderCharacterSheet(panel, data) {
     ['Armor Class', `${Number(stats.armorClass || 0)}`, deltaColor(stats.armorClass, 10)],
     ['Luck', `${Number(stats.luck || 0)}`, deltaColor(stats.luck)],
     ['Crit %', `${Number(stats.critChancePercent || 0).toFixed(1)}`, deltaColor(stats.critChancePercent)],
-    ['Crit Mult', `\u00d7${Number(stats.critMult || 0).toFixed(1)}`, deltaColor(stats.critMult)],
+    ['Crit Mult', `\u00d7${(2 + Number(stats.critMult || 0)).toFixed(1)}`, deltaColor(stats.critMult)],
     ['Dmg Bonus', `${Number(stats.damageFlatBonus || 0)}`, deltaColor(stats.damageFlatBonus)],
     ['Mana Regen', `${Number(stats.manaRegen || 0).toFixed(2)}/t`, deltaColor(stats.manaRegenDerived)],
     ['Stam Regen', `${Number(stats.staminaRegen || 0).toFixed(1)}/t`, deltaColor(stats.staminaRegenDerived)],
