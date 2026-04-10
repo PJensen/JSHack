@@ -56,6 +56,7 @@ import { createSlideFxController } from "./display/fx/slideFxController.js";
 import { createLightingEngine } from "./display/lighting/engine.js";
 import { collectLightSources, collectFxLights, computeAmbient, getVisionDef, installLightEventListeners } from "./display/lighting/sources/index.js";
 import { drawProcStateBadges, getProcStateVisual, procBadgeWorldCenter } from "./display/fx/procStateGlyphs.js";
+import { drawRootedVines } from "./display/fx/rootedVineFx.js";
 import { drawEquipmentBadges } from "./display/fx/equipBadges.js";
 import { readRuntimeConfig } from "./main/config/runtimeConfig.js";
 import { createMessageLog } from "./main/ui/messageLog.js";
@@ -4801,6 +4802,10 @@ function render(worldView) {
     // Glyph-FX: proc state badges (doom_clock, cataclysm_mark, etc.) — above-right of entity
     if (renderEntity.procStates) {
       drawProcStateBadges(bctx, renderEntity.pos.x, renderEntity.pos.y, renderEntity.procStates, _fxTime, renderEntity.id);
+    }
+
+    if (Array.isArray(renderEntity.tags) && renderEntity.tags.includes('rooted')) {
+      drawRootedVines(bctx, renderEntity.pos.x, renderEntity.pos.y, _fxTime, renderEntity.id);
     }
 
     // Equipment corner badges — melee right, ranged/zap bottom-left, shield top-left

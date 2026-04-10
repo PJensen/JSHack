@@ -83,6 +83,7 @@ const _solidRecs = new Map();    // id -> { id, x, y }
 const DISPLAY_STATUS_TAGS = new Set([
 	'invulnerable',
 	'stunned',
+	'rooted',
 	'poisoned',
 	'burning',
 	'regen',
