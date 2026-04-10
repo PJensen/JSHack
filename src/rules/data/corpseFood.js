@@ -107,12 +107,20 @@ export const CORPSE_DEFS = Object.freeze({
     ]),
   }),
 
-  // Grid Bug: shock damage + 30% electric affinity
+  // Grid Bug: shock damage + electric affinity
   corpse_grid_bug: Object.freeze({
     onEat: Object.freeze([
-      corpseProcNode({ effects: [{ kind: "dealDamage", a: 3, c: "corpse" }] }),
       corpseProcNode({
-        gates: [{ kind: "chance", b: 0.3 }],
+        effects: [{ kind: "dealDamage", a: 3, c: "corpse" }],
+        script: (ctx, proc) => {
+          proc.emit("corpse:shocked", {
+            actor: ctx.actor,
+            amount: 3,
+          });
+        },
+      }),
+      corpseProcNode({
+        gates: [{ kind: "chance", b: 0.5 }],
         effects: [{ kind: "attachTimedBuff", a: "resist_electric", b: 120 }],
         script: (ctx, proc) => {
           proc.emit("corpse:buff-gained", {

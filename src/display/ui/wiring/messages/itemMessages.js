@@ -75,6 +75,12 @@ export function installItemMessages(ctx) {
     log(TRAIT_MESSAGES[trait] || `Something fundamental shifts \u2014 you've gained ${label}!`, 'legendary');
   });
 
+  world.on('corpse:shocked', ({ actor }) => {
+    const pe = playerEntity(world);
+    if (!pe || Number(actor || 0) !== pe.id) return;
+    log('The corpse crackles with static \u2014 electricity jolts through you!', 'danger');
+  });
+
   world.on('corpse:buff-gained', ({ actor, effect, description }) => {
     const pe = playerEntity(world);
     if (!pe || Number(actor || 0) !== pe.id) return;
