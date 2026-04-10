@@ -59,11 +59,11 @@ function resolveBaseColor(weaponClass, elementTint) {
 
 function damageColorShift(baseColor, amount, critical) {
   const t = Math.min(1, (amount || 0) / DMG_SCALE_CAP);
-  const hot = [255, 180, 160];
-  const shifted = lerpColor(baseColor, hot, t * 0.6);
+  const bloodRed = [255, 60, 40];
+  const shifted = lerpColor(baseColor, bloodRed, t * 0.6);
   if (critical) {
-    // Crits push further toward white
-    return lerpColor(shifted, [255, 255, 250], 0.35);
+    // Crits push toward bright gold — devastating, powerful
+    return lerpColor(shifted, [255, 220, 80], 0.4);
   }
   return shifted;
 }
@@ -493,8 +493,14 @@ export function createMeleeSlashFxController() {
       const t = Number(target || 0) | 0;
       if (!(a > 0) || !(t > 0)) return;
 
+      const apos = getPosition(a);
       const tpos = getPosition(t);
       if (!tpos) return;
+
+      // Place FX origin 60% from attacker toward target — near the weapon's reach,
+      // close to the attacker's facing dot rather than centered on the target.
+      const ox = apos ? apos.x + (tpos.x - apos.x) * 0.6 : tpos.x;
+      const oy = apos ? apos.y + (tpos.y - apos.y) * 0.6 : tpos.y;
 
       const attackKind = impactProfile.attackKind || 'strike';
       const facingVec = impactProfile.facingVector || null;
@@ -502,12 +508,12 @@ export function createMeleeSlashFxController() {
 
       let fxEntry;
       if (attackKind === 'stab') {
-        fxEntry = spawnStab(tpos.x, tpos.y, facingVec, impactVector, elementTint, amount, critical, a, offhand);
+        fxEntry = spawnStab(ox, oy, facingVec, impactVector, elementTint, amount, critical, a, offhand);
       } else if (attackKind === 'blunt') {
-        fxEntry = spawnImpact(tpos.x, tpos.y, facingVec, impactVector, weaponClass, elementTint, amount, critical, a);
+        fxEntry = spawnImpact(ox, oy, facingVec, impactVector, weaponClass, elementTint, amount, critical, a);
       } else {
         // slash / strike → sweep
-        fxEntry = spawnSweep(tpos.x, tpos.y, facingVec, impactVector, weaponClass, elementTint, amount, critical, a, offhand);
+        fxEntry = spawnSweep(ox, oy, facingVec, impactVector, weaponClass, elementTint, amount, critical, a, offhand);
       }
 
       if (offhand) {
@@ -517,7 +523,7 @@ export function createMeleeSlashFxController() {
       }
     });
 
-    // Parry spark
+    // Parry spark — at the contact point between the two fighters
     world.on('combat:parry', ({ defender, attacker, at }) => {
       const dId = Number(defender || 0) | 0;
       const aId = Number(attacker || 0) | 0;
@@ -525,10 +531,12 @@ export function createMeleeSlashFxController() {
       const atkPos = getPosition(aId);
       if (!defPos) return;
 
-      _active.push(spawnParry(defPos.x, defPos.y, atkPos));
+      const ox = atkPos ? atkPos.x + (defPos.x - atkPos.x) * 0.6 : defPos.x;
+      const oy = atkPos ? atkPos.y + (defPos.y - atkPos.y) * 0.6 : defPos.y;
+      _active.push(spawnParry(ox, oy, atkPos));
     });
 
-    // Dodge whiff
+    // Dodge whiff — originates from the attacker's swing
     world.on('combat:dodge', ({ defender, attacker, at }) => {
       const dId = Number(defender || 0) | 0;
       const aId = Number(attacker || 0) | 0;
@@ -536,7 +544,9 @@ export function createMeleeSlashFxController() {
       const atkPos = getPosition(aId);
       if (!defPos) return;
 
-      _active.push(spawnWhiff(defPos.x, defPos.y, atkPos));
+      const ox = atkPos ? atkPos.x + (defPos.x - atkPos.x) * 0.6 : defPos.x;
+      const oy = atkPos ? atkPos.y + (defPos.y - atkPos.y) * 0.6 : defPos.y;
+      _active.push(spawnWhiff(ox, oy, atkPos));
     });
   }
 
