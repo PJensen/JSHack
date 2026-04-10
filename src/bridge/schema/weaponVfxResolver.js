@@ -116,7 +116,7 @@ export function resolveEquippedWeaponVfx(world, entityId, opts = {}) {
   const id = Number(entityId || 0) | 0;
   if (!(id > 0)) return [];
   /** @type {any} */
-  const eq = /** @type any */ (world.get(id, Equipment));
+  const eq = /** @type any */ (opts._eq || world.get(id, Equipment));
   if (!eq) return [];
 
   const slots = Array.isArray(opts.slots) && opts.slots.length > 0

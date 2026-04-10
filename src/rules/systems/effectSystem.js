@@ -20,6 +20,7 @@ import { chebyshev } from '../utils/distance.js';
 import { hasSpellLineOfSight } from '../utils/spellTargeting.js';
 import { buildBlocksVisionMap, blockedCallback } from '../utils/vision.js';
 import { emitSafe } from '../utils/emitSafe.js';
+import { forEachInRadius } from '../utils/spatialIndex.js';
 
 /** @type {Record<string, { operation:string, statuses:string[] }>} */
 const EFFECTS_BY_KEY = buildEffectIndex(EFFECT_DEFS);
@@ -446,21 +447,22 @@ function _processSwarmJumps(world, jumps) {
         const radius = Number(effect.meta?.jumpRadius || 6);
 
         // Find nearest living hostile without an active swarm effect
+        // Use spatial index to avoid scanning all entities in the world
         let bestId = 0, bestD2 = Infinity;
-        for (const [cid, cp] of world.query(Position)) {
-            if (cid === sourceId) continue;
+        forEachInRadius(world, spos.x, spos.y, radius, (cid, cp) => {
+            if (cid === sourceId) return;
             const vit = world.get(cid, Vitality);
-            if (!vit || (vit.hp | 0) <= 0) continue;
+            if (!vit || (vit.hp | 0) <= 0) return;
             const fac = world.get(cid, /** @type any */ (Faction));
-            if (!fac || !areFactionsHostile('player', String(fac.key || ''))) continue;
+            if (!fac || !areFactionsHostile('player', String(fac.key || ''))) return;
             const cdist2 = d2(spos.x, spos.y, cp.x, cp.y);
-            if (cdist2 > radius * radius || cdist2 >= bestD2) continue;
+            if (cdist2 > radius * radius || cdist2 >= bestD2) return;
             // Skip if already swarmed
             const cae = world.get(cid, ActiveEffects);
-            if (cae && Array.isArray(cae.effects) && cae.effects.some(e => e && e.key === 'swarm' && e.turnsLeft > 0)) continue;
+            if (cae && Array.isArray(cae.effects) && cae.effects.some(e => e && e.key === 'swarm' && e.turnsLeft > 0)) return;
             bestId = cid;
             bestD2 = cdist2;
-        }
+        });
         if (!bestId) continue;
 
         // Clone the swarm effect onto the new target
