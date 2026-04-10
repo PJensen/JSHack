@@ -1,4 +1,5 @@
 import { World } from "../../lib/ecs-js/index.js";
+import { createRng } from "../../lib/ecs-js/rng.js";
 import { configureWorld } from "../scheduler.js";
 import { makeRulesDispatcher } from "../input/rulesDispatch.js";
 import { buildWorldView } from "../../bridge/schema/worldView.js";
@@ -19,13 +20,28 @@ import { BaseStats } from "../../rules/components/BaseStats.js";
 import { Devotion } from "../../rules/components/Devotion.js";
 import { Vitality } from "../../rules/components/Vitality.js";
 import { DungeonState } from "../../rules/components/DungeonState.js";
+import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 import { effectiveMaxHp } from "../../rules/utils/passiveBonuses.js";
+import {
+  identify,
+  resetIdentification,
+  restoreIdentification,
+  setIdentificationEnabled,
+} from "../../rules/data/identification.js";
+import { initGemPricing, restoreGemPricing } from "../../rules/data/gemPricing.js";
 
 import { PHASE_TURNS } from "../../rules/data/calendar.js";
+
+const TOUCHSTONE_IDENTITY = "stone_touchstone";
+const GEM_PRICING_SEED_SALT = 0x6E45;
 
 function coerceInt(value, fallback) {
   const n = Number(value);
   return Number.isFinite(n) ? (n | 0) : fallback;
+}
+
+function gemPricingRng(world) {
+  return createRng((Number(world?.seed || 0) >>> 0) ^ GEM_PRICING_SEED_SALT);
 }
 
 function upsert(world, entityId, component, value) {
@@ -57,6 +73,52 @@ export function createConfiguredWorld(seed = 0xC0FFEE) {
   const world = new World({ seed: Number(seed) >>> 0 });
   configureWorld(world);
   return world;
+}
+
+/**
+ * Initialize identification + gem pricing state for a run.
+ *
+ * @param {import("../../lib/ecs-js/index.js").World} world
+ * @param {{
+ *   identifyItems?: boolean,
+ *   pendingSavegame?: { identified?: unknown, gemPricing?: unknown } | null,
+ * }} [opts]
+ */
+export function initializeRunItemState(world, opts = {}) {
+  setIdentificationEnabled(opts.identifyItems !== false);
+  resetIdentification();
+  const pendingSavegame = opts?.pendingSavegame || null;
+  if (pendingSavegame) {
+    restoreIdentification(pendingSavegame.identified);
+    if (!Array.isArray(pendingSavegame.identified)) identify(TOUCHSTONE_IDENTITY);
+    restoreGemPricing(pendingSavegame.gemPricing);
+    if (!Array.isArray(pendingSavegame.gemPricing)) initGemPricing(gemPricingRng(world));
+    return;
+  }
+  identify(TOUCHSTONE_IDENTITY);
+  initGemPricing(gemPricingRng(world));
+}
+
+/**
+ * Reset run item state to a clean non-save baseline.
+ *
+ * @param {import("../../lib/ecs-js/index.js").World} world
+ * @param {{ identifyItems?: boolean }} [opts]
+ */
+export function reinitializeRunItemStateForFreshStart(world, opts = {}) {
+  setIdentificationEnabled(opts.identifyItems !== false);
+  resetIdentification();
+  identify(TOUCHSTONE_IDENTITY);
+  initGemPricing(gemPricingRng(world));
+}
+
+/**
+ * Re-roll gem pricing for the current world seed.
+ *
+ * @param {import("../../lib/ecs-js/index.js").World} world
+ */
+export function reseedRunGemPricing(world) {
+  initGemPricing(gemPricingRng(world));
 }
 
 /**
@@ -97,12 +159,14 @@ export function ensurePlayerSpawned(world, opts) {
  * @param {number} playerId
  * @param {any} classDef
  * @param {{
+ *   identifyStarterItems?: boolean,
  *   onStarterItem?: (itemId:string, createdId:number)=>void,
  * }} [opts]
  * @returns {{ classSpells: string[] }}
  */
 export function applyPlayerClassLoadout(world, playerId, classDef, opts = {}) {
   const stats = classDef?.stats || {};
+  const identifyStarterItems = opts?.identifyStarterItems === true;
   const onStarterItem = typeof opts?.onStarterItem === "function" ? opts.onStarterItem : null;
 
   upsert(world, playerId, Mana, {
@@ -137,6 +201,10 @@ export function applyPlayerClassLoadout(world, playerId, classDef, opts = {}) {
     const createdId = createItemById(world, itemId, opts);
     if (!(createdId > 0)) return 0;
     const ok = addToInventory(world, playerId, createdId, { silent: true });
+    if (ok && identifyStarterItems) {
+      const identity = String(world.get(createdId, NamedIdentity)?.identity || itemId || "").trim();
+      if (identity) identify(identity);
+    }
     if (ok && onStarterItem) {
       try { onStarterItem(String(itemId || ""), createdId); } catch {}
     }
@@ -246,9 +314,11 @@ export function createRuntimeFacade(world, opts = {}) {
  * @param {{
  *   seed?: number,
  *   classId?: string,
- *   playerName?: string,
- *   startDepth?: number,
- *   dungeonType?: string | null,
+  *   playerName?: string,
+  *   startDepth?: number,
+  *   dungeonType?: string | null,
+ *   identifyItems?: boolean,
+ *   pendingSavegame?: { identified?: unknown, gemPricing?: unknown } | null,
  *   onAction?: (turn:number, type:string, payload:object)=>void,
  * }} [opts]
  */
@@ -260,6 +330,10 @@ export function createGameRuntime(opts = {}) {
   const startDepth = Math.max(0, coerceInt(opts.startDepth, 1));
 
   const world = createConfiguredWorld(seed);
+  initializeRunItemState(world, {
+    identifyItems: opts.identifyItems !== false,
+    pendingSavegame: opts.pendingSavegame || null,
+  });
 
   const spawnPos = initDungeon(world, {
     startDepth,

@@ -3,6 +3,10 @@
 // This file is allowed to import rules and the ECS World (per Separation Manifest).
 
 import { MoveIntent, WaitIntent, PrayIntent, DrinkIntent, CastSpellIntent, PickupIntent, DropIntent, EquipIntent, RangedAttackIntent, EngraveIntent, DisarmIntent, SetPostureIntent, Position, ItemInfo, Settings } from "../../rules/components/index.js";
+import { Equipment } from "../../rules/components/Equipment.js";
+import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
+import { Faction } from "../../rules/components/Faction.js";
+import { Vitality } from "../../rules/components/Vitality.js";
 import { UseIntent } from "../../rules/components/Intents/UseIntent.js";
 import { ApplyIntent } from "../../rules/components/Intents/ApplyIntent.js";
 import { ThrowIntent } from "../../rules/components/Intents/ThrowIntent.js";
@@ -12,6 +16,14 @@ import { Interactable } from "../../rules/components/Interactable.js";
 import { itemsAt } from "../../rules/utils/queries.js";
 import { inventoryItems } from "../../rules/utils/inventoryFacade.js";
 import { statusStrength } from "../../rules/utils/statusFacade.js";
+import { forEachInRadius } from "../../rules/utils/spatialIndex.js";
+import { chebyshevScalar } from "../../rules/utils/distance.js";
+import { buildBlocksVisionMap, blockedCallback } from "../../rules/utils/vision.js";
+import { hasLOS } from "../../shared/math/gridLOS.js";
+import { getSpell } from "../../rules/data/spells.js";
+import { getEffectiveVisionRange } from "../../rules/utils/blind.js";
+import { getEntityFacingConeDegrees, getNormalizedEntityFacing } from "../../rules/utils/facing.js";
+import { updateFOV, isVisible as isTileVisible } from "../../rules/environment/dungeon/exploredMap.js";
 
 /**
  * Create a rules dispatcher bound to a world and an actor resolver.
@@ -150,8 +162,83 @@ export function makeRulesDispatcher(world, getActorId, opts = {}) {
         break;
       }
       case "rules.shootRanged": {
-        // No explicit target; delegate to app-side auto-targeting
-        dispatchUiEvent('ui:shootRanged');
+        const actorPos = world?.get?.(actorId, Position);
+        if (!actorPos) break;
+        const eq = world?.get?.(actorId, Equipment);
+        const rangedId = Number(eq?.ranged || 0) | 0;
+        const rangedInfo = rangedId > 0 ? world?.get?.(rangedId, ItemInfo) : null;
+        if (!rangedInfo) {
+          world?.emit?.("message", { text: "Nothing equipped in ranged slot.", type: "system" });
+          break;
+        }
+
+        const isWand = rangedInfo.type === "wand";
+        const isBow = rangedInfo.subtype === "bow";
+        if (!isWand && !isBow) {
+          world?.emit?.("message", { text: "Nothing equipped in ranged slot.", type: "system" });
+          break;
+        }
+
+        let maxRange = Number(rangedInfo.range || 0);
+        if (!Number.isFinite(maxRange) || maxRange <= 0) {
+          const identity = String(world?.get?.(rangedId, NamedIdentity)?.identity || "");
+          const spellId = identity.startsWith("wand_") ? identity.slice(5) : "";
+          const spell = spellId ? getSpell(spellId) : null;
+          maxRange = Number(spell?.range || 8);
+        }
+        maxRange = Math.max(1, maxRange | 0);
+
+        const px = actorPos.x | 0;
+        const py = actorPos.y | 0;
+        const blocked = buildBlocksVisionMap(world);
+        const isBlocked = blockedCallback(blocked);
+        const facing = getNormalizedEntityFacing(world, actorId) || { dx: 0, dy: 0 };
+        const coneDegrees = getEntityFacingConeDegrees(world, actorId);
+        const visionRange = Math.max(1, getEffectiveVisionRange(world, actorId) | 0);
+        updateFOV(world?.step ?? 0, px, py, visionRange, isBlocked, {
+          facingDx: facing.dx,
+          facingDy: facing.dy,
+          coneDegrees,
+        });
+
+        let bestId = 0;
+        let bestDist = Infinity;
+        forEachInRadius(world, px, py, maxRange, (id, pos) => {
+          if (id === actorId) return;
+          const fac = world.get(id, Faction);
+          if (!fac || fac.key !== "enemy") return;
+          const vit = world.get(id, Vitality);
+          if (!vit || (vit.hp | 0) <= 0) return;
+          const tx = pos.x | 0;
+          const ty = pos.y | 0;
+          if (!hasLOS(px, py, tx, ty, isBlocked)) return;
+          if (!isTileVisible(tx, ty)) return;
+          const dist = chebyshevScalar(tx, ty, px, py);
+          if (dist < bestDist) {
+            bestDist = dist;
+            bestId = id;
+          }
+        });
+
+        if (!(bestId > 0)) {
+          world?.emit?.("message", { text: "No target in range.", type: "system" });
+          break;
+        }
+
+        if (isBow) {
+          world?.add?.(actorId, RangedAttackIntent, { targetId: bestId });
+          world?.tick?.(1);
+          break;
+        }
+
+        const targetPos = world?.get?.(bestId, Position);
+        const use = { itemId: rangedId, targetId: bestId };
+        if (targetPos && Number.isFinite(targetPos.x) && Number.isFinite(targetPos.y)) {
+          use.x = targetPos.x | 0;
+          use.y = targetPos.y | 0;
+        }
+        world?.add?.(actorId, UseIntent, use);
+        world?.tick?.(1);
         break;
       }
       case "rules.rangedAttack": {

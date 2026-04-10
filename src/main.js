@@ -7,6 +7,9 @@ import {
   createConfiguredWorld,
   ensurePlayerSpawned,
   applyPlayerClassLoadout,
+  initializeRunItemState,
+  reinitializeRunItemStateForFreshStart,
+  reseedRunGemPricing,
 } from "./main/runtime/gameRuntime.js";
 import { playerEntity, findNearestValidTileAround } from "./rules/utils/queries.js";
 import { getEffectiveVisionRange, blind } from "./rules/utils/blind.js";
@@ -125,7 +128,6 @@ import { installProofWiring } from "./main/proof/proofWiring.js";
 import { postVerifiedScore } from "./shared/tombstoneApi.js";
 import { forEachInRadius } from "./rules/utils/spatialIndex.js";
 import { chebyshevScalar, manhattanScalar } from "./rules/utils/distance.js";
-import { hasLOS } from "./shared/math/gridLOS.js";
 import { isChestIdentity } from "./shared/chests.js";
 import { buildBlocksVisionMap, blockedCallback } from "./rules/utils/vision.js";
 import {
@@ -142,9 +144,7 @@ import { resolveItemDisplayName, buildItemDisplayData, resolveAffixes } from "./
 import { evaluateSound, thresholdForTier } from "./rules/utils/sound.js";
 import { updateFOV, isVisible as isTileVisible, isExplored as isTileExplored, setFovDisabled } from "./rules/environment/dungeon/exploredMap.js";
 import { getTile, isWalkable, isOpaque, isFlyable, isRoofed, forEachLoadedTile } from "./rules/environment/dungeon/tileMap.js";
-import { resetIdentification, identify, restoreIdentification, setIdentificationEnabled } from "./rules/data/identification.js";
-import { initGemPricing, restoreGemPricing } from "./rules/data/gemPricing.js";
-import { createRng, mulberry32 } from "./lib/ecs-js/rng.js";
+import { mulberry32 } from "./lib/ecs-js/rng.js";
 import { getClass, listClassIds } from "./rules/data/classes.js";
 import { getDeity } from "./rules/data/deities.js";
 import { showCharCreation } from "./display/ui/charCreation.js";
@@ -284,19 +284,11 @@ installChannelingController(world, () => (playerEntity(world)?.id || 0));
 bootAdvance("Configured ECS systems");
 
 // Initialize identification & gem pricing for this game run
-resetIdentification();
-setIdentificationEnabled(runtimeConfig.identifyItems);
-if (_pendingSavegame) {
-  restoreIdentification(_pendingSavegame.identified);
-  if (!Array.isArray(_pendingSavegame.identified)) identify('stone_touchstone');
-  restoreGemPricing(_pendingSavegame.gemPricing);
-  if (!Array.isArray(_pendingSavegame.gemPricing)) initGemPricing(createRng(world.seed ^ 0x6E45));
-  bootAdvance("Prepared saved item state");
-} else {
-  identify('stone_touchstone');
-  initGemPricing(createRng(world.seed ^ 0x6E45));
-  bootAdvance("Prepared run-specific item state");
-}
+initializeRunItemState(world, {
+  identifyItems: runtimeConfig.identifyItems,
+  pendingSavegame: _pendingSavegame,
+});
+bootAdvance(_pendingSavegame ? "Prepared saved item state" : "Prepared run-specific item state");
 
 // Initialize tombstone system
 const tombstoneRepo = new TombstoneRepository();
@@ -631,9 +623,7 @@ if (_pendingSavegame) {
     console.error("[SAVE] Failed to apply snapshot, continuing as new game.", err);
     clearSavegamePayload();
     _activeSpellId = null; spellCtrl.setActiveSpell(null); spellCtrl.restoreSlots([]); spellCtrl.restorePinnedSlots([]);
-    resetIdentification();
-    identify('stone_touchstone');
-    initGemPricing(createRng(world.seed ^ 0x6E45));
+    reinitializeRunItemStateForFreshStart(world, { identifyItems: runtimeConfig.identifyItems });
     updateBootProgress("Save was invalid; starting new run", _bootDoneUnits);
   }
 }
@@ -697,7 +687,7 @@ function _finalizeNewGame(classData) {
       // Destroy all existing entities (the pre-generated dungeon)
       for (const id of Array.from(world.alive)) world.destroy(id);
       // Re-init gem pricing with the new seed
-      initGemPricing(createRng(world.seed ^ 0x6E45));
+      reseedRunGemPricing(world);
       // Regenerate the dungeon
       spawnPos = initDungeon(world, { startDepth: _startDepth, tombstoneRepo });
     }
@@ -713,9 +703,7 @@ function _finalizeNewGame(classData) {
       classDef,
       playerName: classData?.name ?? "Hero",
     });
-    const { classSpells } = applyPlayerClassLoadout(world, pe.id, classDef, {
-      onStarterItem: (itemId) => identify(itemId),
-    });
+    const { classSpells } = applyPlayerClassLoadout(world, pe.id, classDef, { identifyStarterItems: true });
     if (classSpells.length > 0) setActiveSpell(classSpells[0]);
 
     // Spawn pet next to the player (familiar for warlock, kitty otherwise)
@@ -1184,68 +1172,7 @@ addEventListener('ui:requestPickup', (e) => {
 // Ranged shoot button / 'r' key → auto-target nearest visible enemy and fire
 addEventListener('ui:shootRanged', () => {
   if (isSimUiBlocked()) return;
-  const pe = playerEntity(world);
-  if (!pe) return;
-  const eq = /** @type any */ (world.get(pe.id, Equipment));
-  const rangedId = Number(eq?.ranged || 0);
-  const rangedInfo = rangedId ? world.get(rangedId, ItemInfo) : null;
-  if (!rangedInfo) {
-    log('Nothing equipped in ranged slot.');
-    return;
-  }
-
-  const isWand = rangedInfo.type === 'wand';
-  const isBow = rangedInfo.subtype === 'bow';
-  if (!isWand && !isBow) {
-    log('Nothing equipped in ranged slot.');
-    return;
-  }
-
-  let maxRange = Number(rangedInfo.range || 0);
-  if (!Number.isFinite(maxRange) || maxRange <= 0) {
-    const identity = String(world.get(rangedId, NamedIdentity)?.identity || '');
-    const spellId = identity.startsWith('wand_') ? identity.slice(5) : '';
-    const spell = spellId ? getSpell(spellId) : null;
-    maxRange = Number(spell?.range || 8);
-  }
-  maxRange = Math.max(1, maxRange | 0);
-
-  const px = pe.pos.x | 0, py = pe.pos.y | 0;
-  const blocked = buildBlocksVisionMap(world);
-  const isBlocked = blockedCallback(blocked);
-
-  let bestId = 0, bestDist = Infinity;
-  forEachInRadius(world, px, py, maxRange, (id, pos) => {
-    if (id === pe.id) return;
-    const fac = world.get(id, Faction);
-    if (!fac || fac.key !== 'enemy') return;
-    const vit = /** @type any */ (world.get(id, Vitality));
-    if (!vit || (vit.hp | 0) <= 0) return;
-    const tx = pos.x | 0, ty = pos.y | 0;
-    if (!hasLOS(px, py, tx, ty, isBlocked)) return;
-    if (!isTileVisible(tx, ty)) return;
-    const dist = chebyshevScalar(tx, ty, px, py);
-    if (dist < bestDist) { bestDist = dist; bestId = id; }
-  });
-
-  if (!bestId) {
-    try { messageLog.log({ text: 'No target in range.', type: 'system' }); } catch (e) { console.debug('[main] messageLog failed:', e); }
-    return;
-  }
-
-  const rulesHandler = makeRulesDispatcher(world, () => pe.id);
-  if (isBow) {
-    rulesHandler({ type: 'rules.rangedAttack', payload: { targetId: bestId } });
-    return;
-  }
-
-  const targetPos = world.get(bestId, Position);
-  const payload = { itemId: rangedId, targetId: bestId };
-  if (targetPos && Number.isFinite(targetPos.x) && Number.isFinite(targetPos.y)) {
-    payload.x = targetPos.x | 0;
-    payload.y = targetPos.y | 0;
-  }
-  rulesHandler({ type: 'rules.useItem', payload });
+  _sharedRulesDispatcher({ type: 'rules.shootRanged', payload: {} });
 });
 
 // Engrave button → prompt for text, then dispatch engrave action
