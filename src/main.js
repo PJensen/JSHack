@@ -692,11 +692,12 @@ function _finalizeNewGame(classData) {
     }
   }
 
+  let pe;
   if (!_savegameLoaded) {
     // Start new games at dawn (start of "work" phase, ~7 AM)
     world.step = PHASE_TURNS.sleep + PHASE_TURNS.breakfast;
     clearFloorCache();
-    const pe = ensurePlayerSpawned(world, {
+    pe = ensurePlayerSpawned(world, {
       x: spawnPos.x,
       y: spawnPos.y,
       classDef,
@@ -726,6 +727,8 @@ function _finalizeNewGame(classData) {
       startDepth: _startDepth,
       timestamp: Date.now(),
     }).catch(() => {});
+  } else {
+    pe = playerEntity(world);
   }
 
   // Ensure deity state is initialized for current player (new game or loaded save).
