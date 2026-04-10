@@ -196,6 +196,23 @@ export class ArcSweepFx extends FxEntry {
 }
 
 // ---------------------------------------------------------------------------
+// Melee slash — directional arc sweep for weapon strikes.
+// ---------------------------------------------------------------------------
+export class MeleeSlashFx extends FxEntry {
+  constructor({ x, y, startAngle, sweepAngle, radius, ttl, color, lineWidth, style }) {
+    super(ttl);
+    this.x = x;
+    this.y = y;
+    this.startAngle = startAngle;
+    this.sweepAngle = sweepAngle;
+    this.radius = radius;
+    this.color = color;   // [r,g,b]
+    this.lineWidth = lineWidth || 0.14;
+    this.style = style;   // 'sweep' | 'stab' | 'impact' | 'parry' | 'whiff'
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Smoke cloud — expanding translucent disc (smoke bomb, fog).
 // ---------------------------------------------------------------------------
 export class SmokeFx extends FxEntry {
