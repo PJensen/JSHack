@@ -2,6 +2,7 @@
 // Canonical damage pipeline. ALL damage in the game flows through here.
 import { Resistances } from "../components/Resistences.js";
 import { Vitality } from "../components/Vitality.js";
+import { Player } from "../components/Player.js";
 import { KnockbackPending } from "../components/KnockbackPending.js";
 import { Equipment } from "../components/Equipment.js";
 import { Material } from "../components/Material.js";
@@ -301,6 +302,12 @@ export function dealDamage(world, spec) {
   // Mark of Death amplification: +35% damage to marked targets
   if (finalAmount > 0 && statusStrength(world, target, "marked") > 0) {
     finalAmount = Math.ceil(finalAmount * 1.35);
+  }
+
+  // Desperate vulnerability: critically wounded targets take +50% damage
+  const hpPct = (vit.hp | 0) / (vit.maxHp | 0);
+  if (finalAmount > 0 && hpPct > 0 && hpPct < 0.05 && !world.has(target, Player)) {
+    finalAmount = Math.ceil(finalAmount * 1.5);
   }
 
   // Front-arc shield mitigation (only when an actual offhand shield is equipped
