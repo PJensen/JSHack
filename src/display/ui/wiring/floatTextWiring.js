@@ -887,6 +887,77 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     _fountainBurst(fx, pos, '#88ccff', 20);
   });
 
+  world.on('inventory:gold-gained', ({ ownerId, count }) => {
+    const qty = Math.max(0, Number(count || 0) | 0);
+    if (qty <= 0) return;
+    const pos = getPosition(Number(ownerId || 0));
+    if (!pos || !canShowAt(pos.x, pos.y)) return;
+
+    ftext.addGold(pos.x, pos.y - 0.45, qty, {
+      life: 0.95,
+      scaleStart: 1.18,
+      scaleEnd: 0.92,
+      color: '#ffd45e',
+    });
+
+    for (let i = 0; i < 12; i++) {
+      const angle = -Math.PI / 2 + (Math.random() - 0.5) * 1.35;
+      const speed = 0.22 + Math.random() * 0.42;
+      fx.pool.spawn(new Particle({
+        x: pos.x + (Math.random() - 0.5) * 0.24,
+        y: pos.y - 0.08 + (Math.random() - 0.5) * 0.14,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 0.36,
+        ay: 0.72,
+        life: 0.28 + Math.random() * 0.22,
+        size0: 0.08 + Math.random() * 0.04,
+        size1: 0.01,
+        r: 255,
+        g: 206 + ((Math.random() * 28) | 0),
+        b: 92 + ((Math.random() * 38) | 0),
+        a0: 0.92,
+        a1: 0.0,
+      }));
+    }
+  });
+
+  world.on('quest:completed', ({ questId, playerId }) => {
+    const qid = String(questId || '');
+    const owner = Number(playerId || 0) | 0;
+    if (!_throttle(`quest:completed:vfx:${qid || owner}`, 1000)) return;
+    const pos = getPosition(owner);
+    if (!pos || !canShowAt(pos.x, pos.y)) return;
+
+    ftext.addStatus(pos.x, pos.y - 0.72, 'QUEST COMPLETE!', {
+      color: '#ffd85a',
+      life: 1.35,
+      scaleStart: 1.72,
+      scaleEnd: 1.02,
+    });
+
+    for (let i = 0; i < 26; i++) {
+      const t = i / 25;
+      const spread = 0.10 + t * 0.64;
+      const angle = -Math.PI / 2 + (Math.random() - 0.5) * 1.7;
+      const speed = 0.14 + Math.random() * 0.48;
+      fx.pool.spawn(new Particle({
+        x: pos.x + (Math.random() - 0.5) * spread,
+        y: pos.y + 0.18 - t * 0.55 + (Math.random() - 0.5) * 0.06,
+        vx: Math.cos(angle) * speed,
+        vy: -0.56 - Math.random() * 0.72,
+        ay: 0.58,
+        life: 0.30 + Math.random() * 0.36,
+        size0: 0.10 + Math.random() * 0.06,
+        size1: 0.015,
+        r: 255,
+        g: 214 + ((Math.random() * 26) | 0),
+        b: 100 + ((Math.random() * 34) | 0),
+        a0: 0.92,
+        a1: 0.0,
+      }));
+    }
+  });
+
   // ── Misc float text ─────────────────────────────────────────────────
 
   world.on('mimic:revealed', ({ at }) => {

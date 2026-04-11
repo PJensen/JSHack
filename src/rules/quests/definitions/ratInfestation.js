@@ -1,11 +1,9 @@
-import { createFrom } from "../../../lib/ecs-js/archetype.js";
-import { GoldStack } from "../../archetypes/Items.js";
-import { ItemInfo } from "../../components/ItemInfo.js";
 import { NamedIdentity } from "../../components/NamedIdentity.js";
 import { Position } from "../../components/Position.js";
 import { QuestVars } from "../../components/QuestVars.js";
 import { getMonster } from "../../data/monsters.js";
 import { createItemById } from "../../utils/itemFactory.js";
+import { addToInventory } from "../../utils/inventoryFacade.js";
 import { spawnMonsterEntity } from "../../utils/spawnMonsterEntity.js";
 import { emitSafe } from "../../utils/emitSafe.js";
 import { firstPlayerId } from "../../utils/worldAccess.js";
@@ -197,11 +195,11 @@ export const RatInfestationQuest = registerQuest({
                 const giverPos = giverId > 0 ? ctx.world.get(giverId, Position) : null;
                 const x = giverPos?.x ?? 0;
                 const y = giverPos?.y ?? 0;
-                // Drop gold at the giver's feet
-                const gid = createFrom(ctx.world, GoldStack, {});
-                ctx.world.mutate(gid, ItemInfo, (r) => { r.count = REWARD_GOLD; });
-                ctx.world.add(gid, Position, { x, y });
-                emitSafe(ctx.world, 'item:dropped', { itemId: gid, count: REWARD_GOLD, at: { x, y } });
+                const playerId = Number(ctx.bind.player || 0) | 0;
+                if (playerId > 0) {
+                  const goldId = createItemById(ctx.world, "gold", { count: REWARD_GOLD });
+                  if (goldId > 0) addToInventory(ctx.world, playerId, goldId);
+                }
                 // Drop a hot meal
                 const stewId = createItemById(ctx.world, "food_stew");
                 if (stewId > 0) {
@@ -214,6 +212,7 @@ export const RatInfestationQuest = registerQuest({
                 playerId: ctx.bind.player,
                 giverId: ctx.bind.giver,
                 title: "Rat Infestation",
+                rewardGold: REWARD_GOLD,
               })),
             ],
             to: "complete",

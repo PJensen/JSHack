@@ -11,6 +11,7 @@ import { QuestState } from "../src/rules/components/QuestState.js";
 import { installQuestRuntime } from "../src/rules/quests/runtime.js";
 import { addToInventory } from "../src/rules/utils/inventoryFacade.js";
 import { inventoryHasIdentity } from "../src/rules/utils/townEconomy.js";
+import { inventoryItems } from "../src/rules/utils/inventoryFacade.js";
 import "../src/rules/quests/definitions/graveyardWatch.js";
 import "../src/rules/dialogues/townfolkDialogs.js";
 import { installDialogRuntime } from "../src/rules/dialogues/runtime.js";
@@ -72,6 +73,15 @@ Deno.test("priest dialog runs the starter fetch quest from offer to turn-in", ()
 
   assertEquals(world.get(quest.id, QuestState)?.status, "complete");
   assertEquals(inventoryHasIdentity(world, player, "book_dead", 1), false);
+
+  let goldTotal = 0;
+  for (const itemId of inventoryItems(world, player)) {
+    const ni = world.get(itemId, NamedIdentity);
+    if (String(ni?.identity || "") !== "gold") continue;
+    const info = world.get(itemId, ItemInfo);
+    goldTotal += Math.max(1, Number(info?.count || 1) | 0);
+  }
+  assert(goldTotal >= 100, "starter priest quest should award gold");
 });
 
 Deno.test("barkeep rat quest acceptance drops starter bow + arrows and announces bats", () => {

@@ -8,6 +8,8 @@ import { incVar, emit, setVar } from "./actions.js";
 import { getQuestDef } from "./registry.js";
 import { registerQuest } from "./registry.js";
 import { createRng } from "../utils/rng.js";
+import { addToInventory } from "../utils/inventoryFacade.js";
+import { createItemById } from "../utils/itemFactory.js";
 import { currentDepth, firstPlayerId } from "../utils/worldAccess.js";
 import { ensureQuestRuntimeEventRoutes, findQuestEntity, instantiateQuest } from "./runtime.js";
 import { getDistrictBulletinVirtual, getPlayerOpportunityViewVirtual } from "../utils/townInterpretationVirtuals.js";
@@ -96,6 +98,31 @@ const FALLBACK_OFFER_POOL = Object.freeze([
   }),
 ]);
 
+function clampInt(value, min, max) {
+  const n = Number(value) | 0;
+  return Math.max(min, Math.min(max, n));
+}
+
+function computeQuestGoldReward({ target, urgency }) {
+  const goal = Math.max(1, Number(target || 1) | 0);
+  const u = String(urgency || "low");
+  const urgencyBonus = u === "high" ? 30 : (u === "medium" ? 16 : 8);
+  return clampInt(18 + goal * 3 + urgencyBonus, 25, 150);
+}
+
+function grantQuestGold(world, playerId, amount) {
+  const ownerId = Number(playerId || 0) | 0;
+  const qty = Math.max(0, Number(amount || 0) | 0);
+  if (!(ownerId > 0) || qty <= 0) return 0;
+  const goldId = createItemById(world, "gold", { count: qty });
+  if (!(goldId > 0)) return 0;
+  if (!addToInventory(world, ownerId, goldId)) {
+    try { world.destroy(goldId); } catch {}
+    return 0;
+  }
+  return qty;
+}
+
 function selectWeightedTemplate(rng) {
   let total = 0;
   for (const entry of LOCAL_TEMPLATE_POOL) total += Math.max(1, Number(entry.weight || 1) | 0);
@@ -180,6 +207,7 @@ function buildOfferQuestDef(world, playerId, offer) {
   const sourceLabel = String(offer?.sourceLabel || sourceDistrict || "Town");
   const tag = String(offer?.tag || "work");
   const questId = buildOfferQuestId(world, playerId, offer);
+  const rewardGold = computeQuestGoldReward({ target, urgency });
 
   const def = {
     id: questId,
@@ -192,6 +220,7 @@ function buildOfferQuestDef(world, playerId, offer) {
       completed: false,
       objective: String(offer?.objective || "Complete posted town work."),
       urgency,
+      rewardGold,
       sourceDistrict,
       sourceLabel,
       offerTag: tag,
@@ -210,10 +239,15 @@ function buildOfferQuestDef(world, playerId, offer) {
               actions: [
                 setVar("progress", (ctx) => Math.max(1, Number(ctx.vars?.target || 1) | 0)),
                 setVar("completed", true),
+                (ctx) => {
+                  const reward = Math.max(0, Number(ctx.vars?.rewardGold || rewardGold) | 0);
+                  grantQuestGold(ctx.world, ctx.bind.player, reward);
+                },
                 emit("quest:completed", (ctx) => ({
                   questId,
                   playerId,
                   title,
+                  rewardGold: Math.max(0, Number(ctx.vars?.rewardGold || rewardGold) | 0),
                   district: String(ctx.vars?.sourceDistrict || sourceDistrict),
                 })),
               ],
@@ -369,6 +403,7 @@ export function buildLocalGeneratedQuest(world, opts = {}) {
   const title = String(rng.choice(template.titles) || "Local Patrol");
   const target = Number(opts.targetSteps ?? rng.int(6, 12)) | 0;
   const questId = String(opts.questId || makeLocalQuestId(worldSeed, playerId, depth));
+  const rewardGold = computeQuestGoldReward({ target, urgency: "low" });
 
   const def = {
     id: questId,
@@ -378,6 +413,7 @@ export function buildLocalGeneratedQuest(world, opts = {}) {
       accepted: true,
       progress: 0,
       target,
+      rewardGold,
       completed: false,
       templateKey: String(template.key || "scout"),
       depth,
@@ -396,10 +432,15 @@ export function buildLocalGeneratedQuest(world, opts = {}) {
               actions: [
                 setVar("progress", (ctx) => Math.max(1, Number(ctx.vars?.target || 1) | 0)),
                 setVar("completed", true),
+                (ctx) => {
+                  const reward = Math.max(0, Number(ctx.vars?.rewardGold || rewardGold) | 0);
+                  grantQuestGold(ctx.world, ctx.bind.player, reward);
+                },
                 emit("quest:completed", () => ({
                   questId,
                   playerId,
                   title,
+                  rewardGold,
                 })),
               ],
               to: "complete",

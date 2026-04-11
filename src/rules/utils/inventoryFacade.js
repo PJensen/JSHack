@@ -82,6 +82,19 @@ function ensureWeightRecord(world, itemId) {
   return addImmediate(world, itemId, Weight, payload);
 }
 
+function readCurrencyCount(world, itemId, fallback = 0) {
+  const info = world.get(itemId, ItemInfo);
+  if (!info || String(info.type || "") !== "currency") return 0;
+  const count = Number(info.count ?? fallback);
+  return Math.max(1, Number.isFinite(count) ? (count | 0) : 1);
+}
+
+function emitCurrencyAdded(world, ownerId, itemId, count, merged = false) {
+  const qty = Math.max(0, Number(count || 0) | 0);
+  if (qty <= 0) return;
+  world.emit("inventory:gold-gained", { ownerId, itemId, count: qty, merged: !!merged });
+}
+
 function capacityStackKey(world, itemId) {
   if (!(itemId > 0) || !world.isAlive(itemId)) return `__dead_${itemId}`;
   const ni = world.get(itemId, NamedIdentity);
@@ -241,6 +254,8 @@ export function addToInventory(world, ownerId, itemId, opts) {
         });
         ensureWeightRecord(world, existingId);
         world.destroy(itemId);
+        const currencyCount = readCurrencyCount(world, existingId, incomingCount);
+        if (currencyCount > 0) emitCurrencyAdded(world, ownerId, existingId, incomingCount, true);
         if (!opts?.silent) world.emit('inventory:added', { ownerId, itemId: existingId, merged: true, count: incomingCount });
         return true;
       }
@@ -250,6 +265,8 @@ export function addToInventory(world, ownerId, itemId, opts) {
   ensureWeightRecord(world, itemId);
   attach(world, itemId, rootId);
   removeImmediate(world, itemId, Position);
+  const currencyCount = readCurrencyCount(world, itemId);
+  if (currencyCount > 0) emitCurrencyAdded(world, ownerId, itemId, currencyCount, false);
   if (!opts?.silent) world.emit('inventory:added', { ownerId, itemId });
   return true;
 }
@@ -328,6 +345,8 @@ export function transferItem(world, itemId, fromId, toId, opts) {
   if (!(toRootId > 0)) return false;
   reparent(world, itemId, toRootId);
   removeImmediate(world, itemId, Position);
+  const currencyCount = readCurrencyCount(world, itemId);
+  if (currencyCount > 0) emitCurrencyAdded(world, toId, itemId, currencyCount, false);
   if (!opts?.silent) world.emit('inventory:added', { ownerId: toId, itemId });
   return true;
 }
