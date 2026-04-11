@@ -431,6 +431,42 @@ Deno.test("facade: items without NamedIdentity each count as separate stack", ()
   assert(!hasCapacity(world, owner));
 });
 
+Deno.test("facade: addToInventory emits inventory:gold-gained for currency stacks", () => {
+  const world = makeWorld();
+  const owner = makeOwner(world);
+  const events = [];
+  world.on("inventory:gold-gained", (ev) => events.push(ev));
+  const gold = makeItem(world, { identity: "gold", count: 12 });
+  world.mutate(gold, ItemInfo, (rec) => { rec.type = "currency"; });
+
+  addToInventory(world, owner, gold);
+
+  assertEquals(events.length, 1);
+  assertEquals(events[0].ownerId, owner);
+  assertEquals(events[0].count, 12);
+  assertEquals(events[0].merged, false);
+});
+
+Deno.test("facade: currency merge emits inventory:gold-gained with incoming count", () => {
+  const world = makeWorld();
+  const owner = makeOwner(world);
+  const events = [];
+  world.on("inventory:gold-gained", (ev) => events.push(ev));
+  const a = makeItem(world, { identity: "gold", count: 8 });
+  const b = makeItem(world, { identity: "gold", count: 5 });
+  world.mutate(a, ItemInfo, (rec) => { rec.type = "currency"; });
+  world.mutate(b, ItemInfo, (rec) => { rec.type = "currency"; });
+
+  addToInventory(world, owner, a);
+  addToInventory(world, owner, b);
+
+  assertEquals(events.length, 2);
+  assertEquals(events[0].count, 8);
+  assertEquals(events[0].merged, false);
+  assertEquals(events[1].count, 5);
+  assertEquals(events[1].merged, true);
+});
+
 function attachLegacyItem(world, ownerId, itemId) {
   attach(world, itemId, ownerId);
 }

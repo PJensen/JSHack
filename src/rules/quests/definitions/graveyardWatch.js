@@ -1,13 +1,12 @@
-import { createFrom } from "../../../lib/ecs-js/archetype.js";
-import { GoldStack } from "../../archetypes/Items.js";
 import { buildCatalogItem } from "../../data/itemCatalogLoader.js";
 import { DungeonState } from "../../components/DungeonState.js";
-import { ItemInfo } from "../../components/ItemInfo.js";
 import { NamedIdentity } from "../../components/NamedIdentity.js";
 import { Position } from "../../components/Position.js";
 import { emitSafe } from "../../utils/emitSafe.js";
 import { consumeInventoryIdentity, inventoryHasIdentity } from "../../utils/townEconomy.js";
 import { attachEntityToCurrentFloor } from "../../utils/floorEntities.js";
+import { addToInventory } from "../../utils/inventoryFacade.js";
+import { createItemById } from "../../utils/itemFactory.js";
 import { currentDepth, firstPlayerId } from "../../utils/worldAccess.js";
 import { emit, setVar } from "../actions.js";
 import { registerQuest } from "../registry.js";
@@ -169,20 +168,18 @@ export const GraveyardWatchQuest = registerQuest({
               },
               setVar("delivered", true),
               (ctx) => {
-                const giverId = Number(ctx.bind.giver || 0);
-                const giverPos = giverId > 0 ? ctx.world.get(giverId, Position) : null;
-                const x = giverPos?.x ?? 0;
-                const y = giverPos?.y ?? 0;
-                const gid = createFrom(ctx.world, GoldStack, {});
-                ctx.world.mutate(gid, ItemInfo, (r) => { r.count = REWARD_GOLD; });
-                ctx.world.add(gid, Position, { x, y });
-                emitSafe(ctx.world, 'item:dropped', { itemId: gid, count: REWARD_GOLD, at: { x, y } });
+                const playerId = Number(ctx.bind.player || 0) | 0;
+                if (playerId > 0) {
+                  const goldId = createItemById(ctx.world, "gold", { count: REWARD_GOLD });
+                  if (goldId > 0) addToInventory(ctx.world, playerId, goldId);
+                }
               },
               emit("quest:completed", (ctx) => ({
                 questId: STARTER_PRIEST_FETCH_QUEST_ID,
                 playerId: ctx.bind.player,
                 giverId: ctx.bind.giver,
                 title: "The Book Below",
+                rewardGold: REWARD_GOLD,
               })),
             ],
             to: "complete",
