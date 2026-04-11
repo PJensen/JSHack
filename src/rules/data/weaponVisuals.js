@@ -28,6 +28,112 @@ const DEFAULT_LENGTH_CM_BY_CLASS = Object.freeze({
   unarmed: 0,
 });
 
+const SIGNATURE_WEAPON_VISUAL_OVERRIDES = Object.freeze({
+  sunsword: Object.freeze({
+    weaponLengthCm: 116,
+    weaponVfxProfile: Object.freeze({
+      length: 1.18,
+      widthScale: 0.96,
+      handleStart: 0.22,
+      alphaStops: Object.freeze([
+        [0.00, 0.22],
+        [0.45, 0.60],
+        [0.86, 0.95],
+        [1.00, 1.00],
+      ]),
+    }),
+  }),
+  debtbringer: Object.freeze({
+    weaponLengthCm: 132,
+    weaponVfxProfile: "mace",
+  }),
+  flametongue: Object.freeze({
+    weaponLengthCm: 104,
+    weaponVfxProfile: "sword",
+  }),
+  deathascendant_blade: Object.freeze({
+    weaponLengthCm: 128,
+    weaponVfxProfile: Object.freeze({
+      length: 1.25,
+      widthScale: 1.03,
+      handleStart: 0.20,
+      alphaStops: Object.freeze([
+        [0.00, 0.18],
+        [0.50, 0.54],
+        [0.90, 1.00],
+        [1.00, 0.96],
+      ]),
+    }),
+  }),
+  soul_ascendant_scythe: Object.freeze({
+    weaponLengthCm: 168,
+    weaponVfxProfile: "spear",
+  }),
+  cataclysm_warspear: Object.freeze({
+    weaponLengthCm: 188,
+    weaponVfxProfile: "spear",
+  }),
+  thundergod_maul: Object.freeze({
+    weaponLengthCm: 138,
+    weaponVfxProfile: "mace",
+  }),
+  hollow_greatsword: Object.freeze({
+    weaponLengthCm: 152,
+    weaponVfxProfile: "sword",
+  }),
+  stormcaller_blade: Object.freeze({
+    weaponLengthCm: 112,
+    weaponVfxProfile: "sword",
+  }),
+  soulreaver_axe: Object.freeze({
+    weaponLengthCm: 118,
+    weaponVfxProfile: "axe",
+  }),
+  blade_of_echoes: Object.freeze({
+    weaponLengthCm: 108,
+    weaponVfxProfile: Object.freeze({
+      length: 1.14,
+      widthScale: 0.90,
+      handleStart: 0.24,
+      alphaStops: Object.freeze([
+        [0.00, 0.16],
+        [0.40, 0.42],
+        [0.78, 0.80],
+        [1.00, 1.00],
+      ]),
+    }),
+  }),
+  predator_stakebow: Object.freeze({
+    weaponLengthCm: 176,
+    weaponVfxProfile: "bow",
+  }),
+  doom_crossbow: Object.freeze({
+    weaponLengthCm: 98,
+    weaponVfxProfile: "bow",
+  }),
+  resonant_quarterstaff: Object.freeze({
+    weaponLengthCm: 172,
+    weaponVfxProfile: "staff",
+  }),
+  voidmind_athame: Object.freeze({
+    weaponLengthCm: 48,
+    weaponVfxProfile: "dagger",
+  }),
+  nightfang_dagger: Object.freeze({
+    weaponLengthCm: 44,
+    weaponVfxProfile: Object.freeze({
+      length: 0.78,
+      widthScale: 0.86,
+      handleStart: 0.28,
+      alphaStops: Object.freeze([
+        [0.00, 0.20],
+        [0.58, 0.72],
+        [1.00, 1.00],
+      ]),
+    }),
+  }),
+});
+
 function coerceFinitePositive(value) {
   const n = Number(value);
   return Number.isFinite(n) && n > 0 ? n : null;
@@ -118,14 +224,19 @@ function defaultProfileForClass(weaponClass) {
  * @returns {{ weaponClass: string, weaponLengthCm: number, weaponVfxProfile: string }}
  */
 export function resolveWeaponVisualMeta(rec = {}) {
+  const byId = SIGNATURE_WEAPON_VISUAL_OVERRIDES[String(rec.id || "").toLowerCase()] || null;
   const identityText = `${String(rec.id || "")} ${String(rec.name || "")}`;
   const inferredClass = inferWeaponClassFromText(identityText, rec.damageType, rec.subtype);
 
-  const overrideProfile = String(rec.weaponVfxProfile || "").trim().toLowerCase();
-  const weaponClass = overrideProfile || inferredClass;
-  const profile = overrideProfile || defaultProfileForClass(inferredClass);
+  const authoredProfile = rec.weaponVfxProfile ?? byId?.weaponVfxProfile ?? null;
+  const profileIsString = typeof authoredProfile === "string";
+  const overrideProfileKey = profileIsString ? String(authoredProfile).trim().toLowerCase() : "";
+  const profile = profileIsString
+    ? (overrideProfileKey || defaultProfileForClass(inferredClass))
+    : (authoredProfile || defaultProfileForClass(inferredClass));
+  const weaponClass = overrideProfileKey || inferredClass;
 
-  const explicitLength = coerceFinitePositive(rec.weaponLengthCm);
+  const explicitLength = coerceFinitePositive(rec.weaponLengthCm ?? byId?.weaponLengthCm);
   const lengthCm = explicitLength ?? defaultLengthForClass(inferredClass, rec.twoHanded === true);
 
   return {

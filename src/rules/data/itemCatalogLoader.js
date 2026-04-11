@@ -7,6 +7,16 @@ import { Potion } from "../components/Potion.js";
 import { attachProcPackage } from "./procPackages.js";
 import { ScriptRef } from "../components/ScriptRef.js";
 
+function cloneWeaponVfxProfile(profile) {
+  if (typeof profile === "string") return profile;
+  if (!profile || typeof profile !== "object" || Array.isArray(profile)) return null;
+  const out = { ...profile };
+  if (Array.isArray(profile.alphaStops)) {
+    out.alphaStops = profile.alphaStops.map((stop) => Array.isArray(stop) ? [stop[0], stop[1]] : stop);
+  }
+  return out;
+}
+
 /**
  * Build an item entity from the unified item catalog.
  * @param {import("../../lib/ecs-js/index.js").World} world
@@ -50,7 +60,7 @@ export function buildCatalogItem(world, itemId, opts = {}) {
     subtype: def.subtype || null,
     range: def.range || null,
     weaponLengthCm: Number(def.weaponLengthCm || 0) > 0 ? (Number(def.weaponLengthCm) | 0) : null,
-    weaponVfxProfile: typeof def.weaponVfxProfile === "string" ? def.weaponVfxProfile : null,
+    weaponVfxProfile: cloneWeaponVfxProfile(def.weaponVfxProfile),
     identified: def.identified === true,
     noQuickChip: def.noQuickChip === true,
     tags: Array.isArray(def.tags) ? def.tags.slice() : [],

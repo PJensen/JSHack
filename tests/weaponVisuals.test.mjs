@@ -30,6 +30,28 @@ Deno.test("buildCatalogItem propagates weapon visual metadata into ItemInfo", ()
   assert(String(info.weaponVfxProfile || "").length > 0, "expected propagated weaponVfxProfile");
 });
 
+Deno.test("signature weapon overrides are applied in catalog output", () => {
+  const sun = ITEM_CATALOG.sunsword;
+  assert(sun, "expected sunsword catalog entry");
+  assertEquals(Number(sun.weaponLengthCm), 116);
+  assert(typeof sun.weaponVfxProfile === "object", "expected sunsword profile object override");
+
+  const doom = ITEM_CATALOG.doom_crossbow;
+  assert(doom, "expected doom_crossbow catalog entry");
+  assertEquals(Number(doom.weaponLengthCm), 98);
+  assertEquals(String(doom.weaponVfxProfile), "bow");
+});
+
+Deno.test("buildCatalogItem keeps object weapon density profiles", () => {
+  const world = new World({ seed: 0xCAFE });
+  const id = buildCatalogItem(world, "sunsword");
+  const info = world.get(id, ItemInfo);
+  assert(info, "expected ItemInfo for sunsword");
+  assertEquals(Number(info.weaponLengthCm), 116);
+  assert(typeof info.weaponVfxProfile === "object", "expected object profile on ItemInfo");
+  assert(Array.isArray(info.weaponVfxProfile.alphaStops), "expected alphaStops array on object profile");
+});
+
 Deno.test("weapon visual overrides take priority over inferred defaults", () => {
   const meta = resolveWeaponVisualMeta({
     id: "ancient_sword",
