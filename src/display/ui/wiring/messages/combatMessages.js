@@ -214,36 +214,33 @@ export function installCombatMessages(ctx) {
     log(`Not enough stamina to attack with ${weaponName} (need ${need}, have ${Math.floor(have)}).`, 'combat');
   });
 
-  const _critVerbs = ['devastates', 'crushes', 'savages', 'smashes', 'demolishes'];
-  const _hitVerbs  = ['hits', 'strikes', 'smacks', 'bashes', 'nails', 'tags'];
-
   world.on('damaged', ({ target, amount, critical, crit, source, offhand, cause }) => {
     const defName = nameOfEntity(target);
     const isCrit = !!(critical || crit);
     const handTxt = offhand ? ' (off-hand)' : '';
+    const critTxt = isCrit ? ' (CRIT!)' : '';
     if (Number(source || 0)) {
       const atkName = nameOfEntity(source);
       let weaponLabel = '';
       const eq = compGet(Number(source || 0), Equipment);
       const causeKey = String(cause || '').toLowerCase();
+      const isSpell = causeKey.startsWith('spell:') || causeKey.startsWith('affix:')
+        || causeKey.startsWith('procpackage:') || causeKey.startsWith('monster:');
       const usingRanged = causeKey === 'ranged';
-      const wid = offhand
-        ? Number(eq?.offhand || 0)
-        : (usingRanged ? Number(eq?.ranged || 0) : Number(eq?.weapon || 0));
-      if (wid) {
-        const wname = compGet(wid, NamedIdentity)?.name;
-        if (wname) weaponLabel = ` with ${bracketizeName(wname)}`;
-      } else if (!offhand && compHas(Number(source || 0), Player)) {
-        weaponLabel = ' with bare fists';
+      if (!isSpell) {
+        const wid = offhand
+          ? Number(eq?.offhand || 0)
+          : (usingRanged ? Number(eq?.ranged || 0) : Number(eq?.weapon || 0));
+        if (wid) {
+          const wname = compGet(wid, NamedIdentity)?.name;
+          if (wname) weaponLabel = ` with ${bracketizeName(wname)}`;
+        } else if (!offhand && compHas(Number(source || 0), Player)) {
+          weaponLabel = ' with bare fists';
+        }
       }
-      const step = world.step || 0;
-      const verb = isCrit
-        ? _critVerbs[step % _critVerbs.length]
-        : _hitVerbs[step % _hitVerbs.length];
-      const critTxt = isCrit ? '!' : '.';
-      log(`${atkName} ${verb} ${defName}${weaponLabel} for ${amount}${handTxt}${critTxt}`, 'combat');
+      log(`${atkName} ${atkName === 'You' ? 'hit' : 'hits'} ${defName}${weaponLabel} for ${amount}${critTxt}${handTxt}.`, 'combat');
     } else {
-      log(`${defName} takes ${amount} damage${isCrit ? '!' : '.'}${handTxt}`, 'combat');
+      log(`${defName} ${defName === 'You' ? 'take' : 'takes'} ${amount} damage${critTxt}${handTxt}.`, 'combat');
     }
   });
 
@@ -311,7 +308,7 @@ export function installCombatMessages(ctx) {
     (w) => `${w} collapses in a heap.`,
   ];
 
-  function _pickDeath(arr, step) {
+  function _pick(arr, step) {
     return arr[(step || 0) % arr.length];
   }
 
@@ -363,56 +360,17 @@ export function installCombatMessages(ctx) {
     log(_pickDeath(_deathFallback, step)(who), 'combat');
   });
 
-  // ── Context-aware miss messages ──
-  const _missGeneric = [
-    (s, t) => `${s} misses ${t}.`,
-    (s, t) => `${s} lunges at ${t} but misses.`,
-  ];
-  const _missByWeapon = {
-    sword:   [(s, t) => `${s} swings at ${t} and whiffs.`,
-              (s, t) => `${s}'s blade whistles past ${t}.`],
-    axe:     [(s, t) => `${s} chops at ${t} \u2014 nothing but air.`,
-              (s, t) => `${s}'s axe bites stone instead of flesh.`],
-    mace:    [(s, t) => `${s} flails at ${t} and misses.`,
-              (s, t) => `${s}'s mace thuds into the ground.`],
-    dagger:  [(s, t) => `${s} stabs at ${t} but finds only air.`,
-              (s, t) => `${s}'s dagger flashes past ${t}.`],
-    spear:   [(s, t) => `${s} thrusts at ${t} and misses.`,
-              (s, t) => `${s}'s spear jabs wide.`],
-    staff:   [(s, t) => `${s} swats at ${t} but misses.`,
-              (s, t) => `${s}'s staff sweeps harmlessly past ${t}.`],
-    bow:     [(s, t) => `${s}'s arrow sails past ${t}.`,
-              (s, t) => `${s} looses an arrow \u2014 it clatters off a wall.`],
-    fist:    [(s, t) => `${s} swings a fist at ${t} and whiffs.`,
-              (s, t) => `${s} punches empty air.`],
-  };
-
-  function _resolveWeaponFlavor(sourceId) {
-    const eq = compGet(Number(sourceId || 0), Equipment);
-    const wid = Number(eq?.weapon || 0);
-    if (!wid) return compHas(Number(sourceId || 0), Player) ? 'fist' : '';
-    const wname = String(compGet(wid, NamedIdentity)?.identity || '').toLowerCase();
-    if (wname.includes('sword') || wname.includes('blade') || wname.includes('scimitar') || wname.includes('rapier')) return 'sword';
-    if (wname.includes('axe') || wname.includes('hatchet') || wname.includes('cleaver')) return 'axe';
-    if (wname.includes('mace') || wname.includes('hammer') || wname.includes('flail') || wname.includes('club')) return 'mace';
-    if (wname.includes('dagger') || wname.includes('knife') || wname.includes('shiv')) return 'dagger';
-    if (wname.includes('spear') || wname.includes('trident') || wname.includes('pike') || wname.includes('lance')) return 'spear';
-    if (wname.includes('staff') || wname.includes('rod') || wname.includes('wand')) return 'staff';
-    return '';
-  }
-
   world.on('status', (payload) => {
     const { id, kind, source } = normalizeStatusEvent(payload);
     const style = (String(kind || '')).toLowerCase();
     const tgt = nameOfEntity(id);
-    const srcId = Number(source || 0);
-    const src = srcId ? nameOfEntity(source) : null;
+    const src = Number(source || 0) ? nameOfEntity(source) : null;
     if (style === 'miss' && src) {
-      const wep = _resolveWeaponFlavor(srcId);
-      const pool = _missByWeapon[wep] || _missGeneric;
-      log(_pickDeath(pool, world.step || 0)(src, tgt), 'combat');
+      log(`${src} ${src === 'You' ? 'miss' : 'misses'} ${tgt}.`, 'combat');
     }
-    if (style === 'immune' && src) log(`${src} attacks ${tgt}. It does nothing.`, 'combat');
+    if (style === 'immune' && src) {
+      log(`${src} ${src === 'You' ? 'attack' : 'attacks'} ${tgt}. It does nothing.`, 'combat');
+    }
   });
 
   // === Ranged combat events ===
