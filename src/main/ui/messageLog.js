@@ -28,8 +28,9 @@ export function createMessageLog({ maxEntries = 50, onUpdate = null } = {}) {
       entry = {
         text: msg.text,
         type: msg.type || 'default',
-        timestamp: msg.timestamp || Date.now()
+        timestamp: msg.timestamp || Date.now(),
       };
+      if (msg.html) entry.html = msg.html;
     } else {
       entry = { text: String(msg), type: 'default' };
     }
