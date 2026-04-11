@@ -15,19 +15,19 @@
 const MODE = 'freeze';
 
 /** Time scale during freeze mode (0 = full stop, 0.02 = near-frozen) */
-const FREEZE_SCALE = 0.03;
+const FREEZE_SCALE = 0.05;
 
 /** Time scale during slowdown mode */
 const SLOW_SCALE = 0.12;
 
 /** Duration (seconds of REAL time) for a baseline hit (1 damage) */
-const BASE_DURATION = 0.07;
+const BASE_DURATION = 0.04;
 
 /** Duration for a critical hit */
-const CRIT_DURATION = 0.14;
+const CRIT_DURATION = 0.09;
 
 /** Duration for a killing blow */
-const KILL_DURATION = 0.20;
+const KILL_DURATION = 0.13;
 
 /** Extra duration per point of damage (log-scaled, caps out) */
 const DMG_DURATION_SCALE = 0.008;
@@ -37,7 +37,7 @@ const DMG_DURATION_CAP = 0.08;
 const MIN_DAMAGE = 2;
 
 /** Ease-out: last portion of duration ramps scale back toward 1.0 */
-const EASE_OUT_FRAC = 0.35;
+const EASE_OUT_FRAC = 0.45;
 
 // ── Controller ──────────────────────────────────────────────────────
 
