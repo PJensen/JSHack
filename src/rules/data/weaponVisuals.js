@@ -49,7 +49,17 @@ const SIGNATURE_WEAPON_VISUAL_OVERRIDES = Object.freeze({
   }),
   flametongue: Object.freeze({
     weaponLengthCm: 104,
-    weaponVfxProfile: "sword",
+    weaponVfxProfile: Object.freeze({
+      length: 1.12,
+      widthScale: 0.94,
+      handleStart: 0.24,
+      alphaStops: Object.freeze([
+        [0.00, 0.18],
+        [0.46, 0.58],
+        [0.86, 0.96],
+        [1.00, 1.00],
+      ]),
+    }),
   }),
   deathascendant_blade: Object.freeze({
     weaponLengthCm: 128,
@@ -83,11 +93,31 @@ const SIGNATURE_WEAPON_VISUAL_OVERRIDES = Object.freeze({
   }),
   stormcaller_blade: Object.freeze({
     weaponLengthCm: 112,
-    weaponVfxProfile: "sword",
+    weaponVfxProfile: Object.freeze({
+      length: 1.20,
+      widthScale: 0.92,
+      handleStart: 0.25,
+      alphaStops: Object.freeze([
+        [0.00, 0.16],
+        [0.42, 0.46],
+        [0.76, 0.80],
+        [1.00, 0.96],
+      ]),
+    }),
   }),
   soulreaver_axe: Object.freeze({
     weaponLengthCm: 118,
-    weaponVfxProfile: "axe",
+    weaponVfxProfile: Object.freeze({
+      length: 1.20,
+      widthScale: 1.16,
+      handleStart: 0.18,
+      alphaStops: Object.freeze([
+        [0.00, 0.12],
+        [0.52, 0.30],
+        [0.82, 1.00],
+        [1.00, 0.88],
+      ]),
+    }),
   }),
   blade_of_echoes: Object.freeze({
     weaponLengthCm: 108,
@@ -105,15 +135,42 @@ const SIGNATURE_WEAPON_VISUAL_OVERRIDES = Object.freeze({
   }),
   predator_stakebow: Object.freeze({
     weaponLengthCm: 176,
-    weaponVfxProfile: "bow",
+    weaponVfxProfile: Object.freeze({
+      length: 1.24,
+      widthScale: 0.82,
+      handleStart: 0.18,
+      alphaStops: Object.freeze([
+        [0.00, 0.26],
+        [0.50, 0.76],
+        [1.00, 0.84],
+      ]),
+    }),
   }),
   doom_crossbow: Object.freeze({
     weaponLengthCm: 98,
-    weaponVfxProfile: "bow",
+    weaponVfxProfile: Object.freeze({
+      length: 0.88,
+      widthScale: 1.08,
+      handleStart: 0.24,
+      alphaStops: Object.freeze([
+        [0.00, 0.20],
+        [0.46, 0.86],
+        [1.00, 0.88],
+      ]),
+    }),
   }),
   resonant_quarterstaff: Object.freeze({
     weaponLengthCm: 172,
-    weaponVfxProfile: "staff",
+    weaponVfxProfile: Object.freeze({
+      length: 1.34,
+      widthScale: 0.88,
+      handleStart: 0.12,
+      alphaStops: Object.freeze([
+        [0.00, 0.14],
+        [0.74, 0.62],
+        [1.00, 0.90],
+      ]),
+    }),
   }),
   voidmind_athame: Object.freeze({
     weaponLengthCm: 48,
@@ -128,6 +185,212 @@ const SIGNATURE_WEAPON_VISUAL_OVERRIDES = Object.freeze({
       alphaStops: Object.freeze([
         [0.00, 0.20],
         [0.58, 0.72],
+        [1.00, 1.00],
+      ]),
+    }),
+  }),
+  venomfang_dagger: Object.freeze({
+    weaponLengthCm: 46,
+    weaponVfxProfile: Object.freeze({
+      length: 0.82,
+      widthScale: 0.90,
+      handleStart: 0.30,
+      alphaStops: Object.freeze([
+        [0.00, 0.18],
+        [0.56, 0.70],
+        [1.00, 1.00],
+      ]),
+    }),
+  }),
+  caustic_stiletto: Object.freeze({
+    weaponLengthCm: 52,
+    weaponVfxProfile: Object.freeze({
+      length: 0.90,
+      widthScale: 0.78,
+      handleStart: 0.32,
+      alphaStops: Object.freeze([
+        [0.00, 0.16],
+        [0.62, 0.64],
+        [1.00, 1.00],
+      ]),
+    }),
+  }),
+  plague_fang: Object.freeze({
+    weaponLengthCm: 47,
+    weaponVfxProfile: Object.freeze({
+      length: 0.84,
+      widthScale: 0.86,
+      handleStart: 0.28,
+      alphaStops: Object.freeze([
+        [0.00, 0.18],
+        [0.52, 0.66],
+        [1.00, 1.00],
+      ]),
+    }),
+  }),
+  warhammer_of_fury: Object.freeze({
+    weaponLengthCm: 124,
+    weaponVfxProfile: Object.freeze({
+      length: 1.20,
+      widthScale: 1.22,
+      handleStart: 0.16,
+      alphaStops: Object.freeze([
+        [0.00, 0.10],
+        [0.50, 0.24],
+        [0.84, 0.94],
+        [1.00, 1.00],
+      ]),
+    }),
+  }),
+  pyreheart_mace: Object.freeze({
+    weaponLengthCm: 109,
+    weaponVfxProfile: Object.freeze({
+      length: 1.08,
+      widthScale: 1.18,
+      handleStart: 0.18,
+      alphaStops: Object.freeze([
+        [0.00, 0.12],
+        [0.54, 0.24],
+        [0.86, 0.96],
+        [1.00, 1.00],
+      ]),
+    }),
+  }),
+  stormtouched_mace: Object.freeze({
+    weaponLengthCm: 101,
+    weaponVfxProfile: Object.freeze({
+      length: 1.00,
+      widthScale: 1.12,
+      handleStart: 0.20,
+      alphaStops: Object.freeze([
+        [0.00, 0.12],
+        [0.60, 0.28],
+        [0.90, 0.96],
+        [1.00, 1.00],
+      ]),
+    }),
+  }),
+  eclipse_maul: Object.freeze({
+    weaponLengthCm: 146,
+    weaponVfxProfile: Object.freeze({
+      length: 1.36,
+      widthScale: 1.30,
+      handleStart: 0.14,
+      alphaStops: Object.freeze([
+        [0.00, 0.10],
+        [0.46, 0.20],
+        [0.80, 0.90],
+        [1.00, 1.00],
+      ]),
+    }),
+  }),
+  tolling_blade: Object.freeze({
+    weaponLengthCm: 118,
+    weaponVfxProfile: Object.freeze({
+      length: 1.22,
+      widthScale: 0.96,
+      handleStart: 0.20,
+      alphaStops: Object.freeze([
+        [0.00, 0.18],
+        [0.42, 0.48],
+        [0.84, 0.92],
+        [1.00, 1.00],
+      ]),
+    }),
+  }),
+  witchfire_sword: Object.freeze({
+    weaponLengthCm: 110,
+    weaponVfxProfile: Object.freeze({
+      length: 1.16,
+      widthScale: 0.94,
+      handleStart: 0.24,
+      alphaStops: Object.freeze([
+        [0.00, 0.18],
+        [0.44, 0.52],
+        [0.82, 0.90],
+        [1.00, 1.00],
+      ]),
+    }),
+  }),
+  blood_covenant_sword: Object.freeze({
+    weaponLengthCm: 126,
+    weaponVfxProfile: Object.freeze({
+      length: 1.24,
+      widthScale: 0.98,
+      handleStart: 0.20,
+      alphaStops: Object.freeze([
+        [0.00, 0.16],
+        [0.40, 0.48],
+        [0.86, 0.96],
+        [1.00, 1.00],
+      ]),
+    }),
+  }),
+  blood_covenant_rapier: Object.freeze({
+    weaponLengthCm: 118,
+    weaponVfxProfile: Object.freeze({
+      length: 1.20,
+      widthScale: 0.76,
+      handleStart: 0.26,
+      alphaStops: Object.freeze([
+        [0.00, 0.16],
+        [0.70, 0.62],
+        [1.00, 1.00],
+      ]),
+    }),
+  }),
+  hungering_cleaver: Object.freeze({
+    weaponLengthCm: 134,
+    weaponVfxProfile: Object.freeze({
+      length: 1.28,
+      widthScale: 1.22,
+      handleStart: 0.16,
+      alphaStops: Object.freeze([
+        [0.00, 0.12],
+        [0.52, 0.26],
+        [0.86, 0.98],
+        [1.00, 0.92],
+      ]),
+    }),
+  }),
+  cataclysm_axe: Object.freeze({
+    weaponLengthCm: 142,
+    weaponVfxProfile: Object.freeze({
+      length: 1.34,
+      widthScale: 1.26,
+      handleStart: 0.14,
+      alphaStops: Object.freeze([
+        [0.00, 0.10],
+        [0.50, 0.24],
+        [0.84, 0.98],
+        [1.00, 0.90],
+      ]),
+    }),
+  }),
+  glacial_edge: Object.freeze({
+    weaponLengthCm: 108,
+    weaponVfxProfile: Object.freeze({
+      length: 1.12,
+      widthScale: 0.90,
+      handleStart: 0.24,
+      alphaStops: Object.freeze([
+        [0.00, 0.20],
+        [0.44, 0.50],
+        [0.84, 0.86],
+        [1.00, 1.00],
+      ]),
+    }),
+  }),
+  never_sated_warclub: Object.freeze({
+    weaponLengthCm: 128,
+    weaponVfxProfile: Object.freeze({
+      length: 1.26,
+      widthScale: 1.24,
+      handleStart: 0.14,
+      alphaStops: Object.freeze([
+        [0.00, 0.10],
+        [0.48, 0.22],
+        [0.82, 0.90],
         [1.00, 1.00],
       ]),
     }),
@@ -219,9 +482,9 @@ function defaultProfileForClass(weaponClass) {
  *   damageType?: string,
  *   twoHanded?: boolean,
  *   weaponLengthCm?: number|string|null,
- *   weaponVfxProfile?: string|null,
+ *   weaponVfxProfile?: string|object|null,
  * }} rec
- * @returns {{ weaponClass: string, weaponLengthCm: number, weaponVfxProfile: string }}
+ * @returns {{ weaponClass: string, weaponLengthCm: number, weaponVfxProfile: string|object }}
  */
 export function resolveWeaponVisualMeta(rec = {}) {
   const byId = SIGNATURE_WEAPON_VISUAL_OVERRIDES[String(rec.id || "").toLowerCase()] || null;

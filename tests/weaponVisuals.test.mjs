@@ -39,7 +39,7 @@ Deno.test("signature weapon overrides are applied in catalog output", () => {
   const doom = ITEM_CATALOG.doom_crossbow;
   assert(doom, "expected doom_crossbow catalog entry");
   assertEquals(Number(doom.weaponLengthCm), 98);
-  assertEquals(String(doom.weaponVfxProfile), "bow");
+  assert(typeof doom.weaponVfxProfile === "object", "expected doom_crossbow object profile override");
 });
 
 Deno.test("buildCatalogItem keeps object weapon density profiles", () => {
@@ -65,4 +65,23 @@ Deno.test("weapon visual overrides take priority over inferred defaults", () => 
   assertEquals(meta.weaponLengthCm, 333);
   assertEquals(meta.weaponVfxProfile, "spear");
   assertEquals(meta.weaponClass, "spear");
+});
+
+Deno.test("director pass applies bespoke profiles to iconic weapons", () => {
+  const ids = [
+    "cataclysm_axe",
+    "hungering_cleaver",
+    "blood_covenant_rapier",
+    "eclipse_maul",
+    "warhammer_of_fury",
+    "witchfire_sword",
+  ];
+  for (let i = 0; i < ids.length; i++) {
+    const id = ids[i];
+    const rec = ITEM_CATALOG[id];
+    assert(rec, `missing catalog item ${id}`);
+    assert(Number(rec.weaponLengthCm || 0) > 0, `${id} should have explicit weaponLengthCm`);
+    assert(typeof rec.weaponVfxProfile === "object", `${id} should use bespoke object profile`);
+    assert(Array.isArray(rec.weaponVfxProfile.alphaStops), `${id} should include alphaStops`);
+  }
 });
