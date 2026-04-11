@@ -928,9 +928,9 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     const pos = getPosition(owner);
     if (!pos || !canShowAt(pos.x, pos.y)) return;
 
-    ftext.addStatus(pos.x, pos.y - 0.72, 'QUEST COMPLETE!', {
+    ftext.addStatus(pos.x, pos.y - 1.3, 'QUEST COMPLETE!', {
       color: '#ffd85a',
-      life: 1.35,
+      life: 3.0,
       scaleStart: 1.72,
       scaleEnd: 1.02,
     });
