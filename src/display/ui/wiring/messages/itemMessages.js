@@ -6,22 +6,7 @@ export function installItemMessages(ctx) {
   const { world, log, nameOfEntity, nameOfItem, bracketizeName, richEntity, playerEntity,
           compGet, compHas, canSeeAt, ItemInfo, NamedIdentity, Position, Player, Pet, Owner, Devotion, Encumbrance } = ctx;
 
-  // === Item events ===
-  world.on('drank', ({ actor, itemId, target, feel, identified }) => {
-    const who = nameOfEntity(actor);
-    const tgt = nameOfEntity(target || actor);
-    if (identified === false && feel) {
-      if (who === 'You') log(`You drink an unknown vial. ${feel}`, 'system');
-      else log(`${who} drinks an unknown vial.`, 'system');
-      return;
-    }
-    const it = nameOfItem(itemId);
-    if (tgt === 'You' && who === 'You') log(`You drink ${it}.`, 'system');
-    else if (who === tgt) log(`${who} drinks ${it}.`, 'system');
-    else log(`${who} uses ${it} on ${tgt}.`, 'system');
-  });
-
-  world.on('item:pickup', ({ actor, itemId, count }) => {
+  function logPickupEvent({ actor, itemId, count }) {
     const pe = playerEntity(world);
     const playerId = Number(pe?.id || 0) | 0;
     const actorId = Number(actor || 0) | 0;
@@ -48,9 +33,35 @@ export function installItemMessages(ctx) {
     // Non-player pickup — only if visible
     const pos = compGet(actorId, Position);
     if (!pos || !canSeeAt(pos.x, pos.y)) return;
-    const petName = nameOfEntity(actor);
+    const pickerName = nameOfEntity(actor);
     const it = nameOfItem(itemId);
-    log(`${petName} picks up ${it}.`, 'system');
+    log(`${pickerName} picks up ${it}.`, 'system');
+  }
+
+  // === Item events ===
+  world.on('drank', ({ actor, itemId, target, feel, identified }) => {
+    const who = nameOfEntity(actor);
+    const tgt = nameOfEntity(target || actor);
+    if (identified === false && feel) {
+      if (who === 'You') log(`You drink an unknown vial. ${feel}`, 'system');
+      else log(`${who} drinks an unknown vial.`, 'system');
+      return;
+    }
+    const it = nameOfItem(itemId);
+    if (tgt === 'You' && who === 'You') log(`You drink ${it}.`, 'system');
+    else if (who === tgt) log(`${who} drinks ${it}.`, 'system');
+    else log(`${who} uses ${it} on ${tgt}.`, 'system');
+  });
+
+  world.on('item:pickup', ({ actor, itemId, count }) => {
+    logPickupEvent({ actor, itemId, count });
+  });
+
+  // Legacy pickup event compatibility: { id, itemId, at }
+  world.on('pickup', ({ id, itemId, count }) => {
+    const info = compGet(itemId, ItemInfo);
+    const resolvedCount = Number(count ?? info?.count ?? 1) | 0;
+    logPickupEvent({ actor: id, itemId, count: resolvedCount });
   });
 
   world.on('item:transformed', ({ itemId, ownerId, scope, from, to, cause }) => {

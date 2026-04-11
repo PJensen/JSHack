@@ -473,3 +473,41 @@ Deno.test("messageWiring logs explicit bleeding proc sources", () => {
   assert(messageLog.entries[0].text.includes("wound"), "bleeding proc should mention the wound");
   assert(messageLog.entries[1].text.includes("wound") || messageLog.entries[1].text.includes("rips"), "hemorrhage proc should describe the wound worsening");
 });
+
+Deno.test("messageWiring logs player item:pickup events", () => {
+  const world = new World({ seed: 321 });
+  const playerId = world.create();
+  world.add(playerId, Player, {});
+
+  const itemId = world.create();
+  world.add(itemId, NamedIdentity, { name: "Apple", identity: "apple" });
+  world.add(itemId, ItemInfo, { type: "food", count: 1, weight: 0.2, bonuses: {}, affixes: [] });
+
+  const messageLog = createMessageLog();
+  installWithDeps(world, messageLog, playerId);
+
+  world.emit("item:pickup", { actor: playerId, itemId, count: 1, itemX: 1, itemY: 1 });
+
+  assertEquals(messageLog.entries.length, 1);
+  assert(messageLog.entries[0].text.includes("You pick up"), "pickup should be logged");
+  assert(messageLog.entries[0].text.includes("[Apple]"), "pickup message should include item name");
+});
+
+Deno.test("messageWiring logs legacy pickup events", () => {
+  const world = new World({ seed: 654 });
+  const playerId = world.create();
+  world.add(playerId, Player, {});
+
+  const itemId = world.create();
+  world.add(itemId, NamedIdentity, { name: "Apple", identity: "apple" });
+  world.add(itemId, ItemInfo, { type: "food", count: 1, weight: 0.2, bonuses: {}, affixes: [] });
+
+  const messageLog = createMessageLog();
+  installWithDeps(world, messageLog, playerId);
+
+  world.emit("pickup", { id: playerId, itemId, at: { x: 1, y: 1 } });
+
+  assertEquals(messageLog.entries.length, 1);
+  assert(messageLog.entries[0].text.includes("You pick up"), "legacy pickup should be logged");
+  assert(messageLog.entries[0].text.includes("[Apple]"), "legacy pickup message should include item name");
+});
