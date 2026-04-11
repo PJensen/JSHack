@@ -1955,7 +1955,7 @@ function createQuickSlot(opts = {}) {
     stack.push(normalizeQuickItem({ ...item, justPickedUp: true }));
     const top = peekStackTop(stack);
     console.debug('[quickSlot] stack after push:', JSON.stringify(stack), 'actionable[top]:', top ? actionable(top) : 'empty');
-    renderStack();
+    renderStack({ startExpanded: true });
     resetDismissTimer();
   });
 
