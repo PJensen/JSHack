@@ -18,7 +18,7 @@ export function installCombatLogTooltip(tickerEl, deps) {
   Object.assign(tip.style, {
     position: 'fixed',
     display: 'none',
-    pointerEvents: 'none',
+    pointerEvents: 'auto',
     zIndex: String(TIP_Z),
     background: 'rgba(8,12,20,0.96)',
     border: '1px solid rgba(80,120,170,0.7)',
@@ -34,6 +34,23 @@ export function installCombatLogTooltip(tickerEl, deps) {
     wordBreak: 'break-word',
   });
   document.body.appendChild(tip);
+
+  // Inject a style rule so tooltip-target elements look interactive
+  const style = document.createElement('style');
+  style.textContent = `
+    [data-entity-id], [data-spell-id] {
+      cursor: pointer;
+      text-decoration-line: underline;
+      text-decoration-style: dotted;
+      text-underline-offset: 2px;
+      text-decoration-thickness: 1px;
+    }
+    [data-entity-id]:hover, [data-spell-id]:hover {
+      text-decoration-style: solid;
+      filter: brightness(1.25);
+    }
+  `;
+  document.head.appendChild(style);
 
   // ── Rarity colors ──
   const rarityColors = {
@@ -192,25 +209,59 @@ export function installCombatLogTooltip(tickerEl, deps) {
     clearTimeout(showTimer);
   }
 
-  tickerEl.addEventListener('pointerenter', (ev) => {
-    const el = /** @type {HTMLElement} */ (ev.target)?.closest?.('[data-entity-id],[data-spell-id]');
+  const SELECTOR = '[data-entity-id],[data-spell-id]';
+
+  // Hover: use pointerover/pointerout (they bubble, unlike pointerenter/pointerleave)
+  tickerEl.addEventListener('pointerover', (ev) => {
+    const el = /** @type {HTMLElement} */ (ev.target)?.closest?.(SELECTOR);
     if (!el) return;
     if (el === activeTarget) return;
     activeTarget = el;
     clearTimeout(showTimer);
-    // Small delay to avoid flicker on mouse traversal
-    showTimer = setTimeout(() => show(el), 120);
+    showTimer = setTimeout(() => show(el), 100);
+  });
+
+  tickerEl.addEventListener('pointerout', (ev) => {
+    const el = /** @type {HTMLElement} */ (ev.target)?.closest?.(SELECTOR);
+    if (!el) return;
+    // Only hide if we're leaving the active target and not entering another tip target
+    const related = /** @type {HTMLElement} */ (ev.relatedTarget)?.closest?.(SELECTOR);
+    if (related === activeTarget) return;
+    hide();
+  });
+
+  // Click/tap: toggle tooltip on rich elements, block expand/collapse
+  tickerEl.addEventListener('click', (ev) => {
+    const el = /** @type {HTMLElement} */ (ev.target)?.closest?.(SELECTOR);
+    if (el) {
+      ev.preventDefault();
+      ev.stopImmediatePropagation();
+      if (el === activeTarget && tip.style.display === 'block') {
+        hide();
+      } else {
+        activeTarget = el;
+        clearTimeout(showTimer);
+        show(el);
+      }
+      return;
+    }
+    // Non-tooltip click — hide any open tooltip (expand/collapse will handle itself)
+    hide();
   }, true);
 
-  tickerEl.addEventListener('pointerleave', (ev) => {
-    const el = /** @type {HTMLElement} */ (ev.target)?.closest?.('[data-entity-id],[data-spell-id]');
-    if (el && el === activeTarget) hide();
-  }, true);
-
-  // Also hide on any click (expand/collapse)
-  tickerEl.addEventListener('click', () => hide(), true);
-
-  // Hide on scroll/resize
+  // Hide on scroll/resize or touch outside
   window.addEventListener('scroll', hide, { passive: true });
   window.addEventListener('resize', hide, { passive: true });
+  // Tap tooltip itself to dismiss
+  tip.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    hide();
+  });
+
+  // Tap outside tooltip + ticker to dismiss
+  document.addEventListener('pointerdown', (ev) => {
+    if (!tip.contains(/** @type {Node} */ (ev.target)) && !tickerEl.contains(/** @type {Node} */ (ev.target))) {
+      hide();
+    }
+  }, { passive: true });
 }
