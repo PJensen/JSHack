@@ -539,6 +539,21 @@ export function createMeleeSlashFxController() {
       _active.push(spawnParry(ox, oy, atkPos));
     });
 
+    // Miss whiff — awkward swing through air on a failed to-hit roll
+    world.on('status', (ev) => {
+      if (!ev || ev.kind !== 'miss' || !ev.source) return;
+      const aId = Number(ev.source) | 0;
+      const dId = Number(ev.id) | 0;
+      if (!(aId > 0)) return;
+      const atkPos = getPosition(aId);
+      const defPos = getPosition(dId);
+      if (!defPos) return;
+
+      const ox = atkPos ? atkPos.x + (defPos.x - atkPos.x) * 0.6 : defPos.x;
+      const oy = atkPos ? atkPos.y + (defPos.y - atkPos.y) * 0.6 : defPos.y;
+      _active.push(spawnWhiff(ox, oy, atkPos));
+    });
+
     // Dodge whiff — originates from the attacker's swing
     world.on('combat:dodge', ({ defender, attacker, at }) => {
       const dId = Number(defender || 0) | 0;

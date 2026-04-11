@@ -364,6 +364,24 @@ export function createBumpFxController() {
       if (attacker) convertToWhiff(Number(attacker) | 0);
     });
 
+    // Insufficient stamina → convert lunge into a struggle jerk
+    world.on('attack:insufficient-stamina', ({ attacker }) => {
+      const a = Number(attacker || 0) | 0;
+      if (!(a > 0)) return;
+      const queue = active.get(a);
+      if (!queue) return;
+      for (let i = queue.length - 1; i >= 0; i--) {
+        const b = queue[i];
+        if (!b.offhand && !b.struggle) {
+          b.struggle = true;
+          b.dist = STRUGGLE_DIST;
+          b.duration = STRUGGLE_TOTAL;
+          b.elapsed = b.delay;
+          break;
+        }
+      }
+    });
+
     // Struggle jerk when slowed actor tries to move
     world.on('movement:slowed', ({ actor, x, y, dx, dy }) => {
       const a = Number(actor || 0) | 0;
