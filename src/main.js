@@ -113,6 +113,7 @@ import { createGlyphAtlas, drawKind, drawKindScaled } from "./display/passes/gly
 import { aegisWard as drawAegisWardGlyphFx } from "./display/passes/vfx/glyph/effects/aegisWard.js";
 import { Settings } from "./rules/components/Settings.js";
 import { Vitality } from "./rules/components/Vitality.js";
+import { Encumbrance } from "./rules/components/Encumbrance.js";
 import { Devotion } from "./rules/components/Devotion.js";
 import { Anatomy, HEARING_TIERS } from "./rules/components/Anatomy.js";
 import { Status } from "./rules/components/Status.js";
@@ -1222,6 +1223,7 @@ installMessageWiring({
     Anatomy,
     DungeonState,
     Status,
+    Encumbrance,
   },
   soundApi: {
     evaluateSound,
@@ -1236,7 +1238,8 @@ if (_overlays?.ticker) {
     world,
     getMonster,
     getSpell,
-    components: { NamedIdentity, ItemInfo, Vitality, Equipment },
+    resolveItemDisplayObject: buildItemDisplayData,
+    components: { NamedIdentity, ItemInfo, Vitality },
   });
 }
 
