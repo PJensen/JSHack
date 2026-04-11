@@ -86,19 +86,29 @@ export function installItemMessages(ctx) {
   world.on('corpse:buff-gained', ({ actor, effect, description }) => {
     const pe = playerEntity(world);
     if (!pe || Number(actor || 0) !== pe.id) return;
-    log(`You feel ${String(description || effect || 'something stirs within you')}.`, 'system');
+    const desc = String(description || effect || 'something stirring inside you');
+    log(`You wipe the blood from your chin. You feel ${desc}.`, 'system');
   });
 
   world.on('corpse:debuff-gained', ({ actor, effect, description }) => {
     const pe = playerEntity(world);
     if (!pe || Number(actor || 0) !== pe.id) return;
-    log(`You feel ${String(description || effect || 'something is wrong')}.`, 'danger');
+    const desc = String(description || effect || 'deeply wrong');
+    log(`That was a mistake. You feel ${desc}.`, 'danger');
   });
 
   world.on('corpse:resistance-gained', ({ actor, type }) => {
     const pe = playerEntity(world);
     if (!pe || Number(actor || 0) !== pe.id) return;
-    log(`Your body adapts \u2014 ${String(type || 'unknown')} resistance gained.`, 'legendary');
+    const label = String(type || 'unknown');
+    const _resistMsgs = {
+      fire: `The meat burns going down. Your flesh no longer fears flame \u2014 fire resistance gained.`,
+      cold: `The meat is ice-cold and numbs your throat. Cold resistance gained.`,
+      poison: `The aftertaste is chemical. Your blood thickens \u2014 poison resistance gained.`,
+      lightning: `Static crackles between your teeth. Lightning resistance gained.`,
+      acid: `Your tongue blisters, then heals. Acid resistance gained.`,
+    };
+    log(_resistMsgs[label] || `Your body adapts to something fundamental \u2014 ${label} resistance gained.`, 'legendary');
   });
 
   world.on('corpse:resist-building', ({ actor, type, pct }) => {
@@ -113,7 +123,12 @@ export function installItemMessages(ctx) {
   world.on('corpse:progression', ({ actor, name, count, threshold }) => {
     const pe = playerEntity(world);
     if (!pe || Number(actor || 0) !== pe.id) return;
-    log(`Your body adapts... (${String(name || 'unknown')}: ${Number(count || 0)}/${Number(threshold || 0)})`, 'system');
+    const c = Number(count || 0);
+    const t = Number(threshold || 0);
+    const label = String(name || 'unknown');
+    if (c <= 1) log(`Something stirs inside you... (${label}: ${c}/${t})`, 'system');
+    else if (c >= t - 1) log(`Your body is on the verge of transformation. (${label}: ${c}/${t})`, 'system');
+    else log(`The change deepens. (${label}: ${c}/${t})`, 'system');
   });
 
   world.on('corpse:misdirect', ({ actor, identity, misdirectedCount, isUndead }) => {
