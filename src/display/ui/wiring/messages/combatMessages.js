@@ -276,7 +276,7 @@ export function installCombatMessages(ctx) {
     const info = compGet(wid, ItemInfo);
     const rn = String(info?.rarityName || 'common').toLowerCase();
     const color = _rarityColors[rn] || '#ffffff';
-    return ` with <b style="color:${color}">[${wname}]</b>`;
+    return ` with <b style="color:${color}" data-entity-id="${wid}" data-tip="item">[${wname}]</b>`;
   }
 
   // verb pairs: [you-form, third-person-form]

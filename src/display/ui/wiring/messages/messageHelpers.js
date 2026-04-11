@@ -399,5 +399,6 @@ export function createMessageContext({
     Player,
     Position,
     Devotion,
+    Status,
   };
 }
