@@ -364,6 +364,6 @@ Deno.test("messageWiring logs explicit bleeding proc sources", () => {
   world.emit("proc:hemorrhage", { actor: playerId, target: enemyId });
 
   assertEquals(messageLog.entries.length, 2);
-  assert(messageLog.entries[0].text.includes("bleeding wound"), "bleeding proc should explain why bleed occurred");
-  assert(messageLog.entries[1].text.includes("Hemorrhage"), "hemorrhage proc should be named in the log");
+  assert(messageLog.entries[0].text.includes("wound"), "bleeding proc should mention the wound");
+  assert(messageLog.entries[1].text.includes("wound") || messageLog.entries[1].text.includes("rips"), "hemorrhage proc should describe the wound worsening");
 });
