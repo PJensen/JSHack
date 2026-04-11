@@ -82,6 +82,17 @@ const WEAPON_VFX_PROFILES = Object.freeze({
     ]),
   }),
   morningstar: Object.freeze({
+    length: 1.10,
+    widthScale: 1.20,
+    handleStart: 0.18,
+    alphaStops: Object.freeze([
+      [0.00, 0.06],
+      [0.70, 0.10],
+      [0.85, 0.80],
+      [1.00, 1.00],
+    ]),
+  }),
+  nunchucks: Object.freeze({
     length: 0.98,
     widthScale: 1.16,
     handleStart: 0.20,
