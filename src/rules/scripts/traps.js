@@ -76,7 +76,7 @@ registerScript('trap_spike', {
       amount,
       source: Number(ctx?.trapId || 0) || 0,
       type: 'pierce',
-      cause: 'spike_trap',
+      cause: 'a pit full of sharp spikes',
       at: pos ? { x: pos.x, y: pos.y } : undefined,
     });
   }
@@ -100,7 +100,7 @@ registerScript('trap_shock', {
       amount,
       source: Number(ctx?.trapId || 0) || 0,
       type: 'lightning',
-      cause: 'shock_trap',
+      cause: 'a jolt of mass electrocution',
       at: pos ? { x: pos.x, y: pos.y } : undefined,
     });
     // Electrocution (stun + blind + deafen) is auto-applied by the damaged-event
@@ -196,7 +196,7 @@ registerScript("trap_pit", {
       amount,
       source: trapId,
       type: "blunt",
-      cause: "pit_trap",
+      cause: "a long fall into a pit",
       at: candidate ? { x: candidate.x | 0, y: candidate.y | 0 } : { x: from.x | 0, y: from.y | 0 },
     });
   },
@@ -258,7 +258,7 @@ registerScript("trap_siphon", {
           amount,
           source: trapId,
           type: "arcane",
-          cause: "siphon_trap",
+          cause: "having the life sucked out by a siphon trap",
           at: pos ? { x: pos.x | 0, y: pos.y | 0 } : undefined,
         });
         drained = Math.max(0, Number(out?.amount || 0));
@@ -426,7 +426,7 @@ registerScript("trap_gas", {
         if (!vit || (vit.hp | 0) <= 0) return;
         dealDamage(world, {
           target: id, amount: EXPLOSION_DMG, source: 0,
-          type: 'fire', cause: 'trap:gas_explosion',
+          type: 'fire', cause: 'an exploding gas trap',
           at: { x: tx, y: ty },
         });
       });

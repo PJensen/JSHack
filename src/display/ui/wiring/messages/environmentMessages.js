@@ -167,30 +167,30 @@ export function installEnvironmentMessages(ctx) {
   world.on('fountain:drink', (ev) => {
     const { actor, effect, amount } = ev;
     if (nameOfEntity(actor) !== 'You') return;
-    if (effect === 'heal') log(`You drink from the fountain and feel refreshed. (+${amount} HP)`, 'system');
-    else if (effect === 'mana') log(`You drink from the fountain. Magical energy surges through you. (+${amount} MP)`, 'system');
+    if (effect === 'heal') log(`You take a sip and feel vigour course through you. (+${amount} HP)`, 'system');
+    else if (effect === 'mana') log(`The water tastes faintly of ozone. Magical energy surges into you. (+${amount} MP)`, 'system');
     else if (effect === 'buff') {
       const labels = { lucky: 'Lucky', keen_eye: 'Keen Eye', bear_vigor: "Bear's Vigor" };
-      log(`You drink from the fountain. A warm tingle spreads through you. (${labels[ev.buff] || ev.buff})`, 'system');
+      log(`A warm tingle spreads from your stomach to your fingertips. (${labels[ev.buff] || ev.buff})`, 'system');
     }
-    else if (effect === 'see_invisible') log('You drink from the fountain. Your eyes tingle \u2014 you can perceive the unseen!', 'system');
-    else if (effect === 'gold') log(`Gold coins bubble up from the fountain depths! (+${amount} gold)`, 'system');
+    else if (effect === 'see_invisible') log('Your eyes sting. The air shimmers. You can see things that aren\u2019t entirely there.', 'system');
+    else if (effect === 'gold') log(`Gold coins bubble up from the depths! You fish them out greedily. (+${amount} gold)`, 'system');
     else if (effect === 'curse') {
-      if (ev.cursedName) log(`You drink from the fountain. A black aura envelops your ${ev.cursedName}!`, 'danger');
-      else log('You drink from the fountain. You feel a chill, but nothing happens.', 'system');
+      if (ev.cursedName) log(`The water is ice-cold. A black aura crawls over your ${ev.cursedName}!`, 'danger');
+      else log('The water is ice-cold. You shiver, but nothing else happens.', 'system');
     }
-    else if (effect === 'poison') log(`You drink from the fountain. It was contaminated! (-${amount} HP)`, 'combat');
+    else if (effect === 'poison') log(`Gah \u2014 the water is foul! You gag and spit. (-${amount} HP)`, 'combat');
     else if (effect === 'creature') {
-      if (ev.spawnedName) log(`Something emerges from the fountain! A ${ev.spawnedName} appears!`, 'danger');
-      else log('You drink from the fountain. The water churns ominously, then settles.', 'system');
+      if (ev.spawnedName) log(`Something grabs your hand from below! A ${ev.spawnedName} surges out of the fountain!`, 'danger');
+      else log('The water churns ominously. Bubbles rise, then stop. Just bubbles. Probably.', 'system');
     }
-    else if (effect === 'teleport') log('You drink from the fountain. The world spins and you are elsewhere!', 'danger');
-    else if (effect === 'gush') log('The fountain erupts! Water gushes everywhere as the fountain crumbles!', 'danger');
+    else if (effect === 'teleport') log('The water tastes like static. The world lurches and you are elsewhere!', 'danger');
+    else if (effect === 'gush') log('The fountain erupts! Water gushes everywhere and the basin crumbles to rubble!', 'danger');
     else if (effect === 'wish') {
-      if (ev.wishedItem) log(`A shimmering spirit rises from the fountain depths and grants you a boon: ${ev.wishedItem}!`, 'system');
-      else log('A spirit stirs in the depths... but the waters fall still.', 'system');
+      if (ev.wishedItem) log(`A shimmering spirit rises from the depths and presses something into your hands: ${ev.wishedItem}!`, 'system');
+      else log('A spirit stirs in the depths... regards you... and sinks back without a word.', 'system');
     }
-    else log('You drink from the fountain. The water is stale.', 'system');
+    else log('You take a sip. The water is stale and tastes faintly of copper.', 'system');
   });
 
   world.on('fountain:destroyed', ({ actor }) => {
