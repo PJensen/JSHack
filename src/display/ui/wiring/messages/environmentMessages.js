@@ -158,8 +158,12 @@ export function installEnvironmentMessages(ctx) {
     }
   });
 
-  world.on('interaction', ({ action, result, items: droppedIds, targetId, epitaph }) => {
+  world.on('interaction', ({ actor, action, result, items: droppedIds, targetId, epitaph }) => {
     if (action === 'toggleDoor') {
+      const actorIsPlayer = nameOfEntity(actor) === 'You';
+      const doorPos = compGet(Number(targetId || 0), Position);
+      const canPerceiveDoor = !!(doorPos && canSeeAt(doorPos.x, doorPos.y));
+      if (!actorIsPlayer && !canPerceiveDoor) return;
       if (result === 'opened') {
         if (_playerHas('blinded')) log('You find the handle by touch. The door creaks open.', 'system');
         else if (_playerHas('confused')) log('You fumble with the door. It creaks open \u2014 you think.', 'system');

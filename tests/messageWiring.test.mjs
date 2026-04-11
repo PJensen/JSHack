@@ -254,6 +254,77 @@ Deno.test("messageWiring only logs flying messages for visible creatures", () =>
   assert(visibleLog.entries[1].text.includes("ground") || visibleLog.entries[1].text.includes("lands") || visibleLog.entries[1].text.includes("folds"), "land should describe landing");
 });
 
+Deno.test("messageWiring suppresses non-player door toggle messages when door is not visible", () => {
+  const world = new World({ seed: 42 });
+  const playerId = world.create();
+  world.add(playerId, Player, {});
+
+  const npcId = world.create();
+  world.add(npcId, NamedIdentity, { name: "Vendor", identity: "town_vendor" });
+
+  const doorId = world.create();
+  world.add(doorId, Position, { x: 10, y: 10 });
+
+  const messageLog = createMessageLog();
+  installWithDeps(world, messageLog, playerId, { isVisibleAt: () => false });
+
+  world.emit("interaction", {
+    actor: npcId,
+    action: "toggleDoor",
+    result: "closed",
+    targetId: doorId,
+  });
+
+  assertEquals(messageLog.entries.length, 0);
+});
+
+Deno.test("messageWiring logs non-player door toggle messages when door is visible", () => {
+  const world = new World({ seed: 42 });
+  const playerId = world.create();
+  world.add(playerId, Player, {});
+
+  const npcId = world.create();
+  world.add(npcId, NamedIdentity, { name: "Vendor", identity: "town_vendor" });
+
+  const doorId = world.create();
+  world.add(doorId, Position, { x: 10, y: 10 });
+
+  const messageLog = createMessageLog();
+  installWithDeps(world, messageLog, playerId, { isVisibleAt: () => true });
+
+  world.emit("interaction", {
+    actor: npcId,
+    action: "toggleDoor",
+    result: "closed",
+    targetId: doorId,
+  });
+
+  assertEquals(messageLog.entries.length, 1);
+  assert(messageLog.entries[0].text.includes("door"), "visible door toggle should be logged");
+});
+
+Deno.test("messageWiring always logs player door toggles even without visibility probe", () => {
+  const world = new World({ seed: 42 });
+  const playerId = world.create();
+  world.add(playerId, Player, {});
+
+  const doorId = world.create();
+  world.add(doorId, Position, { x: 10, y: 10 });
+
+  const messageLog = createMessageLog();
+  installWithDeps(world, messageLog, playerId, { isVisibleAt: () => false });
+
+  world.emit("interaction", {
+    actor: playerId,
+    action: "toggleDoor",
+    result: "opened",
+    targetId: doorId,
+  });
+
+  assertEquals(messageLog.entries.length, 1);
+  assert(messageLog.entries[0].text.includes("door"), "player door toggle should always be logged");
+});
+
 Deno.test("messageWiring scopes spell:not-known text by actor", () => {
   const world = new World({ seed: 42 });
   const playerId = world.create();
