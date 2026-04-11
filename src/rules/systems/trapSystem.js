@@ -1,6 +1,7 @@
 import { Position } from "../components/Position.js";
 import { Trap } from "../components/Trap.js";
 import { Vitality } from "../components/Vitality.js";
+import { Player } from "../components/Player.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { runScript, ScriptVerb } from "../scripting.js";
 import { resolveCanonicalStats } from "../utils/canonicalStats.js";
@@ -14,9 +15,9 @@ export function trapSystem(world) {
   for (const [tid, tpos, t] of world.query(Position, Trap)) {
     if (!tpos || !t || !t.armed) continue;
 
-    // Find the first living entity standing on this trap
+    // Find the player standing on this trap (monsters don't trigger traps)
     let victimId = 0;
-    for (const [id, pos] of world.query(Position, Vitality)) {
+    for (const [id, pos] of world.query(Position, Player)) {
       if (!pos || id === tid) continue;
       if (pos.x === tpos.x && pos.y === tpos.y) {
         victimId = id;

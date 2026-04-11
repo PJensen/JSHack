@@ -71,7 +71,7 @@ export const SiphonTrap = defineArchetype(
     [Trap, (p) => ({
         type: "siphon",
         script: "trap_siphon",
-        params: p.trapParams ?? { resource: "hp", percent: 0.15, healNearestEnemy: true },
+        params: p.trapParams ?? { resource: "drain", percent: 0.15, healNearestEnemy: false },
         revealed: false,
         armed: true,
         difficulty: p.difficulty ?? 13,
