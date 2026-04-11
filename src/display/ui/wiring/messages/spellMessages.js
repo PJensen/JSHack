@@ -10,76 +10,76 @@ export function installSpellMessages(ctx) {
     const tgt = nameOfEntity(targetId || actor);
     const s = getSpell ? getSpell(String(spellId || '')) : null;
     const label = s?.name ? bracketizeName(s.name) : '[Spell]';
-    if (who === 'You' && tgt === 'You') log(`You cast ${label}.`, 'system');
-    else if (who === 'You') log(`You cast ${label} on ${tgt}.`, 'system');
-    else if (tgt === 'You') log(`${who} casts ${label} on you.`, 'system');
+    if (who === 'You' && tgt === 'You') log(`You invoke ${label}.`, 'system');
+    else if (who === 'You') log(`You hurl ${label} at ${tgt}.`, 'system');
+    else if (tgt === 'You') log(`${who} hurls ${label} at you!`, 'danger');
     else log(`${who} casts ${label} on ${tgt}.`, 'system');
   });
 
   world.on('spirit:spellBoost', () => {
-    log('The spirit wisp surges alongside your spell!', 'deity');
+    log('The spirit wisp flares \u2014 it feeds its essence into your spell!', 'deity');
   });
 
   world.on('spell:not-known', ({ actor, spellId }) => {
     const who = nameOfEntity(actor);
     if (who === 'You') {
-      log(`You don't know that spell${spellId ? ` [${spellId}]` : ''}.`, 'system');
+      log(`You trace the gestures for ${spellId ? `[${spellId}]` : 'a spell'}, but nothing happens. You don't know this magic.`, 'system');
       return;
     }
-    log(`${who} tries to cast an unknown spell${spellId ? ` [${spellId}]` : ''}.`, 'system');
+    log(`${who} fumbles through unfamiliar incantations. Nothing happens.`, 'system');
   });
 
   world.on('spell:unknown', ({ actor, spellId }) => {
     const who = nameOfEntity(actor);
     if (who === 'You') {
-      log(`Unknown spell${spellId ? ` [${spellId}]` : ''}.`, 'system');
+      log(`The words feel wrong in your mouth. This isn't a real spell.`, 'system');
       return;
     }
-    log(`${who} attempts an invalid spell${spellId ? ` [${spellId}]` : ''}.`, 'system');
+    log(`${who} mutters gibberish and waves their hands. Nothing happens.`, 'system');
   });
 
   world.on('spell:no-target', ({ actor, range }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    log(range <= 1 ? 'No enemy in melee range.' : 'No enemy in range.', 'system');
+    log(range <= 1 ? 'You lash out \u2014 nothing within arm\u2019s reach.' : 'You scan for a target. Nothing in range.', 'system');
   });
 
   world.on('spell:oom', ({ actor, spellId, need, have, costKind }) => {
     const who = nameOfEntity(actor);
     const resource = String(costKind || 'mana');
-    const label = resource === 'stamina' ? 'stamina' : resource === 'life' ? 'life' : 'mana';
+    const label = resource === 'stamina' ? 'stamina' : resource === 'life' ? 'life force' : 'mana';
     if (who === 'You') {
-      log(`Not enough ${label} to cast [${String(spellId || 'spell')}] (need ${need}, have ${have}).`, 'system');
+      log(`You reach for the magic \u2014 your ${label} gutters like a dying candle. Not enough. (need ${need}, have ${have})`, 'system');
       return;
     }
     if (spellId) {
-      log(`${who} lacks ${label} for [${String(spellId)}].`, 'system');
+      log(`${who} begins [${String(spellId)}] but falters \u2014 drained of ${label}.`, 'system');
       return;
     }
-    log(`${who} lacks ${label} to cast.`, 'system');
+    log(`${who} reaches for magic and comes up empty.`, 'system');
   });
 
   world.on('spell:on-cooldown', ({ actor, spellId }) => {
     if (nameOfEntity(actor) !== 'You') return;
     const s = getSpell ? getSpell(String(spellId || '')) : null;
-    const label = s?.name ? `[${s.name}]` : `[${String(spellId || 'spell')}]`;
-    log(`${label} is not ready yet.`, 'system');
+    const label = s?.name || String(spellId || 'spell');
+    log(`The power for [${label}] hasn't gathered yet. Give it time.`, 'system');
   });
 
   world.on('spell:lifetap', ({ actor, hpSpent, manaGained }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    log(`You sacrifice ${hpSpent} life, gaining ${manaGained} mana.`, 'system');
+    log(`You open a vein and let your blood burn into mana. (-${hpSpent} HP, +${manaGained} MP)`, 'combat');
   });
 
   world.on('spell:fizzle', ({ actor, spellId, confused, reason }) => {
     if (nameOfEntity(actor) !== 'You') return;
     const s = getSpell ? getSpell(String(spellId || '')) : null;
     const label = s?.name ? `[${s.name}]` : `[${String(spellId || 'spell')}]`;
-    if (confused) { log(`You lose focus and ${label} fizzles.`, 'system'); return; }
-    if (reason === 'silenced') { log(`You are silenced; ${label} cannot be cast.`, 'system'); return; }
-    if (reason === 'asleep') { log(`You are asleep; ${label} fizzles.`, 'system'); return; }
-    if (reason === 'stunned') { log(`You are stunned; ${label} fizzles.`, 'system'); return; }
-    if (reason === 'mindlocked') { log(`Your mind is locked; ${label} fizzles.`, 'system'); return; }
-    log(`${label} fizzles.`, 'system');
+    if (confused) { log(`Your thoughts scatter \u2014 ${label} unravels in your hands.`, 'system'); return; }
+    if (reason === 'silenced') { log(`Your lips move but no sound comes. ${label} dies on your tongue.`, 'system'); return; }
+    if (reason === 'asleep') { log(`You mumble ${label} in your sleep... the magic slips away.`, 'system'); return; }
+    if (reason === 'stunned') { log(`Your head rings. ${label} fizzles before you can focus.`, 'system'); return; }
+    if (reason === 'mindlocked') { log(`Something grips your mind like a vice. ${label} won't come.`, 'system'); return; }
+    log(`${label} fizzles. The magic dissipates.`, 'system');
   });
 
   world.on('spell:miscast', ({ actor, fromSpellId, toSpellId, confused }) => {
@@ -88,8 +88,8 @@ export function installSpellMessages(ctx) {
     const to = getSpell ? getSpell(String(toSpellId || '')) : null;
     const fromLabel = from?.name ? `[${from.name}]` : `[${String(fromSpellId || 'spell')}]`;
     const toLabel = to?.name ? `[${to.name}]` : `[${String(toSpellId || 'spell')}]`;
-    if (confused) { log(`Your confusion twists ${fromLabel} into ${toLabel}.`, 'system'); return; }
-    log(`${fromLabel} miscasts into ${toLabel}.`, 'system');
+    if (confused) { log(`Your confusion twists ${fromLabel} into ${toLabel} \u2014 that's not what you meant!`, 'danger'); return; }
+    log(`The magic warps \u2014 ${fromLabel} becomes ${toLabel}!`, 'danger');
   });
 
   // === Channeling events ===
@@ -97,73 +97,76 @@ export function installSpellMessages(ctx) {
     if (nameOfEntity(actor) !== 'You') return;
     const s = getSpell ? getSpell(String(spellId || '')) : null;
     const label = s?.name ? bracketizeName(s.name) : '[Spell]';
-    log(`You begin channeling ${label}...`, 'system');
+    log(`You plant your feet and begin channeling ${label}...`, 'system');
   });
 
   world.on('channeling:tick', ({ actor, spellId, mode, turnsRemaining, turnsTotal }) => {
     if (nameOfEntity(actor) !== 'You') return;
     if (mode === 'sustain') return;
     const elapsed = Math.max(0, (turnsTotal || 0) - (turnsRemaining || 0));
-    log(`Channeling... (${elapsed}/${turnsTotal || '?'})`, 'system');
+    const pct = turnsTotal ? Math.round((elapsed / turnsTotal) * 100) : 0;
+    if (pct < 30) log(`Power gathers... (${elapsed}/${turnsTotal || '?'})`, 'system');
+    else if (pct < 70) log(`The air hums with building energy. (${elapsed}/${turnsTotal || '?'})`, 'system');
+    else log(`Almost there \u2014 the spell strains to release! (${elapsed}/${turnsTotal || '?'})`, 'system');
   });
 
   world.on('channeling:cancelled', ({ actor, spellId, reason }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    if (reason === 'dead') { log('Channeling interrupted by death.', 'combat'); }
-    else if (reason === 'oom') { log('Your mana gives out and the channel collapses.', 'system'); }
-    else if (reason === 'silenced') { log('You are silenced and lose the channel.', 'system'); }
-    else if (reason === 'asleep') { log('You fall asleep and the channel breaks.', 'system'); }
-    else if (reason === 'stunned') { log('You are stunned and lose the channel.', 'system'); }
-    else if (reason === 'mindlocked') { log('Your mind locks and the channel breaks.', 'system'); }
-    else if (reason === 'mana_full') { log('Your mana is fully restored.', 'system'); }
-    else { log('Channeling interrupted.', 'system'); }
+    if (reason === 'dead') { log('The channel dies with you.', 'combat'); }
+    else if (reason === 'oom') { log('Your mana runs dry \u2014 the channel collapses in a shower of sparks.', 'system'); }
+    else if (reason === 'silenced') { log('Silence falls over you. The channel shatters.', 'system'); }
+    else if (reason === 'asleep') { log('You slump forward. The channel dissolves.', 'system'); }
+    else if (reason === 'stunned') { log('A blow breaks your concentration \u2014 the channel snaps.', 'system'); }
+    else if (reason === 'mindlocked') { log('Your mind seizes. The gathered energy scatters.', 'system'); }
+    else if (reason === 'mana_full') { log('Mana floods back into you \u2014 you\u2019re full to the brim.', 'heal'); }
+    else { log('Your concentration breaks. The channeled energy disperses.', 'system'); }
   });
 
   world.on('intent:blocked', ({ actor, reason }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    if (reason === 'stunned') { log('You are stunned and can only wait.', 'system'); return; }
-    if (reason === 'rooted') { log('Vines hold you fast — you cannot move!', 'system'); return; }
-    log('You cannot act right now.', 'system');
+    if (reason === 'stunned') { log('Your body won\u2019t obey. All you can do is wait for the ringing to stop.', 'system'); return; }
+    if (reason === 'rooted') { log('Thorny vines dig into your boots \u2014 you\u2019re going nowhere!', 'system'); return; }
+    log('You strain against invisible bonds. Nothing happens.', 'system');
   });
 
   world.on('spell:smite', ({ actor, fizzle }) => {
     if (!fizzle) return;
     if (nameOfEntity(actor) !== 'You') return;
-    log('Smite finds no target.', 'system');
+    log('You call down holy wrath \u2014 but there\u2019s nothing to smite.', 'system');
   });
 
   world.on('spell:flash_heal', ({ actor, reason, amount }) => {
     if (nameOfEntity(actor) !== 'You') return;
     if (reason === 'full_health' || Number(amount || 0) <= 0) {
-      log('Flash Heal has no effect; you are already at full health.', 'system');
+      log('Healing light washes over you and finds nothing to mend.', 'system');
     }
   });
 
   world.on('spell:heal', ({ actor, reason, amount }) => {
     if (nameOfEntity(actor) !== 'You') return;
     if (reason === 'full_health' || Number(amount || 0) <= 0) {
-      log('Heal has no effect; target is already at full health.', 'system');
+      log('The healing spell finds you whole. The magic fades, unused.', 'system');
     }
   });
 
   world.on('spell:learned', ({ actor, spellId }) => {
     const s = getSpell ? getSpell(String(spellId || '')) : null;
     const label = s?.name ? `[${s.name}]` : `[${String(spellId || 'spell')}]`;
-    log(`You learn ${label}.`, 'system');
+    log(`The knowledge burns itself into your mind \u2014 you learn ${label}!`, 'system');
   });
 
   world.on('spell:already-known', ({ actor, spellId }) => {
     const s = getSpell ? getSpell(String(spellId || '')) : null;
     const label = s?.name ? `[${s.name}]` : `[${String(spellId || 'spell')}]`;
-    log(`You already know ${label}.`, 'system');
+    log(`You already know ${label}. The text offers nothing new.`, 'system');
   });
 
   world.on('spell:learn-denied', ({ actor, reason, need, have, spellId }) => {
     const s = getSpell ? getSpell(String(spellId || '')) : null;
     const label = s?.name ? `[${s.name}]` : (spellId ? `[${String(spellId)}]` : 'that spell');
     let msg = `You can't learn ${label}.`;
-    if (reason === 'intelligence') msg = `You need more intelligence to learn ${label} (need ${need}, have ${have}).`;
-    if (reason === 'unknown-spell') msg = `This tome is inscrutable.`;
+    if (reason === 'intelligence') msg = `The symbols for ${label} swim before your eyes. Too complex. (need ${need} INT, have ${have})`;
+    if (reason === 'unknown-spell') msg = 'The pages are covered in notation you\u2019ve never seen. Inscrutable.';
     log(msg, 'system');
   });
 
@@ -171,40 +174,40 @@ export function installSpellMessages(ctx) {
     if (nameOfEntity(actor) !== 'You') return;
     if (randomized) {
       const why = randomReason === 'confused' ? 'confused' : 'hallucinating';
-      log(`Your ${why} mind yanks the blink off-course.`, 'system');
+      log(`Reality tears open \u2014 but your ${why} mind picks the wrong spot!`, 'danger');
       return;
     }
-    log('Space folds and you blink to your mark.', 'system');
+    log('Space folds. You step through \u2014 and arrive.', 'system');
   });
 
   world.on('spell:blink:failed', ({ actor, reason, range }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    if (reason === 'no_target') { log('Blink needs a destination tile.', 'system'); return; }
-    if (reason === 'out_of_range') { log(`Blink destination is out of range (${Number(range || 10) | 0} tiles).`, 'system'); return; }
-    if (reason === 'no_safe_landing') { log('Blink fizzles: no safe landing tile.', 'system'); return; }
-    log('Blink fizzles.', 'system');
+    if (reason === 'no_target') { log('Blink where? You need to pick a spot.', 'system'); return; }
+    if (reason === 'out_of_range') { log(`Too far \u2014 blink only reaches ${Number(range || 10) | 0} tiles.`, 'system'); return; }
+    if (reason === 'no_safe_landing') { log('Space folds... then snaps back. Something\u2019s in the way.', 'system'); return; }
+    log('The blink misfires. You stay put.', 'system');
   });
 
   world.on('spell:phase_strike', ({ actor, hits, randomized, randomReason }) => {
     if (nameOfEntity(actor) !== 'You') return;
     if (randomized) {
       const why = randomReason === 'confused' ? 'confused' : 'hallucinating';
-      log(`Your ${why} mind yanks the phase strike off-course.`, 'system');
+      log(`You phase \u2014 but your ${why} mind drags you off-course!`, 'danger');
       return;
     }
     const hitCount = Array.isArray(hits) ? hits.length : 0;
     if (hitCount > 0) {
-      log(`You phase through your enemies, striking ${hitCount === 1 ? 'one foe' : hitCount + ' foes'}.`, 'system');
+      log(`You flicker through ${hitCount === 1 ? 'one enemy' : hitCount + ' enemies'} \u2014 your blade draws blood from each!`, 'combat');
     } else {
-      log('You phase strike to your mark.', 'system');
+      log('You phase to your mark. The air crackles where you were.', 'system');
     }
   });
 
   world.on('spell:phase_strike:failed', ({ actor, reason, range }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    if (reason === 'no_target') { log('Phase Strike needs a destination tile.', 'system'); return; }
-    if (reason === 'out_of_range') { log(`Phase Strike destination is out of range (${Number(range || 10) | 0} tiles).`, 'system'); return; }
-    if (reason === 'no_safe_landing') { log('Phase Strike fizzles: no safe landing tile.', 'system'); return; }
+    if (reason === 'no_target') { log('Phase Strike needs a destination.', 'system'); return; }
+    if (reason === 'out_of_range') { log(`Too far for Phase Strike (${Number(range || 10) | 0} tile range).`, 'system'); return; }
+    if (reason === 'no_safe_landing') { log('Phase Strike collapses \u2014 no room to materialize.', 'system'); return; }
     log('Phase Strike fizzles.', 'system');
   });
 
@@ -213,51 +216,48 @@ export function installSpellMessages(ctx) {
     const tgt = nameOfEntity(targetId);
     if (fizzle) {
       if (who === 'You') {
-        if (reason === 'no_los') log('Blind fizzles \u2014 no line of sight.', 'system');
-        else if (reason === 'out_of_range') log('Blind fizzles \u2014 target out of range.', 'system');
-        else log('Blind finds no target.', 'system');
+        if (reason === 'no_los') log('You reach for their sight \u2014 but can\u2019t see them yourself.', 'system');
+        else if (reason === 'out_of_range') log('Too far. The darkness won\u2019t stretch that far.', 'system');
+        else log('You conjure darkness, but it finds no eyes to fill.', 'system');
       }
       return;
     }
     if (who === 'You') {
-      log(`You veil ${tgt}'s sight in darkness.`, 'combat');
+      log(`Inky darkness pours into ${tgt}'s eyes. They can't see.`, 'combat');
       const tni = compGet(Number(targetId || 0), NamedIdentity);
       if (String(tni?.identity || '') === 'floating_eye') {
-        log("The Floating Eye's gaze dims \u2014 its power broken!", 'combat');
+        log("The Floating Eye's gaze dims \u2014 its power over you is broken!", 'combat');
       }
     } else if (tgt === 'You') {
-      log(`${who} veils your sight in darkness!`, 'danger');
+      log(`${who} speaks a word of darkness \u2014 your vision goes black!`, 'danger');
     } else {
-      log(`${who} blinds ${tgt}.`, 'combat');
+      log(`${who} strikes ${tgt} blind.`, 'combat');
     }
   });
 
   world.on('spell:rampage', ({ actor }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    log('You enter a blood rage!', 'combat');
+    log('Red creeps into the edges of your vision. Blood rage takes hold.', 'combat');
   });
 
   world.on('spell:verdant_ward', ({ actor }) => {
-    if (nameOfEntity(actor) !== 'You') return;
-    log('Bark and sap spiral around you in a verdant ward.', 'system');
+    if (nameOfEntity(actor) === 'You') log('Living bark spirals up your arms. Sap seals the cracks. You are warded.', 'system');
   });
 
   world.on('spell:harmony_ward', ({ actor }) => {
-    if (nameOfEntity(actor) !== 'You') return;
-    log('A balanced ward settles over your skin.', 'system');
+    if (nameOfEntity(actor) === 'You') log('A balanced ward settles over your skin \u2014 equal parts force and faith.', 'system');
   });
 
   world.on('spell:shadow_veil', ({ actor }) => {
-    if (nameOfEntity(actor) !== 'You') return;
-    log('Your outline thins into shadow. You are invisible.', 'system');
+    if (nameOfEntity(actor) === 'You') log('Your edges blur. Your shadow thins to nothing. You are invisible.', 'system');
   });
 
   world.on('spell:earthshatter', ({ actor, enhanced }) => {
     if (nameOfEntity(actor) !== 'You') return;
     if (enhanced) {
-      log('You slam the ground \u2014 magma seethes through the cracks!', 'danger');
+      log('You drive your fist into the stone \u2014 the floor splits and magma wells up from below!', 'danger');
     } else {
-      log('You slam the ground \u2014 the earth cracks!', 'system');
+      log('You slam the ground \u2014 cracks race outward!', 'system');
     }
   });
 
@@ -265,9 +265,9 @@ export function installSpellMessages(ctx) {
     const who = nameOfEntity(actor);
     const whom = nameOfEntity(targetId);
     if (who === 'You') {
-      log(`Grasping vines bind ${whom} in place!`, 'combat');
+      log(`Thorny vines erupt from the floor and coil around ${whom} \u2014 held fast!`, 'combat');
     } else if (whom === 'You') {
-      log(`${who} entangles you in thorny vines!`, 'danger');
+      log(`Roots burst from the stone beneath you! ${who}'s vines pin you in place!`, 'danger');
     }
   });
 
@@ -275,76 +275,76 @@ export function installSpellMessages(ctx) {
     const who = nameOfEntity(actor);
     const hitCount = Array.isArray(impacts) ? impacts.length : 0;
     if (who === 'You') {
-      log(`Razor thorns erupt outward${hitCount > 1 ? `, shredding ${hitCount} foes!` : hitCount === 1 ? ', shredding a foe!' : '!'}`, 'combat');
+      log(`Razor thorns erupt from your skin${hitCount > 1 ? ` \u2014 ${hitCount} enemies shredded!` : hitCount === 1 ? ' \u2014 one enemy shredded!' : '!'}`, 'combat');
     } else {
-      log(`${who} erupts in a burst of razor thorns!`, 'danger');
+      log(`${who} bristles with thorns \u2014 they explode outward!`, 'danger');
     }
   });
 
   // Generator messages
   world.on('spell:savage_strike', ({ actor, hit }) => {
     if (nameOfEntity(actor) !== 'You' || !hit) return;
-    log('You land a savage strike \u2014 stamina surges!', 'combat');
+    log('A savage hit! The impact jolts stamina back into your limbs.', 'combat');
   });
 
   world.on('spell:natures_touch', ({ actor, hit }) => {
     if (nameOfEntity(actor) !== 'You' || !hit) return;
-    log('Nature replenishes your reserves.', 'system');
+    log('Green energy pulses from the wound \u2014 nature replenishes you.', 'system');
   });
 
   world.on('spell:cheap_shot', ({ actor, hit }) => {
     if (nameOfEntity(actor) !== 'You' || !hit) return;
-    log('A dirty hit \u2014 mana flows back.', 'combat');
+    log('A dirty hit below the belt \u2014 mana trickles back.', 'combat');
   });
 
   world.on('spell:arcane_bolt', ({ actor, hit }) => {
     if (nameOfEntity(actor) !== 'You' || !hit) return;
-    log('Arcane energy siphons back into you.', 'system');
+    log('Arcane energy rebounds from the impact and siphons back into you.', 'system');
   });
 
   world.on('spell:leech_spores', ({ actor, hit }) => {
     if (nameOfEntity(actor) !== 'You' || !hit) return;
-    log('Parasitic spores drain your foe \u2014 you feel renewed.', 'combat');
+    log('Parasitic spores latch onto the wound and drink deep \u2014 you feel the stolen vitality.', 'combat');
   });
 
   world.on('spell:holy_strike', ({ actor, hit }) => {
     if (nameOfEntity(actor) !== 'You' || !hit) return;
-    log('Holy light renews your faith.', 'system');
+    log('Holy light flows from the wound back into you. Faith renewed.', 'system');
   });
 
   // Buff / Rotation ability messages
   world.on('spell:iron_flesh', ({ actor }) => {
-    if (nameOfEntity(actor) === 'You') log('Your flesh hardens to iron!', 'system');
+    if (nameOfEntity(actor) === 'You') log('Your skin hardens to grey iron. You feel heavy \u2014 and invincible.', 'system');
   });
 
   world.on('spell:ignite_weapons', ({ actor }) => {
-    if (nameOfEntity(actor) === 'You') log('Flames wreathe your weapons!', 'combat');
+    if (nameOfEntity(actor) === 'You') log('Flames crawl up your blade and settle into a hungry edge.', 'combat');
   });
 
   world.on('spell:barkskin', ({ actor }) => {
-    if (nameOfEntity(actor) === 'You') log('Bark grows over your skin \u2014 thorns bristle outward.', 'system');
+    if (nameOfEntity(actor) === 'You') log('Bark creeps over your arms. Thorns push through the seams. You are armoured in living wood.', 'system');
   });
 
   world.on('spell:quicken', ({ actor }) => {
-    if (nameOfEntity(actor) === 'You') log('Adrenaline surges through you \u2014 everything slows down.', 'system');
+    if (nameOfEntity(actor) === 'You') log('Adrenaline hits like a freight train \u2014 the world slows to a crawl around you.', 'system');
   });
 
   world.on('spell:mark_of_death', ({ actor, targetId }) => {
     const who = nameOfEntity(actor);
     const whom = nameOfEntity(targetId);
     if (who === 'You') {
-      log(`A death sigil burns into ${whom} \u2014 all damage amplified!`, 'combat');
+      log(`A black sigil sears itself into ${whom}'s flesh \u2014 every wound will cut twice as deep.`, 'combat');
     } else if (whom === 'You') {
-      log(`${who} brands you with a mark of death!`, 'danger');
+      log(`${who} brands you with a mark of death! Pain amplified!`, 'danger');
     }
   });
 
   world.on('spell:primal_roar', ({ actor, affected }) => {
     if (nameOfEntity(actor) === 'You') {
       if (affected > 0) {
-        log(`You unleash a primal roar \u2014 ${affected} ${affected > 1 ? 'enemies stagger' : 'enemy staggers'}!`, 'combat');
+        log(`You roar from the gut \u2014 the sound hits like a wall. ${affected} ${affected > 1 ? 'enemies stagger' : 'enemy staggers'} back!`, 'combat');
       } else {
-        log('You unleash a primal roar \u2014 savage fury fills you!', 'system');
+        log('You let out a primal roar. Savage fury floods through you!', 'system');
       }
     }
   });
@@ -353,116 +353,116 @@ export function installSpellMessages(ctx) {
   world.on('spell:war_cry', ({ actor, affected }) => {
     if (nameOfEntity(actor) !== 'You') return;
     if (affected > 0) {
-      log(`You unleash a thundering war cry \u2014 ${affected} ${affected === 1 ? 'enemy cowers' : 'enemies cower'}!`, 'combat');
+      log(`Your war cry splits the air \u2014 ${affected} ${affected === 1 ? 'enemy flinches' : 'enemies flinch'}!`, 'combat');
     } else {
-      log('You bellow a war cry, but nothing is close enough to hear.', 'system');
+      log('You bellow into the dark. Only echoes answer.', 'system');
     }
   });
 
   world.on('spell:cleave', ({ actor, hits }) => {
     if (nameOfEntity(actor) !== 'You') return;
     if (hits && hits.length > 0) {
-      log(`You cleave through ${hits.length} ${hits.length === 1 ? 'foe' : 'foes'}!`, 'combat');
+      log(`Your weapon arcs through ${hits.length} ${hits.length === 1 ? 'body' : 'bodies'} in a single stroke!`, 'combat');
     } else {
-      log('You sweep your weapon, but nothing is in reach.', 'system');
+      log('Your weapon sweeps through empty air.', 'system');
     }
   });
 
   world.on('spell:bloodthirst', ({ actor }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    log('Blood-hunger surges through you \u2014 your strikes will mend your wounds.', 'combat');
+    log('Hunger stirs in your veins. Every wound you deal will feed you.', 'combat');
   });
 
   world.on('proc:bloodthirst', ({ actor, healed }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    log(`You drain ${healed} HP from the wound.`, 'heal');
+    log(`Warm strength flows back from the wound. (+${healed} HP)`, 'heal');
   });
 
   // Cleric ability messages
   world.on('spell:purify', ({ actor, removed }) => {
     if (nameOfEntity(actor) !== 'You') return;
     if (removed > 0) {
-      log(`Holy light burns away ${removed} ${removed === 1 ? 'affliction' : 'afflictions'}.`, 'heal');
+      log(`Holy light scours through you \u2014 ${removed} ${removed === 1 ? 'affliction burns' : 'afflictions burn'} away!`, 'heal');
     } else {
-      log('You invoke purification, but your body is already clean.', 'system');
+      log('You invoke purification. The light finds you clean.', 'system');
     }
   });
 
   world.on('spell:divine_shield', ({ actor }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    log('A shell of divine light hardens around you.', 'system');
+    log('A shell of golden light crystallizes around you. Nothing is getting through.', 'system');
   });
 
   world.on('spell:consecrate', ({ actor }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    log('Holy fire sanctifies the ground beneath you.', 'system');
+    log('Holy fire erupts from the ground at your feet \u2014 the stone itself glows white-hot.', 'system');
   });
 
   // Outlaw ability messages
   world.on('spell:smoke_bomb', ({ actor, affected }) => {
     if (nameOfEntity(actor) !== 'You') return;
     if (affected > 0) {
-      log(`You vanish in a puff of smoke \u2014 ${affected} ${affected === 1 ? 'enemy loses' : 'enemies lose'} sight of you!`, 'combat');
+      log(`Smoke billows out \u2014 you vanish! ${affected} ${affected === 1 ? 'enemy loses' : 'enemies lose'} track of you.`, 'combat');
     } else {
-      log('You toss a smoke bomb, but nobody is around to see it.', 'system');
+      log('You pop a smoke bomb. Nobody around to fool.', 'system');
     }
   });
 
   world.on('spell:poison_blade', ({ actor, fizzle, weaponName, charges }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    if (fizzle) { log('You have no weapon to coat.', 'system'); }
-    else { log(`You drag venom across your ${weaponName} (${charges} charges).`, 'combat'); }
+    if (fizzle) { log('You reach for a weapon to coat \u2014 your hands are empty.', 'system'); }
+    else { log(`You drag venom along your ${weaponName}'s edge. It glistens. (${charges} charges)`, 'combat'); }
   });
 
   world.on('spell:scorch', ({ actor, fizzle, missed, critical }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    if (fizzle) { log('Scorch finds no target.', 'system'); return; }
-    if (missed) { log('Your scorch misses!', 'system'); return; }
-    if (critical) { log('Your scorch sears the target!', 'combat'); return; }
-    log('You scorch the target.', 'combat');
+    if (fizzle) { log('You snap your fingers. No spark, no target. Nothing.', 'system'); return; }
+    if (missed) { log('Your scorch streaks wide \u2014 heat shimmer on stone.', 'system'); return; }
+    if (critical) { log('Your scorch catches them dead-on \u2014 flesh sizzles!', 'combat'); return; }
+    log('Your scorch connects. Smoke rises.', 'combat');
   });
 
   world.on('spell:plague_swarm', ({ actor, fizzle, missed }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    if (fizzle) { log('The swarm finds no host.', 'system'); return; }
-    if (missed) { log('Your plague swarm misses!', 'system'); return; }
-    log('You unleash a plague swarm!', 'combat');
+    if (fizzle) { log('Insects buzz around your hands and disperse. No host to feed on.', 'system'); return; }
+    if (missed) { log('The swarm veers wide \u2014 the insects scatter!', 'system'); return; }
+    log('You unleash a plague swarm! Chitinous bodies pour from your hands!', 'combat');
   });
 
   world.on('spell:plague_swarm:jump', () => {
-    log('The swarm leaps to a new host!', 'combat');
+    log('The swarm abandons the husk and leaps to fresh meat!', 'combat');
   });
 
   world.on('spell:fireball', ({ actor, fizzle, missed }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    if (fizzle) { log('Fireball finds no target.', 'system'); return; }
-    if (missed) { log('Your fireball misses!', 'system'); return; }
-    log('You hurl a fireball!', 'combat');
+    if (fizzle) { log('You shape the flame but there\u2019s nothing to throw it at.', 'system'); return; }
+    if (missed) { log('Your fireball goes wide \u2014 it detonates against stone!', 'system'); return; }
+    log('You compress fire between your palms and hurl it!', 'combat');
   });
 
   world.on('spell:meteor', ({ actor, randomized, randomReason }) => {
     if (nameOfEntity(actor) !== 'You') return;
     if (randomized) {
       const why = randomReason === 'confused' ? 'confused' : 'hallucinating';
-      log(`Your ${why} mind drags the meteor off-course.`, 'system');
+      log(`You call the meteor down \u2014 your ${why} mind pulls it off-target!`, 'danger');
     }
   });
 
   world.on('spell:meteor:failed', ({ actor, reason, range }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    if (reason === 'no_target') { log('Meteor needs a target tile.', 'system'); return; }
-    if (reason === 'out_of_range') { log(`Meteor target is out of range (${Number(range || 12) | 0} tiles).`, 'system'); return; }
-    if (reason === 'blocked_los') { log('Meteor target must be in line of sight.', 'system'); return; }
-    log('Meteor fizzles.', 'system');
+    if (reason === 'no_target') { log('You reach skyward \u2014 but where should the meteor fall?', 'system'); return; }
+    if (reason === 'out_of_range') { log(`Too far to call a meteor. (${Number(range || 12) | 0} tile range)`, 'system'); return; }
+    if (reason === 'blocked_los') { log('You can\u2019t see the target \u2014 the meteor has nowhere to aim.', 'system'); return; }
+    log('The sky stays empty. The meteor doesn\u2019t come.', 'system');
   });
 
   function installStormFailureMessage(eventName, spellName) {
     world.on(eventName, ({ actor, reason, range }) => {
       if (nameOfEntity(actor) !== 'You') return;
-      if (reason === 'no_target') { log(`${spellName} needs a target tile.`, 'system'); return; }
-      if (reason === 'out_of_range') { log(`${spellName} target is out of range (${Number(range || 10) | 0} tiles).`, 'system'); return; }
-      if (reason === 'blocked_los') { log(`${spellName} target must be in line of sight.`, 'system'); return; }
-      log(`${spellName} fizzles.`, 'system');
+      if (reason === 'no_target') { log(`You reach for ${spellName} \u2014 but where should it strike?`, 'system'); return; }
+      if (reason === 'out_of_range') { log(`Too far for ${spellName}. (${Number(range || 10) | 0} tile range)`, 'system'); return; }
+      if (reason === 'blocked_los') { log(`You can't see the target. ${spellName} needs line of sight.`, 'system'); return; }
+      log(`${spellName} fizzles. The magic scatters.`, 'system');
     });
   }
 
