@@ -203,7 +203,8 @@ registerScript("trap_pit", {
 });
 
 // Siphon trap: drains a resource and optionally transfers to a nearby hostile.
-// Params: { resource?: 'hp'|'mana'|'stamina', percent?: number, healNearestEnemy?: boolean }
+// Params: { resource?: 'hp'|'mana'|'stamina'|'drain', percent?: number, healNearestEnemy?: boolean }
+// resource='drain' drains both mana and stamina simultaneously.
 registerScript("trap_siphon", {
   [ScriptVerb.TrapTrigger]: (world, ctx) => {
     const trapId = Number(ctx?.trapId || 0) | 0;
@@ -215,26 +216,37 @@ registerScript("trap_siphon", {
     const healNearestEnemy = ctx?.params?.healNearestEnemy !== false;
 
     let drained = 0;
-    if (resource === "mana") {
+
+    function drainMana() {
       const mana = world.get(target, Mana);
-      if (mana) {
-        const cap = Math.max(0, Number(mana.maxMana || 0) | 0);
-        const amount = Math.max(1, Math.floor(cap * pct));
-        const before = Math.max(0, Number(mana.mana || 0));
-        const after = Math.max(0, before - amount);
-        drained = Math.max(0, before - after);
-        world.set(target, Mana, { ...mana, mana: after, regenCooldown: Math.max(Number(mana.regenCooldown || 0), 1) });
-      }
-    } else if (resource === "stamina") {
+      if (!mana) return 0;
+      const cap = Math.max(0, Number(mana.maxMana || 0) | 0);
+      const amount = Math.max(1, Math.floor(cap * pct));
+      const before = Math.max(0, Number(mana.mana || 0));
+      const after = Math.max(0, before - amount);
+      const lost = Math.max(0, before - after);
+      world.set(target, Mana, { ...mana, mana: after, regenCooldown: Math.max(Number(mana.regenCooldown || 0), 1) });
+      return lost;
+    }
+
+    function drainStamina() {
       const stamina = world.get(target, Stamina);
-      if (stamina) {
-        const cap = Math.max(0, Number(stamina.maxStamina || 0) | 0);
-        const amount = Math.max(1, Math.floor(cap * pct));
-        const before = Math.max(0, Number(stamina.stamina || 0));
-        const after = Math.max(0, before - amount);
-        drained = Math.max(0, before - after);
-        world.set(target, Stamina, { ...stamina, stamina: after, regenCooldown: Math.max(Number(stamina.regenCooldown || 0), 1) });
-      }
+      if (!stamina) return 0;
+      const cap = Math.max(0, Number(stamina.maxStamina || 0) | 0);
+      const amount = Math.max(1, Math.floor(cap * pct));
+      const before = Math.max(0, Number(stamina.stamina || 0));
+      const after = Math.max(0, before - amount);
+      const lost = Math.max(0, before - after);
+      world.set(target, Stamina, { ...stamina, stamina: after, regenCooldown: Math.max(Number(stamina.regenCooldown || 0), 1) });
+      return lost;
+    }
+
+    if (resource === "drain") {
+      drained = drainMana() + drainStamina();
+    } else if (resource === "mana") {
+      drained = drainMana();
+    } else if (resource === "stamina") {
+      drained = drainStamina();
     } else {
       const vit = world.get(target, Vitality);
       if (vit) {

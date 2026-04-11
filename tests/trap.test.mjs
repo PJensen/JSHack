@@ -80,9 +80,9 @@ Deno.test("trap is no-op when no entity stands on it", () => {
   assert(world.get(trap, Trap).armed === true, 'trap should remain armed');
 });
 
-// ── Monster trap triggering ──────────────────────────────────────────
+// ── Monsters do NOT trigger traps ───────────────────────────────────
 
-Deno.test("monster on spike trap takes damage and trap disarms", () => {
+Deno.test("monster on spike trap does NOT trigger it", () => {
   const world = new World({ seed: 1 });
 
   const monster = world.create();
@@ -96,37 +96,19 @@ Deno.test("monster on spike trap takes damage and trap disarms", () => {
   trapSystem(world);
 
   const vit = world.get(monster, Vitality);
-  assert(vit.hp === 20, `monster should take 20 damage (50% of 40), hp=${vit.hp}`);
+  assert(vit.hp === 40, `monster should be unharmed, hp=${vit.hp}`);
 
   const t = world.get(trap, Trap);
-  assert(t.armed === false, 'trap should be disarmed after monster triggers it');
-  assert(t.revealed === true, 'trap should be revealed after monster triggers it');
-});
-
-Deno.test("monster on different tile does not trigger trap", () => {
-  const world = new World({ seed: 1 });
-
-  const monster = world.create();
-  world.add(monster, Position, { x: 1, y: 1 });
-  world.add(monster, Vitality, { maxHp: 40, hp: 40 });
-
-  const trap = world.create();
-  world.add(trap, Position, { x: 8, y: 8 });
-  world.add(trap, Trap, { type: 'spike', armed: true, revealed: false, script: 'trap_spike', params: { percent: 0.5 } });
-
-  trapSystem(world);
-
-  const vit = world.get(monster, Vitality);
-  assert(vit.hp === 40, `monster should be unharmed, hp=${vit.hp}`);
-  assert(world.get(trap, Trap).armed === true, 'trap should remain armed');
+  assert(t.armed === true, 'trap should remain armed when only a monster steps on it');
 });
 
 Deno.test("trap:triggered event is emitted with victim info", () => {
   const world = new World({ seed: 1 });
 
-  const monster = world.create();
-  world.add(monster, Position, { x: 2, y: 2 });
-  world.add(monster, Vitality, { maxHp: 50, hp: 50 });
+  const player = world.create();
+  world.add(player, Player);
+  world.add(player, Position, { x: 2, y: 2 });
+  world.add(player, Vitality, { maxHp: 50, hp: 50 });
 
   const trap = world.create();
   world.add(trap, Position, { x: 2, y: 2 });
@@ -139,7 +121,7 @@ Deno.test("trap:triggered event is emitted with victim info", () => {
 
   assert(emitted !== null, 'trap:triggered event should be emitted');
   assert(emitted.trapId === trap, `trapId should be ${trap}, got ${emitted.trapId}`);
-  assert(emitted.victimId === monster, `victimId should be ${monster}, got ${emitted.victimId}`);
+  assert(emitted.victimId === player, `victimId should be ${player}, got ${emitted.victimId}`);
   assert(emitted.type === 'spike', `type should be spike, got ${emitted.type}`);
 });
 
@@ -307,9 +289,10 @@ Deno.test("siphon trap drains hp and heals nearest hostile", () => {
   assert(world.get(enemy, Vitality).hp > 20, "siphon trap should transfer drained hp to nearby hostile");
 });
 
-Deno.test("siphon trap can drain mana and stamina pools", () => {
+Deno.test("siphon trap can drain mana and stamina pools individually", () => {
   const world = new World({ seed: 5 });
   const actor = world.create();
+  world.add(actor, Player);
   world.add(actor, Position, { x: 2, y: 2 });
   world.add(actor, Vitality, { maxHp: 30, hp: 30 });
   world.add(actor, Mana, { maxMana: 50, mana: 50, manaRegen: 0.1, regenCooldown: 0 });
@@ -341,6 +324,33 @@ Deno.test("siphon trap can drain mana and stamina pools", () => {
   });
   trapSystem(world);
   assert(world.get(actor, Stamina).stamina < 100, "stamina siphon should reduce stamina");
+});
+
+Deno.test("drain trap drains both mana and stamina simultaneously", () => {
+  const world = new World({ seed: 8 });
+  const player = world.create();
+  world.add(player, Player);
+  world.add(player, Position, { x: 4, y: 4 });
+  world.add(player, Vitality, { maxHp: 100, hp: 100 });
+  world.add(player, Mana, { maxMana: 50, mana: 50, manaRegen: 0.1, regenCooldown: 0 });
+  world.add(player, Stamina, { maxStamina: 100, stamina: 100, staminaRegen: 3, regenCooldown: 0 });
+
+  const trap = world.create();
+  world.add(trap, Position, { x: 4, y: 4 });
+  world.add(trap, Trap, {
+    type: "siphon",
+    armed: true,
+    revealed: false,
+    script: "trap_siphon",
+    params: { resource: "drain", percent: 0.15, healNearestEnemy: false },
+    difficulty: 21,
+  });
+
+  trapSystem(world);
+
+  assert(world.get(player, Mana).mana < 50, "drain trap should reduce mana");
+  assert(world.get(player, Stamina).stamina < 100, "drain trap should reduce stamina");
+  assert(world.get(player, Vitality).hp === 100, "drain trap should NOT touch hp");
 });
 
 Deno.test("rust trap applies weakened anti-gear effect", () => {
