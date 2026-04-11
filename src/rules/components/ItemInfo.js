@@ -57,8 +57,8 @@ export const ItemInfo = defineComponent(
         throw new Error("ItemInfo.validate(): tags must be an array");
       if (rec.weaponLengthCm != null && (!Number.isFinite(rec.weaponLengthCm) || rec.weaponLengthCm <= 0))
         throw new Error("ItemInfo.validate(): weaponLengthCm must be null or a positive number");
-      if (rec.weaponVfxProfile != null && typeof rec.weaponVfxProfile !== "string")
-        throw new Error("ItemInfo.validate(): weaponVfxProfile must be null or a string");
+      if (rec.weaponVfxProfile != null && typeof rec.weaponVfxProfile !== "string" && typeof rec.weaponVfxProfile !== "object")
+        throw new Error("ItemInfo.validate(): weaponVfxProfile must be null, string, or object");
       return true;
     },
   }
