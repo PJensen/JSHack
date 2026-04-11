@@ -70,6 +70,7 @@ import { readRuntimeConfig } from "./main/config/runtimeConfig.js";
 import { createMessageLog } from "./main/ui/messageLog.js";
 import { installDeityUiWiring } from "./display/ui/wiring/deityUiWiring.js";
 import { installMessageWiring } from "./display/ui/wiring/messageWiring.js";
+import { installCombatLogTooltip } from "./display/ui/combatLogTooltip.js";
 import { installShopWiring } from "./main/wiring/shopWiring.js";
 import { installChestWiring } from "./main/wiring/chestWiring.js";
 import { installRackWiring } from "./main/wiring/rackWiring.js";
@@ -859,7 +860,7 @@ const inputDisposers = [];
 bootAdvance("Bound input handlers");
 
 // ---- Display UI overlays + data feeds -------------------------------------
-initOverlays();
+const _overlays = initOverlays();
 initHUD();
 initPetMenu();
 initStatusLine();
@@ -1228,6 +1229,16 @@ installMessageWiring({
     HEARING_TIERS,
   },
 });
+
+// ---- Combat log tooltip (hover items/monsters/spells in the message bar) ----
+if (_overlays?.ticker) {
+  installCombatLogTooltip(_overlays.ticker, {
+    world,
+    getMonster,
+    getSpell,
+    components: { NamedIdentity, ItemInfo, Vitality, Equipment },
+  });
+}
 
 // ---- Targeting controller (after messageLog is ready) -----------------------
 // `isVisibleAt` is defined further down (display section) — forward-ref via closure.
