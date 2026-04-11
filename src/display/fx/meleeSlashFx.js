@@ -7,11 +7,11 @@
 import { MeleeSlashFx } from "./fxEntries.js";
 
 // ── Timing ─────────────────────────────────────────────────────────────────
-const SWEEP_TTL       = 0.20;   // sword/axe arc lifetime
-const STAB_TTL        = 0.15;   // dagger thrust
-const IMPACT_TTL      = 0.18;   // mace/blunt burst
-const PARRY_TTL       = 0.14;   // metallic spark
-const WHIFF_TTL       = 0.22;   // ghostly miss trail (lingers slightly)
+const SWEEP_TTL       = 0.14;   // sword/axe arc lifetime
+const STAB_TTL        = 0.11;   // dagger thrust
+const IMPACT_TTL      = 0.13;   // mace/blunt burst
+const PARRY_TTL       = 0.10;   // metallic spark
+const WHIFF_TTL       = 0.16;   // ghostly miss trail (lingers slightly)
 const OFFHAND_DELAY   = 0.15;   // match bump/gore offhand delay
 
 // ── Weapon colour palettes [r, g, b] ──────────────────────────────────────
