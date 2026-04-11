@@ -4,10 +4,11 @@
  */
 export function installCombatMessages(ctx) {
   const { world, log, nameOfEntity, bracketizeName, compGet, compHas, playerEntity,
-          canSeeAt, normalizeStatusEvent, Equipment, ItemInfo, NamedIdentity, Pet, Owner, Player } = ctx;
+          canSeeAt, normalizeStatusEvent, Equipment, ItemInfo, NamedIdentity, Pet, Owner, Player, Position } = ctx;
 
   // === Monster ability messages ===
   world.on('monster:ability:windup', ({ actor, targetId, abilityName }) => {
+    if (!_playerCanSee([actor, targetId])) return;
     const who = nameOfEntity(actor);
     const tgt = nameOfEntity(targetId);
     const label = String(abilityName || "ability");
@@ -16,6 +17,7 @@ export function installCombatMessages(ctx) {
   });
 
   world.on('monster:ability:cast', ({ actor, targetId, abilityName }) => {
+    if (!_playerCanSee([actor, targetId])) return;
     const who = nameOfEntity(actor);
     const tgt = nameOfEntity(targetId);
     const label = String(abilityName || "ability");
@@ -214,8 +216,23 @@ export function installCombatMessages(ctx) {
     log(`Not enough stamina to attack with ${weaponName} (need ${need}, have ${Math.floor(have)}).`, 'combat');
   });
 
-  // ── You/they conjugation: [youForm, theyForm] ──
+  // ── Helpers ──
   function _v(name, you, they) { return name === 'You' ? you : they; }
+
+  /** True if the player is involved OR the event is visible to the player. */
+  function _playerCanSee(ids, at) {
+    const pe = playerEntity(world);
+    const pid = Number(pe?.id || 0) | 0;
+    for (const id of ids) {
+      if (Number(id || 0) === pid) return true;
+    }
+    if (at && canSeeAt(at.x, at.y)) return true;
+    for (const id of ids) {
+      const p = compGet(Number(id || 0), Position);
+      if (p && canSeeAt(p.x, p.y)) return true;
+    }
+    return false;
+  }
 
   // verb pairs: [you-form, third-person-form]
   const _meleeVerbs = {
@@ -243,11 +260,13 @@ export function installCombatMessages(ctx) {
     blunt: ['crush', 'crushes'],
   };
 
-  world.on('damaged', ({ target, amount, critical, crit, source, offhand, cause, type, impactProfile }) => {
+  world.on('damaged', ({ target, amount, critical, crit, source, offhand, cause, type, impactProfile, at }) => {
+    if (!_playerCanSee([target, source], at)) return;
+
     const defName = nameOfEntity(target);
     const isCrit = !!(critical || crit);
     const handTxt = offhand ? ' (off-hand)' : '';
-    const critTxt = isCrit ? ' (CRIT!)' : '';
+    const critTxt = isCrit ? ' \u2014 CRIT!' : '';
     const causeKey = String(cause || '').toLowerCase();
     const isSpell = causeKey.startsWith('spell:') || causeKey.startsWith('affix:')
       || causeKey.startsWith('procpackage:') || causeKey.startsWith('monster:');
@@ -257,16 +276,14 @@ export function installCombatMessages(ctx) {
 
     if (Number(source || 0)) {
       const atkName = nameOfEntity(source);
-      const isYou = atkName === 'You';
 
       if (isSpell) {
-        // Spell/proc: verb from damage type, no weapon
         const pair = _spellVerbs[dt] || ['hit', 'hits'];
         log(`${atkName} ${_v(atkName, pair[0], pair[1])} ${defName} for ${amount}${critTxt}.`, 'combat');
         return;
       }
 
-      // Melee / ranged: verb from attack shape, include weapon
+      // Melee / ranged — resolve weapon
       let weaponLabel = '';
       const eq = compGet(Number(source || 0), Equipment);
       const wid = offhand
@@ -280,7 +297,7 @@ export function installCombatMessages(ctx) {
       }
       const pair = (isCrit && _critMelee[attackKind])
         || _meleeVerbs[attackKind]
-        || (usingRanged ? ['hit', 'hits'] : ['hit', 'hits']);
+        || ['hit', 'hits'];
       log(`${atkName} ${_v(atkName, pair[0], pair[1])} ${defName}${weaponLabel} for ${amount}${critTxt}${handTxt}.`, 'combat');
     } else {
       log(`${defName} ${_v(defName, 'take', 'takes')} ${amount} damage${critTxt}${handTxt}.`, 'combat');
@@ -288,7 +305,9 @@ export function installCombatMessages(ctx) {
   });
 
   world.on('healed', ({ id, amount }) => {
-    log(`${nameOfEntity(id)} heals ${amount}.`, 'system');
+    if (!_playerCanSee([id])) return;
+    const who = nameOfEntity(id);
+    log(`${who} ${_v(who, 'heal', 'heals')} ${amount}.`, 'system');
   });
 
   // ── Context-aware death messages ──
@@ -311,6 +330,8 @@ export function installCombatMessages(ctx) {
   const _deathByElement = {
     fire:      [(w) => `${w} burns to cinders.`,
                 (w) => `${w} is consumed by flame.`],
+    cold:      [(w) => `${w} freezes solid and shatters.`,
+                (w) => `${w} is flash-frozen where it stands.`],
     lightning: [(w) => `${w} is fried to a crisp.`,
                 (w) => `${w} convulses and drops, smoking.`],
     poison:    [(w) => `${w} chokes on venom and expires.`,
@@ -321,6 +342,7 @@ export function installCombatMessages(ctx) {
                 (w) => `${w} disintegrates in a flash of plasma.`],
     arcane:    [(w) => `${w} unravels under the arcane force.`,
                 (w) => `${w} is torn apart by raw magic.`],
+    starvation:[(w) => `${w} keels over from hunger.`],
   };
   const _deathByGore = {
     spark:  [(w) => `${w} sparks violently and shuts down.`,
@@ -331,11 +353,13 @@ export function installCombatMessages(ctx) {
              (w) => `${w} is no more.`],
   };
   const _deathCrit = {
-    stab:  [(w) => `${w} is skewered \u2014 dead before hitting the floor.`],
-    slash: [(w) => `${w} is bisected in a single stroke.`],
-    blunt: [(w) => `${w} is pulverized.`],
-    fire:  [(w) => `${w} explodes into a pillar of flame!`],
+    stab:      [(w) => `${w} is skewered \u2014 dead before hitting the floor.`],
+    slash:     [(w) => `${w} is bisected in a single stroke.`],
+    blunt:     [(w) => `${w} is pulverized.`],
+    fire:      [(w) => `${w} explodes into a pillar of flame!`],
+    cold:      [(w) => `${w} shatters into a thousand frozen pieces!`],
     lightning: [(w) => `A bolt rips through ${w} \u2014 nothing but char remains.`],
+    acid:      [(w) => `${w} dissolves into nothing \u2014 not even bones remain.`],
   };
   const _deathBySize = {
     S: [(w) => `${w} pops like a grape.`,
@@ -357,6 +381,8 @@ export function installCombatMessages(ctx) {
 
   world.on('died', (ev) => {
     const { id, killer, critical, damageType, goreType, sizeClass, impactProfile } = ev;
+    if (!_playerCanSee([id, killer])) return;
+
     const who = nameOfEntity(id);
     const pe = playerEntity(world);
     const playerId = Number(pe?.id || 0) | 0;
@@ -381,26 +407,26 @@ export function installCombatMessages(ctx) {
     // 1. Crit kills — most dramatic
     if (critical) {
       const pool = _deathCrit[attackKind] || _deathCrit[dt];
-      if (pool) { log(_pickDeath(pool, step)(who), 'combat'); return; }
+      if (pool) { log(_pick(pool, step)(who), 'combat'); return; }
     }
     // 2. Elemental kills
     if (_deathByElement[dt]) {
-      log(_pickDeath(_deathByElement[dt], step)(who), 'combat'); return;
+      log(_pick(_deathByElement[dt], step)(who), 'combat'); return;
     }
     // 3. Size-specific flavor for small/large
     if (_deathBySize[size] && step % 3 === 0) {
-      log(_pickDeath(_deathBySize[size], step)(who), 'combat'); return;
+      log(_pick(_deathBySize[size], step)(who), 'combat'); return;
     }
     // 4. Attack-kind flavor (melee weapon shape)
     if (_deathByAttack[attackKind]) {
-      log(_pickDeath(_deathByAttack[attackKind], step)(who), 'combat'); return;
+      log(_pick(_deathByAttack[attackKind], step)(who), 'combat'); return;
     }
     // 5. Gore-type flavor (non-blood creatures)
     if (gore !== 'blood' && _deathByGore[gore]) {
-      log(_pickDeath(_deathByGore[gore], step)(who), 'combat'); return;
+      log(_pick(_deathByGore[gore], step)(who), 'combat'); return;
     }
     // 6. Fallback
-    log(_pickDeath(_deathFallback, step)(who), 'combat');
+    log(_pick(_deathFallback, step)(who), 'combat');
   });
 
   const _missVerbs = {
@@ -422,7 +448,9 @@ export function installCombatMessages(ctx) {
   }
 
   world.on('status', (payload) => {
-    const { id, kind, source } = normalizeStatusEvent(payload);
+    const { id, kind, source, at } = normalizeStatusEvent(payload);
+    if (!_playerCanSee([id, source], at)) return;
+
     const style = (String(kind || '')).toLowerCase();
     const tgt = nameOfEntity(id);
     const srcId = Number(source || 0);
