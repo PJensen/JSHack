@@ -3,8 +3,8 @@
  * Lines ~332-376, ~1408-1492, ~1685-1739, ~2070-2137, ~2431-2479 from original.
  */
 export function installItemMessages(ctx) {
-  const { world, log, nameOfEntity, nameOfItem, bracketizeName, playerEntity,
-          compGet, compHas, canSeeAt, ItemInfo, NamedIdentity, Position, Player, Pet, Owner, Devotion } = ctx;
+  const { world, log, nameOfEntity, nameOfItem, bracketizeName, richEntity, playerEntity,
+          compGet, compHas, canSeeAt, ItemInfo, NamedIdentity, Position, Player, Pet, Owner, Devotion, Encumbrance } = ctx;
 
   // === Item events ===
   world.on('drank', ({ actor, itemId, target, feel, identified }) => {
@@ -23,13 +23,34 @@ export function installItemMessages(ctx) {
 
   world.on('item:pickup', ({ actor, itemId, count }) => {
     const pe = playerEntity(world);
-    if (!pe || pe.id !== actor) {
-      const pos = compGet(Number(actor || 0), Position);
-      if (!pos || !canSeeAt(pos.x, pos.y)) return;
-      const petName = nameOfEntity(actor);
-      const it = nameOfItem(itemId);
-      log(`${petName} picks up ${it}.`, 'system');
+    const playerId = Number(pe?.id || 0) | 0;
+    const actorId = Number(actor || 0) | 0;
+
+    if (playerId > 0 && actorId === playerId) {
+      // Player pickup — show item with weight/encumbrance context
+      const rich = richEntity ? richEntity(itemId) : null;
+      const it = rich ? rich : { text: nameOfItem(itemId) };
+      const info = compGet(itemId, ItemInfo);
+      const w = Number(info?.weight || 0);
+      const c = Math.max(1, Number(count ?? info?.count ?? 1) | 0);
+      let suffix = '';
+      if (w > 0) suffix = ` (${c > 1 ? w + ' kg \u00d7' + c + ' = ' + (w * c).toFixed(1) + ' kg' : w + ' kg'})`;
+      const enc = Encumbrance ? compGet(playerId, Encumbrance) : null;
+      let warning = '';
+      if (enc?.overloaded) warning = ' You are overloaded!';
+      else if (enc?.heavilyLoaded) warning = ' Your pack is getting heavy.';
+      const text = `You pick up ${it.text}${suffix}.${warning}`;
+      const html = it.html ? `You pick up ${it.html}${suffix}.${warning}` : undefined;
+      log({ text, html, type: warning ? 'warning' : 'system' });
+      return;
     }
+
+    // Non-player pickup — only if visible
+    const pos = compGet(actorId, Position);
+    if (!pos || !canSeeAt(pos.x, pos.y)) return;
+    const petName = nameOfEntity(actor);
+    const it = nameOfItem(itemId);
+    log(`${petName} picks up ${it}.`, 'system');
   });
 
   world.on('item:transformed', ({ itemId, ownerId, scope, from, to, cause }) => {
