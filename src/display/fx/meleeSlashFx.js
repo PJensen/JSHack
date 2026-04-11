@@ -23,6 +23,109 @@ const COL_DEFAULT = [230, 230, 230]; // neutral
 const COL_PARRY   = [255, 255, 220]; // bright metallic yellow-white
 const COL_WHIFF   = [180, 190, 210]; // ghostly blue-grey
 
+// ── Weapon silhouette profiles ────────────────────────────────────────────
+// Each class gets explicit length + alpha distribution along that length.
+// t=0 is near the grip/handle, t=1 is the weapon's striking end.
+const DEFAULT_WEAPON_PROFILE = Object.freeze({
+  length: 0.9,
+  widthScale: 1.0,
+  handleStart: 0.24, // where the rendered shape begins, as fraction of length
+  alphaStops: Object.freeze([
+    [0.00, 0.18],
+    [0.50, 0.55],
+    [1.00, 1.00],
+  ]),
+});
+
+const WEAPON_VFX_PROFILES = Object.freeze({
+  sword: Object.freeze({
+    length: 1.0,
+    widthScale: 0.95,
+    handleStart: 0.28,
+    alphaStops: Object.freeze([
+      [0.00, 0.20],
+      [0.42, 0.48],
+      [0.78, 0.82],
+      [1.00, 1.00],
+    ]),
+  }),
+  dagger: Object.freeze({
+    length: 0.68,
+    widthScale: 0.82,
+    handleStart: 0.30,
+    alphaStops: Object.freeze([
+      [0.00, 0.22],
+      [0.50, 0.66],
+      [1.00, 1.00],
+    ]),
+  }),
+  axe: Object.freeze({
+    length: 0.92,
+    widthScale: 1.10,
+    handleStart: 0.22,
+    alphaStops: Object.freeze([
+      [0.00, 0.16],
+      [0.56, 0.34],
+      [0.82, 1.00],
+      [1.00, 0.86],
+    ]),
+  }),
+  mace: Object.freeze({
+    length: 0.88,
+    widthScale: 1.18,
+    handleStart: 0.20,
+    alphaStops: Object.freeze([
+      [0.00, 0.12],
+      [0.60, 0.24],
+      [0.84, 0.96],
+      [1.00, 1.00],
+    ]),
+  }),
+  morningstar: Object.freeze({
+    length: 0.98,
+    widthScale: 1.16,
+    handleStart: 0.20,
+    alphaStops: Object.freeze([
+      [0.00, 0.12],
+      [0.58, 0.26],
+      [0.86, 0.96],
+      [1.00, 1.00],
+    ]),
+  }),
+  staff: Object.freeze({
+    length: 1.30,
+    widthScale: 0.90,
+    handleStart: 0.16,
+    alphaStops: Object.freeze([
+      [0.00, 0.16],
+      [0.72, 0.58],
+      [1.00, 0.86],
+    ]),
+  }),
+  spear: Object.freeze({
+    length: 1.38,
+    widthScale: 0.88,
+    handleStart: 0.14,
+    alphaStops: Object.freeze([
+      [0.00, 0.16],
+      [0.76, 0.48],
+      [0.94, 1.00],
+      [1.00, 0.92],
+    ]),
+  }),
+  bow: Object.freeze({
+    length: 1.20,
+    widthScale: 0.84,
+    handleStart: 0.20,
+    alphaStops: Object.freeze([
+      [0.00, 0.24],
+      [0.50, 0.72],
+      [1.00, 0.86],
+    ]),
+  }),
+  weapon: DEFAULT_WEAPON_PROFILE,
+});
+
 // ── Element tint overrides ────────────────────────────────────────────────
 // Keys must match the canonical tint ids from rules/data/elementTints.js
 const ELEMENT_TINTS = {
@@ -87,6 +190,66 @@ function damageLineWidthScale(amount) {
   return 1.0 + Math.min(0.5, amount / DMG_SCALE_CAP * 0.5);
 }
 
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function coerceLengthScaleFromCm(weaponLengthCm) {
+  const cm = Number(weaponLengthCm);
+  if (!(cm > 0)) return 1.0;
+  // 90cm baseline, clamped so absurd data does not blow up VFX.
+  return clamp(cm / 90, 0.5, 1.7);
+}
+
+function sanitizeProfileObject(profile) {
+  if (!profile || typeof profile !== 'object') return null;
+  const length = Number(profile.length);
+  const widthScale = Number(profile.widthScale);
+  const handleStart = Number(profile.handleStart);
+  const alphaStopsSrc = Array.isArray(profile.alphaStops) ? profile.alphaStops : null;
+  let alphaStops = null;
+  if (alphaStopsSrc && alphaStopsSrc.length >= 2) {
+    alphaStops = alphaStopsSrc
+      .map((it) => [Number(it?.[0]), Number(it?.[1])])
+      .filter((it) => Number.isFinite(it[0]) && Number.isFinite(it[1]))
+      .map((it) => [clamp(it[0], 0, 1), clamp(it[1], 0, 1)])
+      .sort((a, b) => a[0] - b[0]);
+  }
+  return {
+    length: Number.isFinite(length) ? clamp(length, 0.4, 2.0) : undefined,
+    widthScale: Number.isFinite(widthScale) ? clamp(widthScale, 0.5, 1.8) : undefined,
+    handleStart: Number.isFinite(handleStart) ? clamp(handleStart, 0, 0.85) : undefined,
+    alphaStops: alphaStops || undefined,
+  };
+}
+
+function resolveWeaponProfile(weaponClass, profileRef, weaponLengthCm) {
+  const profileKey = typeof profileRef === 'string' ? profileRef : '';
+  const baseFromClass = WEAPON_VFX_PROFILES[weaponClass] || DEFAULT_WEAPON_PROFILE;
+  const baseFromKey = WEAPON_VFX_PROFILES[profileKey] || baseFromClass;
+  const inline = sanitizeProfileObject(profileRef);
+  const merged = inline ? { ...baseFromKey, ...inline } : baseFromKey;
+  return {
+    ...merged,
+    length: (Number(merged.length) || 1.0) * coerceLengthScaleFromCm(weaponLengthCm),
+  };
+}
+
+function profileAlpha(profile, t) {
+  const stops = profile?.alphaStops || DEFAULT_WEAPON_PROFILE.alphaStops;
+  const k = Math.max(0, Math.min(1, Number(t) || 0));
+  for (let i = 1; i < stops.length; i++) {
+    const [x0, a0] = stops[i - 1];
+    const [x1, a1] = stops[i];
+    if (k <= x1) {
+      const span = Math.max(1e-6, x1 - x0);
+      const localT = Math.max(0, Math.min(1, (k - x0) / span));
+      return a0 + (a1 - a0) * localT;
+    }
+  }
+  return stops[stops.length - 1][1];
+}
+
 // ── Angle helpers ─────────────────────────────────────────────────────────
 
 // Resolve the primary direction for the slash VFX.
@@ -128,10 +291,11 @@ export function createMeleeSlashFxController() {
 
   // ── Spawn helpers ─────────────────────────────────────────────────────
 
-  function spawnSweep(x, y, facingVec, impactVec, weaponClass, elementTint, amount, critical, attackerId, offhand) {
+  function spawnSweep(x, y, facingVec, impactVec, weaponClass, profileRef, weaponLengthCm, elementTint, amount, critical, attackerId, offhand) {
     const n = nextSwing(attackerId);
     const baseAngle = resolveBaseAngle(facingVec, impactVec);
     const isAxe = (weaponClass === 'axe' || weaponClass === 'morningstar');
+    const profile = resolveWeaponProfile(weaponClass, profileRef, weaponLengthCm);
 
     // Alternate: even swings go CW (positive sweep), odd go CCW (negative)
     const direction = (n % 2 === 0) ? 1 : -1;
@@ -145,10 +309,10 @@ export function createMeleeSlashFxController() {
 
     const baseCol = resolveBaseColor(weaponClass, elementTint);
     const color = damageColorShift(baseCol, amount, critical);
-    const radius = damageRadiusScale(amount) * (isAxe ? 1.0 : 0.9);
-    const lw = (isAxe ? 0.18 : 0.13) * damageLineWidthScale(amount);
+    const radius = damageRadiusScale(amount) * (isAxe ? 1.0 : 0.9) * profile.length * (offhand ? 0.92 : 1.0);
+    const lw = (isAxe ? 0.18 : 0.13) * damageLineWidthScale(amount) * profile.widthScale;
 
-    return new MeleeSlashFx({
+    const fx = new MeleeSlashFx({
       x, y,
       startAngle,
       sweepAngle: sweep,
@@ -158,11 +322,14 @@ export function createMeleeSlashFxController() {
       lineWidth: lw,
       style: 'sweep',
     });
+    fx.weaponProfile = profile;
+    return fx;
   }
 
-  function spawnStab(x, y, facingVec, impactVec, elementTint, amount, critical, attackerId, offhand) {
+  function spawnStab(x, y, facingVec, impactVec, weaponClass, profileRef, weaponLengthCm, elementTint, amount, critical, attackerId, offhand) {
     const n = nextSwing(attackerId);
     const baseAngle = resolveBaseAngle(facingVec, impactVec);
+    const profile = resolveWeaponProfile(weaponClass || 'dagger', profileRef, weaponLengthCm);
 
     // Stab: very narrow arc (20-30°) in the facing direction
     // Alternate slightly left/right of center
@@ -172,10 +339,10 @@ export function createMeleeSlashFxController() {
 
     const baseCol = resolveBaseColor('dagger', elementTint);
     const color = damageColorShift(baseCol, amount, critical);
-    const radius = damageRadiusScale(amount) * 0.85; // stabs are compact thrusts
-    const lw = 0.10 * damageLineWidthScale(amount);
+    const radius = damageRadiusScale(amount) * 0.85 * profile.length * (offhand ? 0.9 : 1.0); // stabs are compact thrusts
+    const lw = 0.10 * damageLineWidthScale(amount) * profile.widthScale;
 
-    return new MeleeSlashFx({
+    const fx = new MeleeSlashFx({
       x, y,
       startAngle,
       sweepAngle: sweep,
@@ -185,11 +352,14 @@ export function createMeleeSlashFxController() {
       lineWidth: lw,
       style: 'stab',
     });
+    fx.weaponProfile = profile;
+    return fx;
   }
 
-  function spawnImpact(x, y, facingVec, impactVec, weaponClass, elementTint, amount, critical, attackerId) {
+  function spawnImpact(x, y, facingVec, impactVec, weaponClass, profileRef, weaponLengthCm, elementTint, amount, critical, attackerId) {
     const n = nextSwing(attackerId);
     const baseAngle = resolveBaseAngle(facingVec, impactVec);
+    const profile = resolveWeaponProfile(weaponClass, profileRef, weaponLengthCm);
 
     // Impact: wide but short burst — 160-200° centered on facing direction
     // Alternate the center offset
@@ -200,10 +370,10 @@ export function createMeleeSlashFxController() {
 
     const baseCol = resolveBaseColor(weaponClass, elementTint);
     const color = damageColorShift(baseCol, amount, critical);
-    const radius = damageRadiusScale(amount) * 0.65; // shorter radius — compact burst
-    const lw = 0.22 * damageLineWidthScale(amount); // thicker lines
+    const radius = damageRadiusScale(amount) * 0.65 * profile.length; // shorter radius — compact burst
+    const lw = 0.22 * damageLineWidthScale(amount) * profile.widthScale; // thicker lines
 
-    return new MeleeSlashFx({
+    const fx = new MeleeSlashFx({
       x, y,
       startAngle,
       sweepAngle: sweep,
@@ -213,6 +383,8 @@ export function createMeleeSlashFxController() {
       lineWidth: lw,
       style: 'impact',
     });
+    fx.weaponProfile = profile;
+    return fx;
   }
 
   function spawnParry(x, y, attackerPos) {
@@ -292,31 +464,49 @@ export function createMeleeSlashFxController() {
     const t = fx.progress;
     const alpha = fx.alpha;
     const [cr, cg, cb] = fx.color;
+    const profile = fx.weaponProfile || DEFAULT_WEAPON_PROFILE;
 
     // Sweep grows to full over first 35% of lifetime
     const sweepT = Math.min(1, t * (1 / 0.35));
     const currentSweep = fx.sweepAngle * sweepT;
-    const R = fx.radius * (0.7 + t * 0.3);
+    const tipR = fx.radius * (0.7 + t * 0.3);
+    const rootR = tipR * Math.max(0, Math.min(1, profile.handleStart));
+    const span = Math.max(0.08, tipR - rootR);
+    const bandCount = 6;
 
     // Outer glow
-    ctx.strokeStyle = `rgba(${cr|0},${cg|0},${cb|0},${(0.3 * alpha).toFixed(3)})`;
-    ctx.lineWidth = fx.lineWidth + 0.12 * (1 - t);
+    ctx.strokeStyle = `rgba(${cr|0},${cg|0},${cb|0},${(0.24 * alpha).toFixed(3)})`;
+    ctx.lineWidth = fx.lineWidth + 0.10 * (1 - t);
     ctx.beginPath();
-    ctx.arc(fx.x, fx.y, R + 0.10, fx.startAngle, fx.startAngle + currentSweep, currentSweep < 0);
+    ctx.arc(fx.x, fx.y, tipR + 0.08, fx.startAngle, fx.startAngle + currentSweep, currentSweep < 0);
     ctx.stroke();
 
-    // Core slash — brighter, thinner
-    ctx.strokeStyle = `rgba(255,250,245,${(0.75 * alpha * (1 - t * 0.3)).toFixed(3)})`;
-    ctx.lineWidth = fx.lineWidth;
-    ctx.beginPath();
-    ctx.arc(fx.x, fx.y, R, fx.startAngle, fx.startAngle + currentSweep, currentSweep < 0);
-    ctx.stroke();
+    // Core slash ribbon: multiple radial bands create a weapon-specific silhouette.
+    for (let i = 0; i < bandCount; i++) {
+      const bandT = i / (bandCount - 1);
+      const r = rootR + span * bandT;
+      const profileA = profileAlpha(profile, bandT);
+      const coreA = (0.72 * alpha * profileA * (1 - t * 0.3));
+      const glowA = (0.36 * alpha * profileA);
+
+      ctx.strokeStyle = `rgba(${cr|0},${cg|0},${cb|0},${glowA.toFixed(3)})`;
+      ctx.lineWidth = Math.max(0.04, fx.lineWidth * (0.42 + (1 - bandT) * 0.18));
+      ctx.beginPath();
+      ctx.arc(fx.x, fx.y, r, fx.startAngle, fx.startAngle + currentSweep, currentSweep < 0);
+      ctx.stroke();
+
+      ctx.strokeStyle = `rgba(255,250,245,${coreA.toFixed(3)})`;
+      ctx.lineWidth = Math.max(0.03, fx.lineWidth * (0.24 + (1 - bandT) * 0.10));
+      ctx.beginPath();
+      ctx.arc(fx.x, fx.y, r, fx.startAngle, fx.startAngle + currentSweep, currentSweep < 0);
+      ctx.stroke();
+    }
 
     // Leading edge spark
     if (sweepT < 1) {
       const edgeAngle = fx.startAngle + currentSweep;
-      const ex = fx.x + Math.cos(edgeAngle) * R;
-      const ey = fx.y + Math.sin(edgeAngle) * R;
+      const ex = fx.x + Math.cos(edgeAngle) * tipR;
+      const ey = fx.y + Math.sin(edgeAngle) * tipR;
       ctx.fillStyle = `rgba(255,255,255,${(0.6 * alpha).toFixed(3)})`;
       ctx.beginPath();
       ctx.arc(ex, ey, 0.08, 0, Math.PI * 2);
@@ -328,6 +518,7 @@ export function createMeleeSlashFxController() {
     const t = fx.progress;
     const alpha = fx.alpha;
     const [cr, cg, cb] = fx.color;
+    const profile = fx.weaponProfile || DEFAULT_WEAPON_PROFILE;
 
     // Stab: thrust line extends then fades
     const thrustT = Math.min(1, t * (1 / 0.25)); // fully extended at 25% lifetime
@@ -340,7 +531,7 @@ export function createMeleeSlashFxController() {
     const y1 = fx.y + Math.sin(centerAngle) * len;
 
     // Outer glow
-    ctx.strokeStyle = `rgba(${cr|0},${cg|0},${cb|0},${(0.35 * alpha).toFixed(3)})`;
+    ctx.strokeStyle = `rgba(${cr|0},${cg|0},${cb|0},${(0.30 * alpha).toFixed(3)})`;
     ctx.lineWidth = fx.lineWidth + 0.08;
     ctx.lineCap = 'round';
     ctx.beginPath();
@@ -348,8 +539,16 @@ export function createMeleeSlashFxController() {
     ctx.lineTo(x1, y1);
     ctx.stroke();
 
-    // Core — bright white
-    ctx.strokeStyle = `rgba(255,252,250,${(0.8 * alpha).toFixed(3)})`;
+    // Core gradient: handle lighter alpha, tip denser alpha.
+    const grad = ctx.createLinearGradient(x0, y0, x1, y1);
+    const stops = profile.alphaStops || DEFAULT_WEAPON_PROFILE.alphaStops;
+    for (let i = 0; i < stops.length; i++) {
+      const stop = stops[i];
+      const pos = Math.max(0, Math.min(1, Number(stop[0]) || 0));
+      const pAlpha = Math.max(0, Math.min(1, Number(stop[1]) || 0));
+      grad.addColorStop(pos, `rgba(255,252,250,${(0.78 * alpha * pAlpha).toFixed(3)})`);
+    }
+    ctx.strokeStyle = grad;
     ctx.lineWidth = fx.lineWidth;
     ctx.beginPath();
     ctx.moveTo(x0, y0);
@@ -369,23 +568,32 @@ export function createMeleeSlashFxController() {
     const t = fx.progress;
     const alpha = fx.alpha;
     const [cr, cg, cb] = fx.color;
+    const profile = fx.weaponProfile || DEFAULT_WEAPON_PROFILE;
 
     // Impact: expanding ring burst + radial lines
     const expandT = Math.min(1, t * (1 / 0.30));
-    const R = fx.radius * (0.4 + expandT * 0.6);
+    const tipR = fx.radius * (0.4 + expandT * 0.6);
+    const rootR = tipR * Math.max(0, Math.min(1, profile.handleStart));
+    const span = Math.max(0.06, tipR - rootR);
+    const bandCount = 5;
 
-    // Thick ring
-    ctx.strokeStyle = `rgba(${cr|0},${cg|0},${cb|0},${(0.4 * alpha).toFixed(3)})`;
-    ctx.lineWidth = fx.lineWidth * (1.5 - t);
-    ctx.beginPath();
-    ctx.arc(fx.x, fx.y, R, fx.startAngle, fx.startAngle + fx.sweepAngle);
-    ctx.stroke();
+    // Ring burst with weapon-profile density bands.
+    for (let i = 0; i < bandCount; i++) {
+      const bandT = i / (bandCount - 1);
+      const r = rootR + span * bandT;
+      const pAlpha = profileAlpha(profile, bandT);
+      ctx.strokeStyle = `rgba(${cr|0},${cg|0},${cb|0},${(0.36 * alpha * pAlpha).toFixed(3)})`;
+      ctx.lineWidth = Math.max(0.05, fx.lineWidth * (1.30 - t) * (0.65 + 0.35 * pAlpha));
+      ctx.beginPath();
+      ctx.arc(fx.x, fx.y, r, fx.startAngle, fx.startAngle + fx.sweepAngle);
+      ctx.stroke();
+    }
 
-    // Inner bright ring
-    ctx.strokeStyle = `rgba(255,240,220,${(0.6 * alpha * (1 - t * 0.5)).toFixed(3)})`;
-    ctx.lineWidth = fx.lineWidth * 0.7;
+    // Inner bright highlight
+    ctx.strokeStyle = `rgba(255,240,220,${(0.56 * alpha * (1 - t * 0.5)).toFixed(3)})`;
+    ctx.lineWidth = fx.lineWidth * 0.62;
     ctx.beginPath();
-    ctx.arc(fx.x, fx.y, R * 0.7, fx.startAngle, fx.startAngle + fx.sweepAngle);
+    ctx.arc(fx.x, fx.y, rootR + span * 0.72, fx.startAngle, fx.startAngle + fx.sweepAngle);
     ctx.stroke();
 
     // Radial impact lines bursting outward
@@ -397,8 +605,8 @@ export function createMeleeSlashFxController() {
     ctx.lineCap = 'round';
     for (let j = 0; j < lineCount; j++) {
       const a = centerAngle - spread / 2 + (spread / (lineCount - 1)) * j;
-      const r0 = R * 0.3;
-      const r1 = R * (0.5 + expandT * 0.5);
+      const r0 = rootR + span * 0.18;
+      const r1 = tipR * (0.5 + expandT * 0.5);
       ctx.beginPath();
       ctx.moveTo(fx.x + Math.cos(a) * r0, fx.y + Math.sin(a) * r0);
       ctx.lineTo(fx.x + Math.cos(a) * r1, fx.y + Math.sin(a) * r1);
@@ -508,15 +716,17 @@ export function createMeleeSlashFxController() {
       const attackKind = impactProfile.attackKind || 'strike';
       const facingVec = impactProfile.facingVector || null;
       const elementTint = impactProfile.elementTint || null;
+      const profileRef = impactProfile.weaponVfxProfile || null;
+      const weaponLengthCm = Number(impactProfile.weaponLengthCm || 0) || null;
 
       let fxEntry;
       if (attackKind === 'stab') {
-        fxEntry = spawnStab(ox, oy, facingVec, impactVector, elementTint, amount, critical, a, offhand);
+        fxEntry = spawnStab(ox, oy, facingVec, impactVector, weaponClass, profileRef, weaponLengthCm, elementTint, amount, critical, a, offhand);
       } else if (attackKind === 'blunt') {
-        fxEntry = spawnImpact(ox, oy, facingVec, impactVector, weaponClass, elementTint, amount, critical, a);
+        fxEntry = spawnImpact(ox, oy, facingVec, impactVector, weaponClass, profileRef, weaponLengthCm, elementTint, amount, critical, a);
       } else {
         // slash / strike → sweep
-        fxEntry = spawnSweep(ox, oy, facingVec, impactVector, weaponClass, elementTint, amount, critical, a, offhand);
+        fxEntry = spawnSweep(ox, oy, facingVec, impactVector, weaponClass, profileRef, weaponLengthCm, elementTint, amount, critical, a, offhand);
       }
 
       if (offhand) {

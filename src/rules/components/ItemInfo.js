@@ -20,6 +20,8 @@ export const ItemInfo = defineComponent(
     affixes: [], // list of affix ids applied to this item (rules/data/affixes)
     sockets: [], // gem ids socketed into this item (e.g. ['gem_ruby'])
     maxSockets: 0, // maximum number of gem sockets this item can hold
+    weaponLengthCm: null, // physical weapon length in centimeters (rules -> display)
+    weaponVfxProfile: null, // density profile key (grip->tip) for weapon VFX
     noQuickChip: false, // suppress pickup quick-chip UI for this item
     tags: [], // behavioral flags: "conflict", "sunlight", "levitate", etc.
   },
@@ -53,6 +55,10 @@ export const ItemInfo = defineComponent(
         throw new Error("ItemInfo.validate(): noQuickChip must be a boolean");
       if (!Array.isArray(rec.tags))
         throw new Error("ItemInfo.validate(): tags must be an array");
+      if (rec.weaponLengthCm != null && (!Number.isFinite(rec.weaponLengthCm) || rec.weaponLengthCm <= 0))
+        throw new Error("ItemInfo.validate(): weaponLengthCm must be null or a positive number");
+      if (rec.weaponVfxProfile != null && typeof rec.weaponVfxProfile !== "string")
+        throw new Error("ItemInfo.validate(): weaponVfxProfile must be null or a string");
       return true;
     },
   }

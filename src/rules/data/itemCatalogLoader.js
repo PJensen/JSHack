@@ -49,6 +49,8 @@ export function buildCatalogItem(world, itemId, opts = {}) {
     staminaCost: def.staminaCost ?? null,
     subtype: def.subtype || null,
     range: def.range || null,
+    weaponLengthCm: Number(def.weaponLengthCm || 0) > 0 ? (Number(def.weaponLengthCm) | 0) : null,
+    weaponVfxProfile: typeof def.weaponVfxProfile === "string" ? def.weaponVfxProfile : null,
     identified: def.identified === true,
     noQuickChip: def.noQuickChip === true,
     tags: Array.isArray(def.tags) ? def.tags.slice() : [],
