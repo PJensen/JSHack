@@ -470,37 +470,30 @@ export function createMeleeSlashFxController() {
     const sweepT = Math.min(1, t * (1 / 0.35));
     const currentSweep = fx.sweepAngle * sweepT;
     const tipR = fx.radius * (0.7 + t * 0.3);
-    const rootR = tipR * Math.max(0, Math.min(1, profile.handleStart));
-    const span = Math.max(0.08, tipR - rootR);
-    const bandCount = 6;
+    const rootR = tipR * Math.max(0.05, Math.min(0.85, profile.handleStart));
+    const midR = (rootR + tipR) * 0.5;
+    const span = tipR - rootR;
 
     // Outer glow
-    ctx.strokeStyle = `rgba(${cr|0},${cg|0},${cb|0},${(0.24 * alpha).toFixed(3)})`;
-    ctx.lineWidth = fx.lineWidth + 0.10 * (1 - t);
+    ctx.strokeStyle = `rgba(${cr|0},${cg|0},${cb|0},${(0.3 * alpha).toFixed(3)})`;
+    ctx.lineWidth = span + 0.12 * (1 - t);
     ctx.beginPath();
-    ctx.arc(fx.x, fx.y, tipR + 0.08, fx.startAngle, fx.startAngle + currentSweep, currentSweep < 0);
+    ctx.arc(fx.x, fx.y, midR, fx.startAngle, fx.startAngle + currentSweep, currentSweep < 0);
     ctx.stroke();
 
-    // Core slash ribbon: multiple radial bands create a weapon-specific silhouette.
-    for (let i = 0; i < bandCount; i++) {
-      const bandT = i / (bandCount - 1);
-      const r = rootR + span * bandT;
-      const profileA = profileAlpha(profile, bandT);
-      const coreA = (0.72 * alpha * profileA * (1 - t * 0.3));
-      const glowA = (0.36 * alpha * profileA);
-
-      ctx.strokeStyle = `rgba(${cr|0},${cg|0},${cb|0},${glowA.toFixed(3)})`;
-      ctx.lineWidth = Math.max(0.04, fx.lineWidth * (0.42 + (1 - bandT) * 0.18));
-      ctx.beginPath();
-      ctx.arc(fx.x, fx.y, r, fx.startAngle, fx.startAngle + currentSweep, currentSweep < 0);
-      ctx.stroke();
-
-      ctx.strokeStyle = `rgba(255,250,245,${coreA.toFixed(3)})`;
-      ctx.lineWidth = Math.max(0.03, fx.lineWidth * (0.24 + (1 - bandT) * 0.10));
-      ctx.beginPath();
-      ctx.arc(fx.x, fx.y, r, fx.startAngle, fx.startAngle + currentSweep, currentSweep < 0);
-      ctx.stroke();
+    // Core slash — single thick arc with radial gradient for weapon bulk.
+    const stops = profile.alphaStops || DEFAULT_WEAPON_PROFILE.alphaStops;
+    const grad = ctx.createRadialGradient(fx.x, fx.y, rootR, fx.x, fx.y, tipR);
+    for (let i = 0; i < stops.length; i++) {
+      const pos = Math.max(0, Math.min(1, Number(stops[i][0]) || 0));
+      const pA = Math.max(0, Math.min(1, Number(stops[i][1]) || 0));
+      grad.addColorStop(pos, `rgba(255,250,245,${(0.75 * alpha * pA * (1 - t * 0.3)).toFixed(3)})`);
     }
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = span;
+    ctx.beginPath();
+    ctx.arc(fx.x, fx.y, midR, fx.startAngle, fx.startAngle + currentSweep, currentSweep < 0);
+    ctx.stroke();
 
     // Leading edge spark
     if (sweepT < 1) {
@@ -573,25 +566,27 @@ export function createMeleeSlashFxController() {
     // Impact: expanding ring burst + radial lines
     const expandT = Math.min(1, t * (1 / 0.30));
     const tipR = fx.radius * (0.4 + expandT * 0.6);
-    const rootR = tipR * Math.max(0, Math.min(1, profile.handleStart));
-    const span = Math.max(0.06, tipR - rootR);
-    const bandCount = 5;
+    const rootR = tipR * Math.max(0.05, Math.min(0.85, profile.handleStart));
+    const midR = (rootR + tipR) * 0.5;
+    const span = tipR - rootR;
 
-    // Ring burst with weapon-profile density bands.
-    for (let i = 0; i < bandCount; i++) {
-      const bandT = i / (bandCount - 1);
-      const r = rootR + span * bandT;
-      const pAlpha = profileAlpha(profile, bandT);
-      ctx.strokeStyle = `rgba(${cr|0},${cg|0},${cb|0},${(0.36 * alpha * pAlpha).toFixed(3)})`;
-      ctx.lineWidth = Math.max(0.05, fx.lineWidth * (1.30 - t) * (0.65 + 0.35 * pAlpha));
-      ctx.beginPath();
-      ctx.arc(fx.x, fx.y, r, fx.startAngle, fx.startAngle + fx.sweepAngle);
-      ctx.stroke();
+    // Thick ring with radial gradient for weapon bulk.
+    const stops = profile.alphaStops || DEFAULT_WEAPON_PROFILE.alphaStops;
+    const grad = ctx.createRadialGradient(fx.x, fx.y, rootR, fx.x, fx.y, tipR);
+    for (let i = 0; i < stops.length; i++) {
+      const pos = Math.max(0, Math.min(1, Number(stops[i][0]) || 0));
+      const pA = Math.max(0, Math.min(1, Number(stops[i][1]) || 0));
+      grad.addColorStop(pos, `rgba(${cr|0},${cg|0},${cb|0},${(0.4 * alpha * pA).toFixed(3)})`);
     }
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = span * (1.5 - t);
+    ctx.beginPath();
+    ctx.arc(fx.x, fx.y, midR, fx.startAngle, fx.startAngle + fx.sweepAngle);
+    ctx.stroke();
 
     // Inner bright highlight
-    ctx.strokeStyle = `rgba(255,240,220,${(0.56 * alpha * (1 - t * 0.5)).toFixed(3)})`;
-    ctx.lineWidth = fx.lineWidth * 0.62;
+    ctx.strokeStyle = `rgba(255,240,220,${(0.6 * alpha * (1 - t * 0.5)).toFixed(3)})`;
+    ctx.lineWidth = fx.lineWidth * 0.7;
     ctx.beginPath();
     ctx.arc(fx.x, fx.y, rootR + span * 0.72, fx.startAngle, fx.startAngle + fx.sweepAngle);
     ctx.stroke();
