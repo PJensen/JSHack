@@ -32,7 +32,7 @@ export class FloatText {
     // Defaults per flavor
     this.defaults = {
       damage: { life: 0.9, color: '#ffd966', scaleBase: 1.0 },
-      gold:   { life: 0.8, color: '#ffcd45', scaleBase: 1.0 },
+      gold:   { life: 0.8, color: '#f0a830', scaleBase: 1.0 },
       heal:   { life: 0.9, color: '#7BFF7B', scaleBase: 1.0 },
       status: { life: 0.7, color: '#c0c8d0', scaleBase: 1.0 }
     };
@@ -134,8 +134,8 @@ export class FloatText {
   }
   /** @param {number} x @param {number} y @param {number} count @param {FTOptions} [opts] */
   addGold(x,y,count, opts={}){
-    const text = '+' + Math.max(0, Math.floor(Math.abs(count)||0));
-    return this.add(x,y,text,{...opts, flavor:'gold', color: ((opts && opts.color) || '#ffcd45')});
+    const text = '+' + Math.max(0, Math.floor(Math.abs(count)||0)) + 'g';
+    return this.add(x,y,text,{...opts, flavor:'gold', color: ((opts && opts.color) || '#f0a830')});
   }
   /** @param {number} x @param {number} y @param {number} amount @param {FTOptions} [opts] */
   addHeal(x,y,amount, opts={}){
@@ -211,7 +211,7 @@ export class FloatText {
       ctx.scale(scale, scale);
       // Keep text upright and roughly tile-sized
       const fontPx = (p.flavor === 'damage' || p.flavor === 'gold' || p.flavor === 'heal') ? worldFontPx : smallFontPx;
-      ctx.font = `${fontPx}px monospace`;
+      ctx.font = (p.flavor === 'gold' ? 'bold ' : '') + `${fontPx}px monospace`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.globalAlpha *= Math.max(0, Math.min(1, alpha));
