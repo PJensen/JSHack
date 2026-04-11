@@ -62,9 +62,10 @@ const MOOD_KEYS = Object.keys(MOOD_RGB);
 const NEUTRAL_COLOR = [140, 210, 255];
 
 // ── Danger sense ───────────────────────────────────────────────────
-const DANGER_SENSE_RADIUS = 4; // tiles to scan for hidden traps / ambushers
-const DANGER_PULL_STRENGTH = 0.35; // how far wisp drifts toward danger (tiles)
-const DANGER_SCAN_INTERVAL = 0.5; // seconds between scans (perf)
+const DANGER_SENSE_RADIUS = 4;          // tiles at peak attitude standing
+const DANGER_PULL_STRENGTH = 0.35;      // how far wisp drifts toward danger (tiles)
+const DANGER_SCAN_INTERVAL = 0.5;       // seconds between scans (perf)
+const DANGER_SENSE_PEAK_STANDING = 1.2; // standing at which full radius applies
 
 // ── Miracle flight ─────────────────────────────────────────────────
 const MIRACLE_FLY_SPEED = 12; // tiles/sec
@@ -277,12 +278,17 @@ export function createSpiritWispFxController(
   }
 
   function _scanDangers(px, py) {
-    // Only warn when in good standing
-    if (_betrayed) {
+    // Trap awareness scales entirely with attitude: 0 at betrayal threshold, 1 at peak.
+    const attitudeFactor = Math.max(0, Math.min(1,
+      (_standing - BETRAYAL_STANDING_THRESHOLD) /
+      (DANGER_SENSE_PEAK_STANDING - BETRAYAL_STANDING_THRESHOLD),
+    ));
+    if (attitudeFactor <= 0) {
       _dangerIntensity = 0;
       return;
     }
 
+    const effectiveRadius = DANGER_SENSE_RADIUS * attitudeFactor;
     let closestDist = Infinity;
     let dx = 0, dy = 0;
     let found = false;
@@ -290,7 +296,7 @@ export function createSpiritWispFxController(
     for (const [id, pos, trap] of world.query(Position, Trap)) {
       if (trap.revealed || !trap.armed) continue;
       const dist = Math.max(Math.abs(pos.x - px), Math.abs(pos.y - py));
-      if (dist > DANGER_SENSE_RADIUS || dist < 1) continue;
+      if (dist > effectiveRadius || dist < 1) continue;
       if (dist < closestDist) {
         closestDist = dist;
         dx = pos.x - px;
@@ -307,7 +313,7 @@ export function createSpiritWispFxController(
       _dangerDy = dy / len;
       _dangerIntensity = Math.min(
         1,
-        1 - (closestDist - 1) / DANGER_SENSE_RADIUS,
+        attitudeFactor * (1 - (closestDist - 1) / effectiveRadius),
       );
       _trapHintX = px + dx;
       _trapHintY = py + dy;
