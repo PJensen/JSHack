@@ -307,6 +307,34 @@ export function installCombatMessages(ctx) {
     slash: ['cleave', 'cleaves'],
     blunt: ['crush', 'crushes'],
   };
+  const _flavorAdverbs = Object.freeze({
+    brutal: 'brutally',
+    vicious: 'viciously',
+    savage: 'savagely',
+    precise: 'precisely',
+    ruthless: 'ruthlessly',
+  });
+
+  function _toPastVerb(verb) {
+    const v = String(verb || '').toLowerCase();
+    if (!v) return '';
+    if (v === 'hit' || v === 'hits') return 'hit';
+    if (v === 'slash' || v === 'slashes') return 'slashed';
+    if (v === 'stab' || v === 'stabs') return 'stabbed';
+    if (v === 'bash' || v === 'bashes') return 'bashed';
+    if (v === 'skewer' || v === 'skewers') return 'skewered';
+    if (v === 'cleave' || v === 'cleaves') return 'cleaved';
+    if (v === 'crush' || v === 'crushes') return 'crushed';
+    if (v.endsWith('es')) return `${v.slice(0, -2)}ed`;
+    if (v.endsWith('s')) return `${v.slice(0, -1)}ed`;
+    return `${v}ed`;
+  }
+
+  function _adverbForFlavor(flavor) {
+    const f = String(flavor || '').trim().toLowerCase();
+    if (!f) return '';
+    return _flavorAdverbs[f] || f;
+  }
 
   function _impactLabel(amount, maxHp, isCrit) {
     const dmg = Math.max(0, Number(amount || 0));
@@ -324,13 +352,109 @@ export function installCombatMessages(ctx) {
     return label;
   }
 
-  function _hpContext(amount, maxHp, hpAfter, isCrit) {
+  const _impactByWeapon = Object.freeze({
+    pickaxe: Object.freeze({
+      light: ["The pick's point chips in."],
+      solid: ["The pick bites deep and twists."],
+      heavy: ["The pickaxe hooks bone and wrenches free."],
+      devastating: ["A devastating quarry-bite caves everything in."],
+    }),
+    mace: Object.freeze({
+      light: ["The mace clips hard enough to rattle teeth."],
+      solid: ["The mace lands square and the frame buckles."],
+      heavy: ["The mace caves ribs with a wet thud."],
+      devastating: ["A devastating crush folds armor like tin."],
+    }),
+    dagger: Object.freeze({
+      light: ["A quick nick draws first blood."],
+      solid: ["The dagger slides between plates."],
+      heavy: ["The dagger drives in to the hilt."],
+      devastating: ["A devastating thrust finds something vital."],
+    }),
+    sword: Object.freeze({
+      light: ["Steel kisses and opens a line."],
+      solid: ["The edge bites and parts flesh cleanly."],
+      heavy: ["The blade shears through with brutal leverage."],
+      devastating: ["A devastating cut nearly takes them in half."],
+    }),
+    axe: Object.freeze({
+      light: ["The axe nicks and tears away."],
+      solid: ["The axe buries and rips free."],
+      heavy: ["The axe hews deep with a splintering crack."],
+      devastating: ["A devastating hew nearly drops them where they stand."],
+    }),
+    spear: Object.freeze({
+      light: ["The spear jabs and tests the guard."],
+      solid: ["The spear punches through the centerline."],
+      heavy: ["The spear drives through and jerks back bloody."],
+      devastating: ["A devastating impalement pins them in place."],
+    }),
+    bow: Object.freeze({
+      light: ["The shot grazes and stings."],
+      solid: ["The arrow thunks in deep."],
+      heavy: ["The shaft punches through with force."],
+      devastating: ["A devastating shot hammers straight through."],
+    }),
+    unarmed: Object.freeze({
+      light: ["A sharp clip catches them."],
+      solid: ["A hard strike snaps the head back."],
+      heavy: ["A brutal body shot empties their lungs."],
+      devastating: ["A devastating blow drops them to a knee."],
+    }),
+    weapon: Object.freeze({
+      light: ["A glancing cut still draws blood."],
+      solid: ["A clean hit lands true."],
+      heavy: ["A heavy strike tears through defenses."],
+      devastating: ["A devastating strike breaks the fight open."],
+    }),
+    spell: Object.freeze({
+      light: ["The magic scorches, but only just."],
+      solid: ["The spell hits with a sharp pulse."],
+      heavy: ["The spell detonates across their body."],
+      devastating: ["A devastating surge of power rips through them."],
+    }),
+  });
+
+  function _pickImpact(pool, seed) {
+    if (!Array.isArray(pool) || pool.length === 0) return '';
+    const n = Math.abs((Number(seed || 0) | 0)) % pool.length;
+    return String(pool[n]);
+  }
+
+  function _impactSentence(amount, maxHp, isCrit, weaponClass, step) {
+    const level = _impactLabel(amount, maxHp, isCrit);
+    const wc = String(weaponClass || '').toLowerCase();
+    const bank = _impactByWeapon[wc] || _impactByWeapon.weapon;
+    const pool = bank[level] || _impactByWeapon.weapon[level] || _impactByWeapon.weapon.solid;
+    const line = _pickImpact(pool, (step | 0) + (Number(amount || 0) | 0) + (Number(maxHp || 0) | 0));
+    if (!isCrit) return line;
+    return `${line} Critical!`;
+  }
+
+  function _woundSentence(defName, hpAfter, maxHp) {
     const max = Math.max(0, Number(maxHp || 0));
     const after = Math.max(0, Number(hpAfter || 0));
     if (!(max > 0)) return '';
-    const severity = _impactLabel(amount, max, isCrit);
-    const pct = Math.max(0, Math.min(100, Math.round((after / max) * 100)));
-    return ` (${severity}; ${after}/${max} HP left, ${pct}%)`;
+    const be = defName === 'You' ? 'are' : 'is';
+    if (after <= 0) return `${defName} ${be} finished.`;
+    const ratio = after / max;
+    if (ratio > 0.85) return `${defName} ${be} barely scratched.`;
+    if (ratio > 0.65) return `${defName} ${be} hurt.`;
+    if (ratio > 0.4) return `${defName} ${be} wounded and bleeding.`;
+    if (ratio > 0.2) return `${defName} ${be} staggering, bleeding out.`;
+    if (ratio > 0.08) return `${defName} ${be} barely standing.`;
+    return `${defName} ${be} hanging on by a thread.`;
+  }
+
+  function _combatDetailText(defName, amount, maxHp, hpAfter, isCrit, weaponClass, step) {
+    const max = Math.max(0, Number(maxHp || 0));
+    if (!(max > 0)) return '';
+    const impactTxt = _impactSentence(amount, max, isCrit, weaponClass, step);
+    const woundTxt = _woundSentence(defName, hpAfter, max);
+    if (!impactTxt && !woundTxt) return '';
+    if (!impactTxt) return ` ${woundTxt}`;
+    if (!woundTxt) return ` ${impactTxt}`;
+    return ` ${impactTxt} ${woundTxt}`;
   }
 
   world.on('damaged', ({ target, amount, critical, crit, source, offhand, cause, type, impactProfile, at, hpAfter, maxHp }) => {
@@ -338,7 +462,6 @@ export function installCombatMessages(ctx) {
 
     const defName = nameOfEntity(target);
     const isCrit = !!(critical || crit);
-    const hpTxt = _hpContext(amount, maxHp, hpAfter, isCrit);
     const handTxt = offhand ? ' (off-hand)' : '';
     const critTxt = isCrit ? ' \u2014 CRIT!' : '';
     const causeKey = String(cause || '').toLowerCase();
@@ -352,27 +475,27 @@ export function installCombatMessages(ctx) {
       const atkName = nameOfEntity(source);
 
       if (!isWeaponHit) {
+        const detailTxt = _combatDetailText(defName, amount, maxHp, hpAfter, isCrit, 'spell', world.step || 0);
         const pair = _spellVerbs[dt] || ['hit', 'hits'];
-        log(`${atkName} ${_v(atkName, pair[0], pair[1])} ${defName} for ${amount}${hpTxt}${critTxt}.`, 'combat');
+        log(`${atkName} ${_v(atkName, pair[0], pair[1])} ${defName} for ${amount}${critTxt}.${detailTxt}`, 'combat');
         return;
       }
 
       // Melee / ranged — resolve weapon
       let weaponPlain = '';
       let weaponRich = '';
+      let weaponFlavor = '';
       const eq = compGet(Number(source || 0), Equipment);
       const wid = offhand
         ? Number(eq?.offhand || 0)
         : (usingRanged ? Number(eq?.ranged || 0) : Number(eq?.weapon || 0));
       if (wid) {
         const wInfo = compGet(wid, ItemInfo);
-        const flavor = String(wInfo?.combatFlavor || '').trim();
+        weaponFlavor = String(wInfo?.combatFlavor || '').trim();
         weaponRich = _weaponHtml(wid);
         const wname = compGet(wid, NamedIdentity)?.name;
         if (wname) {
           weaponPlain = ` with ${bracketizeName(wname)}`;
-          if (flavor) weaponPlain += ` (${flavor})`;
-          if (weaponRich && flavor) weaponRich += ` (${flavor})`;
         }
       } else if (!offhand && compHas(Number(source || 0), Player)) {
         weaponPlain = ' with bare fists';
@@ -382,13 +505,25 @@ export function installCombatMessages(ctx) {
         || _meleeVerbs[attackKind]
         || ['hit', 'hits'];
       const verb = _v(atkName, pair[0], pair[1]);
-      const text = `${atkName} ${verb} ${defName}${weaponPlain} for ${amount}${hpTxt}${critTxt}${handTxt}.`;
+      const flavorAdverb = _adverbForFlavor(weaponFlavor);
+      const actionVerb = flavorAdverb ? `${flavorAdverb} ${_toPastVerb(verb)}` : verb;
+      const detailTxt = _combatDetailText(
+        defName,
+        amount,
+        maxHp,
+        hpAfter,
+        isCrit,
+        String(impactProfile?.weaponClass || (usingRanged ? 'bow' : 'weapon')),
+        world.step || 0,
+      );
+      const text = `${atkName} ${actionVerb} ${defName}${weaponPlain} for ${amount}${critTxt}${handTxt}.${detailTxt}`;
       const html = weaponRich
-        ? `${atkName} ${verb} ${defName}${weaponRich} for ${amount}${hpTxt}${critTxt}${handTxt}.`
+        ? `${atkName} ${actionVerb} ${defName}${weaponRich} for ${amount}${critTxt}${handTxt}.${detailTxt}`
         : undefined;
       log({ text, html, type: 'combat' });
     } else {
-      log(`${defName} ${_v(defName, 'take', 'takes')} ${amount} damage${hpTxt}${critTxt}${handTxt}.`, 'combat');
+      const detailTxt = _combatDetailText(defName, amount, maxHp, hpAfter, isCrit, String(impactProfile?.weaponClass || ''), world.step || 0);
+      log(`${defName} ${_v(defName, 'take', 'takes')} ${amount} damage${critTxt}${handTxt}.${detailTxt}`, 'combat');
     }
   });
 

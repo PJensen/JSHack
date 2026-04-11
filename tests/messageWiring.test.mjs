@@ -337,7 +337,7 @@ Deno.test("messageWiring includes hit severity and hp context when provided", ()
 
   const pickaxeId = world.create();
   world.add(pickaxeId, NamedIdentity, { name: "Iron Pickaxe", identity: "iron_pickaxe" });
-  world.add(pickaxeId, ItemInfo, { type: "equip", slot: "weapon", count: 1, bonuses: {}, affixes: [] });
+  world.add(pickaxeId, ItemInfo, { type: "equip", slot: "weapon", combatFlavor: "brutal", count: 1, bonuses: {}, affixes: [] });
   world.mutate(playerId, Equipment, (eq) => { eq.weapon = pickaxeId; });
 
   const messageLog = createMessageLog();
@@ -354,8 +354,11 @@ Deno.test("messageWiring includes hit severity and hp context when provided", ()
 
   assertEquals(messageLog.entries.length, 1);
   const text = String(messageLog.entries[0].text || "");
+  assert(text.includes("brutally"), "weapon flavor should modify the attack verb");
+  assert(!text.includes("(brutal)"), "weapon flavor should not be appended as parenthetical");
   assert(text.includes("devastating"), "damage log should include severity flavor");
-  assert(text.includes("2/18 HP left"), "damage log should include hp context");
+  assert(text.includes("barely standing"), "damage log should include wound-state flavor");
+  assert(!text.includes("HP"), "damage log should avoid readout-style HP telemetry");
 });
 
 Deno.test("messageWiring logs spell-proc gear messages for player events", () => {
