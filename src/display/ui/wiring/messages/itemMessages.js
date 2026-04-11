@@ -4,7 +4,7 @@
  */
 export function installItemMessages(ctx) {
   const { world, log, nameOfEntity, nameOfItem, bracketizeName, playerEntity,
-          compGet, compHas, ItemInfo, NamedIdentity, Player, Pet, Owner, Devotion } = ctx;
+          compGet, compHas, canSeeAt, ItemInfo, NamedIdentity, Position, Player, Pet, Owner, Devotion } = ctx;
 
   // === Item events ===
   world.on('drank', ({ actor, itemId, target, feel, identified }) => {
@@ -24,6 +24,8 @@ export function installItemMessages(ctx) {
   world.on('item:pickup', ({ actor, itemId, count }) => {
     const pe = playerEntity(world);
     if (!pe || pe.id !== actor) {
+      const pos = compGet(Number(actor || 0), Position);
+      if (!pos || !canSeeAt(pos.x, pos.y)) return;
       const petName = nameOfEntity(actor);
       const it = nameOfItem(itemId);
       log(`${petName} picks up ${it}.`, 'system');
@@ -52,10 +54,10 @@ export function installItemMessages(ctx) {
     const label = bracketizeName(String(corpseName || "pet corpse"));
     const desecratedOwnPet = (Number(ownerId || 0) | 0) === playerId;
     if (desecratedOwnPet) {
-      log(`You consume ${label}. It is horrifying. The heavens will remember this.`, 'deity');
+      log(`You devour ${label}. Your own companion. The heavens will remember this.`, 'deity');
       return;
     }
-    log(`You desecrate ${label}.`, 'deity');
+    log(`You tear into ${label}. It tastes exactly as bad as it looks.`, 'deity');
   });
 
   world.on('corpse:trait-gained', ({ actor, trait, name }) => {
