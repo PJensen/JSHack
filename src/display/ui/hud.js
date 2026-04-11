@@ -1533,6 +1533,7 @@ export function initHUD() {
   pinSlots = createPinnedItemSlots();
   const quick = createQuickSlot({
     onPinItem: (item) => pinSlots.pinItem(item),
+    isPinned: (identity) => pinSlots.hasIdentity(identity),
   });
   pinSlots.setPresenter((item) => quick.presentItem(item));
   bar.appendChild(charBtn);
@@ -1792,6 +1793,7 @@ export function ensureRoot() {
 // --- Singular Quick Slot (LIFO, most recent pickup first) -----------------
 function createQuickSlot(opts = {}) {
   const onPinItem = typeof opts?.onPinItem === 'function' ? opts.onPinItem : null;
+  const isPinned = typeof opts?.isPinned === 'function' ? opts.isPinned : null;
   const BASE_BOTTOM = 'calc(var(--jshack-actionbar-height, 48px) + 12px + env(safe-area-inset-bottom, 0px))';
   const MOBILE_DOCK_GAP_PX = 8;
   const el = document.createElement('div');
@@ -1950,6 +1952,7 @@ function createQuickSlot(opts = {}) {
     const item = e?.detail?.item;
     console.debug('[quickSlot] ui:recentPickup received:', item);
     if (!item) return;
+    if (isPinned && isPinned(item.identity)) return;
     const idx = stack.findIndex((x) => x && x.id === item.id);
     if (idx >= 0) stack.splice(idx, 1);
     stack.push(normalizeQuickItem({ ...item, justPickedUp: true }));
