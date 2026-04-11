@@ -921,11 +921,14 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     }
   });
 
-  world.on('quest:completed', ({ questId, playerId }) => {
+  world.on('quest:completed', ({ questId, playerId, at }) => {
     const qid = String(questId || '');
     const owner = Number(playerId || 0) | 0;
     if (!_throttle(`quest:completed:vfx:${qid || owner}`, 1000)) return;
-    const pos = getPosition(owner);
+    const anchored = at && Number.isFinite(Number(at.x)) && Number.isFinite(Number(at.y))
+      ? { x: Number(at.x), y: Number(at.y) }
+      : null;
+    const pos = anchored || getPosition(owner);
     if (!pos || !canShowAt(pos.x, pos.y)) return;
 
     ftext.addStatus(pos.x, pos.y - 1.3, 'QUEST COMPLETE!', {
@@ -935,24 +938,24 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
       scaleEnd: 1.02,
     });
 
-    for (let i = 0; i < 26; i++) {
-      const t = i / 25;
-      const spread = 0.10 + t * 0.64;
-      const angle = -Math.PI / 2 + (Math.random() - 0.5) * 1.7;
-      const speed = 0.14 + Math.random() * 0.48;
+    for (let i = 0; i < 54; i++) {
+      const t = i / 53;
+      const spread = 0.08 + t * 0.86;
+      const angle = -Math.PI / 2 + (Math.random() - 0.5) * 2.0;
+      const speed = 0.24 + Math.random() * 0.78;
       fx.pool.spawn(new Particle({
         x: pos.x + (Math.random() - 0.5) * spread,
-        y: pos.y + 0.18 - t * 0.55 + (Math.random() - 0.5) * 0.06,
+        y: pos.y + 0.20 - t * 0.74 + (Math.random() - 0.5) * 0.09,
         vx: Math.cos(angle) * speed,
-        vy: -0.56 - Math.random() * 0.72,
-        ay: 0.58,
-        life: 0.30 + Math.random() * 0.36,
-        size0: 0.10 + Math.random() * 0.06,
-        size1: 0.015,
+        vy: -0.72 - Math.random() * 1.02,
+        ay: 0.66,
+        life: 0.34 + Math.random() * 0.46,
+        size0: 0.12 + Math.random() * 0.10,
+        size1: 0.02,
         r: 255,
         g: 214 + ((Math.random() * 26) | 0),
         b: 100 + ((Math.random() * 34) | 0),
-        a0: 0.92,
+        a0: 0.98,
         a1: 0.0,
       }));
     }
