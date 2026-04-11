@@ -5,7 +5,14 @@
 export function installEnvironmentMessages(ctx) {
   const { world, log, nameOfEntity, nameOfItem, bracketizeName, playerEntity,
           compGet, compHas, canSeeAt, resolveAmbientSoundText,
-          isFavoredDeityForPlayer, Position, Devotion, NamedIdentity } = ctx;
+          isFavoredDeityForPlayer, Position, Devotion, NamedIdentity, Status } = ctx;
+
+  function _playerHas(statusType) {
+    const pe = playerEntity(world);
+    if (!pe?.id || !Status) return false;
+    const st = compGet(pe.id, Status);
+    return Array.isArray(st?.statuses) && st.statuses.some((s) => s.type === statusType && (Number(s.duration || 0) | 0) > 0);
+  }
 
   // === Ambient sound ===
   world.on('ambient:sound', (ev) => {
@@ -136,7 +143,9 @@ export function installEnvironmentMessages(ctx) {
   // === Environment events ===
   world.on('engrave', ({ actor, text, x, y }) => {
     const who = nameOfEntity(actor);
-    log(`${who} scratch${who === 'You' ? '' : 'es'} "${text}" into the stone floor.`, 'system');
+    if (who === 'You' && _playerHas('blinded')) log(`You scratch something into the stone by feel. You hope it says "${text}".`, 'system');
+    else if (who === 'You' && _playerHas('confused')) log(`You scratch "${text}" into the stone. The letters swim before your eyes.`, 'system');
+    else log(`${who} scratch${who === 'You' ? '' : 'es'} "${text}" into the stone floor.`, 'system');
   });
 
   world.on('engrave:scrambled', ({ actor, text, x, y }) => {
@@ -151,8 +160,15 @@ export function installEnvironmentMessages(ctx) {
 
   world.on('interaction', ({ action, result, items: droppedIds, targetId, epitaph }) => {
     if (action === 'toggleDoor') {
-      if (result === 'opened') log('The door creaks open.', 'system');
-      else if (result === 'closed') log('The door swings shut with a thud.', 'system');
+      if (result === 'opened') {
+        if (_playerHas('blinded')) log('You find the handle by touch. The door creaks open.', 'system');
+        else if (_playerHas('confused')) log('You fumble with the door. It creaks open \u2014 you think.', 'system');
+        else log('The door creaks open.', 'system');
+      }
+      else if (result === 'closed') {
+        if (_playerHas('blinded')) log('You push the door shut. It clicks. Probably.', 'system');
+        else log('The door swings shut with a thud.', 'system');
+      }
       else log('The door is locked. It doesn\u2019t budge.', 'system');
     }
     if (action === 'toggleLantern') log(result === 'lit' ? 'You strike the lantern. Warm light spills out.' : 'You snuff the lantern. Darkness closes in.', 'system');
@@ -173,21 +189,35 @@ export function installEnvironmentMessages(ctx) {
   });
 
   world.on('bed:rested', ({ actor }) => {
-    if (nameOfEntity(actor) === 'You') log('You collapse into bed. The aches drain away. Fully restored.', 'system');
+    if (nameOfEntity(actor) === 'You') {
+      if (_playerHas('burning')) log('You throw yourself into bed and smother the flames in linen. The aches drain away. Fully restored.', 'system');
+      else if (_playerHas('poisoned')) log('You collapse into bed, shivering and sick. Sleep takes you anyway. Fully restored.', 'system');
+      else if (_playerHas('confused')) log('You fall into bed \u2014 or the bed falls into you. Either way, rest comes. Fully restored.', 'system');
+      else if (_playerHas('bleeding')) log('You collapse into bed. Blood soaks the sheets. Sleep takes you all the same. Fully restored.', 'system');
+      else log('You collapse into bed. The aches drain away. Fully restored.', 'system');
+    }
     else log(`${nameOfEntity(actor)} stretches out and rests.`, 'system');
   });
 
   // Room feature events
   world.on('well:drink', ({ actor, amount }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    if (amount > 0) log(`You cup your hands and drink deep. The water is cold and clean. (+${amount} SP)`, 'system');
+    if (amount > 0) {
+      if (_playerHas('burning')) log(`You thrust your hands into the well. Water sizzles against your scorched skin. (+${amount} SP)`, 'system');
+      else if (_playerHas('poisoned')) log(`You drink greedily, hoping the clean water will settle your stomach. (+${amount} SP)`, 'system');
+      else log(`You cup your hands and drink deep. The water is cold and clean. (+${amount} SP)`, 'system');
+    }
     else log('You cup your hands and drink. The water is cold and clean.', 'system');
   });
 
   world.on('fountain:drink', (ev) => {
     const { actor, effect, amount } = ev;
     if (nameOfEntity(actor) !== 'You') return;
-    if (effect === 'heal') log(`You take a sip and feel vigour course through you. (+${amount} HP)`, 'system');
+    if (effect === 'heal') {
+      if (_playerHas('burning')) log(`You plunge your face into the water. Steam hisses off your skin. (+${amount} HP)`, 'system');
+      else if (_playerHas('poisoned')) log(`You drink deep, desperate. The water fights the venom in your gut. (+${amount} HP)`, 'system');
+      else log(`You take a sip and feel vigour course through you. (+${amount} HP)`, 'system');
+    }
     else if (effect === 'mana') log(`The water tastes faintly of ozone. Magical energy surges into you. (+${amount} MP)`, 'system');
     else if (effect === 'buff') {
       const labels = { lucky: 'Lucky', keen_eye: 'Keen Eye', bear_vigor: "Bear's Vigor" };
@@ -224,7 +254,11 @@ export function installEnvironmentMessages(ctx) {
 
   world.on('altar:pray', ({ actor }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    log('You kneel on cold stone, bow your head, and pray.', 'deity');
+    if (_playerHas('burning')) log('You drop to your knees, flames still licking your skin, and pray through gritted teeth.', 'deity');
+    else if (_playerHas('poisoned')) log('You kneel on cold stone, shaking with fever, and beg the heavens for relief.', 'deity');
+    else if (_playerHas('blinded')) log('You kneel on cold stone. Blind, you bow your head and pray by feel alone.', 'deity');
+    else if (_playerHas('confused')) log('You kneel \u2014 at least you think you kneel \u2014 and mumble a prayer.', 'deity');
+    else log('You kneel on cold stone, bow your head, and pray.', 'deity');
   });
   world.on('altar:offered', ({ actor, deityName, itemName }) => {
     if (nameOfEntity(actor) !== 'You') return;
@@ -260,7 +294,9 @@ export function installEnvironmentMessages(ctx) {
 
   world.on('mushroom:hallucinate', ({ actor }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    log('The mushroom cap tastes like wet dirt and lightning. The walls start breathing. Rage fills you.', 'danger');
+    if (_playerHas('hallucinating')) log('Another mushroom. The walls were already breathing \u2014 now they\u2019re screaming.', 'danger');
+    else if (_playerHas('confused')) log('The mushroom cap tastes like... what was it? The walls are doing something. Rage fills you. Maybe.', 'danger');
+    else log('The mushroom cap tastes like wet dirt and lightning. The walls start breathing. Rage fills you.', 'danger');
   });
 
   world.on('deathlog:open', () => {
@@ -274,8 +310,19 @@ export function installEnvironmentMessages(ctx) {
   });
 
   world.on('stair:traverse', ({ actor, targetId, direction }) => {
-    if (direction === 'down') log('You descend. The air grows colder. The dark grows thicker.', 'system');
-    else log('You climb the stairs. Light and warmth beckon above.', 'system');
+    if (direction === 'down') {
+      if (_playerHas('blinded')) log('You feel for the edge with your boot and descend, step by careful step.', 'system');
+      else if (_playerHas('confused')) log('You stumble down the stairs. Was it up you wanted? Too late now.', 'system');
+      else if (_playerHas('burning')) log('You hurl yourself down the stairs, trailing smoke and embers.', 'system');
+      else if (_playerHas('poisoned')) log('You descend, one hand on the wall, stomach churning with every step.', 'system');
+      else log('You descend. The air grows colder. The dark grows thicker.', 'system');
+    } else {
+      if (_playerHas('blinded')) log('You grope upward, counting steps by feel. Light means nothing to you now.', 'system');
+      else if (_playerHas('confused')) log('You stagger upward. The stairs seem to twist under your feet.', 'system');
+      else if (_playerHas('burning')) log('You scramble up the stairs, desperate for open air. Smoke trails behind you.', 'system');
+      else if (_playerHas('poisoned')) log('You drag yourself upward, pausing twice to retch against the wall.', 'system');
+      else log('You climb the stairs. Light and warmth beckon above.', 'system');
+    }
   });
 
   world.on('portal:spawned', ({ portalId, at }) => {
@@ -283,7 +330,11 @@ export function installEnvironmentMessages(ctx) {
   });
   world.on('portal:return', ({ actor }) => {
     const who = nameOfEntity(actor);
-    if (who === 'You') log('You step into the portal. Reality folds around you.', 'system');
+    if (who === 'You') {
+      if (_playerHas('blinded')) log('You step forward into something that isn\u2019t air. Reality folds around you.', 'system');
+      else if (_playerHas('confused')) log('You lurch into the portal \u2014 or it lurches into you. Reality folds.', 'system');
+      else log('You step into the portal. Reality folds around you.', 'system');
+    }
     else log(`${who} steps into the portal and vanishes.`, 'system');
   });
   world.on('portal:return:fragged', ({ count, at }) => {
@@ -364,7 +415,8 @@ export function installEnvironmentMessages(ctx) {
       rust: 'Orange dust puffs from a hidden plate \u2014 you shield your gear just in time!',
       swarm: 'Insects boil from a cracked tile \u2014 you stomp backward before they reach you!',
     };
-    log(trapFlav[type] || 'You spot the trap and nimbly dodge it!', 'info');
+    if (_playerHas('blinded')) log('Something feels wrong underfoot \u2014 you throw yourself sideways on instinct!', 'info');
+    else log(trapFlav[type] || 'You spot the trap and nimbly dodge it!', 'info');
   });
   world.on('trap:disarmed', ({ actor, trapType }) => {
     const trapFlav = {
@@ -391,22 +443,54 @@ export function installEnvironmentMessages(ctx) {
 
   // === Weather events ===
   world.on('weather:changed', ({ weather, prev }) => {
-    if (weather === 'rain') log('Dark clouds roll in. Rain begins to fall, pattering against stone.', 'ambient');
-    else if (weather === 'heavy_rain') log('The sky opens up. Rain hammers down in sheets \u2014 you can barely see.', 'ambient');
-    else if (weather === 'clear' && (prev === 'rain' || prev === 'heavy_rain')) log('The rain eases. Puddles glint in the returning light.', 'ambient');
+    const blind = _playerHas('blinded');
+    const deaf = _playerHas('deafened');
+    if (weather === 'rain') {
+      if (blind && deaf) log('Cold drops strike your face. Something has changed in the air.', 'ambient');
+      else if (blind) log('Cold drops strike your face. The sound of rain rises around you.', 'ambient');
+      else if (deaf) log('Dark clouds roll in. Rain begins to fall, though you hear nothing.', 'ambient');
+      else log('Dark clouds roll in. Rain begins to fall, pattering against stone.', 'ambient');
+    }
+    else if (weather === 'heavy_rain') {
+      if (blind) log('The rain hammers your skin now. The world is nothing but cold water and noise.', 'ambient');
+      else if (deaf) log('The sky opens up. Rain hammers down in sheets \u2014 you feel the impacts but hear nothing.', 'ambient');
+      else log('The sky opens up. Rain hammers down in sheets \u2014 you can barely see.', 'ambient');
+    }
+    else if (weather === 'clear' && (prev === 'rain' || prev === 'heavy_rain')) {
+      if (blind) log('The rain stops. Your skin dries in what might be sunlight.', 'ambient');
+      else log('The rain eases. Puddles glint in the returning light.', 'ambient');
+    }
   });
   world.on('weather:extinguish', ({ kind }) => {
     if (kind === 'player') log('The downpour douses the flames on you. Steam rises from your scorched skin.', 'info');
     else if (kind === 'structure') log('Rain snuffs out a nearby fire. Smoke curls upward.', 'ambient');
   });
   world.on('weather:lightning', ({ x, y, hitTree, hitWater, hitCount, hitPlayer }) => {
-    if ((hitCount | 0) > 0) log('CRACK! A bolt of lightning hammers down!', 'danger');
-    else if (hitTree) log('Lightning forks down and splits a tree in two!', 'system');
-    else if (hitWater) log('Lightning strikes the water \u2014 the surface flashes white!', 'system');
-    else log('Lightning stabs the ground nearby. Thunder rolls.', 'system');
+    const blind = _playerHas('blinded');
+    const deaf = _playerHas('deafened');
+    if ((hitCount | 0) > 0) {
+      if (blind && deaf) log('Heat sears the air beside you \u2014 something struck close!', 'danger');
+      else if (blind) log('CRACK! Thunder splits the air \u2014 something was hit!', 'danger');
+      else if (deaf) log('A bolt of lightning hammers down! You feel the impact through the ground.', 'danger');
+      else log('CRACK! A bolt of lightning hammers down!', 'danger');
+    }
+    else if (hitTree) {
+      if (blind) log('You hear wood splinter and crash \u2014 a tree struck by lightning!', 'system');
+      else log('Lightning forks down and splits a tree in two!', 'system');
+    }
+    else if (hitWater) {
+      if (blind) log('A sharp hiss of steam \u2014 lightning hit water somewhere close.', 'system');
+      else log('Lightning strikes the water \u2014 the surface flashes white!', 'system');
+    }
+    else {
+      if (blind && deaf) log('The hair on your arms stands up. The air smells of ozone.', 'system');
+      else if (blind) log('Thunder cracks nearby. The smell of scorched earth fills the air.', 'system');
+      else if (deaf) log('Lightning stabs the ground nearby. You feel the vibration in your bones.', 'system');
+      else log('Lightning stabs the ground nearby. Thunder rolls.', 'system');
+    }
     if (hitPlayer) {
-      log('*** BLINDING WHITE ***', 'danger');
-      log('*** your ears ring like a struck bell ***', 'danger');
+      if (blind) { log('*** HEAT LIKE A FORGE ***', 'danger'); log('*** your whole body seizes ***', 'danger'); }
+      else { log('*** BLINDING WHITE ***', 'danger'); log('*** your ears ring like a struck bell ***', 'danger'); }
     }
   });
   world.on('shock_trap:sensory', ({ target }) => {

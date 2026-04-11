@@ -211,57 +211,55 @@ export function installCombatLogTooltip(tickerEl, deps) {
 
   const SELECTOR = '[data-entity-id],[data-spell-id]';
 
-  // Hover: use pointerover/pointerout (they bubble, unlike pointerenter/pointerleave)
+  function _find(ev) {
+    let el = /** @type {HTMLElement|null} */ (ev.target);
+    if (!el) return null;
+    const match = el.closest?.(SELECTOR);
+    return (match && tickerEl.contains(match)) ? /** @type {HTMLElement} */ (match) : null;
+  }
+
+  // ── Desktop hover ──
   tickerEl.addEventListener('pointerover', (ev) => {
-    const el = /** @type {HTMLElement} */ (ev.target)?.closest?.(SELECTOR);
-    if (!el) return;
-    if (el === activeTarget) return;
+    if (ev.pointerType === 'touch') return;
+    const el = _find(ev);
+    if (!el || el === activeTarget) return;
     activeTarget = el;
     clearTimeout(showTimer);
     showTimer = setTimeout(() => show(el), 100);
   });
-
   tickerEl.addEventListener('pointerout', (ev) => {
-    const el = /** @type {HTMLElement} */ (ev.target)?.closest?.(SELECTOR);
-    if (!el) return;
-    // Only hide if we're leaving the active target and not entering another tip target
-    const related = /** @type {HTMLElement} */ (ev.relatedTarget)?.closest?.(SELECTOR);
-    if (related === activeTarget) return;
+    if (ev.pointerType === 'touch') return;
+    const to = ev.relatedTarget ? /** @type {HTMLElement} */ (ev.relatedTarget).closest?.(SELECTOR) : null;
+    if (to === activeTarget) return;
     hide();
   });
 
-  // Click/tap: toggle tooltip on rich elements, block expand/collapse
-  tickerEl.addEventListener('click', (ev) => {
-    const el = /** @type {HTMLElement} */ (ev.target)?.closest?.(SELECTOR);
-    if (el) {
-      ev.preventDefault();
-      ev.stopImmediatePropagation();
-      if (el === activeTarget && tip.style.display === 'block') {
-        hide();
-      } else {
-        activeTarget = el;
-        clearTimeout(showTimer);
-        show(el);
-      }
-      return;
-    }
-    // Non-tooltip click — hide any open tooltip (expand/collapse will handle itself)
+  // ── Touch + click: use pointerup in capture (fires before ticker's click) ──
+  tickerEl.addEventListener('pointerup', (ev) => {
+    const el = _find(ev);
+    if (!el) return;
+    ev.preventDefault();
+    ev.stopImmediatePropagation();
+    if (el === activeTarget && tip.style.display === 'block') { hide(); return; }
     hide();
+    activeTarget = el;
+    show(el);
   }, true);
 
-  // Hide on scroll/resize or touch outside
+  // Intercept click so ticker expand/collapse doesn't fire on tooltip taps
+  tickerEl.addEventListener('click', (ev) => {
+    if (_find(ev)) { ev.preventDefault(); ev.stopImmediatePropagation(); return; }
+    if (tip.style.display === 'block') hide();
+  }, true);
+
+  // Dismiss tooltip on tap
+  tip.addEventListener('pointerup', (ev) => { ev.stopPropagation(); hide(); });
+
+  // Dismiss on outside tap / scroll / resize
+  document.addEventListener('pointerdown', (ev) => {
+    const t = /** @type {Node} */ (ev.target);
+    if (!tip.contains(t) && !tickerEl.contains(t)) hide();
+  }, { passive: true });
   window.addEventListener('scroll', hide, { passive: true });
   window.addEventListener('resize', hide, { passive: true });
-  // Tap tooltip itself to dismiss
-  tip.addEventListener('click', (ev) => {
-    ev.stopPropagation();
-    hide();
-  });
-
-  // Tap outside tooltip + ticker to dismiss
-  document.addEventListener('pointerdown', (ev) => {
-    if (!tip.contains(/** @type {Node} */ (ev.target)) && !tickerEl.contains(/** @type {Node} */ (ev.target))) {
-      hide();
-    }
-  }, { passive: true });
 }

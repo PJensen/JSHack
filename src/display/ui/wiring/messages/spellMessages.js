@@ -3,7 +3,14 @@
  * Lines ~377-918 from the original installMessageWiring.
  */
 export function installSpellMessages(ctx) {
-  const { world, log, nameOfEntity, bracketizeName, getSpell, compGet, richSpell, NamedIdentity } = ctx;
+  const { world, log, nameOfEntity, bracketizeName, getSpell, compGet, richSpell, NamedIdentity, playerEntity, Status } = ctx;
+
+  function _playerHas(statusType) {
+    const pe = playerEntity(world);
+    if (!pe?.id || !Status) return false;
+    const st = compGet(pe.id, Status);
+    return Array.isArray(st?.statuses) && st.statuses.some((s) => s.type === statusType && (Number(s.duration || 0) | 0) > 0);
+  }
 
   /** Build a rich spell label. Returns { text, html } or falls back to plain bracket. */
   function _spell(spellId) {
@@ -110,6 +117,11 @@ export function installSpellMessages(ctx) {
   world.on('channeling:start', ({ actor, spellId }) => {
     if (nameOfEntity(actor) !== 'You') return;
     const sp = _spell(spellId);
+    if (_playerHas('confused')) { _log(`You sway on your feet and fumble into ${sp.text}... was this the right spell?`, `You sway on your feet and fumble into ${sp.html}... was this the right spell?`, 'system'); return; }
+    if (_playerHas('stunned')) { _log(`Your head throbs. Through the ringing, you force ${sp.text} to take shape...`, `Your head throbs. Through the ringing, you force ${sp.html} to take shape...`, 'system'); return; }
+    if (_playerHas('blinded')) { _log(`Blind, you steady yourself and begin channeling ${sp.text} from memory...`, `Blind, you steady yourself and begin channeling ${sp.html} from memory...`, 'system'); return; }
+    if (_playerHas('burning')) { _log(`Flames lick your skin \u2014 you grit your teeth and force ${sp.text} to gather...`, `Flames lick your skin \u2014 you grit your teeth and force ${sp.html} to gather...`, 'system'); return; }
+    if (_playerHas('poisoned')) { _log(`Your stomach heaves. You choke down bile and begin channeling ${sp.text}...`, `Your stomach heaves. You choke down bile and begin channeling ${sp.html}...`, 'system'); return; }
     _log(`You plant your feet and begin channeling ${sp.text}...`, `You plant your feet and begin channeling ${sp.html}...`, 'system');
   });
 
@@ -118,9 +130,10 @@ export function installSpellMessages(ctx) {
     if (mode === 'sustain') return;
     const elapsed = Math.max(0, (turnsTotal || 0) - (turnsRemaining || 0));
     const pct = turnsTotal ? Math.round((elapsed / turnsTotal) * 100) : 0;
-    if (pct < 30) log(`Power gathers... (${elapsed}/${turnsTotal || '?'})`, 'system');
-    else if (pct < 70) log(`The air hums with building energy. (${elapsed}/${turnsTotal || '?'})`, 'system');
-    else log(`Almost there \u2014 the spell strains to release! (${elapsed}/${turnsTotal || '?'})`, 'system');
+    const confused = _playerHas('confused');
+    if (pct < 30) log(confused ? `Power gathers... you think. (${elapsed}/${turnsTotal || '?'})` : `Power gathers... (${elapsed}/${turnsTotal || '?'})`, 'system');
+    else if (pct < 70) log(confused ? `The air hums \u2014 or is that your head? (${elapsed}/${turnsTotal || '?'})` : `The air hums with building energy. (${elapsed}/${turnsTotal || '?'})`, 'system');
+    else log(confused ? `The spell writhes in your grip \u2014 almost... almost! (${elapsed}/${turnsTotal || '?'})` : `Almost there \u2014 the spell strains to release! (${elapsed}/${turnsTotal || '?'})`, 'system');
   });
 
   world.on('channeling:cancelled', ({ actor, spellId, reason }) => {
