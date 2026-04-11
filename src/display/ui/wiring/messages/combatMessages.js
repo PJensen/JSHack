@@ -214,33 +214,76 @@ export function installCombatMessages(ctx) {
     log(`Not enough stamina to attack with ${weaponName} (need ${need}, have ${Math.floor(have)}).`, 'combat');
   });
 
-  world.on('damaged', ({ target, amount, critical, crit, source, offhand, cause }) => {
+  // ── You/they conjugation: [youForm, theyForm] ──
+  function _v(name, you, they) { return name === 'You' ? you : they; }
+
+  // verb pairs: [you-form, third-person-form]
+  const _meleeVerbs = {
+    stab:  ['stab', 'stabs'],
+    slash: ['slash', 'slashes'],
+    blunt: ['bash', 'bashes'],
+    strike:['hit', 'hits'],
+  };
+  const _spellVerbs = {
+    fire:      ['burn', 'burns'],
+    lightning: ['shock', 'shocks'],
+    electric:  ['shock', 'shocks'],
+    ice:       ['freeze', 'freezes'],
+    frost:     ['freeze', 'freezes'],
+    cold:      ['freeze', 'freezes'],
+    poison:    ['poison', 'poisons'],
+    acid:      ['corrode', 'corrodes'],
+    arcane:    ['blast', 'blasts'],
+    plasma:    ['sear', 'sears'],
+    radiation: ['irradiate', 'irradiates'],
+  };
+  const _critMelee = {
+    stab:  ['skewer', 'skewers'],
+    slash: ['cleave', 'cleaves'],
+    blunt: ['crush', 'crushes'],
+  };
+
+  world.on('damaged', ({ target, amount, critical, crit, source, offhand, cause, type, impactProfile }) => {
     const defName = nameOfEntity(target);
     const isCrit = !!(critical || crit);
     const handTxt = offhand ? ' (off-hand)' : '';
     const critTxt = isCrit ? ' (CRIT!)' : '';
+    const causeKey = String(cause || '').toLowerCase();
+    const isSpell = causeKey.startsWith('spell:') || causeKey.startsWith('affix:')
+      || causeKey.startsWith('procpackage:') || causeKey.startsWith('monster:');
+    const usingRanged = causeKey === 'ranged';
+    const dt = String(type || '').toLowerCase();
+    const attackKind = impactProfile?.attackKind || '';
+
     if (Number(source || 0)) {
       const atkName = nameOfEntity(source);
+      const isYou = atkName === 'You';
+
+      if (isSpell) {
+        // Spell/proc: verb from damage type, no weapon
+        const pair = _spellVerbs[dt] || ['hit', 'hits'];
+        log(`${atkName} ${_v(atkName, pair[0], pair[1])} ${defName} for ${amount}${critTxt}.`, 'combat');
+        return;
+      }
+
+      // Melee / ranged: verb from attack shape, include weapon
       let weaponLabel = '';
       const eq = compGet(Number(source || 0), Equipment);
-      const causeKey = String(cause || '').toLowerCase();
-      const isSpell = causeKey.startsWith('spell:') || causeKey.startsWith('affix:')
-        || causeKey.startsWith('procpackage:') || causeKey.startsWith('monster:');
-      const usingRanged = causeKey === 'ranged';
-      if (!isSpell) {
-        const wid = offhand
-          ? Number(eq?.offhand || 0)
-          : (usingRanged ? Number(eq?.ranged || 0) : Number(eq?.weapon || 0));
-        if (wid) {
-          const wname = compGet(wid, NamedIdentity)?.name;
-          if (wname) weaponLabel = ` with ${bracketizeName(wname)}`;
-        } else if (!offhand && compHas(Number(source || 0), Player)) {
-          weaponLabel = ' with bare fists';
-        }
+      const wid = offhand
+        ? Number(eq?.offhand || 0)
+        : (usingRanged ? Number(eq?.ranged || 0) : Number(eq?.weapon || 0));
+      if (wid) {
+        const wname = compGet(wid, NamedIdentity)?.name;
+        if (wname) weaponLabel = ` with ${bracketizeName(wname)}`;
+      } else if (!offhand && compHas(Number(source || 0), Player)) {
+        weaponLabel = ' with bare fists';
       }
-      log(`${atkName} ${atkName === 'You' ? 'hit' : 'hits'} ${defName}${weaponLabel} for ${amount}${critTxt}${handTxt}.`, 'combat');
+      const pair = (isCrit && _critMelee[attackKind])
+        || _meleeVerbs[attackKind]
+        || (usingRanged ? ['hit', 'hits'] : ['hit', 'hits']);
+      log(`${atkName} ${_v(atkName, pair[0], pair[1])} ${defName}${weaponLabel} for ${amount}${critTxt}${handTxt}.`, 'combat');
     } else {
-      log(`${defName} ${defName === 'You' ? 'take' : 'takes'} ${amount} damage${critTxt}${handTxt}.`, 'combat');
+      log(`${defName} ${_v(defName, 'take', 'takes')} ${amount} damage${critTxt}${handTxt}.`, 'combat');
     }
   });
 
@@ -360,16 +403,41 @@ export function installCombatMessages(ctx) {
     log(_pickDeath(_deathFallback, step)(who), 'combat');
   });
 
+  const _missVerbs = {
+    stab:  ['stab at', 'stabs at'],
+    slash: ['swing at', 'swings at'],
+    blunt: ['swing at', 'swings at'],
+  };
+
+  function _getAttackKindFor(srcId) {
+    const eq = compGet(Number(srcId || 0), Equipment);
+    const wid = Number(eq?.weapon || 0);
+    if (!wid) return '';
+    const info = compGet(wid, ItemInfo);
+    const dt = String(info?.damageType || '').toLowerCase();
+    if (dt === 'pierce') return 'stab';
+    if (dt === 'slash') return 'slash';
+    if (dt === 'blunt') return 'blunt';
+    return '';
+  }
+
   world.on('status', (payload) => {
     const { id, kind, source } = normalizeStatusEvent(payload);
     const style = (String(kind || '')).toLowerCase();
     const tgt = nameOfEntity(id);
-    const src = Number(source || 0) ? nameOfEntity(source) : null;
+    const srcId = Number(source || 0);
+    const src = srcId ? nameOfEntity(source) : null;
     if (style === 'miss' && src) {
-      log(`${src} ${src === 'You' ? 'miss' : 'misses'} ${tgt}.`, 'combat');
+      const ak = _getAttackKindFor(srcId);
+      const pair = _missVerbs[ak];
+      if (pair) {
+        log(`${src} ${_v(src, pair[0], pair[1])} ${tgt} and ${_v(src, 'miss', 'misses')}.`, 'combat');
+      } else {
+        log(`${src} ${_v(src, 'miss', 'misses')} ${tgt}.`, 'combat');
+      }
     }
     if (style === 'immune' && src) {
-      log(`${src} ${src === 'You' ? 'attack' : 'attacks'} ${tgt}. It does nothing.`, 'combat');
+      log(`${src} ${_v(src, 'attack', 'attacks')} ${tgt}. It does nothing.`, 'combat');
     }
   });
 
