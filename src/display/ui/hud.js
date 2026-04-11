@@ -402,15 +402,45 @@ export function initHUD() {
     return btn;
   }
 
+  const moonPhaseEl = document.createElement('div');
+  moonPhaseEl.textContent = '\uD83C\uDF11';
+  moonPhaseEl.title = 'New Moon';
+  Object.assign(moonPhaseEl.style, {
+    minWidth: '24px',
+    height: '16px',
+    padding: '0 4px',
+    borderRadius: '8px',
+    border: '1px solid rgba(90,110,150,0.45)',
+    background: 'rgba(18,24,36,0.7)',
+    color: '#d7e4ff',
+    fontSize: '12px',
+    lineHeight: '14px',
+    textAlign: 'center',
+    whiteSpace: 'nowrap',
+    pointerEvents: 'none',
+  });
+
   const zoomBar = document.createElement('div');
   Object.assign(zoomBar.style, {
-    display: 'flex', gap: '4px',
+    display: 'flex',
+    gap: '4px',
     justifyContent: 'center',
-    marginTop: '4px',
     pointerEvents: 'auto',
   });
   zoomBar.appendChild(makeZoomBtn('\u2212', 1 / 1.2)); // zoom out
   zoomBar.appendChild(makeZoomBtn('+', 1.2));           // zoom in
+
+  const zoomHud = document.createElement('div');
+  Object.assign(zoomHud.style, {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '3px',
+    marginTop: '4px',
+    pointerEvents: 'auto',
+  });
+  zoomHud.appendChild(moonPhaseEl);
+  zoomHud.appendChild(zoomBar);
 
   // Active effects HUD: vertical stack below the gauge on the right side.
   const effectsHud = document.createElement('div');
@@ -433,7 +463,7 @@ export function initHUD() {
   effectsHud.appendChild(statusRow);
   effectsHud.appendChild(affixRow);
   topRightHud.appendChild(vitals);
-  topRightHud.appendChild(zoomBar);
+  topRightHud.appendChild(zoomHud);
   topRightHud.appendChild(effectsHud);
   root.appendChild(topRightHud);
   vitalsGauge.draw();
@@ -1206,6 +1236,16 @@ export function initHUD() {
       staminaValue: stVal,
       staminaMax: stMax,
     });
+  });
+
+  window.addEventListener('ui:updateCalendar', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const moonEmoji = String(e?.detail?.moonEmoji || '').trim();
+    const moonLabel = String(e?.detail?.moonLabel || '').trim();
+    if (!moonEmoji && !moonLabel) return;
+    moonPhaseEl.textContent = moonEmoji || '\uD83C\uDF11';
+    moonPhaseEl.title = moonLabel || 'Moon phase';
   });
 
   // Update combat HUD details
