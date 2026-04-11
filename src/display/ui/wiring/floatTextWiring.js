@@ -897,7 +897,7 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
       life: 0.95,
       scaleStart: 1.18,
       scaleEnd: 0.92,
-      color: '#ffd45e',
+      color: '#f0a830',
     });
 
     for (let i = 0; i < 12; i++) {
