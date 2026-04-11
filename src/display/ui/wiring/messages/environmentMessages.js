@@ -17,27 +17,26 @@ export function installEnvironmentMessages(ctx) {
   // === Prayer events ===
   world.on('prayer', ({ actor, distress }) => {
     const who = nameOfEntity(actor);
-    if (distress?.desperate) log(`${who} desperately prays for divine intervention!`, 'deity');
-    else if (distress?.troubled) log(`${who} prays for aid...`, 'deity');
-    else log(`${who} prays to the heavens...`, 'deity');
+    if (distress?.desperate) log(`${who} ${who === 'You' ? 'fall' : 'falls'} to ${who === 'You' ? 'your' : 'their'} knees and ${who === 'You' ? 'beg' : 'begs'} the heavens for mercy!`, 'deity');
+    else if (distress?.troubled) log(`${who} ${who === 'You' ? 'clasp your' : 'clasps their'} hands and ${who === 'You' ? 'pray' : 'prays'} for aid...`, 'deity');
+    else log(`${who} ${who === 'You' ? 'close your' : 'closes their'} eyes and ${who === 'You' ? 'whisper' : 'whispers'} a prayer.`, 'deity');
   });
 
   world.on('prayer:insight', ({ actor, deityName, pantheon, desperate, troubled, needs }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    const mode = pantheon ? 'pantheon' : 'single deity';
     const urgency = desperate ? 'desperate' : (troubled ? 'urgent' : 'steady');
     const needText = Array.isArray(needs) && needs.length ? ` Need: ${needs.join(', ')}.` : '';
-    log(`${deityName || 'A deity'} hears your ${urgency} prayer (${mode}).${needText}`, 'deity');
+    log(`${deityName || 'A voice from above'} hears your ${urgency} plea.${needText}`, 'deity');
   });
 
   world.on('prayer:curse-removed', ({ actor, name }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    log(`Divine grace lifts a curse from ${bracketizeName(String(name || 'item'))}.`, 'deity');
+    log(`Warmth floods through ${bracketizeName(String(name || 'item'))} \u2014 the curse lifts like smoke.`, 'deity');
   });
 
   world.on('deity:patronShift', ({ playerId, deityName }) => {
     if (nameOfEntity(playerId) !== 'You') return;
-    log(`The pantheon shifts \u2014 ${deityName || 'a new patron'} now answers you most strongly.`, 'deity');
+    log(`The stars shift. ${deityName || 'A new patron'} turns their gaze upon you.`, 'deity');
   });
 
   world.on('deity:intervention', ({ playerId, deityId, deityName, kind, effect, itemName }) => {
@@ -45,11 +44,11 @@ export function installEnvironmentMessages(ctx) {
     if (!isFavoredDeityForPlayer(playerId, deityId)) return;
     const k = String(kind || 'intervention');
     if (k === 'miracle') return;
-    if (k === 'shrine_blessing') { log(`${deityName || 'A deity'} answers from the shrine.`, 'deity'); return; }
-    if (k === 'prayer_uncurse') { log(`${deityName || 'A deity'} lifts the curse from ${bracketizeName(String(itemName || 'your gear'))}.`, 'deity'); return; }
-    if (k === 'patron_shift') { log(`Divine currents realign around ${deityName || 'a new patron'}.`, 'deity'); return; }
+    if (k === 'shrine_blessing') { log(`${deityName || 'A presence'} stirs within the shrine and answers.`, 'deity'); return; }
+    if (k === 'prayer_uncurse') { log(`${deityName || 'A deity'} reaches down and tears the curse from ${bracketizeName(String(itemName || 'your gear'))}.`, 'deity'); return; }
+    if (k === 'patron_shift') { log(`The divine currents shift. ${deityName || 'A new patron'} claims you.`, 'deity'); return; }
     if (k === 'boon') return;
-    if (k === 'wrath') log(`${deityName || 'A deity'}'s intervention is wrathful.`, 'deity');
+    if (k === 'wrath') log(`${deityName || 'A deity'}'s wrath descends upon you!`, 'deity');
   });
 
   world.on('deity:boon', ({ actor, deityId, message, boon, amount, removed, uncursed }) => {
@@ -58,34 +57,43 @@ export function installEnvironmentMessages(ctx) {
     const text = String(message || '').trim();
     if (text) { log(text, 'deity'); return; }
     const b = String(boon || 'blessing');
-    if (b === 'renewal') { log(`Divine renewal restores you (+${Math.max(0, Number(amount || 0) | 0)} HP).`, 'deity'); return; }
-    if (b === 'mana_surge') { log(`A mana surge fills you (+${Math.max(0, Number(amount || 0) | 0)} MP).`, 'deity'); return; }
-    if (b === 'cleanse') { log(`You are cleansed (${Math.max(0, Number(removed || 0) | 0)} afflictions, ${Math.max(0, Number(uncursed || 0) | 0)} curses removed).`, 'deity'); return; }
-    log('A divine blessing takes hold.', 'deity');
+    if (b === 'renewal') { log(`Divine light knits your wounds. (+${Math.max(0, Number(amount || 0) | 0)} HP)`, 'deity'); return; }
+    if (b === 'mana_surge') { log(`Power crackles through your veins \u2014 mana restored! (+${Math.max(0, Number(amount || 0) | 0)} MP)`, 'deity'); return; }
+    if (b === 'cleanse') { log(`Holy fire scours your body clean. (${Math.max(0, Number(removed || 0) | 0)} afflictions purged, ${Math.max(0, Number(uncursed || 0) | 0)} curses broken)`, 'deity'); return; }
+    log('A divine blessing settles over you like warm rain.', 'deity');
   });
 
   // === Pet events ===
   world.on('pet:deliver', ({ petId, actor, itemId, itemName, count }) => {
     const petName = nameOfEntity(petId);
     const label = itemName ? bracketizeName(itemName) : nameOfItem(itemId);
-    log(`${petName} drops ${label} at your feet.`, 'system');
+    log(`${petName} trots up and drops ${label} at your feet. Good ${petName.toLowerCase().includes('wolf') ? 'boy' : 'pet'}.`, 'system');
   });
 
   world.on('pet:state:changed', ({ petId, prevState, newState, command }) => {
     const petName = nameOfEntity(petId);
-    const stateNames = { following: 'following you', staying: 'staying put', guarding: 'guarding', aggressive: 'aggressive', fetching: 'fetching an item', returning: 'returning', fleeing: 'fleeing', idle: 'idle' };
-    log(`${petName} is now ${stateNames[newState] || newState}.`, 'system');
+    const stateFlav = {
+      following: `${petName} falls into step beside you.`,
+      staying: `${petName} sits and stays.`,
+      guarding: `${petName} plants itself and growls at the shadows.`,
+      aggressive: `${petName}'s hackles rise. It's hunting.`,
+      fetching: `${petName} darts off after something.`,
+      returning: `${petName} turns back toward you.`,
+      fleeing: `${petName} tucks tail and bolts!`,
+      idle: `${petName} yawns and settles down.`,
+    };
+    log(stateFlav[newState] || `${petName} is now ${newState}.`, 'system');
   });
 
   world.on('pet:state:auto', ({ petId, newState, reason }) => {
     const petName = nameOfEntity(petId);
-    if (reason === 'low_health') log(`${petName} flees to safety!`, 'system');
-    else if (reason === 'health_restored') log(`${petName} returns to your side.`, 'system');
-    else if (reason === 'item_picked_up') log(`${petName} has the item!`, 'system');
+    if (reason === 'low_health') log(`${petName} whimpers and flees to safety!`, 'system');
+    else if (reason === 'health_restored') log(`${petName} perks up and returns to your side.`, 'system');
+    else if (reason === 'item_picked_up') log(`${petName} has the item! Tail wagging.`, 'system');
   });
 
   world.on('pet:teleported', ({ petId, from, to }) => {
-    log(`${nameOfEntity(petId)} teleports to your side.`, 'system');
+    log(`${nameOfEntity(petId)} materializes next to you in a flash of light.`, 'system');
   });
 
   world.on('pet:corpse-munch', ({ petId, corpseName, heal, partial, resistedToxin }) => {
@@ -94,8 +102,8 @@ export function installEnvironmentMessages(ctx) {
     const hp = Math.max(0, Number(heal || 0) | 0);
     const keptSome = partial === true;
     let msg = keptSome
-      ? `${petName} takes a bite out of ${label} right off the floor. Crunch.`
-      : `${petName} demolishes ${label} right off the floor. Crunch-crunch.`;
+      ? `${petName} tears a chunk from ${label}. Crunch.`
+      : `${petName} wolfs down ${label} whole. Crunch-crunch.`;
     if (hp > 0) msg += ` (+${hp} HP)`;
     if (resistedToxin === true) msg += ' Iron stomach.';
     log(msg, 'system');
@@ -103,24 +111,32 @@ export function installEnvironmentMessages(ctx) {
 
   // === Summoned creature command events ===
   world.on('summon:state:changed', ({ id, prevState, newState, command }) => {
-    const stateNames = { following: 'following you', staying: 'staying put', guarding: 'guarding', aggressive: 'aggressive', fleeing: 'fleeing', idle: 'idle' };
-    log(`${nameOfEntity(id)} is now ${stateNames[newState] || newState}.`, 'system');
+    const name = nameOfEntity(id);
+    const stateFlav = {
+      following: `${name} drifts after you.`,
+      staying: `${name} holds position.`,
+      guarding: `${name} stands watch.`,
+      aggressive: `${name} surges forward, eager for blood.`,
+      fleeing: `${name} retreats to lick its wounds.`,
+      idle: `${name} waits.`,
+    };
+    log(stateFlav[newState] || `${name} is now ${newState}.`, 'system');
   });
 
   world.on('summon:state:auto', ({ id, newState, reason }) => {
     const name = nameOfEntity(id);
-    if (reason === 'low_health') log(`${name} retreats!`, 'system');
-    else if (reason === 'health_restored') log(`${name} returns to the fight.`, 'system');
+    if (reason === 'low_health') log(`${name} staggers back, badly wounded.`, 'system');
+    else if (reason === 'health_restored') log(`${name} recovers and rejoins the fight.`, 'system');
   });
 
   world.on('summon:teleported', ({ id }) => {
-    log(`${nameOfEntity(id)} reappears near you.`, 'system');
+    log(`${nameOfEntity(id)} flickers and reappears at your side.`, 'system');
   });
 
   // === Environment events ===
   world.on('engrave', ({ actor, text, x, y }) => {
     const who = nameOfEntity(actor);
-    log(`${who} engrave${who === 'You' ? '' : 's'} "${text}" on the ground.`, 'system');
+    log(`${who} scratch${who === 'You' ? '' : 'es'} "${text}" into the stone floor.`, 'system');
   });
 
   world.on('engrave:scrambled', ({ actor, text, x, y }) => {
@@ -129,39 +145,43 @@ export function installEnvironmentMessages(ctx) {
     const ppos = compGet(pe.id, Position);
     if (ppos && Math.max(Math.abs(ppos.x - x), Math.abs(ppos.y - y)) <= 10) {
       const who = nameOfEntity(actor);
-      log(`${who} scuff${who === 'You' ? '' : 's'} the engraving underfoot.`, 'system');
+      log(`${who} scuff${who === 'You' ? '' : 's'} the engraving with ${who === 'You' ? 'your' : 'their'} boot. The words smear.`, 'system');
     }
   });
 
   world.on('interaction', ({ action, result, items: droppedIds, targetId, epitaph }) => {
-    if (action === 'toggleDoor') log(`The door ${result === 'opened' ? 'opens' : (result === 'closed' ? 'closes' : 'is locked')}.`, 'system');
-    if (action === 'toggleLantern') log(result === 'lit' ? 'You light the lantern.' : 'You extinguish the lantern.', 'system');
-    if (action === 'openChest') log('You open the chest!', 'system');
+    if (action === 'toggleDoor') {
+      if (result === 'opened') log('The door creaks open.', 'system');
+      else if (result === 'closed') log('The door swings shut with a thud.', 'system');
+      else log('The door is locked. It doesn\u2019t budge.', 'system');
+    }
+    if (action === 'toggleLantern') log(result === 'lit' ? 'You strike the lantern. Warm light spills out.' : 'You snuff the lantern. Darkness closes in.', 'system');
+    if (action === 'openChest') log('The lid groans open. Dust rises. Let\u2019s see what\u2019s inside...', 'system');
     if (action === 'readTombstone') {
       if (epitaph) { log('--- TOMBSTONE ---', 'system'); log(epitaph, 'system'); log('----------------', 'system'); }
-      else log('The tombstone inscription has faded...', 'system');
+      else log('Time has worn the inscription smooth. Whatever was written here is gone.', 'system');
     }
     if (action === 'readText') {
       const inter = compGet(Number(targetId || 0), NamedIdentity);
-      if (inter?.identity === 'house_sign') log('Home sweet home. Rest, gather, and prepare for another descent.', 'system');
-      else if (inter?.identity === 'smithy_sign') log('The Black Smith \u2014 ore deliveries welcome.', 'system');
-      else if (inter?.identity === 'apothecary_sign') log('The Apothecary \u2014 potions, salves, and remedies.', 'system');
-      else if (inter?.identity === 'gem_shop_sign') log('Gem Dealer \u2014 identified stones, socketables, and fine cuts.', 'system');
-      else if (inter?.identity === 'tombstone') log('The weathered inscription reads: "Rest eternal, faithful soul."', 'system');
-      else log('You read the sign.', 'system');
+      if (inter?.identity === 'house_sign') log('"Home." You\u2019ve earned the rest. Resupply and prepare for the next descent.', 'system');
+      else if (inter?.identity === 'smithy_sign') log('A soot-stained sign reads: "THE BLACK SMITH \u2014 Ore In, Steel Out."', 'system');
+      else if (inter?.identity === 'apothecary_sign') log('Neat lettering on glass: "The Apothecary \u2014 Cures, Salves & Things Best Not Named."', 'system');
+      else if (inter?.identity === 'gem_shop_sign') log('A polished sign gleams: "Gem Dealer \u2014 Cuts, Settings & Appraisals."', 'system');
+      else if (inter?.identity === 'tombstone') log('The weathered stone reads: "Rest eternal, faithful soul."', 'system');
+      else log('You squint at the sign and read it.', 'system');
     }
   });
 
   world.on('bed:rested', ({ actor }) => {
-    if (nameOfEntity(actor) === 'You') log('You rest in your bed and feel fully restored.', 'system');
-    else log(`${nameOfEntity(actor)} rests for a while.`, 'system');
+    if (nameOfEntity(actor) === 'You') log('You collapse into bed. The aches drain away. Fully restored.', 'system');
+    else log(`${nameOfEntity(actor)} stretches out and rests.`, 'system');
   });
 
   // Room feature events
   world.on('well:drink', ({ actor, amount }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    if (amount > 0) log(`You draw cool water from the well. (+${amount} SP)`, 'system');
-    else log('You draw water from the well. You feel refreshed.', 'system');
+    if (amount > 0) log(`You cup your hands and drink deep. The water is cold and clean. (+${amount} SP)`, 'system');
+    else log('You cup your hands and drink. The water is cold and clean.', 'system');
   });
 
   world.on('fountain:drink', (ev) => {
@@ -195,79 +215,80 @@ export function installEnvironmentMessages(ctx) {
 
   world.on('fountain:destroyed', ({ actor }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    log('The fountain is destroyed!', 'danger');
+    log('The fountain cracks apart! Water spills across the floor and drains away.', 'danger');
   });
   world.on('fountain:dry', ({ actor }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    log('The fountain is dry.', 'system');
+    log('You bend over the fountain. Dry as bone. Not a drop left.', 'system');
   });
 
   world.on('altar:pray', ({ actor }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    log('You kneel at the altar and pray...', 'system');
+    log('You kneel on cold stone, bow your head, and pray.', 'deity');
   });
   world.on('altar:offered', ({ actor, deityName, itemName }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    log(`You place ${itemName} on the altar as an offering to ${deityName}.`, 'system');
+    log(`You place ${itemName} upon the altar. It shimmers and is consumed by ${deityName}'s light.`, 'deity');
   });
   world.on('altar:offerFailed', ({ actor, reason }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    if (String(reason || '') === 'not_owned') { log('You are no longer carrying that offering.', 'system'); return; }
-    log('Your offering fails.', 'system');
+    if (String(reason || '') === 'not_owned') { log('Your hands are empty. You have nothing to offer.', 'system'); return; }
+    log('The altar rejects your offering. The item clatters to the floor.', 'system');
   });
 
   world.on('bell:rung', () => {
-    log('You ring the town bell \u2014 the villagers take up arms!', 'warning');
+    log('The bell\u2019s iron voice rings across the town \u2014 villagers grab whatever\u2019s sharp and rally!', 'warning');
   });
 
   world.on('shrine:touch', ({ actor }) => {
     if (nameOfEntity(actor) !== 'You') return;
     const devotion = compGet(Number(actor || 0), Devotion);
     if (devotion?.deityId) return;
-    log('You touch the shrine. A faint warmth pulses through you.', 'system');
+    log('You press your palm to the shrine. Stone hums under your fingers \u2014 faint, but alive.', 'system');
   });
 
   world.on('shrine:communion', ({ actor, deityName, effect, cooldownRemaining }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    if (effect === 'blessing') { log(`${deityName || 'Your deity'} acknowledges your devotion at the shrine.`, 'deity'); return; }
+    if (effect === 'blessing') { log(`${deityName || 'The deity'} stirs within the shrine. You feel seen. A blessing settles over you.`, 'deity'); return; }
     if (effect === 'cooldown') {
       const turns = Math.max(1, Number(cooldownRemaining || 1) | 0);
-      log(`${deityName || 'Your deity'} remains silent. Commune again in ${turns} turns.`, 'deity');
+      log(`${deityName || 'The deity'} is distant. The shrine is cool to the touch. (${turns} turns)`, 'deity');
       return;
     }
-    log('The shrine is silent.', 'system');
+    log('The shrine is cold. Silent. No one answers.', 'system');
   });
 
   world.on('mushroom:hallucinate', ({ actor }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    log('The mushrooms make your head swim. The walls begin to shift... and a furious rage surges through you!', 'system');
+    log('The mushroom cap tastes like wet dirt and lightning. The walls start breathing. Rage fills you.', 'danger');
   });
 
   world.on('deathlog:open', () => {
-    log('You open the Book of the Dead...', 'system');
+    log('You crack open the Book of the Dead. The pages are warm to the touch.', 'system');
     window.dispatchEvent(new CustomEvent('ui:openDeathLog'));
   });
 
   world.on('book:open', ({ title, text }) => {
-    log(`You read ${title || 'a book'}...`, 'system');
+    log(`You open ${title || 'a book'} and begin to read...`, 'system');
     window.dispatchEvent(new CustomEvent('ui:openBookReader', { detail: { title, text } }));
   });
 
   world.on('stair:traverse', ({ actor, targetId, direction }) => {
-    log(`You ${direction === 'down' ? 'descend' : 'ascend'} the stairs...`, 'system');
+    if (direction === 'down') log('You descend. The air grows colder. The dark grows thicker.', 'system');
+    else log('You climb the stairs. Light and warmth beckon above.', 'system');
   });
 
   world.on('portal:spawned', ({ portalId, at }) => {
-    log('A shimmering return portal tears open nearby.', 'system');
+    log('The air tears open in a ring of blue light \u2014 a return portal!', 'system');
   });
   world.on('portal:return', ({ actor }) => {
     const who = nameOfEntity(actor);
-    if (who === 'You') log('You step into the return portal.', 'system');
-    else log(`${who} steps into a return portal.`, 'system');
+    if (who === 'You') log('You step into the portal. Reality folds around you.', 'system');
+    else log(`${who} steps into the portal and vanishes.`, 'system');
   });
   world.on('portal:return:fragged', ({ count, at }) => {
     const n = Math.max(0, Number(count || 0) | 0);
-    if (n > 0) log(`Arrival shockwave obliterates ${n} occupant${n === 1 ? '' : 's'}.`, 'system');
+    if (n > 0) log(`The arrival shockwave tears through ${n} ${n === 1 ? 'creature' : 'creatures'} that were standing in the spot!`, 'combat');
   });
 
   world.on('dungeon:teleport-depth', ({ actor, targetDepth, source }) => {
@@ -275,10 +296,10 @@ export function installEnvironmentMessages(ctx) {
     const src = String(source || '');
     const who = nameOfEntity(actor);
     if (src === 'scroll_homecoming') {
-      if (who === 'You') log('The scroll turns to warm ash. A familiar pull carries you home.', 'system');
+      if (who === 'You') log('The scroll crumbles to warm ash in your hands. The dungeon melts away \u2014 you\u2019re going home.', 'system');
       else log(`${who} vanishes in a swirl of warm ash.`, 'system');
     } else if (src === 'hearthstone') {
-      if (who === 'You') log('The hearthstone pulses with warmth. You are pulled home.', 'system');
+      if (who === 'You') log('The hearthstone pulses against your chest. The world blurs. You\u2019re pulled home.', 'system');
       else log(`${who} vanishes in a pulse of hearthlight.`, 'system');
     }
   });
@@ -286,21 +307,21 @@ export function installEnvironmentMessages(ctx) {
   // Dig events
   world.on('tile:dug', ({ actor, x, y }) => {
     const who = nameOfEntity(actor);
-    log(`${who} dig${who === 'You' ? '' : 's'} through the wall.`, 'system');
+    log(`${who} ${who === 'You' ? 'swing your' : 'swings a'} pickaxe into the wall \u2014 stone crumbles!`, 'system');
   });
   world.on('tile:chopped', ({ actor, x, y }) => {
     const who = nameOfEntity(actor);
-    log(`${who} chop${who === 'You' ? '' : 's'} down the tree.`, 'system');
+    log(`${who} ${who === 'You' ? 'bury your' : 'buries an'} axe into the trunk. The tree groans and falls.`, 'system');
   });
 
   // NPC / quest events
   world.on('npc:dialogue', ({ text }) => { log(text, 'info'); });
-  world.on('quest:started', ({ title }) => { log(`Quest started: ${String(title || 'Quest')}.`, 'system'); });
+  world.on('quest:started', ({ title }) => { log(`New quest: "${String(title || 'Quest')}."`, 'system'); });
   world.on('quest:advanced', ({ objective }) => {
     const text = String(objective || '').trim();
-    if (text) log(`Objective updated: ${text}`, 'system');
+    if (text) log(`Objective: ${text}`, 'system');
   });
-  world.on('quest:completed', ({ title }) => { log(`Quest completed: ${String(title || 'Quest')}.`, 'system'); });
+  world.on('quest:completed', ({ title }) => { log(`Quest complete: "${String(title || 'Quest')}." Well done.`, 'system'); });
 
   // Burn events
   world.on('tile:burned', ({ actor, x, y, burnedKind }) => {
@@ -308,84 +329,101 @@ export function installEnvironmentMessages(ctx) {
     const kind = String(burnedKind || 'tree');
     const { hasNamedEntity, burnVerb } = ctx;
     if (!hasNamedEntity(actor)) {
-      if (kind === 'wall') log('The wall burns open in a shower of sparks.', 'system');
-      else if (kind === 'door') log('The door burns off its hinges.', 'system');
-      else if (kind === 'fence') log('The fence burns away in a quick rush of flame.', 'system');
-      else if (kind === 'roof') log('The roof catches and starts to burn through.', 'system');
-      else log('The tree burns down to ash.', 'system');
+      if (kind === 'wall') log('The wall catches \u2014 mortar cracks, stones split, and the whole section burns open.', 'system');
+      else if (kind === 'door') log('The door catches fire and burns off its hinges in seconds.', 'system');
+      else if (kind === 'fence') log('Dry fence posts go up like kindling.', 'system');
+      else if (kind === 'roof') log('Sparks catch the roofing \u2014 flames eat through the thatch.', 'system');
+      else log('The tree catches fire. Bark peels back, branches crack, and it collapses to ash.', 'system');
       return;
     }
     const who = nameOfEntity(actor);
-    if (kind === 'wall') log(`${who} ${burnVerb(who)} through the wall.`, 'system');
+    if (kind === 'wall') log(`${who} ${burnVerb(who)} a hole clean through the wall.`, 'system');
     else if (kind === 'door') log(`${who} ${burnVerb(who)} the door off its hinges.`, 'system');
-    else if (kind === 'fence') log(`${who} ${burnVerb(who)} the fence down.`, 'system');
-    else if (kind === 'roof') log(`${who} ${burnVerb(who)} through the roof.`, 'system');
-    else log(`${who} ${burnVerb(who)} the tree to ash.`, 'system');
+    else if (kind === 'fence') log(`${who} ${burnVerb(who)} the fence to charcoal.`, 'system');
+    else if (kind === 'roof') log(`${who} ${burnVerb(who)} through the roof above.`, 'system');
+    else log(`${who} ${burnVerb(who)} the tree. It collapses in a shower of embers.`, 'system');
   });
 
   world.on('entity:burned', ({ actor, x, y, name, identity }) => {
     if (!canSeeAt(x, y)) return;
     const label = bracketizeName(name || identity || 'thing');
     const { hasNamedEntity, burnVerb } = ctx;
-    if (!hasNamedEntity(actor)) { log(`${label} goes up in sparks.`, 'system'); return; }
+    if (!hasNamedEntity(actor)) { log(`${label} catches fire and goes up in seconds.`, 'system'); return; }
     const who = nameOfEntity(actor);
     log(`${who} ${burnVerb(who)} ${label} to cinders.`, 'system');
   });
 
   // === Trap events ===
   world.on('trap:avoided', ({ victimId, trapId, type }) => {
-    const trapNames = { spike: "Spike Trap", snake: "Snake Trap", shock: "Shock Trap", pit: "Pit Trap", siphon: "Siphon Trap", rust: "Rust Trap", swarm: "Swarm Trap" };
-    log(`You nimbly dodge the ${trapNames[type] || 'trap'}!`, 'info');
+    const trapFlav = {
+      spike: 'You see the spikes just in time \u2014 you leap clear!',
+      snake: 'A serpent lunges from a hidden pit \u2014 you jerk your foot back!',
+      shock: 'Sparks crackle underfoot \u2014 you jump away before the circuit closes!',
+      pit: 'The floor gives way \u2014 you catch the edge and haul yourself back!',
+      siphon: 'A chill pulls at your soul \u2014 you wrench free before it takes hold!',
+      rust: 'Orange dust puffs from a hidden plate \u2014 you shield your gear just in time!',
+      swarm: 'Insects boil from a cracked tile \u2014 you stomp backward before they reach you!',
+    };
+    log(trapFlav[type] || 'You spot the trap and nimbly dodge it!', 'info');
   });
   world.on('trap:disarmed', ({ actor, trapType }) => {
-    const trapNames = { spike: "Spike Trap", snake: "Snake Trap", shock: "Shock Trap", pit: "Pit Trap", siphon: "Siphon Trap", rust: "Rust Trap", swarm: "Swarm Trap" };
-    log(`You carefully disarm the ${trapNames[trapType] || 'trap'}.`, 'info');
+    const trapFlav = {
+      spike: 'You wedge the spike mechanism open. It won\u2019t fire again.',
+      snake: 'You pin the serpent with a boot and snap the trigger.',
+      shock: 'You ground the electrodes. The sparking stops.',
+      pit: 'You jam the trapdoor shut with a rock.',
+      siphon: 'You crack the sigil stone. The siphon goes dark.',
+      rust: 'You scrape the corrosive powder into a harmless pile.',
+      swarm: 'You crush the nest before anything hatches.',
+    };
+    log(trapFlav[trapType] || 'You carefully disarm the trap.', 'info');
   });
   world.on('trap:disarm:failed', ({ actor, trapType }) => {
     const trapNames = { spike: "Spike Trap", snake: "Snake Trap", shock: "Shock Trap", pit: "Pit Trap", siphon: "Siphon Trap", rust: "Rust Trap", swarm: "Swarm Trap" };
-    log(`You fumble the ${trapNames[trapType] || 'trap'} \u2014 it triggers!`, 'danger');
+    log(`Your fingers slip on the ${trapNames[trapType] || 'trap'} mechanism \u2014 CLICK! It triggers!`, 'danger');
   });
   world.on('trap:gas_explosion', () => {
-    log('The gas ignites \u2014 BOOM! A fiery explosion engulfs the area!', 'danger');
+    log('The gas pocket ignites \u2014 BOOM! A fireball fills the corridor!', 'danger');
   });
   world.on('trap:gas', () => {
-    log('A cloud of noxious gas billows from the trap!', 'warning');
+    log('Noxious green gas hisses from the trap and fills the air!', 'warning');
   });
 
   // === Weather events ===
   world.on('weather:changed', ({ weather, prev }) => {
-    if (weather === 'rain') log('Rain begins to fall.', 'info');
-    else if (weather === 'heavy_rain') log('The rain intensifies into a downpour.', 'info');
-    else if (weather === 'clear' && (prev === 'rain' || prev === 'heavy_rain')) log('The rain lets up.', 'info');
+    if (weather === 'rain') log('Dark clouds roll in. Rain begins to fall, pattering against stone.', 'ambient');
+    else if (weather === 'heavy_rain') log('The sky opens up. Rain hammers down in sheets \u2014 you can barely see.', 'ambient');
+    else if (weather === 'clear' && (prev === 'rain' || prev === 'heavy_rain')) log('The rain eases. Puddles glint in the returning light.', 'ambient');
   });
   world.on('weather:extinguish', ({ kind }) => {
-    if (kind === 'player') log('The rain douses the flames on you.', 'info');
-    else if (kind === 'structure') log('The rain puts out a fire.', 'ambient');
+    if (kind === 'player') log('The downpour douses the flames on you. Steam rises from your scorched skin.', 'info');
+    else if (kind === 'structure') log('Rain snuffs out a nearby fire. Smoke curls upward.', 'ambient');
   });
   world.on('weather:lightning', ({ x, y, hitTree, hitWater, hitCount, hitPlayer }) => {
-    if ((hitCount | 0) > 0) log('A bolt of lightning strikes!', 'danger');
-    else if (hitTree) log('Lightning splinters a nearby tree!', 'system');
-    else if (hitWater) log('Lightning crackles across the water!', 'system');
-    else log('Lightning strikes the ground nearby!', 'system');
+    if ((hitCount | 0) > 0) log('CRACK! A bolt of lightning hammers down!', 'danger');
+    else if (hitTree) log('Lightning forks down and splits a tree in two!', 'system');
+    else if (hitWater) log('Lightning strikes the water \u2014 the surface flashes white!', 'system');
+    else log('Lightning stabs the ground nearby. Thunder rolls.', 'system');
     if (hitPlayer) {
-      log('*** a flash of light! ***', 'danger');
-      log('*** ringing fills your ears! ***', 'danger');
+      log('*** BLINDING WHITE ***', 'danger');
+      log('*** your ears ring like a struck bell ***', 'danger');
     }
   });
   world.on('shock_trap:sensory', ({ target }) => {
     const pe = playerEntity(world);
     const playerId = Number(pe?.id || 0) | 0;
     if (!(playerId > 0) || (Number(target || 0) | 0) !== playerId) return;
-    log('*** a flash of light! ***', 'danger');
-    log('*** ringing fills your ears! ***', 'danger');
+    log('*** BLINDING WHITE ***', 'danger');
+    log('*** your ears ring like a struck bell ***', 'danger');
   });
 
   // === Calendar events ===
   world.on('calendar:newDay', ({ next }) => { /* quiet */ });
-  world.on('calendar:newMonth', ({ name }) => { log(`The month of ${name} begins.`, 'system'); });
+  world.on('calendar:newMonth', ({ name }) => { log(`The month turns. ${name} begins.`, 'ambient'); });
   world.on('calendar:newSeason', ({ next }) => {
     const label = next.charAt(0).toUpperCase() + next.slice(1);
-    log(`${label} has arrived.`, 'system');
+    const flavors = { Spring: 'The air softens. Buds appear.', Summer: 'Heat settles over the land.', Autumn: 'Leaves turn. The wind carries a chill.', Winter: 'Frost creeps across every surface.' };
+    log(`${label} has arrived. ${flavors[label] || ''}`, 'ambient');
   });
-  world.on('calendar:newYear', ({ next }) => { log(`A new year dawns \u2014 Year ${next}.`, 'system'); });
+  world.on('calendar:newYear', ({ next }) => { log(`A new year dawns \u2014 Year ${next}. The world turns.`, 'ambient'); });
 }
