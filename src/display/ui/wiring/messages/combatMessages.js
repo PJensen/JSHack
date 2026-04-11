@@ -308,11 +308,37 @@ export function installCombatMessages(ctx) {
     blunt: ['crush', 'crushes'],
   };
 
-  world.on('damaged', ({ target, amount, critical, crit, source, offhand, cause, type, impactProfile, at }) => {
+  function _impactLabel(amount, maxHp, isCrit) {
+    const dmg = Math.max(0, Number(amount || 0));
+    const max = Math.max(0, Number(maxHp || 0));
+    const ratio = max > 0 ? (dmg / max) : 0;
+    let label = 'light';
+    if (ratio >= 0.4 || dmg >= 16) label = 'devastating';
+    else if (ratio >= 0.25 || dmg >= 10) label = 'heavy';
+    else if (ratio >= 0.12 || dmg >= 5) label = 'solid';
+    if (isCrit && label !== 'devastating') {
+      if (label === 'solid') label = 'heavy';
+      else if (label === 'heavy') label = 'devastating';
+      else label = 'solid';
+    }
+    return label;
+  }
+
+  function _hpContext(amount, maxHp, hpAfter, isCrit) {
+    const max = Math.max(0, Number(maxHp || 0));
+    const after = Math.max(0, Number(hpAfter || 0));
+    if (!(max > 0)) return '';
+    const severity = _impactLabel(amount, max, isCrit);
+    const pct = Math.max(0, Math.min(100, Math.round((after / max) * 100)));
+    return ` (${severity}; ${after}/${max} HP left, ${pct}%)`;
+  }
+
+  world.on('damaged', ({ target, amount, critical, crit, source, offhand, cause, type, impactProfile, at, hpAfter, maxHp }) => {
     if (!_playerCanSee([target, source], at)) return;
 
     const defName = nameOfEntity(target);
     const isCrit = !!(critical || crit);
+    const hpTxt = _hpContext(amount, maxHp, hpAfter, isCrit);
     const handTxt = offhand ? ' (off-hand)' : '';
     const critTxt = isCrit ? ' \u2014 CRIT!' : '';
     const causeKey = String(cause || '').toLowerCase();
@@ -327,7 +353,7 @@ export function installCombatMessages(ctx) {
 
       if (!isWeaponHit) {
         const pair = _spellVerbs[dt] || ['hit', 'hits'];
-        log(`${atkName} ${_v(atkName, pair[0], pair[1])} ${defName} for ${amount}${critTxt}.`, 'combat');
+        log(`${atkName} ${_v(atkName, pair[0], pair[1])} ${defName} for ${amount}${hpTxt}${critTxt}.`, 'combat');
         return;
       }
 
@@ -339,9 +365,15 @@ export function installCombatMessages(ctx) {
         ? Number(eq?.offhand || 0)
         : (usingRanged ? Number(eq?.ranged || 0) : Number(eq?.weapon || 0));
       if (wid) {
+        const wInfo = compGet(wid, ItemInfo);
+        const flavor = String(wInfo?.combatFlavor || '').trim();
         weaponRich = _weaponHtml(wid);
         const wname = compGet(wid, NamedIdentity)?.name;
-        if (wname) weaponPlain = ` with ${bracketizeName(wname)}`;
+        if (wname) {
+          weaponPlain = ` with ${bracketizeName(wname)}`;
+          if (flavor) weaponPlain += ` (${flavor})`;
+          if (weaponRich && flavor) weaponRich += ` (${flavor})`;
+        }
       } else if (!offhand && compHas(Number(source || 0), Player)) {
         weaponPlain = ' with bare fists';
         weaponRich = ' with bare fists';
@@ -350,13 +382,13 @@ export function installCombatMessages(ctx) {
         || _meleeVerbs[attackKind]
         || ['hit', 'hits'];
       const verb = _v(atkName, pair[0], pair[1]);
-      const text = `${atkName} ${verb} ${defName}${weaponPlain} for ${amount}${critTxt}${handTxt}.`;
+      const text = `${atkName} ${verb} ${defName}${weaponPlain} for ${amount}${hpTxt}${critTxt}${handTxt}.`;
       const html = weaponRich
-        ? `${atkName} ${verb} ${defName}${weaponRich} for ${amount}${critTxt}${handTxt}.`
+        ? `${atkName} ${verb} ${defName}${weaponRich} for ${amount}${hpTxt}${critTxt}${handTxt}.`
         : undefined;
       log({ text, html, type: 'combat' });
     } else {
-      log(`${defName} ${_v(defName, 'take', 'takes')} ${amount} damage${critTxt}${handTxt}.`, 'combat');
+      log(`${defName} ${_v(defName, 'take', 'takes')} ${amount} damage${hpTxt}${critTxt}${handTxt}.`, 'combat');
     }
   });
 

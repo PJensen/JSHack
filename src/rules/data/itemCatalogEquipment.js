@@ -1048,6 +1048,7 @@ export const EQUIPMENT_ITEMS = {
     bonuses: { accuracy: 0, damagePower: 2, piercePenetration: 4, dig: 1 },
     damageDice: "1d12",
     damageType: "pierce",
+    combatFlavor: "brutal",
     staminaCost: 20,
     weight: 4.0,
   },

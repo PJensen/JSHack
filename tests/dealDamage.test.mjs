@@ -206,6 +206,9 @@ Deno.test("dealDamage: emits 'damaged' with correct payload", () => {
   assertEquals(events[0].impactProfile?.weaponClass, 'sword');
   assertEquals(events[0].impactProfile?.attackKind, 'slash');
   assertEquals(events[0].impactProfile?.signature?.slash, 0.7);
+  assertEquals(events[0].hpBefore, 20);
+  assertEquals(events[0].hpAfter, 13);
+  assertEquals(events[0].maxHp, 20);
 });
 
 Deno.test("dealDamage: noTrigger flag forwarded in damaged event", () => {
