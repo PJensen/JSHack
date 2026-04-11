@@ -3,17 +3,30 @@
  * Lines ~377-918 from the original installMessageWiring.
  */
 export function installSpellMessages(ctx) {
-  const { world, log, nameOfEntity, bracketizeName, getSpell, compGet, NamedIdentity } = ctx;
+  const { world, log, nameOfEntity, bracketizeName, getSpell, compGet, richSpell, NamedIdentity } = ctx;
+
+  /** Build a rich spell label. Returns { text, html } or falls back to plain bracket. */
+  function _spell(spellId) {
+    const s = getSpell ? getSpell(String(spellId || '')) : null;
+    if (s?.name) return richSpell(spellId);
+    const fallback = `[${String(spellId || 'Spell')}]`;
+    return { text: fallback, html: fallback };
+  }
+
+  /** Log a message that may include rich spell HTML. */
+  function _log(text, html, type) {
+    if (html && html !== text) log({ text, html, type });
+    else log(text, type);
+  }
 
   world.on('castSpell', ({ actor, spellId, targetId }) => {
     const who = nameOfEntity(actor);
     const tgt = nameOfEntity(targetId || actor);
-    const s = getSpell ? getSpell(String(spellId || '')) : null;
-    const label = s?.name ? bracketizeName(s.name) : '[Spell]';
-    if (who === 'You' && tgt === 'You') log(`You invoke ${label}.`, 'system');
-    else if (who === 'You') log(`You hurl ${label} at ${tgt}.`, 'system');
-    else if (tgt === 'You') log(`${who} hurls ${label} at you!`, 'danger');
-    else log(`${who} casts ${label} on ${tgt}.`, 'system');
+    const sp = _spell(spellId);
+    if (who === 'You' && tgt === 'You') _log(`You invoke ${sp.text}.`, `You invoke ${sp.html}.`, 'system');
+    else if (who === 'You') _log(`You hurl ${sp.text} at ${tgt}.`, `You hurl ${sp.html} at ${tgt}.`, 'system');
+    else if (tgt === 'You') _log(`${who} hurls ${sp.text} at you!`, `${who} hurls ${sp.html} at you!`, 'danger');
+    else _log(`${who} casts ${sp.text} on ${tgt}.`, `${who} casts ${sp.html} on ${tgt}.`, 'system');
   });
 
   world.on('spirit:spellBoost', () => {
@@ -48,11 +61,15 @@ export function installSpellMessages(ctx) {
     const resource = String(costKind || 'mana');
     const label = resource === 'stamina' ? 'stamina' : resource === 'life' ? 'life force' : 'mana';
     if (who === 'You') {
-      log(`You reach for the magic \u2014 your ${label} gutters like a dying candle. Not enough. (need ${need}, have ${have})`, 'system');
+      const sp = _spell(spellId);
+      _log(`You reach for ${sp.text} \u2014 your ${label} gutters like a dying candle. Not enough. (need ${need}, have ${have})`,
+           `You reach for ${sp.html} \u2014 your ${label} gutters like a dying candle. Not enough. (need ${need}, have ${have})`, 'system');
       return;
     }
     if (spellId) {
-      log(`${who} begins [${String(spellId)}] but falters \u2014 drained of ${label}.`, 'system');
+      const sp = _spell(spellId);
+      _log(`${who} begins ${sp.text} but falters \u2014 drained of ${label}.`,
+           `${who} begins ${sp.html} but falters \u2014 drained of ${label}.`, 'system');
       return;
     }
     log(`${who} reaches for magic and comes up empty.`, 'system');
@@ -60,9 +77,9 @@ export function installSpellMessages(ctx) {
 
   world.on('spell:on-cooldown', ({ actor, spellId }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    const s = getSpell ? getSpell(String(spellId || '')) : null;
-    const label = s?.name || String(spellId || 'spell');
-    log(`The power for [${label}] hasn't gathered yet. Give it time.`, 'system');
+    const sp = _spell(spellId);
+    _log(`The power for ${sp.text} hasn't gathered yet. Give it time.`,
+         `The power for ${sp.html} hasn't gathered yet. Give it time.`, 'system');
   });
 
   world.on('spell:lifetap', ({ actor, hpSpent, manaGained }) => {
@@ -72,32 +89,28 @@ export function installSpellMessages(ctx) {
 
   world.on('spell:fizzle', ({ actor, spellId, confused, reason }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    const s = getSpell ? getSpell(String(spellId || '')) : null;
-    const label = s?.name ? `[${s.name}]` : `[${String(spellId || 'spell')}]`;
-    if (confused) { log(`Your thoughts scatter \u2014 ${label} unravels in your hands.`, 'system'); return; }
-    if (reason === 'silenced') { log(`Your lips move but no sound comes. ${label} dies on your tongue.`, 'system'); return; }
-    if (reason === 'asleep') { log(`You mumble ${label} in your sleep... the magic slips away.`, 'system'); return; }
-    if (reason === 'stunned') { log(`Your head rings. ${label} fizzles before you can focus.`, 'system'); return; }
-    if (reason === 'mindlocked') { log(`Something grips your mind like a vice. ${label} won't come.`, 'system'); return; }
-    log(`${label} fizzles. The magic dissipates.`, 'system');
+    const sp = _spell(spellId);
+    if (confused) { _log(`Your thoughts scatter \u2014 ${sp.text} unravels in your hands.`, `Your thoughts scatter \u2014 ${sp.html} unravels in your hands.`, 'system'); return; }
+    if (reason === 'silenced') { _log(`Your lips move but no sound comes. ${sp.text} dies on your tongue.`, `Your lips move but no sound comes. ${sp.html} dies on your tongue.`, 'system'); return; }
+    if (reason === 'asleep') { _log(`You mumble ${sp.text} in your sleep... the magic slips away.`, `You mumble ${sp.html} in your sleep... the magic slips away.`, 'system'); return; }
+    if (reason === 'stunned') { _log(`Your head rings. ${sp.text} fizzles before you can focus.`, `Your head rings. ${sp.html} fizzles before you can focus.`, 'system'); return; }
+    if (reason === 'mindlocked') { _log(`Something grips your mind like a vice. ${sp.text} won't come.`, `Something grips your mind like a vice. ${sp.html} won't come.`, 'system'); return; }
+    _log(`${sp.text} fizzles. The magic dissipates.`, `${sp.html} fizzles. The magic dissipates.`, 'system');
   });
 
   world.on('spell:miscast', ({ actor, fromSpellId, toSpellId, confused }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    const from = getSpell ? getSpell(String(fromSpellId || '')) : null;
-    const to = getSpell ? getSpell(String(toSpellId || '')) : null;
-    const fromLabel = from?.name ? `[${from.name}]` : `[${String(fromSpellId || 'spell')}]`;
-    const toLabel = to?.name ? `[${to.name}]` : `[${String(toSpellId || 'spell')}]`;
-    if (confused) { log(`Your confusion twists ${fromLabel} into ${toLabel} \u2014 that's not what you meant!`, 'danger'); return; }
-    log(`The magic warps \u2014 ${fromLabel} becomes ${toLabel}!`, 'danger');
+    const fr = _spell(fromSpellId);
+    const to = _spell(toSpellId);
+    if (confused) { _log(`Your confusion twists ${fr.text} into ${to.text} \u2014 that's not what you meant!`, `Your confusion twists ${fr.html} into ${to.html} \u2014 that's not what you meant!`, 'danger'); return; }
+    _log(`The magic warps \u2014 ${fr.text} becomes ${to.text}!`, `The magic warps \u2014 ${fr.html} becomes ${to.html}!`, 'danger');
   });
 
   // === Channeling events ===
   world.on('channeling:start', ({ actor, spellId }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    const s = getSpell ? getSpell(String(spellId || '')) : null;
-    const label = s?.name ? bracketizeName(s.name) : '[Spell]';
-    log(`You plant your feet and begin channeling ${label}...`, 'system');
+    const sp = _spell(spellId);
+    _log(`You plant your feet and begin channeling ${sp.text}...`, `You plant your feet and begin channeling ${sp.html}...`, 'system');
   });
 
   world.on('channeling:tick', ({ actor, spellId, mode, turnsRemaining, turnsTotal }) => {
@@ -150,24 +163,27 @@ export function installSpellMessages(ctx) {
   });
 
   world.on('spell:learned', ({ actor, spellId }) => {
-    const s = getSpell ? getSpell(String(spellId || '')) : null;
-    const label = s?.name ? `[${s.name}]` : `[${String(spellId || 'spell')}]`;
-    log(`The knowledge burns itself into your mind \u2014 you learn ${label}!`, 'system');
+    const sp = _spell(spellId);
+    _log(`The knowledge burns itself into your mind \u2014 you learn ${sp.text}!`,
+         `The knowledge burns itself into your mind \u2014 you learn ${sp.html}!`, 'system');
   });
 
   world.on('spell:already-known', ({ actor, spellId }) => {
-    const s = getSpell ? getSpell(String(spellId || '')) : null;
-    const label = s?.name ? `[${s.name}]` : `[${String(spellId || 'spell')}]`;
-    log(`You already know ${label}. The text offers nothing new.`, 'system');
+    const sp = _spell(spellId);
+    _log(`You already know ${sp.text}. The text offers nothing new.`,
+         `You already know ${sp.html}. The text offers nothing new.`, 'system');
   });
 
   world.on('spell:learn-denied', ({ actor, reason, need, have, spellId }) => {
-    const s = getSpell ? getSpell(String(spellId || '')) : null;
-    const label = s?.name ? `[${s.name}]` : (spellId ? `[${String(spellId)}]` : 'that spell');
-    let msg = `You can't learn ${label}.`;
-    if (reason === 'intelligence') msg = `The symbols for ${label} swim before your eyes. Too complex. (need ${need} INT, have ${have})`;
-    if (reason === 'unknown-spell') msg = 'The pages are covered in notation you\u2019ve never seen. Inscrutable.';
-    log(msg, 'system');
+    const sp = _spell(spellId);
+    if (reason === 'intelligence') {
+      _log(`The symbols for ${sp.text} swim before your eyes. Too complex. (need ${need} INT, have ${have})`,
+           `The symbols for ${sp.html} swim before your eyes. Too complex. (need ${need} INT, have ${have})`, 'system');
+    } else if (reason === 'unknown-spell') {
+      log('The pages are covered in notation you\u2019ve never seen. Inscrutable.', 'system');
+    } else {
+      _log(`You can't learn ${sp.text}.`, `You can't learn ${sp.html}.`, 'system');
+    }
   });
 
   world.on('spell:blink', ({ actor, randomized, randomReason }) => {

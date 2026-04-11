@@ -4,7 +4,7 @@
  */
 export function installCreatureMessages(ctx) {
   const { world, log, nameOfEntity, bracketizeName, canSeeAt, playerEntity,
-          compGet, spellLabel, NamedIdentity, Player, Position } = ctx;
+          compGet, spellLabel, richEntity, richSpell, richLabel, NamedIdentity, Player, Position } = ctx;
 
   // === Gaze events (Floating Eye) ===
   world.on('proc:gaze:message', ({ message }) => {
@@ -51,7 +51,8 @@ export function installCreatureMessages(ctx) {
 
   // === Nymph events ===
   world.on('nymph:stole', ({ itemName }) => {
-    log(`Hey! The Nymph snatched your ${bracketizeName(String(itemName || 'item'))} right out of your hands!`, 'danger');
+    const stolen = bracketizeName(String(itemName || 'item'));
+    log(`Hey! The Nymph snatched your ${stolen} right out of your hands!`, 'danger');
   });
   world.on('nymph:blinked', () => {
     log('The Nymph blows you a kiss and vanishes. Your item goes with her.', 'warning');
@@ -70,19 +71,25 @@ export function installCreatureMessages(ctx) {
     const tid = Number(targetId || 0) | 0;
     const tpos = compGet(tid, Position);
     if (tpos && !canSeeAt(tpos.x, tpos.y)) return;
-    log(`Frost erupts from your sigil \u2014 ${nameOfEntity(tid)} is locked in ice!`, 'system');
+    const gl = richLabel('Glacier Sigil', '#55ccff');
+    const tgtName = nameOfEntity(tid);
+    log({ text: `${gl.text} \u2014 ${tgtName} is locked in ice!`, html: `${gl.html} \u2014 ${tgtName} is locked in ice!`, type: 'system' });
   });
   world.on('proc:conductionLens', ({ actor, extraChains }) => {
     const pe = playerEntity(world);
     if (!pe || Number(actor || 0) !== pe.id) return;
     const links = Math.max(1, Number(extraChains || 1) | 0);
-    log(`Your lightning forks through the lens \u2014 ${links} extra ${links === 1 ? "target caught" : "targets caught"} in the arc!`, 'system');
+    const cl = richLabel('Conduction Lens', '#ffdd44');
+    const suffix = `${links} extra ${links === 1 ? "target caught" : "targets caught"} in the arc!`;
+    log({ text: `${cl.text} \u2014 ${suffix}`, html: `${cl.html} \u2014 ${suffix}`, type: 'system' });
   });
   world.on('proc:echoGrimoire:echo', ({ actor, spellId, powerScale }) => {
     const pe = playerEntity(world);
     if (!pe || Number(actor || 0) !== pe.id) return;
     const pct = Math.max(1, Math.round(Math.max(0, Number(powerScale || 1)) * 100));
-    log(`The grimoire flares \u2014 ${bracketizeName(spellLabel(spellId))} echoes at ${pct}% power!`, 'system');
+    const eg = richLabel('Echo Grimoire', '#c47bff');
+    const sp = richSpell(spellId);
+    log({ text: `${eg.text} \u2014 ${sp.text} echoes at ${pct}% power!`, html: `${eg.html} \u2014 ${sp.html} echoes at ${pct}% power!`, type: 'system' });
   });
 
   // === Centipede events ===

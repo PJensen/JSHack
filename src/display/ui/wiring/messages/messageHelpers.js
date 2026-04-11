@@ -116,6 +116,68 @@ export function createMessageContext({
     return "";
   }
 
+  // ── Rarity / tier colors for rich text ──
+  const _rarityColors = {
+    common: '#ddd', uncommon: '#1eff00', rare: '#55aaff',
+    magic: '#55aaff', epic: '#c47bff', legendary: '#ff9f3b',
+  };
+  const _monsterColors = { rare: '#ff9f3b', elite: '#c47bff' };
+  const _spellColor = '#79c0ff';
+
+  /**
+   * Format an entity (item OR monster) as rich { text, html } with color + tooltip hook.
+   * Falls back to plain bracketized name if no special data found.
+   */
+  function richEntity(id) {
+    const n = Number(id || 0);
+    if (!(n > 0)) return null;
+    const ni = compGet(n, NamedIdentity);
+    const name = ni?.name;
+    if (!name) return null;
+    const text = bracketizeName(name);
+
+    // Item path — has ItemInfo with rarity
+    const info = ItemInfo ? compGet(n, ItemInfo) : null;
+    if (info) {
+      const rn = String(info.rarityName || 'common').toLowerCase();
+      const color = _rarityColors[rn] || '#ddd';
+      const html = `<b style="color:${color}" data-entity-id="${n}" data-tip="item">${text}</b>`;
+      return { text, html };
+    }
+
+    // Monster / creature path — check identity for rare tag
+    const identity = String(ni?.identity || '');
+    const isRare = identity && (ni?.tags?.includes?.('rare') || ni?.tags?.includes?.('elite'));
+    if (isRare) {
+      const color = ni?.tags?.includes?.('elite') ? _monsterColors.elite : _monsterColors.rare;
+      const html = `<b style="color:${color}" data-entity-id="${n}" data-tip="monster">${text}</b>`;
+      return { text, html };
+    }
+
+    // Default entity — white bold with tooltip hook
+    const html = `<b data-entity-id="${n}" data-tip="entity">${text}</b>`;
+    return { text, html };
+  }
+
+  /**
+   * Format a spell/ability name as rich { text, html }.
+   */
+  function richSpell(spellId) {
+    const label = spellLabel(spellId);
+    const text = bracketizeName(label);
+    const html = `<b style="color:${_spellColor}" data-tip="spell" data-spell-id="${String(spellId || '')}">${text}</b>`;
+    return { text, html };
+  }
+
+  /**
+   * Format a named label (affix, gear proc, etc.) with a specific color.
+   */
+  function richLabel(name, color) {
+    const text = bracketizeName(name);
+    const html = `<b style="color:${color || '#ddd'}">${text}</b>`;
+    return { text, html };
+  }
+
   function nameOfEntity(id) {
     const pe = playerEntity(world);
     const playerId = pe?.id || 0;
@@ -310,6 +372,9 @@ export function createMessageContext({
     canSeeAt,
     nameOfEntity,
     nameOfItem,
+    richEntity,
+    richSpell,
+    richLabel,
     spellLabel,
     hasNamedEntity,
     burnVerb,
