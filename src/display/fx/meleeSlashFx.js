@@ -294,22 +294,35 @@ export function createMeleeSlashFxController() {
   /** @type {Map<number, number>} */
   const _swingCounter = new Map();
 
-  function nextSwing(attackerId) {
+  function nextSwing(attackerId, offhand) {
+    if (offhand) return _swingCounter.get(attackerId) || 0;
     const n = (_swingCounter.get(attackerId) || 0) + 1;
     _swingCounter.set(attackerId, n);
     return n;
   }
 
+  // Dual-wield direction pairings — picked randomly each attack.
+  const _DUAL_PAIRS = [[-1, -1], [+1, +1], [-1, +1], [+1, -1]];
+  let _lastDualPair = null;
+
+  function swingDirection(n, offhand) {
+    if (!offhand) {
+      // Pick a random pairing for this attack (main hand fires first).
+      _lastDualPair = _DUAL_PAIRS[(Math.random() * 4) | 0];
+      return _lastDualPair[0];
+    }
+    return (_lastDualPair || _DUAL_PAIRS[0])[1];
+  }
+
   // ── Spawn helpers ─────────────────────────────────────────────────────
 
   function spawnSweep(x, y, facingVec, impactVec, weaponClass, profileRef, weaponLengthCm, elementTint, amount, critical, attackerId, offhand) {
-    const n = nextSwing(attackerId);
+    const n = nextSwing(attackerId, offhand);
     const baseAngle = resolveBaseAngle(facingVec, impactVec);
     const isAxe = (weaponClass === 'axe' || weaponClass === 'morningstar');
     const profile = resolveWeaponProfile(weaponClass, profileRef, weaponLengthCm);
 
-    // Alternate: even swings go CW (positive sweep), odd go CCW (negative)
-    const direction = (n % 2 === 0) ? 1 : -1;
+    const direction = swingDirection(n, offhand);
 
     // Base sweep: swords 100°, axes 130°
     const baseSweep = isAxe ? (130 * Math.PI / 180) : (100 * Math.PI / 180);
@@ -338,13 +351,13 @@ export function createMeleeSlashFxController() {
   }
 
   function spawnStab(x, y, facingVec, impactVec, weaponClass, profileRef, weaponLengthCm, elementTint, amount, critical, attackerId, offhand) {
-    const n = nextSwing(attackerId);
+    const n = nextSwing(attackerId, offhand);
     const baseAngle = resolveBaseAngle(facingVec, impactVec);
     const profile = resolveWeaponProfile(weaponClass || 'dagger', profileRef, weaponLengthCm);
 
     // Stab: very narrow arc (20-30°) in the facing direction
     // Alternate slightly left/right of center
-    const sideOffset = (n % 2 === 0) ? 0.15 : -0.15;
+    const sideOffset = swingDirection(n, offhand) * 0.15;
     const sweep = (25 * Math.PI / 180) * damageSweepScale(amount);
     const startAngle = baseAngle - sweep / 2 + sideOffset + jitter(n) * 0.5;
 

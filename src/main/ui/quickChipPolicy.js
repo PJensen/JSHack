@@ -1,4 +1,5 @@
-import { Equipment, GEAR_SLOTS } from "../../rules/components/Equipment.js";
+import { Equipment } from "../../rules/components/Equipment.js";
+import { ItemInfo } from "../../rules/components/ItemInfo.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 
 function normalizeIdentity(value) {
@@ -6,8 +7,9 @@ function normalizeIdentity(value) {
 }
 
 /**
- * Suppress quick-chip for inventory pickups that duplicate an already equipped
- * item identity (including ammo).
+ * Suppress quick-chip for ammo pickups that duplicate already-equipped ammo.
+ * Non-ammo equipped duplicates (e.g. dual-wielded weapons) are allowed through
+ * so the player can interact with them via the chip.
  *
  * @param {import("../../lib/ecs-js/index.js").World} world
  * @param {number} ownerId
@@ -16,18 +18,19 @@ function normalizeIdentity(value) {
  */
 export function shouldSuppressRecentPickupChipForEquippedDuplicate(world, ownerId, itemId) {
   if (!(ownerId > 0) || !(itemId > 0) || !world.isAlive(itemId)) return false;
+
+  const info = world.get(itemId, ItemInfo);
+  if (!info || info.type !== 'ammo') return false;
+
   const equipment = world.get(ownerId, Equipment);
   if (!equipment) return false;
+
+  const equippedAmmoId = equipment.ammo;
+  if (!Number.isInteger(equippedAmmoId) || equippedAmmoId <= 0 || !world.isAlive(equippedAmmoId)) return false;
 
   const pickupIdentity = normalizeIdentity(world.get(itemId, NamedIdentity)?.identity);
   if (!pickupIdentity) return false;
 
-  for (const slot of GEAR_SLOTS) {
-    const equippedId = equipment[slot];
-    if (!Number.isInteger(equippedId) || equippedId <= 0 || !world.isAlive(equippedId)) continue;
-    const equippedIdentity = normalizeIdentity(world.get(equippedId, NamedIdentity)?.identity);
-    if (equippedIdentity && equippedIdentity === pickupIdentity) return true;
-  }
-
-  return false;
+  const equippedIdentity = normalizeIdentity(world.get(equippedAmmoId, NamedIdentity)?.identity);
+  return equippedIdentity === pickupIdentity;
 }

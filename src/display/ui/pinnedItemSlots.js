@@ -630,6 +630,14 @@ export function createPinnedItemSlots() {
   return {
     el,
     pinItem,
+    hasIdentity(identity) {
+      const key = String(identity || '').trim().toLowerCase();
+      if (!key) return false;
+      return pinned.some((entry) => {
+        const eid = String(entry?.identity || '').trim().toLowerCase();
+        return eid && eid === key;
+      });
+    },
     setPresenter(fn) {
       presenter = typeof fn === 'function' ? fn : null;
     },
