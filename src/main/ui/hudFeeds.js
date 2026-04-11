@@ -10,7 +10,7 @@ import { inventoryItems } from "../../rules/utils/inventoryFacade.js";
 import { getAffixName } from "../../rules/data/affixes.js";
 import { DungeonState } from "../../rules/components/DungeonState.js";
 import { CalendarState } from "../../rules/components/CalendarState.js";
-import { getCalendarDate } from "../../rules/data/calendar.js";
+import { getCalendarDate, TURNS_PER_DAY } from "../../rules/data/calendar.js";
 import { Hunger } from "../../rules/components/Hunger.js";
 import { getHungerLevel } from "../../rules/data/food.js";
 import { Pet } from "../../rules/components/Pet.js";
@@ -62,6 +62,52 @@ export function createHudFeeds(world, deps) {
   let _lastPinnedSpellBarSig = '';
   /** @type {Set<string>} */
   let _prevKnownSpells = new Set();
+
+  const CLOCK_HOURS = Object.freeze([
+    "\uD83D\uDD5B", // 12
+    "\uD83D\uDD50", // 1
+    "\uD83D\uDD51", // 2
+    "\uD83D\uDD52", // 3
+    "\uD83D\uDD53", // 4
+    "\uD83D\uDD54", // 5
+    "\uD83D\uDD55", // 6
+    "\uD83D\uDD56", // 7
+    "\uD83D\uDD57", // 8
+    "\uD83D\uDD58", // 9
+    "\uD83D\uDD59", // 10
+    "\uD83D\uDD5A", // 11
+  ]);
+  const CLOCK_HALVES = Object.freeze([
+    "\uD83D\uDD67", // 12:30
+    "\uD83D\uDD5C", // 1:30
+    "\uD83D\uDD5D", // 2:30
+    "\uD83D\uDD5E", // 3:30
+    "\uD83D\uDD5F", // 4:30
+    "\uD83D\uDD60", // 5:30
+    "\uD83D\uDD61", // 6:30
+    "\uD83D\uDD62", // 7:30
+    "\uD83D\uDD63", // 8:30
+    "\uD83D\uDD64", // 9:30
+    "\uD83D\uDD65", // 10:30
+    "\uD83D\uDD66", // 11:30
+  ]);
+
+  function resolveClockFromTurn(turn) {
+    const safeTurn = Math.max(0, Number(turn || 0) | 0);
+    const turnOfDay = safeTurn % TURNS_PER_DAY;
+    const totalMinutes = turnOfDay * 2;
+    const hh = Math.floor(totalMinutes / 60) % 24;
+    const mm = totalMinutes % 60;
+
+    // Pick the closest emoji clock in 30-minute increments.
+    const halfHourSlot = Math.round(totalMinutes / 30) % 48;
+    const hour12 = ((Math.floor(halfHourSlot / 2) + 11) % 12) + 1;
+    const isHalf = (halfHourSlot % 2) === 1;
+    const emoji = isHalf ? CLOCK_HALVES[(hour12 + 11) % 12] : CLOCK_HOURS[(hour12 + 11) % 12];
+
+    const label = `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+    return { turnOfDay, emoji, label };
+  }
 
   function sumPlayerGold(playerId) {
     const items = inventoryItems(world, playerId);
@@ -283,8 +329,16 @@ export function createHudFeeds(world, deps) {
     const turn = Math.max(0, Number(world.step || 0) | 0);
     if (turn !== lastTurn) {
       lastTurn = turn;
+      const clock = resolveClockFromTurn(turn);
       try {
-        window.dispatchEvent(new CustomEvent("ui:updateTurn", { detail: { turn } }));
+        window.dispatchEvent(new CustomEvent("ui:updateTurn", {
+          detail: {
+            turn,
+            turnOfDay: clock.turnOfDay,
+            clockEmoji: clock.emoji,
+            clockLabel: clock.label,
+          }
+        }));
       } catch (e) { console.debug('[hudFeeds] dispatch ui:updateTurn:', e); }
     }
   }

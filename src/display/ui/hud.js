@@ -403,10 +403,18 @@ export function initHUD() {
   }
 
   const moonPhaseEl = document.createElement('div');
-  moonPhaseEl.textContent = '\uD83C\uDF11';
-  moonPhaseEl.title = 'New Moon';
+  let moonEmoji = '\uD83C\uDF11';
+  let moonLabel = 'New Moon';
+  let clockEmoji = '\uD83D\uDD5B';
+  let clockLabel = '00:00';
+
+  function syncSkyChip() {
+    moonPhaseEl.textContent = `${moonEmoji} ${clockEmoji}`;
+    moonPhaseEl.title = `${moonLabel} • ${clockLabel}`;
+  }
+
   Object.assign(moonPhaseEl.style, {
-    minWidth: '24px',
+    minWidth: '40px',
     height: '16px',
     padding: '0 4px',
     borderRadius: '8px',
@@ -419,6 +427,7 @@ export function initHUD() {
     whiteSpace: 'nowrap',
     pointerEvents: 'none',
   });
+  syncSkyChip();
 
   const zoomBar = document.createElement('div');
   Object.assign(zoomBar.style, {
@@ -1241,11 +1250,21 @@ export function initHUD() {
   window.addEventListener('ui:updateCalendar', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
-    const moonEmoji = String(e?.detail?.moonEmoji || '').trim();
-    const moonLabel = String(e?.detail?.moonLabel || '').trim();
-    if (!moonEmoji && !moonLabel) return;
-    moonPhaseEl.textContent = moonEmoji || '\uD83C\uDF11';
-    moonPhaseEl.title = moonLabel || 'Moon phase';
+    const nextMoonEmoji = String(e?.detail?.moonEmoji || '').trim();
+    const nextMoonLabel = String(e?.detail?.moonLabel || '').trim();
+    if (nextMoonEmoji) moonEmoji = nextMoonEmoji;
+    if (nextMoonLabel) moonLabel = nextMoonLabel;
+    syncSkyChip();
+  });
+
+  window.addEventListener('ui:updateTurn', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const nextClockEmoji = String(e?.detail?.clockEmoji || '').trim();
+    const nextClockLabel = String(e?.detail?.clockLabel || '').trim();
+    if (nextClockEmoji) clockEmoji = nextClockEmoji;
+    if (nextClockLabel) clockLabel = nextClockLabel;
+    syncSkyChip();
   });
 
   // Update combat HUD details
