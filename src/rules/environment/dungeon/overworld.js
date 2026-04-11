@@ -359,7 +359,7 @@ export function generateOverworldChunks(worldSeed) {
   const doorX = homeX;
   const doorY = homeY - halfH;
   const fountainCX = homeX;
-  const fountainCY = homeY - 6;
+  const fountainCY = homeY - 7;
   const crossingX = homeX;
   const crossingY = homeY - 20;
   const spawnX = fountainCX;
@@ -761,10 +761,10 @@ export function generateOverworldChunks(worldSeed) {
   }
 
   // ── Town square — cobblestone plaza with fountain, trees, and benches ────────
-  const sqX0 = fountainCX - 4;
-  const sqX1 = fountainCX + 4;
-  const sqY0 = fountainCY - 3;
-  const sqY1 = fountainCY + 3;
+  const sqX0 = fountainCX - 1;
+  const sqX1 = fountainCX + 1;
+  const sqY0 = fountainCY - 1;
+  const sqY1 = fountainCY + 1;
   for (let fy = sqY0; fy <= sqY1; fy++) {
     for (let fx = sqX0; fx <= sqX1; fx++) {
       setWorldTile(chunks, fx, fy, TILE_COBBLESTONE);
@@ -773,20 +773,16 @@ export function generateOverworldChunks(worldSeed) {
   addSpawn(chunks, fountainCX, fountainCY, "fountain");
   addSpawn(chunks, fountainCX - 3, fountainCY + 1, "message_board");
   // Corner trees
-  addSpawn(chunks, sqX0, sqY0, "tree_node");
-  addSpawn(chunks, sqX1, sqY0, "tree_node");
-  addSpawn(chunks, sqX0, sqY1, "tree_node");
-  addSpawn(chunks, sqX1, sqY1, "tree_node");
+  addSpawn(chunks, sqX0 - 3, sqY0 - 3, "tree_node");
+  addSpawn(chunks, sqX1 + 3, sqY0 - 3, "tree_node");
+  addSpawn(chunks, sqX0 - 3, sqY1 + 3, "tree_node");
+  addSpawn(chunks, sqX1 + 3, sqY1 + 3, "tree_node");
   // Benches along the sides
   addSpawn(chunks, fountainCX - 2, sqY0 + 1, "bench");
   addSpawn(chunks, fountainCX + 2, sqY0 + 1, "bench");
   addSpawn(chunks, fountainCX - 2, sqY1 - 1, "bench");
   addSpawn(chunks, fountainCX + 2, sqY1 - 1, "bench");
 
-  // ── Cobblestone path from town square east to tavern door ──
-  for (let px = sqX1 + 1; px <= tavDoorX; px++) {
-    setWorldTile(chunks, px, tavDoorY, TILE_COBBLESTONE);
-  }
 
   // ── Worker cottages — actual homes for the town to sleep in ─────────────
   const farmerHouse = buildCottage(chunks, homeX + 8, homeY + 10, "north");
