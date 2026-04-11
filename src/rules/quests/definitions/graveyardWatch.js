@@ -180,6 +180,10 @@ export const GraveyardWatchQuest = registerQuest({
                 giverId: ctx.bind.giver,
                 title: "The Book Below",
                 rewardGold: REWARD_GOLD,
+                at: (() => {
+                  const p = ctx.world.get(Number(ctx.bind.player || 0) | 0, Position);
+                  return p ? { x: Number(p.x) | 0, y: Number(p.y) | 0 } : null;
+                })(),
               })),
             ],
             to: "complete",

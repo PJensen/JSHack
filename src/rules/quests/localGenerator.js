@@ -2,6 +2,7 @@ import { DistrictProfile } from "../components/DistrictProfile.js";
 import { DistrictState } from "../components/DistrictState.js";
 import { QuestBindings } from "../components/QuestBindings.js";
 import { QuestDefRef } from "../components/QuestDefRef.js";
+import { Position } from "../components/Position.js";
 import { QuestState } from "../components/QuestState.js";
 import { QuestVars } from "../components/QuestVars.js";
 import { incVar, emit, setVar } from "./actions.js";
@@ -248,6 +249,10 @@ function buildOfferQuestDef(world, playerId, offer) {
                   playerId,
                   title,
                   rewardGold: Math.max(0, Number(ctx.vars?.rewardGold || rewardGold) | 0),
+                  at: (() => {
+                    const p = ctx.world.get(Number(ctx.bind.player || 0) | 0, Position);
+                    return p ? { x: Number(p.x) | 0, y: Number(p.y) | 0 } : null;
+                  })(),
                   district: String(ctx.vars?.sourceDistrict || sourceDistrict),
                 })),
               ],
@@ -436,11 +441,15 @@ export function buildLocalGeneratedQuest(world, opts = {}) {
                   const reward = Math.max(0, Number(ctx.vars?.rewardGold || rewardGold) | 0);
                   grantQuestGold(ctx.world, ctx.bind.player, reward);
                 },
-                emit("quest:completed", () => ({
+                emit("quest:completed", (ctx) => ({
                   questId,
                   playerId,
                   title,
                   rewardGold,
+                  at: (() => {
+                    const p = ctx.world.get(Number(ctx.bind.player || 0) | 0, Position);
+                    return p ? { x: Number(p.x) | 0, y: Number(p.y) | 0 } : null;
+                  })(),
                 })),
               ],
               to: "complete",
