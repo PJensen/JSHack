@@ -1398,16 +1398,7 @@ export function renderMessageTicker(container, entries) {
       for (let i = 0; i < reversed.length; i++) {
         const m = reversed[i];
         const row = document.createElement('div');
-        if (typeof m === 'string') {
-          row.textContent = m;
-          row.style.color = getMessageColor('default');
-        } else if (m && typeof m === 'object') {
-          row.textContent = formatMessageLine(m);
-          row.style.color = getMessageColor(String(m.type || 'default'));
-        } else {
-          row.textContent = String(m ?? '');
-          row.style.color = getMessageColor('default');
-        }
+        applyMessageContent(row, m);
         row.style.opacity = i < 3 ? '1' : i < 8 ? '0.72' : '0.5';
         row.style.textShadow = '0 1px 0 rgba(0,0,0,0.42)';
         row.style.whiteSpace = 'normal';
@@ -1440,14 +1431,7 @@ export function renderMessageTicker(container, entries) {
     const m = recent[i];
     const row = document.createElement('div');
     const tier = tierStyles[Math.min(i, tierStyles.length - 1)];
-    if (typeof m === 'string') {
-      row.textContent = m;
-    } else if (m && typeof m === 'object') {
-      row.textContent = formatMessageLine(m);
-      row.style.color = getMessageColor(m.type);
-    } else {
-      row.textContent = String(m ?? '');
-    }
+    applyMessageContent(row, m);
     row.style.textShadow = tier.textShadow;
     row.style.opacity = String(tier.opacity);
     row.style.whiteSpace = 'nowrap';
@@ -1472,6 +1456,25 @@ export function formatMessageLine(message) {
   const repeat = Math.max(1, Number(message?.repeat || 1));
   if (repeat <= 1) return text;
   return `${text} \u00d7${repeat}`;
+}
+
+/** Apply formatted text to a row element. Supports `html` field for rich messages. */
+function applyMessageContent(row, message) {
+  if (typeof message === 'string') {
+    row.textContent = message;
+    return;
+  }
+  if (message && typeof message === 'object') {
+    if (message.html) {
+      const repeat = Math.max(1, Number(message.repeat || 1));
+      row.innerHTML = repeat > 1 ? `${message.html} \u00d7${repeat}` : message.html;
+    } else {
+      row.textContent = formatMessageLine(message);
+    }
+    row.style.color = getMessageColor(String(message.type || 'default'));
+    return;
+  }
+  row.textContent = String(message ?? '');
 }
 
 /**

@@ -234,6 +234,20 @@ export function installCombatMessages(ctx) {
     return false;
   }
 
+  // ── Rarity colors for weapon names in combat log ──
+  const _rarityColors = {
+    common: '#ffffff', uncommon: '#1eff00', rare: '#55aaff',
+    magic: '#55aaff', epic: '#c47bff', legendary: '#ff9f3b',
+  };
+  function _weaponHtml(wid) {
+    const wname = compGet(wid, NamedIdentity)?.name;
+    if (!wname) return '';
+    const info = compGet(wid, ItemInfo);
+    const rn = String(info?.rarityName || 'common').toLowerCase();
+    const color = _rarityColors[rn] || '#ffffff';
+    return ` with <b style="color:${color}">[${wname}]</b>`;
+  }
+
   // verb pairs: [you-form, third-person-form]
   const _meleeVerbs = {
     stab:  ['stab', 'stabs'],
@@ -253,6 +267,9 @@ export function installCombatMessages(ctx) {
     arcane:    ['blast', 'blasts'],
     plasma:    ['sear', 'sears'],
     radiation: ['irradiate', 'irradiates'],
+    shadow:    ['torment', 'torments'],
+    nature:    ['ravage', 'ravages'],
+    generic:   ['wound', 'wounds'],
   };
   const _critMelee = {
     stab:  ['skewer', 'skewers'],
@@ -268,37 +285,45 @@ export function installCombatMessages(ctx) {
     const handTxt = offhand ? ' (off-hand)' : '';
     const critTxt = isCrit ? ' \u2014 CRIT!' : '';
     const causeKey = String(cause || '').toLowerCase();
-    const isSpell = causeKey.startsWith('spell:') || causeKey.startsWith('affix:')
-      || causeKey.startsWith('procpackage:') || causeKey.startsWith('monster:');
     const usingRanged = causeKey === 'ranged';
+    const isMelee = causeKey === 'melee' || causeKey === 'retaliation' || !!impactProfile;
+    const isWeaponHit = isMelee || usingRanged;
     const dt = String(type || '').toLowerCase();
     const attackKind = impactProfile?.attackKind || '';
 
     if (Number(source || 0)) {
       const atkName = nameOfEntity(source);
 
-      if (isSpell) {
+      if (!isWeaponHit) {
         const pair = _spellVerbs[dt] || ['hit', 'hits'];
         log(`${atkName} ${_v(atkName, pair[0], pair[1])} ${defName} for ${amount}${critTxt}.`, 'combat');
         return;
       }
 
       // Melee / ranged — resolve weapon
-      let weaponLabel = '';
+      let weaponPlain = '';
+      let weaponRich = '';
       const eq = compGet(Number(source || 0), Equipment);
       const wid = offhand
         ? Number(eq?.offhand || 0)
         : (usingRanged ? Number(eq?.ranged || 0) : Number(eq?.weapon || 0));
       if (wid) {
+        weaponRich = _weaponHtml(wid);
         const wname = compGet(wid, NamedIdentity)?.name;
-        if (wname) weaponLabel = ` with ${bracketizeName(wname)}`;
+        if (wname) weaponPlain = ` with ${bracketizeName(wname)}`;
       } else if (!offhand && compHas(Number(source || 0), Player)) {
-        weaponLabel = ' with bare fists';
+        weaponPlain = ' with bare fists';
+        weaponRich = ' with bare fists';
       }
       const pair = (isCrit && _critMelee[attackKind])
         || _meleeVerbs[attackKind]
         || ['hit', 'hits'];
-      log(`${atkName} ${_v(atkName, pair[0], pair[1])} ${defName}${weaponLabel} for ${amount}${critTxt}${handTxt}.`, 'combat');
+      const verb = _v(atkName, pair[0], pair[1]);
+      const text = `${atkName} ${verb} ${defName}${weaponPlain} for ${amount}${critTxt}${handTxt}.`;
+      const html = weaponRich
+        ? `${atkName} ${verb} ${defName}${weaponRich} for ${amount}${critTxt}${handTxt}.`
+        : undefined;
+      log({ text, html, type: 'combat' });
     } else {
       log(`${defName} ${_v(defName, 'take', 'takes')} ${amount} damage${critTxt}${handTxt}.`, 'combat');
     }
