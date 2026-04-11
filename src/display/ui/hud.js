@@ -345,7 +345,7 @@ export function initHUD() {
   Object.assign(topRightHud.style, {
     position: 'fixed',
     right: 'calc(8px + env(safe-area-inset-right, 0px))',
-    top: 'calc(8px + env(safe-area-inset-top, 0px))',
+    top: 'calc(var(--jshack-ticker-height, 0px) + 8px + env(safe-area-inset-top, 0px))',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'flex-end',

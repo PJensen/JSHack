@@ -1303,29 +1303,30 @@ export function ensureMessageTicker(root) {
   const box = document.createElement('div');
   Object.assign(box.style, {
     position: 'fixed',
-    left: 'calc(8px + env(safe-area-inset-left, 0px))',
-    top: 'calc(8px + env(safe-area-inset-top, 0px))',
-    width: 'min(62vw, 580px)',
+    left: '0',
+    top: '0',
+    width: '100%',
     display: 'flex',
     flexDirection: 'column',
-    gap: '3px',
+    gap: '2px',
     pointerEvents: 'auto',
     zIndex: 850,
     color: '#cfe8ff',
     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, "Courier New", monospace',
-    fontSize: 'min(14px, 3.2vw)',
-    lineHeight: '1.3',
-    background: 'rgba(10, 14, 22, 0.72)',
-    borderRadius: '8px',
-    padding: '7px 9px',
-    border: '1px solid rgba(45,59,82,0.56)',
-    boxShadow: '0 4px 18px rgba(0,0,0,0.35)',
+    fontSize: 'min(15px, 3.4vw)',
+    lineHeight: '1.35',
+    background: 'rgba(6, 8, 14, 0.92)',
+    borderRadius: '0',
+    padding: '5px 12px',
+    borderBottom: '1px solid rgba(60,80,120,0.6)',
+    boxShadow: '0 2px 12px rgba(0,0,0,0.4)',
     overflow: 'hidden',
     cursor: 'pointer',
     userSelect: 'none',
     webkitTextSizeAdjust: 'none',
     textSizeAdjust: 'none',
-    transition: 'width 140ms ease-out, max-height 140ms ease-out, background 140ms ease-out, border-color 140ms ease-out, box-shadow 140ms ease-out',
+    boxSizing: 'border-box',
+    transition: 'max-height 180ms ease-out, background 140ms ease-out',
   });
   (/** @type {any} */ (box))._entries = [];
   (/** @type {any} */ (box))._expanded = false;
@@ -1349,28 +1350,26 @@ export function renderMessageTicker(container, entries) {
   const expanded = !!store._expanded;
   if (expanded) {
     Object.assign(container.style, {
-      width: 'min(86vw, 760px)',
       maxHeight: 'min(50vh, 430px)',
-      gap: '6px',
+      gap: '5px',
       fontSize: 'min(13px, 3.1vw)',
       lineHeight: '1.45',
-      padding: '10px 12px',
-      background: 'rgba(8,12,18,0.92)',
-      border: '1px solid rgba(80,120,170,0.82)',
-      boxShadow: '0 12px 34px rgba(0,0,0,0.52)',
+      padding: '8px 12px',
+      background: 'rgba(4, 6, 12, 0.96)',
+      borderBottom: '1px solid rgba(80,120,170,0.7)',
+      boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
       cursor: 'pointer',
     });
   } else {
     Object.assign(container.style, {
-      width: 'min(62vw, 580px)',
       maxHeight: '',
-      gap: '3px',
-      fontSize: 'min(14px, 3.2vw)',
-      lineHeight: '1.3',
-      padding: '7px 9px',
-      background: 'rgba(10, 14, 22, 0.72)',
-      border: '1px solid rgba(45,59,82,0.56)',
-      boxShadow: '0 4px 18px rgba(0,0,0,0.35)',
+      gap: '2px',
+      fontSize: 'min(15px, 3.4vw)',
+      lineHeight: '1.35',
+      padding: '5px 12px',
+      background: 'rgba(6, 8, 14, 0.92)',
+      borderBottom: '1px solid rgba(60,80,120,0.6)',
+      boxShadow: '0 2px 12px rgba(0,0,0,0.4)',
       cursor: 'pointer',
     });
   }
@@ -1379,46 +1378,25 @@ export function renderMessageTicker(container, entries) {
   if (!allEntries.length) return;
 
   if (expanded) {
-    const header = document.createElement('div');
-    header.textContent = 'Message Log';
-    Object.assign(header.style, {
-      fontWeight: '700',
-      letterSpacing: '0.02em',
-      color: '#cfe8ff',
-      textShadow: '0 1px 0 rgba(0,0,0,0.45)',
-    });
-    container.appendChild(header);
-
-    const sub = document.createElement('div');
-    sub.textContent = 'Tap/click to collapse';
-    Object.assign(sub.style, {
-      fontSize: '11px',
-      opacity: '0.72',
-      marginTop: '-2px',
-      marginBottom: '2px',
-    });
-    container.appendChild(sub);
-
     const list = document.createElement('div');
     Object.assign(list.style, {
       display: 'flex',
       flexDirection: 'column',
-      gap: '6px',
+      gap: '4px',
       overflowY: 'auto',
-      maxHeight: 'min(40vh, 320px)',
+      maxHeight: 'min(42vh, 360px)',
       paddingRight: '2px',
     });
 
-    const expandedEntries = allEntries.slice().reverse();
-
-    if (!expandedEntries.length) {
+    const reversed = allEntries.slice().reverse();
+    if (!reversed.length) {
       const empty = document.createElement('div');
       empty.textContent = 'No messages yet.';
       Object.assign(empty.style, { opacity: '0.78', fontStyle: 'italic' });
       list.appendChild(empty);
     } else {
-      for (let i = 0; i < expandedEntries.length; i++) {
-        const m = expandedEntries[i];
+      for (let i = 0; i < reversed.length; i++) {
+        const m = reversed[i];
         const row = document.createElement('div');
         if (typeof m === 'string') {
           row.textContent = m;
@@ -1430,7 +1408,7 @@ export function renderMessageTicker(container, entries) {
           row.textContent = String(m ?? '');
           row.style.color = getMessageColor('default');
         }
-        row.style.opacity = i === 0 ? '1' : '0.9';
+        row.style.opacity = i < 3 ? '1' : i < 8 ? '0.72' : '0.5';
         row.style.textShadow = '0 1px 0 rgba(0,0,0,0.42)';
         row.style.whiteSpace = 'normal';
         row.style.overflowWrap = 'anywhere';
@@ -1440,24 +1418,28 @@ export function renderMessageTicker(container, entries) {
       }
     }
     container.appendChild(list);
+    list.scrollTop = 0;
+    requestAnimationFrame(() => {
+      const h = Math.max(0, Math.ceil(container.getBoundingClientRect().height || 0));
+      document.documentElement.style.setProperty('--jshack-ticker-height', `${h}px`);
+    });
     return;
   }
 
-  // Collapsed mode: newest 3 messages with recency opacity hierarchy.
+  // Collapsed mode: newest message on top (prominent), older messages fade below.
   const recent = allEntries.slice(-3).reverse();
   if (!recent.length) return;
 
   const tierStyles = [
     { opacity: 1.0, textShadow: '0 1px 0 rgba(0,0,0,0.45), 0 0 6px rgba(0,0,0,0.25)' },
-    { opacity: 0.62, textShadow: '0 1px 0 rgba(0,0,0,0.38), 0 0 4px rgba(0,0,0,0.2)' },
-    { opacity: 0.38, textShadow: '0 1px 0 rgba(0,0,0,0.32), 0 0 3px rgba(0,0,0,0.16)' },
+    { opacity: 0.50, textShadow: '0 1px 0 rgba(0,0,0,0.38)' },
+    { opacity: 0.30, textShadow: '0 1px 0 rgba(0,0,0,0.32)' },
   ];
 
   for (let i = 0; i < recent.length; i++) {
     const m = recent[i];
     const row = document.createElement('div');
     const tier = tierStyles[Math.min(i, tierStyles.length - 1)];
-    // Handle both plain strings (legacy) and message objects with types
     if (typeof m === 'string') {
       row.textContent = m;
     } else if (m && typeof m === 'object') {
@@ -1468,14 +1450,17 @@ export function renderMessageTicker(container, entries) {
     }
     row.style.textShadow = tier.textShadow;
     row.style.opacity = String(tier.opacity);
-    row.style.filter = '';
     row.style.whiteSpace = 'nowrap';
     row.style.overflow = 'hidden';
     row.style.textOverflow = 'ellipsis';
-    row.style.transformOrigin = 'left center';
-    row.style.transform = i === 0 ? 'scale(1)' : (i === 1 ? 'scale(0.995)' : 'scale(0.99)');
     container.appendChild(row);
   }
+
+  // Publish ticker height so other HUD elements can offset below it.
+  requestAnimationFrame(() => {
+    const h = Math.max(0, Math.ceil(container.getBoundingClientRect().height || 0));
+    document.documentElement.style.setProperty('--jshack-ticker-height', `${h}px`);
+  });
 }
 
 /**
