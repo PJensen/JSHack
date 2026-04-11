@@ -78,9 +78,8 @@ export function installCombatLogTooltip(tickerEl, deps) {
   // ── Monster tooltip ──
   function showMonsterTip(entityId, anchorEl) {
     const ni = world.get(entityId, NamedIdentity);
-    if (!ni) return false;
-    const name = ni.name || ni.identity || 'Creature';
-    const identity = String(ni.identity || '');
+    const name = ni?.name || ni?.identity || String(anchorEl?.textContent || 'Creature').replace(/[\[\]]/g, '').trim() || 'Creature';
+    const identity = String(ni?.identity || '');
     const monsterDef = getMonster(identity);
     const vit = Vitality ? world.get(entityId, Vitality) : null;
     const lines = [];
@@ -104,6 +103,17 @@ export function installCombatLogTooltip(tickerEl, deps) {
     return true;
   }
 
+  function useItemFromTooltip(itemObj) {
+    const itemId = Number(itemObj?.id || 0) | 0;
+    if (!(itemId > 0)) return;
+    const type = String(itemObj?.type || '').toLowerCase();
+    if (type === 'potion') {
+      window.dispatchEvent(new CustomEvent('ui:requestDrink', { detail: { itemId } }));
+    } else {
+      window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId } }));
+    }
+  }
+
   // ── Item tooltip — delegates to existing renderItemDetails ──
   function showItemTip(entityId, anchorEl) {
     const tip = getItemTooltip();
@@ -112,10 +122,22 @@ export function installCombatLogTooltip(tickerEl, deps) {
     const obj = typeof resolveItemDisplayObject === 'function'
       ? resolveItemDisplayObject(world, entityId)
       : null;
-    if (!obj) return false;
-    renderItemDetails(tip, obj);
+    if (!obj) {
+      const label = String(anchorEl?.textContent || '').trim() || 'Item';
+      customTip.innerHTML = `<div style="color:#dbeaff;font-weight:bold;font-size:14px">${label}</div><div style="color:#8899aa;margin-top:4px">Details unavailable.</div>`;
+      customTip.style.display = 'block';
+      positionTooltip(customTip, anchorEl);
+      return true;
+    }
+    renderItemDetails(tip, obj, {
+      onNameTap: () => {
+        useItemFromTooltip(obj);
+        hideAll();
+      },
+    });
     tip.style.display = 'block';
     tip.style.maxWidth = '280px';
+    tip.style.pointerEvents = 'auto';
     positionTooltip(tip, anchorEl);
     return true;
   }
@@ -126,7 +148,7 @@ export function installCombatLogTooltip(tickerEl, deps) {
     if (spellId) return showSpellTip(spellId, el);
 
     const entityId = Number(el.dataset.entityId || 0);
-    if (!(entityId > 0) || !world.isAlive(entityId)) return false;
+    if (!(entityId > 0)) return false;
 
     const tipType = el.dataset.tip || '';
     if (tipType === 'item') return showItemTip(entityId, el);
@@ -141,7 +163,10 @@ export function installCombatLogTooltip(tickerEl, deps) {
     customTip.style.display = 'none';
     customTip.innerHTML = '';
     const itemTip = getItemTooltip();
-    if (itemTip) itemTip.style.display = 'none';
+    if (itemTip) {
+      itemTip.style.display = 'none';
+      itemTip.style.pointerEvents = 'none';
+    }
     activeTarget = null;
     clearTimeout(showTimer);
   }
