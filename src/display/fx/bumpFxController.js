@@ -10,8 +10,8 @@
 // ── Timing (seconds) ────────────────────────────────────────────────
 const LUNGE_OUT   = 0.030;   // snap toward target — almost instant
 const LUNGE_OVER  = 0.020;   // push-through overshoot past contact point
-const LUNGE_HOLD  = 0.045;   // hold at apex so the brain registers contact
-const LUNGE_BACK  = 0.095;   // slow withdrawal sells weight
+const LUNGE_HOLD  = 0.030;   // hold at apex so the brain registers contact
+const LUNGE_BACK  = 0.075;   // slow withdrawal sells weight
 const TOTAL       = LUNGE_OUT + LUNGE_OVER + LUNGE_HOLD + LUNGE_BACK;
 
 // Overshoot: how far past 1.0 the lunge pushes (fraction of dist)
@@ -20,7 +20,7 @@ const OVERSHOOT_FRAC = 0.12;
 // Offhand: quicker, snappier follow-up (lighter overshoot)
 const OH_LUNGE_OUT  = 0.025;
 const OH_LUNGE_OVER = 0.015;
-const OH_LUNGE_HOLD = 0.035;
+const OH_LUNGE_HOLD = 0.025;
 const OH_LUNGE_BACK = 0.070;
 const OH_TOTAL      = OH_LUNGE_OUT + OH_LUNGE_OVER + OH_LUNGE_HOLD + OH_LUNGE_BACK;
 const OH_OVERSHOOT_FRAC = 0.08;
@@ -38,7 +38,7 @@ const DMG_SCALE_CAP = 10;      // damage at which scaling maxes out
 const WHIFF_OUT   = 0.025;
 const WHIFF_OVER  = 0.030;   // longer overshoot — no contact to arrest momentum
 const WHIFF_HOLD  = 0.010;   // barely any hold — nothing to hit
-const WHIFF_BACK  = 0.110;   // slow recovery sells the stumble
+const WHIFF_BACK  = 0.085;   // slow recovery sells the stumble
 const WHIFF_TOTAL = WHIFF_OUT + WHIFF_OVER + WHIFF_HOLD + WHIFF_BACK;
 const WHIFF_DIST  = 0.22;    // shorter reach than a connected hit
 const WHIFF_OVERSHOOT = 0.20; // 20% overshoot — big swing through empty air

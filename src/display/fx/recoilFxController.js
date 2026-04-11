@@ -10,8 +10,8 @@
 
 // ── Timing (seconds) ────────────────────────────────────────────────
 const RECOIL_OUT  = 0.030;   // snap away from impact (fast)
-const RECOIL_HOLD = 0.045;   // hold at peak — let the brain register the wince
-const RECOIL_BACK = 0.120;   // slow settle back to origin
+const RECOIL_HOLD = 0.030;   // hold at peak — let the brain register the wince
+const RECOIL_BACK = 0.090;   // slow settle back to origin
 
 // Offhand: lighter follow-up
 const OH_RECOIL_OUT  = 0.025;
@@ -20,16 +20,16 @@ const OH_RECOIL_BACK = 0.090;
 
 // Melee: tighter, punchier — keeps cadence with the attacker's lunge
 const MELEE_RECOIL_OUT  = 0.025;
-const MELEE_RECOIL_HOLD = 0.050;
+const MELEE_RECOIL_HOLD = 0.035;
 const MELEE_RECOIL_BACK = 0.100;
 
 // ── Distance (tiles) ───────────────────────────────────────────────
 const RECOIL_DIST_BASE  = 0.12;  // baseline recoil (1 damage)
 const RECOIL_DIST_OH    = 0.08;  // offhand baseline
-const RECOIL_DIST_MAX   = 0.28;  // cap for huge hits
+const RECOIL_DIST_MAX   = 0.22;  // cap for huge hits
 const RECOIL_DIST_OH_MAX = 0.18;
 const MELEE_RECOIL_DIST_BASE = 0.10;
-const MELEE_RECOIL_DIST_MAX  = 0.22;
+const MELEE_RECOIL_DIST_MAX  = 0.18;
 
 // ── Rotation (radians) — glyph tilts away from impact ──────────────
 const ROT_BASE      = 0.06;   // baseline tilt (~3.4°)
