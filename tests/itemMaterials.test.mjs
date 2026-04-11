@@ -18,6 +18,14 @@ Deno.test("buildCatalogItem applies material and charges from item defs", () => 
   assertEquals(info.count, 3);
 });
 
+Deno.test("buildCatalogItem carries optional combatFlavor for weapons", () => {
+  const world = new World({ seed: 17 });
+  const pickaxeId = buildCatalogItem(world, "iron_pickaxe");
+  const info = world.get(pickaxeId, ItemInfo);
+  assert(info, "pickaxe should have item info");
+  assertEquals(info.combatFlavor, "brutal");
+});
+
 Deno.test("materializeDrop item path preserves material and placement", () => {
   const world = new World({ seed: 12 });
   const id = materializeDrop(

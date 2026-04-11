@@ -340,7 +340,10 @@ export function dealDamage(world, spec) {
   }
 
   // Step 4: Apply damage
-  vit.hp = Math.max(0, (vit.hp | 0) - finalAmount);
+  const hpBefore = vit.hp | 0;
+  const maxHp = vit.maxHp | 0;
+  vit.hp = Math.max(0, hpBefore - finalAmount);
+  const hpAfter = vit.hp | 0;
 
   // Step 4b: Queue knockback (resolved by knockbackSystem this tick).
   const kb = spec.knockback;
@@ -359,6 +362,9 @@ export function dealDamage(world, spec) {
   emitSafe(world, 'damaged', {
     target,
     amount: finalAmount,
+    hpBefore,
+    hpAfter,
+    maxHp,
     rawAmount,
     type,
     source,

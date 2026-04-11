@@ -326,6 +326,38 @@ Deno.test("messageWiring uses ranged slot weapon name for ranged damage logs", (
   assert(!text.includes("[Dagger]"), "ranged combat log should not use melee weapon name");
 });
 
+Deno.test("messageWiring includes hit severity and hp context when provided", () => {
+  const world = new World({ seed: 42 });
+  const playerId = world.create();
+  world.add(playerId, Player, {});
+  world.add(playerId, Equipment, {});
+
+  const targetId = world.create();
+  world.add(targetId, NamedIdentity, { name: "Grid Bug", identity: "grid_bug" });
+
+  const pickaxeId = world.create();
+  world.add(pickaxeId, NamedIdentity, { name: "Iron Pickaxe", identity: "iron_pickaxe" });
+  world.add(pickaxeId, ItemInfo, { type: "equip", slot: "weapon", count: 1, bonuses: {}, affixes: [] });
+  world.mutate(playerId, Equipment, (eq) => { eq.weapon = pickaxeId; });
+
+  const messageLog = createMessageLog();
+  installWithDeps(world, messageLog, playerId);
+
+  world.emit("damaged", {
+    source: playerId,
+    target: targetId,
+    amount: 16,
+    cause: "melee",
+    hpAfter: 2,
+    maxHp: 18,
+  });
+
+  assertEquals(messageLog.entries.length, 1);
+  const text = String(messageLog.entries[0].text || "");
+  assert(text.includes("devastating"), "damage log should include severity flavor");
+  assert(text.includes("2/18 HP left"), "damage log should include hp context");
+});
+
 Deno.test("messageWiring logs spell-proc gear messages for player events", () => {
   const world = new World({ seed: 99 });
   const playerId = world.create();

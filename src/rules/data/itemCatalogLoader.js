@@ -45,6 +45,7 @@ export function buildCatalogItem(world, itemId, opts = {}) {
     maxSockets: Number(def.maxSockets || 0) | 0,
     damageDice: def.damageDice || null,
     damageType: def.damageType || null,
+    combatFlavor: typeof def.combatFlavor === "string" ? def.combatFlavor : "",
     staminaCost: def.staminaCost ?? null,
     subtype: def.subtype || null,
     range: def.range || null,
