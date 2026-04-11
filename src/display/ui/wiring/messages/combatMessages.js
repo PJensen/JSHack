@@ -12,7 +12,7 @@ export function installCombatMessages(ctx) {
     const who = nameOfEntity(actor);
     const tgt = nameOfEntity(targetId);
     const label = String(abilityName || "ability");
-    if (tgt === 'You') { log(`${who} winds up ${label.toLowerCase()}!`, 'danger'); return; }
+    if (tgt === 'You') { log(`${who} rears back \u2014 ${label.toLowerCase()} incoming!`, 'danger'); return; }
     log(`${who} prepares ${label.toLowerCase()}.`, 'combat');
   });
 
@@ -21,16 +21,26 @@ export function installCombatMessages(ctx) {
     const who = nameOfEntity(actor);
     const tgt = nameOfEntity(targetId);
     const label = String(abilityName || "ability");
-    if (tgt === 'You') { log(`${who} uses ${label.toLowerCase()} on you!`, 'danger'); return; }
-    log(`${who} uses ${label.toLowerCase()}.`, 'combat');
+    if (tgt === 'You') { log(`${who} unleashes ${label.toLowerCase()} on you!`, 'danger'); return; }
+    log(`${who} unleashes ${label.toLowerCase()}.`, 'combat');
   });
 
-  world.on('monster:firebreath', ({ actor, target }) => {
-    if (nameOfEntity(target) !== 'You') return;
-    log(`${nameOfEntity(actor)} exhales a line of fire!`, 'combat');
+  world.on('monster:firebreath', ({ actor, target, tiles }) => {
+    if (!_playerCanSee([actor, target])) return;
+    const who = nameOfEntity(actor);
+    const len = Array.isArray(tiles) ? tiles.length : 0;
+    const tgt = nameOfEntity(target);
+    if (tgt === 'You') {
+      log(`${who} opens its jaws \u2014 a torrent of fire roars toward you!`, 'danger');
+    } else if (len > 3) {
+      log(`${who} rears back and bathes the corridor in dragonfire!`, 'combat');
+    } else {
+      log(`${who} spews a gout of flame!`, 'combat');
+    }
   });
 
   world.on('spell:death_volley', ({ actor, hits }) => {
+    if (!_playerCanSee([actor])) return;
     const who = nameOfEntity(actor);
     const hitYou = Array.isArray(hits) && hits.some((hit) => nameOfEntity(hit?.id) === 'You');
     if (hitYou) { log(`${who}'s volley rains arrows across your position!`, 'danger'); return; }
@@ -39,126 +49,138 @@ export function installCombatMessages(ctx) {
   });
 
   world.on('spell:boar_charge', ({ actor, targetId, hit, missed }) => {
+    if (!_playerCanSee([actor, targetId])) return;
     const who = nameOfEntity(actor);
     const tgt = nameOfEntity(targetId);
     if (tgt === 'You') {
-      if (hit) log(`${who} slams into you with a charge!`, 'danger');
-      else if (missed) log(`${who} barrels past, but still knocks you back!`, 'danger');
-      else log(`${who} rushes you with a charge!`, 'danger');
+      if (hit) log(`${who} slams into you like a battering ram! The ground shakes.`, 'danger');
+      else if (missed) log(`${who} thunders past \u2014 the wind alone knocks you back!`, 'danger');
+      else log(`${who} lowers its head and charges straight at you!`, 'danger');
       return;
     }
-    if (hit) log(`${who} crashes into ${tgt}.`, 'combat');
+    if (hit) log(`${who} tramples ${tgt}.`, 'combat');
   });
 
   world.on('spell:boar_bite', ({ actor, targetId, hit, missed }) => {
+    if (!_playerCanSee([actor, targetId])) return;
     const who = nameOfEntity(actor);
     const tgt = nameOfEntity(targetId);
     if (tgt === 'You') {
-      if (hit) log(`${who} bites deep, leaving you weakened!`, 'danger');
-      else if (missed) log(`${who} snaps at you, but misses.`, 'danger');
+      if (hit) log(`${who} clamps down on your arm \u2014 you feel bone grind!`, 'danger');
+      else if (missed) log(`${who} snaps its jaws shut on empty air.`, 'combat');
       return;
     }
-    if (hit) log(`${who} bites ${tgt}.`, 'combat');
+    if (hit) log(`${who} sinks its teeth into ${tgt}.`, 'combat');
   });
 
   world.on('spell:rat_gnaw', ({ actor, targetId, hit, missed }) => {
+    if (!_playerCanSee([actor, targetId])) return;
     const who = nameOfEntity(actor);
     const tgt = nameOfEntity(targetId);
     if (tgt === 'You') {
-      if (hit) log(`${who} gnaws at your legs, opening a bleed!`, 'danger');
-      else if (missed) log(`${who} lunges for a gnaw, but misses.`, 'danger');
+      if (hit) log(`${who} gnaws through your boot leather \u2014 blood wells up!`, 'danger');
+      else if (missed) log(`${who} lunges for your ankle and misses.`, 'combat');
       return;
     }
-    if (hit) log(`${who} gnaws ${tgt}.`, 'combat');
+    if (hit) log(`${who} gnaws into ${tgt}.`, 'combat');
   });
 
   world.on('spell:goblin_dirty_trick', ({ actor, targetId, hit, missed }) => {
+    if (!_playerCanSee([actor, targetId])) return;
     const who = nameOfEntity(actor);
     const tgt = nameOfEntity(targetId);
     if (tgt === 'You') {
-      if (hit) log(`${who} pulls a dirty trick and blinds you!`, 'danger');
-      else if (missed) log(`${who} tries a dirty trick, but whiffs.`, 'danger');
+      if (hit) log(`${who} hurls dirt in your eyes! You can't see!`, 'danger');
+      else if (missed) log(`${who} tries to throw dirt in your eyes, but you flinch away.`, 'combat');
       return;
     }
-    if (hit) log(`${who} blinds ${tgt} with a dirty trick.`, 'combat');
+    if (hit) log(`${who} blinds ${tgt} with a fistful of dirt.`, 'combat');
   });
 
   world.on('spell:snake_fang', ({ actor, targetId, hit, missed }) => {
+    if (!_playerCanSee([actor, targetId])) return;
     const who = nameOfEntity(actor);
     const tgt = nameOfEntity(targetId);
     if (tgt === 'You') {
-      if (hit) log(`${who} sinks venomous fangs into you!`, 'danger');
-      else if (missed) log(`${who} strikes with its fangs, but misses.`, 'danger');
+      if (hit) log(`${who} buries its fangs in your flesh \u2014 venom burns through your veins!`, 'danger');
+      else if (missed) log(`${who} strikes \u2014 fangs flash past your skin, barely missing.`, 'combat');
       return;
     }
-    if (hit) log(`${who} bites ${tgt} with venomous fangs.`, 'combat');
+    if (hit) log(`${who} sinks venomous fangs into ${tgt}.`, 'combat');
   });
 
   world.on('spell:spider_lunge', ({ actor, targetId, hit, missed }) => {
+    if (!_playerCanSee([actor, targetId])) return;
     const who = nameOfEntity(actor);
     const tgt = nameOfEntity(targetId);
     if (tgt === 'You') {
-      if (hit) log(`${who} lunges and staggers you!`, 'danger');
-      else if (missed) log(`${who} lunges at you, but misses.`, 'danger');
+      if (hit) log(`${who} launches itself at your face! Legs everywhere!`, 'danger');
+      else if (missed) log(`${who} pounces \u2014 you twist aside just in time.`, 'combat');
       return;
     }
-    if (hit) log(`${who} lunges into ${tgt}.`, 'combat');
+    if (hit) log(`${who} pounces on ${tgt}.`, 'combat');
   });
 
   world.on('proc:bleeding', ({ actor, target }) => {
+    if (!_playerCanSee([actor, target])) return;
     const who = nameOfEntity(actor);
     const tgt = nameOfEntity(target);
-    if (tgt === 'You') { log(`${who} opens a bleeding wound!`, 'danger'); return; }
-    if (who === 'You') { log(`You leave ${tgt} bleeding.`, 'combat'); return; }
-    log(`${who} leaves ${tgt} bleeding.`, 'combat');
+    if (tgt === 'You') { log(`Blood \u2014 yours \u2014 hits the floor. ${who} opened a wound.`, 'danger'); return; }
+    if (who === 'You') { log(`You open a vein. ${tgt} starts to bleed.`, 'combat'); return; }
+    log(`${who} opens a wound on ${tgt}.`, 'combat');
   });
 
   world.on('proc:hemorrhage', ({ actor, target }) => {
+    if (!_playerCanSee([actor, target])) return;
     const who = nameOfEntity(actor);
     const tgt = nameOfEntity(target);
-    if (tgt === 'You') { log(`${who}'s ${bracketizeName('Hemorrhage')} tears you open!`, 'danger'); return; }
-    if (who === 'You') { log(`${bracketizeName('Hemorrhage')} tears ${tgt} open.`, 'combat'); return; }
-    log(`${who}'s ${bracketizeName('Hemorrhage')} tears ${tgt} open.`, 'combat');
+    if (tgt === 'You') { log(`The wound tears wider \u2014 blood pours freely!`, 'danger'); return; }
+    if (who === 'You') { log(`${tgt}'s wound rips open. Blood everywhere.`, 'combat'); return; }
+    log(`${who} tears ${tgt}'s wound wider.`, 'combat');
   });
 
   world.on('proc:paralyzed', ({ actor, target }) => {
+    if (!_playerCanSee([actor, target])) return;
     const who = nameOfEntity(actor);
     const tgt = nameOfEntity(target);
-    if (tgt === 'You') { log(`${who}'s strike paralyzes you!`, 'danger'); return; }
-    if (who === 'You') { log(`Your strike paralyzes ${tgt}!`, 'combat'); return; }
+    if (tgt === 'You') { log(`Your muscles lock up \u2014 you can't move!`, 'danger'); return; }
+    if (who === 'You') { log(`Your blow locks ${tgt}'s joints solid!`, 'combat'); return; }
     log(`${who}'s strike paralyzes ${tgt}!`, 'combat');
   });
 
   world.on('spell:wolf_howl', ({ actor, alertedIds }) => {
+    if (!_playerCanSee([actor])) return;
     const who = nameOfEntity(actor);
     const count = Array.isArray(alertedIds) ? alertedIds.length : 0;
-    if (count > 0) { log(`${who} howls, rallying ${count} ${count === 1 ? 'ally' : 'allies'}!`, 'danger'); return; }
-    log(`${who} lets out a hunting howl.`, 'combat');
+    if (count > 0) { log(`${who} throws back its head and howls \u2014 ${count} more ${count === 1 ? 'answers' : 'answer'} from the dark!`, 'danger'); return; }
+    log(`${who} howls. The sound echoes and dies.`, 'combat');
   });
 
   world.on('spell:shield_bash', ({ actor, targetId, hit, missed }) => {
+    if (!_playerCanSee([actor, targetId])) return;
     const who = nameOfEntity(actor);
     const tgt = nameOfEntity(targetId);
     if (tgt === 'You') {
-      if (hit) log(`${who} shield-bashes you and staggers your footing!`, 'danger');
-      else if (missed) log(`${who} slams a shield at you, but misses.`, 'danger');
+      if (hit) log(`${who} drives a shield into your chest \u2014 your ribs creak!`, 'danger');
+      else if (missed) log(`${who} swings a shield at your head \u2014 you duck!`, 'combat');
       return;
     }
-    if (hit) log(`${who} bashes ${tgt} aside.`, 'combat');
+    if (hit) log(`${who} smashes a shield into ${tgt}.`, 'combat');
   });
 
   // Shield / dodge / parry combat messages
   world.on('shield:guarded', ({ id, source, stacks, broken }) => {
+    if (!_playerCanSee([id, source])) return;
     const who = nameOfEntity(id);
     const attacker = nameOfEntity(source);
     if (who === 'You') {
       log(broken
-        ? `You block ${attacker}'s attack but your shield shatters!`
-        : `You block ${attacker}'s attack with your shield. (${stacks} guard left)`, broken ? 'danger' : 'combat');
+        ? `Your shield catches the blow \u2014 and shatters!`
+        : `Your shield catches ${attacker}'s blow. (${stacks} guard left)`, broken ? 'danger' : 'combat');
     } else {
       log(broken
-        ? `${who} blocks your attack \u2014 the shield breaks!`
-        : `${who} blocks with a shield.`, 'combat');
+        ? `${who}'s shield splinters under your attack!`
+        : `${who} catches your blow on a shield.`, 'combat');
     }
   });
 
@@ -170,40 +192,49 @@ export function installCombatMessages(ctx) {
   });
 
   world.on('combat:dodge', ({ defender, attacker }) => {
+    if (!_playerCanSee([defender, attacker])) return;
     const who = nameOfEntity(defender);
     const atk = nameOfEntity(attacker);
-    if (who === 'You') log(`You dodge ${atk}'s attack!`, 'combat');
-    else log(`${who} dodges your attack!`, 'combat');
+    if (who === 'You') log(`You twist aside \u2014 ${atk}'s attack sails past!`, 'combat');
+    else log(`${who} sidesteps your attack!`, 'combat');
   });
 
   world.on('combat:parry', ({ defender, attacker, weaponName }) => {
+    if (!_playerCanSee([defender, attacker])) return;
     const who = nameOfEntity(defender);
     const atk = nameOfEntity(attacker);
     const wName = String(weaponName || 'weapon');
-    if (who === 'You') log(`You parry ${atk}'s strike with your ${wName}!`, 'combat');
-    else log(`${who} parries your attack!`, 'combat');
+    if (who === 'You') log(`Steel meets steel \u2014 you deflect ${atk}'s strike with your ${wName}!`, 'combat');
+    else log(`${who} deflects your attack with a ringing parry!`, 'combat');
   });
 
   world.on('spell:acid_spit', ({ actor, targetId, hit }) => {
+    if (!_playerCanSee([actor, targetId])) return;
     const who = nameOfEntity(actor);
     const tgt = nameOfEntity(targetId);
-    if (tgt === 'You') { log(hit ? `${who} spits acid over you!` : `${who} spits acid that hisses at your feet!`, 'danger'); return; }
-    log(`${who} spits a glob of acid.`, 'combat');
+    if (tgt === 'You') {
+      log(hit
+        ? `${who} rears back and spits \u2014 acid sizzles across your skin!`
+        : `${who} spits acid that spatters at your feet, hissing on the stone!`, 'danger');
+      return;
+    }
+    log(`${who} hawks a glob of acid at ${tgt}.`, 'combat');
   });
 
   world.on('monster:death:fire_puff', ({ at }) => {
     if (!at || !canSeeAt(at.x, at.y)) return;
-    log('The corpse flashes into cinders.', 'combat');
+    log('The creature bursts \u2014 a flash of heat, then nothing but ash.', 'combat');
   });
 
   world.on('monster:death:gas_spore', ({ at }) => {
     if (!at || !canSeeAt(at.x, at.y)) return;
-    log('The gas spore ruptures \u2014 volatile spores billow out!', 'danger');
+    log('The gas spore ruptures with a wet pop \u2014 toxic clouds billow outward!', 'danger');
   });
 
   world.on('proc:rot_grub:burrow', ({ actor, target }) => {
+    if (!_playerCanSee([actor, target])) return;
     const tgt = nameOfEntity(target);
-    if (tgt === 'You') { log('A rot grub burrows under your skin! You are bleeding badly!', 'danger'); return; }
+    if (tgt === 'You') { log('Something wriggles under your skin \u2014 a rot grub! You are bleeding badly!', 'danger'); return; }
     log(`A rot grub burrows into ${tgt}!`, 'combat');
   });
 
