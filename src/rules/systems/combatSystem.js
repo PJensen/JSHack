@@ -43,27 +43,23 @@ import { ensureActiveEffects } from '../utils/effects.js';
 import { computeImpactVector } from '../utils/projectileKinematics.js';
 import { getAffixElementTint } from '../data/affixes.js';
 import { EFFECT_DEFS } from '../data/effectDefs.js';
+import { resolveWeaponVisualMeta } from '../data/weaponVisuals.js';
 
 const BUMP_ATTACK_INSTALLED = Symbol.for('jshack:combat:bumpAttack:installed');
 
 function resolveWeaponClass(world, weaponId, damageType) {
     if (!(weaponId > 0) || !world.isAlive(weaponId)) return 'unarmed';
     const info = world.get(weaponId, ItemInfo);
-    const identity = String(
-        world.get(weaponId, NamedIdentity)?.identity
-        || info?.subtype
-        || world.get(weaponId, NamedIdentity)?.name
-        || ''
-    ).toLowerCase();
-    if (identity.includes('morningstar')) return 'morningstar';
-    if (identity.includes('dagger') || identity.includes('shiv') || identity.includes('athame') || identity.includes('knife') || identity.includes('stiletto') || identity.includes('fang')) return 'dagger';
-    if (identity.includes('sword') || identity.includes('blade') || identity.includes('sabre') || identity.includes('rapier') || identity.includes('katana') || identity.includes('edge') || identity.includes('flametongue')) return 'sword';
-    if (identity.includes('mace') || identity.includes('maul') || identity.includes('club') || identity.includes('hammer') || identity.includes('flail') || identity.includes('staff') || identity.includes('debtbringer')) return 'mace';
-    if (identity.includes('axe') || identity.includes('hatchet') || identity.includes('reaver') || identity.includes('cleaver') || identity.includes('scythe')) return 'axe';
-    if (damageType === 'blunt') return 'mace';
-    if (damageType === 'slash') return 'sword';
-    if (damageType === 'pierce') return 'dagger';
-    return 'weapon';
+    const named = world.get(weaponId, NamedIdentity);
+    return resolveWeaponVisualMeta({
+        id: named?.identity || '',
+        name: named?.name || '',
+        subtype: info?.subtype || '',
+        damageType,
+        twoHanded: info?.twoHanded === true,
+        weaponLengthCm: info?.weaponLengthCm,
+        weaponVfxProfile: info?.weaponVfxProfile,
+    }).weaponClass;
 }
 
 function buildDamageSignature(info, damageType) {
@@ -125,12 +121,24 @@ function resolveElementTint(world, sourceId, weaponId) {
 
 function buildMeleeImpactProfile(world, sourceId, weaponId, damageType, offhand, facingVector) {
     const info = (weaponId > 0 && world.isAlive(weaponId)) ? world.get(weaponId, ItemInfo) : null;
+    const named = (weaponId > 0 && world.isAlive(weaponId)) ? world.get(weaponId, NamedIdentity) : null;
+    const visualMeta = resolveWeaponVisualMeta({
+        id: named?.identity || '',
+        name: named?.name || '',
+        subtype: info?.subtype || '',
+        damageType,
+        twoHanded: info?.twoHanded === true,
+        weaponLengthCm: info?.weaponLengthCm,
+        weaponVfxProfile: info?.weaponVfxProfile,
+    });
     const weaponClass = resolveWeaponClass(world, weaponId, damageType);
     const attackKind = damageType === 'pierce'
         ? 'stab'
         : (damageType === 'slash' ? 'slash' : (damageType === 'blunt' ? 'blunt' : 'strike'));
     return {
         weaponClass,
+        weaponLengthCm: visualMeta.weaponLengthCm,
+        weaponVfxProfile: visualMeta.weaponVfxProfile,
         attackKind,
         offhand: !!offhand,
         signature: buildDamageSignature(info, damageType),

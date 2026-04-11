@@ -4,15 +4,34 @@
 // the merged catalog and public API.
 import { EQUIPMENT_ITEMS } from "./itemCatalogEquipment.js";
 import { MAGIC_ITEMS } from "./itemCatalogMagic.js";
+import { isWeaponCatalogItem, resolveWeaponVisualMeta } from "./weaponVisuals.js";
 import {
   canGemSocketDipTarget,
   createGemSocketDipHook,
 } from "./itemCatalogHooks.js";
 
-export const ITEM_CATALOG = {
-  ...EQUIPMENT_ITEMS,
-  ...MAGIC_ITEMS,
-};
+function buildItemCatalog() {
+  const merged = {
+    ...EQUIPMENT_ITEMS,
+    ...MAGIC_ITEMS,
+  };
+  const out = {};
+  for (const [id, rec] of Object.entries(merged)) {
+    if (!isWeaponCatalogItem(rec)) {
+      out[id] = rec;
+      continue;
+    }
+    const meta = resolveWeaponVisualMeta(rec);
+    out[id] = {
+      ...rec,
+      weaponLengthCm: meta.weaponLengthCm,
+      weaponVfxProfile: meta.weaponVfxProfile,
+    };
+  }
+  return out;
+}
+
+export const ITEM_CATALOG = buildItemCatalog();
 
 // ── Gem socket hook registry (separate from ITEM_CATALOG to avoid duplication) ──
 // Gems are defined in gems.js; hooks live here and are resolved via getGemItemHooks().

@@ -226,7 +226,7 @@ export function resolveResistance(world, targetId, rawAmount, type, armorPenetra
  * @property {number}  [armorPenetration=0]- Reduces effective kinetic DR for this hit
  * @property {{dx:number,dy:number}} [impactVector] - Normalized travel direction for impact VFX
  * @property {string} [projectileKind=""]  - Optional projectile classifier for display VFX (e.g. 'arrow')
- * @property {{weaponClass?:string,attackKind?:string,offhand?:boolean}} [impactProfile] - Optional melee impact profile for display VFX
+ * @property {{weaponClass?:string,weaponLengthCm?:number,weaponVfxProfile?:string|object,attackKind?:string,offhand?:boolean}} [impactProfile] - Optional melee impact profile for display VFX
  */
 
 /**
