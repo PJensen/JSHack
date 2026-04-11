@@ -214,9 +214,12 @@ export function installCombatMessages(ctx) {
     log(`Not enough stamina to attack with ${weaponName} (need ${need}, have ${Math.floor(have)}).`, 'combat');
   });
 
+  const _critVerbs = ['devastates', 'crushes', 'savages', 'smashes', 'demolishes'];
+  const _hitVerbs  = ['hits', 'strikes', 'smacks', 'bashes', 'nails', 'tags'];
+
   world.on('damaged', ({ target, amount, critical, crit, source, offhand, cause }) => {
     const defName = nameOfEntity(target);
-    const critTxt = (critical || crit) ? ' (CRIT!)' : '';
+    const isCrit = !!(critical || crit);
     const handTxt = offhand ? ' (off-hand)' : '';
     if (Number(source || 0)) {
       const atkName = nameOfEntity(source);
@@ -233,9 +236,14 @@ export function installCombatMessages(ctx) {
       } else if (!offhand && compHas(Number(source || 0), Player)) {
         weaponLabel = ' with bare fists';
       }
-      log(`${atkName} hits ${defName}${weaponLabel} for ${amount}${critTxt}${handTxt}.`, 'combat');
+      const step = world.step || 0;
+      const verb = isCrit
+        ? _critVerbs[step % _critVerbs.length]
+        : _hitVerbs[step % _hitVerbs.length];
+      const critTxt = isCrit ? '!' : '.';
+      log(`${atkName} ${verb} ${defName}${weaponLabel} for ${amount}${handTxt}${critTxt}`, 'combat');
     } else {
-      log(`${defName} takes ${amount} damage${critTxt}${handTxt}.`, 'combat');
+      log(`${defName} takes ${amount} damage${isCrit ? '!' : '.'}${handTxt}`, 'combat');
     }
   });
 
@@ -243,24 +251,78 @@ export function installCombatMessages(ctx) {
     log(`${nameOfEntity(id)} heals ${amount}.`, 'system');
   });
 
-  const _deathQuips = [
-    (who) => `${who} is destroyed.`,
-    (who) => `${who} is no more.`,
-    (who) => `${who} falls.`,
-    (who) => `${who} crumples to the ground.`,
-    (who) => `${who} dies.`,
-    (who) => `${who} expires.`,
-    (who) => `${who} goes limp.`,
-    (who) => `${who} collapses in a heap.`,
+  // ── Context-aware death messages ──
+  // Keyed by: attackKind (stab/slash/blunt/strike), goreType (blood/ichor/spark/none),
+  //           sizeClass (S/M/L), damageType (fire/lightning/poison/acid/etc.), critical
+  const _deathByAttack = {
+    stab:  [(w) => `${w} slumps off the blade.`,
+            (w) => `${w} is run through.`,
+            (w) => `${w} staggers and falls, pierced clean.`],
+    slash: [(w) => `${w} is cut down.`,
+            (w) => `${w} is cleaved apart.`,
+            (w) => `${w} drops in a spray of gore.`],
+    blunt: [(w) => `${w} crumples from the impact.`,
+            (w) => `${w} is bludgeoned into the ground.`,
+            (w) => `${w} folds like a sack of wet grain.`],
+    strike:[(w) => `${w} falls.`,
+            (w) => `${w} goes limp.`,
+            (w) => `${w} collapses.`],
+  };
+  const _deathByElement = {
+    fire:      [(w) => `${w} burns to cinders.`,
+                (w) => `${w} is consumed by flame.`],
+    lightning: [(w) => `${w} is fried to a crisp.`,
+                (w) => `${w} convulses and drops, smoking.`],
+    poison:    [(w) => `${w} chokes on venom and expires.`,
+                (w) => `${w} froths and collapses.`],
+    acid:      [(w) => `${w} dissolves in a hiss of acid.`,
+                (w) => `${w} melts into a puddle.`],
+    plasma:    [(w) => `${w} is vaporized.`,
+                (w) => `${w} disintegrates in a flash of plasma.`],
+    arcane:    [(w) => `${w} unravels under the arcane force.`,
+                (w) => `${w} is torn apart by raw magic.`],
+  };
+  const _deathByGore = {
+    spark:  [(w) => `${w} sparks violently and shuts down.`,
+             (w) => `${w} detonates in a shower of sparks.`],
+    ichor:  [(w) => `${w} bursts, spattering ichor across the floor.`,
+             (w) => `${w} oozes apart.`],
+    none:   [(w) => `${w} is destroyed.`,
+             (w) => `${w} is no more.`],
+  };
+  const _deathCrit = {
+    stab:  [(w) => `${w} is skewered \u2014 dead before hitting the floor.`],
+    slash: [(w) => `${w} is bisected in a single stroke.`],
+    blunt: [(w) => `${w} is pulverized.`],
+    fire:  [(w) => `${w} explodes into a pillar of flame!`],
+    lightning: [(w) => `A bolt rips through ${w} \u2014 nothing but char remains.`],
+  };
+  const _deathBySize = {
+    S: [(w) => `${w} pops like a grape.`,
+        (w) => `${w} crumples into a tiny heap.`],
+    L: [(w) => `${w} topples like a felled tree.`,
+        (w) => `${w} crashes to the ground \u2014 the floor shakes.`],
+  };
+  const _deathFallback = [
+    (w) => `${w} dies.`,
+    (w) => `${w} expires.`,
+    (w) => `${w} is no more.`,
+    (w) => `${w} falls.`,
+    (w) => `${w} collapses in a heap.`,
   ];
-  let _deathQuipIdx = 0;
 
-  world.on('died', ({ id, killer }) => {
+  function _pickDeath(arr, step) {
+    return arr[(step || 0) % arr.length];
+  }
+
+  world.on('died', (ev) => {
+    const { id, killer, critical, damageType, goreType, sizeClass, impactProfile } = ev;
     const who = nameOfEntity(id);
     const pe = playerEntity(world);
     const playerId = Number(pe?.id || 0) | 0;
     const deadId = Number(id || 0) | 0;
     const killerId = Number(killer || 0) | 0;
+    const step = world.step || 0;
 
     if (compHas(deadId, Pet)) {
       const owner = compGet(deadId, Owner);
@@ -271,24 +333,84 @@ export function installCombatMessages(ctx) {
       }
     }
 
-    const quip = _deathQuips[_deathQuipIdx % _deathQuips.length];
-    _deathQuipIdx++;
-    log(quip(who), 'combat');
+    const attackKind = impactProfile?.attackKind || '';
+    const dt = String(damageType || '');
+    const gore = String(goreType || 'blood');
+    const size = String(sizeClass || 'M');
+
+    // 1. Crit kills — most dramatic
+    if (critical) {
+      const pool = _deathCrit[attackKind] || _deathCrit[dt];
+      if (pool) { log(_pickDeath(pool, step)(who), 'combat'); return; }
+    }
+    // 2. Elemental kills
+    if (_deathByElement[dt]) {
+      log(_pickDeath(_deathByElement[dt], step)(who), 'combat'); return;
+    }
+    // 3. Size-specific flavor for small/large
+    if (_deathBySize[size] && step % 3 === 0) {
+      log(_pickDeath(_deathBySize[size], step)(who), 'combat'); return;
+    }
+    // 4. Attack-kind flavor (melee weapon shape)
+    if (_deathByAttack[attackKind]) {
+      log(_pickDeath(_deathByAttack[attackKind], step)(who), 'combat'); return;
+    }
+    // 5. Gore-type flavor (non-blood creatures)
+    if (gore !== 'blood' && _deathByGore[gore]) {
+      log(_pickDeath(_deathByGore[gore], step)(who), 'combat'); return;
+    }
+    // 6. Fallback
+    log(_pickDeath(_deathFallback, step)(who), 'combat');
   });
+
+  // ── Context-aware miss messages ──
+  const _missGeneric = [
+    (s, t) => `${s} misses ${t}.`,
+    (s, t) => `${s} lunges at ${t} but misses.`,
+  ];
+  const _missByWeapon = {
+    sword:   [(s, t) => `${s} swings at ${t} and whiffs.`,
+              (s, t) => `${s}'s blade whistles past ${t}.`],
+    axe:     [(s, t) => `${s} chops at ${t} \u2014 nothing but air.`,
+              (s, t) => `${s}'s axe bites stone instead of flesh.`],
+    mace:    [(s, t) => `${s} flails at ${t} and misses.`,
+              (s, t) => `${s}'s mace thuds into the ground.`],
+    dagger:  [(s, t) => `${s} stabs at ${t} but finds only air.`,
+              (s, t) => `${s}'s dagger flashes past ${t}.`],
+    spear:   [(s, t) => `${s} thrusts at ${t} and misses.`,
+              (s, t) => `${s}'s spear jabs wide.`],
+    staff:   [(s, t) => `${s} swats at ${t} but misses.`,
+              (s, t) => `${s}'s staff sweeps harmlessly past ${t}.`],
+    bow:     [(s, t) => `${s}'s arrow sails past ${t}.`,
+              (s, t) => `${s} looses an arrow \u2014 it clatters off a wall.`],
+    fist:    [(s, t) => `${s} swings a fist at ${t} and whiffs.`,
+              (s, t) => `${s} punches empty air.`],
+  };
+
+  function _resolveWeaponFlavor(sourceId) {
+    const eq = compGet(Number(sourceId || 0), Equipment);
+    const wid = Number(eq?.weapon || 0);
+    if (!wid) return compHas(Number(sourceId || 0), Player) ? 'fist' : '';
+    const wname = String(compGet(wid, NamedIdentity)?.identity || '').toLowerCase();
+    if (wname.includes('sword') || wname.includes('blade') || wname.includes('scimitar') || wname.includes('rapier')) return 'sword';
+    if (wname.includes('axe') || wname.includes('hatchet') || wname.includes('cleaver')) return 'axe';
+    if (wname.includes('mace') || wname.includes('hammer') || wname.includes('flail') || wname.includes('club')) return 'mace';
+    if (wname.includes('dagger') || wname.includes('knife') || wname.includes('shiv')) return 'dagger';
+    if (wname.includes('spear') || wname.includes('trident') || wname.includes('pike') || wname.includes('lance')) return 'spear';
+    if (wname.includes('staff') || wname.includes('rod') || wname.includes('wand')) return 'staff';
+    return '';
+  }
 
   world.on('status', (payload) => {
     const { id, kind, source } = normalizeStatusEvent(payload);
     const style = (String(kind || '')).toLowerCase();
     const tgt = nameOfEntity(id);
-    const src = Number(source || 0) ? nameOfEntity(source) : null;
+    const srcId = Number(source || 0);
+    const src = srcId ? nameOfEntity(source) : null;
     if (style === 'miss' && src) {
-      const _misses = [
-        `${src} misses ${tgt}.`,
-        `${src} swings at ${tgt} and whiffs.`,
-        `${src} flails at ${tgt} \u2014 nothing but air.`,
-        `${src} lunges at ${tgt} but misses.`,
-      ];
-      log(_misses[(world.step || 0) % _misses.length], 'combat');
+      const wep = _resolveWeaponFlavor(srcId);
+      const pool = _missByWeapon[wep] || _missGeneric;
+      log(_pickDeath(pool, world.step || 0)(src, tgt), 'combat');
     }
     if (style === 'immune' && src) log(`${src} attacks ${tgt}. It does nothing.`, 'combat');
   });

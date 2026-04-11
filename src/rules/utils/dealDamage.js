@@ -435,7 +435,16 @@ export function dealDamage(world, spec) {
   }
 
   if (killed) {
-    emitSafe(world, 'died', { id: target, killer: source, cause });
+    emitSafe(world, 'died', {
+      id: target, killer: source, cause,
+      damageType: type,
+      critical,
+      amount: finalAmount,
+      goreType: String(getMonster(String(world.get(target, NamedIdentity)?.identity || ''))?.goreType || 'blood'),
+      sizeClass: String(world.get(target, Physiology)?.sizeClass || 'M'),
+      impactProfile: spec.impactProfile || undefined,
+      targetKind: String(world.get(target, NamedIdentity)?.identity || ''),
+    });
 
     if (!spec.noTrigger && source > 0 && world.isAlive(source)) {
       ensureEquippedAffixTopology(world, source);
