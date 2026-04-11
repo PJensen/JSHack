@@ -243,6 +243,18 @@ export function installCombatMessages(ctx) {
     log(`${nameOfEntity(id)} heals ${amount}.`, 'system');
   });
 
+  const _deathQuips = [
+    (who) => `${who} is destroyed.`,
+    (who) => `${who} is no more.`,
+    (who) => `${who} falls.`,
+    (who) => `${who} crumples to the ground.`,
+    (who) => `${who} dies.`,
+    (who) => `${who} expires.`,
+    (who) => `${who} goes limp.`,
+    (who) => `${who} collapses in a heap.`,
+  ];
+  let _deathQuipIdx = 0;
+
   world.on('died', ({ id, killer }) => {
     const who = nameOfEntity(id);
     const pe = playerEntity(world);
@@ -259,7 +271,9 @@ export function installCombatMessages(ctx) {
       }
     }
 
-    log(`${who} dies.`, 'combat');
+    const quip = _deathQuips[_deathQuipIdx % _deathQuips.length];
+    _deathQuipIdx++;
+    log(quip(who), 'combat');
   });
 
   world.on('status', (payload) => {
@@ -267,8 +281,16 @@ export function installCombatMessages(ctx) {
     const style = (String(kind || '')).toLowerCase();
     const tgt = nameOfEntity(id);
     const src = Number(source || 0) ? nameOfEntity(source) : null;
-    if (style === 'miss' && src) log(`${src} misses ${tgt}.`, 'combat');
-    if (style === 'immune' && src) log(`${src} can't hurt ${tgt}.`, 'combat');
+    if (style === 'miss' && src) {
+      const _misses = [
+        `${src} misses ${tgt}.`,
+        `${src} swings at ${tgt} and whiffs.`,
+        `${src} flails at ${tgt} \u2014 nothing but air.`,
+        `${src} lunges at ${tgt} but misses.`,
+      ];
+      log(_misses[(world.step || 0) % _misses.length], 'combat');
+    }
+    if (style === 'immune' && src) log(`${src} attacks ${tgt}. It does nothing.`, 'combat');
   });
 
   // === Ranged combat events ===

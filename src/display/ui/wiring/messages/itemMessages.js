@@ -127,31 +127,31 @@ export function installItemMessages(ctx) {
   // === Bad potion messages ===
   world.on('potion:paralysis', ({ actor }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    log("Your body goes rigid. You can't move!", 'danger');
+    log("Your body locks up. You can't even blink.", 'danger');
   });
   world.on('potion:hallucination', ({ actor }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    log('The world dissolves into swirling colours. Nothing looks real anymore.', 'danger');
+    log('Oh wow, like, superior, man! The walls are breathing and the floor tastes purple.', 'danger');
   });
   world.on('potion:blindness', ({ actor }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    log("Everything goes dark. You can't see a thing!", 'danger');
+    log("A film coats your eyes. Everything goes dark!", 'danger');
   });
   world.on('potion:weakness', ({ actor }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    log('A wave of lethargy washes over you. You feel permanently diminished.', 'danger');
+    log('Ulch! This makes you feel mediocre.', 'danger');
   });
   world.on('potion:confusion', ({ actor }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    log('Your head spins. Which way is which?', 'danger');
+    log('Huh, what? Where am I? Which way is which?', 'danger');
   });
   world.on('potion:sickness', ({ actor }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    log('Your stomach lurches violently. You feel poisoned!', 'danger');
+    log('Gaggg... this tastes like sewage! Your stomach lurches violently.', 'danger');
   });
   world.on('potion:lethargy', ({ actorId }) => {
     if (nameOfEntity(actorId) !== 'You') return;
-    log('A wave of exhaustion washes over you. Your stamina recovery slows to a crawl.', 'danger');
+    log('Your limbs turn to lead. Even blinking feels like a chore.', 'danger');
   });
 
   // === Bad scroll messages ===
