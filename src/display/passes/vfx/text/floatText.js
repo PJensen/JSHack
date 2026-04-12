@@ -32,7 +32,7 @@ export class FloatText {
     // Defaults per flavor
     this.defaults = {
       damage: { life: 0.9, color: '#ffd966', scaleBase: 1.0 },
-      gold:   { life: 0.8, color: '#f0a830', scaleBase: 1.0 },
+      gold:   { life: 0.8, color: '#c37f09', scaleBase: 1.0 },
       heal:   { life: 0.9, color: '#7BFF7B', scaleBase: 1.0 },
       status: { life: 0.7, color: '#c0c8d0', scaleBase: 1.0 }
     };
