@@ -48,19 +48,22 @@ for (const id of NEW_MONSTERS) {
 Deno.test("goblin_archer has ranged loadout options", () => {
   const def = getMonster('goblin_archer');
   assert(Array.isArray(def.equipped), "should define equipped loadout");
-  const ranged = def.equipped.filter((entry) => String(entry?.slot || "") === "ranged");
-  const ammo = def.equipped.filter((entry) => String(entry?.slot || "") === "ammo");
-  assert(ranged.length > 0, "should include ranged slot options");
-  assert(ammo.length > 0, "should include ammo slot");
-  assert(ranged.some((entry) => entry.itemId === "goblin_barbed_shortbow"), "should include barbed bow option");
-  assert(ranged.some((entry) => entry.itemId === "bow_short"), "should include plain bow option");
+  // Bows can be plain strings (slot inferred from catalog) or objects
+  const hasBarbed = def.equipped.some((e) => e === "goblin_barbed_shortbow" || e?.itemId === "goblin_barbed_shortbow");
+  const hasBow = def.equipped.some((e) => e === "bow_short" || e?.itemId === "bow_short");
+  const hasAmmo = def.equipped.some((e) => String(e?.slot || "") === "ammo");
+  assert(hasBarbed, "should include barbed bow option");
+  assert(hasBow, "should include plain bow option");
+  assert(hasAmmo, "should include ammo slot");
 });
 
 Deno.test("bandit_archer has direct ranged loadout", () => {
   const def = getMonster('bandit_archer');
   assert(Array.isArray(def.equipped), "should define equipped loadout");
-  assert(def.equipped.some((entry) => String(entry?.slot || "") === "ranged" && entry?.itemId === "bow_short"));
-  assert(def.equipped.some((entry) => String(entry?.slot || "") === "ammo" && entry?.itemId === "ammo_arrows"));
+  const hasBow = def.equipped.some((e) => e === "bow_short" || e?.itemId === "bow_short");
+  const hasAmmo = def.equipped.some((e) => String(e?.slot || "") === "ammo" && e?.itemId === "ammo_arrows");
+  assert(hasBow, "should include bow");
+  assert(hasAmmo, "should include ammo");
 });
 
 Deno.test("goblin uses dedicated shiv loadout instead of direct onHit bleed hook", () => {
