@@ -86,10 +86,7 @@ export const MONSTERS = [
       "goblin_jagged_shiv",
       "goblin_shiv",
     ],
-    equipped: [
-      { slot: "armor", itemId: "leather_armor" },
-      { slot: "head", itemId: "scout_hood" },
-    ],
+    equipped: ["leather_armor", "scout_hood"],
     learnedSpellIds: ['goblin_dirty_trick'],
     hooks: {
       whileLOS: [
@@ -128,8 +125,8 @@ export const MONSTERS = [
     resistances: { kinetic: { DR: 0 } },
     speed: 2,
     equipped: [
-      { slot: "ranged", itemId: "goblin_barbed_shortbow" },
-      { slot: "ranged", itemId: "bow_short" },
+      "goblin_barbed_shortbow",
+      "bow_short",
       { slot: "ammo", itemId: "ammo_arrows" },
     ],
     hooks: null,
@@ -195,10 +192,7 @@ export const MONSTERS = [
       'dagger_quick',
       'goblin_shiv',
     ],
-    equipped: [
-      { slot: 'armor', itemId: 'leather_armor' },
-      { slot: 'head', itemId: 'scout_hood' },
-    ],
+    equipped: ["leather_armor", "scout_hood"],
     hooks: null,
     specials: ['Weapon user (dagger/shiv)', 'May spawn with light armor'],
     description: 'A cutthroat drifter with a cheap blade and a hungry stare.',
@@ -222,7 +216,7 @@ export const MONSTERS = [
     resistances: { kinetic: { DR: 0 } },
     speed: 2,
     equipped: [
-      { slot: 'ranged', itemId: 'bow_short' },
+      "bow_short",
       { slot: 'ammo', itemId: 'ammo_arrows' },
     ],
     hooks: null,
@@ -586,10 +580,7 @@ export const MONSTERS = [
     hooks: null,
     specials: ['Ranged weapon user (shortbow)'],
     description: 'A rattling skeleton clutching a short bow.',
-    equipped: [
-      { slot: 'ranged', itemId: 'bow_short' },
-      { slot: 'ammo', itemId: 'ammo_arrows' },
-    ],
+    equipped: ["bow_short", { slot: 'ammo', itemId: 'ammo_arrows' }],
   },
 
   {
@@ -724,10 +715,7 @@ export const MONSTERS = [
     },
     specials: ["Bleed 20%"],
     description: 'A skeletal bowman with practiced aim. Its arrows leave jagged wounds.',
-    equipped: [
-      { slot: 'ranged', itemId: 'bow_short' },
-      { slot: 'ammo', itemId: 'ammo_arrows' },
-    ],
+    equipped: ["bow_short", { slot: 'ammo', itemId: 'ammo_arrows' }],
   },
   {
     id: 'dire_wolf',
@@ -785,13 +773,10 @@ export const MONSTERS = [
     learnedSpellIds: ['shield_bash'],
     wielding: ['iron_mace', 'dagger_quick', 'sword_plain'],
     equipped: [
-      { slot: 'offhand', itemId: 'shield_wood' },
-      { slot: 'offhand', itemId: 'shield_iron' },
-      { slot: 'armor', itemId: 'chain_armor' },
-      { slot: 'head', itemId: 'helm_iron' },
-      { slot: 'head', itemId: 'helm_steel' },
-      { slot: 'feet', itemId: 'boots_leather' },
-      { slot: 'belt', itemId: 'belt_leather' },
+      "shield_wood", "shield_iron",
+      "chain_armor",
+      "helm_iron", "helm_steel",
+      "boots_leather", "belt_leather",
     ],
     hooks: {
       whileLOS: [
@@ -926,10 +911,8 @@ export const MONSTERS = [
       'iron_mace',
     ],
     equipped: [
-      { slot: 'armor', itemId: 'leather_armor' },
-      { slot: 'armor', itemId: 'chain_armor' },
-      { slot: 'head', itemId: 'helm_iron' },
-      { slot: 'feet', itemId: 'boots_leather' },
+      "leather_armor", "chain_armor",
+      "helm_iron", "boots_leather",
     ],
     hooks: {
       onBeforeHit: [bonusDamageOnBeforeHit(25, 0xdead0007, 2, "proc:rage")],
@@ -962,11 +945,7 @@ export const MONSTERS = [
       'iron_mace', 'iron_mace',
       'flail',
     ],
-    equipped: [
-      { slot: 'head', itemId: 'helm_iron' },
-      { slot: 'head', itemId: 'helm_iron' },
-      { slot: 'armor', itemId: 'leather_armor' },
-    ],
+    equipped: ["helm_iron", "helm_iron", "leather_armor"],
     hooks: {
       onDamaged: [healOnDamaged(20, 0xdead0008, 2, "proc:reassemble")],
     },
@@ -993,10 +972,7 @@ export const MONSTERS = [
     resistances: { kinetic: { DR: 2 } },
     speed: 2,
     wielding: ['staff_oak'],
-    equipped: [
-      { slot: 'armor', itemId: 'leather_armor' },
-      { slot: 'feet', itemId: 'sandals_hemp' },
-    ],
+    equipped: ["leather_armor", "sandals_hemp"],
     learnedSpellIds: ['frost', 'heal'],
     maxMana: 30,
     manaRegen: 0.16,
@@ -1046,11 +1022,8 @@ export const MONSTERS = [
       "hobgoblin_warblade",
     ],
     equipped: [
-      { slot: "armor", itemId: "chain_armor" },
-      { slot: "head", itemId: "helm_iron" },
-      { slot: 'gloves', itemId: 'gloves_leather' },
-      { slot: 'feet', itemId: 'boots_leather' },
-      { slot: 'belt', itemId: 'belt_leather' },
+      "chain_armor", "helm_iron",
+      "gloves_leather", "boots_leather", "belt_leather",
     ],
     hooks: {
       onBeforeHit: [bonusDamageOnBeforeHit(20, 0xdead0402, 3, "proc:rage")],
@@ -1103,11 +1076,7 @@ export const MONSTERS = [
       'iron_mace',
       'flail',
     ],
-    equipped: [
-      { slot: 'armor', itemId: 'chain_armor' },
-      { slot: 'armor', itemId: 'leather_armor' },
-      { slot: 'head', itemId: 'helm_iron' },
-    ],
+    equipped: ["chain_armor", "leather_armor", "helm_iron"],
     resistances: {
       kinetic: { DR: 3, bluntMult: 1.3, pierceMult: 0.6, slashMult: 0.7 },
       chemical: { toxMult: 0 },
@@ -1186,11 +1155,7 @@ export const MONSTERS = [
     },
     speed: 2,
     wielding: ['staff_oak'],
-    equipped: [
-      { slot: 'armor', itemId: 'leather_armor' },
-      { slot: 'feet', itemId: 'sandals_hemp' },
-      { slot: 'belt', itemId: 'belt_leather' },
-    ],
+    equipped: ["leather_armor", "sandals_hemp", "belt_leather"],
     learnedSpellIds: ['entangle', 'thorn_burst', 'verdant_ward'],
     maxMana: 40,
     manaRegen: 0.15,
@@ -1255,10 +1220,7 @@ export const MONSTERS = [
     },
     specials: ["Burn 20%"],
     description: 'A grim skeleton nocking arrows tipped with alchemical fire.',
-    equipped: [
-      { slot: 'ranged', itemId: 'bow_short' },
-      { slot: 'ammo', itemId: 'ammo_fire_arrows' },
-    ],
+    equipped: ["bow_short", { slot: 'ammo', itemId: 'ammo_fire_arrows' }],
   },
   {
     id: 'skeleton_sharpshooter',
@@ -1285,10 +1247,7 @@ export const MONSTERS = [
     },
     specials: ["Stun 15%"],
     description: 'A headless torso that somehow never misses.',
-    equipped: [
-      { slot: 'ranged', itemId: 'bow_short' },
-      { slot: 'ammo', itemId: 'ammo_arrows' },
-    ],
+    equipped: ["bow_short", { slot: 'ammo', itemId: 'ammo_arrows' }],
   },
   {
     id: 'troll',
@@ -1413,11 +1372,9 @@ export const MONSTERS = [
     speed: 2,
     wielding: ['staff_oak', 'dagger_quick'],
     equipped: [
-      { slot: 'armor', itemId: 'leather_armor' },
-      { slot: 'head', itemId: 'helm_mage' },
-      { slot: 'head', itemId: 'scout_hood' },
-      { slot: 'feet', itemId: 'sandals_hemp' },
-      { slot: 'feet', itemId: 'boots_leather' },
+      "leather_armor",
+      "helm_mage", "scout_hood",
+      "sandals_hemp", "boots_leather",
     ],
     learnedSpellIds: ['agony', 'shadow_bolt'],
     maxMana: 45,
@@ -1463,11 +1420,8 @@ export const MONSTERS = [
     speed: 2,
     wielding: ["orc_warchief_maul"],
     equipped: [
-      "chain_armor",
-      "helm_steel",
-      { slot: 'gloves', itemId: 'gauntlets_iron' },
-      { slot: 'feet', itemId: 'boots_ironshod' },
-      { slot: 'belt', itemId: 'belt_chain' },
+      "chain_armor", "helm_steel",
+      "gauntlets_iron", "boots_ironshod", "belt_chain",
     ],
     hooks: {
       onBeforeHit: [bonusDamageOnBeforeHit(30, 0xdead0409, 3, "proc:rage")],
@@ -1517,10 +1471,7 @@ export const MONSTERS = [
     },
     specials: ["Telegraphed volley", "Drain 3 HP (20%)"],
     description: 'An ancient undead marksman wreathed in cold flame. Its arrows sap the life from their targets.',
-    equipped: [
-      { slot: 'ranged', itemId: 'bow_short' },
-      { slot: 'ammo', itemId: 'ammo_fire_arrows' },
-    ],
+    equipped: ["bow_short", { slot: 'ammo', itemId: 'ammo_fire_arrows' }],
   },
   {
     id: 'demon',
@@ -1598,13 +1549,10 @@ export const MONSTERS = [
     speed: 2,
     wielding: ['staff_oak', 'resonant_quarterstaff'],
     equipped: [
-      { slot: 'armor', itemId: 'leather_armor' },
-      { slot: 'head', itemId: 'helm_mage' },
-      { slot: 'neck', itemId: 'amulet_arcanum' },
-      { slot: 'neck', itemId: 'amulet_focus' },
-      { slot: 'ring1', itemId: 'ring_arcana' },
-      { slot: 'ring1', itemId: 'ring_channeling' },
-      { slot: 'feet', itemId: 'boots_leather' },
+      "leather_armor", "helm_mage",
+      "amulet_arcanum", "amulet_focus",
+      "ring_arcana", "ring_channeling",
+      "boots_leather",
     ],
     hooks: {
       onHit: [drainOnHit(25, 0xdead000c, 2)],
