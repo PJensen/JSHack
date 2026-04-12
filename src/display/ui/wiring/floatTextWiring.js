@@ -894,10 +894,10 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     if (!pos || !canShowAt(pos.x, pos.y)) return;
 
     ftext.addGold(pos.x, pos.y - 0.45, qty, {
-      life: 0.95,
-      scaleStart: 1.18,
-      scaleEnd: 0.92,
-      color: '#f0a830',
+      life: 1.95,
+      scaleStart: .5,
+      scaleEnd: 0.22,
+      color: '#ffa200',
     });
 
     for (let i = 0; i < 12; i++) {
