@@ -127,7 +127,7 @@ export const MONSTERS = [
     equipped: [
       "goblin_barbed_shortbow",
       "bow_short",
-      { slot: "ammo", itemId: "ammo_arrows" },
+      "ammo_arrows",
     ],
     hooks: null,
     specials: ["May spawn with barbed bow"],
@@ -1220,7 +1220,7 @@ export const MONSTERS = [
     },
     specials: ["Burn 20%"],
     description: 'A grim skeleton nocking arrows tipped with alchemical fire.',
-    equipped: ["bow_short", { slot: 'ammo', itemId: 'ammo_fire_arrows' }],
+    equipped: ["bow_short", "ammo_fire_arrows"],
   },
   {
     id: 'skeleton_sharpshooter',
@@ -1471,7 +1471,7 @@ export const MONSTERS = [
     },
     specials: ["Telegraphed volley", "Drain 3 HP (20%)"],
     description: 'An ancient undead marksman wreathed in cold flame. Its arrows sap the life from their targets.',
-    equipped: ["bow_short", { slot: 'ammo', itemId: 'ammo_fire_arrows' }],
+    equipped: ["bow_short", "ammo_fire_arrows"],
   },
   {
     id: 'demon',
