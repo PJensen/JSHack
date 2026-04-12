@@ -60,7 +60,10 @@ function resolveEntrySlot(world, itemId, requestedSlot) {
 }
 
 function inferSlotFromItemId(itemId) {
-  const def = getCatalogItem(String(itemId || ""));
+  const key = String(itemId || "").trim().toLowerCase();
+  // Ammo items live outside the equipment catalog; infer slot from ID prefix.
+  if (key.startsWith("ammo_")) return "ammo";
+  const def = getCatalogItem(key);
   return String(def?.slot || "").trim().toLowerCase();
 }
 

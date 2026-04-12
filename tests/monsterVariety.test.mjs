@@ -51,17 +51,17 @@ Deno.test("goblin_archer has ranged loadout options", () => {
   // Bows can be plain strings (slot inferred from catalog) or objects
   const hasBarbed = def.equipped.some((e) => e === "goblin_barbed_shortbow" || e?.itemId === "goblin_barbed_shortbow");
   const hasBow = def.equipped.some((e) => e === "bow_short" || e?.itemId === "bow_short");
-  const hasAmmo = def.equipped.some((e) => String(e?.slot || "") === "ammo");
+  const hasAmmo = def.equipped.some((e) => e === "ammo_arrows" || e?.itemId === "ammo_arrows");
   assert(hasBarbed, "should include barbed bow option");
   assert(hasBow, "should include plain bow option");
-  assert(hasAmmo, "should include ammo slot");
+  assert(hasAmmo, "should include ammo");
 });
 
 Deno.test("bandit_archer has direct ranged loadout", () => {
   const def = getMonster('bandit_archer');
   assert(Array.isArray(def.equipped), "should define equipped loadout");
   const hasBow = def.equipped.some((e) => e === "bow_short" || e?.itemId === "bow_short");
-  const hasAmmo = def.equipped.some((e) => String(e?.slot || "") === "ammo" && e?.itemId === "ammo_arrows");
+  const hasAmmo = def.equipped.some((e) => e === "ammo_arrows" || e?.itemId === "ammo_arrows");
   assert(hasBow, "should include bow");
   assert(hasAmmo, "should include ammo");
 });
