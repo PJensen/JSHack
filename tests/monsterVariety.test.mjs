@@ -184,13 +184,13 @@ Deno.test("bat is eligible in dungeon level 1 monster pool", () => {
   assertEquals(bat.identity, "bat");
 });
 
-Deno.test("bat spawner uses high concurrency and medium total profile", () => {
+Deno.test("bat spawner uses moderate concurrency and limited total profile", () => {
   for (let seed = 1; seed <= 25; seed++) {
     const rng = createRng(seed);
     const spawner = pickSpecificSpawner(rng, "bat", 1);
     assert(spawner, "bat spawner should be created");
-    assert(spawner.maxConcurrent >= 3 && spawner.maxConcurrent <= 4, `maxConcurrent=${spawner.maxConcurrent}`);
-    assert(spawner.packSize >= 4 && spawner.packSize <= 6, `packSize=${spawner.packSize}`);
+    assert(spawner.maxConcurrent >= 2 && spawner.maxConcurrent <= 3, `maxConcurrent=${spawner.maxConcurrent}`);
+    assert(spawner.packSize >= 3 && spawner.packSize <= 4, `packSize=${spawner.packSize}`);
   }
 });
 

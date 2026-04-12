@@ -144,19 +144,19 @@ const PACK_SIZE_BY_CLASS = {
 };
 
 // Spawner profiles by size class — controls concurrent/total/cooldown variety.
-// XS: lone trickle nests that keep producing over time (1 concurrent, high total)
-// S:  swarm nests that burst several at once but exhaust faster (2-3 concurrent, lower total)
+// Tuned for fewer, more meaningful encounters. Spawners are a slow trickle,
+// not a flood — the player should feel pressure, not drowning.
 const SPAWNER_PROFILE_BY_CLASS = {
-  'XS': { concurrent: { min: 1, max: 2 }, total: { min: 6, max: 10 }, cooldown: 12 },
-  'S':  { concurrent: { min: 2, max: 3 }, total: { min: 3, max: 5 },  cooldown: 15 },
-  'M':  { concurrent: { min: 1, max: 2 }, total: { min: 4, max: 6 },  cooldown: 20 },
-  'L':  { concurrent: { min: 1, max: 1 }, total: { min: 2, max: 3 },  cooldown: 25 },
-  'XL': { concurrent: { min: 1, max: 1 }, total: { min: 1, max: 2 },  cooldown: 80 },
+  'XS': { concurrent: { min: 1, max: 1 }, total: { min: 3, max: 5 },  cooldown: 20 },
+  'S':  { concurrent: { min: 1, max: 2 }, total: { min: 2, max: 3 },  cooldown: 24 },
+  'M':  { concurrent: { min: 1, max: 1 }, total: { min: 2, max: 4 },  cooldown: 30 },
+  'L':  { concurrent: { min: 1, max: 1 }, total: { min: 1, max: 2 },  cooldown: 35 },
+  'XL': { concurrent: { min: 1, max: 1 }, total: { min: 1, max: 1 },  cooldown: 80 },
 };
 
 const SPAWNER_PROFILE_BY_MONSTER_ID = {
-  // Bats are swarmy fliers: higher concurrent pressure with a medium lifetime total.
-  bat: { concurrent: { min: 3, max: 4 }, total: { min: 4, max: 6 }, cooldown: 12 },
+  // Bats spawn in small groups but exhaust quickly.
+  bat: { concurrent: { min: 2, max: 3 }, total: { min: 3, max: 4 }, cooldown: 18 },
 };
 
 const SPAWNER_WHITELIST_MONSTER_IDS = new Set([
