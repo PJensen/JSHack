@@ -573,7 +573,7 @@ export const MONSTERS = [
     packSense: true, packRadius: 5,
     baseHp: 10,
     hpPerLevel: 1,
-    attack: 2,
+    attack: 3,
     defense: 0,
     damageDice: '1d4',
     sizeClass: 'M',
@@ -584,9 +584,12 @@ export const MONSTERS = [
     },
     speed: 2,
     hooks: null,
-    specials: [],
+    specials: ['Ranged weapon user (shortbow)'],
     description: 'A rattling skeleton clutching a short bow.',
-    equipment: { ranged: 'bow_short', ammo: 'arrows' },
+    equipped: [
+      { slot: 'ranged', itemId: 'bow_short' },
+      { slot: 'ammo', itemId: 'ammo_arrows' },
+    ],
   },
 
   {
@@ -721,7 +724,10 @@ export const MONSTERS = [
     },
     specials: ["Bleed 20%"],
     description: 'A skeletal bowman with practiced aim. Its arrows leave jagged wounds.',
-    equipment: { ranged: 'bow_short', ammo: 'arrows' },
+    equipped: [
+      { slot: 'ranged', itemId: 'bow_short' },
+      { slot: 'ammo', itemId: 'ammo_arrows' },
+    ],
   },
   {
     id: 'dire_wolf',
@@ -1197,7 +1203,10 @@ export const MONSTERS = [
     },
     specials: ["Burn 20%"],
     description: 'A grim skeleton nocking arrows tipped with alchemical fire.',
-    equipment: { ranged: 'bow_short', ammo: 'fire_arrows' },
+    equipped: [
+      { slot: 'ranged', itemId: 'bow_short' },
+      { slot: 'ammo', itemId: 'ammo_fire_arrows' },
+    ],
   },
   {
     id: 'skeleton_sharpshooter',
@@ -1224,7 +1233,10 @@ export const MONSTERS = [
     },
     specials: ["Stun 15%"],
     description: 'A headless torso that somehow never misses.',
-    equipment: { ranged: 'bow_short', ammo: 'arrows' },
+    equipped: [
+      { slot: 'ranged', itemId: 'bow_short' },
+      { slot: 'ammo', itemId: 'ammo_arrows' },
+    ],
   },
   {
     id: 'troll',
@@ -1439,7 +1451,10 @@ export const MONSTERS = [
     },
     specials: ["Telegraphed volley", "Drain 3 HP (20%)"],
     description: 'An ancient undead marksman wreathed in cold flame. Its arrows sap the life from their targets.',
-    equipment: { ranged: 'bow_short', ammo: 'fire_arrows' },
+    equipped: [
+      { slot: 'ranged', itemId: 'bow_short' },
+      { slot: 'ammo', itemId: 'ammo_fire_arrows' },
+    ],
   },
   {
     id: 'demon',
