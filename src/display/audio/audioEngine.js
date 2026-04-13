@@ -21,6 +21,26 @@ const _loading = new Map();
 
 // ── Internals ───────────────────────────────────────────────
 
+/** Convert cents to playback-rate multiplier. */
+function centsToRate(cents) {
+  return Math.pow(2, Number(cents || 0) / 1200);
+}
+
+/**
+ * Compute final playback rate from base rate + fixed/random pitch in cents.
+ * Using playbackRate (instead of only detune) keeps pitch variation reliable
+ * across browser engines.
+ * @param {{ rate?: number, detune?: number, randomPitch?: number } | undefined} opts
+ * @param {() => number} rng returns [0,1)
+ */
+export function computePlaybackRate(opts, rng = Math.random) {
+  const baseRate = Number(opts?.rate ?? 1);
+  const detune = Number(opts?.detune || 0);
+  const randomPitch = Number(opts?.randomPitch || 0);
+  const jitter = randomPitch > 0 ? (rng() * 2 - 1) * randomPitch : 0;
+  return baseRate * centsToRate(detune + jitter);
+}
+
 /** @returns {AudioContext} */
 function ctx() {
   if (!_ctx) {
@@ -294,11 +314,7 @@ function _playTrackedBuffer(buf, opts) {
     const src = ac.createBufferSource();
     src.buffer = buf;
     if (opts?.loop) src.loop = true;
-
-    let detune = 0;
-    const randomPitch = Number(opts?.randomPitch || 0);
-    if (randomPitch > 0) detune = (Math.random() * 2 - 1) * randomPitch;
-    if (detune) src.detune.value = detune;
+    src.playbackRate.value = computePlaybackRate(opts);
 
     const dest = bus(opts?.bus || "spells");
     const gain = ac.createGain();
@@ -425,15 +441,8 @@ function _playBuffer(url, buf, opts) {
     const ac = ctx();
     const src = ac.createBufferSource();
     src.buffer = buf;
-
-    // ── Pitch: fixed detune + random jitter ───────────────
-    let detune = Number(opts?.detune || 0);
-    const randomPitch = Number(opts?.randomPitch || 0);
-    if (randomPitch > 0) {
-      detune += (Math.random() * 2 - 1) * randomPitch;
-    }
-    if (detune) src.detune.value = detune;
-    if (opts?.rate) src.playbackRate.value = opts.rate;
+    // ── Pitch: fixed detune + random jitter via playbackRate ───────────────
+    src.playbackRate.value = computePlaybackRate(opts);
 
     const dest = bus(opts?.bus || "ui");
     const vol = Number(opts?.volume ?? 1);
