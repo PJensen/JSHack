@@ -880,6 +880,33 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     }
   });
 
+  world.on('fountain:dip', (ev) => {
+    const pos = getPosition(Number(ev.targetId || 0));
+    if (!pos || !canShowAt(pos.x, pos.y)) return;
+
+    const eff = String(ev.effect || '');
+    if (eff === 'uncurse') {
+      ftext.addStatus(pos.x, pos.y - 0.45, 'CLEANSED', { color: '#88ccff', life: 1.2, scaleStart: 1.3, scaleEnd: 1.0 });
+      _fountainBurst(fx, pos, '#88ccff', 10);
+    } else if (eff === 'bless') {
+      ftext.addStatus(pos.x, pos.y - 0.45, 'BLESSED', { color: '#ffee88', life: 1.4, scaleStart: 1.4, scaleEnd: 1.0 });
+      _fountainBurst(fx, pos, '#ffdd44', 14);
+    } else if (eff === 'curse') {
+      ftext.addStatus(pos.x, pos.y - 0.45, 'CURSED!', { color: '#aa33cc', life: 1.3, scaleStart: 1.4, scaleEnd: 1.0 });
+      _fountainBurst(fx, pos, '#6622aa', 14);
+    } else if (eff === 'rust') {
+      ftext.addStatus(pos.x, pos.y - 0.45, 'CORRODED!', { color: '#cc6633', life: 1.2, scaleStart: 1.3, scaleEnd: 1.0 });
+      _fountainBurst(fx, pos, '#aa4422', 10);
+    } else if (eff === 'creature') {
+      if (ev.spawnedName) {
+        ftext.addStatus(pos.x, pos.y - 0.45, 'SOMETHING STIRS!', { color: '#ff4466', life: 1.4, scaleStart: 1.5, scaleEnd: 1.0 });
+        _fountainBurst(fx, pos, '#ff2244', 16);
+      }
+    } else if (eff === 'wet' || eff === 'nothing') {
+      _fountainBurst(fx, pos, '#5588bb', 6);
+    }
+  });
+
   world.on('fountain:destroyed', ({ targetId }) => {
     const pos = getPosition(Number(targetId || 0));
     if (!pos || !canShowAt(pos.x, pos.y)) return;

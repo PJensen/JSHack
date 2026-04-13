@@ -256,6 +256,31 @@ export function installEnvironmentMessages(ctx) {
     log('You bend over the fountain. Dry as bone. Not a drop left.', 'system');
   });
 
+  world.on('fountain:dip', (ev) => {
+    const { actor, effect, itemName } = ev;
+    if (nameOfEntity(actor) !== 'You') return;
+    const name = itemName || 'the item';
+    if (effect === 'uncurse') {
+      log(`You dip ${name} into the fountain. It glows softly for a moment, then the water clears.`, 'system');
+    } else if (effect === 'bless') {
+      log(`You dip ${name} into the fountain. A warm light rises from the depths and envelops it.`, 'system');
+    } else if (effect === 'curse') {
+      log(`You dip ${name} into the fountain. The water turns dark and cold around it.`, 'danger');
+    } else if (effect === 'rust') {
+      log(`You dip ${name} into the fountain. Reddish flakes cloud the water \u2014 it\u2019s corroding!`, 'danger');
+    } else if (effect === 'wet') {
+      log(`You dip ${name} into the fountain. It comes out dripping wet, but otherwise fine.`, 'system');
+    } else if (effect === 'creature') {
+      if (ev.spawnedName) {
+        log(`You dip ${name} into the fountain. The water churns \u2014 something rises from the depths!`, 'danger');
+      } else {
+        log(`You dip ${name} into the fountain. Bubbles surge up, then subside.`, 'system');
+      }
+    } else {
+      log(`You dip ${name} into the fountain. The water ripples, but nothing happens.`, 'system');
+    }
+  });
+
   world.on('altar:pray', ({ actor }) => {
     if (nameOfEntity(actor) !== 'You') return;
     if (_playerHas('burning')) log('You drop to your knees, flames still licking your skin, and pray through gritted teeth.', 'deity');
