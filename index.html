@@ -189,6 +189,31 @@
 					opacity: 0.7;
 				}
 
+				#boot-files {
+					margin-top: 12px;
+					width: min(600px, 80vw);
+					max-height: 96px;
+					overflow-y: auto;
+					padding: 8px 10px;
+					border: 1px solid rgba(139, 212, 255, 0.18);
+					border-radius: 4px;
+					background: rgba(12, 22, 34, 0.35);
+					box-sizing: border-box;
+					font-size: 11px;
+					line-height: 1.3;
+				}
+
+				.boot-file-row {
+					white-space: nowrap;
+					overflow: hidden;
+					text-overflow: ellipsis;
+					color: #8fb3cc;
+				}
+
+				.boot-file-row[data-status="requested"] { color: #9fc6df; }
+				.boot-file-row[data-status="loaded"] { color: #8bd4a8; }
+				.boot-file-row[data-status="error"] { color: #ff9b9b; }
+
 				#boot-install {
 					display: none;
 					margin-top: 16px;
@@ -226,6 +251,7 @@
 					<div id="boot-label">Loading...</div>
 				<div id="boot-track"><div id="boot-fill" class="indeterminate"></div></div>
 				<div id="boot-fraction" style="visibility:hidden">0%</div>
+				<div id="boot-files"></div>
 				<div id="boot-hint" style="margin-top:20px;font-size:12px;color:#7aafcf;font-style:italic;text-align:center;opacity:0;transition:opacity 400ms ease;min-height:1.4em;letter-spacing:0.02em;max-width:min(520px,80vw)"></div>
 				<div id="boot-install"></div>
 			</div>
@@ -236,6 +262,7 @@
 			const bootLabel = document.getElementById('boot-label');
 			const bootFill = document.getElementById('boot-fill');
 			const bootFraction = document.getElementById('boot-fraction');
+			const bootFiles = document.getElementById('boot-files');
 			const bootInstall = document.getElementById('boot-install');
 			const saveKey = 'jshack:savegame:v1';
 			let bootDone = 0;
@@ -296,6 +323,88 @@
 				bootFill.style.width = `${(pct * 100).toFixed(2)}%`;
 				bootFraction.textContent = `${Math.round(pct * 100)}% (${Math.max(0, Math.floor(bootDone))}/${Math.max(1, Math.floor(bootTotal))})`;
 			}
+
+			const bootFileRows = new Map();
+			const BOOT_FILE_ROW_LIMIT = 28;
+
+			function toBootFileName(resource) {
+				try {
+					const raw = String(resource || '').trim();
+					if (!raw) return '(unknown file)';
+					const url = new URL(raw, window.location.href);
+					const pathname = decodeURIComponent(url.pathname || '/');
+					const cleanPath = pathname.replace(/^\/+/, '');
+					const file = cleanPath || url.hostname || raw;
+					const qs = url.search ? url.search : '';
+					return `${file}${qs}`;
+				} catch {
+					return String(resource || '(unknown file)');
+				}
+			}
+
+			function addBootFile(resource, status = 'requested') {
+				if (!bootFiles) return;
+				const fileName = toBootFileName(resource);
+				let row = bootFileRows.get(fileName);
+				if (row && !row.isConnected) {
+					bootFileRows.delete(fileName);
+					row = null;
+				}
+				if (!row) {
+					row = document.createElement('div');
+					row.className = 'boot-file-row';
+					row.dataset.fileName = fileName;
+					bootFiles.appendChild(row);
+					bootFileRows.set(fileName, row);
+				}
+
+				// Don't regress from loaded to requested.
+				const priorStatus = row.dataset.status || 'requested';
+				const nextStatus = (priorStatus === 'loaded' && status === 'requested') ? priorStatus : status;
+				row.dataset.status = nextStatus;
+				const marker = nextStatus === 'loaded' ? '[ok]' : nextStatus === 'error' ? '[err]' : '[dl]';
+				row.textContent = `${marker} ${fileName}`;
+
+				while (bootFiles.children.length > BOOT_FILE_ROW_LIMIT) {
+					const first = bootFiles.firstElementChild;
+					if (!first) break;
+					const removedName = first.getAttribute('data-file-name');
+					if (removedName) bootFileRows.delete(removedName);
+					bootFiles.removeChild(first);
+				}
+				bootFiles.scrollTop = bootFiles.scrollHeight;
+			}
+
+			(function installBootFileTelemetry() {
+				if (typeof window.fetch === 'function') {
+					const nativeFetch = window.fetch.bind(window);
+					window.fetch = (input, init) => {
+						const url = (typeof input === 'string')
+							? input
+							: (input && typeof input.url === 'string' ? input.url : String(input || ''));
+						addBootFile(url, 'requested');
+						return nativeFetch(input, init)
+							.then((res) => {
+								addBootFile(url, res && res.ok ? 'loaded' : 'error');
+								return res;
+							})
+							.catch((err) => {
+								addBootFile(url, 'error');
+								throw err;
+							});
+					};
+				}
+
+				if (typeof PerformanceObserver === 'function') {
+					try {
+						const observer = new PerformanceObserver((list) => {
+							const entries = list.getEntries();
+							for (const entry of entries) addBootFile(entry.name, 'loaded');
+						});
+						observer.observe({ type: 'resource', buffered: true });
+					} catch {}
+				}
+			})();
 
 			function applyBootProgress(progress = {}) {
 				const nextDone = Number(progress.done);
@@ -474,6 +583,9 @@
 				const script = document.createElement('script');
 				script.type = 'module';
 				script.src = `./src/main.js?v=${encodeURIComponent(version)}`;
+				addBootFile(script.src, 'requested');
+				script.addEventListener('load', () => addBootFile(script.src, 'loaded'), { once: true });
+				script.addEventListener('error', () => addBootFile(script.src, 'error'), { once: true });
 				document.body.appendChild(script);
 			}
 
