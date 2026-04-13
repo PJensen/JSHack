@@ -1378,7 +1378,7 @@ Deno.test("fountain has finite uses and becomes dry", () => {
 
   const fountain = world.create();
   world.add(fountain, Interactable, {
-    action: "drinkFountain",
+    action: "fountain",
     params: { chargesRemaining: 2, primaryEffect: "heal" },
   });
 
@@ -1387,11 +1387,11 @@ Deno.test("fountain has finite uses and becomes dry", () => {
   world.on("fountain:drink", (e) => drinks.push(e));
   world.on("fountain:dry", (e) => dry.push(e));
 
-  world.add(actor, InteractIntent, { targetId: fountain });
+  world.add(actor, InteractIntent, { targetId: fountain, mode: "drink" });
   interactionSystem(world);
-  world.add(actor, InteractIntent, { targetId: fountain });
+  world.add(actor, InteractIntent, { targetId: fountain, mode: "drink" });
   interactionSystem(world);
-  world.add(actor, InteractIntent, { targetId: fountain });
+  world.add(actor, InteractIntent, { targetId: fountain, mode: "drink" });
   interactionSystem(world);
 
   const inter = world.get(fountain, Interactable);
@@ -1414,7 +1414,7 @@ Deno.test("fountain beneficial effect is stable per fountain", () => {
 
   const fountain = world.create();
   world.add(fountain, Interactable, {
-    action: "drinkFountain",
+    action: "fountain",
     params: { chargesRemaining: 20, primaryEffect: "mana" },
   });
 
@@ -1423,7 +1423,7 @@ Deno.test("fountain beneficial effect is stable per fountain", () => {
 
   for (let i = 0; i < 12; i++) {
     world.step = i;
-    world.add(actor, InteractIntent, { targetId: fountain });
+    world.add(actor, InteractIntent, { targetId: fountain, mode: "drink" });
     interactionSystem(world);
   }
 
@@ -1447,7 +1447,7 @@ Deno.test("dry fountain refills after cooldown and can be used again", () => {
 
   const fountain = world.create();
   world.add(fountain, Interactable, {
-    action: "drinkFountain",
+    action: "fountain",
     params: {
       chargesRemaining: 0,
       maxCharges: 2,
@@ -1466,7 +1466,7 @@ Deno.test("dry fountain refills after cooldown and can be used again", () => {
   world.on("fountain:refilled", (e) => refilled.push(e));
 
   world.step = 204;
-  world.add(actor, InteractIntent, { targetId: fountain });
+  world.add(actor, InteractIntent, { targetId: fountain, mode: "drink" });
   interactionSystem(world);
   assert(
     drinks.length === 0,
@@ -1476,7 +1476,7 @@ Deno.test("dry fountain refills after cooldown and can be used again", () => {
 
   world.step = 205;
   fountainRegrowthSystem(world);
-  world.add(actor, InteractIntent, { targetId: fountain });
+  world.add(actor, InteractIntent, { targetId: fountain, mode: "drink" });
   interactionSystem(world);
 
   assert(

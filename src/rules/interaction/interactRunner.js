@@ -16,6 +16,7 @@
 //   ctx.data       — mutable bag for sharing state between hook phases
 
 import { INTERACT_PAYLOADS } from "../content/interaction/interactPayloads.js";
+import { ACTION_MENUS } from "../content/interaction/actionMenus.js";
 
 /**
  * @param {any} world
@@ -61,6 +62,14 @@ export function createInteractContext(world, actor, targetId, params, intent) {
  * @returns {boolean}
  */
 export function runInteractHooks(action, world, actor, targetId, params, intent) {
+  // If the action has a multi-option menu and no mode was chosen yet,
+  // emit the chooser event and bail — the UI will re-dispatch with a mode.
+  const menu = ACTION_MENUS[action];
+  if (menu && !intent?.mode) {
+    world.emit?.("action:choose", { actor, targetId, action, options: menu });
+    return true;
+  }
+
   const payload = INTERACT_PAYLOADS[action];
   if (!payload) return false;
 

@@ -2003,6 +2003,65 @@ addEventListener('ui:requestAltarOffer', (ev) => {
   try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch (err) { console.debug('[main] dispatch ui:requestInventoryData:', err); }
 });
 
+// When user selects an action from the generic action chooser (fountain drink/dip, etc.)
+addEventListener('ui:requestActionSelect', (ev) => {
+  if (isSimUiBlocked()) return;
+  /** @type {CustomEvent} */ // @ts-ignore
+  const e = ev;
+  const targetId = Number(e?.detail?.targetId || 0);
+  const action = String(e?.detail?.action || "");
+  const mode = String(e?.detail?.mode || "");
+  if (!Number.isInteger(targetId) || targetId <= 0) return;
+  if (!action || !mode) return;
+
+  const pe = playerEntity(world);
+  if (!pe) return;
+
+  const pPos = world.get(pe.id, Position);
+  const tPos = world.get(targetId, Position);
+  if (!pPos || !tPos) return;
+  const dist = Math.max(Math.abs((pPos.x | 0) - (tPos.x | 0)), Math.abs((pPos.y | 0) - (tPos.y | 0)));
+  if (dist > 1) {
+    try { messageLog.log({ text: 'You are too far away.', type: 'system' }); } catch (err) { console.debug('[main] messageLog failed:', err); }
+    return;
+  }
+
+  const inter = world.get(targetId, Interactable);
+  if (!inter || inter.action !== action) return;
+
+  const rulesHandler = makeRulesDispatcher(world, () => pe.id);
+  rulesHandler({ type: 'rules.actionSelect', payload: { targetId, mode } });
+});
+
+// When user selects an item to dip in a fountain
+addEventListener('ui:requestFountainDip', (ev) => {
+  if (isSimUiBlocked()) return;
+  /** @type {CustomEvent} */ // @ts-ignore
+  const e = ev;
+  const fountainId = Number(e?.detail?.fountainId || 0);
+  const itemId = Number(e?.detail?.itemId || 0);
+  if (!Number.isInteger(fountainId) || fountainId <= 0) return;
+  if (!Number.isInteger(itemId) || itemId <= 0) return;
+
+  const pe = playerEntity(world);
+  if (!pe) return;
+
+  const pPos = world.get(pe.id, Position);
+  const fPos = world.get(fountainId, Position);
+  if (!pPos || !fPos) return;
+  const dist = Math.max(Math.abs((pPos.x | 0) - (fPos.x | 0)), Math.abs((pPos.y | 0) - (fPos.y | 0)));
+  if (dist > 1) {
+    try { messageLog.log({ text: 'You are too far from the fountain.', type: 'system' }); } catch (err) { console.debug('[main] messageLog failed:', err); }
+    return;
+  }
+
+  const inter = world.get(fountainId, Interactable);
+  if (!inter || inter.action !== 'fountain') return;
+
+  const rulesHandler = makeRulesDispatcher(world, () => pe.id);
+  rulesHandler({ type: 'rules.fountainDip', payload: { fountainId, itemId } });
+});
+
 // When user throws an inventory item
 addEventListener('ui:requestThrow', (ev) => {
   if (isSimUiBlocked()) return;

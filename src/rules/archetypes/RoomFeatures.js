@@ -19,7 +19,7 @@ export const Fountain = defineArchetype(
   [NamedIdentity, { name: "Fountain", identity: "fountain" }],
   [Material, { kind: "stone" }],
   [Collider, { solid: true, blocksSight: false }],
-  [Interactable, { action: "drinkFountain", params: null }],
+  [Interactable, { action: "fountain", params: null }],
 );
 
 export const Altar = defineArchetype(

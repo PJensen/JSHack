@@ -385,7 +385,7 @@ export const ChurchFont = defineArchetype(
   [NamedIdentity, { name: "Baptismal Font", identity: "church_font" }],
   [Material, { kind: "stone" }],
   [Collider, { solid: true, blocksSight: false }],
-  [Interactable, { action: "drinkFountain", params: null }],
+  [Interactable, { action: "fountain", params: null }],
 );
 
 export const ChurchWindow = defineArchetype(

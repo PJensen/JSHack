@@ -456,6 +456,23 @@ export function makeRulesDispatcher(world, getActorId, opts = {}) {
         world?.tick?.(1);
         break;
       }
+      case "rules.actionSelect": {
+        const { targetId = 0, mode = "" } = action.payload || {};
+        if (!Number.isInteger(targetId) || targetId <= 0) break;
+        const modeStr = String(mode || "").trim();
+        if (!modeStr) break;
+        world?.add?.(actorId, InteractIntent, { targetId, mode: modeStr });
+        world?.tick?.(1);
+        break;
+      }
+      case "rules.fountainDip": {
+        const { fountainId = 0, itemId = 0 } = action.payload || {};
+        if (!Number.isInteger(fountainId) || fountainId <= 0) break;
+        if (!Number.isInteger(itemId) || itemId <= 0) break;
+        world?.add?.(actorId, InteractIntent, { targetId: fountainId, mode: "dip", itemId });
+        world?.tick?.(1);
+        break;
+      }
       case "rules.quickInteract": {
         const actorPos = world?.get?.(actorId, Position);
         if (!actorPos) break;

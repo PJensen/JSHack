@@ -34,7 +34,7 @@ export { renderItemDetails } from './overlayUtils.js';
 import {
   renderInventory, renderSettings, renderQuestJournal, renderTownBoard,
   renderCharacterSheet, renderEquipment, renderSpellPicker, renderMessageLog,
-  renderAltarOfferChooser, renderPickupChooser, renderUseChooser,
+  renderAltarOfferChooser, renderActionChooser, renderDipChooser, renderPickupChooser, renderUseChooser,
   renderThrowChooser, renderApplyToolChooser, renderApplyTargetChooser, renderSlotChooser,
   renderShop, renderChest, renderBookReader, renderDeathLog, renderRack,
 } from './overlayRenders.js';
@@ -59,6 +59,8 @@ export function initOverlays() {
   const chest = ensurePanel('chest');
   const rack = ensurePanel('rack');
   const altar = ensurePanel('altar');
+  const actionChooser = ensurePanel('actionChooser');
+  const dipChooser = ensurePanel('dipChooser');
   const slotChooser = ensurePanel('slotChooser');
   const groundTip = ensureGroundTooltip(root);
   setItemTooltip(ensureItemTooltip(root));
@@ -532,6 +534,26 @@ export function initOverlays() {
     const altarId = Number(e?.detail?.altarId || 0) | 0;
     renderAltarOfferChooser(altar, items, altarId);
     show(altar);
+  });
+
+  // Generic action chooser (fountain drink/dip, etc.)
+  window.addEventListener('ui:actionChooser', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const detail = e?.detail;
+    if (!detail) return;
+    renderActionChooser(actionChooser, detail);
+    show(actionChooser);
+  });
+
+  // Fountain dip item chooser
+  window.addEventListener('ui:fountainDipPrompt', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const items = (e?.detail?.items) || [];
+    const fountainId = Number(e?.detail?.fountainId || 0) | 0;
+    renderDipChooser(dipChooser, items, fountainId);
+    show(dipChooser);
   });
 
   // Use-item chooser (filtered inventory for usable items)

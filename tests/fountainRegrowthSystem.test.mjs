@@ -14,7 +14,7 @@ Deno.test("fountainRegrowthSystem refills dry fountains and emits structured sou
   const fountainId = world.create();
   world.add(fountainId, Position, { x: 12, y: 7 });
   world.add(fountainId, Interactable, {
-    action: "drinkFountain",
+    action: "fountain",
     params: {
       chargesRemaining: 0,
       maxCharges: 3,

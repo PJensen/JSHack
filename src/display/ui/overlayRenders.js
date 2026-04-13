@@ -900,6 +900,193 @@ export function renderAltarOfferChooser(panel, items, altarId) {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Generic action chooser — used by any multi-action interactable
+// (fountains, etc.). Displays a short list of labelled actions.
+// ---------------------------------------------------------------------------
+
+/**
+ * @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel
+ * @param {{ targetId: number, action: string, options: Array<{mode:string,label:string}> }} data
+ */
+export function renderActionChooser(panel, data) {
+  const el = /** @type {HTMLDivElement} */ (/** @type {any} */ (panel)._inner);
+  el.innerHTML = '';
+
+  const title = document.createElement('div');
+  title.textContent = 'What do you want to do?';
+  title.style.fontWeight = 'bold';
+  title.style.marginBottom = '8px';
+  el.appendChild(title);
+
+  const { targetId, action, options } = data;
+  if (!options || !options.length) { hide(panel); return; }
+
+  const list = document.createElement('div');
+  list.style.display = 'flex';
+  list.style.flexDirection = 'column';
+  list.style.gap = '4px';
+  el.appendChild(list);
+
+  const rows = options.map((opt, idx) => {
+    const row = createChooserRow();
+    const label = document.createElement('span');
+    label.textContent = opt.label || opt.mode;
+    row.appendChild(label);
+    row.addEventListener('mouseenter', () => setSel(idx));
+    row.addEventListener('click', () => confirmSelected());
+    list.appendChild(row);
+    return row;
+  });
+
+  const hint = document.createElement('div');
+  hint.style.marginTop = '8px';
+  hint.style.opacity = '0.85';
+  hint.style.fontSize = '12px';
+  hint.textContent = '\u2191/\u2193 select \u00b7 Enter=Confirm \u00b7 Esc=Close';
+  el.appendChild(hint);
+
+  const { getSel, setSel } = createSimpleSel(rows, options.length);
+
+  function confirmSelected() {
+    const i = getSel();
+    const opt = options[i];
+    if (!opt) return;
+    pulseRow(rows[i], 'use');
+    window.dispatchEvent(new CustomEvent('ui:requestActionSelect', {
+      detail: { targetId, action, mode: opt.mode },
+    }));
+    hide(panel);
+  }
+
+  setSel(0);
+
+  installKeyHandler(panel, (e) => {
+    if (panel.style.display !== 'block') return;
+    const k = e.key;
+    if (k === 'ArrowUp') { setSel(getSel() - 1); e.preventDefault(); }
+    else if (k === 'ArrowDown') { setSel(getSel() + 1); e.preventDefault(); }
+    else if (k === 'Home') { setSel(0); e.preventDefault(); }
+    else if (k === 'End') { setSel(options.length - 1); e.preventDefault(); }
+    else if (k === 'Enter') { confirmSelected(); e.preventDefault(); }
+    else if (k === 'Escape') { hide(panel); e.preventDefault(); }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Dip item chooser — select which inventory item to dip into a fountain
+// ---------------------------------------------------------------------------
+
+/**
+ * @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel
+ * @param {Array<any>} items
+ * @param {number} fountainId
+ */
+export function renderDipChooser(panel, items, fountainId) {
+  const el = /** @type {HTMLDivElement} */ (/** @type {any} */ (panel)._inner);
+  el.innerHTML = '';
+
+  const title = document.createElement('div');
+  title.textContent = 'Dip which item?';
+  title.style.fontWeight = 'bold';
+  title.style.marginBottom = '8px';
+  el.appendChild(title);
+
+  if (!items.length) {
+    const empty = document.createElement('div');
+    empty.textContent = '(you have nothing to dip)';
+    empty.style.marginBottom = '10px';
+    el.appendChild(empty);
+
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = 'Close';
+    decorateButton(closeBtn);
+    closeBtn.addEventListener('click', () => hide(panel));
+    el.appendChild(closeBtn);
+    return;
+  }
+
+  const list = document.createElement('div');
+  list.style.display = 'flex';
+  list.style.flexDirection = 'column';
+  list.style.gap = '4px';
+  el.appendChild(list);
+
+  const rows = items.map((it, idx) => {
+    const row = createChooserRow();
+
+    const name = document.createElement('span');
+    Object.assign(name.style, rarityStyle(it.rarityName));
+    name.textContent = bracketize(sanitize(it.name || it.description || it.type || 'item'));
+
+    const qty = document.createElement('span');
+    qty.style.opacity = '0.8';
+    qty.textContent = `x${Math.max(1, Number(it.count || 1))}`;
+
+    row.appendChild(name);
+    row.appendChild(qty);
+
+    row.addEventListener('mouseenter', () => setSel(idx));
+    row.addEventListener('click', () => dipSelected());
+    list.appendChild(row);
+    return row;
+  });
+
+  const hint = document.createElement('div');
+  hint.style.marginTop = '8px';
+  hint.style.opacity = '0.85';
+  hint.style.fontSize = '12px';
+  hint.textContent = '\u2191/\u2193 select \u00b7 Enter=Dip \u00b7 Esc=Close';
+  el.appendChild(hint);
+
+  const actionsEl = document.createElement('div');
+  actionsEl.style.display = 'flex';
+  actionsEl.style.gap = '8px';
+  actionsEl.style.marginTop = '10px';
+
+  const dipBtn = document.createElement('button');
+  dipBtn.textContent = 'Dip';
+  decorateButton(dipBtn);
+  dipBtn.addEventListener('click', () => dipSelected());
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.textContent = 'Cancel';
+  decorateButton(cancelBtn);
+  cancelBtn.addEventListener('click', () => hide(panel));
+
+  actionsEl.appendChild(dipBtn);
+  actionsEl.appendChild(cancelBtn);
+  el.appendChild(actionsEl);
+
+  const { getSel, setSel } = createSimpleSel(rows, items.length, (i) => {
+    showItemTooltip(items[i], rows[i]);
+  });
+
+  function dipSelected() {
+    const i = getSel();
+    const it = items[i];
+    if (!it) return;
+    pulseRow(rows[i], 'use');
+    window.dispatchEvent(new CustomEvent('ui:requestFountainDip', {
+      detail: { fountainId, itemId: it.id },
+    }));
+    hide(panel);
+  }
+
+  setSel(0);
+
+  installKeyHandler(panel, (e) => {
+    if (panel.style.display !== 'block') return;
+    const k = e.key;
+    if (k === 'ArrowUp') { setSel(getSel() - 1); e.preventDefault(); }
+    else if (k === 'ArrowDown') { setSel(getSel() + 1); e.preventDefault(); }
+    else if (k === 'Home') { setSel(0); e.preventDefault(); }
+    else if (k === 'End') { setSel(items.length - 1); e.preventDefault(); }
+    else if (k === 'Enter') { dipSelected(); e.preventDefault(); }
+    else if (k === 'Escape') { hide(panel); e.preventDefault(); }
+  });
+}
+
 /** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Array<any>} items */
 export function renderPickupChooser(panel, items) {
   const el = /** @type {HTMLDivElement} */ (/** @type {any} */(panel)._inner);
