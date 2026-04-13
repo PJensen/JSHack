@@ -267,7 +267,13 @@ export function installEnvironmentMessages(ctx) {
     } else if (effect === 'curse') {
       log(`You dip ${name} into the fountain. The water turns dark and cold around it.`, 'danger');
     } else if (effect === 'rust') {
-      log(`You dip ${name} into the fountain. Reddish flakes cloud the water \u2014 it\u2019s corroding!`, 'danger');
+      const stacks = Number(ev.stacks || 0);
+      if (stacks >= 3) log(`You dip ${name} into the fountain. Reddish flakes cloud the water \u2014 it\u2019s badly corroded!`, 'danger');
+      else log(`You dip ${name} into the fountain. Reddish flakes cloud the water \u2014 it\u2019s corroding!`, 'danger');
+    } else if (effect === 'blessedResist') {
+      log(`You dip ${name} into the fountain. It shimmers with protective light \u2014 but the blessing fades.`, 'system');
+    } else if (effect === 'resist') {
+      log(`You dip ${name} into the fountain. The water beads off harmlessly \u2014 the metal won\u2019t corrode.`, 'system');
     } else if (effect === 'wet') {
       log(`You dip ${name} into the fountain. It comes out dripping wet, but otherwise fine.`, 'system');
     } else if (effect === 'creature') {

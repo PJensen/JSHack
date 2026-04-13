@@ -412,10 +412,32 @@ Deno.test("dip: curse outcome changes uncursed item to cursed", () => {
   assertEquals(beat.state, "cursed", "item should be cursed after dip");
 });
 
-Deno.test("dip: rust outcome emits rust for metallic items", () => {
+Deno.test("dip: rust outcome adds corrosion stack and reduces bonus", () => {
   const hit = findDipSeedForEffect("rust", "uncursed");
   assert(hit, "should find a seed that produces rust on iron item");
   assertEquals(hit.ev.effect, "rust");
+  const info = hit.world.get(hit.item, ItemInfo);
+  assert(info, "item should have ItemInfo");
+  assert(Number(info.corrosionStacks || 0) > 0, "corrosionStacks should be incremented");
+});
+
+Deno.test("dip: blessed item resists rust and loses blessing", () => {
+  // Blessed iron item — should resist rust by consuming the blessing
+  for (let seed = 1; seed <= 3000; seed++) {
+    const { world, actor, fountain, item } = makeDipWorld(seed, 20, "blessed");
+    // Ensure it has bonuses for corrosion to target
+    const info = world.get(item, ItemInfo);
+    info.bonuses = { attack: 2 };
+    const ev = dipOnce(world, actor, fountain, item);
+    if (ev && ev.effect === "blessedResist") {
+      const beat = world.get(item, Beatitude);
+      assertEquals(beat.state, "uncursed", "blessing should be consumed");
+      assertEquals(Number(info.corrosionStacks || 0), 0, "no corrosion stacks added");
+      assertEquals(info.bonuses.attack, 2, "bonus should be preserved");
+      return;
+    }
+  }
+  assert(false, "should find a seed that produces blessedResist");
 });
 
 Deno.test("dip: nothing outcome leaves item unchanged", () => {
