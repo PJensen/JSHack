@@ -73,7 +73,15 @@ function equipMonsterLoadout(world, entityId, params = {}) {
 
   const identity = String(world.get(entityId, NamedIdentity)?.identity || "");
   const def = identity ? getMonster(identity) : null;
-  if (def && (!Array.isArray(def.tags) || !def.tags.includes("humanoid"))) return;
+  if (def) {
+    const tags = Array.isArray(def.tags) ? def.tags : [];
+    const isHumanoid = tags.includes("humanoid");
+    const hasAuthoredLoadout = !!def.equipment
+      || (Array.isArray(def.wielding) && def.wielding.length > 0)
+      || (Array.isArray(def.equipped) && def.equipped.length > 0)
+      || (Array.isArray(def.inventory) && def.inventory.length > 0);
+    if (!isHumanoid && !hasAuthoredLoadout) return;
+  }
 
   const loadout = (params.equipment && typeof params.equipment === "object") ? params.equipment : {};
   const wielding = Array.isArray(params.wielding) ? params.wielding : (Array.isArray(loadout.wielding) ? loadout.wielding : []);
