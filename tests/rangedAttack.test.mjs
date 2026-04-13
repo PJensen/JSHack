@@ -863,3 +863,38 @@ Deno.test("ranged: piercing arrows travel faster than plain arrows", () => {
   assert(baselineDelay > 0, `baseline projectile delay should be positive, got ${baselineDelay}`);
   assert(piercingDelay < baselineDelay, `piercing arrows should have shorter projectile delay (baseline=${baselineDelay}, piercing=${piercingDelay})`);
 });
+
+Deno.test("ranged: miss emits directional missTo with forward overshoot", () => {
+  const events = [];
+  const { world, archer, target } = setup({ seed: 0x51aa, ax: 2, ay: 2, tx: 7, ty: 2 });
+  trackEvents(world, events);
+
+  world.mutate(archer, Equipment, (eq) => {
+    eq.accuracyDerived = 0;
+    eq.damagePowerDerived = 0;
+  });
+  world.mutate(target, Equipment, (eq) => {
+    eq.evadeDerived = 200;
+  });
+
+  world.add(archer, RangedAttackIntent, { targetId: target, toX: 7, toY: 2 });
+  rangedAttackSystem(world);
+
+  const shot = events.find((e) => e._event === "ranged:shot");
+  assert(shot, "expected ranged:shot event");
+  assertEquals(shot.hit, false);
+  assert(Number.isFinite(shot.from?.x) && Number.isFinite(shot.from?.y), "miss shot should include from");
+  assert(Number.isFinite(shot.to?.x) && Number.isFinite(shot.to?.y), "miss shot should include to");
+  assert(Number.isFinite(shot.missTo?.x) && Number.isFinite(shot.missTo?.y), "miss shot should include missTo");
+
+  const from = shot.from;
+  const to = shot.to;
+  const missTo = shot.missTo;
+  const vx = Number(to.x) - Number(from.x);
+  const vy = Number(to.y) - Number(from.y);
+  const len = Math.hypot(vx, vy) || 1;
+  const ux = vx / len;
+  const uy = vy / len;
+  const forward = ((Number(missTo.x) - Number(from.x)) * ux) + ((Number(missTo.y) - Number(from.y)) * uy);
+  assert(forward > (len * 1.1), `missTo should overshoot forward (forward=${forward}, len=${len})`);
+});

@@ -1257,9 +1257,13 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
   }
 
   function installListeners() {
-    world.on('ranged:shot', ({ attacker, target, hit, style, projectileSpeed }) => {
-      const apos = getPosition(Number(attacker || 0));
-      const dpos = getPosition(Number(target || 0));
+    world.on('ranged:shot', ({ attacker, target, hit, style, projectileSpeed, from, to, missTo }) => {
+      const apos = (from && Number.isFinite(from.x) && Number.isFinite(from.y))
+        ? { x: Number(from.x), y: Number(from.y) }
+        : getPosition(Number(attacker || 0));
+      const dpos = (to && Number.isFinite(to.x) && Number.isFinite(to.y))
+        ? { x: Number(to.x), y: Number(to.y) }
+        : getPosition(Number(target || 0));
       if (!apos || !dpos) return;
       const baseStyle = String(style || 'plain').toLowerCase();
       const profile = resolveDominantProjectileVfx(world, Number(attacker || 0));
@@ -1267,12 +1271,14 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
       const s = (baseStyle === "plain" && profileStyle) ? profileStyle : baseStyle;
       _lastShotStyle.set(Number(target || 0), s);
       const speed = Number(projectileSpeed || 18);
-      const missTo = !hit
-        ? computeMissEndpoint(apos, dpos, missSeedFromIds(attacker, target, 0x52a9))
+      const end = !hit
+        ? ((missTo && Number.isFinite(missTo.x) && Number.isFinite(missTo.y))
+          ? { x: Number(missTo.x), y: Number(missTo.y) }
+          : computeMissEndpoint(apos, dpos, missSeedFromIds(attacker, target, 0x52a9)))
         : dpos;
       spawnTransientProjectile({
         from: apos,
-        to: missTo,
+        to: end,
         style: s,
         speed,
         minDuration: 0.06,

@@ -38,7 +38,7 @@ import { getEntityFacingConeDegrees, getNormalizedEntityFacing, isPointInFacingC
 import { getPositionalAttackBonus } from '../utils/combatPositioning.js';
 import { setCombatPosture } from '../utils/posture.js';
 import { chebyshevScalar } from '../utils/distance.js';
-import { computeImpactVectorXY, computeProjectileDelay } from '../utils/projectileKinematics.js';
+import { computeImpactVectorXY, computeMissEndpoint, computeProjectileDelay } from '../utils/projectileKinematics.js';
 
 const RANGED_PROJECTILE_SPEED = 18;
 const RANGED_PROJECTILE_MIN_DURATION = 0.06;
@@ -241,7 +241,25 @@ export function rangedAttackSystem(world) {
       world.emit?.('status', createStatusEvent({ id: defender, kind: 'miss', source: attacker }));
       // Consume ammo even on miss
       consumeAmmo(world, attacker, ammoId, ammoInfo);
-      world.emit?.('ranged:shot', { attacker, target: defender, hit: false, style: ammoStyle, projectileSpeed });
+      const missTo = computeMissEndpoint(world, apos, dpos, {
+        sourceId: attacker,
+        targetId: defender,
+        key: 'ranged:shot',
+        salt: 0x52a9,
+        maxAngleDeg: 15,
+        minDistanceScale: 1.2,
+        distanceExtraScale: 0.2,
+      });
+      world.emit?.('ranged:shot', {
+        attacker,
+        target: defender,
+        hit: false,
+        style: ammoStyle,
+        projectileSpeed,
+        from: { x: apos.x, y: apos.y },
+        to: { x: dpos.x, y: dpos.y },
+        missTo,
+      });
       world.remove(attacker, RangedAttackIntent);
       continue;
     }
@@ -362,7 +380,16 @@ export function rangedAttackSystem(world) {
       rng: r,
     });
 
-    world.emit?.('ranged:shot', { attacker, target: defender, hit: true, damage: dmg, style: ammoStyle, projectileSpeed });
+    world.emit?.('ranged:shot', {
+      attacker,
+      target: defender,
+      hit: true,
+      damage: dmg,
+      style: ammoStyle,
+      projectileSpeed,
+      from: { x: apos.x, y: apos.y },
+      to: { x: dpos.x, y: dpos.y },
+    });
     world.remove(attacker, RangedAttackIntent);
   }
 }
