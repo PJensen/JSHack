@@ -8,6 +8,7 @@ import { MATERIAL_REACTION_RULES } from "../data/materialReactions.js";
 import { hasAnyStatus } from "../utils/statusFacade.js";
 import { inventoryItems } from "../utils/inventoryFacade.js";
 import { applyWaterExposure } from "../utils/waterExposure.js";
+import { applyMaterialStimulus } from "../utils/materialStimulus.js";
 
 const SEEN_KEY = Symbol.for("jshack:materialReactions:seenPerStep");
 const INSTALLED_KEY = Symbol.for("jshack:materialReactions:listeners:installed");
@@ -283,6 +284,7 @@ function matchesReaction(info, mat, identity, match, sourcePayload, reaction) {
 function applyReactionOutcome(world, itemId, info, mat, reaction, sourcePayload, sourceId) {
   const outcome = String(reaction?.outcome || "");
   if (outcome === "transmute_to_ash") {
+    applyMaterialStimulus(world, itemId, { kind: "fire", mode: "contact", intensity: 1, duration: 1 });
     transmuteToAsh(world, itemId, info, mat);
     return { applied: true, transformed: true, result: String(reaction?.result || "ash") };
   }
@@ -320,6 +322,24 @@ function applyReactionOutcome(world, itemId, info, mat, reaction, sourcePayload,
       waterType: String(sourcePayload?.waterType || "plain"),
     });
     return { applied: true, transformed: false, result: String(exposure?.effect || reaction?.result || "wet") };
+  }
+
+  if (outcome === "apply_material_stimulus") {
+    const stimulusKind = String(reaction?.stimulusKind || "water");
+    const intensity = Math.max(0, Number(reaction?.intensity ?? 1));
+    const duration = Math.max(0, Number(reaction?.duration ?? 1));
+    const mode = String(reaction?.mode || "contact");
+    const applied = applyMaterialStimulus(world, itemId, {
+      kind: stimulusKind,
+      intensity,
+      duration,
+      mode,
+    });
+    if (String(reaction?.transform || "") === "ash" && applied?.state?.burning) {
+      transmuteToAsh(world, itemId, info, mat);
+      return { applied: true, transformed: true, result: String(reaction?.result || "ash") };
+    }
+    return { applied: true, transformed: false, result: String(reaction?.result || "stimulated") };
   }
 
   return { applied: false, transformed: false, result: "none" };

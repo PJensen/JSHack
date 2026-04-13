@@ -1,4 +1,5 @@
 import { Consumable } from "../../components/Consumable.js";
+import { MaterialState } from "../../components/MaterialState.js";
 import { findUsePayload } from "../../content/items/usePayloads.js";
 import { interceptUseForWaterDamage } from "../../utils/waterExposure.js";
 
@@ -88,6 +89,7 @@ export function usePipeline(ctx) {
     info,
     intent,
     consumable: cons,
+    materialState: ctx.query.get(itemId, MaterialState),
     effectParams: (cons?.effectParams && typeof cons.effectParams === "object") ? cons.effectParams : {},
   };
 

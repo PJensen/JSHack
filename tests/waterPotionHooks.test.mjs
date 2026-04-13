@@ -9,6 +9,7 @@ import { UseIntent } from "../src/rules/components/Intents/UseIntent.js";
 import { HazardArea } from "../src/rules/components/HazardArea.js";
 import { Inventory } from "../src/rules/components/Inventory.js";
 import { Position } from "../src/rules/components/Position.js";
+import { MaterialState } from "../src/rules/components/MaterialState.js";
 import { applySystem } from "../src/rules/systems/applySystem.js";
 import { drinkSystem } from "../src/rules/systems/drinkSystem.js";
 import { installMaterialReactionListeners, materialReactionSystem } from "../src/rules/systems/materialReactionSystem.js";
@@ -111,6 +112,9 @@ Deno.test("water dip waterlogs paper targets via material reaction rules", () =>
   assert(!world.isAlive(water), "water dip should consume the potion");
   assertEquals(waterlogged.length, 1);
   assertEquals(Number(waterlogged[0]?.itemId || 0), scroll);
+  const state = world.get(scroll, MaterialState);
+  assert(state, "material state should be created for dipped targets");
+  assert(Number(state.wetness || 0) > 0, "material state wetness should increase after dip");
 });
 
 Deno.test("waterlogged scroll disintegrates on use", () => {
