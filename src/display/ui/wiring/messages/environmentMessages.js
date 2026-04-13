@@ -261,21 +261,21 @@ export function installEnvironmentMessages(ctx) {
     if (nameOfEntity(actor) !== 'You') return;
     const name = itemName || 'the item';
     if (effect === 'uncurse') {
-      log(`You dip ${name} into the fountain. It glows softly for a moment, then the water clears.`, 'system');
+      log(`You dip ${name} into the fountain. The dark aura around ${name} lifts \u2014 it glows softly, then the water clears.`, 'system');
     } else if (effect === 'bless') {
-      log(`You dip ${name} into the fountain. A warm light rises from the depths and envelops it.`, 'system');
+      log(`You dip ${name} into the fountain. A warm light rises from the depths and envelops ${name}. It feels hallowed.`, 'system');
     } else if (effect === 'curse') {
-      log(`You dip ${name} into the fountain. The water turns dark and cold around it.`, 'danger');
+      log(`You dip ${name} into the fountain. The water turns dark and cold around ${name}. A malign energy clings to it.`, 'danger');
     } else if (effect === 'rust') {
       const stacks = Number(ev.stacks || 0);
-      if (stacks >= 3) log(`You dip ${name} into the fountain. Reddish flakes cloud the water \u2014 it\u2019s badly corroded!`, 'danger');
-      else log(`You dip ${name} into the fountain. Reddish flakes cloud the water \u2014 it\u2019s corroding!`, 'danger');
+      if (stacks >= 3) log(`You dip ${name} into the fountain. Reddish flakes cloud the water \u2014 ${name} is badly corroded!`, 'danger');
+      else log(`You dip ${name} into the fountain. Reddish flakes cloud the water \u2014 ${name} is corroding!`, 'danger');
     } else if (effect === 'blessedResist') {
-      log(`You dip ${name} into the fountain. It shimmers with protective light \u2014 but the blessing fades.`, 'system');
+      log(`You dip ${name} into the fountain. ${name} shimmers with protective light, repelling the water \u2014 but the blessing fades.`, 'system');
     } else if (effect === 'resist') {
-      log(`You dip ${name} into the fountain. The water beads off harmlessly \u2014 the metal won\u2019t corrode.`, 'system');
+      log(`You dip ${name} into the fountain. The water beads off ${name} harmlessly.`, 'system');
     } else if (effect === 'wet') {
-      log(`You dip ${name} into the fountain. It comes out dripping wet, but otherwise fine.`, 'system');
+      log(`You dip ${name} into the fountain. ${name} comes out dripping wet, but otherwise fine.`, 'system');
     } else if (effect === 'creature') {
       if (ev.spawnedName) {
         log(`You dip ${name} into the fountain. The water churns \u2014 something rises from the depths!`, 'danger');
@@ -283,7 +283,7 @@ export function installEnvironmentMessages(ctx) {
         log(`You dip ${name} into the fountain. Bubbles surge up, then subside.`, 'system');
       }
     } else {
-      log(`You dip ${name} into the fountain. The water ripples, but nothing happens.`, 'system');
+      log(`You dip ${name} into the fountain. The water ripples around ${name}, but nothing happens.`, 'system');
     }
   });
 
