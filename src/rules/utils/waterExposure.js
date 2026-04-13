@@ -1,6 +1,7 @@
 import { ItemInfo } from "../components/ItemInfo.js";
 import { Material } from "../components/Material.js";
 import { materialHasTag } from "../data/materials.js";
+import { applyMaterialStimulus } from "./materialStimulus.js";
 import {
   applyCorrosionStack,
   consumeBlessedRustWard,
@@ -39,6 +40,13 @@ export function applyWaterExposure(world, itemId, opts = {}) {
   const mat = world.get(itemId, Material);
   const type = String(info?.type || "").toLowerCase();
   const kind = String(mat?.kind || "").toLowerCase();
+  const stimulus = applyMaterialStimulus(world, itemId, {
+    kind: "water",
+    mode: "dip",
+    intensity: 1,
+    duration: 1,
+  });
+  const wetness = Math.max(0, Number(stimulus?.state?.wetness || 0));
   const payload = {
     actor: Number(opts.actor || 0) | 0,
     sourceId: Number(opts.sourceId || 0) | 0,
@@ -64,7 +72,8 @@ export function applyWaterExposure(world, itemId, opts = {}) {
   if (!info) return { effect: "wet", applied: false, stacks: 0 };
 
   if (materialHasTag(kind, "paper") || type === "scroll" || type === "learn" || type === "book") {
-    const stacks = bumpStack(info, "waterloggedStacks");
+    const stacks = Math.max(bumpStack(info, "waterloggedStacks"), wetness >= 0.8 ? 2 : (wetness >= 0.35 ? 1 : 0));
+    if (stacks > Number(info.waterloggedStacks || 0)) info.waterloggedStacks = stacks;
     const ruined = (type === "scroll" || type === "learn" || type === "book") && stacks >= 2;
     if (ruined) info.ruinedByWater = true;
     emitWaterCondition(world, "waterlogged", { ...payload, stacks, ruined });
@@ -72,19 +81,22 @@ export function applyWaterExposure(world, itemId, opts = {}) {
   }
 
   if ((type === "potion" || type === "elixir") && materialHasTag(kind, "glass")) {
-    const stacks = bumpStack(info, "dilutedStacks");
+    const stacks = Math.max(bumpStack(info, "dilutedStacks"), wetness >= 0.5 ? 1 : 0);
+    if (stacks > Number(info.dilutedStacks || 0)) info.dilutedStacks = stacks;
     emitWaterCondition(world, "diluted", { ...payload, stacks });
     return { effect: "diluted", applied: true, stacks };
   }
 
   if (materialHasTag(kind, "wood") || type === "wand" || type === "staff") {
-    const stacks = bumpStack(info, "swollenStacks");
+    const stacks = Math.max(bumpStack(info, "swollenStacks"), wetness >= 0.55 ? 1 : 0);
+    if (stacks > Number(info.swollenStacks || 0)) info.swollenStacks = stacks;
     emitWaterCondition(world, "swollen", { ...payload, stacks });
     return { effect: "swollen", applied: true, stacks };
   }
 
   if (type === "food" || materialHasTag(kind, "organic")) {
-    const stacks = bumpStack(info, "soggyStacks");
+    const stacks = Math.max(bumpStack(info, "soggyStacks"), wetness >= 0.45 ? 1 : 0);
+    if (stacks > Number(info.soggyStacks || 0)) info.soggyStacks = stacks;
     emitWaterCondition(world, "soggy", { ...payload, stacks });
     return { effect: "soggy", applied: true, stacks };
   }
@@ -103,10 +115,11 @@ export function interceptUseForWaterDamage(ctx, state) {
   if (!info) return null;
 
   const type = String(info.type || "").toLowerCase();
-  const waterlogged = Number(info.waterloggedStacks || 0) | 0;
-  const diluted = Number(info.dilutedStacks || 0) | 0;
-  const swollen = Number(info.swollenStacks || 0) | 0;
-  const soggy = Number(info.soggyStacks || 0) | 0;
+  const wetness = Math.max(0, Number(state?.materialState?.wetness || 0));
+  const waterlogged = Math.max(Number(info.waterloggedStacks || 0) | 0, wetness >= 0.35 ? 1 : 0);
+  const diluted = Math.max(Number(info.dilutedStacks || 0) | 0, wetness >= 0.5 ? 1 : 0);
+  const swollen = Math.max(Number(info.swollenStacks || 0) | 0, wetness >= 0.55 ? 1 : 0);
+  const soggy = Math.max(Number(info.soggyStacks || 0) | 0, wetness >= 0.45 ? 1 : 0);
 
   if ((type === "scroll" || type === "learn" || type === "book") && waterlogged > 0) {
     ctx.io.emit("item:ruinedByWater", { actor, itemId, stacks: waterlogged });

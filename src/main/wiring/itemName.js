@@ -4,6 +4,7 @@
 // instead of directly reading NamedIdentity.name.
 
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
+import { MaterialState } from "../../rules/components/MaterialState.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 import { FoodDecay } from "../../rules/components/FoodDecay.js";
 import { children } from "../../lib/ecs-js/index.js";
@@ -40,11 +41,16 @@ import {
 export function resolveItemDisplayName(world, entityId) {
   const ni = world.get(entityId, NamedIdentity);
   const info = world.get(entityId, ItemInfo);
-  const corrosionStacks = Number(info?.corrosionStacks || 0) | 0;
-  const waterloggedStacks = Number(info?.waterloggedStacks || 0) | 0;
-  const soggyStacks = Number(info?.soggyStacks || 0) | 0;
-  const dilutedStacks = Number(info?.dilutedStacks || 0) | 0;
-  const swollenStacks = Number(info?.swollenStacks || 0) | 0;
+  const materialState = world.get(entityId, MaterialState);
+  const corrosionStacks = Math.max(
+    Number(info?.corrosionStacks || 0) | 0,
+    materialState?.corrosion >= 0.34 ? 1 : 0,
+  );
+  const wetness = Math.max(0, Number(materialState?.wetness || 0));
+  const waterloggedStacks = Math.max(Number(info?.waterloggedStacks || 0) | 0, wetness >= 0.35 ? 1 : 0);
+  const soggyStacks = Math.max(Number(info?.soggyStacks || 0) | 0, wetness >= 0.45 ? 1 : 0);
+  const dilutedStacks = Math.max(Number(info?.dilutedStacks || 0) | 0, wetness >= 0.5 ? 1 : 0);
+  const swollenStacks = Math.max(Number(info?.swollenStacks || 0) | 0, wetness >= 0.55 ? 1 : 0);
 
   function withRustedTag(label) {
     const base = String(label || "item");

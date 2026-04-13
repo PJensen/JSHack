@@ -16,6 +16,7 @@ export { DoorState } from './DoorState.js';
 export { ItemInfo } from './ItemInfo.js';
 export { Equipment } from './Equipment.js';
 export { Material } from './Material.js';
+export { MaterialState } from './MaterialState.js';
 export { DamageSpec } from './DamageSpec.js';
 export { Player } from './Player.js';
 export { Inventory } from './Inventory.js';

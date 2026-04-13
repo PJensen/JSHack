@@ -333,6 +333,18 @@ export const MATERIAL_CATALOG = [
   }},
 ];
 
+const MATERIAL_BY_KIND = new Map();
+for (const row of MATERIAL_CATALOG) {
+  const id = String(row?.id || "").toLowerCase();
+  const kind = String(row?.Material?.kind || "").toLowerCase();
+  if (id) MATERIAL_BY_KIND.set(id, row.Material);
+  if (kind) MATERIAL_BY_KIND.set(kind, row.Material);
+}
+
+export function getMaterialIntrinsic(kind) {
+  return MATERIAL_BY_KIND.get(String(kind || "").toLowerCase()) || null;
+}
+
 export const MATERIAL_TAGS = Object.freeze({
   metal: new Set([
     "iron", "steel", "copper", "bronze", "brass", "silver", "gold",

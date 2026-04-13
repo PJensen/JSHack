@@ -10,6 +10,7 @@ export const MATERIAL_REACTION_OUTCOME_IDS = Object.freeze([
   "set_beatitude",
   "emit_waterlogged",
   "apply_water_exposure",
+  "apply_material_stimulus",
 ]);
 
 /**
@@ -27,6 +28,11 @@ export const MATERIAL_REACTION_OUTCOME_IDS = Object.freeze([
  *   outcome: string,
  *   state?: "blessed" | "uncursed" | "cursed",
  *   waterTypes?: Array<"holy" | "unholy" | "plain">,
+ *   stimulusKind?: string,
+ *   mode?: string,
+ *   intensity?: number,
+ *   duration?: number,
+ *   transform?: string,
  *   result?: string,
  * }} MaterialReactionDef
  */
@@ -56,7 +62,12 @@ export const MATERIAL_REACTION_RULES = [
           itemTypes: ["scroll"],
           materials: ["paper"],
         },
-        outcome: "transmute_to_ash",
+        outcome: "apply_material_stimulus",
+        stimulusKind: "fire",
+        intensity: 2,
+        duration: 1,
+        mode: "contact",
+        transform: "ash",
         result: "ash",
       },
     ],
