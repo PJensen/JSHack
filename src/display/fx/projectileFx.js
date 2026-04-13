@@ -692,7 +692,12 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
       if (soundId && _playTracked && _resolveSound) {
         const s = _resolveSound(soundId);
         if (s) {
-          const handle = _playTracked(s.url, { bus: s.bus, loop: true, volume: 0.6 });
+          const handle = _playTracked(s.url, {
+            bus: s.bus,
+            loop: true,
+            volume: 0.6,
+            randomPitch: s.randomPitch,
+          });
           if (handle) _travelAudio.set(entry, handle);
         }
       }
