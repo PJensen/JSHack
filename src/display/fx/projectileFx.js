@@ -7,6 +7,7 @@ import { ArrowFx, ArrowSparkFx, RadialFx, StuckArrowFx } from "./fxEntries.js";
 import { resolveDominantProjectileVfx } from "../../bridge/schema/weaponVfxResolver.js";
 import { normalizedGoreType } from "../ui/wiring/goreEngine.js";
 import { setInputLock } from "../input/inputLock.js";
+import { computeMissEndpoint, missSeedFromIds } from "./projectileMiss.js";
 
 // Lazy audio imports — must not break projectile VFX if audio fails to load
 let _playTracked = null;
@@ -1261,9 +1262,12 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
       const s = (baseStyle === "plain" && profileStyle) ? profileStyle : baseStyle;
       _lastShotStyle.set(Number(target || 0), s);
       const speed = Number(projectileSpeed || 18);
+      const missTo = !hit
+        ? computeMissEndpoint(apos, dpos, missSeedFromIds(attacker, target, 0x52a9))
+        : dpos;
       spawnTransientProjectile({
         from: apos,
-        to: dpos,
+        to: missTo,
         style: s,
         speed,
         minDuration: 0.06,
@@ -1352,12 +1356,15 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
     });
 
     // Frost Bolt: icy projectile from caster to target
-    world.on('spell:frost', ({ from, at, fizzle }) => {
+    world.on('spell:frost', ({ actor, targetId, from, at, fizzle, missed }) => {
       if (fizzle) return;
       if (!from || !at) return;
+      const to = missed
+        ? computeMissEndpoint(from, at, missSeedFromIds(actor, targetId, 0x1075))
+        : at;
       spawnTransientProjectile({
         from,
-        to: at,
+        to,
         style: 'frostbolt',
         speed: 8,
         minDuration: 0.1,
@@ -1366,11 +1373,15 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
     });
 
     // Shadow Bolt: purple energy projectile from caster to target
-    world.on('spell:shadow_bolt', ({ actor, targetId, from, to, fizzle }) => {
+    world.on('spell:shadow_bolt', ({ actor, targetId, from, to, fizzle, missed }) => {
       if (fizzle) return;
+      if (!from || !to) return;
+      const end = missed
+        ? computeMissEndpoint(from, to, missSeedFromIds(actor, targetId, 0xb01a))
+        : to;
       spawnTransientProjectile({
         from,
-        to,
+        to: end,
         style: 'shadow_bolt',
         speed: 10,
         minDuration: 0.08,
@@ -1379,12 +1390,15 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
     });
 
     // Fireball: fiery orb from caster to target (reuses familiar fireball VFX)
-    world.on('spell:fireball', ({ from, to, fizzle }) => {
+    world.on('spell:fireball', ({ actor, targetId, from, to, fizzle, missed }) => {
       if (fizzle) return;
       if (!from || !to) return;
+      const end = missed
+        ? computeMissEndpoint(from, to, missSeedFromIds(actor, targetId, 0xf1b4))
+        : to;
       spawnTransientProjectile({
         from,
-        to,
+        to: end,
         style: 'fireball',
         speed: 8,
         minDuration: 0.1,
@@ -1407,12 +1421,15 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
     }
 
     // Plague Swarm: buzzing swarm projectile from caster to target
-    world.on('spell:plague_swarm', ({ from, at, fizzle, missed }) => {
-      if (fizzle || missed) return;
+    world.on('spell:plague_swarm', ({ actor, targetId, from, at, fizzle, missed }) => {
+      if (fizzle) return;
       if (!from || !at) return;
+      const to = missed
+        ? computeMissEndpoint(from, at, missSeedFromIds(actor, targetId, 0x5a77))
+        : at;
       spawnTransientProjectile({
         from,
-        to: at,
+        to,
         style: 'plague_swarm',
         speed: 6,
         minDuration: 0.15,

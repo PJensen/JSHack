@@ -11,6 +11,7 @@ import { Particle } from "../passes/vfx/particles/particlePool.js";
 import { Position } from "../../rules/components/Position.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 import { Trap } from "../../rules/components/Trap.js";
+import { computeMissEndpoint, missSeedFromIds } from "./projectileMiss.js";
 
 const INSTALLED_KEY = Symbol.for("jshack:display:spiritWisp:installed");
 
@@ -1592,23 +1593,34 @@ export function createSpiritWispFxController(
     }
 
     // ── Ranged projectile spells ──────────────────────────────────────
-    world.on("spell:frost", ({ from, at, fizzle }) => {
+    world.on("spell:frost", ({ actor, targetId, from, at, fizzle, missed }) => {
       if (fizzle || !from || !at) return;
-      _trySurge(from.x, from.y, at.x, at.y, 8);
+      const to = missed
+        ? computeMissEndpoint(from, at, missSeedFromIds(actor, targetId, 0x1075))
+        : at;
+      _trySurge(from.x, from.y, to.x, to.y, 8);
     });
-    world.on("spell:shadow_bolt", ({ from, to, fizzle }) => {
+    world.on("spell:shadow_bolt", ({ actor, targetId, from, to, fizzle, missed }) => {
       if (fizzle || !from || !to) return;
-      _trySurge(from.x, from.y, to.x, to.y, 10);
+      const end = missed
+        ? computeMissEndpoint(from, to, missSeedFromIds(actor, targetId, 0xb01a))
+        : to;
+      _trySurge(from.x, from.y, end.x, end.y, 10);
     });
     world.on("spell:bolt", ({ from, to, chainIndex }) => {
       if (!from || !to || (chainIndex | 0) !== 0) return; // first chain segment only
       _trySurge(from.x, from.y, to.x, to.y, 14);
     });
-    world.on("spell:smite", ({ actor, targetId, fizzle }) => {
+    world.on("spell:smite", ({ actor, targetId, fizzle, missed }) => {
       if (fizzle) return;
       const apos = getPosition(Number(actor || 0));
       const tpos = getPosition(Number(targetId || 0));
-      if (apos && tpos) _trySurge(apos.x, apos.y, tpos.x, tpos.y, 10);
+      if (apos && tpos) {
+        const to = missed
+          ? computeMissEndpoint(apos, tpos, missSeedFromIds(actor, targetId, 0x5a17))
+          : tpos;
+        _trySurge(apos.x, apos.y, to.x, to.y, 10);
+      }
     });
 
     // ── Ranged AoE (single-target AoE at a point) ────────────────────
@@ -1616,23 +1628,34 @@ export function createSpiritWispFxController(
       if (fizzle || !from || !origin) return;
       _trySurge(from.x, from.y, origin.x, origin.y, 10);
     });
-    world.on("spell:scorch", ({ actor, targetId, fizzle }) => {
+    world.on("spell:scorch", ({ actor, targetId, fizzle, missed }) => {
       if (fizzle) return;
       const apos = getPosition(Number(actor || 0));
       const tpos = getPosition(Number(targetId || 0));
-      if (apos && tpos) _trySurge(apos.x, apos.y, tpos.x, tpos.y, 10);
+      if (apos && tpos) {
+        const to = missed
+          ? computeMissEndpoint(apos, tpos, missSeedFromIds(actor, targetId, 0x5c0c2))
+          : tpos;
+        _trySurge(apos.x, apos.y, to.x, to.y, 10);
+      }
     });
 
     // ── Fireball (wisp flies to target) ────────────────────────────
-    world.on("spell:fireball", ({ from, to, fizzle }) => {
+    world.on("spell:fireball", ({ actor, targetId, from, to, fizzle, missed }) => {
       if (fizzle || !from || !to) return;
-      _trySurge(from.x, from.y, to.x, to.y, 10);
+      const end = missed
+        ? computeMissEndpoint(from, to, missSeedFromIds(actor, targetId, 0xf1b4))
+        : to;
+      _trySurge(from.x, from.y, end.x, end.y, 10);
     });
 
     // ── Targeted DoTs (wisp flies to target on application) ──────────
-    world.on("spell:plague_swarm", ({ from, at, fizzle }) => {
+    world.on("spell:plague_swarm", ({ actor, targetId, from, at, fizzle, missed }) => {
       if (fizzle || !from || !at) return;
-      _trySurge(from.x, from.y, at.x, at.y, 8);
+      const to = missed
+        ? computeMissEndpoint(from, at, missSeedFromIds(actor, targetId, 0x5a77))
+        : at;
+      _trySurge(from.x, from.y, to.x, to.y, 8);
     });
     world.on("spell:agony", ({ from, at, fizzle }) => {
       if (fizzle || !from || !at) return;
