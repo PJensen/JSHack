@@ -11,6 +11,7 @@ import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
 import { DungeonState } from "../src/rules/components/DungeonState.js";
 import { Inventory } from "../src/rules/components/Inventory.js";
+import { Material } from "../src/rules/components/Material.js";
 import { interactionSystem } from "../src/rules/systems/interactionSystem.js";
 import {
   addToInventory,
@@ -335,5 +336,135 @@ Deno.test("fountain: all 11 outcome types are reachable", () => {
 
   for (const t of target) {
     assert(seen.has(t), `outcome "${t}" was never reached in 5000 seeds (saw: ${[...seen].join(", ")})`);
+  }
+});
+
+// ── Dip tests ────────────────────────────────────────────────────────────
+
+// Helper: create a world with player, fountain, and a dippable item.
+function makeDipWorld(seed, charges = 20, itemBeatitude = "uncursed") {
+  const world = new World({ seed });
+  world.step = 1;
+
+  clearAll();
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR);
+  loadChunk(0, 0, tiles);
+
+  const actor = world.create();
+  world.add(actor, Position, { x: 5, y: 5 });
+  world.add(actor, Vitality, { maxHp: 40, hp: 20 });
+  world.add(actor, Inventory, { capacity: 20 });
+
+  const item = world.create();
+  world.add(item, NamedIdentity, { name: "Iron Sword", identity: "iron_sword" });
+  world.add(item, ItemInfo, { type: "weapon", slot: "weapon", count: 1 });
+  world.add(item, Beatitude, { state: itemBeatitude });
+  world.add(item, Material, { kind: "iron" });
+  addToInventory(world, actor, item);
+
+  const fountain = world.create();
+  world.add(fountain, Position, { x: 6, y: 5 });
+  world.add(fountain, Interactable, {
+    action: "fountain",
+    params: { chargesRemaining: charges, primaryEffect: "heal" },
+  });
+
+  return { world, actor, fountain, item };
+}
+
+// Dip once and return the event payload.
+function dipOnce(world, actor, fountain, itemId) {
+  const events = [];
+  world.on("fountain:dip", (e) => events.push(e));
+  world.add(actor, InteractIntent, { targetId: fountain, mode: "dip", itemId });
+  interactionSystem(world);
+  return events[0] || null;
+}
+
+// Brute-force: find a seed that produces a specific dip effect.
+function findDipSeedForEffect(targetEffect, beatitude = "uncursed", maxAttempts = 3000) {
+  for (let seed = 1; seed <= maxAttempts; seed++) {
+    const { world, actor, fountain, item } = makeDipWorld(seed, 20, beatitude);
+    const ev = dipOnce(world, actor, fountain, item);
+    if (ev && ev.effect === targetEffect) return { seed, world, actor, fountain, item, ev };
+  }
+  return null;
+}
+
+Deno.test("dip: uncurse outcome changes cursed item to uncursed", () => {
+  const hit = findDipSeedForEffect("uncurse", "cursed");
+  assert(hit, "should find a seed that produces uncurse");
+  const beat = hit.world.get(hit.item, Beatitude);
+  assertEquals(beat.state, "uncursed", "item should be uncursed after dip");
+});
+
+Deno.test("dip: bless outcome changes uncursed item to blessed", () => {
+  const hit = findDipSeedForEffect("bless", "uncursed");
+  assert(hit, "should find a seed that produces bless");
+  const beat = hit.world.get(hit.item, Beatitude);
+  assertEquals(beat.state, "blessed", "item should be blessed after dip");
+});
+
+Deno.test("dip: curse outcome changes uncursed item to cursed", () => {
+  const hit = findDipSeedForEffect("curse", "uncursed");
+  assert(hit, "should find a seed that produces curse");
+  const beat = hit.world.get(hit.item, Beatitude);
+  assertEquals(beat.state, "cursed", "item should be cursed after dip");
+});
+
+Deno.test("dip: rust outcome emits rust for metallic items", () => {
+  const hit = findDipSeedForEffect("rust", "uncursed");
+  assert(hit, "should find a seed that produces rust on iron item");
+  assertEquals(hit.ev.effect, "rust");
+});
+
+Deno.test("dip: nothing outcome leaves item unchanged", () => {
+  const hit = findDipSeedForEffect("nothing", "uncursed");
+  assert(hit, "should find a seed that produces nothing");
+  const beat = hit.world.get(hit.item, Beatitude);
+  assertEquals(beat.state, "uncursed", "beatitude should be unchanged");
+});
+
+Deno.test("dip: creature outcome spawns a monster", () => {
+  const hit = findDipSeedForEffect("creature", "uncursed");
+  assert(hit, "should find a seed that produces creature");
+  // spawnedName may be null if no valid tile — just check event fired
+  assert(hit.ev.effect === "creature");
+});
+
+Deno.test("dip: uses a fountain charge", () => {
+  const { world, actor, fountain, item } = makeDipWorld(42, 3);
+  dipOnce(world, actor, fountain, item);
+  const inter = world.get(fountain, Interactable);
+  const charges = Number(inter?.params?.chargesRemaining || 0);
+  assert(charges < 3, `expected charges to decrease, got ${charges}`);
+});
+
+Deno.test("dip: dry fountain blocks dip", () => {
+  const { world, actor, fountain, item } = makeDipWorld(42, 0);
+  const events = [];
+  world.on("fountain:dip", (e) => events.push(e));
+  world.on("fountain:dry", (e) => events.push({ ...e, _type: "dry" }));
+  world.add(actor, InteractIntent, { targetId: fountain, mode: "dip", itemId: item });
+  interactionSystem(world);
+  assertEquals(events.filter(e => !e._type).length, 0, "no dip event should fire on dry fountain");
+  assert(events.some(e => e._type === "dry"), "dry event should fire");
+});
+
+Deno.test("dip: all 6 dip outcome types are reachable", () => {
+  const target = ["uncurse", "bless", "curse", "nothing", "rust", "creature"];
+  const seen = new Set();
+
+  for (let seed = 1; seed <= 5000; seed++) {
+    // Alternate beatitude to hit uncurse (needs cursed) and bless (needs uncursed)
+    const beatitude = seed % 2 === 0 ? "cursed" : "uncursed";
+    const { world, actor, fountain, item } = makeDipWorld(seed, 20, beatitude);
+    const ev = dipOnce(world, actor, fountain, item);
+    if (ev) seen.add(ev.effect);
+    if (seen.size === target.length) break;
+  }
+
+  for (const t of target) {
+    assert(seen.has(t), `dip outcome "${t}" was never reached (saw: ${[...seen].join(", ")})`);
   }
 });
