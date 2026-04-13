@@ -24,7 +24,6 @@ import {
 } from "../environment/dungeon/constants.js";
 import { getTile, isRoofed, setTile } from "../environment/dungeon/tileMap.js";
 import { dealDamage } from "../utils/dealDamage.js";
-import { MATERIAL_CATALOG } from "../data/materials.js";
 import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { Ashes } from "../archetypes/Items.js";
 import { spawnHazard } from "../utils/hazardSpawn.js";
@@ -35,6 +34,8 @@ import {
   tickDestroyedTileLedger,
 } from "../utils/destroyedTiles.js";
 import { clamp01Or, clampInt } from "../utils/numberCoerce.js";
+import { applyMaterialStimulus } from "../utils/materialStimulus.js";
+import { applyMaterialTransform, resolveMaterialTransform } from "../utils/materialTransforms.js";
 
 const DEFAULT_TURNS = 3;
 const DEFAULT_RADIUS = 1;
@@ -48,10 +49,6 @@ const NEIGHBOR_OFFSETS = Object.freeze([
   [-1, 0],           [1, 0],
   [-1, 1],  [0, 1],  [1, 1],
 ]);
-const FLAMMABILITY_BY_MATERIAL = new Map(MATERIAL_CATALOG.map((entry) => [
-  String(entry?.id || entry?.Material?.kind || ""),
-  Number(entry?.Material?.flammability || 0),
-]));
 
 function isOverworld(world) {
   for (const [, ds] of world.query(DungeonState)) {
@@ -101,10 +98,21 @@ function burnFlammableEntitiesAt(world, x, y, source, hazardId, cause, sourceId,
     if ((pos.x | 0) !== (x | 0) || (pos.y | 0) !== (y | 0)) continue;
     if (world.has(id, Vitality)) continue;
     if (world.has(id, Burned)) continue;
-    const flammability = Number(FLAMMABILITY_BY_MATERIAL.get(String(mat.kind || "")) || 0);
     const ident = world.get(id, NamedIdentity);
     const isWeb = String(ident?.identity || "").toLowerCase() === WEB_IDENTITY;
-    if (!isWeb && !(flammability > 0)) continue;
+    const stimulus = applyMaterialStimulus(world, id, {
+      kind: "fire",
+      mode: "hazard_contact",
+      intensity: 3,
+      duration: 1,
+    });
+    const transform = resolveMaterialTransform({
+      stimulusKind: "fire",
+      requestedTransform: "ash",
+      identity: String(ident?.identity || ""),
+      state: stimulus?.state,
+    });
+    if (!isWeb && transform !== "ash") continue;
     try {
       world.emit?.("entity:burned", {
         actor: source,
@@ -120,10 +128,14 @@ function burnFlammableEntitiesAt(world, x, y, source, hazardId, cause, sourceId,
         material: String(mat.kind || ""),
       });
     } catch { /* */ }
-    try {
-      const ashId = createFrom(world, Ashes, {});
-      world.add(ashId, Position, { x: x | 0, y: y | 0 });
-    } catch { /* */ }
+    if (world.has(id, ItemInfo)) {
+      try { applyMaterialTransform(world, id, "ash"); } catch { /* */ }
+    } else {
+      try {
+        const ashId = createFrom(world, Ashes, {});
+        world.add(ashId, Position, { x: x | 0, y: y | 0 });
+      } catch { /* */ }
+    }
     try {
       world.add(id, Burned, {
         atTurn: world.step | 0,

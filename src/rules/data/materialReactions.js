@@ -155,6 +155,12 @@ export const MATERIAL_REACTION_RULES = [
     eventKind: "water:dipped",
     reactions: [
       {
+        id: "dipped_ash_becomes_mud",
+        match: { identities: ["ash", "ashes"] },
+        outcome: "apply_water_exposure",
+        result: "mud",
+      },
+      {
         id: "dipped_wood_item_swollen",
         match: { materials: ["wood"] },
         outcome: "apply_water_exposure",

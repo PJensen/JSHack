@@ -9,6 +9,7 @@ import { hasAnyStatus } from "../utils/statusFacade.js";
 import { inventoryItems } from "../utils/inventoryFacade.js";
 import { applyWaterExposure } from "../utils/waterExposure.js";
 import { applyMaterialStimulus } from "../utils/materialStimulus.js";
+import { applyMaterialTransform, resolveMaterialTransform } from "../utils/materialTransforms.js";
 
 const SEEN_KEY = Symbol.for("jshack:materialReactions:seenPerStep");
 const INSTALLED_KEY = Symbol.for("jshack:materialReactions:listeners:installed");
@@ -128,34 +129,6 @@ function eventTargetIds(payload) {
     if (id > 0) ids.add(id);
   }
   return Array.from(ids);
-}
-
-function transmuteToAsh(world, id, info, mat) {
-  const ni = world.get(id, NamedIdentity);
-  if (ni) {
-    ni.name = "Ash";
-    ni.identity = "ash";
-  } else {
-    world.add(id, NamedIdentity, { name: "Ash", identity: "ash" });
-  }
-
-  info.type = "junk";
-  info.slot = "bag";
-  info.description = "A small pile of ash.";
-  info.weight = 0.05;
-  info.value = 0;
-  info.count = Math.max(1, Number(info.count || 1) | 0);
-  info.affixes = [];
-  info.bonuses = {};
-  info.damageDice = null;
-  info.staminaCost = null;
-  info.subtype = null;
-  info.range = null;
-  info.rarity = 1;
-  info.rarityName = "common";
-
-  if (mat) mat.kind = "sand";
-  else world.add(id, Material, { kind: "sand" });
 }
 
 /**
@@ -284,9 +257,24 @@ function matchesReaction(info, mat, identity, match, sourcePayload, reaction) {
 function applyReactionOutcome(world, itemId, info, mat, reaction, sourcePayload, sourceId) {
   const outcome = String(reaction?.outcome || "");
   if (outcome === "transmute_to_ash") {
-    applyMaterialStimulus(world, itemId, { kind: "fire", mode: "contact", intensity: 1, duration: 1 });
-    transmuteToAsh(world, itemId, info, mat);
-    return { applied: true, transformed: true, result: String(reaction?.result || "ash") };
+    const stimulus = applyMaterialStimulus(world, itemId, {
+      kind: "fire",
+      mode: "contact",
+      intensity: 2,
+      duration: 1,
+    });
+    const ni = world.get(itemId, NamedIdentity);
+    const transform = resolveMaterialTransform({
+      stimulusKind: "fire",
+      requestedTransform: "ash",
+      identity: String(ni?.identity || ""),
+      state: stimulus?.state,
+    });
+    if (transform) {
+      applyMaterialTransform(world, itemId, transform);
+      return { applied: true, transformed: true, result: String(reaction?.result || transform) };
+    }
+    return { applied: false, transformed: false, result: "none" };
   }
 
   if (outcome === "set_beatitude") {
@@ -335,9 +323,16 @@ function applyReactionOutcome(world, itemId, info, mat, reaction, sourcePayload,
       duration,
       mode,
     });
-    if (String(reaction?.transform || "") === "ash" && applied?.state?.burning) {
-      transmuteToAsh(world, itemId, info, mat);
-      return { applied: true, transformed: true, result: String(reaction?.result || "ash") };
+    const ni = world.get(itemId, NamedIdentity);
+    const transform = resolveMaterialTransform({
+      stimulusKind,
+      requestedTransform: String(reaction?.transform || ""),
+      identity: String(ni?.identity || ""),
+      state: applied?.state,
+    });
+    if (transform) {
+      applyMaterialTransform(world, itemId, transform);
+      return { applied: true, transformed: true, result: String(reaction?.result || transform) };
     }
     return { applied: true, transformed: false, result: String(reaction?.result || "stimulated") };
   }

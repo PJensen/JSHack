@@ -8,6 +8,7 @@ import { runCallbackList } from "../src/rules/interaction/dispatch.js";
 import { Equipment } from "../src/rules/components/Equipment.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 import { Material } from "../src/rules/components/Material.js";
+import { MaterialState } from "../src/rules/components/MaterialState.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { Vitality } from "../src/rules/components/Vitality.js";
 import { Position } from "../src/rules/components/Position.js";
@@ -87,8 +88,10 @@ Deno.test("rust_monster: corrode reduces item bonus", () => {
 
   assert(triggered, "corrode should trigger within 50 steps");
   const info = world.get(armor, ItemInfo);
+  const state = world.get(armor, MaterialState);
   assertEquals(info.bonuses.defense, 4, "defense bonus should be reduced by 1");
   assertEquals(info.corrosionStacks, 1, "should have 1 corrosion stack");
+  assertEquals(Number(state?.corrosionStacks || 0), 1, "material state should track 1 corrosion stack");
   assertEquals(events[0].itemId, armor);
   assertEquals(events[0].stacks, 1);
 });
@@ -116,7 +119,9 @@ Deno.test("rust_monster: corrosion stacks up to max", () => {
 
   assertEquals(stacks, 3, "should reach max corrosion stacks");
   const info = world.get(armor, ItemInfo);
+  const state = world.get(armor, MaterialState);
   assertEquals(info.bonuses.defense, 3, "defense should be reduced by 3 total");
+  assertEquals(Number(state?.corrosionStacks || 0), 3, "material state should track max corrosion stacks");
 
   const ni = world.get(armor, NamedIdentity);
   assertEquals(ni.name, "Iron Plate", "base identity name should stay canonical");
