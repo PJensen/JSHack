@@ -454,61 +454,60 @@ function _fountainDip(ctx) {
     // ── Nothing ──────────────────────────────────────────────────
     world.emit?.("fountain:dip", { actor, targetId, itemId, effect: "nothing", itemName });
   } else if (roll < 0.90) {
-    // ── Rust / water damage ──────────────────────────────────────
-    // Same corrosion logic as rust monster (combat.js corrodeEquipmentOnHit):
-    //   - corrosion-resistant materials are immune
-    //   - blessed items lose blessing instead of corroding
-    //   - stacks on ItemInfo.corrosionStacks, reduces largest bonus, renames at 3
+    // ── Water damage to the dipped item ──────────────────────────
+    // Uses Material.corrosionResist (0–1) from materials.js as the
+    // sole gate.  High-resist materials (gold, mithril, titanium)
+    // shrug it off; low-resist metals (iron, copper, blood-iron)
+    // take real corrosion stacks identical to rust-monster hits.
+    // Non-metallic items with low resist just get wet (cosmetic).
     const MAX_CORROSION = 3;
     const mat = world.get(itemId, Material);
-    const isMetallic = mat && (mat.kind === "iron" || mat.kind === "steel" || mat.kind === "metal");
-    if (isMetallic) {
-      // Corrosion-resistant material?
-      if (mat && typeof mat.corrosionResist === "number" && mat.corrosionResist >= 0.95) {
-        world.emit?.("fountain:dip", { actor, targetId, itemId, effect: "resist", itemName });
+    const resist = (mat && typeof mat.corrosionResist === "number")
+      ? mat.corrosionResist : 0.5;
+
+    if (resist >= 0.95) {
+      // Material is effectively rustproof (gold, titanium, mithril, etc.)
+      world.emit?.("fountain:dip", { actor, targetId, itemId, effect: "resist", itemName });
+    } else if (resist < 0.75) {
+      // Vulnerable — apply corrosion to the dipped item.
+      // Blessed items sacrifice their blessing to resist (one-time shield).
+      const dipBeat = world.get(itemId, Beatitude);
+      if (dipBeat && dipBeat.state === "blessed") {
+        world.set(itemId, Beatitude, { state: "uncursed" });
+        world.emit?.("fountain:dip", { actor, targetId, itemId, effect: "blessedResist", itemName });
       } else {
-        // Blessed protection: consumes blessing instead
-        const dipBeat = world.get(itemId, Beatitude);
-        if (dipBeat && dipBeat.state === "blessed") {
-          world.set(itemId, Beatitude, { state: "uncursed" });
-          world.emit?.("fountain:dip", { actor, targetId, itemId, effect: "blessedResist", itemName });
-        } else {
-          // Actually corrode: add stack, reduce bonus, rename at max
-          const info = world.get(itemId, ItemInfo);
-          if (info) {
-            const stacks = (Number(info.corrosionStacks || 0) | 0);
-            if (stacks < MAX_CORROSION) {
-              const newStacks = stacks + 1;
-              info.corrosionStacks = newStacks;
-              // Reduce the largest positive bonus by 1
-              if (info.bonuses && typeof info.bonuses === "object") {
-                let bestKey = null, bestVal = 0;
-                for (const [k, v] of Object.entries(info.bonuses)) {
-                  if (typeof v === "number" && v > bestVal) { bestKey = k; bestVal = v; }
-                }
-                if (bestKey) info.bonuses[bestKey] = Math.max(0, info.bonuses[bestKey] - 1);
+        const info = world.get(itemId, ItemInfo);
+        if (info) {
+          const stacks = (Number(info.corrosionStacks || 0) | 0);
+          if (stacks < MAX_CORROSION) {
+            const newStacks = stacks + 1;
+            info.corrosionStacks = newStacks;
+            if (info.bonuses && typeof info.bonuses === "object") {
+              let bestKey = null, bestVal = 0;
+              for (const [k, v] of Object.entries(info.bonuses)) {
+                if (typeof v === "number" && v > bestVal) { bestKey = k; bestVal = v; }
               }
-              // Rename at max stacks
-              if (newStacks >= MAX_CORROSION) {
-                const rustNi = world.get(itemId, NamedIdentity);
-                if (rustNi && rustNi.name && !rustNi.name.startsWith("Corroded ")) {
-                  rustNi.name = `Corroded ${rustNi.name}`;
-                }
-              }
-              world.emit?.("fountain:dip", {
-                actor, targetId, itemId, effect: "rust", itemName,
-                stacks: newStacks,
-              });
-            } else {
-              // Already fully corroded
-              world.emit?.("fountain:dip", { actor, targetId, itemId, effect: "nothing", itemName });
+              if (bestKey) info.bonuses[bestKey] = Math.max(0, info.bonuses[bestKey] - 1);
             }
+            if (newStacks >= MAX_CORROSION) {
+              const rustNi = world.get(itemId, NamedIdentity);
+              if (rustNi && rustNi.name && !rustNi.name.startsWith("Corroded ")) {
+                rustNi.name = `Corroded ${rustNi.name}`;
+              }
+            }
+            world.emit?.("fountain:dip", {
+              actor, targetId, itemId, effect: "rust", itemName,
+              stacks: newStacks,
+            });
           } else {
-            world.emit?.("fountain:dip", { actor, targetId, itemId, effect: "rust", itemName, stacks: 0 });
+            world.emit?.("fountain:dip", { actor, targetId, itemId, effect: "nothing", itemName });
           }
+        } else {
+          world.emit?.("fountain:dip", { actor, targetId, itemId, effect: "wet", itemName });
         }
       }
     } else {
+      // Mid-range resist (steel, bronze, etc.) — just gets wet, no damage
       world.emit?.("fountain:dip", { actor, targetId, itemId, effect: "wet", itemName });
     }
   } else {
