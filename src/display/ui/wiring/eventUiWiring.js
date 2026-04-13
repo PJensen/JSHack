@@ -124,6 +124,42 @@ export function installEventUiWiring({
     } catch (e) { console.debug('[eventUiWiring] dispatch ui:altarOfferPrompt:', e); }
   });
 
+  // Fountain dip item chooser: present inventory so player can choose which item to dip.
+  world.on('fountain:dipPrompt', ({ actor, targetId, items }) => {
+    const pe = getPlayerEntity();
+    if (!pe || pe.id !== actor) return;
+    if (!Array.isArray(items)) return;
+    const dippableItems = [];
+    for (const iid of items) {
+      const info = getItemInfo(Number(iid || 0));
+      if (!info) continue;
+      dippableItems.push({
+        id: iid,
+        type: info.type || 'item',
+        name: resolveItemDisplayName(Number(iid || 0)),
+        count: info.count || 1,
+        rarityName: info.rarityName || 'common',
+        value: info.value || 0,
+      });
+    }
+    try {
+      window.dispatchEvent(new CustomEvent('ui:fountainDipPrompt', {
+        detail: { fountainId: targetId, items: dippableItems },
+      }));
+    } catch (e) { console.debug('[eventUiWiring] dispatch ui:fountainDipPrompt:', e); }
+  });
+
+  // Generic action chooser: multi-action interactables (fountain drink/dip, etc.)
+  world.on('action:choose', ({ actor, targetId, action, options }) => {
+    const pe = getPlayerEntity();
+    if (!pe || pe.id !== actor) return;
+    try {
+      window.dispatchEvent(new CustomEvent('ui:actionChooser', {
+        detail: { targetId, action, options },
+      }));
+    } catch (e) { console.debug('[eventUiWiring] dispatch ui:actionChooser:', e); }
+  });
+
   // Harvest updates: refresh inventory UI after gather actions.
   // Deferred so the tick's command queue (component adds) flushes first.
   world.on('harvest:picked', ({ actor, count, kind }) => {

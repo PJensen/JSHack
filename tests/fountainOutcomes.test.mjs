@@ -41,7 +41,7 @@ function makeWorld(seed, fountainCharges = 20) {
   const fountain = world.create();
   world.add(fountain, Position, { x: 6, y: 5 });
   world.add(fountain, Interactable, {
-    action: "drinkFountain",
+    action: "fountain",
     params: { chargesRemaining: fountainCharges, primaryEffect: "heal" },
   });
 
@@ -52,7 +52,7 @@ function makeWorld(seed, fountainCharges = 20) {
 function drinkOnce(world, actor, fountain) {
   const events = [];
   world.on("fountain:drink", (e) => events.push(e));
-  world.add(actor, InteractIntent, { targetId: fountain });
+  world.add(actor, InteractIntent, { targetId: fountain, mode: "drink" });
   interactionSystem(world);
   return events[0] || null;
 }
@@ -93,13 +93,13 @@ Deno.test("fountain: mana outcome restores mana", () => {
     const fountain = world.create();
     world.add(fountain, Position, { x: 6, y: 5 });
     world.add(fountain, Interactable, {
-      action: "drinkFountain",
+      action: "fountain",
       params: { chargesRemaining: 20, primaryEffect: "mana" },
     });
 
     const events = [];
     world.on("fountain:drink", (e) => events.push(e));
-    world.add(actor, InteractIntent, { targetId: fountain });
+    world.add(actor, InteractIntent, { targetId: fountain, mode: "drink" });
     interactionSystem(world);
 
     if (events[0]?.effect === "mana") {
@@ -164,7 +164,7 @@ Deno.test("fountain: curse outcome curses an inventory item", () => {
 
     const events = [];
     world.on("fountain:drink", (e) => events.push(e));
-    world.add(actor, InteractIntent, { targetId: fountain });
+    world.add(actor, InteractIntent, { targetId: fountain, mode: "drink" });
     interactionSystem(world);
 
     if (events[0]?.effect === "curse") {
@@ -239,7 +239,7 @@ Deno.test("fountain: wish outcome spawns a loot item", () => {
     const fountain = world.create();
     world.add(fountain, Position, { x: 6, y: 5 });
     world.add(fountain, Interactable, {
-      action: "drinkFountain",
+      action: "fountain",
       params: { chargesRemaining: 20, primaryEffect: "heal" },
     });
 
@@ -248,7 +248,7 @@ Deno.test("fountain: wish outcome spawns a loot item", () => {
 
     const events = [];
     world.on("fountain:drink", (e) => events.push(e));
-    world.add(actor, InteractIntent, { targetId: fountain });
+    world.add(actor, InteractIntent, { targetId: fountain, mode: "drink" });
     interactionSystem(world);
 
     if (events[0]?.effect === "wish") {
@@ -271,7 +271,7 @@ Deno.test("fountain: charge decremented after each drink", () => {
 
   for (let i = 0; i < 4; i++) {
     world.step = i + 1;
-    world.add(actor, InteractIntent, { targetId: fountain });
+    world.add(actor, InteractIntent, { targetId: fountain, mode: "drink" });
     interactionSystem(world);
   }
 
@@ -318,7 +318,7 @@ Deno.test("fountain: all 11 outcome types are reachable", () => {
     const fountain = world.create();
     world.add(fountain, Position, { x: 6, y: 5 });
     world.add(fountain, Interactable, {
-      action: "drinkFountain",
+      action: "fountain",
       params: { chargesRemaining: 20, primaryEffect: primary },
     });
 
@@ -327,7 +327,7 @@ Deno.test("fountain: all 11 outcome types are reachable", () => {
 
     const events = [];
     world.on("fountain:drink", (e) => events.push(e));
-    world.add(actor, InteractIntent, { targetId: fountain });
+    world.add(actor, InteractIntent, { targetId: fountain, mode: "drink" });
     interactionSystem(world);
 
     if (events[0]) seen.add(events[0].effect);

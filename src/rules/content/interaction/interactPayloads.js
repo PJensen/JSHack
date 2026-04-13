@@ -37,6 +37,7 @@ import { Position } from "../../components/Position.js";
 import { ItemInfo } from "../../components/ItemInfo.js";
 import { Beatitude } from "../../components/Beatitude.js";
 import { Owner } from "../../components/Owner.js";
+import { Material } from "../../components/Material.js";
 import { Interactable } from "../../components/Interactable.js";
 import { ObjectState } from "../../components/ObjectState.js";
 import { DungeonState } from "../../components/DungeonState.js";
@@ -393,6 +394,109 @@ function _fountainPrimary(world, actor, targetId, primaryEffect, vit, r) {
         actor, targetId, effect: "nothing", amount: 0,
       });
     }
+  }
+}
+
+/**
+ * Dip an inventory item into a fountain.
+ * Outcome table loosely inspired by NetHack — weighted random.
+ *
+ *  0.00–0.30  uncurse (if cursed → uncursed)
+ *  0.30–0.50  bless   (if uncursed → blessed)
+ *  0.50–0.65  curse   (uncursed/blessed → cursed)
+ *  0.65–0.80  nothing (water ripples, no effect)
+ *  0.80–0.90  rust    (metallic items take damage — placeholder event)
+ *  0.90–1.00  spawn water creature (nymph or snake)
+ */
+function _fountainDip(ctx) {
+  const { world, actor, targetId, intent } = ctx;
+  const itemId = intent?.itemId | 0;
+  if (!(itemId > 0) || !world.isAlive(itemId)) return;
+
+  const state = ensureFountainState(world, targetId);
+  const charges = Number(state?.charges || 0);
+  if (charges <= 0) return;
+
+  const fSeed = combatSeed(world.seed, world.step, actor | 0, targetId | 0, 0xD1B5);
+  const r = mulberry32(fSeed);
+  const roll = r();
+
+  const beat = world.get(itemId, Beatitude);
+  const prevState = String(beat?.state || "uncursed");
+  const ni = world.get(itemId, NamedIdentity);
+  const itemName = ni?.name || "the item";
+
+  if (roll < 0.30) {
+    // ── Uncurse ──────────────────────────────────────────────────
+    if (prevState === "cursed") {
+      world.set(itemId, Beatitude, { state: "uncursed" });
+      world.emit?.("fountain:dip", { actor, targetId, itemId, effect: "uncurse", itemName });
+    } else {
+      world.emit?.("fountain:dip", { actor, targetId, itemId, effect: "nothing", itemName });
+    }
+  } else if (roll < 0.50) {
+    // ── Bless ────────────────────────────────────────────────────
+    if (prevState === "uncursed") {
+      world.set(itemId, Beatitude, { state: "blessed" });
+      world.emit?.("fountain:dip", { actor, targetId, itemId, effect: "bless", itemName });
+    } else {
+      world.emit?.("fountain:dip", { actor, targetId, itemId, effect: "nothing", itemName });
+    }
+  } else if (roll < 0.65) {
+    // ── Curse ────────────────────────────────────────────────────
+    if (prevState !== "cursed") {
+      world.set(itemId, Beatitude, { state: "cursed" });
+      world.emit?.("fountain:dip", { actor, targetId, itemId, effect: "curse", itemName });
+    } else {
+      world.emit?.("fountain:dip", { actor, targetId, itemId, effect: "nothing", itemName });
+    }
+  } else if (roll < 0.80) {
+    // ── Nothing ──────────────────────────────────────────────────
+    world.emit?.("fountain:dip", { actor, targetId, itemId, effect: "nothing", itemName });
+  } else if (roll < 0.90) {
+    // ── Rust / water damage ──────────────────────────────────────
+    const mat = world.get(itemId, Material);
+    const isMetallic = mat && (mat.kind === "iron" || mat.kind === "steel" || mat.kind === "metal");
+    if (isMetallic) {
+      world.emit?.("fountain:dip", { actor, targetId, itemId, effect: "rust", itemName });
+    } else {
+      world.emit?.("fountain:dip", { actor, targetId, itemId, effect: "wet", itemName });
+    }
+  } else {
+    // ── Spawn water creature ─────────────────────────────────────
+    const fPos = world.get(targetId, Position);
+    let spawnedName = null;
+    if (fPos) {
+      const tile = findNearestValidTileAround(world, fPos, { maxDistance: 2 });
+      if (tile) {
+        const isNymph = r() < 0.5;
+        const def = isNymph
+          ? { name: "Water Nymph", identity: "nymph", maxHp: 14, baseHp: 14, attack: 2, defense: 1, damageDice: "1d4", faction: "enemy", speed: 3 }
+          : { name: "Water Snake", identity: "cave_snake", maxHp: 10, baseHp: 10, attack: 3, defense: 0, damageDice: "1d6", faction: "enemy", speed: 2 };
+        const eid = spawnMonsterEntity(world, { ...def, x: tile.x, y: tile.y });
+        if (eid > 0) spawnedName = def.name;
+      }
+    }
+    world.emit?.("fountain:dip", { actor, targetId, itemId, effect: "creature", spawnedName, itemName });
+  }
+
+  // ── Charge bookkeeping (same as drink) ─────────────────────────
+  const nextCharges = Math.max(0, charges - 1);
+  if (nextCharges <= 0) {
+    const cooldownTurns = Math.max(1, Number(state?.cooldownTurns || 1) | 0);
+    const dryUntilStep = (Number(world.step || 0) | 0) + cooldownTurns;
+    setFountainState(world, targetId, {
+      chargesRemaining: 0,
+      maxCharges: Math.max(1, Number(state?.maxCharges || 1) | 0),
+      primaryEffect: String(state?.primaryEffect || "heal"),
+      cooldownTurns,
+      dryUntilStep,
+    });
+    world.emit?.("fountain:dry", {
+      actor, targetId, chargesRemaining: 0, cooldownTurns, dryUntilStep,
+    });
+  } else {
+    setFountainState(world, targetId, { chargesRemaining: nextCharges });
   }
 }
 
@@ -967,32 +1071,64 @@ export const INTERACT_PAYLOADS = {
   },
 
   // ── Fountain ───────────────────────────────────────────────────────────────
+  // Multi-action: menu gate in interactRunner shows Drink / Dip chooser.
+  // When intent.mode arrives, dispatch to the appropriate branch below.
 
-  drinkFountain: {
+  fountain: {
     beforeInteract(ctx) {
-      const { world, actor, targetId } = ctx;
-      if (!world.get(actor, Vitality)) {
-        ctx.cancel("NO_VITALITY", "Actor has no vitality component.");
-      }
-      const state = ensureFountainState(world, targetId);
-      const charges = Number(state?.charges || 0);
-      const cooldownTurns = Math.max(1, Number(state?.cooldownTurns || 1) | 0);
-      const dryUntilStep = Number(state?.dryUntilStep ?? -1);
-      if (charges <= 0) {
-        world.emit?.("fountain:dry", {
-          actor,
-          targetId,
-          chargesRemaining: 0,
-          cooldownTurns,
-          dryUntilStep: dryUntilStep >= 0
-            ? dryUntilStep
-            : ((Number(world.step || 0) | 0) + cooldownTurns),
-        });
-        ctx.cancel("FOUNTAIN_DRY", "The fountain has run dry.");
+      const { world, actor, targetId, intent } = ctx;
+      const mode = String(intent?.mode || "");
+      if (mode === "drink") {
+        if (!world.get(actor, Vitality)) {
+          ctx.cancel("NO_VITALITY", "Actor has no vitality component.");
+          return;
+        }
+        const state = ensureFountainState(world, targetId);
+        const charges = Number(state?.charges || 0);
+        const cooldownTurns = Math.max(1, Number(state?.cooldownTurns || 1) | 0);
+        const dryUntilStep = Number(state?.dryUntilStep ?? -1);
+        if (charges <= 0) {
+          world.emit?.("fountain:dry", {
+            actor,
+            targetId,
+            chargesRemaining: 0,
+            cooldownTurns,
+            dryUntilStep: dryUntilStep >= 0
+              ? dryUntilStep
+              : ((Number(world.step || 0) | 0) + cooldownTurns),
+          });
+          ctx.cancel("FOUNTAIN_DRY", "The fountain has run dry.");
+        }
+      } else if (mode === "dip") {
+        // Phase 1: no item yet — emit prompt so the UI can ask which item.
+        if (!(intent?.itemId > 0)) {
+          const items = inventoryItems(world, actor).filter(
+            iid => world.isAlive(iid),
+          );
+          world.emit?.("fountain:dipPrompt", { actor, targetId, items });
+          ctx.cancel("DIP_PROMPT", "");
+          return;
+        }
+        // Phase 2: item selected — validate charges.
+        const state = ensureFountainState(world, targetId);
+        const charges = Number(state?.charges || 0);
+        if (charges <= 0) {
+          world.emit?.("fountain:dry", { actor, targetId, chargesRemaining: 0 });
+          ctx.cancel("FOUNTAIN_DRY", "The fountain has run dry.");
+        }
       }
     },
     onInteract(ctx) {
-      const { world, actor, targetId } = ctx;
+      const { world, actor, targetId, intent } = ctx;
+      const mode = String(intent?.mode || "");
+
+      // ── Dip ────────────────────────────────────────────────────────
+      if (mode === "dip") {
+        _fountainDip(ctx);
+        return;
+      }
+
+      // ── Drink (default) ────────────────────────────────────────────
       const state = ensureFountainState(world, targetId);
       const charges = Number(state?.charges || 0);
       const primaryEffect = String(state?.primaryEffect || "heal");

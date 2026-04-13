@@ -29,7 +29,7 @@ function getWakeups(world) {
  * @param {any} inter
  */
 function readDryUntil(inter) {
-  if (String(inter?.action || "") !== "drinkFountain") return null;
+  if (String(inter?.action || "") !== "fountain") return null;
   const params = (inter?.params && typeof inter.params === "object") ? inter.params : null;
   if (!params) return null;
   const chargesRemaining = Math.max(0, Number(params.chargesRemaining || 0) | 0);
@@ -84,7 +84,7 @@ export function fountainRegrowthSystem(world) {
     const targetId = Number(value || 0) | 0;
     if (!(targetId > 0) || !world.isAlive(targetId)) return;
     const inter = world.get(targetId, Interactable);
-    if (!inter || String(inter?.action || "") !== "drinkFountain") return;
+    if (!inter || String(inter?.action || "") !== "fountain") return;
 
     const params = (inter.params && typeof inter.params === "object")
       ? { ...inter.params }
