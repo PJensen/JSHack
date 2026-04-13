@@ -10,6 +10,7 @@ import { Owner } from "../src/rules/components/Owner.js";
 import { Position } from "../src/rules/components/Position.js";
 import { Devotion } from "../src/rules/components/Devotion.js";
 import { Status } from "../src/rules/components/Status.js";
+import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
 import { HEARING_TIERS } from "../src/rules/components/Anatomy.js";
 import { DungeonState } from "../src/rules/components/DungeonState.js";
 import { evaluateSound, thresholdForTier } from "../src/rules/utils/sound.js";
@@ -37,6 +38,7 @@ function installWithDeps(world, messageLog, playerId, { isVisibleAt } = {}) {
       Anatomy,
       DungeonState,
       Status,
+      ActiveEffects,
     },
     soundApi: {
       evaluateSound,
@@ -488,6 +490,73 @@ Deno.test("messageWiring wound flavor mentions bleeding when bleed status is pre
   assertEquals(messageLog.entries.length, 1);
   const text = String(messageLog.entries[0].text || "").toLowerCase();
   assert(text.includes("wounded and bleeding"), "should mention bleeding when bleed status is present");
+});
+
+Deno.test("messageWiring wound flavor recognizes bleeding from ActiveEffects", () => {
+  const world = new World({ seed: 42 });
+  const playerId = world.create();
+  world.add(playerId, Player, {});
+  world.add(playerId, Equipment, {});
+
+  const targetId = world.create();
+  world.add(targetId, NamedIdentity, { name: "Bleeding by Effect", identity: "dummy" });
+  world.add(targetId, ActiveEffects, {
+    effects: [{ key: "bleed", turnsLeft: 2, potency: 1 }],
+  });
+
+  const messageLog = createMessageLog();
+  installWithDeps(world, messageLog, playerId);
+
+  world.emit("damaged", {
+    source: playerId,
+    target: targetId,
+    amount: 3,
+    cause: "melee",
+    hpAfter: 6,
+    maxHp: 12,
+  });
+
+  assertEquals(messageLog.entries.length, 1);
+  const text = String(messageLog.entries[0].text || "").toLowerCase();
+  assert(text.includes("bleeding"), "active bleed effect should produce bleeding wound prose");
+});
+
+Deno.test("messageWiring varies repeated wound prose in same combat context", () => {
+  const world = new World({ seed: 42 });
+  const playerId = world.create();
+  world.add(playerId, Player, {});
+  world.add(playerId, Equipment, {});
+
+  const targetId = world.create();
+  world.add(targetId, NamedIdentity, { name: "Skeleton Guard", identity: "skeleton_guard" });
+  world.add(targetId, Status, {
+    statuses: [{ type: "bleeding", duration: 3, potency: 1 }],
+  });
+
+  const messageLog = createMessageLog();
+  installWithDeps(world, messageLog, playerId);
+
+  world.emit("damaged", {
+    source: playerId,
+    target: targetId,
+    amount: 3,
+    cause: "melee",
+    hpAfter: 6,
+    maxHp: 12,
+  });
+  world.emit("damaged", {
+    source: playerId,
+    target: targetId,
+    amount: 3,
+    cause: "melee",
+    hpAfter: 6,
+    maxHp: 12,
+  });
+
+  assertEquals(messageLog.entries.length, 2);
+  const first = String(messageLog.entries[0].text || "");
+  const second = String(messageLog.entries[1].text || "");
+  assert(first !== second, "repeated same-context hits should rotate wound prose");
 });
 
 Deno.test("messageWiring logs spell-proc gear messages for player events", () => {

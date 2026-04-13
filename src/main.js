@@ -1224,6 +1224,7 @@ installMessageWiring({
     DungeonState,
     Status,
     Encumbrance,
+    ActiveEffects,
   },
   soundApi: {
     evaluateSound,
