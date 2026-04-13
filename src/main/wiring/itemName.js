@@ -40,22 +40,43 @@ import {
 export function resolveItemDisplayName(world, entityId) {
   const ni = world.get(entityId, NamedIdentity);
   const info = world.get(entityId, ItemInfo);
+  const corrosionStacks = Number(info?.corrosionStacks || 0) | 0;
+  const waterloggedStacks = Number(info?.waterloggedStacks || 0) | 0;
+  const soggyStacks = Number(info?.soggyStacks || 0) | 0;
+  const dilutedStacks = Number(info?.dilutedStacks || 0) | 0;
+  const swollenStacks = Number(info?.swollenStacks || 0) | 0;
+
+  function withRustedTag(label) {
+    const base = String(label || "item");
+    if (corrosionStacks <= 0) return base;
+    if (base.startsWith("[Rusted] ")) return base;
+    return `[Rusted] ${base}`;
+  }
+
+  function withWaterTags(label) {
+    let out = String(label || "item");
+    if (waterloggedStacks > 0 && !out.startsWith("[Waterlogged] ")) out = `[Waterlogged] ${out}`;
+    if (soggyStacks > 0 && !out.startsWith("[Soggy] ")) out = `[Soggy] ${out}`;
+    if (dilutedStacks > 0 && !out.startsWith("[Diluted] ")) out = `[Diluted] ${out}`;
+    if (swollenStacks > 0 && !out.startsWith("[Swollen] ")) out = `[Swollen] ${out}`;
+    return out;
+  }
 
   if (info && info.type === 'gem') {
     const identity = ni?.identity || '';
     const identified = info.identified === true || (identity && isIdentified(identity));
     if (identified) {
-      return ni?.name || info.description || info.type || 'gem';
+      return withWaterTags(withRustedTag(ni?.name || info.description || info.type || 'gem'));
     }
     // Unidentified gem: show appearance (e.g. "red gem")
-    return info.appearance || info.description || info.type || 'gem';
+    return withWaterTags(withRustedTag(info.appearance || info.description || info.type || 'gem'));
   }
 
   // Check if this item requires identification
   if (info && requiresIdentification(info)) {
     const identity = ni?.identity || '';
     if (identity && !isIdentified(identity)) {
-      return getUnidentifiedName(info) || 'Unidentified Item';
+      return withWaterTags(withRustedTag(getUnidentifiedName(info) || 'Unidentified Item'));
     }
   }
 
@@ -71,6 +92,8 @@ export function resolveItemDisplayName(world, entityId) {
       name = `${prefix} ${name}`;
     }
   }
+
+  name = withWaterTags(withRustedTag(name));
 
   // Prepend BUC status when identified and beatitude is not the default uncursed
   const beat = world.get(entityId, Beatitude);

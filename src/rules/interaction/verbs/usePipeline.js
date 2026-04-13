@@ -1,5 +1,6 @@
 import { Consumable } from "../../components/Consumable.js";
 import { findUsePayload } from "../../content/items/usePayloads.js";
+import { interceptUseForWaterDamage } from "../../utils/waterExposure.js";
 
 /**
  * @param {any} value
@@ -91,6 +92,37 @@ export function usePipeline(ctx) {
   };
 
   const payload = findUsePayload(state);
+  const wetIntercept = interceptUseForWaterDamage(ctx, state);
+  if (wetIntercept?.cancelled) {
+    ctx.cancel({
+      code: String(wetIntercept.code || "USE_CANCELLED"),
+      message: String(wetIntercept.message || "Use action cancelled."),
+      consumesTurn: wetIntercept.consumesTurn === true,
+    });
+    return {
+      metrics,
+      payload: {
+        defId: null,
+        path: "waterIntercept",
+        hookResult: wetIntercept,
+      },
+    };
+  }
+  if (wetIntercept?.consumed) {
+    ctx.mutate.consume(itemId, actor);
+    ctx.io.emit("item:used", { actor, itemId });
+    metrics.consumed = true;
+    metrics.path = "waterIntercept";
+    return {
+      metrics,
+      payload: {
+        defId: null,
+        path: "waterIntercept",
+        hookResult: wetIntercept,
+      },
+    };
+  }
+
   if (!payload) {
     return { metrics, payload: { defId: null, path: "none" } };
   }

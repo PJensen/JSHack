@@ -77,6 +77,51 @@ export function installItemMessages(ctx) {
     log(`${fromLabel} in your pack transforms into ${toLabel}.`, 'system');
   });
 
+  world.on('item:reacted', ({ itemId, ownerId, scope, result, source }) => {
+    const pe = playerEntity(world);
+    if (!pe) return;
+    const playerId = Number(pe.id || 0) | 0;
+    const src = Number(source || 0) | 0;
+    if (scope === 'inventory' && Number(ownerId || 0) !== playerId) return;
+    if (scope !== 'inventory' && src > 0 && src !== playerId) return;
+
+    const name = bracketizeName(nameOfItem(itemId));
+    const kind = String(result || "");
+    if (kind === "waterlogged") {
+      log(`${name} is waterlogged.`, 'warning');
+    } else if (kind === "soggy") {
+      log(`${name} turns soggy.`, 'warning');
+    } else if (kind === "swollen") {
+      log(`${name} swells from moisture.`, 'warning');
+    } else if (kind === "diluted") {
+      log(`${name} is diluted.`, 'warning');
+    }
+  });
+
+  world.on('item:ruinedByWater', ({ actor, itemId }) => {
+    const pe = playerEntity(world);
+    if (!pe || Number(actor || 0) !== Number(pe.id || 0)) return;
+    log(`${bracketizeName(nameOfItem(itemId))} disintegrates when you try to use it.`, 'danger');
+  });
+
+  world.on('item:dilutedFizzle', ({ actor, itemId }) => {
+    const pe = playerEntity(world);
+    if (!pe || Number(actor || 0) !== Number(pe.id || 0)) return;
+    log(`${bracketizeName(nameOfItem(itemId))} fizzles uselessly.`, 'warning');
+  });
+
+  world.on('item:swollenMisfire', ({ actor, itemId }) => {
+    const pe = playerEntity(world);
+    if (!pe || Number(actor || 0) !== Number(pe.id || 0)) return;
+    log(`${bracketizeName(nameOfItem(itemId))} sputters and misfires.`, 'warning');
+  });
+
+  world.on('item:soggyNutritionPenalty', ({ actor, itemId }) => {
+    const pe = playerEntity(world);
+    if (!pe || Number(actor || 0) !== Number(pe.id || 0)) return;
+    log(`${bracketizeName(nameOfItem(itemId))} is soggy and less nourishing.`, 'system');
+  });
+
   // === Corpse events ===
   world.on('corpse:desecrated', ({ actor, ownerId, corpseName }) => {
     const pe = playerEntity(world);

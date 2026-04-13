@@ -7,8 +7,6 @@ import { Brain } from "../../components/Brain.js";
 import { Equipment, GEAR_SLOTS } from "../../components/Equipment.js";
 import { Inventory } from "../../components/Inventory.js";
 import { ItemInfo } from "../../components/ItemInfo.js";
-import { Material } from "../../components/Material.js";
-import { Beatitude } from "../../components/Beatitude.js";
 import { NamedIdentity } from "../../components/NamedIdentity.js";
 import { Player } from "../../components/Player.js";
 import { Position } from "../../components/Position.js";
@@ -22,6 +20,13 @@ import { inventoryItems, addToInventory, removeFromInventory } from "../../utils
 import { dealDamage } from "../../utils/dealDamage.js";
 import { emitSafe } from "../../utils/emitSafe.js";
 import { currentDepth } from "../../utils/worldAccess.js";
+import {
+  applyCorrosionStack,
+  consumeBlessedRustWard,
+  isMetalItemMaterial,
+  isRustproofItemMaterial,
+  MAX_CORROSION_STACKS,
+} from "../../utils/corrosion.js";
 import { dropLoot } from "../lootResolver.js";
 
 // ── CombatCallbackContext ──────────────────────────────────────────
@@ -424,13 +429,9 @@ export function burrowAndDieOnHit(chancePct, seedSalt, effect, emitEvent) {
 /** Slots eligible for corrosion (metal gear). */
 const CORRODE_SLOTS = ["weapon", "armor", "head", "gloves", "feet", "legs", "offhand"];
 
-/** Max corrosion stacks per item. */
-const MAX_CORROSION_STACKS = 3;
-
 /**
  * Roll → pick a random metal-eligible equipped slot on the defender →
  * decrement its primary stat bonus and track corrosion stacks.
- * At max stacks the item name is prefixed with "Corroded".
  * @param {number} chancePct
  * @param {number} seedSalt
  */
@@ -451,13 +452,12 @@ export function corrodeEquipmentOnHit(chancePct, seedSalt) {
       if (!info) continue;
       // Skip items with no bonuses at all (natural/bare)
       if (!info.bonuses || typeof info.bonuses !== 'object') continue;
+      // Rust only affects metal equipment.
+      if (!isMetalItemMaterial(ctx.world, itemId)) continue;
       // Skip corrosion-resistant materials (stainless steel, mithril, etc.)
-      const mat = ctx.world.get(itemId, Material);
-      if (mat && typeof mat.corrosionResist === 'number' && mat.corrosionResist >= 0.95) continue;
+      if (isRustproofItemMaterial(ctx.world, itemId)) continue;
       // Blessed metal resists rust — consumes the blessing as a one-time shield
-      const beat = ctx.world.get(itemId, Beatitude);
-      if (beat && beat.state === 'blessed') {
-        beat.state = 'uncursed';
+      if (consumeBlessedRustWard(ctx.world, itemId)) {
         const blessedName = ctx.world.get(itemId, NamedIdentity)?.name || 'equipment';
         ctx.emit("proc:blessed_resist_rust", { target: ctx.defender, itemId, itemName: blessedName });
         continue;
@@ -472,26 +472,9 @@ export function corrodeEquipmentOnHit(chancePct, seedSalt) {
     const pick = candidates[rngInt(rng, 0, candidates.length - 1)];
     const { itemId, info } = pick;
 
-    // Increment corrosion stacks
-    const newStacks = (Number(info.corrosionStacks || 0) | 0) + 1;
-    info.corrosionStacks = newStacks;
-
-    // Apply stat penalty: reduce the largest positive bonus by 1
-    const bonuses = info.bonuses;
-    let bestKey = null;
-    let bestVal = 0;
-    for (const [k, v] of Object.entries(bonuses)) {
-      if (typeof v === 'number' && v > bestVal) { bestKey = k; bestVal = v; }
-    }
-    if (bestKey) bonuses[bestKey] = Math.max(0, bonuses[bestKey] - 1);
-
-    // At max stacks, prefix the item name
-    if (newStacks >= MAX_CORROSION_STACKS) {
-      const ni = ctx.world.get(itemId, NamedIdentity);
-      if (ni && ni.name && !ni.name.startsWith('Corroded ')) {
-        ni.name = `Corroded ${ni.name}`;
-      }
-    }
+    const corrosion = applyCorrosionStack(ctx.world, itemId, MAX_CORROSION_STACKS);
+    if (!corrosion.applied) return;
+    const newStacks = corrosion.stacks;
 
     const ni = ctx.world.get(itemId, NamedIdentity);
     const itemName = ni?.name || 'equipment';

@@ -14,6 +14,7 @@ import { Position } from "../src/rules/components/Position.js";
 import { Player } from "../src/rules/components/Player.js";
 import { clearAll, loadChunk } from "../src/rules/environment/dungeon/tileMap.js";
 import { CHUNK_SIZE, TILE_FLOOR } from "../src/rules/environment/dungeon/constants.js";
+import { resolveItemDisplayName } from "../src/main/wiring/itemName.js";
 
 function makeWorld(seed = 1) {
   clearAll();
@@ -118,7 +119,9 @@ Deno.test("rust_monster: corrosion stacks up to max", () => {
   assertEquals(info.bonuses.defense, 3, "defense should be reduced by 3 total");
 
   const ni = world.get(armor, NamedIdentity);
-  assert(ni.name.startsWith("Corroded"), "name should be prefixed with Corroded at max stacks");
+  assertEquals(ni.name, "Iron Plate", "base identity name should stay canonical");
+  const displayName = resolveItemDisplayName(world, armor);
+  assert(displayName.includes("[Rusted]"), "display name should include [Rusted] marker");
 });
 
 Deno.test("rust_monster: immune to corrosion-resistant materials", () => {
