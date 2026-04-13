@@ -11,10 +11,10 @@ const BASE = "./assets/audio/";
  */
 const SOUNDS = {
   // ── Combat ──────────────────────────────────────
-  "melee:hit":        { file: "melee_hit.wav",     bus: "combat" },
-  "melee:crit":       { file: "melee_crit.wav",    bus: "combat" },
+  "melee:hit":        { file: "melee_hit.wav",     bus: "combat", randomPitch: 55 },
+  "melee:crit":       { file: "melee_crit.wav",    bus: "combat", randomPitch: 40 },
   "melee:miss":       { file: "melee_miss.wav",    bus: "combat" },
-  "ranged:shot":      { file: "ranged_shot.wav",   bus: "combat" },
+  "ranged:shot":      { file: "ranged_shot.wav",   bus: "combat", randomPitch: 35 },
   "death":            { file: "death.wav",          bus: "combat", maxVoices: 3 },
   "player:death":     { file: "player_death.wav",   bus: "combat", maxVoices: 1 },
 
