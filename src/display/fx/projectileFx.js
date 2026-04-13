@@ -1356,11 +1356,13 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
     });
 
     // Frost Bolt: icy projectile from caster to target
-    world.on('spell:frost', ({ actor, targetId, from, at, fizzle, missed }) => {
+    world.on('spell:frost', ({ actor, targetId, from, at, fizzle, missed, missTo }) => {
       if (fizzle) return;
       if (!from || !at) return;
       const to = missed
-        ? computeMissEndpoint(from, at, missSeedFromIds(actor, targetId, 0x1075))
+        ? (missTo && Number.isFinite(missTo.x) && Number.isFinite(missTo.y)
+          ? { x: Number(missTo.x), y: Number(missTo.y) }
+          : computeMissEndpoint(from, at, missSeedFromIds(actor, targetId, 0x1075)))
         : at;
       spawnTransientProjectile({
         from,
@@ -1373,11 +1375,13 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
     });
 
     // Shadow Bolt: purple energy projectile from caster to target
-    world.on('spell:shadow_bolt', ({ actor, targetId, from, to, fizzle, missed }) => {
+    world.on('spell:shadow_bolt', ({ actor, targetId, from, to, fizzle, missed, missTo }) => {
       if (fizzle) return;
       if (!from || !to) return;
       const end = missed
-        ? computeMissEndpoint(from, to, missSeedFromIds(actor, targetId, 0xb01a))
+        ? (missTo && Number.isFinite(missTo.x) && Number.isFinite(missTo.y)
+          ? { x: Number(missTo.x), y: Number(missTo.y) }
+          : computeMissEndpoint(from, to, missSeedFromIds(actor, targetId, 0xb01a)))
         : to;
       spawnTransientProjectile({
         from,
@@ -1390,11 +1394,13 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
     });
 
     // Fireball: fiery orb from caster to target (reuses familiar fireball VFX)
-    world.on('spell:fireball', ({ actor, targetId, from, to, fizzle, missed }) => {
+    world.on('spell:fireball', ({ actor, targetId, from, to, fizzle, missed, missTo }) => {
       if (fizzle) return;
       if (!from || !to) return;
       const end = missed
-        ? computeMissEndpoint(from, to, missSeedFromIds(actor, targetId, 0xf1b4))
+        ? (missTo && Number.isFinite(missTo.x) && Number.isFinite(missTo.y)
+          ? { x: Number(missTo.x), y: Number(missTo.y) }
+          : computeMissEndpoint(from, to, missSeedFromIds(actor, targetId, 0xf1b4)))
         : to;
       spawnTransientProjectile({
         from,
@@ -1408,24 +1414,31 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
 
     // Generator projectiles (ranged builders)
     for (const _ev of ['spell:arcane_bolt', 'spell:natures_touch', 'spell:leech_spores']) {
-      world.on(_ev, ({ from, at, hit }) => {
-        if (!hit || !from || !at) return;
+      world.on(_ev, ({ actor, targetId, from, at, hit, missed, missTo }) => {
+        if (!(hit || missed) || !from || !at) return;
         const style = _ev === 'spell:arcane_bolt' ? 'plain'
           : _ev === 'spell:natures_touch' ? 'venom'
           : 'venom';
+        const to = missed
+          ? (missTo && Number.isFinite(missTo.x) && Number.isFinite(missTo.y)
+            ? { x: Number(missTo.x), y: Number(missTo.y) }
+            : computeMissEndpoint(from, at, missSeedFromIds(actor, targetId, 0x6e91)))
+          : at;
         spawnTransientProjectile({
-          from, to: at, style,
+          from, to, style,
           speed: 12, minDuration: 0.06, maxDuration: 0.4,
         });
       });
     }
 
     // Plague Swarm: buzzing swarm projectile from caster to target
-    world.on('spell:plague_swarm', ({ actor, targetId, from, at, fizzle, missed }) => {
+    world.on('spell:plague_swarm', ({ actor, targetId, from, at, fizzle, missed, missTo }) => {
       if (fizzle) return;
       if (!from || !at) return;
       const to = missed
-        ? computeMissEndpoint(from, at, missSeedFromIds(actor, targetId, 0x5a77))
+        ? (missTo && Number.isFinite(missTo.x) && Number.isFinite(missTo.y)
+          ? { x: Number(missTo.x), y: Number(missTo.y) }
+          : computeMissEndpoint(from, at, missSeedFromIds(actor, targetId, 0x5a77)))
         : at;
       spawnTransientProjectile({
         from,

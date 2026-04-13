@@ -82,6 +82,12 @@ Deno.test("frost: publishes VFX event on miss and does not apply frost", () => {
   assertEquals(frostEvents[0].targetId, target);
   assertEquals(frostEvents[0].missed, true);
   assertEquals(frostEvents[0].projectileDelay, 0.5);
+  assertEquals(Number.isFinite(frostEvents[0].missTo?.x), true);
+  assertEquals(Number.isFinite(frostEvents[0].missTo?.y), true);
+  assertEquals(
+    frostEvents[0].missTo.x === frostEvents[0].at.x && frostEvents[0].missTo.y === frostEvents[0].at.y,
+    false,
+  );
   assertEquals(missEvents.length, 1);
   assertEquals(missEvents[0].spellId, "frost");
   assertEquals(world.get(target, Vitality).hp, 20);
