@@ -5,6 +5,7 @@ import { Beatitude } from "../src/rules/components/Beatitude.js";
 import { ApplyIntent } from "../src/rules/components/Intents/ApplyIntent.js";
 import { DrinkIntent } from "../src/rules/components/Intents/DrinkIntent.js";
 import { ThrowIntent } from "../src/rules/components/Intents/ThrowIntent.js";
+import { UseIntent } from "../src/rules/components/Intents/UseIntent.js";
 import { HazardArea } from "../src/rules/components/HazardArea.js";
 import { Inventory } from "../src/rules/components/Inventory.js";
 import { Position } from "../src/rules/components/Position.js";
@@ -12,6 +13,8 @@ import { applySystem } from "../src/rules/systems/applySystem.js";
 import { drinkSystem } from "../src/rules/systems/drinkSystem.js";
 import { installMaterialReactionListeners, materialReactionSystem } from "../src/rules/systems/materialReactionSystem.js";
 import { throwSystem } from "../src/rules/systems/throwSystem.js";
+import { useItemSystem } from "../src/rules/systems/useItemSystem.js";
+import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 import { createItemById } from "../src/rules/utils/itemFactory.js";
 import { addToInventory } from "../src/rules/utils/inventoryFacade.js";
 
@@ -108,6 +111,55 @@ Deno.test("water dip waterlogs paper targets via material reaction rules", () =>
   assert(!world.isAlive(water), "water dip should consume the potion");
   assertEquals(waterlogged.length, 1);
   assertEquals(Number(waterlogged[0]?.itemId || 0), scroll);
+});
+
+Deno.test("waterlogged scroll disintegrates on use", () => {
+  const world = new World({ seed: 9010 });
+  const actor = world.create();
+  world.add(actor, Inventory, { items: [], maxWeight: 100 });
+
+  const scroll = createItemById(world, "scroll_mapping");
+  assert(scroll != null, "scroll should be creatable");
+  addToInventory(world, actor, scroll);
+  const info = world.get(scroll, ItemInfo);
+  info.waterloggedStacks = 2;
+  info.ruinedByWater = true;
+
+  const ruined = [];
+  const used = [];
+  world.on("item:ruinedByWater", (ev) => ruined.push(ev));
+  world.on("item:used", (ev) => used.push(ev));
+
+  world.add(actor, UseIntent, { itemId: scroll });
+  useItemSystem(world);
+
+  assertEquals(ruined.length, 1);
+  assertEquals(used.length, 1);
+  assert(!world.isAlive(scroll), "waterlogged scroll should be consumed on failed use");
+});
+
+Deno.test("diluted potion fizzles on use", () => {
+  const world = new World({ seed: 9011 });
+  const actor = world.create();
+  world.add(actor, Inventory, { items: [], maxWeight: 100 });
+
+  const potion = createItemById(world, "potion_vigor");
+  assert(potion != null, "potion should be creatable");
+  addToInventory(world, actor, potion);
+  const info = world.get(potion, ItemInfo);
+  info.dilutedStacks = 1;
+
+  const fizzles = [];
+  const used = [];
+  world.on("item:dilutedFizzle", (ev) => fizzles.push(ev));
+  world.on("item:used", (ev) => used.push(ev));
+
+  world.add(actor, UseIntent, { itemId: potion });
+  useItemSystem(world);
+
+  assertEquals(fizzles.length, 1);
+  assertEquals(used.length, 1);
+  assert(!world.isAlive(potion), "diluted potion should be consumed as a fizzle");
 });
 
 Deno.test("thrown water potion spawns wet splash hazard", () => {

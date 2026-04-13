@@ -332,3 +332,32 @@ export const MATERIAL_CATALOG = [
     radShieldAlpha:1.0, radShieldBeta:0.85, radShieldGamma:0.45, radShieldNeutron:0.3, radActivation:0.4
   }},
 ];
+
+export const MATERIAL_TAGS = Object.freeze({
+  metal: new Set([
+    "iron", "steel", "copper", "bronze", "brass", "silver", "gold",
+    "lead", "mercury", "aluminum", "titanium", "mithril", "adamantine",
+    "radiant-alloy", "darksteel", "star-metal", "blood-iron",
+  ]),
+  paper: new Set(["paper"]),
+  wood: new Set(["wood"]),
+  glass: new Set(["glass", "soul-glass", "glass-fiber"]),
+  organic: new Set([
+    "flesh", "leather", "wool", "cloth", "bone", "ivory", "horn", "shell",
+  ]),
+});
+
+export function materialHasTag(kind, tag) {
+  const kinds = MATERIAL_TAGS[String(tag || "").toLowerCase()];
+  if (!kinds) return false;
+  return kinds.has(String(kind || "").toLowerCase());
+}
+
+export function materialTagsFor(kind) {
+  const needle = String(kind || "").toLowerCase();
+  const out = [];
+  for (const [tag, kinds] of Object.entries(MATERIAL_TAGS)) {
+    if (kinds.has(needle)) out.push(tag);
+  }
+  return out;
+}

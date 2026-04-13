@@ -9,6 +9,7 @@ export const MATERIAL_REACTION_OUTCOME_IDS = Object.freeze([
   "transmute_to_ash",
   "set_beatitude",
   "emit_waterlogged",
+  "apply_water_exposure",
 ]);
 
 /**
@@ -125,14 +126,46 @@ export const MATERIAL_REACTION_RULES = [
       {
         id: "dipped_scroll_waterlogged",
         match: { itemTypes: ["scroll", "learn"] },
-        outcome: "emit_waterlogged",
+        outcome: "apply_water_exposure",
         result: "waterlogged",
       },
       {
         id: "dipped_paper_item_waterlogged",
         match: { materials: ["paper"] },
-        outcome: "emit_waterlogged",
+        outcome: "apply_water_exposure",
         result: "waterlogged",
+      },
+    ],
+  },
+  {
+    id: "water_dip_applies_nonmetal_conditions",
+    sourceEvents: ["water:dipped"],
+    itemScopes: ["target"],
+    eventKind: "water:dipped",
+    reactions: [
+      {
+        id: "dipped_wood_item_swollen",
+        match: { materials: ["wood"] },
+        outcome: "apply_water_exposure",
+        result: "swollen",
+      },
+      {
+        id: "dipped_food_soggy",
+        match: { itemTypes: ["food"] },
+        outcome: "apply_water_exposure",
+        result: "soggy",
+      },
+      {
+        id: "dipped_organic_item_soggy",
+        match: { materials: ["flesh", "leather", "wool", "cloth", "bone", "ivory", "horn", "shell"] },
+        outcome: "apply_water_exposure",
+        result: "soggy",
+      },
+      {
+        id: "dipped_glass_potion_diluted",
+        match: { itemTypes: ["potion"], materials: ["glass", "soul-glass", "glass-fiber"] },
+        outcome: "apply_water_exposure",
+        result: "diluted",
       },
     ],
   },

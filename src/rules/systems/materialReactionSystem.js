@@ -7,6 +7,7 @@ import { Position } from "../components/Position.js";
 import { MATERIAL_REACTION_RULES } from "../data/materialReactions.js";
 import { hasAnyStatus } from "../utils/statusFacade.js";
 import { inventoryItems } from "../utils/inventoryFacade.js";
+import { applyWaterExposure } from "../utils/waterExposure.js";
 
 const SEEN_KEY = Symbol.for("jshack:materialReactions:seenPerStep");
 const INSTALLED_KEY = Symbol.for("jshack:materialReactions:listeners:installed");
@@ -304,15 +305,21 @@ function applyReactionOutcome(world, itemId, info, mat, reaction, sourcePayload,
   }
 
   if (outcome === "emit_waterlogged") {
-    try {
-      world.emit?.("item:waterlogged", {
-        actor: Number(sourcePayload?.actor || sourceId || 0) | 0,
-        itemId: itemId | 0,
-        by: Number(sourcePayload?.toolId || sourcePayload?.itemId || 0) | 0,
-        waterType: String(sourcePayload?.waterType || ""),
-      });
-    } catch { /* */ }
-    return { applied: true, transformed: false, result: String(reaction?.result || "waterlogged") };
+    const exposure = applyWaterExposure(world, itemId, {
+      actor: Number(sourcePayload?.actor || sourceId || 0) | 0,
+      sourceId: Number(sourcePayload?.toolId || sourcePayload?.itemId || 0) | 0,
+      waterType: String(sourcePayload?.waterType || "plain"),
+    });
+    return { applied: true, transformed: false, result: String(exposure?.effect || reaction?.result || "waterlogged") };
+  }
+
+  if (outcome === "apply_water_exposure") {
+    const exposure = applyWaterExposure(world, itemId, {
+      actor: Number(sourcePayload?.actor || sourceId || 0) | 0,
+      sourceId: Number(sourcePayload?.toolId || sourcePayload?.itemId || 0) | 0,
+      waterType: String(sourcePayload?.waterType || "plain"),
+    });
+    return { applied: true, transformed: false, result: String(exposure?.effect || reaction?.result || "wet") };
   }
 
   return { applied: false, transformed: false, result: "none" };

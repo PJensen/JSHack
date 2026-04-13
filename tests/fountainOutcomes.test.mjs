@@ -17,6 +17,7 @@ import {
   addToInventory,
   inventoryItems,
 } from "../src/rules/utils/inventoryFacade.js";
+import { resolveItemDisplayName } from "../src/main/wiring/itemName.js";
 import { clearAll, loadChunk, setTile } from "../src/rules/environment/dungeon/tileMap.js";
 import {
   CHUNK_SIZE,
@@ -342,7 +343,7 @@ Deno.test("fountain: all 11 outcome types are reachable", () => {
 // ── Dip tests ────────────────────────────────────────────────────────────
 
 // Helper: create a world with player, fountain, and a dippable item.
-function makeDipWorld(seed, charges = 20, itemBeatitude = "uncursed") {
+function makeDipWorld(seed, charges = 20, itemBeatitude = "uncursed", itemSpec = {}) {
   const world = new World({ seed });
   world.step = 1;
 
@@ -356,10 +357,18 @@ function makeDipWorld(seed, charges = 20, itemBeatitude = "uncursed") {
   world.add(actor, Inventory, { capacity: 20 });
 
   const item = world.create();
-  world.add(item, NamedIdentity, { name: "Iron Sword", identity: "iron_sword" });
-  world.add(item, ItemInfo, { type: "weapon", slot: "weapon", count: 1 });
+  const name = String(itemSpec.name || "Iron Sword");
+  const identity = String(itemSpec.identity || "iron_sword");
+  const type = String(itemSpec.type || "weapon");
+  const slot = String(itemSpec.slot || "weapon");
+  const materialKind = String(itemSpec.materialKind || "iron");
+  const bonuses = itemSpec.bonuses && typeof itemSpec.bonuses === "object"
+    ? { ...itemSpec.bonuses }
+    : { attack: 2 };
+  world.add(item, NamedIdentity, { name, identity });
+  world.add(item, ItemInfo, { type, slot, count: 1, bonuses });
   world.add(item, Beatitude, { state: itemBeatitude });
-  world.add(item, Material, { kind: "iron" });
+  world.add(item, Material, { kind: materialKind });
   addToInventory(world, actor, item);
 
   const fountain = world.create();
@@ -489,4 +498,59 @@ Deno.test("dip: all 6 dip outcome types are reachable", () => {
   for (const t of target) {
     assert(seen.has(t), `dip outcome "${t}" was never reached (saw: ${[...seen].join(", ")})`);
   }
+});
+
+Deno.test("dip: non-metal paper item waterlogs instead of rusting", () => {
+  const rustSeed = findDipSeedForEffect("rust", "uncursed");
+  assert(rustSeed, "should find a seed that lands in the rust window");
+
+  const ironEv = dipOnce(rustSeed.world, rustSeed.actor, rustSeed.fountain, rustSeed.item);
+  assertEquals(ironEv?.effect, "rust", "control seed should rust iron item");
+
+  const paper = makeDipWorld(rustSeed.seed, 20, "uncursed", {
+    name: "Scroll of Mapping",
+    identity: "scroll_mapping",
+    type: "scroll",
+    slot: "bag",
+    materialKind: "paper",
+    bonuses: {},
+  });
+  const paperEv = dipOnce(paper.world, paper.actor, paper.fountain, paper.item);
+  assertEquals(paperEv?.effect, "waterlogged", "paper should waterlog, not rust");
+
+  const info = paper.world.get(paper.item, ItemInfo);
+  assertEquals(Number(info?.corrosionStacks || 0), 0, "paper should not gain corrosion stacks");
+  assert(Number(info?.waterloggedStacks || 0) > 0, "paper should gain waterlogged stacks");
+});
+
+Deno.test("dip corrosion uses derived [Rusted] display marker without mutating base name", () => {
+  const hit = findDipSeedForEffect("rust", "uncursed");
+  assert(hit, "should find a seed that produces rust");
+
+  const ni = hit.world.get(hit.item, NamedIdentity);
+  assertEquals(ni?.name, "Iron Sword", "base name should stay canonical");
+
+  const displayName = resolveItemDisplayName(hit.world, hit.item);
+  assert(displayName.includes("[Rusted]"), "display name should include rust marker");
+});
+
+Deno.test("dip: potion becomes diluted and display name reflects condition", () => {
+  const rustSeed = findDipSeedForEffect("rust", "uncursed");
+  assert(rustSeed, "should find a seed that lands in water-damage band");
+
+  const potion = makeDipWorld(rustSeed.seed, 20, "uncursed", {
+    name: "Potion of Vigor",
+    identity: "potion_vigor",
+    type: "potion",
+    slot: "bag",
+    materialKind: "glass",
+    bonuses: {},
+  });
+  const ev = dipOnce(potion.world, potion.actor, potion.fountain, potion.item);
+  assertEquals(ev?.effect, "diluted", "glass potion should be diluted by water");
+
+  const info = potion.world.get(potion.item, ItemInfo);
+  assert(Number(info?.dilutedStacks || 0) > 0, "potion should track diluted stacks");
+  const displayName = resolveItemDisplayName(potion.world, potion.item);
+  assert(displayName.includes("[Diluted]"), "display name should include diluted marker");
 });

@@ -274,6 +274,15 @@ export function installEnvironmentMessages(ctx) {
       log(`You dip ${name} into the fountain. ${name} shimmers with protective light, repelling the water \u2014 but the blessing fades.`, 'system');
     } else if (effect === 'resist') {
       log(`You dip ${name} into the fountain. The water beads off ${name} harmlessly.`, 'system');
+    } else if (effect === 'waterlogged') {
+      if (ev.ruined) log(`You dip ${name} into the fountain. The ink runs and the pages blur into mush.`, 'danger');
+      else log(`You dip ${name} into the fountain. It comes out waterlogged and blotchy.`, 'warning');
+    } else if (effect === 'soggy') {
+      log(`You dip ${name} into the fountain. It turns soggy and unpleasant.`, 'warning');
+    } else if (effect === 'swollen') {
+      log(`You dip ${name} into the fountain. The wood swells from absorbed water.`, 'warning');
+    } else if (effect === 'diluted') {
+      log(`You dip ${name} into the fountain. Its contents look thinned and cloudy.`, 'warning');
     } else if (effect === 'wet') {
       log(`You dip ${name} into the fountain. ${name} comes out dripping wet, but otherwise fine.`, 'system');
     } else if (effect === 'creature') {

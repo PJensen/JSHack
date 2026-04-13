@@ -37,7 +37,6 @@ import { Position } from "../../components/Position.js";
 import { ItemInfo } from "../../components/ItemInfo.js";
 import { Beatitude } from "../../components/Beatitude.js";
 import { Owner } from "../../components/Owner.js";
-import { Material } from "../../components/Material.js";
 import { Interactable } from "../../components/Interactable.js";
 import { ObjectState } from "../../components/ObjectState.js";
 import { DungeonState } from "../../components/DungeonState.js";
@@ -90,6 +89,9 @@ import { upsertTimedEffect } from "../../utils/effectSemantics.js";
 import { spawnMonsterEntity } from "../../utils/spawnMonsterEntity.js";
 import { findNearestValidTileAround } from "../../utils/queries.js";
 import { isEntityOnCurrentFloor } from "../../utils/floorEntities.js";
+import {
+  applyWaterExposure,
+} from "../../utils/waterExposure.js";
 
 // Maps catalog item IDs → archetypes for harvest yield entity creation.
 const CATALOG_ARCHETYPES = {
@@ -455,61 +457,20 @@ function _fountainDip(ctx) {
     world.emit?.("fountain:dip", { actor, targetId, itemId, effect: "nothing", itemName });
   } else if (roll < 0.90) {
     // ── Water damage to the dipped item ──────────────────────────
-    // Uses Material.corrosionResist (0–1) from materials.js as the
-    // sole gate.  High-resist materials (gold, mithril, titanium)
-    // shrug it off; low-resist metals (iron, copper, blood-iron)
-    // take real corrosion stacks identical to rust-monster hits.
-    // Non-metallic items with low resist just get wet (cosmetic).
-    const MAX_CORROSION = 3;
-    const mat = world.get(itemId, Material);
-    const resist = (mat && typeof mat.corrosionResist === "number")
-      ? mat.corrosionResist : 0.5;
-
-    if (resist >= 0.95) {
-      // Material is effectively rustproof (gold, titanium, mithril, etc.)
-      world.emit?.("fountain:dip", { actor, targetId, itemId, effect: "resist", itemName });
-    } else if (resist < 0.75) {
-      // Vulnerable — apply corrosion to the dipped item.
-      // Blessed items sacrifice their blessing to resist (one-time shield).
-      const dipBeat = world.get(itemId, Beatitude);
-      if (dipBeat && dipBeat.state === "blessed") {
-        world.set(itemId, Beatitude, { state: "uncursed" });
-        world.emit?.("fountain:dip", { actor, targetId, itemId, effect: "blessedResist", itemName });
-      } else {
-        const info = world.get(itemId, ItemInfo);
-        if (info) {
-          const stacks = (Number(info.corrosionStacks || 0) | 0);
-          if (stacks < MAX_CORROSION) {
-            const newStacks = stacks + 1;
-            info.corrosionStacks = newStacks;
-            if (info.bonuses && typeof info.bonuses === "object") {
-              let bestKey = null, bestVal = 0;
-              for (const [k, v] of Object.entries(info.bonuses)) {
-                if (typeof v === "number" && v > bestVal) { bestKey = k; bestVal = v; }
-              }
-              if (bestKey) info.bonuses[bestKey] = Math.max(0, info.bonuses[bestKey] - 1);
-            }
-            if (newStacks >= MAX_CORROSION) {
-              const rustNi = world.get(itemId, NamedIdentity);
-              if (rustNi && rustNi.name && !rustNi.name.startsWith("Corroded ")) {
-                rustNi.name = `Corroded ${rustNi.name}`;
-              }
-            }
-            world.emit?.("fountain:dip", {
-              actor, targetId, itemId, effect: "rust", itemName,
-              stacks: newStacks,
-            });
-          } else {
-            world.emit?.("fountain:dip", { actor, targetId, itemId, effect: "nothing", itemName });
-          }
-        } else {
-          world.emit?.("fountain:dip", { actor, targetId, itemId, effect: "wet", itemName });
-        }
-      }
-    } else {
-      // Mid-range resist (steel, bronze, etc.) — just gets wet, no damage
-      world.emit?.("fountain:dip", { actor, targetId, itemId, effect: "wet", itemName });
-    }
+    const exposure = applyWaterExposure(world, itemId, {
+      actor,
+      sourceId: targetId,
+      waterType: "plain",
+    });
+    world.emit?.("fountain:dip", {
+      actor,
+      targetId,
+      itemId,
+      effect: String(exposure?.effect || "wet"),
+      itemName,
+      stacks: Number(exposure?.stacks || 0) | 0,
+      ruined: exposure?.ruined === true,
+    });
   } else {
     // ── Spawn water creature ─────────────────────────────────────
     const fPos = world.get(targetId, Position);

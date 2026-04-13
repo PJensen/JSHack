@@ -903,6 +903,18 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     } else if (eff === 'resist') {
       ftext.addStatus(pos.x, pos.y - 0.45, 'NO EFFECT', { color: '#88aacc', life: 1.0, scaleStart: 1.1, scaleEnd: 1.0 });
       _fountainBurst(fx, pos, '#6688aa', 6);
+    } else if (eff === 'waterlogged') {
+      ftext.addStatus(pos.x, pos.y - 0.45, 'WATERLOGGED', { color: '#6aa7d8', life: 1.1, scaleStart: 1.2, scaleEnd: 1.0 });
+      _fountainBurst(fx, pos, '#4f89b8', 8);
+    } else if (eff === 'soggy') {
+      ftext.addStatus(pos.x, pos.y - 0.45, 'SOGGY', { color: '#8fa36b', life: 1.1, scaleStart: 1.2, scaleEnd: 1.0 });
+      _fountainBurst(fx, pos, '#70834e', 8);
+    } else if (eff === 'swollen') {
+      ftext.addStatus(pos.x, pos.y - 0.45, 'SWOLLEN', { color: '#b3895d', life: 1.1, scaleStart: 1.2, scaleEnd: 1.0 });
+      _fountainBurst(fx, pos, '#946a40', 8);
+    } else if (eff === 'diluted') {
+      ftext.addStatus(pos.x, pos.y - 0.45, 'DILUTED', { color: '#7ba8c9', life: 1.1, scaleStart: 1.2, scaleEnd: 1.0 });
+      _fountainBurst(fx, pos, '#5c88a9', 8);
     } else if (eff === 'creature') {
       if (ev.spawnedName) {
         ftext.addStatus(pos.x, pos.y - 0.45, 'SOMETHING STIRS!', { color: '#ff4466', life: 1.4, scaleStart: 1.5, scaleEnd: 1.0 });
