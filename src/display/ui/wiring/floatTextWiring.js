@@ -897,6 +897,12 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     } else if (eff === 'rust') {
       ftext.addStatus(pos.x, pos.y - 0.45, 'CORRODED!', { color: '#cc6633', life: 1.2, scaleStart: 1.3, scaleEnd: 1.0 });
       _fountainBurst(fx, pos, '#aa4422', 10);
+    } else if (eff === 'blessedResist') {
+      ftext.addStatus(pos.x, pos.y - 0.45, 'RESISTED', { color: '#ffee88', life: 1.0, scaleStart: 1.2, scaleEnd: 1.0 });
+      _fountainBurst(fx, pos, '#ffdd44', 8);
+    } else if (eff === 'resist') {
+      ftext.addStatus(pos.x, pos.y - 0.45, 'NO EFFECT', { color: '#88aacc', life: 1.0, scaleStart: 1.1, scaleEnd: 1.0 });
+      _fountainBurst(fx, pos, '#6688aa', 6);
     } else if (eff === 'creature') {
       if (ev.spawnedName) {
         ftext.addStatus(pos.x, pos.y - 0.45, 'SOMETHING STIRS!', { color: '#ff4466', life: 1.4, scaleStart: 1.5, scaleEnd: 1.0 });
