@@ -48,7 +48,6 @@ const RANGED_PROJECTILE_MAX_DURATION = 0.4;
 const EMBEDDED_ARROW_RECOVERY_CHANCE = 0.22;
 const BLUNT_ARROW_SPEED_MULT = 0.9;
 const PIERCING_ARROW_SPEED_MULT = 1.1;
-const MISS_BEHIND_DAMAGE_MULT = 0.6;
 
 /** @param {import('../../lib/ecs-js/index.js').World} world */
 export function rangedAttackSystem(world) {
@@ -263,29 +262,124 @@ export function rangedAttackSystem(world) {
         const strayId = missRay.hitTargetId | 0;
         const strayPos = world.get(strayId, Position);
         if (strayPos) {
+          const sx = strayPos.x | 0;
+          const sy = strayPos.y | 0;
+          const strayDist = chebyshevScalar(ax, ay, sx, sy);
+          const strayAtkSnapshot = resolveCombatSnapshot(world, attacker, { mode: 'ranged' });
+          const strayDefSnapshot = resolveCombatSnapshot(world, strayId, { mode: 'ranged' });
+          const strayPositional = getPositionalAttackBonus(world, attacker, strayId);
+          const strayBlindExposure = Math.max(0, Number(strayDefSnapshot?.status?.blinded || 0));
+          const strayAttackBonus = strayAtkSnapshot.attackBonus + strayPositional.attackBonus;
+          const strayArmorClass = strayDefSnapshot.armorClass;
+          const strayRangePenalty = Math.floor(strayDist / 3);
+          let strayArmorPenetration = Math.max(0, Number(strayAtkSnapshot.physicalPenetration || 0))
+            + Math.max(0, Number(strayAtkSnapshot.piercePenetration || 0));
+          const strayTotalToHit = d20 + strayAttackBonus - strayRangePenalty;
+
           const baseDice = weaponInfo.damageDice || '1d6';
           const damageRoll = rollDice(baseDice, r);
-          const flatBonus = atkSnapshot.damageFlatBonus;
+          const flatBonus = strayAtkSnapshot.damageFlatBonus;
           let strayDamage = Math.max(1, damageRoll + flatBonus);
-          strayDamage = Math.max(1, Math.floor(strayDamage * MISS_BEHIND_DAMAGE_MULT));
+          strayDamage = Math.max(1, Math.floor(strayDamage * strayPositional.damageMult));
+          if ((Number(strayAtkSnapshot?.posture?.lastMoveStep ?? -1) | 0) === (Number(world.step || 0) | 0)) {
+            strayDamage += 1;
+          }
+
+          let strayIsCrit = false;
+          const strayBlindCritBonusPct = getBlindedCritChanceBonusPct(strayBlindExposure);
+          const strayCritPct = (strayAtkSnapshot.critChance * 100) + (strayAtkSnapshot.luck || 0) + strayBlindCritBonusPct;
+          if (strayCritPct > 0) strayIsCrit = pct(r, strayCritPct);
+          const strayBlindCritMultBonus = getBlindedCritMultBonus(strayBlindExposure);
+          const strayCritMult = 2 + (strayAtkSnapshot.critMult || 0) + strayBlindCritMultBonus;
+          if (strayIsCrit) strayDamage = Math.max(1, Math.floor(strayDamage * strayCritMult));
+          strayDamage = calculateBlindedPhysicalDamage(strayDamage, strayBlindExposure);
+
+          const strayProcScratch = {};
+          let strayDamageType = 'pierce';
+          strayDamage = applyPendingDamageProcPhase(world, attacker, buildProcContext('onBeforeHit', {
+            source: attacker,
+            target: strayId,
+            item: weaponId,
+            damage: strayDamage,
+            damageType: strayDamageType,
+            crit: strayIsCrit,
+            scratch: strayProcScratch,
+            tags: ['ranged', 'projectile', `relation:${strayPositional.relation}`],
+          }), () => r(), { excludeSlots: ['weapon', 'offhand'] });
+
+          const strayActorImpactCtx = runAmmoScripts(world, ammoIdentity, 'onProjectileActorImpact', {
+            phase: 'projectile-actor-impact',
+            attacker,
+            defender: strayId,
+            ammoId,
+            ammoIdentity,
+            ammoInfo,
+            style: ammoStyle,
+            distance: strayDist,
+            damage: strayDamage,
+            d20,
+            totalToHit: strayTotalToHit,
+            armorClass: strayArmorClass,
+            critical: strayIsCrit,
+            damageType: strayDamageType,
+            armorPenetration: strayArmorPenetration,
+            rng: r,
+          });
+          if (strayActorImpactCtx) {
+            strayDamage = Math.max(0, strayActorImpactCtx.damage);
+            strayDamageType = strayActorImpactCtx.damageType;
+            strayArmorPenetration = Math.max(0, strayActorImpactCtx.armorPenetration);
+          }
+          strayDamage = applyPendingDamageProcPhase(world, attacker, buildProcContext('onHit', {
+            source: attacker,
+            target: strayId,
+            item: weaponId,
+            damage: strayDamage,
+            damageType: strayDamageType,
+            crit: strayIsCrit,
+            scratch: strayProcScratch,
+            tags: ['ranged', 'projectile', `relation:${strayPositional.relation}`],
+          }), () => r(), { excludeSlots: ['weapon', 'offhand'] });
+          applyReactionProcPhase(world, strayId, buildProcContext('onHit', {
+            source: attacker,
+            target: strayId,
+            item: weaponId,
+            damage: strayDamage,
+            damageType: strayDamageType,
+            crit: strayIsCrit,
+            scratch: strayProcScratch,
+            tags: ['ranged', 'projectile', `relation:${strayPositional.relation}`],
+          }), { excludeSlots: ['weapon'] });
+
+          applyWeaponCoatingOnHit(world, {
+            attacker,
+            defender: strayId,
+            weaponId: ammoId,
+            didHit: strayDamage > 0,
+          });
+
           const strayResult = dealDamage(world, {
             target: strayId,
             amount: strayDamage,
             source: attacker,
-            type: 'pierce',
+            type: strayDamageType,
             cause: 'ranged',
-            critical: false,
-            armorPenetration,
+            critical: strayIsCrit,
+            armorPenetration: strayArmorPenetration,
             projectileDelay: computeProjectileDelay(
               { x: ax, y: ay },
-              { x: strayPos.x | 0, y: strayPos.y | 0 },
+              { x: sx, y: sy },
               projectileSpeed,
               RANGED_PROJECTILE_MIN_DURATION,
               RANGED_PROJECTILE_MAX_DURATION,
             ),
-            impactVector: computeImpactVectorXY(ax, ay, strayPos.x | 0, strayPos.y | 0),
+            impactVector: computeImpactVectorXY(ax, ay, sx, sy),
             projectileKind: 'arrow',
           });
+          if (strayActorImpactCtx) {
+            strayActorImpactCtx.resolveDamageResult(strayResult);
+            strayActorImpactCtx.flushResolved();
+          }
           if (strayResult?.applied) {
             tryRecoverEmbeddedArrow(world, {
               attacker,
