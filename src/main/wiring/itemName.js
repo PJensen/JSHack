@@ -43,14 +43,15 @@ export function resolveItemDisplayName(world, entityId) {
   const info = world.get(entityId, ItemInfo);
   const materialState = world.get(entityId, MaterialState);
   const corrosionStacks = Math.max(
+    Number(materialState?.corrosionStacks || 0) | 0,
     Number(info?.corrosionStacks || 0) | 0,
     materialState?.corrosion >= 0.34 ? 1 : 0,
   );
   const wetness = Math.max(0, Number(materialState?.wetness || 0));
-  const waterloggedStacks = Math.max(Number(info?.waterloggedStacks || 0) | 0, wetness >= 0.35 ? 1 : 0);
-  const soggyStacks = Math.max(Number(info?.soggyStacks || 0) | 0, wetness >= 0.45 ? 1 : 0);
-  const dilutedStacks = Math.max(Number(info?.dilutedStacks || 0) | 0, wetness >= 0.5 ? 1 : 0);
-  const swollenStacks = Math.max(Number(info?.swollenStacks || 0) | 0, wetness >= 0.55 ? 1 : 0);
+  const waterloggedStacks = Math.max(Number(materialState?.waterloggedStacks || 0) | 0, Number(info?.waterloggedStacks || 0) | 0, wetness >= 0.35 ? 1 : 0);
+  const soggyStacks = Math.max(Number(materialState?.soggyStacks || 0) | 0, Number(info?.soggyStacks || 0) | 0, wetness >= 0.45 ? 1 : 0);
+  const dilutedStacks = Math.max(Number(materialState?.dilutedStacks || 0) | 0, Number(info?.dilutedStacks || 0) | 0, wetness >= 0.5 ? 1 : 0);
+  const swollenStacks = Math.max(Number(materialState?.swollenStacks || 0) | 0, Number(info?.swollenStacks || 0) | 0, wetness >= 0.55 ? 1 : 0);
 
   function withRustedTag(label) {
     const base = String(label || "item");

@@ -12,6 +12,7 @@ import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
 import { DungeonState } from "../src/rules/components/DungeonState.js";
 import { Inventory } from "../src/rules/components/Inventory.js";
 import { Material } from "../src/rules/components/Material.js";
+import { MaterialState } from "../src/rules/components/MaterialState.js";
 import { interactionSystem } from "../src/rules/systems/interactionSystem.js";
 import {
   addToInventory,
@@ -426,8 +427,10 @@ Deno.test("dip: rust outcome adds corrosion stack and reduces bonus", () => {
   assert(hit, "should find a seed that produces rust on iron item");
   assertEquals(hit.ev.effect, "rust");
   const info = hit.world.get(hit.item, ItemInfo);
+  const state = hit.world.get(hit.item, MaterialState);
   assert(info, "item should have ItemInfo");
   assert(Number(info.corrosionStacks || 0) > 0, "corrosionStacks should be incremented");
+  assert(Number(state?.corrosionStacks || 0) > 0, "material state corrosionStacks should be incremented");
 });
 
 Deno.test("dip: blessed item resists rust and loses blessing", () => {
@@ -519,8 +522,10 @@ Deno.test("dip: non-metal paper item waterlogs instead of rusting", () => {
   assertEquals(paperEv?.effect, "waterlogged", "paper should waterlog, not rust");
 
   const info = paper.world.get(paper.item, ItemInfo);
+  const state = paper.world.get(paper.item, MaterialState);
   assertEquals(Number(info?.corrosionStacks || 0), 0, "paper should not gain corrosion stacks");
   assert(Number(info?.waterloggedStacks || 0) > 0, "paper should gain waterlogged stacks");
+  assert(Number(state?.waterloggedStacks || 0) > 0, "material state should track waterlogged stacks");
 });
 
 Deno.test("dip corrosion uses derived [Rusted] display marker without mutating base name", () => {
@@ -550,7 +555,30 @@ Deno.test("dip: potion becomes diluted and display name reflects condition", () 
   assertEquals(ev?.effect, "diluted", "glass potion should be diluted by water");
 
   const info = potion.world.get(potion.item, ItemInfo);
+  const state = potion.world.get(potion.item, MaterialState);
   assert(Number(info?.dilutedStacks || 0) > 0, "potion should track diluted stacks");
+  assert(Number(state?.dilutedStacks || 0) > 0, "material state should track diluted stacks");
   const displayName = resolveItemDisplayName(potion.world, potion.item);
   assert(displayName.includes("[Diluted]"), "display name should include diluted marker");
+});
+
+Deno.test("dip: ash mixed with fountain water becomes mud", () => {
+  const rustSeed = findDipSeedForEffect("rust", "uncursed");
+  assert(rustSeed, "should find a seed that lands in water-damage band");
+
+  const ash = makeDipWorld(rustSeed.seed, 20, "uncursed", {
+    name: "Ash",
+    identity: "ash",
+    type: "junk",
+    slot: "bag",
+    materialKind: "sand",
+    bonuses: {},
+  });
+  const ev = dipOnce(ash.world, ash.actor, ash.fountain, ash.item);
+  assertEquals(ev?.effect, "mud", "ash should transform into mud when dipped");
+
+  const ni = ash.world.get(ash.item, NamedIdentity);
+  const mat = ash.world.get(ash.item, Material);
+  assertEquals(String(ni?.identity || ""), "mud");
+  assertEquals(String(mat?.kind || ""), "clay");
 });

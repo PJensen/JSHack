@@ -11,13 +11,30 @@ export const MaterialState = defineComponent(
     wetness: 0,
     heatC: 20,
     corrosion: 0,
+    corrosionStacks: 0,
+    waterloggedStacks: 0,
+    soggyStacks: 0,
+    swollenStacks: 0,
+    dilutedStacks: 0,
+    ruinedByWater: false,
     soot: 0,
     burning: false,
     brittleBonus: 0,
   },
   {
     validate(rec) {
-      const numericKeys = ["wetness", "heatC", "corrosion", "soot", "brittleBonus"];
+      const numericKeys = [
+        "wetness",
+        "heatC",
+        "corrosion",
+        "corrosionStacks",
+        "waterloggedStacks",
+        "soggyStacks",
+        "swollenStacks",
+        "dilutedStacks",
+        "soot",
+        "brittleBonus",
+      ];
       for (const key of numericKeys) {
         if (!Number.isFinite(Number(rec?.[key]))) {
           throw new Error(`MaterialState.validate(): ${key} must be finite`);
@@ -28,6 +45,9 @@ export const MaterialState = defineComponent(
       }
       if (typeof rec?.burning !== "boolean") {
         throw new Error("MaterialState.validate(): burning must be boolean");
+      }
+      if (typeof rec?.ruinedByWater !== "boolean") {
+        throw new Error("MaterialState.validate(): ruinedByWater must be boolean");
       }
       return true;
     },

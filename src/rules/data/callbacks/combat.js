@@ -22,6 +22,7 @@ import { emitSafe } from "../../utils/emitSafe.js";
 import { currentDepth } from "../../utils/worldAccess.js";
 import {
   applyCorrosionStack,
+  corrosionStacksOf,
   consumeBlessedRustWard,
   isMetalItemMaterial,
   isRustproofItemMaterial,
@@ -462,7 +463,7 @@ export function corrodeEquipmentOnHit(chancePct, seedSalt) {
         ctx.emit("proc:blessed_resist_rust", { target: ctx.defender, itemId, itemName: blessedName });
         continue;
       }
-      const stacks = Number(info.corrosionStacks || 0) | 0;
+      const stacks = corrosionStacksOf(ctx.world, itemId);
       if (stacks >= MAX_CORROSION_STACKS) continue;
       candidates.push({ slot, itemId, info });
     }

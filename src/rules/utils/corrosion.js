@@ -1,7 +1,9 @@
 import { Beatitude } from "../components/Beatitude.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { Material } from "../components/Material.js";
+import { MaterialState } from "../components/MaterialState.js";
 import { materialHasTag } from "../data/materials.js";
+import { ensureMaterialState } from "./materialStimulus.js";
 
 export const MAX_CORROSION_STACKS = 3;
 
@@ -31,14 +33,34 @@ export function consumeBlessedRustWard(world, itemId) {
   return true;
 }
 
+export function corrosionStacksOf(world, itemId) {
+  const info = world.get(itemId, ItemInfo);
+  const state = world.get(itemId, MaterialState);
+  return Math.max(
+    Number(state?.corrosionStacks || 0) | 0,
+    Number(info?.corrosionStacks || 0) | 0,
+    Number(state?.corrosion || 0) >= 0.34 ? 1 : 0,
+  );
+}
+
 export function applyCorrosionStack(world, itemId, maxStacks = MAX_CORROSION_STACKS) {
   const info = world.get(itemId, ItemInfo);
   if (!info) return { applied: false, stacks: 0, reason: "no_item_info" };
+  const rec = ensureMaterialState(world, itemId);
+  const state = rec?.state;
 
-  const stacks = Number(info.corrosionStacks || 0) | 0;
+  const stacks = corrosionStacksOf(world, itemId);
   if (stacks >= maxStacks) return { applied: false, stacks, reason: "maxed" };
 
   const next = stacks + 1;
+  if (state) {
+    state.corrosionStacks = next;
+    state.corrosion = Math.max(
+      Number(state.corrosion || 0),
+      Math.min(1, next / Math.max(1, maxStacks)),
+    );
+  }
+  // Compatibility mirror for one release.
   info.corrosionStacks = next;
 
   let reducedBonus = null;

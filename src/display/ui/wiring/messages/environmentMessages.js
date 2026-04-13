@@ -283,6 +283,8 @@ export function installEnvironmentMessages(ctx) {
       log(`You dip ${name} into the fountain. The wood swells from absorbed water.`, 'warning');
     } else if (effect === 'diluted') {
       log(`You dip ${name} into the fountain. Its contents look thinned and cloudy.`, 'warning');
+    } else if (effect === 'mud') {
+      log(`You dip ${name} into the fountain. It slumps into a clump of wet mud.`, 'warning');
     } else if (effect === 'wet') {
       log(`You dip ${name} into the fountain. ${name} comes out dripping wet, but otherwise fine.`, 'system');
     } else if (effect === 'creature') {
