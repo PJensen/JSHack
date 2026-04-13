@@ -34,6 +34,7 @@ import { areFactionsHostile } from "../utils/factionHostility.js";
 import { chebyshev, chebyshevScalar } from "../utils/distance.js";
 import { buildSpellDamageSpec, createSpellDamageContext, emitSpellMiss, getSpellHitChancePct, getSpellIntelligenceBonus, rollSpellHit, scaleSpellDamage } from "../utils/spellDamage.js";
 import { hasSpellLineOfSight } from "../utils/spellTargeting.js";
+import { computeMissEndpoint } from "../utils/projectileKinematics.js";
 import { isVisible as isTileVisible } from "../environment/dungeon/exploredMap.js";
 import { getPassiveBonuses, effectiveMaxHp, effectiveMaxMana, effectiveMaxStamina } from "../utils/passiveBonuses.js";
 import { Stamina } from "../components/Stamina.js";
@@ -103,6 +104,25 @@ function getFlashHealSpellLevel(world, actor, spell, intent) {
  */
 function createLOSBlocker(world) {
   return blockedCallback(buildBlocksVisionMap(world));
+}
+
+/**
+ * @param {World} world
+ * @param {number} sourceId
+ * @param {number} targetId
+ * @param {{x:number,y:number}} from
+ * @param {{x:number,y:number}} to
+ * @param {string} key
+ * @param {number} salt
+ */
+function resolveMissTo(world, sourceId, targetId, from, to, key, salt) {
+  return computeMissEndpoint(world, from, to, {
+    sourceId,
+    targetId,
+    key,
+    salt,
+    maxAngleDeg: 15,
+  });
 }
 
 /**
@@ -1083,15 +1103,19 @@ REGISTRY['frost'] = function frostScript(world, actor, spell, intent) {
   }
 
   // Emit semantic event for display VFX
+  const frostFrom = { x: apos.x, y: apos.y };
+  const frostAt = { x: target.x, y: target.y };
+  const frostMissed = frostResult.reason === 'missed';
   emitSafe(world, 'spell:frost', {
     actor,
     targetId: target.id,
-    from: { x: apos.x, y: apos.y },
-    at: { x: target.x, y: target.y },
+    from: frostFrom,
+    at: frostAt,
     duration: frostResult.applied ? duration : 0,
     mass: massKg,
     projectileDelay: _frostDelay,
-    missed: frostResult.reason === 'missed',
+    missed: frostMissed,
+    missTo: frostMissed ? resolveMissTo(world, actor, target.id, frostFrom, frostAt, 'spell:frost', 0x1075) : undefined,
   });
 };
 
@@ -1318,12 +1342,15 @@ REGISTRY['smite'] = function smiteScript(world, actor, spell, intent) {
     salt: target.id,
   }));
 
+  const smiteAt = { x: target.x, y: target.y };
+  const smiteMissed = result.reason === 'missed';
   emitSafe(world, 'spell:smite', {
     actor,
     targetId: target.id,
-    at: { x: target.x, y: target.y },
+    at: smiteAt,
     amount: result.amount || 0,
-    missed: result.reason === 'missed',
+    missed: smiteMissed,
+    missTo: smiteMissed ? resolveMissTo(world, actor, target.id, { x: apos.x, y: apos.y }, smiteAt, 'spell:smite', 0x5a17) : undefined,
   });
 
   // Dazzle: anyone with LOS to the impact gets a brief vision reduction (the flash).
@@ -2139,12 +2166,16 @@ REGISTRY['shadow_bolt'] = function shadowBoltScript(world, actor, spell, intent)
   }));
 
   // Emit VFX event
+  const shadowFrom = { x: apos.x, y: apos.y };
+  const shadowTo = { x: target.x, y: target.y };
+  const shadowMissed = result.reason === 'missed';
   emitSafe(world, 'spell:shadow_bolt', {
     actor,
     targetId: target.id,
-    from: { x: apos.x, y: apos.y },
-    to: { x: target.x, y: target.y },
-    missed: result.reason === 'missed',
+    from: shadowFrom,
+    to: shadowTo,
+    missed: shadowMissed,
+    missTo: shadowMissed ? resolveMissTo(world, actor, target.id, shadowFrom, shadowTo, 'spell:shadow_bolt', 0xb01a) : undefined,
   });
 };
 
@@ -2550,10 +2581,13 @@ REGISTRY['scorch'] = function scorchScript(world, actor, spell, intent) {
       hitChancePct,
       at: { x: tpos.x, y: tpos.y },
     });
+    const scorchFrom = { x: apos.x, y: apos.y };
+    const scorchAt = { x: tpos.x, y: tpos.y };
     emitSafe(world, 'spell:scorch', {
       actor, targetId,
-      from: { x: apos.x, y: apos.y }, at: { x: tpos.x, y: tpos.y },
+      from: scorchFrom, at: scorchAt,
       missed: true, hitChancePct,
+      missTo: resolveMissTo(world, actor, targetId, scorchFrom, scorchAt, 'spell:scorch', 0x5c0c2),
     });
     return;
   }
@@ -2618,6 +2652,7 @@ REGISTRY['scorch'] = function scorchScript(world, actor, spell, intent) {
     at: { x: tpos.x, y: tpos.y },
     amount: result.amount,
     critical,
+    missed: false,
   });
 };
 
@@ -2667,10 +2702,13 @@ REGISTRY['plague_swarm'] = function plagueSwarmScript(world, actor, spell, _inte
       hitChancePct: getSpellHitChancePct(world, actor, target.id),
       at: { x: target.x, y: target.y },
     });
+    const swarmFrom = { x: apos.x, y: apos.y };
+    const swarmAt = { x: target.x, y: target.y };
     emitSafe(world, 'spell:plague_swarm', {
       actor, targetId: target.id,
-      from: { x: apos.x, y: apos.y }, at: { x: target.x, y: target.y },
+      from: swarmFrom, at: swarmAt,
       missed: true,
+      missTo: resolveMissTo(world, actor, target.id, swarmFrom, swarmAt, 'spell:plague_swarm', 0x5a77),
     });
     return;
   }
@@ -2705,6 +2743,7 @@ REGISTRY['plague_swarm'] = function plagueSwarmScript(world, actor, spell, _inte
     from: { x: apos.x, y: apos.y },
     at: { x: target.x, y: target.y },
     potency: basePotency, duration,
+    missed: false,
   });
 };
 
@@ -2782,12 +2821,16 @@ REGISTRY['fireball'] = function fireballScript(world, actor, spell, _intent) {
   }
 
   // Emit VFX event
+  const fireballFrom = { x: apos.x, y: apos.y };
+  const fireballTo = { x: target.x, y: target.y };
+  const fireballMissed = result.reason === 'missed';
   emitSafe(world, 'spell:fireball', {
     actor,
     targetId: target.id,
-    from: { x: apos.x, y: apos.y },
-    to: { x: target.x, y: target.y },
-    missed: result.reason === 'missed',
+    from: fireballFrom,
+    to: fireballTo,
+    missed: fireballMissed,
+    missTo: fireballMissed ? resolveMissTo(world, actor, target.id, fireballFrom, fireballTo, 'spell:fireball', 0xf1b4) : undefined,
   });
 };
 
@@ -3168,11 +3211,16 @@ function runGeneratorScript(world, actor, spell, { baseAmount, type, cause, mana
     }
   }
 
+  const from = { x: apos.x, y: apos.y };
+  const at = { x: tpos.x, y: tpos.y };
+  const missed = result.reason === "missed";
   emitSafe(world, cause, {
     actor, targetId: bestId,
-    from: { x: apos.x, y: apos.y },
-    at: { x: tpos.x, y: tpos.y },
+    from,
+    at,
     hit: result.applied,
+    missed,
+    missTo: missed ? resolveMissTo(world, actor, bestId, from, at, cause, 0x6e91) : undefined,
     manaRestored,
     staminaRestored,
   });

@@ -1593,17 +1593,21 @@ export function createSpiritWispFxController(
     }
 
     // ── Ranged projectile spells ──────────────────────────────────────
-    world.on("spell:frost", ({ actor, targetId, from, at, fizzle, missed }) => {
+    world.on("spell:frost", ({ actor, targetId, from, at, fizzle, missed, missTo }) => {
       if (fizzle || !from || !at) return;
       const to = missed
-        ? computeMissEndpoint(from, at, missSeedFromIds(actor, targetId, 0x1075))
+        ? (missTo && Number.isFinite(missTo.x) && Number.isFinite(missTo.y)
+          ? { x: Number(missTo.x), y: Number(missTo.y) }
+          : computeMissEndpoint(from, at, missSeedFromIds(actor, targetId, 0x1075)))
         : at;
       _trySurge(from.x, from.y, to.x, to.y, 8);
     });
-    world.on("spell:shadow_bolt", ({ actor, targetId, from, to, fizzle, missed }) => {
+    world.on("spell:shadow_bolt", ({ actor, targetId, from, to, fizzle, missed, missTo }) => {
       if (fizzle || !from || !to) return;
       const end = missed
-        ? computeMissEndpoint(from, to, missSeedFromIds(actor, targetId, 0xb01a))
+        ? (missTo && Number.isFinite(missTo.x) && Number.isFinite(missTo.y)
+          ? { x: Number(missTo.x), y: Number(missTo.y) }
+          : computeMissEndpoint(from, to, missSeedFromIds(actor, targetId, 0xb01a)))
         : to;
       _trySurge(from.x, from.y, end.x, end.y, 10);
     });
@@ -1611,13 +1615,15 @@ export function createSpiritWispFxController(
       if (!from || !to || (chainIndex | 0) !== 0) return; // first chain segment only
       _trySurge(from.x, from.y, to.x, to.y, 14);
     });
-    world.on("spell:smite", ({ actor, targetId, fizzle, missed }) => {
+    world.on("spell:smite", ({ actor, targetId, fizzle, missed, missTo }) => {
       if (fizzle) return;
       const apos = getPosition(Number(actor || 0));
       const tpos = getPosition(Number(targetId || 0));
       if (apos && tpos) {
         const to = missed
-          ? computeMissEndpoint(apos, tpos, missSeedFromIds(actor, targetId, 0x5a17))
+          ? (missTo && Number.isFinite(missTo.x) && Number.isFinite(missTo.y)
+            ? { x: Number(missTo.x), y: Number(missTo.y) }
+            : computeMissEndpoint(apos, tpos, missSeedFromIds(actor, targetId, 0x5a17)))
           : tpos;
         _trySurge(apos.x, apos.y, to.x, to.y, 10);
       }
@@ -1628,32 +1634,38 @@ export function createSpiritWispFxController(
       if (fizzle || !from || !origin) return;
       _trySurge(from.x, from.y, origin.x, origin.y, 10);
     });
-    world.on("spell:scorch", ({ actor, targetId, fizzle, missed }) => {
+    world.on("spell:scorch", ({ actor, targetId, fizzle, missed, missTo }) => {
       if (fizzle) return;
       const apos = getPosition(Number(actor || 0));
       const tpos = getPosition(Number(targetId || 0));
       if (apos && tpos) {
         const to = missed
-          ? computeMissEndpoint(apos, tpos, missSeedFromIds(actor, targetId, 0x5c0c2))
+          ? (missTo && Number.isFinite(missTo.x) && Number.isFinite(missTo.y)
+            ? { x: Number(missTo.x), y: Number(missTo.y) }
+            : computeMissEndpoint(apos, tpos, missSeedFromIds(actor, targetId, 0x5c0c2)))
           : tpos;
         _trySurge(apos.x, apos.y, to.x, to.y, 10);
       }
     });
 
     // ── Fireball (wisp flies to target) ────────────────────────────
-    world.on("spell:fireball", ({ actor, targetId, from, to, fizzle, missed }) => {
+    world.on("spell:fireball", ({ actor, targetId, from, to, fizzle, missed, missTo }) => {
       if (fizzle || !from || !to) return;
       const end = missed
-        ? computeMissEndpoint(from, to, missSeedFromIds(actor, targetId, 0xf1b4))
+        ? (missTo && Number.isFinite(missTo.x) && Number.isFinite(missTo.y)
+          ? { x: Number(missTo.x), y: Number(missTo.y) }
+          : computeMissEndpoint(from, to, missSeedFromIds(actor, targetId, 0xf1b4)))
         : to;
       _trySurge(from.x, from.y, end.x, end.y, 10);
     });
 
     // ── Targeted DoTs (wisp flies to target on application) ──────────
-    world.on("spell:plague_swarm", ({ actor, targetId, from, at, fizzle, missed }) => {
+    world.on("spell:plague_swarm", ({ actor, targetId, from, at, fizzle, missed, missTo }) => {
       if (fizzle || !from || !at) return;
       const to = missed
-        ? computeMissEndpoint(from, at, missSeedFromIds(actor, targetId, 0x5a77))
+        ? (missTo && Number.isFinite(missTo.x) && Number.isFinite(missTo.y)
+          ? { x: Number(missTo.x), y: Number(missTo.y) }
+          : computeMissEndpoint(from, at, missSeedFromIds(actor, targetId, 0x5a77)))
         : at;
       _trySurge(from.x, from.y, to.x, to.y, 8);
     });
