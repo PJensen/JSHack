@@ -104,7 +104,7 @@ function setup(opts = {}) {
 
 function trackEvents(world, events) {
   events.length = 0;
-  for (const ev of ['ranged:shot', 'ranged:no-ammo', 'ranged:blocked', 'ranged:out-of-range', 'ranged:insufficient-stamina', 'attack:insufficient-stamina', 'damaged', 'died', 'proc:burning', 'proc:stunned']) {
+  for (const ev of ['ranged:shot', 'ranged:no-ammo', 'ranged:blocked', 'ranged:out-of-range', 'ranged:insufficient-stamina', 'attack:insufficient-stamina', 'ranged:miss-behind-hit', 'damaged', 'died', 'proc:burning', 'proc:stunned']) {
     world.on(ev, (data) => events.push({ _event: ev, ...data }));
   }
 }
@@ -897,4 +897,50 @@ Deno.test("ranged: miss emits directional missTo with forward overshoot", () => 
   const uy = vy / len;
   const forward = ((Number(missTo.x) - Number(from.x)) * ux) + ((Number(missTo.y) - Number(from.y)) * uy);
   assert(forward > (len * 1.1), `missTo should overshoot forward (forward=${forward}, len=${len})`);
+});
+
+Deno.test("ranged: deterministic miss ray can hit hostile behind the missed target", () => {
+  let validated = false;
+  for (let seed = 1; seed <= 1024; seed++) {
+    const events = [];
+    const { world, archer, target } = setup({
+      seed,
+      ax: 2,
+      ay: 2,
+      tx: 7,
+      ty: 2,
+      targetHp: 20,
+    });
+    trackEvents(world, events);
+
+    world.mutate(archer, Equipment, (eq) => {
+      eq.accuracyDerived = 0;
+      eq.damagePowerDerived = 4;
+    });
+    world.mutate(target, Equipment, (eq) => {
+      eq.evadeDerived = 200; // force miss on intended target
+    });
+
+    const behind = world.create();
+    world.add(behind, Position, { x: 9, y: 2 });
+    world.add(behind, Vitality, { maxHp: 20, hp: 20 });
+    world.add(behind, Equipment, { evadeDerived: 0 });
+    world.add(behind, Faction, { key: "enemy" });
+
+    world.add(archer, RangedAttackIntent, { targetId: target, toX: 7, toY: 2 });
+    rangedAttackSystem(world);
+
+    const shot = events.find((e) => e._event === "ranged:shot");
+    if (!shot || shot.hit !== false) continue;
+    const behindHit = events.find((e) => e._event === "ranged:miss-behind-hit" && (e.target | 0) === behind);
+    if (!behindHit) continue;
+
+    const intendedHp = world.get(target, Vitality)?.hp || 0;
+    const behindHp = world.get(behind, Vitality)?.hp || 0;
+    assertEquals(intendedHp, 20, "intended target should remain unharmed on miss");
+    assert(behindHp < 20, "hostile behind target should take stray miss-ray damage");
+    validated = true;
+    break;
+  }
+  assert(validated, "expected at least one deterministic seed where miss ray hits a hostile behind target");
 });

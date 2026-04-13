@@ -5,6 +5,7 @@ import { RangedAttackIntent } from '../components/Intents/RangedAttackIntent.js'
 import { Equipment } from '../components/Equipment.js';
 import { Inventory } from '../components/Inventory.js';
 import { Vitality } from '../components/Vitality.js';
+import { Collider } from '../components/Collider.js';
 import { ItemInfo } from '../components/ItemInfo.js';
 import { Stamina } from '../components/Stamina.js';
 import { Faction } from '../components/Faction.js';
@@ -39,6 +40,7 @@ import { getPositionalAttackBonus } from '../utils/combatPositioning.js';
 import { setCombatPosture } from '../utils/posture.js';
 import { chebyshevScalar } from '../utils/distance.js';
 import { computeImpactVectorXY, computeMissEndpoint, computeProjectileDelay } from '../utils/projectileKinematics.js';
+import { bresenhamLine } from '../../shared/math/bresenham.js';
 
 const RANGED_PROJECTILE_SPEED = 18;
 const RANGED_PROJECTILE_MIN_DURATION = 0.06;
@@ -46,6 +48,7 @@ const RANGED_PROJECTILE_MAX_DURATION = 0.4;
 const EMBEDDED_ARROW_RECOVERY_CHANCE = 0.22;
 const BLUNT_ARROW_SPEED_MULT = 0.9;
 const PIERCING_ARROW_SPEED_MULT = 1.1;
+const MISS_BEHIND_DAMAGE_MULT = 0.6;
 
 /** @param {import('../../lib/ecs-js/index.js').World} world */
 export function rangedAttackSystem(world) {
@@ -239,8 +242,6 @@ export function rangedAttackSystem(world) {
         rng: r,
       });
       world.emit?.('status', createStatusEvent({ id: defender, kind: 'miss', source: attacker }));
-      // Consume ammo even on miss
-      consumeAmmo(world, attacker, ammoId, ammoInfo);
       const missTo = computeMissEndpoint(world, apos, dpos, {
         sourceId: attacker,
         targetId: defender,
@@ -250,6 +251,60 @@ export function rangedAttackSystem(world) {
         minDistanceScale: 1.2,
         distanceExtraScale: 0.2,
       });
+      const missRay = resolveMissRayImpact(world, {
+        attacker,
+        defender,
+        from: { x: apos.x | 0, y: apos.y | 0 },
+        intended: { x: dpos.x | 0, y: dpos.y | 0 },
+        missTo,
+        isBlocked,
+      });
+      if (missRay?.hitTargetId > 0) {
+        const strayId = missRay.hitTargetId | 0;
+        const strayPos = world.get(strayId, Position);
+        if (strayPos) {
+          const baseDice = weaponInfo.damageDice || '1d6';
+          const damageRoll = rollDice(baseDice, r);
+          const flatBonus = atkSnapshot.damageFlatBonus;
+          let strayDamage = Math.max(1, damageRoll + flatBonus);
+          strayDamage = Math.max(1, Math.floor(strayDamage * MISS_BEHIND_DAMAGE_MULT));
+          const strayResult = dealDamage(world, {
+            target: strayId,
+            amount: strayDamage,
+            source: attacker,
+            type: 'pierce',
+            cause: 'ranged',
+            critical: false,
+            armorPenetration,
+            projectileDelay: computeProjectileDelay(
+              { x: ax, y: ay },
+              { x: strayPos.x | 0, y: strayPos.y | 0 },
+              projectileSpeed,
+              RANGED_PROJECTILE_MIN_DURATION,
+              RANGED_PROJECTILE_MAX_DURATION,
+            ),
+            impactVector: computeImpactVectorXY(ax, ay, strayPos.x | 0, strayPos.y | 0),
+            projectileKind: 'arrow',
+          });
+          if (strayResult?.applied) {
+            tryRecoverEmbeddedArrow(world, {
+              attacker,
+              defender: strayId,
+              ammoIdentity,
+              rng: r,
+            });
+            world.emit?.('ranged:miss-behind-hit', {
+              attacker,
+              missedTarget: defender,
+              target: strayId,
+              damage: strayResult.amount | 0,
+              missTo,
+            });
+          }
+        }
+      }
+      // Consume ammo on miss (whether or not a behind hit occurs)
+      consumeAmmo(world, attacker, ammoId, ammoInfo);
       world.emit?.('ranged:shot', {
         attacker,
         target: defender,
@@ -448,4 +503,65 @@ function tryRecoverEmbeddedArrow(world, { attacker, defender, ammoIdentity, rng 
     world.destroy(recoveredId);
     return;
   }
+}
+
+function tileKey(x, y) {
+  return `${x | 0},${y | 0}`;
+}
+
+function buildTileOccupants(world) {
+  /** @type {Map<string, number[]>} */
+  const byTile = new Map();
+  for (const [id, pos] of world.query(Position)) {
+    const k = tileKey(pos.x, pos.y);
+    if (!byTile.has(k)) byTile.set(k, []);
+    byTile.get(k).push(id);
+  }
+  return byTile;
+}
+
+function resolveMissRayImpact(world, { attacker, defender, from, intended, missTo, isBlocked }) {
+  const fx = Number(from?.x || 0) | 0;
+  const fy = Number(from?.y || 0) | 0;
+  const tx = Number(intended?.x || 0);
+  const ty = Number(intended?.y || 0);
+  const mx = Math.round(Number(missTo?.x || tx));
+  const my = Math.round(Number(missTo?.y || ty));
+  const aimDx = tx - fx;
+  const aimDy = ty - fy;
+  const aimLen = Math.hypot(aimDx, aimDy) || 1;
+  const ux = aimDx / aimLen;
+  const uy = aimDy / aimLen;
+  const byTile = buildTileOccupants(world);
+  const attackerFaction = String(world.get(attacker, Faction)?.key || '');
+
+  for (const [x, y] of bresenhamLine(fx, fy, mx, my)) {
+    if (isBlocked(x, y)) {
+      return { kind: 'wall', x, y, hitTargetId: 0 };
+    }
+
+    const ids = byTile.get(tileKey(x, y));
+    if (!ids || ids.length === 0) continue;
+
+    let blocker = 0;
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i] | 0;
+      if (id === attacker) continue;
+      const pos = world.get(id, Position);
+      if (!pos) continue;
+      const forward = ((Number(pos.x) - fx) * ux) + ((Number(pos.y) - fy) * uy);
+      if (forward <= (aimLen + 0.01)) continue; // only allow targets behind intended endpoint
+
+      const vit = world.get(id, Vitality);
+      const hp = Number(vit?.hp || 0);
+      const col = world.get(id, Collider);
+      const fac = String(world.get(id, Faction)?.key || '');
+      if (id !== defender && hp > 0 && areFactionsHostile(attackerFaction, fac)) {
+        return { kind: 'entity', x: pos.x | 0, y: pos.y | 0, hitTargetId: id };
+      }
+      if (id !== defender && (hp > 0 || !!col?.solid)) blocker = id;
+    }
+    if (blocker > 0) return { kind: 'entity-block', x, y, hitTargetId: 0, blockerId: blocker };
+  }
+  return null;
 }
