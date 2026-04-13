@@ -9,6 +9,7 @@ import { Equipment } from "../src/rules/components/Equipment.js";
 import { Owner } from "../src/rules/components/Owner.js";
 import { Position } from "../src/rules/components/Position.js";
 import { Devotion } from "../src/rules/components/Devotion.js";
+import { Status } from "../src/rules/components/Status.js";
 import { HEARING_TIERS } from "../src/rules/components/Anatomy.js";
 import { DungeonState } from "../src/rules/components/DungeonState.js";
 import { evaluateSound, thresholdForTier } from "../src/rules/utils/sound.js";
@@ -35,6 +36,7 @@ function installWithDeps(world, messageLog, playerId, { isVisibleAt } = {}) {
       Devotion,
       Anatomy,
       DungeonState,
+      Status,
     },
     soundApi: {
       evaluateSound,
@@ -430,6 +432,62 @@ Deno.test("messageWiring includes hit severity and hp context when provided", ()
   assert(text.includes("devastating"), "damage log should include severity flavor");
   assert(text.includes("barely standing"), "damage log should include wound-state flavor");
   assert(!text.includes("HP"), "damage log should avoid readout-style HP telemetry");
+});
+
+Deno.test("messageWiring wound flavor does not claim bleeding without bleed status", () => {
+  const world = new World({ seed: 42 });
+  const playerId = world.create();
+  world.add(playerId, Player, {});
+  world.add(playerId, Equipment, {});
+
+  const targetId = world.create();
+  world.add(targetId, NamedIdentity, { name: "Target Dummy", identity: "dummy" });
+
+  const messageLog = createMessageLog();
+  installWithDeps(world, messageLog, playerId);
+
+  world.emit("damaged", {
+    source: playerId,
+    target: targetId,
+    amount: 3,
+    cause: "melee",
+    hpAfter: 6,
+    maxHp: 12,
+  });
+
+  assertEquals(messageLog.entries.length, 1);
+  const text = String(messageLog.entries[0].text || "").toLowerCase();
+  assert(text.includes("wounded"), "expected wounded flavor at 50% hp");
+  assert(!text.includes("bleeding"), "should not claim bleeding when target has no bleed status");
+});
+
+Deno.test("messageWiring wound flavor mentions bleeding when bleed status is present", () => {
+  const world = new World({ seed: 42 });
+  const playerId = world.create();
+  world.add(playerId, Player, {});
+  world.add(playerId, Equipment, {});
+
+  const targetId = world.create();
+  world.add(targetId, NamedIdentity, { name: "Bleeding Dummy", identity: "dummy" });
+  world.add(targetId, Status, {
+    statuses: [{ type: "bleeding", duration: 3, potency: 1 }],
+  });
+
+  const messageLog = createMessageLog();
+  installWithDeps(world, messageLog, playerId);
+
+  world.emit("damaged", {
+    source: playerId,
+    target: targetId,
+    amount: 3,
+    cause: "melee",
+    hpAfter: 6,
+    maxHp: 12,
+  });
+
+  assertEquals(messageLog.entries.length, 1);
+  const text = String(messageLog.entries[0].text || "").toLowerCase();
+  assert(text.includes("wounded and bleeding"), "should mention bleeding when bleed status is present");
 });
 
 Deno.test("messageWiring logs spell-proc gear messages for player events", () => {

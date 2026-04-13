@@ -78,6 +78,28 @@ Deno.test("materializeSpawn does not equip non-humanoid monster loadout", () => 
   assertEquals(eq.ammo, null, 'non-humanoid should not receive ammo');
 });
 
+Deno.test("materializeSpawn equips authored non-humanoid monster ranged loadout", () => {
+  const world = new World({ seed: 42 });
+  const archerDef = getMonster('skeleton_archer');
+  const id = materializeSpawn(world, {
+    x: 8,
+    y: 8,
+    kind: 'monster',
+    params: {
+      name: archerDef.name,
+      identity: archerDef.id,
+      maxHp: archerDef.baseHp,
+      faction: 'enemy',
+      equipped: Array.isArray(archerDef.equipped) ? archerDef.equipped.slice() : [],
+    },
+  });
+
+  const eq = world.get(id, Equipment);
+  assert(eq, 'monster should have equipment component');
+  assert(eq.ranged !== null, 'authored ranged kit should equip on non-humanoid archer');
+  assert(eq.ammo !== null, 'authored ammo kit should equip on non-humanoid archer');
+});
+
 Deno.test("materializeSpawn goblin wielding picks authored shiv variants", () => {
   const seen = new Set();
   const goblinDef = getMonster("goblin");

@@ -4,7 +4,7 @@
  */
 export function installCombatMessages(ctx) {
   const { world, log, nameOfEntity, bracketizeName, compGet, compHas, playerEntity,
-          canSeeAt, normalizeStatusEvent, Equipment, ItemInfo, NamedIdentity, Pet, Owner, Player, Position } = ctx;
+          canSeeAt, normalizeStatusEvent, Equipment, ItemInfo, NamedIdentity, Pet, Owner, Player, Position, Status } = ctx;
 
   // === Monster ability messages ===
   world.on('monster:ability:windup', ({ actor, targetId, abilityName }) => {
@@ -431,7 +431,17 @@ export function installCombatMessages(ctx) {
     return `${line} Critical!`;
   }
 
-  function _woundSentence(defName, hpAfter, maxHp) {
+  function _hasBleedingStatus(entityId) {
+    const st = compGet(Number(entityId || 0), Status);
+    const statuses = Array.isArray(st?.statuses) ? st.statuses : [];
+    for (let i = 0; i < statuses.length; i++) {
+      const type = String(statuses[i]?.type || '').toLowerCase();
+      if (type === 'bleeding' || type === 'bleed') return true;
+    }
+    return false;
+  }
+
+  function _woundSentence(defName, hpAfter, maxHp, isBleeding) {
     const max = Math.max(0, Number(maxHp || 0));
     const after = Math.max(0, Number(hpAfter || 0));
     if (!(max > 0)) return '';
@@ -440,17 +450,17 @@ export function installCombatMessages(ctx) {
     const ratio = after / max;
     if (ratio > 0.85) return `${defName} ${be} barely scratched.`;
     if (ratio > 0.65) return `${defName} ${be} hurt.`;
-    if (ratio > 0.4) return `${defName} ${be} wounded and bleeding.`;
-    if (ratio > 0.2) return `${defName} ${be} staggering, bleeding out.`;
+    if (ratio > 0.4) return isBleeding ? `${defName} ${be} wounded and bleeding.` : `${defName} ${be} wounded.`;
+    if (ratio > 0.2) return isBleeding ? `${defName} ${be} staggering, bleeding out.` : `${defName} ${be} staggering.`;
     if (ratio > 0.08) return `${defName} ${be} barely standing.`;
     return `${defName} ${be} hanging on by a thread.`;
   }
 
-  function _combatDetailText(defName, amount, maxHp, hpAfter, isCrit, weaponClass, step) {
+  function _combatDetailText(defName, amount, maxHp, hpAfter, isCrit, weaponClass, step, isBleeding) {
     const max = Math.max(0, Number(maxHp || 0));
     if (!(max > 0)) return '';
     const impactTxt = _impactSentence(amount, max, isCrit, weaponClass, step);
-    const woundTxt = _woundSentence(defName, hpAfter, max);
+    const woundTxt = _woundSentence(defName, hpAfter, max, !!isBleeding);
     if (!impactTxt && !woundTxt) return '';
     if (!impactTxt) return ` ${woundTxt}`;
     if (!woundTxt) return ` ${impactTxt}`;
@@ -462,6 +472,7 @@ export function installCombatMessages(ctx) {
 
     const defName = nameOfEntity(target);
     const isCrit = !!(critical || crit);
+    const targetBleeding = _hasBleedingStatus(target);
     const handTxt = offhand ? ' (off-hand)' : '';
     const critTxt = isCrit ? ' \u2014 CRIT!' : '';
     const causeKey = String(cause || '').toLowerCase();
@@ -475,7 +486,7 @@ export function installCombatMessages(ctx) {
       const atkName = nameOfEntity(source);
 
       if (!isWeaponHit) {
-        const detailTxt = _combatDetailText(defName, amount, maxHp, hpAfter, isCrit, 'spell', world.step || 0);
+        const detailTxt = _combatDetailText(defName, amount, maxHp, hpAfter, isCrit, 'spell', world.step || 0, targetBleeding);
         const pair = _spellVerbs[dt] || ['hit', 'hits'];
         log(`${atkName} ${_v(atkName, pair[0], pair[1])} ${defName} for ${amount}${critTxt}.${detailTxt}`, 'combat');
         return;
@@ -515,6 +526,7 @@ export function installCombatMessages(ctx) {
         isCrit,
         String(impactProfile?.weaponClass || (usingRanged ? 'bow' : 'weapon')),
         world.step || 0,
+        targetBleeding,
       );
       const text = `${atkName} ${actionVerb} ${defName}${weaponPlain} for ${amount}${critTxt}${handTxt}.${detailTxt}`;
       const html = weaponRich
@@ -522,7 +534,7 @@ export function installCombatMessages(ctx) {
         : undefined;
       log({ text, html, type: 'combat' });
     } else {
-      const detailTxt = _combatDetailText(defName, amount, maxHp, hpAfter, isCrit, String(impactProfile?.weaponClass || ''), world.step || 0);
+      const detailTxt = _combatDetailText(defName, amount, maxHp, hpAfter, isCrit, String(impactProfile?.weaponClass || ''), world.step || 0, targetBleeding);
       log(`${defName} ${_v(defName, 'take', 'takes')} ${amount} damage${critTxt}${handTxt}.${detailTxt}`, 'combat');
     }
   });
