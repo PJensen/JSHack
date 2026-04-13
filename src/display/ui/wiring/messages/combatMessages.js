@@ -4,7 +4,8 @@
  */
 export function installCombatMessages(ctx) {
   const { world, log, nameOfEntity, bracketizeName, compGet, compHas, playerEntity,
-          canSeeAt, normalizeStatusEvent, Equipment, ItemInfo, NamedIdentity, Pet, Owner, Player, Position, Status } = ctx;
+          canSeeAt, normalizeStatusEvent, Equipment, ItemInfo, NamedIdentity, Pet, Owner, Player, Position, Status, ActiveEffects } = ctx;
+  const PROSE_STATE = Symbol.for("jshack:combatMessages:proseState");
 
   // === Monster ability messages ===
   world.on('monster:ability:windup', ({ actor, targetId, abilityName }) => {
@@ -421,14 +422,66 @@ export function installCombatMessages(ctx) {
     return String(pool[n]);
   }
 
-  function _impactSentence(amount, maxHp, isCrit, weaponClass, step) {
+  function _getProseState() {
+    if (!world[PROSE_STATE]) {
+      world[PROSE_STATE] = { recentByContext: new Map() };
+    }
+    return world[PROSE_STATE];
+  }
+
+  function _rememberLine(contextKey, line) {
+    const key = String(contextKey || '');
+    if (!key || !line) return;
+    const state = _getProseState();
+    const recent = state.recentByContext.get(key) || [];
+    const next = recent.filter((msg) => msg !== line);
+    next.push(line);
+    while (next.length > 4) next.shift();
+    state.recentByContext.set(key, next);
+  }
+
+  function _pickLineAvoidRecent(pool, seed, contextKey) {
+    if (!Array.isArray(pool) || pool.length === 0) return '';
+    const key = String(contextKey || '');
+    const state = _getProseState();
+    const recent = state.recentByContext.get(key) || [];
+    let chosen = '';
+    for (let shift = 0; shift < Math.max(1, pool.length); shift++) {
+      const candidate = _pickImpact(pool, seed + shift);
+      if (!recent.includes(candidate)) {
+        chosen = candidate;
+        break;
+      }
+      if (!chosen) chosen = candidate;
+    }
+    _rememberLine(key, chosen);
+    return chosen;
+  }
+
+  function _impactSentence(amount, maxHp, isCrit, weaponClass, step, contextKey = '') {
     const level = _impactLabel(amount, maxHp, isCrit);
     const wc = String(weaponClass || '').toLowerCase();
     const bank = _impactByWeapon[wc] || _impactByWeapon.weapon;
     const pool = bank[level] || _impactByWeapon.weapon[level] || _impactByWeapon.weapon.solid;
-    const line = _pickImpact(pool, (step | 0) + (Number(amount || 0) | 0) + (Number(maxHp || 0) | 0));
-    if (!isCrit) return line;
-    return `${line} Critical!`;
+    const seed = (step | 0) + (Number(amount || 0) | 0) + (Number(maxHp || 0) | 0);
+    if (!Array.isArray(pool) || pool.length === 0) return '';
+    const key = `${String(contextKey || '')}:impact`;
+    const state = _getProseState();
+    const recent = state.recentByContext.get(key) || [];
+
+    let chosen = '';
+    for (let shift = 0; shift < Math.max(1, pool.length); shift++) {
+      const line = _pickImpact(pool, seed + shift);
+      const candidate = isCrit ? `${line} Critical!` : line;
+      if (!recent.includes(candidate)) {
+        chosen = candidate;
+        break;
+      }
+      if (!chosen) chosen = candidate;
+    }
+
+    _rememberLine(key, chosen);
+    return chosen;
   }
 
   function _hasBleedingStatus(entityId) {
@@ -438,10 +491,17 @@ export function installCombatMessages(ctx) {
       const type = String(statuses[i]?.type || '').toLowerCase();
       if (type === 'bleeding' || type === 'bleed') return true;
     }
+    const fx = compGet(Number(entityId || 0), ActiveEffects);
+    const effects = Array.isArray(fx?.effects) ? fx.effects : [];
+    for (let i = 0; i < effects.length; i++) {
+      const key = String(effects[i]?.key || '').toLowerCase();
+      const turnsLeft = Number(effects[i]?.turnsLeft || 0);
+      if ((key === 'bleeding' || key === 'bleed') && turnsLeft > 0) return true;
+    }
     return false;
   }
 
-  function _woundSentence(defName, hpAfter, maxHp, isBleeding) {
+  function _woundSentence(defName, hpAfter, maxHp, isBleeding, step, contextKey = '') {
     const max = Math.max(0, Number(maxHp || 0));
     const after = Math.max(0, Number(hpAfter || 0));
     if (!(max > 0)) return '';
@@ -450,17 +510,31 @@ export function installCombatMessages(ctx) {
     const ratio = after / max;
     if (ratio > 0.85) return `${defName} ${be} barely scratched.`;
     if (ratio > 0.65) return `${defName} ${be} hurt.`;
-    if (ratio > 0.4) return isBleeding ? `${defName} ${be} wounded and bleeding.` : `${defName} ${be} wounded.`;
-    if (ratio > 0.2) return isBleeding ? `${defName} ${be} staggering, bleeding out.` : `${defName} ${be} staggering.`;
+    if (ratio > 0.4) {
+      const key = `${String(contextKey || '')}:wound:mid`;
+      const pool = isBleeding
+        ? [`${defName} ${be} wounded and bleeding.`, `${defName} ${be} bleeding from a deep cut.`]
+        : [`${defName} ${be} wounded.`, `${defName} ${be} clearly wounded.`];
+      const line = _pickLineAvoidRecent(pool, (step | 0) + after + max, key);
+      return line;
+    }
+    if (ratio > 0.2) {
+      const key = `${String(contextKey || '')}:wound:low`;
+      const pool = isBleeding
+        ? [`${defName} ${be} staggering, bleeding out.`, `${defName} ${be} reeling and losing blood.`]
+        : [`${defName} ${be} staggering.`, `${defName} ${be} reeling.`];
+      const line = _pickLineAvoidRecent(pool, (step | 0) + after + max + 7, key);
+      return line;
+    }
     if (ratio > 0.08) return `${defName} ${be} barely standing.`;
     return `${defName} ${be} hanging on by a thread.`;
   }
 
-  function _combatDetailText(defName, amount, maxHp, hpAfter, isCrit, weaponClass, step, isBleeding) {
+  function _combatDetailText(defName, amount, maxHp, hpAfter, isCrit, weaponClass, step, isBleeding, contextKey) {
     const max = Math.max(0, Number(maxHp || 0));
     if (!(max > 0)) return '';
-    const impactTxt = _impactSentence(amount, max, isCrit, weaponClass, step);
-    const woundTxt = _woundSentence(defName, hpAfter, max, !!isBleeding);
+    const impactTxt = _impactSentence(amount, max, isCrit, weaponClass, step, contextKey);
+    const woundTxt = _woundSentence(defName, hpAfter, max, !!isBleeding, step, contextKey);
     if (!impactTxt && !woundTxt) return '';
     if (!impactTxt) return ` ${woundTxt}`;
     if (!woundTxt) return ` ${impactTxt}`;
@@ -481,12 +555,13 @@ export function installCombatMessages(ctx) {
     const isWeaponHit = isMelee || usingRanged;
     const dt = String(type || '').toLowerCase();
     const attackKind = impactProfile?.attackKind || '';
+    const proseCtxKey = `${Number(source || 0) | 0}:${Number(target || 0) | 0}:${causeKey}:${String(impactProfile?.weaponClass || '')}:${dt}`;
 
     if (Number(source || 0)) {
       const atkName = nameOfEntity(source);
 
       if (!isWeaponHit) {
-        const detailTxt = _combatDetailText(defName, amount, maxHp, hpAfter, isCrit, 'spell', world.step || 0, targetBleeding);
+        const detailTxt = _combatDetailText(defName, amount, maxHp, hpAfter, isCrit, 'spell', world.step || 0, targetBleeding, proseCtxKey);
         const pair = _spellVerbs[dt] || ['hit', 'hits'];
         log(`${atkName} ${_v(atkName, pair[0], pair[1])} ${defName} for ${amount}${critTxt}.${detailTxt}`, 'combat');
         return;
@@ -527,6 +602,7 @@ export function installCombatMessages(ctx) {
         String(impactProfile?.weaponClass || (usingRanged ? 'bow' : 'weapon')),
         world.step || 0,
         targetBleeding,
+        proseCtxKey,
       );
       const text = `${atkName} ${actionVerb} ${defName}${weaponPlain} for ${amount}${critTxt}${handTxt}.${detailTxt}`;
       const html = weaponRich
@@ -534,7 +610,7 @@ export function installCombatMessages(ctx) {
         : undefined;
       log({ text, html, type: 'combat' });
     } else {
-      const detailTxt = _combatDetailText(defName, amount, maxHp, hpAfter, isCrit, String(impactProfile?.weaponClass || ''), world.step || 0, targetBleeding);
+      const detailTxt = _combatDetailText(defName, amount, maxHp, hpAfter, isCrit, String(impactProfile?.weaponClass || ''), world.step || 0, targetBleeding, proseCtxKey);
       log(`${defName} ${_v(defName, 'take', 'takes')} ${amount} damage${critTxt}${handTxt}.${detailTxt}`, 'combat');
     }
   });

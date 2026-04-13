@@ -72,6 +72,7 @@ export function createMessageContext({
     DungeonState,
     Status,
     Encumbrance,
+    ActiveEffects,
   } = components || {};
   const evaluateSound = typeof soundApi.evaluateSound === "function" ? soundApi.evaluateSound : () => ({ audible: false, clarity: "barely", perceivedDb: -Infinity });
   const thresholdForTier = typeof soundApi.thresholdForTier === "function" ? soundApi.thresholdForTier : () => Number.POSITIVE_INFINITY;
@@ -402,5 +403,6 @@ export function createMessageContext({
     Devotion,
     Status,
     Encumbrance,
+    ActiveEffects,
   };
 }
