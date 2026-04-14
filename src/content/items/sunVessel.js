@@ -131,29 +131,49 @@ defineItem('sun_vessel', {
   onTurnWhileCarried(ctx) {
     const st = ctx.state();
     if (st.charge <= 0) {
-      ctx.light(ctx.user, 0); // spent — no light
+      ctx.light(ctx.user, 0);
       return;
     }
 
-    // ── Dynamic light: scales with charge ───────────────────────
-    // Full charge = warm, stately glow. Cracked = volatile, nervous.
-    const chargeRatio = st.charge / st.maxCharge;
-    const baseRadius = 1.5 + chargeRatio * 2.5;   // 1.5–4.0 tiles
-    if (st.cracked) {
-      ctx.light(ctx.user, baseRadius, {
-        color: '#ffb347',
-        temporal: { speed: 2.0, sway: 0.12, wobble: 0.10, jitter: 0.08, rShift: 0.05 },
-      });
-    } else {
-      ctx.light(ctx.user, baseRadius, {
-        color: '#f6d365',
-        pattern: 'holy',
-      });
-    }
+    // ── Dynamic light ───────────────────────────────────────────
+    // The vessel's light IS its mood. Four axes drive it:
+    //   charge    → radius (how far it reaches)
+    //   stability → speed/wobble (how anxious it feels)
+    //   cracked   → jitter/color (bleeding, volatile)
+    //   undead    → sway amplitude (reacting to the dead)
 
-    const undead = ctx.entitiesInRadius(ctx.user, 4, { tag: 'undead' });
+    const chargeRatio = st.charge / st.maxCharge;         // 0–1
+    const stabRatio   = st.stability / 10;                // 0–1 (1 = calm)
+    const undead      = ctx.entitiesInRadius(ctx.user, 4, { tag: 'undead' });
+    const threat      = Math.min(undead.length / 3, 1.0); // 0–1
+
+    // Radius: charge drives reach, cracked bleeds brighter
+    const radius = st.cracked
+      ? 2.0 + chargeRatio * 3.5                           // cracked: 2.0–5.5
+      : 1.5 + chargeRatio * 2.5;                          // intact:  1.5–4.0
+
+    // Color: gold → amber → orange as it destabilizes
+    const color = st.cracked  ? '#ff9933'                  // cracked: deep amber
+      : threat > 0.5          ? '#f5b840'                  // sensing undead: warm
+      : stabRatio < 0.5       ? '#f0c040'                  // stressed: shifting
+                              : '#f6d365';                 // calm: soft gold
+
+    // Temporal: every axis nudges the waveform
+    ctx.light(ctx.user, radius, {
+      color,
+      temporal: {
+        speed:  0.6 + (1 - stabRatio) * 1.2 + threat * 0.8,   // calm=0.6, panicked=2.6
+        sway:   0.04 + threat * 0.12,                           // reacts to undead
+        wobble: 0.02 + (1 - stabRatio) * 0.10,                 // anxiety → wobble
+        jitter: st.cracked ? 0.08 + (1 - chargeRatio) * 0.06   // cracked: noisy, worse when low
+                           : 0.01,                              // intact: rock steady
+        rShift: st.cracked ? 0.06 : threat * 0.03,             // warm shift under stress
+        gShift: st.cracked ? -0.04 : 0,                        // cracked loses green
+        bShift: -threat * 0.03,                                 // undead drain blue
+      },
+    });
+
     if (undead.length === 0) {
-      // Recover stability slowly when safe
       if (st.stability < 10) {
         ctx.setState({ stability: Math.min(10, st.stability + 1) });
       }
