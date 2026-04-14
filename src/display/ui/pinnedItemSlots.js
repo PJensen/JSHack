@@ -124,6 +124,13 @@ export function createPinnedItemSlots() {
           rarityName: item.rarityName,
           glyph: item.glyph,
           glyphColor: item.glyphColor,
+          description: item.description,
+          contentStatus: item.contentStatus,
+          bonuses: item.bonuses,
+          damageDice: item.damageDice,
+          staminaCost: item.staminaCost,
+          twoHanded: item.twoHanded,
+          weight: item.weight,
         };
     renderItemDetails(tip, detailItem);
     tip.style.display = 'block';
@@ -360,6 +367,36 @@ export function createPinnedItemSlots() {
         pointerEvents: 'none',
       });
       btn.appendChild(countBadge);
+
+      // Content-DSL charge badge: show first numeric status line as a
+      // compact overlay on the quick slot (e.g. "3/8" for charges)
+      const statusLines = Array.isArray(item.contentStatus) ? item.contentStatus : [];
+      if (statusLines.length > 0) {
+        const first = statusLines[0];
+        // Extract "N/M" from status text like "Charges: ◈◈◈◇◇ 3/8"
+        const ratioMatch = typeof first?.text === 'string'
+          ? first.text.match(/(\d+)\/(\d+)\s*$/)
+          : null;
+        if (ratioMatch) {
+          const chargeBadge = document.createElement('span');
+          chargeBadge.textContent = `${ratioMatch[1]}/${ratioMatch[2]}`;
+          Object.assign(chargeBadge.style, {
+            position: 'absolute',
+            left: '2px',
+            bottom: '2px',
+            fontSize: '9px',
+            lineHeight: '1',
+            color: String(first.color || '#d4c8a0'),
+            background: 'rgba(16,22,38,0.85)',
+            borderRadius: '3px',
+            padding: '1px 3px',
+            pointerEvents: 'none',
+            fontWeight: 'bold',
+          });
+          btn.appendChild(chargeBadge);
+        }
+      }
+
       if (ring) btn.appendChild(ring.svg);
     }
     if (tooltipEl && tooltipEl.style.display === 'block' && tooltipAnchor) {
