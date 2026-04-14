@@ -2205,13 +2205,17 @@ function renderQuickChip(it, h) {
     textOverflow: 'ellipsis',
   });
   const line2 = document.createElement('span');
-  line2.textContent = getQuickChipDetailLine(it, { expanded: false });
+  // Prefer content status (e.g. "Charges: ◈◈◈◇◇ 3/8") over generic detail
+  const statusLines = Array.isArray(it.contentStatus) ? it.contentStatus : [];
+  const firstStatus = statusLines[0];
+  line2.textContent = firstStatus?.text || getQuickChipDetailLine(it, { expanded: false });
   Object.assign(line2.style, {
     fontSize: '10px',
     opacity: '0.8',
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
+    color: firstStatus?.color || 'inherit',
   });
   textWrap.appendChild(line1);
   textWrap.appendChild(line2);
@@ -2245,20 +2249,8 @@ function renderQuickChip(it, h) {
     borderRadius: '6px',
     background: '#0a111f',
   });
-  const detailItem = it.details && typeof it.details === 'object'
-    ? it.details
-    : {
-        id: it.id,
-        identity: it.identity,
-        type: it.type,
-        slot: it.slot,
-        name: it.name,
-        count: it.count,
-        rarityName: it.rarityName,
-        glyph: it.glyph,
-        glyphColor: it.glyphColor,
-      };
-  renderItemDetails(detailPanel, detailItem);
+  // Use the item directly — it IS the canonical inventory display data.
+  renderItemDetails(detailPanel, it);
   // Quick-chip header already shows item identity; hide duplicated title row in expanded details.
   if (detailPanel.firstElementChild) detailPanel.firstElementChild.remove();
   expandedWrap.appendChild(detailPanel);
