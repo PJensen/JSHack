@@ -1,8 +1,5 @@
 // Equipment entries for the item catalog.
 import { createTorchThrowHook } from "./itemCatalogHooks.js";
-import { ItemCooldown } from "../components/ItemCooldown.js";
-import { SUNSWORD_RAY_COOLDOWN_TURNS } from "./itemAbilityConstants.js";
-import { resolveItemCooldownRemaining } from "../utils/itemCooldowns.js";
 
 export const EQUIPMENT_ITEMS = {
   staff_oak: {
@@ -1971,43 +1968,7 @@ export const EQUIPMENT_ITEMS = {
     weight: 0.06,
   },
 
-  sunsword: {
-    id: "sunsword",
-    catalogKind: "equipment",
-    name: "Sunsword",
-    type: "equip",
-    slot: "weapon",
-    material: "gold",
-    rarity: 4,
-    rarityName: "epic",
-    bonuses: { attack: 2, damagePower: 2 },
-    damageDice: "1d8",
-    damageType: "slash",
-    staminaCost: 8,
-    tags: ["sunlight"],
-    description: "A blade of living light, warm to the touch. Undead recoil at its radiance.",
-    weight: 1.6,
-    hooks: {
-      on_use: (ctx, state) => {
-        const cd = ctx.query.get(state?.itemId | 0, ItemCooldown);
-        const turns = resolveItemCooldownRemaining(cd, ctx.query.worldStep());
-        if (turns > 0) {
-          ctx.io.message(`The Sunsword is still cooling down (${turns} turns).`, 'warning');
-          return {
-            consumed: false,
-            cancelled: true,
-            consumesTurn: false,
-            code: 'ITEM_ON_COOLDOWN',
-            message: 'Sunsword is on cooldown.',
-          };
-        }
-        const actor = Number(state?.actor || ctx.actor || 0) | 0;
-        const itemId = Number(state?.itemId || 0) | 0;
-        ctx.io.emit("sunsword:ray", { actor, itemId, cooldownTurns: SUNSWORD_RAY_COOLDOWN_TURNS });
-        return { consumed: false };
-      },
-    },
-  },
+  // Sunsword: migrated to content DSL (src/content/items/sunsword.js)
 
   // Legendary proc gear (tier 3+)
   stormcaller_blade: {
