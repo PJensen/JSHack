@@ -1917,6 +1917,24 @@ export function renderItemDetails(container, it) {
     }
   }
 
+  // --- Content-DSL status lines (authored dynamic state) ---
+  if (Array.isArray(it.contentStatus) && it.contentStatus.length > 0) {
+    for (const line of it.contentStatus) {
+      if (!line) continue;
+      const el = document.createElement('div');
+      if (typeof line === 'string') {
+        el.textContent = line;
+        el.style.color = '#d4c8a0';
+      } else if (typeof line === 'object') {
+        el.textContent = String(line.text || line.label || '');
+        el.style.color = String(line.color || '#d4c8a0');
+      }
+      el.style.fontSize = '12px';
+      el.style.marginBottom = '1px';
+      container.appendChild(el);
+    }
+  }
+
   // --- Weapon stats (damage dice, stamina cost, two-handed) ---
   const isWeapon = it.slot === 'weapon' || it.slot === 'ranged';
   if (isWeapon && (it.damageDice || it.staminaCost != null)) {
