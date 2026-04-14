@@ -326,6 +326,56 @@ export class ScriptCtx {
     return null;
   }
 
+  // ── Lighting ───────────────────────────────────────────────────────
+
+  /**
+   * Set a dynamic point light on an entity. Persists across frames
+   * until changed or cleared. Radius 0 removes the light.
+   *
+   * @param {number} entity - entity to anchor the light to
+   * @param {number} radius - light radius in tiles (0 to remove)
+   * @param {{ color?: string, pattern?: string, softness?: number, temporal?: object }} [opts]
+   *
+   * opts.pattern — named pattern: 'torch', 'holy', 'breathe', 'occult',
+   *   'pulse', 'storm', 'biolum', 'heartbeat', 'candle', 'ember', 'void'
+   *
+   * opts.temporal — authored temporal definition (overrides pattern):
+   *   {
+   *     speed:  1.0,     // base animation speed
+   *     sway:   0.10,    // slow sinusoidal sway amplitude
+   *     wobble: 0.06,    // medium wobble amplitude
+   *     jitter: 0.04,    // random frame-to-frame jitter
+   *     rShift: 0,       // red color shift (-1 to 1)
+   *     gShift: 0,       // green color shift
+   *     bShift: 0,       // blue color shift
+   *   }
+   */
+  light(entity, radius, opts = {}) {
+    // If an authored temporal spec is provided, register it as a named pattern
+    let pattern = opts.pattern || 'holy';
+    if (opts.temporal) {
+      const tp = opts.temporal;
+      pattern = `_content_${this.identity}_${entity}`;
+      this._emit('content:light:registerPattern', {
+        name: pattern,
+        speed:  tp.speed  ?? 1.0,
+        sway:   tp.sway   ?? 0.10,
+        wobble: tp.wobble  ?? 0.06,
+        jitter: tp.jitter  ?? 0.04,
+        rShift: tp.rShift  ?? 0,
+        gShift: tp.gShift  ?? 0,
+        bShift: tp.bShift  ?? 0,
+      });
+    }
+    this._emit('content:light:set', {
+      entity,
+      radius,
+      color: opts.color || '#fff5c8',
+      pattern,
+      softness: opts.softness || 10,
+    });
+  }
+
   // ── Presentation ──────────────────────────────────────────────────
 
   /**

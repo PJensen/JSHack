@@ -240,3 +240,15 @@ export function evaluatePattern(name, t, id) {
 export function getPatternNames() {
   return Object.keys(PATTERNS);
 }
+
+/**
+ * Register a content-authored temporal pattern at runtime.
+ * Allows defineItem/defineMonster to declare custom light behavior
+ * inline rather than only referencing built-in patterns.
+ *
+ * @param {string} name - unique pattern name
+ * @param {(t: number, id: number) => PatternResult} fn
+ */
+export function registerPattern(name, fn) {
+  if (typeof fn === 'function') PATTERNS[name] = fn;
+}

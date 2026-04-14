@@ -142,7 +142,17 @@ defineItem('dawnbreaker', {
   // Radiance decays slowly if the player isn't fighting.
   onTurnWhileEquipped(ctx) {
     const st = ctx.state();
-    if (st.radiance <= 0) return;
+    if (st.radiance <= 0) {
+      ctx.light(ctx.user, 0);
+      return;
+    }
+
+    // ── Dynamic light: scales with radiance ─────────────────────
+    const radRatio = st.radiance / st.maxRad;
+    ctx.light(ctx.user, 1.0 + radRatio * 3.0, {
+      color: st.awakened ? '#ffe577' : '#f0c040',
+      pattern: st.awakened ? 'holy' : 'breathe',
+    });
 
     // ── Awakened aura ───────────────────────────────────────────
     if (st.awakened) {
