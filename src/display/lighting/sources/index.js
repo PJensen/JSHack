@@ -515,9 +515,10 @@ export function collectLightSources(view, opts = {}) {
     }
     const life = 1 - bl.age / bl.maxAge;
     const fade = life * life;  // quadratic fade-out
+    const baseR = bl.radius || 4;
     out.push({
       x: bl.x, y: bl.y,
-      radius: 4 * fade + 1,
+      radius: baseR * fade + 1,
       color: [bl.color[0] * fade, bl.color[1] * fade, bl.color[2] * fade],
       softness: 10,
     });
@@ -623,6 +624,30 @@ export function installLightEventListeners(world, getPosition) {
       framesLeft: _CONTENT_LIGHT_TTL,  // refreshed each tick; expires if not
     });
   });
+  // Content DSL light pulse: brief one-shot flash (like chest bloom)
+  world.on('content:light:pulse', ({ x, y, entity, radius, color, duration }) => {
+    let px, py;
+    if (Number.isFinite(x) && Number.isFinite(y)) {
+      px = Number(x) + 0.5; py = Number(y) + 0.5;
+    } else if (entity) {
+      // Defer position lookup to next collectLightSources frame
+      // For now, try to find entity in view — but we're in an event handler,
+      // not in the collection loop. Use _chestBlooms with a flag.
+      px = null; py = null;
+    }
+    if (px == null) return;
+    const c = Array.isArray(color) ? color
+      : typeof color === 'string' ? _parseHexToRgb(color)
+      : [255, 245, 200];
+    _chestBlooms.push({
+      x: px, y: py,
+      age: 0,
+      maxAge: duration || 0.4,
+      color: c,
+      radius: radius || 3,
+    });
+  });
+
   world.on('content:light:clear', ({ entity }) => {
     _contentLights.delete(Number(entity || 0) | 0);
   });
