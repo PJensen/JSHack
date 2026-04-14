@@ -149,6 +149,9 @@ export function installContentVfxWiring({ world, ftext, fx, getPosition, isVisib
     const pos = getPosition(Number(entity || 0));
     if (!pos || !canShowAt(pos.x, pos.y)) return;
 
+    // Resolve user position for beam origins
+    const userPos = payload?.user ? getPosition(Number(payload.user || 0)) : null;
+
     // Sound
     if (spec.sound) {
       world.emit('audio:play', { id: spec.sound });
@@ -157,7 +160,7 @@ export function installContentVfxWiring({ world, ftext, fx, getPosition, isVisib
     // VFX effects array
     if (Array.isArray(spec.vfx)) {
       for (const effect of spec.vfx) {
-        _renderPresentationEffect(effect, pos, payload, fx, ftext);
+        _renderPresentationEffect(effect, pos, userPos, payload, fx, ftext, world);
       }
     }
 
@@ -171,11 +174,41 @@ export function installContentVfxWiring({ world, ftext, fx, getPosition, isVisib
   /**
    * Render a single presentation VFX effect.
    */
-  function _renderPresentationEffect(effect, pos, payload, fx, ftext) {
-    if (!effect?.type || !fx?.pool) return;
+  function _renderPresentationEffect(effect, pos, userPos, payload, fx, ftext, world) {
+    if (!effect?.type) return;
     const c = parseHex(effect.color || effect.palette || '#ffffff');
 
     switch (effect.type) {
+      case 'beam': {
+        // Real LineFx beam via boltFxController + holy lighting
+        const from = userPos || pos;
+        const to = pos;
+        world.emit('content:beam:vfx', {
+          fromX: from.x, fromY: from.y,
+          toX: to.x, toY: to.y,
+          style: effect.style || 'holy',
+          shake: effect.shake ?? 2,
+        });
+        // Also spawn particles along the beam for extra density
+        if (fx?.pool) {
+          const steps = 6;
+          for (let i = 0; i <= steps; i++) {
+            const t = i / steps;
+            const x = from.x + (to.x - from.x) * t;
+            const y = from.y + (to.y - from.y) * t;
+            fx.pool.spawn(new Particle({
+              x, y: y - 0.1,
+              vx: (Math.random() - 0.5) * 0.3,
+              vy: (Math.random() - 0.5) * 0.3 - 0.1,
+              ax: 0, ay: 0,
+              life: 0.25 + Math.random() * 0.15,
+              size0: 0.09, size1: 0.02,
+              r: c.r, g: c.g, b: c.b, a0: 0.95,
+            }));
+          }
+        }
+        break;
+      }
       case 'burst': {
         const n = Math.min(effect.count || 8, 32);
         const spd = effect.speed || 1.0;
