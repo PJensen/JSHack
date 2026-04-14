@@ -73,10 +73,12 @@ function _parseHexToRgb(hex) {
   ];
 }
 
-// Content-DSL dynamic lights — set by ctx.light(), persist until overwritten or cleared.
+// Content-DSL dynamic lights — set by ctx.light(), expire if not refreshed.
 // Keyed by entity ID so each entity has at most one content light.
-/** @type {Map<number, {x:number, y:number, radius:number, color:[number,number,number], pattern:string, softness:number}>} */
+// `framesLeft` counts down each frame; tick hooks refresh it each turn.
+/** @type {Map<number, {x:number, y:number, radius:number, color:[number,number,number], pattern:string, softness:number, framesLeft:number}>} */
 const _contentLights = new Map();
+const _CONTENT_LIGHT_TTL = 90; // ~1.5 seconds at 60fps — enough to survive between game ticks
 
 /**
  * Apply a named temporal pattern to a light definition and push it.
@@ -476,23 +478,31 @@ export function collectLightSources(view, opts = {}) {
     ], softness: 5 });
   }
 
-  // ---- Content DSL dynamic lights (entity-anchored, persist across frames) --
-  if (view.entities && _contentLights.size > 0) {
+  // ---- Content DSL dynamic lights (entity-anchored, auto-expire) -----------
+  if (_contentLights.size > 0) {
+    const expired = [];
     for (const [entId, light] of _contentLights) {
+      // Expire if not refreshed by tick hook
+      light.framesLeft -= 1;
+      if (light.framesLeft <= 0) { expired.push(entId); continue; }
+
       // Find entity position in current view
       let found = false;
-      for (let i = 0; i < view.entities.length; i++) {
-        const e = view.entities[i];
-        if ((Number(e.id || 0) | 0) !== entId) continue;
-        light.x = (e.pos?.x ?? e.x ?? 0) + 0.5;
-        light.y = (e.pos?.y ?? e.y ?? 0) + 0.5;
-        found = true;
-        break;
+      if (view.entities) {
+        for (let i = 0; i < view.entities.length; i++) {
+          const e = view.entities[i];
+          if ((Number(e.id || 0) | 0) !== entId) continue;
+          light.x = (e.pos?.x ?? e.x ?? 0) + 0.5;
+          light.y = (e.pos?.y ?? e.y ?? 0) + 0.5;
+          found = true;
+          break;
+        }
       }
-      if (!found) continue; // entity not visible this frame
+      if (!found) continue;
       emitPatterned(out, light.pattern, t, entId, light.x, light.y,
         light.radius, light.color, light.softness);
     }
+    for (const id of expired) _contentLights.delete(id);
   }
 
   // ---- Chest reveal blooms (one-shot fading flashes) --------------------
@@ -605,11 +615,12 @@ export function installLightEventListeners(world, getPosition) {
       : typeof color === 'string' ? _parseHexToRgb(color)
       : [255, 245, 200];
     _contentLights.set(id, {
-      x: 0, y: 0,  // updated each frame from entity position
+      x: 0, y: 0,
       radius: Math.max(0.5, Math.min(12, Number(radius))),
       color: c,
       pattern: pattern || 'holy',
       softness: softness || 10,
+      framesLeft: _CONTENT_LIGHT_TTL,  // refreshed each tick; expires if not
     });
   });
   world.on('content:light:clear', ({ entity }) => {

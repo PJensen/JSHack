@@ -83,14 +83,6 @@ defineItem('sun_vessel', {
     const chargeLeft = Math.max(0, st.charge);
     const landing = ctx.targetPos;
 
-    // Emit throw arc so the display shows the projectile flight
-    ctx.emit('item:thrown', {
-      actor: ctx.user,
-      itemId: ctx.self,
-      from: ctx.targetPos ? undefined : null, // filled by pipeline if available
-      to: landing,
-    });
-
     if (chargeLeft === 0) {
       ctx.message('The empty {item} shatters harmlessly.', 'system');
       ctx.consume();

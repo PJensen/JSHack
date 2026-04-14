@@ -80,7 +80,7 @@ export function createThrowFxController({ world, resolveItemMeta }) {
   }
 
   function installListeners() {
-    world.on('item:thrown', ({ itemId, from, to }) => {
+    world.on('item:thrown', ({ itemId, from, to, consumed }) => {
       const id = Number(itemId || 0) | 0;
       if (!(id > 0)) return;
       if (!from || !to) return;
@@ -108,6 +108,7 @@ export function createThrowFxController({ world, resolveItemMeta }) {
         duration: _duration(dist),
         kind: resolveThrownKind(id, ""),
         isPotion: isThrownPotion(id),
+        consumed: !!consumed,
       });
       syncInputLock();
     });
@@ -119,7 +120,9 @@ export function createThrowFxController({ world, resolveItemMeta }) {
       const rec = _fx[i];
       rec.t += dt;
       const done = rec.t >= rec.duration;
-      const gone = !world.isAlive(rec.itemId);
+      // Don't kill the arc early if the item was consumed (e.g. DSL onThrow
+      // that calls ctx.consume() — the entity dies but the arc should finish)
+      const gone = !rec.consumed && !world.isAlive(rec.itemId);
       if (!done && !gone) continue;
       _hidden.delete(rec.itemId);
       _fx.splice(i, 1);

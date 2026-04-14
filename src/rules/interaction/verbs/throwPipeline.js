@@ -288,6 +288,18 @@ export function throwPipeline(ctx) {
   }
 
   if (hookResult.consumed) {
+    // Emit throw arc directly (bypass event buffer) so throwFxController
+    // receives it BEFORE tx.commit() destroys the entity.
+    ctx.world.emit?.("item:thrown", {
+      actor, itemId, targetId,
+      from: { ...throwSpec.from },
+      to: { ...throwSpec.to },
+      range: throwSpec.range,
+      maxRange: throwSpec.maxRange,
+      weight: throwSpec.weight,
+      path: metrics.path,
+      consumed: true,
+    });
     ctx.mutate.consume(itemId, actor);
     metrics.consumed = true;
   } else if (!hookResult.skipBaseThrow) {
