@@ -91,6 +91,12 @@ export function createWorldFacade(world, actor, itemId) {
     _ScriptState: ScriptState,
     _ItemInfo: ItemInfo,
 
+    _hpPercent(entityId) {
+      const vit = world.get(entityId, Vitality);
+      if (!vit) return 1.0;
+      return vit.hp / Math.max(1, vit.maxHp);
+    },
+
     _getScriptState(entityId) {
       const ss = world.get(entityId, ScriptState);
       return ss ? ss.data : {};

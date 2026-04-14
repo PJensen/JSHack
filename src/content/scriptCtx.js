@@ -229,6 +229,18 @@ export class ScriptCtx {
     }
   }
 
+  // ── Vitals ─────────────────────────────────────────────────────────
+
+  /**
+   * Get an entity's HP as a fraction 0–1.
+   * @param {number} entity
+   * @returns {number}
+   */
+  hpPercent(entity) {
+    if (this._ctx._hpPercent) return this._ctx._hpPercent(entity);
+    return 1.0;
+  }
+
   // ── Semantic Queries ──────────────────────────────────────────────
 
   /**

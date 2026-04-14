@@ -6,6 +6,7 @@ import { Inventory } from "../components/Inventory.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { Mana } from "../components/Mana.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
+import { ScriptState } from "../components/ScriptState.js";
 import { getCatalogItem } from "../data/itemCatalog.js";
 import { getMonster } from "../data/monsters.js";
 import { addToInventory } from "./inventoryFacade.js";
@@ -243,6 +244,12 @@ export function spawnMonsterEntity(world, params = {}) {
   }
 
   equipMonsterLoadout(world, id, p);
+
+  // Content-DSL: attach ScriptState if the monster def has local state
+  const mdef = p.identity ? getMonster(p.identity) : null;
+  if (mdef?._contentState) {
+    try { world.add(id, ScriptState, { data: { ...mdef._contentState } }); } catch {}
+  }
 
   return id;
 }

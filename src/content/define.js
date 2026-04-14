@@ -4,7 +4,8 @@
 // registrations (catalog entry, palette entry, monster def, hooks).
 
 import { registerItem, registerMonster, registerPalette, registerPresentation } from './registry.js';
-import { compileHook } from './scriptCtx.js';
+import { compileHook, ScriptCtx } from './scriptCtx.js';
+import { createWorldFacade } from './worldFacade.js';
 import { inferItemCategory, resolveRarity, SHELF_LIFE } from './helpers.js';
 
 // ── Hook names the DSL recognises, mapped to catalog hook keys ──────
@@ -333,8 +334,11 @@ export function defineMonster(id, def) {
   if (def.corpseDropChance != null) monsterDef.corpseDropChance = def.corpseDropChance;
   if (def.goreType) monsterDef.goreType = def.goreType;
 
-  // Hooks — pass through directly (already compatible arrays of callbacks)
-  if (def.hooks) monsterDef.hooks = def.hooks;
+  // ── Hooks ──────────────────────────────────────────────────────
+  // Merge raw callback arrays (existing pattern) with compiled DSL hooks.
+  const hooks = def.hooks ? { ...def.hooks } : {};
+  _compileMonsterDslHooks(id, def, hooks);
+  if (Object.keys(hooks).length > 0) monsterDef.hooks = hooks;
 
   // Special descriptions (for bestiary / tooltip)
   if (def.specials) monsterDef.specials = def.specials;
@@ -346,6 +350,14 @@ export function defineMonster(id, def) {
 
   // Corpse eating
   if (def.corpseEat) monsterDef.corpseEat = def.corpseEat;
+
+  // Local persistent state
+  if (def.state && typeof def.state === 'object') {
+    monsterDef._contentState = { ...def.state };
+  }
+
+  // AI hints
+  if (def.aiHints) monsterDef._contentAiHints = def.aiHints;
 
   // Metadata
   if (def.meta) monsterDef._contentMeta = def.meta;
@@ -362,7 +374,68 @@ export function defineMonster(id, def) {
     registerPalette(id, entry);
   }
 
+  // ── Presentations ─────────────────────────────────────────────
+  if (def.presentations && typeof def.presentations === 'object') {
+    for (const [presId, spec] of Object.entries(def.presentations)) {
+      registerPresentation(id, presId, spec);
+    }
+  }
+
   return id;
+}
+
+// ── DSL monster hook compilation ────────────────────────────────────
+// Wraps ScriptCtx-style functions into callbacks that the existing
+// combat/AI/death systems can invoke. Each hook type gets a different
+// adapter because the callback context shapes differ.
+
+const _MONSTER_DSL_HOOKS = ['whileLOS', 'onSeen', 'onHit', 'onDamaged', 'onDeath'];
+
+function _compileMonsterDslHooks(id, def, hooks) {
+  for (const hookName of _MONSTER_DSL_HOOKS) {
+    if (typeof def[hookName] !== 'function') continue;
+    const compiled = _wrapMonsterHook(id, hookName, def[hookName]);
+    if (!hooks[hookName]) hooks[hookName] = [];
+    hooks[hookName].push(compiled);
+  }
+}
+
+function _wrapMonsterHook(identity, hookName, dslFn) {
+  return (callbackCtx) => {
+    try {
+      const world = callbackCtx.world;
+      let actor, target;
+
+      if (hookName === 'whileLOS' || hookName === 'onSeen') {
+        actor = callbackCtx.actor | 0;
+        target = callbackCtx.target | 0;
+      } else if (hookName === 'onHit') {
+        actor = callbackCtx.attacker | 0;   // the monster that hit
+        target = callbackCtx.defender | 0;   // who got hit
+      } else if (hookName === 'onDamaged') {
+        actor = callbackCtx.defender | 0;    // the monster taking damage
+        target = callbackCtx.attacker | 0;   // who dealt it
+      } else if (hookName === 'onDeath') {
+        actor = callbackCtx.deadId | 0;
+        target = callbackCtx.killer | 0;
+      } else {
+        return;
+      }
+
+      const facade = createWorldFacade(world, actor, actor);
+      const state = { actor, itemId: actor, target, identity };
+      const ctx = new ScriptCtx(facade, state);
+
+      // Expose combat-specific context for damage hooks
+      if (hookName === 'onHit' || hookName === 'onDamaged') {
+        ctx._combatCtx = callbackCtx;
+      }
+
+      dslFn(ctx);
+    } catch (err) {
+      console.error(`[defineMonster] Error in ${hookName} hook for "${identity}":`, err);
+    }
+  };
 }
 
 
