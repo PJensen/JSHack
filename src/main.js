@@ -287,6 +287,7 @@ bootAdvance("Configured ECS systems");
 // ---- Content DSL: load all scripted content, then install into engine -------
 import './content/items/potionOfRadiance.js';
 import './content/items/sunVessel.js';
+import './content/monsters/barrowWight.js';
 import { installContent } from './content/install.js';
 installContent();
 
