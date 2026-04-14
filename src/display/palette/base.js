@@ -513,3 +513,13 @@ export const basePalette = {
   // Fallback
   default: { glyph: "•", fg: "#cfe8ff", glow: "#6cf" }
 };
+
+/**
+ * Register content-DSL palette entries at runtime.
+ * @param {Record<string, { glyph?: string, fg?: string, glow?: string, baseScale?: number }>} entries
+ */
+export function registerPaletteEntries(entries) {
+  for (const [key, entry] of Object.entries(entries)) {
+    if (!basePalette[key]) basePalette[key] = entry;
+  }
+}

@@ -1,5 +1,7 @@
 import { getCatalogItem } from "./itemCatalog.js";
 import { Beatitude } from "../components/Beatitude.js";
+import { Consumable } from "../components/Consumable.js";
+import { FoodDecay } from "../components/FoodDecay.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { Material } from "../components/Material.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
@@ -105,6 +107,12 @@ export function buildCatalogItem(world, itemId, opts = {}) {
   ])];
   for (let i = 0; i < procPackages.length; i++) {
     attachProcPackage(world, id, procPackages[i]);
+  }
+
+  // Content-DSL food items: attach Consumable + FoodDecay components
+  if (def._contentFood) {
+    world.add(id, Consumable, { ...def._contentFood.consumable });
+    world.add(id, FoodDecay, { ...def._contentFood.decay });
   }
 
   return id;

@@ -82,3 +82,15 @@ export function getCatalogItem(id) {
 }
 export function isCatalogEquipment(def) { return !!def && String(def.catalogKind) === "equipment"; }
 export function isCatalogMagic(def) { return !!def && String(def.catalogKind) === "magic"; }
+
+/**
+ * Register a content-DSL item into the unified catalog at runtime.
+ * @param {string} id
+ * @param {object} def - catalog-compatible item definition
+ */
+export function registerCatalogItem(id, def) {
+  const key = String(id || "").trim().toLowerCase();
+  if (!key) return;
+  if (ITEM_CATALOG[key]) return; // already present, skip
+  ITEM_CATALOG[key] = def;
+}
