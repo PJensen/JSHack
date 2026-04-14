@@ -1867,9 +1867,10 @@ export function renderItemDetails(container, it) {
     container.appendChild(wLine);
   }
 
-  // --- Consumable effect description (potions, scrolls, food, wands) ---
+  // --- Item description (consumables, tools, and any content-DSL item) ---
   const isConsumable = it.type === 'potion' || it.type === 'scroll' || it.type === 'food' || it.type === 'wand' || it.type === 'learn' || it.type === 'book';
-  const consumableDesc = isConsumable ? String(it.description || '').trim() : '';
+  const hasContentStatus = Array.isArray(it.contentStatus) && it.contentStatus.length > 0;
+  const consumableDesc = (isConsumable || it.type === 'tool' || hasContentStatus) ? String(it.description || '').trim() : '';
   if (consumableDesc) {
     const effectLine = document.createElement('div');
     effectLine.textContent = consumableDesc;

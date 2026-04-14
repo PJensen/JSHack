@@ -1830,7 +1830,19 @@ function createQuickSlot(opts = {}) {
       applyTargetCount: Math.max(0, Number(item?.applyTargetCount || 0) | 0),
       justPickedUp: !!item?.justPickedUp,
       interacted: false,
-      details: item?.details || item,
+      // Preserve full display data for renderItemDetails
+      description: item?.description || '',
+      weight: item?.weight || 0,
+      bonuses: item?.bonuses || null,
+      damageDice: item?.damageDice || null,
+      damageType: item?.damageType || null,
+      staminaCost: item?.staminaCost ?? null,
+      twoHanded: item?.twoHanded || false,
+      contentStatus: item?.contentStatus || null,
+      affixes: item?.affixes || null,
+      maxSockets: item?.maxSockets || 0,
+      sockets: item?.sockets || null,
+      coating: item?.coating || null,
     };
   }
 
