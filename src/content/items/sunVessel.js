@@ -93,13 +93,14 @@ defineItem('sun_vessel', {
 
     // Scale damage with remaining charge
     const baseDmg = 2 + chargeLeft * 3;
-    const undead = ctx.entitiesInRadius(ctx.target, 4, { tag: 'undead' });
+    const landing = ctx.targetPos || ctx.target;
+    const undead = ctx.entitiesInRadius(landing, 4, { tag: 'undead' });
     for (const uid of undead) {
       ctx.damage(uid, baseDmg, 'radiant');
     }
 
     // Also damages non-undead nearby, but less
-    const others = ctx.entitiesInRadius(ctx.target, 2, { faction: 'enemy' });
+    const others = ctx.entitiesInRadius(landing, 2, { faction: 'enemy' });
     for (const oid of others) {
       if (!undead.includes(oid)) {
         ctx.damage(oid, Math.floor(baseDmg / 2), 'radiant');
@@ -109,7 +110,7 @@ defineItem('sun_vessel', {
 
     ctx.message('The {item} detonates — a pillar of captured sunlight erupts!', 'danger');
     ctx.present('shatter', {
-      target: ctx.target,
+      at: ctx.targetPos,
       charge: chargeLeft,
     });
     ctx.consume();

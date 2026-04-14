@@ -4,6 +4,7 @@
 
 import { interpolate } from './helpers.js';
 import { getPresentation } from './registry.js';
+import { createWorldFacade } from './worldFacade.js';
 
 /**
  * ScriptCtx provides a Papyrus-style scripting surface for content authors.
@@ -51,6 +52,20 @@ export class ScriptCtx {
 
   /** Whether the item has been identified by the player. */
   get identified() { return !!this._state.identified; }
+
+  /** Throw landing position (available in onThrow hooks). */
+  get targetPos() {
+    const tx = this._state.targetX;
+    const ty = this._state.targetY;
+    if (tx != null && ty != null) return { x: tx | 0, y: ty | 0 };
+    // Fallback: target entity position
+    if (this.target && this._ctx._entitiesInRadius) {
+      // Use query to get position
+      const pos = this._ctx.query?.get?.(this.target, this._ctx._Position);
+      if (pos) return { x: pos.x | 0, y: pos.y | 0 };
+    }
+    return null;
+  }
 
   // ── Healing & Damage ──────────────────────────────────────────────
 
@@ -535,13 +550,58 @@ export class ScriptCtx {
  * The returned function has the signature (ictx, state) => result
  * expected by drinkPipeline, usePipeline, etc.
  *
+ * When called from the interaction pipeline, the ictx has query/helpers/io
+ * but lacks the extended world-backed APIs (state, spatial, cooldown).
+ * We detect this and bridge the gap by overlaying a worldFacade's APIs
+ * onto the interaction context, so the ScriptCtx gets the full surface.
+ *
  * @param {(ctx: ScriptCtx) => void} dslHook
  * @returns {(ictx: object, state: object) => object}
  */
 export function compileHook(dslHook) {
   return (ictx, state) => {
-    const ctx = new ScriptCtx(ictx, state);
+    const augmented = _ensureExtendedCtx(ictx, state);
+    const ctx = new ScriptCtx(augmented, state);
     dslHook(ctx);
     return { consumed: ctx._consumed, ...ctx._results };
+  };
+}
+
+/**
+ * If the interaction context is missing the extended APIs (_getScriptState,
+ * _entitiesInRadius, etc.), overlay them from a worldFacade built from
+ * the raw world reference that the interaction pipeline provides.
+ */
+function _ensureExtendedCtx(ictx, state) {
+  // Already has extended APIs (e.g. came from worldFacade directly)
+  if (ictx._getScriptState) return ictx;
+
+  // Need the raw world to build extended APIs
+  const world = ictx.world;
+  if (!world || typeof world.get !== 'function') return ictx;
+
+  const actor = Number(state?.actor || ictx.actor || 0) | 0;
+  const itemId = Number(state?.itemId || ictx.primary || 0) | 0;
+
+  // Build a worldFacade for the extended APIs only
+  const facade = createWorldFacade(world, actor, itemId);
+
+  // Overlay extended APIs onto the interaction context.
+  // Keep the interaction context's helpers/query/io (they're richer),
+  // but add the world-backed APIs that the interaction context lacks.
+  return {
+    ...ictx,
+    _ScriptState:       facade._ScriptState,
+    _ItemInfo:          facade._ItemInfo,
+    _getScriptState:    facade._getScriptState.bind(facade),
+    _setScriptState:    facade._setScriptState.bind(facade),
+    _mutateScriptState: facade._mutateScriptState.bind(facade),
+    _hasTag:            facade._hasTag.bind(facade),
+    _entitiesInRadius:  facade._entitiesInRadius.bind(facade),
+    _hpPercent:         facade._hpPercent.bind(facade),
+    _tileAt:            facade._tileAt.bind(facade),
+    _setCooldown:       facade._setCooldown.bind(facade),
+    _isOnCooldown:      facade._isOnCooldown.bind(facade),
+    _cooldownRemaining: facade._cooldownRemaining.bind(facade),
   };
 }
