@@ -267,6 +267,15 @@ export function installContentVfxWiring({ world, ftext, fx, getPosition, isVisib
         }
         break;
       }
+      case 'lightPulse': {
+        world.emit('content:light:pulse', {
+          x: pos.x, y: pos.y,
+          radius: effect.radius || 4,
+          color: effect.color || '#fff5c8',
+          duration: effect.duration || 0.4,
+        });
+        break;
+      }
       case 'floatText': {
         if (!ftext) break;
         const text = _interpolatePresentation(effect.text || '', payload);

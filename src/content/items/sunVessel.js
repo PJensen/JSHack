@@ -204,12 +204,13 @@ defineItem('sun_vessel', {
       ctx.present('crack', { target: ctx.user });
     }
 
-    // Cracked: leak radiance
+    // Cracked: leak radiance — bleed charge, damage undead, pulse light
     if (st.cracked) {
       for (const uid of undead) {
         ctx.damage(uid, '1d4', 'radiant');
       }
       ctx.setState({ charge: st.charge - 1 });
+      ctx.present('leak', { target: ctx.user });
 
       if (st.charge - 1 <= 0) {
         ctx.message('The last light drains from the Sun-Vessel.', 'system');
@@ -229,33 +230,53 @@ defineItem('sun_vessel', {
   // Co-located. One file. Simulation calls ctx.present(id, payload),
   // display reads these specs. In headless mode, ignored entirely.
   presentations: {
+    // USE: holy burst — golden explosion of light + particles + heal text
     invoke: {
       sound: 'holy_chime',
       vfx: [
+        { type: 'lightPulse', color: '#f6d365', radius: 5, duration: 0.5 },
         { type: 'burst', color: '#f6d365', count: 14, speed: 1.4, life: 0.4 },
         { type: 'glow', color: '#ffb347', radius: 1.8, life: 1.5 },
         { type: 'floatText', text: '+{healed} HP', color: '#f6d365' },
       ],
     },
+
+    // THROW: full detonation — massive flash + radiant cascade
     shatter: {
       sound: 'glass_shatter',
       vfx: [
+        { type: 'lightPulse', color: '#fffbe6', radius: 8, duration: 0.6 },
         { type: 'flash', color: '#fffbe6', radius: 6 },
         { type: 'burst', color: '#f6d365', count: 24, speed: 3.0, life: 0.6 },
+        { type: 'glow', color: '#ffb347', radius: 2.5, life: 1.0 },
       ],
       message: 'Radiant energy cascades outward — {charge} charges released!',
       messageType: 'danger',
     },
+
+    // TICK: undead sensed — vessel pulses, brief light flare
     pulse: {
       vfx: [
-        { type: 'glow', color: '#f6d365', radius: 0.6, life: 0.4 },
+        { type: 'lightPulse', color: '#f6d365', radius: 3, duration: 0.25 },
+        { type: 'glow', color: '#f6d365', radius: 0.8, life: 0.4 },
       ],
     },
+
+    // TICK: stability hits zero — vessel cracks, sharp flash + text
     crack: {
       sound: 'glass_crack',
       vfx: [
-        { type: 'burst', color: '#ffb347', count: 6, speed: 0.5, life: 0.2 },
+        { type: 'lightPulse', color: '#ff9933', radius: 4, duration: 0.35 },
+        { type: 'burst', color: '#ffb347', count: 8, speed: 0.6, life: 0.25 },
         { type: 'floatText', text: 'CRACKED', color: '#ff8844' },
+      ],
+    },
+
+    // TICK: cracked vessel leaking — dim pulse each turn, fading warmth
+    leak: {
+      vfx: [
+        { type: 'lightPulse', color: '#ffb347', radius: 2, duration: 0.2 },
+        { type: 'burst', color: '#ff9933', count: 3, speed: 0.3, life: 0.15 },
       ],
     },
   },
