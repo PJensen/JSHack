@@ -3,6 +3,7 @@
 // Wraps the interaction runtime context behind a clean, expressive API.
 
 import { interpolate } from './helpers.js';
+import { getPresentation } from './registry.js';
 
 /**
  * ScriptCtx provides a Papyrus-style scripting surface for content authors.
@@ -189,6 +190,104 @@ export class ScriptCtx {
   /** Consume (destroy) the item. Marks this hook as having consumed. */
   consume() {
     this._consumed = true;
+  }
+
+  // ── Local State ───────────────────────────────────────────────────
+
+  /**
+   * Read the local script state for an entity.
+   * Returns a shallow copy — mutate via setState().
+   * @param {number} [entity] - defaults to self
+   * @returns {object}
+   */
+  state(entity) {
+    const id = entity ?? this.self;
+    if (this._ctx._getScriptState) return { ...this._ctx._getScriptState(id) };
+    // Fallback: query ScriptState component directly
+    const ss = this._ctx.query?.get?.(id, this._ctx._ScriptState);
+    return ss ? { ...ss.data } : {};
+  }
+
+  /**
+   * Patch the local script state for an entity.
+   * @param {number} entityOrPatch - entity ID, or patch object (defaults to self)
+   * @param {object} [maybePatch] - patch object if first arg is entity ID
+   */
+  setState(entityOrPatch, maybePatch) {
+    let id, patch;
+    if (typeof entityOrPatch === 'object' && !maybePatch) {
+      id = this.self;
+      patch = entityOrPatch;
+    } else {
+      id = entityOrPatch ?? this.self;
+      patch = maybePatch;
+    }
+    if (this._ctx._setScriptState) {
+      this._ctx._setScriptState(id, patch);
+    } else if (this._ctx._mutateScriptState) {
+      this._ctx._mutateScriptState(id, patch);
+    }
+  }
+
+  // ── Semantic Queries ──────────────────────────────────────────────
+
+  /**
+   * Check if an entity has a tag.
+   * @param {number} entity
+   * @param {string} tag
+   * @returns {boolean}
+   */
+  hasTag(entity, tag) {
+    if (this._ctx._hasTag) return this._ctx._hasTag(entity, tag);
+    // Fallback: check ItemInfo.tags
+    const info = this._ctx.query?.get?.(entity, this._ctx._ItemInfo);
+    if (info && Array.isArray(info.tags) && info.tags.includes(tag)) return true;
+    return false;
+  }
+
+  /**
+   * Find entities within Chebyshev radius of a position or entity.
+   * @param {number|{x:number,y:number}} center - entity ID or position
+   * @param {number} radius
+   * @param {{ tag?: string, faction?: string }} [filter]
+   * @returns {number[]} entity IDs
+   */
+  entitiesInRadius(center, radius, filter) {
+    if (this._ctx._entitiesInRadius) {
+      return this._ctx._entitiesInRadius(center, radius, filter);
+    }
+    return [];
+  }
+
+  /**
+   * Get the tile identity at a world position.
+   * @param {number|{x:number,y:number}} posOrEntity
+   * @returns {string|null}
+   */
+  tileAt(posOrEntity) {
+    if (this._ctx._tileAt) return this._ctx._tileAt(posOrEntity);
+    return null;
+  }
+
+  // ── Presentation ──────────────────────────────────────────────────
+
+  /**
+   * Emit a semantic presentation event.
+   * Looks up the co-located presentation spec and emits it for display.
+   * In headless mode, this is a no-op. Simulation truth is unaffected.
+   *
+   * @param {string} presentationId - key into this thing's `presentations` block
+   * @param {object} [payload] - data for template interpolation in the presentation
+   */
+  present(presentationId, payload = {}) {
+    const spec = getPresentation(this.identity, presentationId);
+    this._emit('script:present', {
+      entity: payload.target ?? payload.entity ?? this.self,
+      id: presentationId,
+      identity: this.identity,
+      spec,
+      payload: { ...payload, user: this.user, target: this.target, item: this.item },
+    });
   }
 
   // ── Messaging ─────────────────────────────────────────────────────

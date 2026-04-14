@@ -3,7 +3,7 @@
 // Each call compiles a single definition object into engine-compatible
 // registrations (catalog entry, palette entry, monster def, hooks).
 
-import { registerItem, registerMonster, registerPalette } from './registry.js';
+import { registerItem, registerMonster, registerPalette, registerPresentation } from './registry.js';
 import { compileHook } from './scriptCtx.js';
 import { inferItemCategory, resolveRarity, SHELF_LIFE } from './helpers.js';
 
@@ -120,6 +120,7 @@ export function defineItem(id, def) {
     value: Number(def.value ?? 0),
     description: def.description || def.name,
     identified: def.identified ?? false,
+    tags: Array.isArray(def.tags) ? def.tags.slice() : [],
   };
 
   // Equipment-specific
@@ -172,11 +173,25 @@ export function defineItem(id, def) {
   // Hooks
   if (hooks) catalogEntry.hooks = hooks;
 
+  // Local persistent state — initial values for ScriptState component
+  if (def.state && typeof def.state === 'object') {
+    catalogEntry._contentState = { ...def.state };
+  }
+
+  // Tick hooks — stored separately, consumed by scriptTickSystem
+  const tickHooks = {};
+  if (typeof def.onTurnWhileCarried === 'function') tickHooks.onTurnWhileCarried = def.onTurnWhileCarried;
+  if (typeof def.onTurnWhileEquipped === 'function') tickHooks.onTurnWhileEquipped = def.onTurnWhileEquipped;
+  if (Object.keys(tickHooks).length > 0) catalogEntry._contentTickHooks = tickHooks;
+
   // Recipe pointer (stored for future recipe system integration)
   if (def.recipe) catalogEntry._contentRecipe = def.recipe;
 
   // Metadata
   if (def.meta) catalogEntry._contentMeta = def.meta;
+
+  // AI hints
+  if (def.aiHints) catalogEntry._contentAiHints = def.aiHints;
 
   // ── Register catalog entry ────────────────────────────────────
   registerItem(id, catalogEntry);
@@ -189,6 +204,13 @@ export function defineItem(id, def) {
     paletteEntry.glow = def.glow || def.color || null;
     if (def.scale != null) paletteEntry.baseScale = def.scale;
     registerPalette(id, paletteEntry);
+  }
+
+  // ── Register presentations ────────────────────────────────────
+  if (def.presentations && typeof def.presentations === 'object') {
+    for (const [presId, spec] of Object.entries(def.presentations)) {
+      registerPresentation(id, presId, spec);
+    }
   }
 
   return id;

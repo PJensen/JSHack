@@ -142,4 +142,106 @@ export function installContentVfxWiring({ world, ftext, fx, getPosition, isVisib
         { color: color || '#ff6633', life: 0.6 });
     }
   });
+
+  // ── Semantic presentation events (ctx.present) ────────────────
+  world.on('script:present', ({ entity, id, spec, payload }) => {
+    if (!spec) return;
+    const pos = getPosition(Number(entity || 0));
+    if (!pos || !canShowAt(pos.x, pos.y)) return;
+
+    // Sound
+    if (spec.sound) {
+      world.emit('audio:play', { id: spec.sound });
+    }
+
+    // VFX effects array
+    if (Array.isArray(spec.vfx)) {
+      for (const effect of spec.vfx) {
+        _renderPresentationEffect(effect, pos, payload, fx, ftext);
+      }
+    }
+
+    // Message
+    if (spec.message) {
+      const text = _interpolatePresentation(spec.message, payload);
+      world.emit('log:message', { text, type: spec.messageType || 'system' });
+    }
+  });
+
+  /**
+   * Render a single presentation VFX effect.
+   */
+  function _renderPresentationEffect(effect, pos, payload, fx, ftext) {
+    if (!effect?.type || !fx?.pool) return;
+    const c = parseHex(effect.color || effect.palette || '#ffffff');
+
+    switch (effect.type) {
+      case 'burst': {
+        const n = Math.min(effect.count || 8, 32);
+        const spd = effect.speed || 1.0;
+        const lt = effect.life || 0.3;
+        for (let i = 0; i < n; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const s = (0.6 + Math.random() * 0.8) * spd;
+          fx.pool.spawn(new Particle({
+            x: pos.x, y: pos.y - 0.1,
+            vx: Math.cos(angle) * s, vy: Math.sin(angle) * s - 0.3,
+            ax: 0, ay: 0.8,
+            life: lt + Math.random() * 0.2,
+            size0: 0.14, size1: 0.03,
+            r: c.r, g: c.g, b: c.b, a0: 0.9,
+          }));
+        }
+        break;
+      }
+      case 'glow': {
+        const rad = effect.radius || 1.0;
+        const lt = effect.life || 1.0;
+        for (let i = 0; i < 12; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const dist = Math.random() * rad * 0.4;
+          fx.pool.spawn(new Particle({
+            x: pos.x + Math.cos(angle) * dist,
+            y: pos.y - 0.1 + Math.sin(angle) * dist,
+            vx: Math.cos(angle) * 0.05, vy: Math.sin(angle) * 0.05,
+            ax: 0, ay: 0,
+            life: lt * (0.5 + Math.random() * 0.5),
+            size0: 0.2, size1: 0.08,
+            r: c.r, g: c.g, b: c.b, a0: 0.5,
+          }));
+        }
+        break;
+      }
+      case 'flash': {
+        const n = Math.min((effect.radius || 4) * 4, 48);
+        for (let i = 0; i < n; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const spd = 2.0 + Math.random() * 3.0;
+          fx.pool.spawn(new Particle({
+            x: pos.x, y: pos.y - 0.1,
+            vx: Math.cos(angle) * spd, vy: Math.sin(angle) * spd,
+            ax: 0, ay: 0,
+            life: 0.15 + Math.random() * 0.15,
+            size0: 0.3, size1: 0.02,
+            r: c.r, g: c.g, b: c.b, a0: 1.0,
+          }));
+        }
+        break;
+      }
+      case 'floatText': {
+        if (!ftext) break;
+        const text = _interpolatePresentation(effect.text || '', payload);
+        ftext.addStatus(pos.x, pos.y - 0.3, text,
+          { color: effect.color || '#ffffff', life: effect.life || 0.8 });
+        break;
+      }
+    }
+  }
+
+  function _interpolatePresentation(template, payload) {
+    return String(template || '').replace(/\{(\w+)\}/g, (match, key) => {
+      const val = payload?.[key];
+      return val != null ? String(val) : match;
+    });
+  }
 }

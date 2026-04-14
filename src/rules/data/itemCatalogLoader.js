@@ -8,6 +8,7 @@ import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Potion } from "../components/Potion.js";
 import { attachProcPackage } from "./procPackages.js";
 import { ScriptRef } from "../components/ScriptRef.js";
+import { ScriptState } from "../components/ScriptState.js";
 
 function cloneWeaponVfxProfile(profile) {
   if (typeof profile === "string") return profile;
@@ -113,6 +114,11 @@ export function buildCatalogItem(world, itemId, opts = {}) {
   if (def._contentFood) {
     world.add(id, Consumable, { ...def._contentFood.consumable });
     world.add(id, FoodDecay, { ...def._contentFood.decay });
+  }
+
+  // Content-DSL local state: attach ScriptState component
+  if (def._contentState) {
+    world.add(id, ScriptState, { data: { ...def._contentState } });
   }
 
   return id;

@@ -284,6 +284,12 @@ import { installChannelingController } from "./main/channelingController.js";
 installChannelingController(world, () => (playerEntity(world)?.id || 0));
 bootAdvance("Configured ECS systems");
 
+// ---- Content DSL: load all scripted content, then install into engine -------
+import './content/items/potionOfRadiance.js';
+import './content/items/sunVessel.js';
+import { installContent } from './content/install.js';
+installContent();
+
 // Initialize identification & gem pricing for this game run
 initializeRunItemState(world, {
   identifyItems: runtimeConfig.identifyItems,
