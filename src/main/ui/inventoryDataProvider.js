@@ -31,6 +31,8 @@ import { resolveItemDisplayName, resolveAffixes, buildItemDisplayData as _buildI
 import { makeRulesDispatcher } from "../input/rulesDispatch.js";
 import { isIdentificationEnabled, setIdentificationEnabled } from "../../rules/data/identification.js";
 import { createItemById, listAllItemIds } from "../../rules/utils/itemFactory.js";
+import { ScriptState } from "../../rules/components/ScriptState.js";
+import { getCatalogItem } from "../../rules/data/itemCatalog.js";
 import { addToInventory } from "../../rules/utils/inventoryFacade.js";
 import { listAllMonsterIds } from "../../rules/data/monsters.js";
 import { Pet } from "../../rules/components/Pet.js";
@@ -105,11 +107,21 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
       || typeof hooks.onUse === "function"
       || typeof hooks.afterUse === "function";
     const p = _itemPalette[identity] || null;
+    // Content-DSL status lines: read ScriptState, call authored status function
+    let contentStatus = null;
+    const catDef = getCatalogItem(identity);
+    if (catDef?._contentStatus) {
+      const ss = world.get(itemId, ScriptState);
+      if (ss?.data) {
+        try { contentStatus = catDef._contentStatus(ss.data); } catch {}
+      }
+    }
     return {
       ...base,
       canUse,
       glyph: String(base?.glyph || p?.glyph || ""),
       glyphColor: String(base?.glyphColor || p?.fg || "#cfe8ff"),
+      contentStatus,
     };
   }
 

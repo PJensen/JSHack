@@ -50,6 +50,20 @@ defineItem('dawnbreaker', {
     killStreak: 0,         // consecutive kills without sheathing
   },
 
+  // ── TOOLTIP STATUS ────────────────────────────────────────────
+  status(st) {
+    const lines = [];
+    const pips = '◈'.repeat(st.radiance) + '◇'.repeat(st.maxRad - st.radiance);
+    lines.push({
+      text: `Radiance: ${pips} ${st.radiance}/${st.maxRad}`,
+      color: st.awakened ? '#ffe577' : st.radiance > 0 ? '#f0c040' : '#666666',
+    });
+    if (st.awakened) {
+      lines.push({ text: 'AWAKENED — bonus radiant damage', color: '#ffe577' });
+    }
+    return lines;
+  },
+
   // ═════════════════════════════════════════════════════════════
   //  ON HIT — fires each time the player lands a blow with this
   // ═════════════════════════════════════════════════════════════

@@ -219,6 +219,11 @@ export function defineItem(id, def) {
     catalogEntry._contentState = { ...def.state };
   }
 
+  // Status function — authored tooltip lines from live state
+  if (typeof def.status === 'function') {
+    catalogEntry._contentStatus = def.status;
+  }
+
   // Tick hooks — stored separately, consumed by scriptTickSystem
   const tickHooks = {};
   if (typeof def.onTurnWhileCarried === 'function') tickHooks.onTurnWhileCarried = def.onTurnWhileCarried;

@@ -34,6 +34,23 @@ defineItem('sun_vessel', {
     cracked:    false,
   },
 
+  // ── TOOLTIP STATUS ──────────────────────────────────────────────
+  // Receives live ScriptState.data, returns lines for the item tooltip.
+  status(st) {
+    const lines = [];
+    const chargePct = st.charge / st.maxCharge;
+    lines.push({
+      text: `Charges: ${'◈'.repeat(st.charge)}${'◇'.repeat(st.maxCharge - st.charge)} ${st.charge}/${st.maxCharge}`,
+      color: chargePct > 0.5 ? '#f6d365' : chargePct > 0 ? '#ffb347' : '#666666',
+    });
+    if (st.cracked) {
+      lines.push({ text: 'CRACKED — leaking radiance', color: '#ff6644' });
+    } else if (st.stability < 10) {
+      lines.push({ text: `Stability: ${st.stability}/10`, color: st.stability < 4 ? '#ff9944' : '#aaaaaa' });
+    }
+    return lines;
+  },
+
   // ── USE: Invoke ─────────────────────────────────────────────────
   // Spend one charge for a holy burst: damages nearby undead,
   // heals the bearer slightly, emits light.
