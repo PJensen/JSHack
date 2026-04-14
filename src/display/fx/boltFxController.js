@@ -404,7 +404,18 @@ export function createBoltFxController({ world, cam, fx, getPosition }) {
         startShake(cam, 4, 0.18);
       }
     });
-    // sunsword:ray:vfx — migrated to content DSL presentation system
+    // Content DSL beam: real LineFx + PulseFx + shake (used by presentation system)
+    world.on('content:beam:vfx', ({ fromX, fromY, toX, toY, style, shake: shakeAmt }) => {
+      if (!Number.isFinite(fromX) || !Number.isFinite(toX)) return;
+      _boltFx.push(new LineFx({
+        from: { x: fromX + 0.5, y: fromY + 0.5 },
+        to: { x: toX + 0.5, y: toY + 0.5 },
+        ttl: 0.36,
+        style: style || 'holy',
+      }));
+      _lightPulses.push(new PulseFx({ x: toX + 0.5, y: toY + 0.5, ttl: 0.42, color: [255, 246, 205] }));
+      if (shakeAmt !== 0) startShake(cam, shakeAmt ?? 2, 0.10);
+    });
     world.on('deity:wrath', ({ playerId, deityId, intensity, severityScale, wrathDebt }) => {
       _spawnDeityWrath({
         playerId: Number(playerId || 0),

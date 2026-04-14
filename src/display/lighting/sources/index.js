@@ -543,7 +543,15 @@ export function installLightEventListeners(world, getPosition) {
     _gazeBeams.delete(Number(actor) | 0);
   });
 
-  // sunsword:ray:vfx — migrated to content DSL presentation system
+  // Content DSL beam: holy lighting beam (used by presentation system)
+  world.on('content:beam:vfx', ({ fromX, fromY, toX, toY }) => {
+    if (!Number.isFinite(fromX) || !Number.isFinite(fromY)) return;
+    _holyBeams.push({
+      fx: fromX + 0.5, fy: fromY + 0.5,
+      tx: toX + 0.5, ty: toY + 0.5,
+      age: 0, maxAge: 0.45,
+    });
+  });
 
   // Clear gaze beams on level transition
   world.on('dungeon:transitioned', () => {
