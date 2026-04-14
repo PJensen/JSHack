@@ -112,27 +112,9 @@ export function createPinnedItemSlots() {
   function showPinnedTooltip(item, anchor) {
     if (!item || !anchor) return;
     const tip = ensurePinnedTooltip();
-    const detailItem = item?.details && typeof item.details === 'object'
-      ? item.details
-      : {
-          id: item.id,
-          identity: item.identity,
-          type: item.type,
-          slot: item.slot,
-          name: item.name,
-          count: item.count,
-          rarityName: item.rarityName,
-          glyph: item.glyph,
-          glyphColor: item.glyphColor,
-          description: item.description,
-          contentStatus: item.contentStatus,
-          bonuses: item.bonuses,
-          damageDice: item.damageDice,
-          staminaCost: item.staminaCost,
-          twoHanded: item.twoHanded,
-          weight: item.weight,
-        };
-    renderItemDetails(tip, detailItem);
+    // The pinned item IS the canonical inventory data after reconciliation.
+    // Pass it directly — no cherry-picking, no separate data shape.
+    renderItemDetails(tip, item);
     tip.style.display = 'block';
     tooltipAnchor = anchor;
     positionPinnedTooltip(anchor);

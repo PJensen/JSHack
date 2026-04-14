@@ -141,6 +141,8 @@ import { PetCommandIntent } from "./rules/components/Intents/PetCommandIntent.js
 import { Owner } from "./rules/components/Owner.js";
 import { getHungerLevel } from "./rules/data/food.js";
 import { resolveItemDisplayName, buildItemDisplayData, resolveAffixes } from "./main/wiring/itemName.js";
+import { getCatalogItem as _getCatalogItem } from "./rules/data/itemCatalog.js";
+import { ScriptState } from "./rules/components/ScriptState.js";
 import { evaluateSound, thresholdForTier } from "./rules/utils/sound.js";
 import { updateFOV, isVisible as isTileVisible, isExplored as isTileExplored, setFovDisabled } from "./rules/environment/dungeon/exploredMap.js";
 import { getTile, isWalkable, isOpaque, isFlyable, isRoofed, forEachLoadedTile } from "./rules/environment/dungeon/tileMap.js";
@@ -1524,24 +1526,34 @@ world.on('inventory:added', ({ ownerId, itemId }) => {
   const canApply = isApplyTool(world, pe.id, itemId);
   const applyTargetCount = canApply ? listApplyTargetsForTool(world, pe.id, itemId).length : 0;
   if (displayItem?.noQuickChip === true) return;
+  // Content-DSL status lines (same path as inventoryDataProvider)
+  const identity = world.get(itemId, NamedIdentity)?.identity || '';
+  let contentStatus = null;
+  { const catDef = _getCatalogItem(identity);
+    if (catDef?._contentStatus) {
+      const ss = world.get(itemId, ScriptState);
+      if (ss?.data) { try { contentStatus = catDef._contentStatus(ss.data); } catch {} }
+    }
+  }
   try {
     window.dispatchEvent(new CustomEvent('ui:recentPickup', {
       detail: {
         item: {
           ...(displayItem && typeof displayItem === 'object' ? displayItem : {}),
           id: Number(itemId),
-          identity: world.get(itemId, NamedIdentity)?.identity || '',
+          identity,
           type: info.type || 'item',
           slot: info.slot || '',
           name: resolveItemDisplayName(world, itemId),
           count: info.count || 1,
           rarityName: info.rarityName || 'common',
           equippedComparison: buildQuickChipEquippedComparison(ownerId, Number(itemId), info.slot),
-          glyph: palette?.[world.get(itemId, NamedIdentity)?.identity]?.glyph || '',
-          glyphColor: palette?.[world.get(itemId, NamedIdentity)?.identity]?.fg || '#cfe8ff',
+          glyph: palette?.[identity]?.glyph || '',
+          glyphColor: palette?.[identity]?.fg || '#cfe8ff',
           hasScrollOfIdentify,
           canApply,
           applyTargetCount,
+          contentStatus,
         }
       }
     }));
