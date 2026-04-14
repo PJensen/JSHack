@@ -336,7 +336,14 @@ _bootDoneUnits = _bootDataBase + _bootDataUnits;
 updateBootProgress("Game data loaded", _bootDoneUnits);
 
 // Only app/scenes step the sim (deterministic). We'll keep it paused here.
-function stepSim(dtTurns = 0) { if (dtTurns > 0) { world.tick(dtTurns); } }
+function stepSim(dtTurns = 0) {
+  if (dtTurns > 0) {
+    world.tick(dtTurns);
+    // Refresh inventory UI after each game tick so content-DSL status
+    // (charges, radiance, stability) stays current in tooltips and chips.
+    try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch {}
+  }
+}
 
 // Bubble dialog controller — created after camera (needs cam/canvas refs).
 // Placeholder; initialized below after cam is created.
