@@ -1,0 +1,396 @@
+// src/content/define.js
+// Content DSL builders: defineItem() and defineMonster().
+// Each call compiles a single definition object into engine-compatible
+// registrations (catalog entry, palette entry, monster def, hooks).
+
+import { registerItem, registerMonster, registerPalette } from './registry.js';
+import { compileHook } from './scriptCtx.js';
+import { inferItemCategory, resolveRarity, SHELF_LIFE } from './helpers.js';
+
+// ── Hook names the DSL recognises, mapped to catalog hook keys ──────
+const ITEM_HOOK_MAP = {
+  onUse:       'on_use',
+  onDrink:     'on_drink',
+  onThrow:     'on_throw',
+  onDip:       'on_dip',
+  beforeUse:   'before_use',
+  afterUse:    'after_use',
+  beforeDrink: 'before_drink',
+  afterDrink:  'after_drink',
+  beforeThrow: 'before_throw',
+  afterThrow:  'after_throw',
+};
+
+/**
+ * Compile DSL hook functions into catalog-compatible hook entries.
+ * Each DSL hook `(ctx: ScriptCtx) => void` becomes
+ * `(ictx, state) => result` via compileHook.
+ */
+function compileItemHooks(def) {
+  const hooks = {};
+  for (const [dslName, catalogName] of Object.entries(ITEM_HOOK_MAP)) {
+    if (typeof def[dslName] === 'function') {
+      hooks[catalogName] = compileHook(def[dslName]);
+    }
+  }
+  return Object.keys(hooks).length > 0 ? hooks : null;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  defineItem()
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Define an item via the content DSL.
+ * One call registers everything: catalog entry, palette, hooks.
+ *
+ * @param {string} id - Unique identity string (e.g. "potion_antidote")
+ * @param {object} def - Item definition
+ *
+ * @param {string} def.name - Display name
+ * @param {string} def.type - Item type: "food", "potion", "weapon", "armor", "tool", "scroll", etc.
+ * @param {string} [def.description] - Flavor text
+ *
+ * // Display
+ * @param {string} [def.glyph] - ASCII/Unicode glyph
+ * @param {string} [def.color] - Foreground hex color
+ * @param {string} [def.glow] - Glow hex color (defaults to color)
+ * @param {number} [def.scale] - Base scale for rendering
+ *
+ * // Stats
+ * @param {number} [def.weight=1]
+ * @param {number} [def.value=0]
+ * @param {string|number} [def.rarity="common"]
+ * @param {string} [def.material]
+ *
+ * // Equipment fields (weapons/armor)
+ * @param {object} [def.bonuses] - { attack, defense, accuracy, ... }
+ * @param {string} [def.damageDice] - "1d8"
+ * @param {string} [def.damageType] - "slash", "blunt", "pierce"
+ * @param {number} [def.staminaCost]
+ * @param {boolean} [def.twoHanded]
+ * @param {number} [def.maxSockets]
+ * @param {string} [def.slot] - Override auto-inferred slot
+ *
+ * // Food fields
+ * @param {number} [def.nutrition] - Nutrition value for food
+ * @param {string|number} [def.shelfLife] - "ration", "short", "medium", "long", or number
+ *
+ * // Potion fields
+ * @param {object} [def.potion] - { route, doses, channels, effects, toxicity, feel }
+ *
+ * // Hooks (content scripts)
+ * @param {Function} [def.onUse] - (ctx: ScriptCtx) => void
+ * @param {Function} [def.onDrink] - (ctx: ScriptCtx) => void
+ * @param {Function} [def.onThrow] - (ctx: ScriptCtx) => void
+ * @param {Function} [def.onDip] - (ctx: ScriptCtx) => void
+ * @param {Function} [def.beforeUse]
+ * @param {Function} [def.afterUse]
+ *
+ * // Recipe
+ * @param {string[]} [def.recipe] - Ingredient identity strings
+ *
+ * // Metadata (arbitrary, for future features)
+ * @param {object} [def.meta] - Free-form metadata
+ *
+ * @returns {string} The registered item id
+ */
+export function defineItem(id, def) {
+  if (!id || typeof id !== 'string') throw new Error('[defineItem] id is required');
+  if (!def || typeof def !== 'object') throw new Error('[defineItem] def is required');
+  if (!def.name) throw new Error(`[defineItem "${id}"] name is required`);
+  if (!def.type) throw new Error(`[defineItem "${id}"] type is required`);
+
+  const { catalogKind, slot: inferredSlot, itemType } = inferItemCategory(def.type);
+  const { rarity, rarityName } = resolveRarity(def.rarity);
+  const hooks = compileItemHooks(def);
+  const slot = def.slot || inferredSlot;
+
+  // ── Build catalog entry ───────────────────────────────────────
+  const catalogEntry = {
+    id,
+    catalogKind,
+    name: def.name,
+    type: itemType,
+    slot,
+    material: def.material || null,
+    rarity,
+    rarityName,
+    weight: Number(def.weight ?? 1),
+    value: Number(def.value ?? 0),
+    description: def.description || def.name,
+    identified: def.identified ?? false,
+  };
+
+  // Equipment-specific
+  if (catalogKind === 'equipment') {
+    catalogEntry.bonuses = def.bonuses || {};
+    catalogEntry.damageDice = def.damageDice || null;
+    catalogEntry.damageType = def.damageType || null;
+    catalogEntry.staminaCost = def.staminaCost ?? null;
+    catalogEntry.twoHanded = def.twoHanded || false;
+    catalogEntry.maxSockets = def.maxSockets || 0;
+    if (def.combatFlavor) catalogEntry.combatFlavor = def.combatFlavor;
+    if (def.range) catalogEntry.range = def.range;
+    if (def.affixes) catalogEntry.affixes = def.affixes;
+    if (def.tags) catalogEntry.tags = def.tags;
+  }
+
+  // Potion-specific
+  if (itemType === 'potion' && def.potion) {
+    catalogEntry.potion = {
+      route: def.potion.route || 'oral',
+      doses: def.potion.doses ?? 1,
+      channels: def.potion.channels || [],
+      effects: def.potion.effects || [],
+      toxicity: def.potion.toxicity || null,
+      feel: def.potion.feel || '',
+    };
+  }
+
+  // Food-specific: extra components to attach at entity build time
+  if (itemType === 'food') {
+    const shelfLife = _resolveShelfLife(def.shelfLife);
+    catalogEntry._contentFood = {
+      consumable: {
+        effectKey: '',
+        effectParams: { nutrition: Number(def.nutrition ?? 50), special: null },
+        remainingUses: 1,
+        potency: 0,
+        meta: {},
+      },
+      decay: {
+        turnsHeld: 0,
+        shelfLife,
+      },
+    };
+  }
+
+  // Scrolls: charges
+  if (def.charges) catalogEntry.charges = def.charges;
+
+  // Hooks
+  if (hooks) catalogEntry.hooks = hooks;
+
+  // Recipe pointer (stored for future recipe system integration)
+  if (def.recipe) catalogEntry._contentRecipe = def.recipe;
+
+  // Metadata
+  if (def.meta) catalogEntry._contentMeta = def.meta;
+
+  // ── Register catalog entry ────────────────────────────────────
+  registerItem(id, catalogEntry);
+
+  // ── Register palette ──────────────────────────────────────────
+  if (def.glyph || def.color) {
+    const paletteEntry = {};
+    if (def.glyph) paletteEntry.glyph = def.glyph;
+    if (def.color) paletteEntry.fg = def.color;
+    paletteEntry.glow = def.glow || def.color || null;
+    if (def.scale != null) paletteEntry.baseScale = def.scale;
+    registerPalette(id, paletteEntry);
+  }
+
+  return id;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  defineMonster()
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Define a monster via the content DSL.
+ * One call registers: MonsterDef, palette entry, scripted hooks.
+ *
+ * @param {string} id - Unique monster identity (e.g. "fire_elemental")
+ * @param {object} def
+ *
+ * @param {string} def.name
+ * @param {string} [def.glyph]
+ * @param {string} [def.color]
+ * @param {string} [def.glow]
+ * @param {string[]} [def.tags]
+ * @param {number} [def.tier=0]
+ * @param {string} [def.description]
+ *
+ * // Combat
+ * @param {number} def.hp - Base HP
+ * @param {number} [def.hpPerLevel=1]
+ * @param {number} [def.attack=1]
+ * @param {number} [def.defense=0]
+ * @param {string} [def.damageDice="1d4"]
+ * @param {number} [def.speed=1]
+ *
+ * // Physics
+ * @param {string} [def.sizeClass="M"]
+ * @param {number} [def.massKg=60]
+ *
+ * // AI
+ * @param {number} [def.intelligence=3]
+ * @param {number} [def.visionRange]
+ * @param {string} [def.aggro] - "passive" | default
+ * @param {boolean} [def.packSense]
+ * @param {number} [def.packRadius]
+ * @param {number} [def.retreatHpPct]
+ * @param {boolean} [def.ambush]
+ *
+ * // Resistances
+ * @param {object} [def.resistances]
+ * @param {string[]} [def.immune] - shorthand: auto-sets resistance mult to 0
+ * @param {string[]} [def.vulnerable] - shorthand: auto-sets resistance mult to 2
+ *
+ * // Equipment
+ * @param {Array} [def.wielding]
+ * @param {Array} [def.equipped]
+ * @param {Array} [def.inventory]
+ *
+ * // Spells
+ * @param {string[]} [def.learnedSpellIds]
+ * @param {number} [def.maxMana]
+ * @param {number} [def.manaRegen]
+ *
+ * // Loot
+ * @param {string} [def.lootTable]
+ * @param {number} [def.corpseDropChance]
+ * @param {string} [def.goreType]
+ *
+ * // Scripted hooks (raw callback arrays, compatible with existing system)
+ * @param {object} [def.hooks] - { onHit: [...], onDamaged: [...], onDeath: [...], whileLOS: [...] }
+ *
+ * // Metadata
+ * @param {object} [def.meta]
+ *
+ * @returns {string} The registered monster id
+ */
+export function defineMonster(id, def) {
+  if (!id || typeof id !== 'string') throw new Error('[defineMonster] id is required');
+  if (!def || typeof def !== 'object') throw new Error('[defineMonster] def is required');
+  if (!def.name) throw new Error(`[defineMonster "${id}"] name is required`);
+
+  const resistances = _buildResistances(def);
+
+  const monsterDef = {
+    id,
+    name: def.name,
+    tags: def.tags || [],
+    tier: def.tier ?? 0,
+    intelligence: def.intelligence ?? 3,
+    baseHp: def.hp ?? 10,
+    hpPerLevel: def.hpPerLevel ?? 1,
+    attack: def.attack ?? 1,
+    defense: def.defense ?? 0,
+    damageDice: def.damageDice || '1d4',
+    sizeClass: def.sizeClass || 'M',
+    massKg: def.massKg ?? 60,
+    resistances,
+    speed: def.speed ?? 1,
+    description: def.description || def.name,
+  };
+
+  // Optional AI fields
+  if (def.visionRange != null) monsterDef.visionRange = def.visionRange;
+  if (def.aggro) monsterDef.aggro = def.aggro;
+  if (def.packSense != null) monsterDef.packSense = def.packSense;
+  if (def.packRadius != null) monsterDef.packRadius = def.packRadius;
+  if (def.retreatHpPct != null) monsterDef.retreatHpPct = def.retreatHpPct;
+  if (def.ambush != null) monsterDef.ambush = def.ambush;
+
+  // Equipment
+  if (def.wielding) monsterDef.wielding = def.wielding;
+  if (def.equipped) monsterDef.equipped = def.equipped;
+  if (def.inventory) monsterDef.inventory = def.inventory;
+
+  // Spells
+  if (def.learnedSpellIds) monsterDef.learnedSpellIds = def.learnedSpellIds;
+  if (def.maxMana != null) monsterDef.maxMana = def.maxMana;
+  if (def.manaRegen != null) monsterDef.manaRegen = def.manaRegen;
+
+  // Loot
+  if (def.lootTable) monsterDef.lootTable = def.lootTable;
+  if (def.corpseDropChance != null) monsterDef.corpseDropChance = def.corpseDropChance;
+  if (def.goreType) monsterDef.goreType = def.goreType;
+
+  // Hooks — pass through directly (already compatible arrays of callbacks)
+  if (def.hooks) monsterDef.hooks = def.hooks;
+
+  // Special descriptions (for bestiary / tooltip)
+  if (def.specials) monsterDef.specials = def.specials;
+
+  // Flags
+  if (def.canFly) monsterDef.canFly = def.canFly;
+  if (def.rare) monsterDef.rare = def.rare;
+  if (def.minDepth != null) monsterDef.minDepth = def.minDepth;
+
+  // Corpse eating
+  if (def.corpseEat) monsterDef.corpseEat = def.corpseEat;
+
+  // Metadata
+  if (def.meta) monsterDef._contentMeta = def.meta;
+
+  // ── Register ──────────────────────────────────────────────────
+  registerMonster(id, monsterDef);
+
+  // ── Palette ───────────────────────────────────────────────────
+  if (def.glyph || def.color) {
+    const entry = {};
+    if (def.glyph) entry.glyph = def.glyph;
+    if (def.color) entry.fg = def.color;
+    entry.glow = def.glow || def.color || null;
+    registerPalette(id, entry);
+  }
+
+  return id;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+//  Internal helpers
+// ═══════════════════════════════════════════════════════════════════
+
+function _resolveShelfLife(input) {
+  if (typeof input === 'number') return Math.max(1, input | 0);
+  if (typeof input === 'string') return SHELF_LIFE[input] || SHELF_LIFE.ration;
+  return SHELF_LIFE.ration;
+}
+
+/**
+ * Build resistances object from def, merging immune/vulnerable shorthands.
+ */
+function _buildResistances(def) {
+  const base = def.resistances ? { ...def.resistances } : {};
+  // Shorthand: immune => set mult to 0
+  if (Array.isArray(def.immune)) {
+    for (const key of def.immune) _setResistMult(base, key, 0);
+  }
+  // Shorthand: vulnerable => set mult to 2
+  if (Array.isArray(def.vulnerable)) {
+    for (const key of def.vulnerable) _setResistMult(base, key, 2.0);
+  }
+  return base;
+}
+
+const _RESIST_KEY_MAP = {
+  fire:     ['thermal', 'burnMult'],
+  cold:     ['thermal', 'freezeMult'],
+  burn:     ['thermal', 'burnMult'],
+  poison:   ['chemical', 'toxMult'],
+  acid:     ['chemical', 'acidMult'],
+  electric: ['electric', 'ohms'],
+  blunt:    ['kinetic', 'bluntMult'],
+  slash:    ['kinetic', 'slashMult'],
+  pierce:   ['kinetic', 'pierceMult'],
+};
+
+function _setResistMult(resistances, shortKey, mult) {
+  const mapping = _RESIST_KEY_MAP[shortKey];
+  if (!mapping) return;
+  const [group, field] = mapping;
+  if (!resistances[group]) resistances[group] = {};
+  if (field === 'ohms') {
+    // electric immunity = very high ohms, vulnerability = low ohms
+    resistances[group][field] = mult === 0 ? 999999 : (mult > 1 ? 100 : 900);
+  } else {
+    resistances[group][field] = mult;
+  }
+}
