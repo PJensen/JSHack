@@ -81,6 +81,15 @@ defineItem('sun_vessel', {
   onThrow(ctx) {
     const st = ctx.state();
     const chargeLeft = Math.max(0, st.charge);
+    const landing = ctx.targetPos;
+
+    // Emit throw arc so the display shows the projectile flight
+    ctx.emit('item:thrown', {
+      actor: ctx.user,
+      itemId: ctx.self,
+      from: ctx.targetPos ? undefined : null, // filled by pipeline if available
+      to: landing,
+    });
 
     if (chargeLeft === 0) {
       ctx.message('The empty {item} shatters harmlessly.', 'system');
@@ -93,14 +102,13 @@ defineItem('sun_vessel', {
 
     // Scale damage with remaining charge
     const baseDmg = 2 + chargeLeft * 3;
-    const landing = ctx.targetPos || ctx.target;
-    const undead = ctx.entitiesInRadius(landing, 4, { tag: 'undead' });
+    const undead = landing ? ctx.entitiesInRadius(landing, 4, { tag: 'undead' }) : [];
     for (const uid of undead) {
       ctx.damage(uid, baseDmg, 'radiant');
     }
 
     // Also damages non-undead nearby, but less
-    const others = ctx.entitiesInRadius(landing, 2, { faction: 'enemy' });
+    const others = landing ? ctx.entitiesInRadius(landing, 2, { faction: 'enemy' }) : [];
     for (const oid of others) {
       if (!undead.includes(oid)) {
         ctx.damage(oid, Math.floor(baseDmg / 2), 'radiant');
@@ -110,7 +118,7 @@ defineItem('sun_vessel', {
 
     ctx.message('The {item} detonates — a pillar of captured sunlight erupts!', 'danger');
     ctx.present('shatter', {
-      at: ctx.targetPos,
+      at: landing,
       charge: chargeLeft,
     });
     ctx.consume();
@@ -122,7 +130,26 @@ defineItem('sun_vessel', {
   // While cracked, leaks radiance that damages nearby undead.
   onTurnWhileCarried(ctx) {
     const st = ctx.state();
-    if (st.charge <= 0) return;
+    if (st.charge <= 0) {
+      ctx.light(ctx.user, 0); // spent — no light
+      return;
+    }
+
+    // ── Dynamic light: scales with charge ───────────────────────
+    // Full charge = warm, stately glow. Cracked = volatile, nervous.
+    const chargeRatio = st.charge / st.maxCharge;
+    const baseRadius = 1.5 + chargeRatio * 2.5;   // 1.5–4.0 tiles
+    if (st.cracked) {
+      ctx.light(ctx.user, baseRadius, {
+        color: '#ffb347',
+        temporal: { speed: 2.0, sway: 0.12, wobble: 0.10, jitter: 0.08, rShift: 0.05 },
+      });
+    } else {
+      ctx.light(ctx.user, baseRadius, {
+        color: '#f6d365',
+        pattern: 'holy',
+      });
+    }
 
     const undead = ctx.entitiesInRadius(ctx.user, 4, { tag: 'undead' });
     if (undead.length === 0) {

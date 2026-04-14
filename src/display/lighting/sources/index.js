@@ -5,7 +5,7 @@
 /** @typedef {import('../engine.js').LightDef} LightDef */
 
 import { basePalette } from '../../palette/base.js';
-import { evaluatePattern } from './temporalPatterns.js';
+import { evaluatePattern, registerPattern } from './temporalPatterns.js';
 
 // Mirror of rules/data/calendar.TURNS_PER_DAY — display layer cannot import
 // rules directly.  The bridge (worldView) normalises time into turnInDay so
@@ -63,6 +63,20 @@ const _chestBlooms = [];
 /** @type {Array<{fx:number, fy:number, tx:number, ty:number, age:number, maxAge:number}>} */
 const _holyBeams = [];
 const HOLY_BEAM_COLOR = [255, 245, 200];
+
+function _parseHexToRgb(hex) {
+  const s = String(hex || '#ffffff');
+  return [
+    parseInt(s.slice(1, 3), 16) || 255,
+    parseInt(s.slice(3, 5), 16) || 255,
+    parseInt(s.slice(5, 7), 16) || 255,
+  ];
+}
+
+// Content-DSL dynamic lights — set by ctx.light(), persist until overwritten or cleared.
+// Keyed by entity ID so each entity has at most one content light.
+/** @type {Map<number, {x:number, y:number, radius:number, color:[number,number,number], pattern:string, softness:number}>} */
+const _contentLights = new Map();
 
 /**
  * Apply a named temporal pattern to a light definition and push it.
@@ -462,6 +476,25 @@ export function collectLightSources(view, opts = {}) {
     ], softness: 5 });
   }
 
+  // ---- Content DSL dynamic lights (entity-anchored, persist across frames) --
+  if (view.entities && _contentLights.size > 0) {
+    for (const [entId, light] of _contentLights) {
+      // Find entity position in current view
+      let found = false;
+      for (let i = 0; i < view.entities.length; i++) {
+        const e = view.entities[i];
+        if ((Number(e.id || 0) | 0) !== entId) continue;
+        light.x = (e.pos?.x ?? e.x ?? 0) + 0.5;
+        light.y = (e.pos?.y ?? e.y ?? 0) + 0.5;
+        found = true;
+        break;
+      }
+      if (!found) continue; // entity not visible this frame
+      emitPatterned(out, light.pattern, t, entId, light.x, light.y,
+        light.radius, light.color, light.softness);
+    }
+  }
+
   // ---- Chest reveal blooms (one-shot fading flashes) --------------------
   for (let i = _chestBlooms.length - 1; i >= 0; i--) {
     const bl = _chestBlooms[i];
@@ -541,6 +574,46 @@ export function installLightEventListeners(world, getPosition) {
   world.on('channeling:cancelled', ({ actor, spellId }) => {
     if (String(spellId || '') !== 'gaze_beam') return;
     _gazeBeams.delete(Number(actor) | 0);
+  });
+
+  // Content DSL authored temporal pattern: register a custom light waveform
+  world.on('content:light:registerPattern', ({ name, speed, sway, wobble, jitter, rShift, gShift, bShift }) => {
+    if (!name) return;
+    registerPattern(name, (t, id) => {
+      const s = speed || 1.0;
+      const v = 1.0
+        + (sway || 0)   * Math.sin(t * s * 1.4 + id)
+        + (wobble || 0)  * Math.sin(t * s * 3.1 + id * 0.7)
+        + (jitter || 0)  * (Math.random() - 0.5);
+      return {
+        intensity: v,
+        r: rShift || 0,
+        g: gShift || 0,
+        b: bShift || 0,
+      };
+    });
+  });
+
+  // Content DSL dynamic light: set/update a point light on an entity.
+  // Called by ctx.light() in scripted content. Persists across frames
+  // until cleared or entity dies. Radius 0 removes the light.
+  world.on('content:light:set', ({ entity, radius, color, pattern, softness }) => {
+    const id = Number(entity || 0) | 0;
+    if (!id) return;
+    if (!radius || radius <= 0) { _contentLights.delete(id); return; }
+    const c = Array.isArray(color) ? color
+      : typeof color === 'string' ? _parseHexToRgb(color)
+      : [255, 245, 200];
+    _contentLights.set(id, {
+      x: 0, y: 0,  // updated each frame from entity position
+      radius: Math.max(0.5, Math.min(12, Number(radius))),
+      color: c,
+      pattern: pattern || 'holy',
+      softness: softness || 10,
+    });
+  });
+  world.on('content:light:clear', ({ entity }) => {
+    _contentLights.delete(Number(entity || 0) | 0);
   });
 
   // Content DSL beam: holy lighting beam (used by presentation system)
