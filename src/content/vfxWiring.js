@@ -146,7 +146,13 @@ export function installContentVfxWiring({ world, ftext, fx, getPosition, isVisib
   // ── Semantic presentation events (ctx.present) ────────────────
   world.on('script:present', ({ entity, id, spec, payload }) => {
     if (!spec) return;
-    const pos = getPosition(Number(entity || 0));
+    // Resolve position: entity ID → Position component, or use payload.at for tile targets
+    let pos = null;
+    if (payload?.at && Number.isFinite(payload.at.x)) {
+      pos = payload.at;
+    } else {
+      pos = getPosition(Number(entity || 0));
+    }
     if (!pos || !canShowAt(pos.x, pos.y)) return;
 
     // Resolve user position for beam origins
