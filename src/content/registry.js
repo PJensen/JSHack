@@ -66,6 +66,37 @@ export function getPresentation(identity, presentationId) {
 
 export function allContentPresentations() { return _presentations; }
 
+// ── Abilities ──────────────────────────────────────────────────────
+
+/** @type {Map<string, Map<string, object>>} itemIdentity → abilityId → ability spec */
+const _abilities = new Map();
+
+export function registerAbility(identity, abilityId, spec) {
+  if (!_abilities.has(identity)) _abilities.set(identity, new Map());
+  _abilities.get(identity).set(abilityId, spec);
+}
+
+/**
+ * Get all abilities for an item identity.
+ * @param {string} identity
+ * @returns {Map<string, object>|null}
+ */
+export function getAbilities(identity) {
+  return _abilities.get(identity) || null;
+}
+
+/**
+ * Get a single ability spec.
+ * @param {string} identity
+ * @param {string} abilityId
+ * @returns {object|null}
+ */
+export function getAbility(identity, abilityId) {
+  return _abilities.get(identity)?.get(abilityId) || null;
+}
+
+export function allContentAbilities() { return _abilities; }
+
 // ── Testing ────────────────────────────────────────────────────────
 
 /** Reset all registries. Test-only. */
@@ -74,4 +105,5 @@ export function clearContentRegistry() {
   _monsters.clear();
   _palettes.clear();
   _presentations.clear();
+  _abilities.clear();
 }

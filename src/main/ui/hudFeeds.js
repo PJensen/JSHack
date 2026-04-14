@@ -25,6 +25,7 @@ import { getSpellCooldown } from "../../rules/utils/spellCooldowns.js";
 import { getItemCooldown } from "../../rules/utils/itemCooldowns.js";
 import { spellCost, spellCostResource } from "../../rules/data/spells.js";
 import { SUNSWORD_RAY_COOLDOWN_TURNS } from "../../rules/data/itemAbilityConstants.js";
+import { getCatalogItem } from "../../rules/data/itemCatalog.js";
 import { impactTracker } from "../../display/fx/projectileImpactTracker.js";
 
 /**
@@ -141,6 +142,39 @@ export function createHudFeeds(world, deps) {
       cdMax: cd ? Math.max(0, Number(cd.max || 0) | 0) : SUNSWORD_RAY_COOLDOWN_TURNS,
       auto: true,
     };
+  }
+
+  /**
+   * Generic resolver: checks equipped weapon for content-DSL abilities.
+   * Returns action objects for the spell bar, or empty array.
+   */
+  function resolveContentWeaponAbilities(playerId) {
+    const eq = /** @type any */ (world.get(playerId, Equipment));
+    const itemId = Number(eq?.weapon || 0) | 0;
+    if (!(itemId > 0)) return [];
+    const identity = String(world.get(itemId, NamedIdentity)?.identity || '').toLowerCase();
+    if (!identity) return [];
+    const def = getCatalogItem(identity);
+    if (!def?._contentAbilities) return [];
+    const results = [];
+    for (const [abilityId, spec] of Object.entries(def._contentAbilities)) {
+      const cd = getItemCooldown(world, itemId);
+      results.push({
+        kind: 'item-use',
+        id: `item-use:${identity}:${abilityId}:${itemId}`,
+        itemId,
+        identity,
+        abilityId,
+        name: spec.name || abilityId,
+        symbol: spec.icon || '?',
+        cost: spec.cost || 0,
+        costKind: spec.costKind || 'item',
+        cdRemaining: cd ? Math.max(0, Number(cd.remaining || 0) | 0) : 0,
+        cdMax: cd ? Math.max(0, Number(cd.max || 0) | 0) : (spec.cooldown || 0),
+        auto: true,
+      });
+    }
+    return results;
   }
 
   function updateVitalsHUD() {
@@ -417,6 +451,7 @@ export function createHudFeeds(world, deps) {
       const resolved = [];
       const equippedAction = pe ? resolveSunswordPinnedAction(pe.id) : null;
       if (equippedAction) resolved.push(equippedAction);
+      if (pe) resolved.push(...resolveContentWeaponAbilities(pe.id));
       for (let i = 0; i < slots.length && resolved.length < slots.length; i++) {
         const id = slots[i];
         if (!id) {
@@ -464,6 +499,7 @@ export function createHudFeeds(world, deps) {
       const resolved = [];
       const equippedAction = pe ? resolveSunswordPinnedAction(pe.id) : null;
       if (equippedAction) resolved.push(equippedAction);
+      if (pe) resolved.push(...resolveContentWeaponAbilities(pe.id));
       for (let i = 0; i < pSlots.length && resolved.length < pSlots.length; i++) {
         const id = pSlots[i];
         if (!id) {

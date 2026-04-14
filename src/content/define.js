@@ -3,7 +3,7 @@
 // Each call compiles a single definition object into engine-compatible
 // registrations (catalog entry, palette entry, monster def, hooks).
 
-import { registerItem, registerMonster, registerPalette, registerPresentation } from './registry.js';
+import { registerItem, registerMonster, registerPalette, registerPresentation, registerAbility } from './registry.js';
 import { compileHook, ScriptCtx } from './scriptCtx.js';
 import { createWorldFacade } from './worldFacade.js';
 import { inferItemCategory, resolveRarity, SHELF_LIFE } from './helpers.js';
@@ -185,6 +185,13 @@ export function defineItem(id, def) {
   if (typeof def.onTurnWhileEquipped === 'function') tickHooks.onTurnWhileEquipped = def.onTurnWhileEquipped;
   if (Object.keys(tickHooks).length > 0) catalogEntry._contentTickHooks = tickHooks;
 
+  // Combat hooks — stored for combatSystem integration
+  const combatHooks = {};
+  if (typeof def.onHit === 'function') combatHooks.onHit = def.onHit;
+  if (typeof def.onEquip === 'function') combatHooks.onEquip = def.onEquip;
+  if (typeof def.onUnequip === 'function') combatHooks.onUnequip = def.onUnequip;
+  if (Object.keys(combatHooks).length > 0) catalogEntry._contentCombatHooks = combatHooks;
+
   // Recipe pointer (stored for future recipe system integration)
   if (def.recipe) catalogEntry._contentRecipe = def.recipe;
 
@@ -212,6 +219,30 @@ export function defineItem(id, def) {
     for (const [presId, spec] of Object.entries(def.presentations)) {
       registerPresentation(id, presId, spec);
     }
+  }
+
+  // ── Register abilities ────────────────────────────────────────
+  // Abilities are named actions that appear in the spell bar,
+  // have cooldowns, and may require targeting.
+  if (def.abilities && typeof def.abilities === 'object') {
+    const abilityMap = {};
+    for (const [abilityId, spec] of Object.entries(def.abilities)) {
+      const compiled = {
+        id: abilityId,
+        name: spec.name || abilityId,
+        icon: spec.icon || '?',
+        targeting: spec.targeting || 'none',  // 'none' | 'enemy' | 'ally' | 'tile'
+        range: spec.range || 1,
+        cooldown: spec.cooldown || 0,
+        cost: spec.cost || 0,
+        costKind: spec.costKind || 'item',
+        onActivate: spec.onActivate || null,
+        description: spec.description || '',
+      };
+      registerAbility(id, abilityId, compiled);
+      abilityMap[abilityId] = compiled;
+    }
+    catalogEntry._contentAbilities = abilityMap;
   }
 
   return id;

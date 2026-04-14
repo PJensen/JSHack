@@ -14,6 +14,7 @@ import { forEachInRadius } from '../rules/utils/spatialIndex.js';
 import { emitSafe } from '../rules/utils/emitSafe.js';
 import { rollDice } from '../rules/utils/rng.js';
 import { getMonster, monsterHasTag } from '../rules/data/monsters.js';
+import { setItemCooldown, getItemCooldownRemaining, isItemOnCooldown } from '../rules/utils/itemCooldowns.js';
 
 /**
  * Create a world-backed context suitable for ScriptCtx.
@@ -151,6 +152,16 @@ export function createWorldFacade(world, actor, itemId) {
     _tileAt(_posOrEntity) {
       // Stub — would need tileMap access; implement when needed
       return null;
+    },
+
+    _setCooldown(entityId, turns) {
+      setItemCooldown(world, entityId, turns);
+    },
+    _isOnCooldown(entityId) {
+      return isItemOnCooldown(world, entityId);
+    },
+    _cooldownRemaining(entityId) {
+      return getItemCooldownRemaining(world, entityId);
     },
   };
 }

@@ -192,6 +192,36 @@ export class ScriptCtx {
     this._consumed = true;
   }
 
+  // ── Cooldown ──────────────────────────────────────────────────────
+
+  /**
+   * Set a cooldown on the item (in game turns).
+   * @param {number} turns
+   */
+  setCooldown(turns) {
+    if (this._ctx._setCooldown) {
+      this._ctx._setCooldown(this.item, turns);
+    }
+  }
+
+  /**
+   * Check if the item is on cooldown.
+   * @returns {boolean}
+   */
+  isOnCooldown() {
+    if (this._ctx._isOnCooldown) return this._ctx._isOnCooldown(this.item);
+    return false;
+  }
+
+  /**
+   * Get remaining cooldown turns.
+   * @returns {number}
+   */
+  cooldownRemaining() {
+    if (this._ctx._cooldownRemaining) return this._ctx._cooldownRemaining(this.item);
+    return 0;
+  }
+
   // ── Local State ───────────────────────────────────────────────────
 
   /**
