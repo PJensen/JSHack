@@ -4,6 +4,7 @@
 import { composeScheduler, registerSystem, clearSystems, getOrderedSystems, installScriptsAPI } from "../lib/ecs-js/index.js";
 /** @typedef {import('../lib/ecs-js/index.js').World} World */
 import { drinkSystem } from "../rules/systems/drinkSystem.js";
+import { scriptTickSystem } from "../rules/systems/scriptTickSystem.js";
 import { itemPickupSystem, autoPickupPostMoveSystem } from "../rules/systems/itemPickupSystem.js";
 import { itemDropSystem } from "../rules/systems/itemDropSystem.js";
 import { equipItemSystem } from "../rules/systems/equipItemSystem.js";
@@ -252,6 +253,9 @@ export function configureWorld(world) {
   // Deity mood ticks in the effects phase (after combat results are emitted)
   registerSystem(deitySystem, 'effects');
   registerSystem(perceptionMemorySystem, 'effects');
+
+  // Phase: scripts (content-DSL tick hooks: onTurnWhileCarried, etc.)
+  registerSystem(scriptTickSystem, 'scripts');
 
   // Phase: cleanup (end-of-turn removals like killing entities with hp <= 0)
   registerSystem(cleanupSystem, 'cleanup');

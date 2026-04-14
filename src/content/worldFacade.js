@@ -1,0 +1,150 @@
+// src/content/worldFacade.js
+// Builds a lightweight interaction-context-shaped facade backed directly
+// by world operations. Used by scriptTickSystem and other non-interaction
+// hook contexts where the full interaction runtime isn't available.
+
+import { Position } from '../rules/components/Position.js';
+import { NamedIdentity } from '../rules/components/NamedIdentity.js';
+import { Faction } from '../rules/components/Faction.js';
+import { ItemInfo } from '../rules/components/ItemInfo.js';
+import { Vitality } from '../rules/components/Vitality.js';
+import { ActiveEffects } from '../rules/components/ActiveEffects.js';
+import { ScriptState } from '../rules/components/ScriptState.js';
+import { forEachInRadius } from '../rules/utils/spatialIndex.js';
+import { emitSafe } from '../rules/utils/emitSafe.js';
+import { rollDice } from '../rules/utils/rng.js';
+import { getMonster, monsterHasTag } from '../rules/data/monsters.js';
+
+/**
+ * Create a world-backed context suitable for ScriptCtx.
+ * Provides the same interface shape as the interaction context
+ * so ScriptCtx doesn't need to know the difference.
+ *
+ * @param {import('../lib/ecs-js/index.js').World} world
+ * @param {number} actor - carrier/owner entity
+ * @param {number} itemId - the scripted entity
+ * @returns {object} interaction-context-shaped facade
+ */
+export function createWorldFacade(world, actor, itemId) {
+  const identity = String(world.get(itemId, NamedIdentity)?.identity || '');
+
+  const query = {
+    get(id, Comp) { return world.get(id, Comp) || null; },
+    name(id) { return String(world.get(id, NamedIdentity)?.name || ''); },
+    identity(id) { return String(world.get(id, NamedIdentity)?.identity || ''); },
+  };
+
+  const helpers = {
+    heal(entityId, amount) {
+      const vit = world.get(entityId, Vitality);
+      if (!vit) return;
+      world.mutate(entityId, Vitality, v => {
+        v.hp = Math.min(v.maxHp, v.hp + Math.max(0, amount | 0));
+      });
+    },
+    damage(entityId, amount, _source) {
+      const vit = world.get(entityId, Vitality);
+      if (!vit) return;
+      const dmg = Math.max(0, amount | 0);
+      world.mutate(entityId, Vitality, v => { v.hp = Math.max(0, v.hp - dmg); });
+      emitSafe(world, 'damaged', { target: entityId, amount: dmg, source: actor, cause: 'script', type: _source || 'script' });
+    },
+    addEffect(entityId, effect) {
+      const ae = world.get(entityId, ActiveEffects);
+      if (!ae) return;
+      world.mutate(entityId, ActiveEffects, a => { a.effects.push({ ...effect }); });
+    },
+    clearEffects(entityId, keys) {
+      const ae = world.get(entityId, ActiveEffects);
+      if (!ae) return;
+      const keySet = new Set(keys);
+      world.mutate(entityId, ActiveEffects, a => {
+        a.effects = a.effects.filter(e => !keySet.has(e.key));
+      });
+    },
+    hasStatus(entityId, key) {
+      const ae = world.get(entityId, ActiveEffects);
+      return ae ? ae.effects.some(e => e.key === key) : false;
+    },
+    hasEffect(entityId, key) { return helpers.hasStatus(entityId, key); },
+    roll(expr) { return Math.max(0, rollDice(String(expr), () => world.rand())); },
+    chance(pct) { const p = pct <= 1 ? pct * 100 : pct; return world.rand() * 100 < p; },
+    int(min, max) { return min + Math.floor(world.rand() * (max - min + 1)); },
+    pick(arr) { return arr?.length ? arr[Math.floor(world.rand() * arr.length)] : null; },
+    consume() {},
+    spawnItem() { return null; },
+    spawnMonster() { return null; },
+    hazardSpawn() {},
+    emit(event, payload) { emitSafe(world, event, payload); },
+    message(text, type) { emitSafe(world, 'log:message', { text, type: type || 'system' }); },
+  };
+
+  return {
+    actor,
+    primary: itemId,
+    target: 0,
+    query,
+    helpers,
+    io: { emit: (e, p) => emitSafe(world, e, p) },
+
+    // ── Extended APIs for ScriptCtx ──────────────────────────────
+    _ScriptState: ScriptState,
+    _ItemInfo: ItemInfo,
+
+    _getScriptState(entityId) {
+      const ss = world.get(entityId, ScriptState);
+      return ss ? ss.data : {};
+    },
+
+    _setScriptState(entityId, patch) {
+      if (!world.has(entityId, ScriptState)) return;
+      world.mutate(entityId, ScriptState, ss => {
+        Object.assign(ss.data, patch);
+      });
+    },
+
+    _mutateScriptState(entityId, patch) {
+      return this._setScriptState(entityId, patch);
+    },
+
+    _hasTag(entityId, tag) {
+      // Check ItemInfo.tags
+      const info = world.get(entityId, ItemInfo);
+      if (info && Array.isArray(info.tags) && info.tags.includes(tag)) return true;
+      // Check monster def tags
+      const ni = world.get(entityId, NamedIdentity);
+      if (ni?.identity) {
+        const mdef = getMonster(ni.identity);
+        if (mdef && Array.isArray(mdef.tags) && mdef.tags.includes(tag)) return true;
+      }
+      return false;
+    },
+
+    _entitiesInRadius(center, radius, filter) {
+      let cx, cy;
+      if (typeof center === 'number') {
+        const pos = world.get(center, Position);
+        if (!pos) return [];
+        cx = pos.x; cy = pos.y;
+      } else {
+        cx = center.x; cy = center.y;
+      }
+      const results = [];
+      forEachInRadius(world, cx, cy, radius, (id, _pos) => {
+        if (id === actor || id === itemId) return; // skip self and carrier
+        if (filter?.tag && !this._hasTag(id, filter.tag)) return;
+        if (filter?.faction) {
+          const f = world.get(id, Faction);
+          if (!f || f.key !== filter.faction) return;
+        }
+        results.push(id);
+      });
+      return results;
+    },
+
+    _tileAt(_posOrEntity) {
+      // Stub — would need tileMap access; implement when needed
+      return null;
+    },
+  };
+}

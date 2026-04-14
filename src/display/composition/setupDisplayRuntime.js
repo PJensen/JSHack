@@ -19,6 +19,7 @@ import { installFloatTextWiring } from "../ui/wiring/floatTextWiring.js";
 import { installEventUiWiring } from "../ui/wiring/eventUiWiring.js";
 import { createDeathVfxController } from "../fx/deathVfxController.js";
 import { installAudioWiring } from "../audio/audioWiring.js";
+import { installContentVfxWiring } from "../../content/vfxWiring.js";
 
 /**
  * Configure display-owned runtime controllers and event wiring.
@@ -117,6 +118,7 @@ export function setupDisplayRuntime({
   });
 
   const { goreTick } = installFloatTextWiring({ world, ftext, fx, getPosition, isVisibleAt, isPet, isPlayer, getFxTime });
+  installContentVfxWiring({ world, ftext, fx, getPosition, isVisibleAt });
   installEventUiWiring({
     world,
     ftext,

@@ -1,0 +1,205 @@
+// src/content/items/sunVessel.js
+// ──────────────────────────────────────────────────────────────────
+// The Sun-Vessel — a complex stateful artifact.
+//
+// A sealed reliquary of captive daylight. Carries charge that can be
+// invoked for holy bursts, or thrown for a devastating explosion.
+// While carried, it pulses near undead, draining stability.
+// When cracked, it leaks radiance that scorches the dead.
+//
+// One file. Everything the thing is, does, and looks like.
+// ──────────────────────────────────────────────────────────────────
+
+import { defineItem } from '../define.js';
+
+defineItem('sun_vessel', {
+  name:        'Sun-Vessel',
+  type:        'tool',
+  glyph:       '{',
+  color:       '#f6d365',
+  glow:        '#ffb347',
+  scale:       0.55,
+  weight:      1.5,
+  value:       350,
+  rarity:      'legendary',
+  material:    'bronze',
+  description: 'A sealed reliquary of captive daylight. It hums with quiet warmth.',
+  tags:        ['light', 'holy', 'volatile'],
+
+  // ── Local persistent state ──────────────────────────────────────
+  state: {
+    charge:     8,
+    maxCharge:  8,
+    stability:  10,
+    cracked:    false,
+  },
+
+  // ── USE: Invoke ─────────────────────────────────────────────────
+  // Spend one charge for a holy burst: damages nearby undead,
+  // heals the bearer slightly, emits light.
+  onUse(ctx) {
+    const st = ctx.state();
+
+    if (st.charge <= 0) {
+      ctx.message('The {item} is spent — only cold glass remains.', 'system');
+      return;
+    }
+
+    // Spend charge
+    ctx.setState({ charge: st.charge - 1 });
+
+    // Holy burst: find undead in radius 3
+    const undead = ctx.entitiesInRadius(ctx.user, 3, { tag: 'undead' });
+    let totalDmg = 0;
+    for (const uid of undead) {
+      totalDmg += ctx.damage(uid, '2d6', 'radiant');
+    }
+
+    // Heal bearer
+    const healed = ctx.heal(ctx.user, '1d6+2');
+
+    // Message
+    if (undead.length > 0) {
+      ctx.message('{user} raises the {item} — golden fire lashes the dead!', 'good');
+    } else {
+      ctx.message('{user} raises the {item} — warm light floods outward.', 'system');
+    }
+
+    // Presentation
+    ctx.present('invoke', {
+      target: ctx.user,
+      healed,
+      damaged: totalDmg,
+      undeadHit: undead.length,
+      remaining: st.charge - 1,
+    });
+  },
+
+  // ── THROW: Shatter ──────────────────────────────────────────────
+  // Shatters the vessel, releasing ALL remaining charge at once.
+  // Massive radiant explosion proportional to stored charge.
+  onThrow(ctx) {
+    const st = ctx.state();
+    const chargeLeft = Math.max(0, st.charge);
+
+    if (chargeLeft === 0) {
+      ctx.message('The empty {item} shatters harmlessly.', 'system');
+      ctx.consume();
+      return;
+    }
+
+    // Release all charge
+    ctx.setState({ charge: 0, cracked: true });
+
+    // Scale damage with remaining charge
+    const baseDmg = 2 + chargeLeft * 3;
+    const undead = ctx.entitiesInRadius(ctx.target, 4, { tag: 'undead' });
+    for (const uid of undead) {
+      ctx.damage(uid, baseDmg, 'radiant');
+    }
+
+    // Also damages non-undead nearby, but less
+    const others = ctx.entitiesInRadius(ctx.target, 2, { faction: 'enemy' });
+    for (const oid of others) {
+      if (!undead.includes(oid)) {
+        ctx.damage(oid, Math.floor(baseDmg / 2), 'radiant');
+        ctx.apply(oid, 'blind', 3);
+      }
+    }
+
+    ctx.message('The {item} detonates — a pillar of captured sunlight erupts!', 'danger');
+    ctx.present('shatter', {
+      target: ctx.target,
+      charge: chargeLeft,
+    });
+    ctx.consume();
+  },
+
+  // ── TICK: While carried ─────────────────────────────────────────
+  // Each turn, if undead are nearby, the vessel pulses.
+  // Drains stability. When stability hits 0, the vessel cracks.
+  // While cracked, leaks radiance that damages nearby undead.
+  onTurnWhileCarried(ctx) {
+    const st = ctx.state();
+    if (st.charge <= 0) return;
+
+    const undead = ctx.entitiesInRadius(ctx.user, 4, { tag: 'undead' });
+    if (undead.length === 0) {
+      // Recover stability slowly when safe
+      if (st.stability < 10) {
+        ctx.setState({ stability: Math.min(10, st.stability + 1) });
+      }
+      return;
+    }
+
+    // Drain stability proportional to undead count
+    const drain = Math.min(undead.length, 3);
+    const newStab = Math.max(0, st.stability - drain);
+    ctx.setState({ stability: newStab });
+
+    // Pulse presentation
+    ctx.present('pulse', { target: ctx.user, intensity: drain });
+
+    // Crack threshold
+    if (newStab <= 0 && !st.cracked) {
+      ctx.setState({ cracked: true });
+      ctx.message('The Sun-Vessel shudders — hairline fractures race across the glass!', 'danger');
+      ctx.present('crack', { target: ctx.user });
+    }
+
+    // Cracked: leak radiance
+    if (st.cracked) {
+      for (const uid of undead) {
+        ctx.damage(uid, '1d4', 'radiant');
+      }
+      ctx.setState({ charge: st.charge - 1 });
+
+      if (st.charge - 1 <= 0) {
+        ctx.message('The last light drains from the Sun-Vessel.', 'system');
+      }
+    }
+  },
+
+  // ── AI HINTS ────────────────────────────────────────────────────
+  aiHints: {
+    threatIfSeenBy: {
+      undead: 'extreme',
+      thief: 'high_value',
+    },
+  },
+
+  // ── PRESENTATIONS ───────────────────────────────────────────────
+  // Co-located. One file. Simulation calls ctx.present(id, payload),
+  // display reads these specs. In headless mode, ignored entirely.
+  presentations: {
+    invoke: {
+      sound: 'holy_chime',
+      vfx: [
+        { type: 'burst', color: '#f6d365', count: 14, speed: 1.4, life: 0.4 },
+        { type: 'glow', color: '#ffb347', radius: 1.8, life: 1.5 },
+        { type: 'floatText', text: '+{healed} HP', color: '#f6d365' },
+      ],
+    },
+    shatter: {
+      sound: 'glass_shatter',
+      vfx: [
+        { type: 'flash', color: '#fffbe6', radius: 6 },
+        { type: 'burst', color: '#f6d365', count: 24, speed: 3.0, life: 0.6 },
+      ],
+      message: 'Radiant energy cascades outward — {charge} charges released!',
+      messageType: 'danger',
+    },
+    pulse: {
+      vfx: [
+        { type: 'glow', color: '#f6d365', radius: 0.6, life: 0.4 },
+      ],
+    },
+    crack: {
+      sound: 'glass_crack',
+      vfx: [
+        { type: 'burst', color: '#ffb347', count: 6, speed: 0.5, life: 0.2 },
+        { type: 'floatText', text: 'CRACKED', color: '#ff8844' },
+      ],
+    },
+  },
+});
