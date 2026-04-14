@@ -136,6 +136,24 @@ export function defineItem(id, def) {
     if (def.range) catalogEntry.range = def.range;
     if (def.affixes) catalogEntry.affixes = def.affixes;
     if (def.tags) catalogEntry.tags = def.tags;
+
+    // Swing profile — authored weapon VFX identity
+    if (def.swingProfile) {
+      const sp = def.swingProfile;
+      if (sp.lengthCm) catalogEntry.weaponLengthCm = sp.lengthCm;
+      if (sp.tint || sp.density || sp.alphaStops || sp.widthScale || sp.handleStart) {
+        catalogEntry.weaponVfxProfile = {};
+        if (sp.density === 'heavy')  catalogEntry.weaponVfxProfile.length = 1.18;
+        if (sp.density === 'light')  catalogEntry.weaponVfxProfile.length = 0.85;
+        if (sp.length)      catalogEntry.weaponVfxProfile.length = sp.length;
+        if (sp.widthScale)   catalogEntry.weaponVfxProfile.widthScale = sp.widthScale;
+        if (sp.handleStart)  catalogEntry.weaponVfxProfile.handleStart = sp.handleStart;
+        if (sp.alphaStops)   catalogEntry.weaponVfxProfile.alphaStops = sp.alphaStops;
+        if (sp.tint)         catalogEntry.weaponVfxProfile.tint = sp.tint;
+      }
+      // String shorthand: "sword", "axe", "mace" etc.
+      if (typeof sp === 'string') catalogEntry.weaponVfxProfile = sp;
+    }
   }
 
   // Potion-specific

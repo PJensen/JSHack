@@ -33,6 +33,15 @@ defineItem('dawnbreaker', {
   staminaCost: 10,
   maxSockets:  1,
 
+  // ── Swing identity ────────────────────────────────────────────
+  swingProfile: {
+    tint:       '#f0c040',
+    lengthCm:   98,
+    widthScale:  0.9,
+    handleStart: 0.18,
+    alphaStops: [[0, 0.3], [0.5, 0.7], [0.9, 1.0], [1, 1.0]],
+  },
+
   // ── Local persistent state ────────────────────────────────────
   state: {
     radiance:   0,         // accumulated through hits (0–10)
