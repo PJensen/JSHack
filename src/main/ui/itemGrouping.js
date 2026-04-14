@@ -24,6 +24,7 @@ const GROUP_SKIP_KEYS = new Set([
   "buyPrice",
   "sellPrice",
   "unpaidPrice",
+  "contentStatus",
 ]);
 
 const SUM_KEYS = Object.freeze([
