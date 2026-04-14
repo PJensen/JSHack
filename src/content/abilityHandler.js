@@ -13,6 +13,7 @@ import { getAbility } from './registry.js';
 import { ScriptCtx } from './scriptCtx.js';
 import { createWorldFacade } from './worldFacade.js';
 import { emitSafe } from '../rules/utils/emitSafe.js';
+import { isItemOnCooldown, getItemCooldownRemaining } from '../rules/utils/itemCooldowns.js';
 
 const _installed = Symbol.for('jshack:content:abilityHandler:installed');
 
@@ -34,6 +35,14 @@ export function installContentAbilityHandler({ world, targeting, playerEntity, s
   world.on('content:ability:request', ({ actor, itemId, abilityId, identity }) => {
     const spec = getAbility(identity, abilityId);
     if (!spec || typeof spec.onActivate !== 'function') return;
+
+    // ── Cooldown gate ───────────────────────────────────────────
+    if (spec.cooldown > 0 && isItemOnCooldown(world, itemId)) {
+      const remaining = getItemCooldownRemaining(world, itemId);
+      const name = world.get(itemId, NamedIdentity)?.name || 'Item';
+      emitSafe(world, 'message', { text: `${name} is still cooling down (${remaining} turns).`, type: 'warning' });
+      return;
+    }
 
     // ── No targeting needed: fire immediately ───────────────────
     if (spec.targeting === 'none' || !spec.targeting) {

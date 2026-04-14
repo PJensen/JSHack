@@ -1099,32 +1099,7 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     }
   });
 
-  world.on('sunsword:ray:vfx', ({ x, y }) => {
-    if (!canShowAt(x, y)) return;
-    ftext.addStatus(x, y - 0.45, 'BLINDED!', {
-      color: '#ffffa0',
-      life: 1.4,
-      scaleStart: 1.5,
-      scaleEnd: 1.0,
-    });
-    for (let i = 0; i < 10; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const speed = 0.3 + Math.random() * 0.5;
-      fx.pool.spawn(new Particle({
-        x,
-        y: y - 0.1,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed - 0.1,
-        life: 0.25 + Math.random() * 0.2,
-        size0: 0.09,
-        size1: 0.02,
-        r: 255,
-        g: 245,
-        b: 180,
-        a0: 0.95,
-      }));
-    }
-  });
+  // sunsword:ray:vfx — migrated to content DSL presentation system
 
   world.on('nymph:stole', ({ at }) => {
     if (!at || !canShowAt(at.x, at.y)) return;

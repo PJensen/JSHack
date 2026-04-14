@@ -172,7 +172,29 @@ export function defineItem(id, def) {
   if (def.charges) catalogEntry.charges = def.charges;
 
   // Hooks
-  if (hooks) catalogEntry.hooks = hooks;
+  if (!hooks) catalogEntry.hooks = {};
+  else catalogEntry.hooks = hooks;
+
+  // Auto-generate on_use for items with abilities:
+  // When the player "uses" a weapon that has a single ability, dispatch it.
+  // When multiple abilities exist, dispatch the first (action bar handles selection).
+  if (def.abilities && !def.onUse) {
+    const abilityIds = Object.keys(def.abilities);
+    if (abilityIds.length > 0) {
+      const primaryAbilityId = abilityIds[0];
+      catalogEntry.hooks.on_use = (ctx, state) => {
+        const actorId = Number(state?.actor || ctx.actor || 0) | 0;
+        const itemId = Number(state?.itemId || ctx.primary || 0) | 0;
+        ctx.io.emit('content:ability:request', {
+          actor: actorId,
+          itemId,
+          abilityId: primaryAbilityId,
+          identity: id,
+        });
+        return { consumed: false };
+      };
+    }
+  }
 
   // Local persistent state — initial values for ScriptState component
   if (def.state && typeof def.state === 'object') {

@@ -543,15 +543,7 @@ export function installLightEventListeners(world, getPosition) {
     _gazeBeams.delete(Number(actor) | 0);
   });
 
-  // Sunsword blinding ray — brief holy beam from player to target
-  world.on('sunsword:ray:vfx', ({ x, y, fromX, fromY }) => {
-    if (!Number.isFinite(fromX) || !Number.isFinite(fromY)) return;
-    _holyBeams.push({
-      fx: fromX + 0.5, fy: fromY + 0.5,
-      tx: Number(x) + 0.5, ty: Number(y) + 0.5,
-      age: 0, maxAge: 0.45,
-    });
-  });
+  // sunsword:ray:vfx — migrated to content DSL presentation system
 
   // Clear gaze beams on level transition
   world.on('dungeon:transitioned', () => {

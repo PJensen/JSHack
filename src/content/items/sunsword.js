@@ -16,7 +16,7 @@
 
 import { defineItem } from '../define.js';
 
-defineItem('sunsword_dsl', {
+defineItem('sunsword', {
   name:        'Sunsword',
   type:        'weapon',
   glyph:       '/',

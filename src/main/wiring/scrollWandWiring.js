@@ -13,7 +13,6 @@ import { Position } from "../../rules/components/Position.js";
 import { Traits } from "../../rules/components/Traits.js";
 import { Vitality } from "../../rules/components/Vitality.js";
 import { setItemCooldown } from "../../rules/utils/itemCooldowns.js";
-import { SUNSWORD_RAY_COOLDOWN_TURNS } from "../../rules/data/itemAbilityConstants.js";
 import { listAllMonsterIds, MONSTERS, getMonster } from "../../rules/data/monsters.js";
 import { Polymorph } from "../../rules/components/Polymorph.js";
 import { resolvePolymorph } from "../../rules/systems/polymorphSystem.js";
@@ -178,46 +177,7 @@ export function installScrollWandWiring({ world, targeting, playerEntity }) {
     });
   });
 
-  // ── Sunsword Blinding Ray ───────────────────────────────────────────────
-  world.on('sunsword:ray', ({ actor, itemId, cooldownTurns }) => {
-    const pe = playerEntity();
-    if (!pe) return;
-    const px = pe.pos.x | 0;
-    const py = pe.pos.y | 0;
-    const range = 6;
-    const enemies = scanVisibleEnemies(world, px, py, range, { playerId: pe.id });
-    if (enemies.length === 0) {
-      world.emit?.('message', { text: 'No visible enemies to blind.', type: 'system' });
-      return;
-    }
-
-    targeting.openEnemyTargeting({
-      spellId: '__sunsword_ray__',
-      spellName: 'Sunsword — Blinding Ray',
-      range,
-      enemies,
-      onConfirm: (enemyId) => {
-        const ae = world.get(enemyId, ActiveEffects);
-        const blindEffect = { key: 'blinded', turnsLeft: 5, stacks: 1, potency: 1 };
-        if (ae) {
-          ae.effects.push(blindEffect);
-        } else {
-          try { world.add(enemyId, ActiveEffects, { effects: [blindEffect] }); } catch {}
-        }
-        blind(world, enemyId, 0, 0, 5, 0, 0);
-        const ni = world.get(enemyId, NamedIdentity);
-        const name = ni?.name || 'creature';
-        const resolvedItemId = Number(itemId || 0) | 0;
-        const resolvedCooldown = Math.max(1, Number.isFinite(cooldownTurns) ? (Number(cooldownTurns) | 0) : SUNSWORD_RAY_COOLDOWN_TURNS);
-        if (resolvedItemId > 0) {
-          setItemCooldown(world, resolvedItemId, resolvedCooldown);
-        }
-        world.emit?.('message', { text: `A searing ray of light strikes the ${name} — it is blinded!`, type: 'system' });
-        const pos = world.get(enemyId, Position);
-        if (pos) world.emit?.('sunsword:ray:vfx', { x: pos.x | 0, y: pos.y | 0, fromX: px, fromY: py });
-      },
-    });
-  });
+  // Sunsword Blinding Ray: migrated to content DSL (src/content/items/sunsword.js)
 
   // ── Scroll of Aggravation ───────────────────────────────────────────────
   world.on('scroll:aggravation', ({ actor }) => {

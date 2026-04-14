@@ -99,7 +99,6 @@ import { Equipment, GEAR_SLOTS } from "./rules/components/Equipment.js";
 import { ItemInfo } from "./rules/components/ItemInfo.js";
 import { ItemCooldown } from "./rules/components/ItemCooldown.js";
 import { NamedIdentity } from "./rules/components/NamedIdentity.js";
-import { SUNSWORD_RAY_COOLDOWN_TURNS } from "./rules/data/itemAbilityConstants.js";
 import { Position } from "./rules/components/Position.js";
 import { Player } from "./rules/components/Player.js";
 import { Trap } from "./rules/components/Trap.js";
@@ -169,6 +168,7 @@ import { pickMonster } from "./rules/environment/dungeon/tables.js";
 import { isApplyTool, listApplyTargetsForTool } from "./rules/content/items/applyPayloads.js";
 import { createTargetingController, scanVisibleEnemies, clampTargetToRange, worldToTile, bracketizeName } from "./main/targeting/targetingController.js";
 import { installScrollWandWiring } from "./main/wiring/scrollWandWiring.js";
+import { installContentAbilityHandler } from "./content/abilityHandler.js";
 import { installPetWiring } from "./main/wiring/petWiring.js";
 import { createDeathLootArcFx } from "./display/fx/deathLootArcFx.js";
 import { createBubbleDialogController } from "./display/ui/bubbleDialog.js";
@@ -1266,6 +1266,7 @@ targeting.installKeyboardHandlers();
 
 // ---- Extracted wiring modules -----------------------------------------------
 installScrollWandWiring({ world, targeting, playerEntity: () => playerEntity(world) });
+installContentAbilityHandler({ world, targeting, playerEntity: () => playerEntity(world), scanVisibleEnemies });
 installPetWiring({ world, playerEntity: () => playerEntity(world) });
 
 function buildQuickItemPinDetailFromWorld(itemId) {
