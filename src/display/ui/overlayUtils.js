@@ -1448,6 +1448,78 @@ export function renderMessageTicker(container, entries) {
 }
 
 /**
+ * Render a single message with optional "--More--" prompt (NetHack style).
+ * Called by the messageMore queue instead of renderMessageTicker when gating.
+ * @param {HTMLElement} container  — the ticker element
+ * @param {any}         message    — current message entry
+ * @param {boolean}     hasMore    — whether the queue has more messages
+ */
+export function renderMessageMore(container, message, hasMore) {
+  if (!container) return;
+  const store = /** @type {any} */ (container);
+  // Collapse expanded mode when --More-- kicks in.
+  store._expanded = false;
+  Object.assign(container.style, {
+    maxHeight: '',
+    gap: '2px',
+    fontSize: 'min(15px, 3.4vw)',
+    lineHeight: '1.35',
+    padding: '5px 12px',
+    background: 'rgba(6, 8, 14, 0.92)',
+    borderBottom: '1px solid rgba(60,80,120,0.6)',
+    boxShadow: '0 2px 12px rgba(0,0,0,0.4)',
+    cursor: hasMore ? 'pointer' : 'default',
+  });
+
+  container.innerHTML = '';
+  if (!message) return;
+
+  const row = document.createElement('div');
+  Object.assign(row.style, {
+    display: 'flex',
+    alignItems: 'baseline',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    textShadow: '0 1px 0 rgba(0,0,0,0.45), 0 0 6px rgba(0,0,0,0.25)',
+  });
+
+  const msgSpan = document.createElement('span');
+  msgSpan.style.flex = '1';
+  msgSpan.style.overflow = 'hidden';
+  msgSpan.style.textOverflow = 'ellipsis';
+  applyMessageContent(msgSpan, message);
+  row.appendChild(msgSpan);
+
+  if (hasMore) {
+    const more = document.createElement('span');
+    more.textContent = '  --More--';
+    Object.assign(more.style, {
+      color: '#ffd966',
+      flexShrink: '0',
+      marginLeft: '8px',
+      animation: 'jshack-more-blink 1.2s step-end infinite',
+    });
+    row.appendChild(more);
+
+    // Inject blink keyframes once.
+    if (!document.getElementById('jshack-more-blink-style')) {
+      const style = document.createElement('style');
+      style.id = 'jshack-more-blink-style';
+      style.textContent = '@keyframes jshack-more-blink{0%,80%{opacity:1}50%,70%{opacity:0}}';
+      document.head.appendChild(style);
+    }
+  }
+
+  container.appendChild(row);
+
+  requestAnimationFrame(() => {
+    const h = Math.max(0, Math.ceil(container.getBoundingClientRect().height || 0));
+    document.documentElement.style.setProperty('--jshack-ticker-height', `${h}px`);
+  });
+}
+
+/**
  * @param {any} message
  * @returns {string}
  */

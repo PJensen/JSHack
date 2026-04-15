@@ -68,6 +68,7 @@ import { drawRootedVines } from "./display/fx/rootedVineFx.js";
 import { drawEquipmentBadges } from "./display/fx/equipBadges.js";
 import { readRuntimeConfig } from "./main/config/runtimeConfig.js";
 import { createMessageLog } from "./main/ui/messageLog.js";
+import { createMessageMoreQueue } from "./display/ui/messageMore.js";
 import { installDeityUiWiring } from "./display/ui/wiring/deityUiWiring.js";
 import { installMessageWiring } from "./display/ui/wiring/messageWiring.js";
 import { installCombatLogTooltip } from "./display/ui/combatLogTooltip.js";
@@ -429,7 +430,11 @@ const TARGETED_SPELL_CONFIG = Object.freeze({
 // Targeting controller — created early, keyboard handlers installed below.
 // Pointer handlers require cam/canvas and are installed after camera init.
 // The consolidated rules dispatcher is a single shared instance used everywhere.
-const _sharedRulesDispatcher = makeRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
+// _messageMoreRef is populated later; the closure captures the mutable binding.
+let _messageMoreRef = null;
+const _sharedRulesDispatcher = makeRulesDispatcher(world, () => (playerEntity(world)?.id || 0), {
+  onAction: () => { _messageMoreRef?.beginBatch(); },
+});
 
 // Shim: targeting state accessors for code that still reads old variables directly.
 // These are getters/setters that delegate to the targeting controller (created later).
@@ -1211,14 +1216,55 @@ addEventListener('ui:castPinnedSpell', (ev) => {
   window.dispatchEvent(new CustomEvent('ui:castActiveSpell'));
 });
 
+// NetHack-style --More-- queue: gates rapid-fire messages behind a keypress.
+// Assign to forward-ref so rulesDispatcher can call beginBatch before each tick.
+const messageMoreQueue = _messageMoreRef = createMessageMoreQueue({
+  onDisplay(message, hasMore) {
+    try { window.dispatchEvent(new CustomEvent('ui:messageMoreShow', { detail: { message, hasMore } })); } catch (e) { console.debug('[main] dispatch ui:messageMoreShow:', e); }
+  },
+  onClear() {
+    try { window.dispatchEvent(new CustomEvent('ui:messageMoreClear', { detail: { entries: messageLog.getEntries() } })); } catch (e) { console.debug('[main] dispatch ui:messageMoreClear:', e); }
+  },
+});
+
 // Basic app-side message log collector (bridge-free for now)
+// The onUpdate callback feeds new (non-repeat) messages into the --More-- queue.
+let _lastQueuedEntry = null;
 const messageLog = createMessageLog({
   maxEntries: 50,
   onUpdate: (entries) => {
+    // Always update normal ticker (used as fallback / expanded history).
     try { window.dispatchEvent(new CustomEvent('ui:updateMessageTicker', { detail: { entries } })); } catch (e) { console.debug('[main] dispatch ui:updateMessageTicker:', e); }
+    // Feed genuinely new messages into the --More-- queue.
+    // Repeat-count increments mutate the same object, so reference check skips them.
+    const newest = entries.length > 0 ? entries[entries.length - 1] : null;
+    if (newest && newest !== _lastQueuedEntry) {
+      _lastQueuedEntry = newest;
+      messageMoreQueue.push(newest);
+    }
   },
 });
 // Message formatting and logging now handled in messageWiring module
+
+// --More-- advance: Space, Enter, or Escape dismiss the prompt.
+// Capture phase so we eat the event before InputManager / rulesDispatch see it.
+window.addEventListener('keydown', (e) => {
+  if (!messageMoreQueue.isActive()) return;
+  if (e.key === ' ' || e.key === 'Enter' || e.key === 'Escape') {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    messageMoreQueue.advance();
+  }
+}, true); // ← capture phase
+// Also allow click/tap on the ticker to advance (mobile-friendly).
+if (_overlays?.ticker) {
+  _overlays.ticker.addEventListener('click', (ev) => {
+    if (!messageMoreQueue.isActive()) return;
+    ev.preventDefault();
+    ev.stopImmediatePropagation();
+    messageMoreQueue.advance();
+  }, true);
+}
 
 installDeityUiWiring(world, { log: messageLog.log.bind(messageLog) });
 installMessageWiring({
