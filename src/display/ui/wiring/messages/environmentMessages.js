@@ -70,6 +70,17 @@ export function installEnvironmentMessages(ctx) {
     log('A divine blessing settles over you like warm rain.', 'deity');
   });
 
+  world.on('shrine:combat:scaling', ({ attacker, label, mult, delta }) => {
+    if (nameOfEntity(attacker) !== 'You') return;
+    const isBoon = mult > 1;
+    const pct = Math.abs(Math.round((mult - 1) * 100));
+    if (isBoon) {
+      log(`The shrine's aura empowers your strike. (+${pct}% damage)`, 'deity');
+    } else {
+      log(`The shrine's presence saps your strength. (-${pct}% damage)`, 'deity');
+    }
+  });
+
   // === Pet events ===
   world.on('pet:deliver', ({ petId, actor, itemId, itemName, count }) => {
     const petName = nameOfEntity(petId);

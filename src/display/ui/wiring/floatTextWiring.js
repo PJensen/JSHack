@@ -824,6 +824,23 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     }
   });
 
+  // ── Shrine proximity combat scaling ─────────────────────────────────
+
+  world.on('shrine:combat:scaling', ({ attacker, label, mult, delta }) => {
+    const pos = getPosition(Number(attacker || 0));
+    if (!pos || !canShowAt(pos.x, pos.y)) return;
+    if (!_throttle(`shrine:scaling:${attacker}`, 2000)) return;
+    const isBoon = mult > 1;
+    const pct = Math.abs(Math.round((mult - 1) * 100));
+    const text = `${label} ${isBoon ? '+' : '-'}${pct}%`;
+    ftext.addStatus(pos.x, pos.y - 0.55, text, {
+      color: isBoon ? '#ffd700' : '#aa44cc',
+      life: 1.0,
+      scaleStart: 1.2,
+      scaleEnd: 0.9,
+    });
+  });
+
   // ── Spirit spell boost ──────────────────────────────────────────────
 
   world.on('spirit:spellBoost', ({ targetId }) => {

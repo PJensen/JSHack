@@ -1638,6 +1638,14 @@ export function resolvePlayerActiveDeity(world, playerId) {
 }
 
 /**
+ * Score a deity's current standing from mood state.
+ * Higher = more favorable. Returns -999 for invalid/missing deity.
+ * @param {import('../../lib/deity-js/deity.js').Deity} deity
+ * @returns {number}
+ */
+export { scoreDeityStanding };
+
+/**
  * Access a deity instance by id (for app-layer event wiring).
  * @param {string} deityId
  */
