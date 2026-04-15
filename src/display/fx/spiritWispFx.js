@@ -1723,13 +1723,13 @@ export function createSpiritWispFxController(
     world.on("castSpell", ({ targetId, spiritBoosted }) => {
       if (!_pendingSurge || !spiritBoosted) return;
       // If no specific spell:* event consumed the surge, fly to target directly
-      setTimeout(() => {
+      queueMicrotask(() => {
         if (!_pendingSurge) return;
         _pendingSurge = false;
         const tid = Number(targetId || 0) | 0;
         const pos = tid > 0 ? getPosition(tid) : null;
         if (pos) _startMiracleFlight(pos.x, pos.y);
-      }, 0);
+      });
     });
 
     // Prayer — wisp spirals inward then eases back out

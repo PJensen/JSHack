@@ -163,10 +163,10 @@ export function installEventUiWiring({
   // Harvest updates: refresh inventory UI after gather actions.
   // Deferred so the tick's command queue (component adds) flushes first.
   world.on('harvest:picked', ({ actor, count, kind }) => {
-    setTimeout(() => {
+    queueMicrotask(() => {
       try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch (e) { console.debug('[eventUiWiring] dispatch ui:requestInventoryData:', e); }
       try { window.dispatchEvent(new CustomEvent('ui:requestUsableItemsData')); } catch (e) { console.debug('[eventUiWiring] dispatch ui:requestUsableItemsData:', e); }
-    }, 0);
+    });
     const pe = getPlayerEntity();
     if (!pe || pe.id !== actor) return;
     const qty = Math.max(1, Number(count || 1) | 0);
