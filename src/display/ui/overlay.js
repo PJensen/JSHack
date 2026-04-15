@@ -975,14 +975,19 @@ export function initOverlays() {
     tileKeyTip.style.display = 'flex';
   });
 
-  // Passive updates to the always-on ticker (normal mode, no --More-- gating)
+  // Passive updates to the always-on ticker — single topline (NetHack style).
+  // The old 3-line fade ticker only appears when the user clicks to expand.
   let _moreActive = false;
   window.addEventListener('ui:updateMessageTicker', (ev) => {
     if (_moreActive) return; // --More-- queue owns the ticker right now
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
     const entries = (e?.detail?.entries) || [];
-    renderMessageTicker(ticker, entries);
+    // Single topline: show only the newest message, no fade stack.
+    const newest = entries.length > 0 ? entries[entries.length - 1] : null;
+    if (newest) {
+      renderMessageMore(ticker, newest, false);
+    }
   });
 
   // NetHack --More-- queue display events
@@ -998,7 +1003,10 @@ export function initOverlays() {
     const e = ev;
     _moreActive = false;
     const entries = (e?.detail?.entries) || [];
-    renderMessageTicker(ticker, entries);
+    const newest = entries.length > 0 ? entries[entries.length - 1] : null;
+    if (newest) {
+      renderMessageMore(ticker, newest, false);
+    }
   });
 
   // Gesture debug path overlay
