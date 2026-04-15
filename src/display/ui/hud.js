@@ -335,7 +335,7 @@ export function initHUD() {
   const root = ensureRoot();
   const bar = document.createElement('div');
   Object.assign(bar.style, {
-    position: 'fixed', left: '8px', right: '8px', bottom: 'calc(8px + env(safe-area-inset-bottom, 0px))',
+    position: 'fixed', left: '8px', right: '8px', bottom: 'calc(var(--jshack-ticker-height, 30px) + 8px + env(safe-area-inset-bottom, 0px))',
     display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center',
     pointerEvents: 'auto', zIndex: 900
   });

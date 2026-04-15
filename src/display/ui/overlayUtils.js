@@ -1307,7 +1307,6 @@ export function ensureMessageTicker(root) {
     bottom: '0',
     width: '100%',
     display: 'block',
-    gap: '2px',
     pointerEvents: 'auto',
     zIndex: 850,
     color: '#cfe8ff',
@@ -1337,6 +1336,8 @@ export function ensureMessageTicker(root) {
     renderMessageTicker(box, (/** @type {any} */ (box))._entries || []);
   });
   root.appendChild(box);
+  // Publish ticker height so action bar + other bottom HUD can stack above it.
+  document.documentElement.style.setProperty('--jshack-ticker-height', '30px');
   return box;
 }
 
