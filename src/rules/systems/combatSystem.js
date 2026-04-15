@@ -45,6 +45,8 @@ import { computeImpactVector } from '../utils/projectileKinematics.js';
 import { getAffixElementTint } from '../data/affixes.js';
 import { EFFECT_DEFS } from '../data/effectDefs.js';
 import { resolveWeaponVisualMeta } from '../data/weaponVisuals.js';
+import { resolvePlayerActiveDeity, scoreDeityStanding } from './deitySystem.js';
+import { forEachInRadius } from '../utils/spatialIndex.js';
 
 const BUMP_ATTACK_INSTALLED = Symbol.for('jshack:combat:bumpAttack:installed');
 
@@ -146,6 +148,56 @@ function buildMeleeImpactProfile(world, sourceId, weaponId, damageType, offhand,
         facingVector: facingVector || undefined,
         elementTint: resolveElementTint(world, sourceId, weaponId),
     };
+}
+
+// ── Shrine proximity combat scaling ──────────────────────────────────
+// Fighting near a shrine scales damage based on deity favor.
+// Positive standing → bonus; negative standing → penalty.
+const SHRINE_COMBAT_RADIUS = 5;
+const SHRINE_SCALING_MAX = 0.25;  // ±25% at extremes
+const SHRINE_STANDING_CAP = 8;    // standing ±8 maps to ±1 normalized
+
+/**
+ * Compute shrine proximity damage multiplier for an attacker.
+ * Returns { mult: number, label: string|null, standing: number, dist: number }
+ * where mult is the raw multiplier (e.g. 1.20 for +20%, 0.85 for -15%).
+ * Returns mult=1 when no shrine is in range or attacker has no deity.
+ */
+function computeShrineCombatScaling(world, attackerId) {
+    const resolved = resolvePlayerActiveDeity(world, attackerId);
+    if (!resolved) return { mult: 1, label: null, standing: 0, dist: -1 };
+
+    const atkPos = world.get(attackerId, Position);
+    if (!atkPos) return { mult: 1, label: null, standing: 0, dist: -1 };
+
+    // Find nearest shrine within radius (Chebyshev)
+    let nearestDist = Infinity;
+    forEachInRadius(world, atkPos.x, atkPos.y, SHRINE_COMBAT_RADIUS, (id, pos) => {
+        const ni = world.get(id, NamedIdentity);
+        if (ni?.identity !== 'shrine') return;
+        const d = Math.max(Math.abs(atkPos.x - pos.x), Math.abs(atkPos.y - pos.y));
+        if (d < nearestDist) nearestDist = d;
+    });
+
+    if (!Number.isFinite(nearestDist)) return { mult: 1, label: null, standing: 0, dist: -1 };
+
+    const standing = scoreDeityStanding(resolved.deity);
+    if (standing === -999) return { mult: 1, label: null, standing: 0, dist: nearestDist };
+
+    // Normalize standing to [-1, +1]
+    const normalized = Math.max(-1, Math.min(1, standing / SHRINE_STANDING_CAP));
+    // Distance falloff: full at dist=0, zero at radius edge
+    const distanceFactor = 1 - (nearestDist / SHRINE_COMBAT_RADIUS);
+    const scalingAmount = normalized * SHRINE_SCALING_MAX * distanceFactor;
+    const mult = 1 + scalingAmount;
+
+    // Determine affix label based on magnitude
+    let label = null;
+    if (Math.abs(scalingAmount) >= 0.02) {
+        label = scalingAmount > 0 ? 'DIVINE FAVOR' : 'DIVINE WRATH';
+    }
+
+    return { mult, label, standing, dist: nearestDist };
 }
 
 /** @param {import('../../lib/ecs-js/index.js').World} world @param {{attacker:number, defender:number, weaponId:number, damage:number, world:any}} base */
@@ -371,6 +423,24 @@ function resolveHitRoll(world, {
     if (isCrit) dmg = Math.max(1, Math.floor(dmg * critMult));
     dmg = calculateBlindedPhysicalDamage(dmg, blindExposure);
     if (atkSnapshot.damageMult > 1) dmg = Math.max(1, Math.floor(dmg * atkSnapshot.damageMult));
+
+    // Shrine proximity scaling — deity favor modifies damage near shrines
+    const shrineScaling = computeShrineCombatScaling(world, source);
+    if (shrineScaling.mult !== 1) {
+        const preShrDmg = dmg;
+        dmg = Math.max(1, Math.floor(dmg * shrineScaling.mult));
+        if (dmg !== preShrDmg && shrineScaling.label) {
+            emitSafe(world, 'shrine:combat:scaling', {
+                attacker: source,
+                target,
+                label: shrineScaling.label,
+                mult: shrineScaling.mult,
+                delta: dmg - preShrDmg,
+                standing: shrineScaling.standing,
+                dist: shrineScaling.dist,
+            });
+        }
+    }
 
     // Pre-hit hooks
     const procScratch = {};
