@@ -32,6 +32,7 @@ export function createMessageMoreQueue({ onDisplay, onClear }) {
   let current = null;
   let gating = false;        // true while --More-- prompt is up and input is locked
   let batchScheduled = false; // true while a microtask processBatch is pending
+  let armed = false;          // false until first beginBatch — avoids deadlock on startup messages
 
   function lock() {
     if (!gating) {
@@ -53,6 +54,7 @@ export function createMessageMoreQueue({ onDisplay, onClear }) {
    * accumulate them and process the batch in a microtask (before repaint).
    */
   function push(entry) {
+    if (!armed) return; // Ignore startup messages — no player action yet.
     queue.push(entry);
     if (!batchScheduled) {
       batchScheduled = true;
@@ -100,6 +102,7 @@ export function createMessageMoreQueue({ onDisplay, onClear }) {
    * Flushes any leftover queue so stale messages don't block the next turn.
    */
   function beginBatch() {
+    armed = true;
     current = null;
     queue.length = 0;
     batchScheduled = false;
