@@ -452,29 +452,34 @@ export function initHUD() {
   zoomHud.appendChild(zoomBar);
 
   // Active effects HUD: vertical stack below the gauge on the right side.
+  // Effects HUD — anchored top-left, horizontal flex row across the top.
   const effectsHud = document.createElement('div');
   Object.assign(effectsHud.style, {
-    position: 'relative',
-    display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px',
+    position: 'fixed',
+    left: 'calc(8px + env(safe-area-inset-left, 0px))',
+    top: 'calc(8px + env(safe-area-inset-top, 0px))',
+    display: 'flex', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', gap: '4px',
     padding: '6px 8px', borderRadius: '6px',
     background: 'rgba(10,14,22,0.55)', border: '1px solid #2d3b52',
     pointerEvents: 'none',
+    zIndex: 905,
   });
   const statusRow = document.createElement('div');
   Object.assign(statusRow.style, {
     display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'flex-end',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'flex-start',
     gap: '6px',
   });
   const affixRow = document.createElement('div');
-  Object.assign(affixRow.style, { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' });
+  Object.assign(affixRow.style, { display: 'flex', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', gap: '4px' });
   effectsHud.appendChild(statusRow);
   effectsHud.appendChild(affixRow);
   topRightHud.appendChild(vitals);
   topRightHud.appendChild(zoomHud);
-  topRightHud.appendChild(effectsHud);
   root.appendChild(topRightHud);
+  root.appendChild(effectsHud);
   vitalsGauge.draw();
 
   // Help button — desktop only, top-left corner
