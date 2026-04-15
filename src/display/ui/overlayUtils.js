@@ -1304,7 +1304,7 @@ export function ensureMessageTicker(root) {
   Object.assign(box.style, {
     position: 'fixed',
     left: '0',
-    top: '0',
+    bottom: 'calc(var(--jshack-actionbar-height, 48px) + 76px + env(safe-area-inset-bottom, 0px))',
     width: '100%',
     display: 'flex',
     flexDirection: 'column',
@@ -1318,8 +1318,8 @@ export function ensureMessageTicker(root) {
     background: 'rgba(6, 8, 14, 0.92)',
     borderRadius: '0',
     padding: '5px 12px',
-    borderBottom: '1px solid rgba(60,80,120,0.6)',
-    boxShadow: '0 2px 12px rgba(0,0,0,0.4)',
+    borderTop: '1px solid rgba(60,80,120,0.6)',
+    boxShadow: '0 -2px 12px rgba(0,0,0,0.4)',
     overflow: 'hidden',
     cursor: 'pointer',
     userSelect: 'none',
@@ -1450,6 +1450,7 @@ export function renderMessageTicker(container, entries) {
 /**
  * Render a single message with optional "--More--" prompt (NetHack style).
  * Called by the messageMore queue instead of renderMessageTicker when gating.
+ * Caches DOM elements to avoid thrashing during rapid-fire combat messages.
  * @param {HTMLElement} container  — the ticker element
  * @param {any}         message    — current message entry
  * @param {boolean}     hasMore    — whether the queue has more messages
@@ -1457,51 +1458,10 @@ export function renderMessageTicker(container, entries) {
 export function renderMessageMore(container, message, hasMore) {
   if (!container) return;
   const store = /** @type {any} */ (container);
-  // Collapse expanded mode when --More-- kicks in.
   store._expanded = false;
-  Object.assign(container.style, {
-    maxHeight: '',
-    gap: '2px',
-    fontSize: 'min(15px, 3.4vw)',
-    lineHeight: '1.35',
-    padding: '5px 12px',
-    background: 'rgba(6, 8, 14, 0.92)',
-    borderBottom: '1px solid rgba(60,80,120,0.6)',
-    boxShadow: '0 2px 12px rgba(0,0,0,0.4)',
-    cursor: hasMore ? 'pointer' : 'default',
-  });
 
-  container.innerHTML = '';
-  if (!message) return;
-
-  const row = document.createElement('div');
-  Object.assign(row.style, {
-    display: 'flex',
-    alignItems: 'baseline',
-    whiteSpace: 'nowrap',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    textShadow: '0 1px 0 rgba(0,0,0,0.45), 0 0 6px rgba(0,0,0,0.25)',
-  });
-
-  const msgSpan = document.createElement('span');
-  msgSpan.style.flex = '1';
-  msgSpan.style.overflow = 'hidden';
-  msgSpan.style.textOverflow = 'ellipsis';
-  applyMessageContent(msgSpan, message);
-  row.appendChild(msgSpan);
-
-  if (hasMore) {
-    const more = document.createElement('span');
-    more.textContent = '  --More--';
-    Object.assign(more.style, {
-      color: '#ffd966',
-      flexShrink: '0',
-      marginLeft: '8px',
-      animation: 'jshack-more-blink 1.2s step-end infinite',
-    });
-    row.appendChild(more);
-
+  // Lazily build the cached single-line DOM structure once.
+  if (!store._moreRow) {
     // Inject blink keyframes once.
     if (!document.getElementById('jshack-more-blink-style')) {
       const style = document.createElement('style');
@@ -1509,14 +1469,58 @@ export function renderMessageMore(container, message, hasMore) {
       style.textContent = '@keyframes jshack-more-blink{0%,80%{opacity:1}50%,70%{opacity:0}}';
       document.head.appendChild(style);
     }
+
+    const row = document.createElement('div');
+    Object.assign(row.style, {
+      display: 'flex',
+      alignItems: 'baseline',
+      whiteSpace: 'nowrap',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      textShadow: '0 1px 0 rgba(0,0,0,0.45), 0 0 6px rgba(0,0,0,0.25)',
+    });
+    const msgSpan = document.createElement('span');
+    Object.assign(msgSpan.style, { flex: '1', overflow: 'hidden', textOverflow: 'ellipsis' });
+    const moreSpan = document.createElement('span');
+    moreSpan.textContent = '  --More--';
+    Object.assign(moreSpan.style, {
+      color: '#ffd966', flexShrink: '0', marginLeft: '8px',
+      animation: 'jshack-more-blink 1.2s step-end infinite',
+    });
+    row.appendChild(msgSpan);
+    row.appendChild(moreSpan);
+    store._moreRow = row;
+    store._moreMsgSpan = msgSpan;
+    store._moreMoreSpan = moreSpan;
   }
 
-  container.appendChild(row);
+  const row = store._moreRow;
+  const msgSpan = store._moreMsgSpan;
+  const moreSpan = store._moreMoreSpan;
 
-  requestAnimationFrame(() => {
-    const h = Math.max(0, Math.ceil(container.getBoundingClientRect().height || 0));
-    document.documentElement.style.setProperty('--jshack-ticker-height', `${h}px`);
-  });
+  // Swap container content to the cached row (only if not already showing it).
+  if (row.parentNode !== container) {
+    container.innerHTML = '';
+    Object.assign(container.style, {
+      maxHeight: '', gap: '2px',
+      fontSize: 'min(15px, 3.4vw)', lineHeight: '1.35',
+      padding: '5px 12px',
+      background: 'rgba(6, 8, 14, 0.92)',
+      borderTop: '1px solid rgba(60,80,120,0.6)',
+      boxShadow: '0 -2px 12px rgba(0,0,0,0.4)',
+    });
+    container.appendChild(row);
+  }
+
+  // Update content — no DOM creation, just text swap.
+  if (!message) {
+    msgSpan.textContent = '';
+    msgSpan.style.color = '';
+  } else {
+    applyMessageContent(msgSpan, message);
+  }
+  moreSpan.style.display = hasMore ? '' : 'none';
+  container.style.cursor = hasMore ? 'pointer' : 'default';
 }
 
 /**
