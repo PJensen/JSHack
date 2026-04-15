@@ -52,9 +52,9 @@ export function getQuickChipPrimaryAction(it) {
  * @returns {boolean}
  */
 export function canQuickChipIdentify(it) {
-  const identity = String(it?.identity || it?.details?.identity || '');
+  const identity = String(it?.identity || '');
   if (identity === 'scroll_identify') return false;
-  const identified = it?.details?.identified ?? it?.identified;
+  const identified = it?.identified ?? it?.details?.identified;
   return identified === false;
 }
 
@@ -1843,6 +1843,7 @@ function createQuickSlot(opts = {}) {
       maxSockets: item?.maxSockets || 0,
       sockets: item?.sockets || null,
       coating: item?.coating || null,
+      identified: item?.identified ?? item?.details?.identified ?? undefined,
     };
   }
 
