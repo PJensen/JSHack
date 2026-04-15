@@ -22,7 +22,7 @@ import {
   show, hide, setItemTooltip,
   renderGroundTooltip, renderStairTooltip, renderTrapTooltip,
   renderTombstoneTooltip, renderDevNoticeTooltip, renderTileKeyTooltip,
-  renderMessageTicker, renderDeathScreen,
+  renderMessageTicker, renderMessageMore, renderDeathScreen,
   drawGestureDebug, buildLightningShadow,
   showItemTooltip, hideItemTooltip,
   CHARACTER_MENU_TABS,
@@ -975,10 +975,28 @@ export function initOverlays() {
     tileKeyTip.style.display = 'flex';
   });
 
-  // Passive updates to the always-on ticker
+  // Passive updates to the always-on ticker (normal mode, no --More-- gating)
+  let _moreActive = false;
   window.addEventListener('ui:updateMessageTicker', (ev) => {
+    if (_moreActive) return; // --More-- queue owns the ticker right now
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
+    const entries = (e?.detail?.entries) || [];
+    renderMessageTicker(ticker, entries);
+  });
+
+  // NetHack --More-- queue display events
+  window.addEventListener('ui:messageMoreShow', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const { message, hasMore } = e?.detail || {};
+    _moreActive = true;
+    renderMessageMore(ticker, message, hasMore);
+  });
+  window.addEventListener('ui:messageMoreClear', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    _moreActive = false;
     const entries = (e?.detail?.entries) || [];
     renderMessageTicker(ticker, entries);
   });
