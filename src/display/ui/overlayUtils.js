@@ -1304,7 +1304,7 @@ export function ensureMessageTicker(root) {
   Object.assign(box.style, {
     position: 'fixed',
     left: '0',
-    bottom: 'calc(var(--jshack-actionbar-height, 48px) + 76px + env(safe-area-inset-bottom, 0px))',
+    bottom: '0',
     width: '100%',
     display: 'flex',
     flexDirection: 'column',
