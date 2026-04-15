@@ -34,19 +34,9 @@ export function createMessageMoreQueue({ onDisplay, onClear }) {
   let batchScheduled = false; // true while a microtask processBatch is pending
   let armed = false;          // false until first beginBatch — avoids deadlock on startup messages
 
-  function lock() {
-    if (!gating) {
-      gating = true;
-      setInputLock(LOCK_KEY, true);
-    }
-  }
-
-  function unlock() {
-    if (gating) {
-      gating = false;
-      setInputLock(LOCK_KEY, false);
-    }
-  }
+  // --More-- is display-only — never locks input.
+  function lock() {}
+  function unlock() {}
 
   /**
    * Feed a new message into the queue.
