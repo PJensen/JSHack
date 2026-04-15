@@ -1482,10 +1482,9 @@ export function renderMessageMore(container, message, hasMore) {
     const msgSpan = document.createElement('span');
     Object.assign(msgSpan.style, { flex: '1', overflow: 'hidden', textOverflow: 'ellipsis' });
     const moreSpan = document.createElement('span');
-    moreSpan.textContent = '  --More--';
+    moreSpan.textContent = '';
     Object.assign(moreSpan.style, {
-      color: '#ffd966', flexShrink: '0', marginLeft: '8px',
-      animation: 'jshack-more-blink 1.2s step-end infinite',
+      display: 'none',
     });
     row.appendChild(msgSpan);
     row.appendChild(moreSpan);
