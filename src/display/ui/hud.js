@@ -1136,8 +1136,9 @@ export function initHUD() {
   }
 
   function syncActionBarHeight() {
-    const h = Math.max(44, Math.ceil(bar.getBoundingClientRect().height || 44));
-    document.documentElement.style.setProperty('--jshack-actionbar-height', `${h}px`);
+    const barH = Math.max(44, Math.ceil(bar.getBoundingClientRect().height || 44));
+    const tickerH = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--jshack-ticker-height') || '30', 10);
+    document.documentElement.style.setProperty('--jshack-actionbar-height', `${barH + tickerH}px`);
   }
 
   // Show/hide pet button based on pet existence
