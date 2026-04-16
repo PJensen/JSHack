@@ -55,6 +55,8 @@ import { PERCEPTION_TUNING } from "../../rules/environment/dungeon/perceptionTun
 import { BaseStats } from "../../rules/components/BaseStats.js";
 import { Physiology } from "../../rules/components/Physiology.js";
 import { resolveEquippedWeaponVfx } from "./weaponVfxResolver.js";
+import { getMaterialIntrinsic } from '../../rules/data/materials.js';
+import { getGem } from '../../rules/data/gems.js';
 import {
 	clearPerceptionMemory,
 	listPerceptionKinds,
@@ -561,6 +563,41 @@ function computeVisualOffset(id) {
 	return { dx: (h1 - 0.5) * 0.3, dy: (h2 - 0.5) * 0.3 };
 }
 
+// Material → temporal pattern for gem base emission (magical gems only, future use)
+const MATERIAL_PATTERN = {
+	diamond:     'holy',
+	corundum:    'breathe',
+	beryl:       'breathe',
+	zircon:      'pulse',
+	topaz:       'candle',
+	chrysoberyl: 'pulse',
+	opal:        'biolum',
+	fluorite:    'biolum',
+	garnet:      'breathe',
+	turquoise:   'breathe',
+	amber:       'candle',
+	quartz:      'breathe',
+	glass:       'breathe',
+};
+
+// Material → RGB tint multipliers for caustic/interaction color filtering.
+// Applied over the source light color when projecting caustics through the gem.
+const MATERIAL_LIGHT_TINT = {
+	diamond:     [0.95, 0.97, 1.00],  // cold white
+	corundum:    [1.00, 0.90, 0.90],  // warm red (ruby/sapphire rely on palette)
+	beryl:       [0.90, 1.00, 0.92],  // green-cool
+	zircon:      [1.00, 0.95, 0.85],  // warm gold
+	topaz:       [1.00, 0.95, 0.80],  // warm yellow
+	chrysoberyl: [0.95, 1.00, 0.85],  // cat's-eye green-gold
+	opal:        [1.00, 1.00, 1.00],  // identity — color from palette
+	fluorite:    [0.85, 0.95, 1.00],  // cool blue-green
+	garnet:      [1.00, 0.80, 0.80],  // deep red
+	turquoise:   [0.85, 1.00, 0.95],  // teal
+	amber:       [1.00, 0.85, 0.60],  // deep warm orange
+	quartz:      [1.00, 1.00, 1.00],  // neutral
+	glass:       [1.00, 1.00, 1.00],  // neutral
+};
+
 /**
  * @param {string} kind
  * @param {any} itemInfo
@@ -574,10 +611,23 @@ function projectItemAffixDisplayTags(kind, itemInfo, rec) {
 		if (!rec.tags.includes('gold_glow')) rec.tags.push('gold_glow');
 	}
 	if (itemInfo && String(itemInfo.type || '').toLowerCase() === 'gem') {
+		// Voidstone: magical darkness aura — intrinsic, not optical physics.
 		if (String(kind || '').toLowerCase() === 'gem_voidstone') {
 			if (!rec.tags.includes('shadow_glowing')) rec.tags.push('shadow_glowing');
 		} else {
-			if (!rec.tags.includes('gem_glowing')) rec.tags.push('gem_glowing');
+			// Natural gems: no emission tag. Attach gemOptical for interaction-only rendering.
+			// The display layer emits caustics/glints/absorption only when light sources are nearby.
+			// Gem in darkness = invisible. Gem in torchlight = alive.
+			const gemDef = getGem(String(kind || ''));
+			const mat = getMaterialIntrinsic(gemDef?.material || 'quartz');
+			if (mat) {
+				rec.gemOptical = {
+					lightPass:    mat.lightPass,
+					lightReflect: mat.lightReflect,
+					lightAbsorb:  mat.lightAbsorb,
+					tint: MATERIAL_LIGHT_TINT[mat.kind] || [1.0, 1.0, 1.0],
+				};
+			}
 		}
 	}
 	if (!itemInfo || !Array.isArray(itemInfo.affixes)) return;
