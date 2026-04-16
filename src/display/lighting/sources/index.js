@@ -231,6 +231,11 @@ export function collectLightSources(view, opts = {}) {
   }
 
   // ---- Entity-derived lights --------------------------------------------
+  // Gems with optical data are deferred here and processed after the loop,
+  // so the interaction pass can scan the complete non-gem source list.
+  /** @type {Array<{id:number, x:number, y:number, kind:string, opt:object}>} */
+  const gemInteractors = [];
+
   if (Array.isArray(view.entities)) {
     for (let i = 0; i < view.entities.length; i++) {
       const e = view.entities[i];
@@ -340,10 +345,10 @@ export function collectLightSources(view, opts = {}) {
       if (tags.includes('gold_glow')) {
         emitPatterned(out, 'candle', t, e.id, ex, ey, 1.5, [255, 210, 80], 4);
       }
-      // Gem glow — slow breathe
-      if (tags.includes('gem_glowing')) {
-        const col = paletteGlow(kind) || [200, 150, 255];
-        emitPatterned(out, 'breathe', t, e.id, ex, ey, 3, col, 6);
+      // Natural gems: pure interaction — no intrinsic emission.
+      // Deferred to interaction pass so we can scan complete non-gem source list.
+      if (e.gemOptical) {
+        gemInteractors.push({ id: e.id, x: ex, y: ey, kind, opt: e.gemOptical });
       }
       // Burning entities — fire light that reads as something on fire
       if (tags.includes('burning')) {
@@ -362,6 +367,81 @@ export function collectLightSources(view, opts = {}) {
         const gb = _gazeBeams.get(e.id | 0);
         // Update eye position each frame (it may move)
         gb.ex = ex; gb.ey = ey;
+      }
+    }
+  }
+
+  // ---- Gem light-material interaction pass --------------------------------
+  // Pure interaction — no base emission. Gems respond to incoming light only.
+  // baseLightCount snapshots the source list before any gem contributions,
+  // so gem responses never trigger other gems (no cross-gem caustic chains).
+  if (gemInteractors.length > 0) {
+    const baseLightCount  = out.length;
+    const MAX_CAUSTICS    = 2;
+    const CAUSTIC_DIST_SQ = 8 * 8;
+    const GLINT_DIST_SQ   = 5 * 5;
+    const ABSORB_DIST_SQ  = 5 * 5;
+
+    for (let gi = 0; gi < gemInteractors.length; gi++) {
+      const { id, x: gx, y: gy, kind, opt } = gemInteractors[gi];
+      let causticCount = 0;
+      let didAbsorb    = false;
+
+      // Gem palette color — used for caustic so each gem projects its own color,
+      // not just a tint of the source. Ruby → red pool. Emerald → green. Diamond → cold white.
+      const gemCol = paletteGlow(kind) || [200, 180, 255];
+
+      for (let si = 0; si < baseLightCount; si++) {
+        const src = out[si];
+        if (!src || src.color[0] < 0) continue; // skip void sources
+
+        const dx = gx - src.x, dy = gy - src.y;
+        const distSq = dx * dx + dy * dy;
+        if (distSq < 0.01) continue;
+
+        // Caustic — light passes through gem, projects a colored pool on the far side.
+        // Color is the gem's own palette color (not a tint of the source) so it reads distinctly.
+        if (opt.lightPass > 0.3 && distSq <= CAUSTIC_DIST_SQ && causticCount < MAX_CAUSTICS) {
+          const dist    = Math.sqrt(distSq);
+          const srcI    = src.flicker != null ? src.flicker : 1.0;
+          const falloff = Math.max(0, 1 - dist / 9);
+          const strength = opt.lightPass * srcI * falloff;
+          if (strength > 0.05) {
+            const ndx = dx / dist, ndy = dy / dist;
+            out.push({
+              x:        gx + ndx * 1.8,
+              y:        gy + ndy * 1.8,
+              radius:   opt.lightPass * 3.5,
+              color:    gemCol,
+              softness: 3,
+              flicker:  strength,
+            });
+            causticCount++;
+          }
+        }
+
+        // Specular glint — hard bright point at the gem from a nearby source.
+        // Large enough to be visible at tile scale.
+        if (opt.lightReflect > 0.06 && distSq <= GLINT_DIST_SQ) {
+          const srcI  = src.flicker != null ? src.flicker : 1.0;
+          const gStr  = opt.lightReflect * srcI * Math.max(0, 1 - Math.sqrt(distSq) / 5);
+          if (gStr > 0.01) {
+            out.push({
+              x:        gx,
+              y:        gy,
+              radius:   opt.lightReflect * 6.0,
+              color:    [255, 252, 245],
+              softness: 2,
+              flicker:  Math.min(1, gStr * 3.0),
+            });
+          }
+        }
+
+        // Absorption shadow — high-absorb gems eat nearby light, once per gem
+        if (!didAbsorb && opt.lightAbsorb > 0.5 && distSq <= ABSORB_DIST_SQ) {
+          emitVoid(out, t, id, gx, gy, opt.lightAbsorb * 2.0, (opt.lightAbsorb - 0.5) * 0.8, 6);
+          didAbsorb = true;
+        }
       }
     }
   }
