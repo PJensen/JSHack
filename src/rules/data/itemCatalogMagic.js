@@ -383,6 +383,12 @@ export const MAGIC_ITEMS = {
         }));
         return { turns: 20 };
       },
+      on_throw: createPotionSplashThrowHook({
+        effectKey: "silenced",
+        duration: 6,
+        potency: 1,
+        sourceKind: "potion_mana",
+      }),
     },
   },
   potion_endurance: {
@@ -408,6 +414,12 @@ export const MAGIC_ITEMS = {
       toxicity: null,
       feel: "Your muscles surge with newfound vigour.",
     },
+    hooks: {
+      on_throw: createPotionSplashThrowHook({
+        sourceKind: "potion_endurance",
+        eventName: "potion:splash:dud",
+      }),
+    },
   },
   potion_second_wind: {
     id: "potion_second_wind",
@@ -431,6 +443,12 @@ export const MAGIC_ITEMS = {
       ],
       toxicity: null,
       feel: "Your lungs open; your breathing quickens and steadies.",
+    },
+    hooks: {
+      on_throw: createPotionSplashThrowHook({
+        sourceKind: "potion_second_wind",
+        eventName: "potion:splash:dud",
+      }),
     },
   },
   potion_resist_fire: {
@@ -2398,8 +2416,8 @@ export const MAGIC_ITEMS = {
         return { consumed: true };
       },
       on_throw: createPotionSplashThrowHook({
-        effectKey: "hallucinating",
-        duration: 15,
+        effectKey: "confused",
+        duration: 10,
         potency: 1,
         sourceKind: "potion_hallucination",
       }),
@@ -2580,11 +2598,10 @@ export const MAGIC_ITEMS = {
         return { turns: 30 };
       },
       on_throw: createPotionSplashThrowHook({
-        effectKey: "mana_drain",
-        duration: 8,
+        effectKey: "silenced",
+        duration: 10,
         potency: 1,
         sourceKind: "potion_mana_surge",
-        eventName: "potion:splash",
       }),
     },
   },
@@ -2667,8 +2684,8 @@ export const MAGIC_ITEMS = {
         return { turns: 30 };
       },
       on_throw: createPotionSplashThrowHook({
-        effectKey: "lethargic",
-        duration: 15,
+        effectKey: "slowed",
+        duration: 12,
         potency: 1,
         sourceKind: "potion_lethargy",
       }),
