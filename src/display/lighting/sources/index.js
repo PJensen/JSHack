@@ -399,23 +399,34 @@ export function collectLightSources(view, opts = {}) {
         const distSq = dx * dx + dy * dy;
         if (distSq < 0.01) continue;
 
-        // Caustic — light passes through gem, projects a colored pool on the far side.
-        // Color is the gem's own palette color (not a tint of the source) so it reads distinctly.
+        // Caustic — light passes through gem, projects on the far side.
+        // High-dispersion gems (diamond, zircon) split into RGB rainbow — "fire".
+        // Low-dispersion gems project a single colored pool.
         if (opt.lightPass > 0.3 && distSq <= CAUSTIC_DIST_SQ && causticCount < MAX_CAUSTICS) {
-          const dist    = Math.sqrt(distSq);
-          const srcI    = src.flicker != null ? src.flicker : 1.0;
-          const falloff = Math.max(0, 1 - dist / 9);
+          const dist     = Math.sqrt(distSq);
+          const srcI     = src.flicker != null ? src.flicker : 1.0;
+          const falloff  = Math.max(0, 1 - dist / 9);
           const strength = opt.lightPass * srcI * falloff;
           if (strength > 0.05) {
             const ndx = dx / dist, ndy = dy / dist;
-            out.push({
-              x:        gx + ndx * 1.8,
-              y:        gy + ndy * 1.8,
-              radius:   opt.lightPass * 3.5,
-              color:    gemCol,
-              softness: 3,
-              flicker:  strength,
-            });
+            const cx  = gx + ndx * 1.8,  cy  = gy + ndy * 1.8;
+            const r   = opt.lightPass * 3.5;
+
+            if (opt.dispersion >= 0.20) {
+              // Dispersive: three offset caustics — red, green, blue at spread angles.
+              // Perpendicular axis (rotated 90° from light direction).
+              const px = -ndy, py = ndx;
+              const spread = opt.dispersion * 1.2; // tile offset per channel
+              out.push({ x: cx + px * spread, y: cy + py * spread,
+                radius: r * 0.8, color: [255, 40,  20 ], softness: 2, flicker: strength * 0.85 });
+              out.push({ x: cx,               y: cy,
+                radius: r * 0.9, color: [40,  255, 60 ], softness: 2, flicker: strength * 0.75 });
+              out.push({ x: cx - px * spread, y: cy - py * spread,
+                radius: r * 0.8, color: [60,  80,  255], softness: 2, flicker: strength * 0.85 });
+            } else {
+              // Non-dispersive: single tinted caustic using gem palette color.
+              out.push({ x: cx, y: cy, radius: r, color: gemCol, softness: 3, flicker: strength });
+            }
             causticCount++;
           }
         }

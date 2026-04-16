@@ -625,6 +625,7 @@ function projectItemAffixDisplayTags(kind, itemInfo, rec) {
 					lightPass:    mat.lightPass,
 					lightReflect: mat.lightReflect,
 					lightAbsorb:  mat.lightAbsorb,
+					dispersion:   mat.dispersion || 0.0,
 					tint: MATERIAL_LIGHT_TINT[mat.kind] || [1.0, 1.0, 1.0],
 				};
 			}
