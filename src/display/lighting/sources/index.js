@@ -216,13 +216,13 @@ export function collectLightSources(view, opts = {}) {
           if (hpRatio <= 0.10) {
             // Critical — slow heartbeat, deep red, dimmer
             const CRIT_RED = [255, 60, 30];
-            emitPatterned(out, 'heartbeat', t * 0.6, playerId, px, py, base * 0.6, CRIT_RED, 12);
+            emitPatterned(out, 'heartbeat', t * 0.6, playerId, px, py, base * 0.6, CRIT_RED, 6);
           } else if (hpRatio <= 0.25) {
             // Low HP — heartbeat, orange-red shift, slightly reduced radius
             const LOW_RED = [255, 130, 60];
-            emitPatterned(out, 'heartbeat', t, playerId, px, py, base * 0.8, LOW_RED, 14);
+            emitPatterned(out, 'heartbeat', t, playerId, px, py, base * 0.8, LOW_RED, 7);
           } else {
-            emitPatterned(out, 'torch', t, playerId, px, py, base + 0.5, WARM_ORANGE, 16);
+            emitPatterned(out, 'torch', t, playerId, px, py, base + 0.5, WARM_ORANGE, 8);
           }
         }
         break;
@@ -251,13 +251,13 @@ export function collectLightSources(view, opts = {}) {
 
       // Placed torches — room features (layer 300) or ground items (layer 250)
       if (kind === 'torch') {
-        emitPatterned(out, 'torch', t, e.id, ex, ey, 6, WARM_ORANGE, 16);
+        emitPatterned(out, 'torch', t, e.id, ex, ey, 6, WARM_ORANGE, 8);
         continue;
       }
 
       // Lit lantern posts (placed world objects)
       if (kind === 'lantern_post') {
-        emitPatterned(out, 'candle', t, e.id, ex, ey, 7, LANTERN_GOLD, 20);
+        emitPatterned(out, 'candle', t, e.id, ex, ey, 7, LANTERN_GOLD, 10);
         continue;
       }
 
@@ -266,23 +266,23 @@ export function collectLightSources(view, opts = {}) {
       {
         const FURNITURE_LIGHT = {
           fountain:    { radius: 3.5, pattern: 'breathe' },
-          altar:       { radius: 4.5, pattern: 'breathe', softness: 8 },
-          shrine:      { radius: 4,   pattern: 'holy',   softness: 8 },
+          altar:       { radius: 4.5, pattern: 'breathe', softness: 4 },
+          shrine:      { radius: 4,   pattern: 'holy',   softness: 4 },
           mushrooms:   { radius: 3,   pattern: 'biolum' },
         };
         const fl = FURNITURE_LIGHT[kind];
         if (fl) {
           const col = paletteGlow(kind) || [160, 170, 190];
-          emitPatterned(out, fl.pattern, t, e.id, ex, ey, fl.radius, col, fl.softness || 12);
+          emitPatterned(out, fl.pattern, t, e.id, ex, ey, fl.radius, col, fl.softness || 6);
           continue;
         }
         // Fire-based furniture — flickering, palette-coloured
         if (kind === 'cooking_fire') {
-          emitPatterned(out, 'torch', t, e.id, ex, ey, 4, paletteGlow(kind) || FIRE_RED, 16);
+          emitPatterned(out, 'torch', t, e.id, ex, ey, 4, paletteGlow(kind) || FIRE_RED, 8);
           continue;
         }
         if (kind === 'furnace') {
-          emitPatterned(out, 'ember', t, e.id, ex, ey, 3, paletteGlow(kind) || FIRE_RED, 16);
+          emitPatterned(out, 'ember', t, e.id, ex, ey, 3, paletteGlow(kind) || FIRE_RED, 8);
           continue;
         }
       }
@@ -291,7 +291,7 @@ export function collectLightSources(view, opts = {}) {
 
       // Torch-bearing NPCs/monsters
       if (tags.includes('torch')) {
-        emitPatterned(out, 'torch', t, e.id, ex, ey, 3, WARM_ORANGE, 14);
+        emitPatterned(out, 'torch', t, e.id, ex, ey, 3, WARM_ORANGE, 7);
         continue; // torch dominates — skip weaker tags
       }
 
@@ -311,39 +311,39 @@ export function collectLightSources(view, opts = {}) {
           hasHolyWeaponVfx ? 6 : 10,
         );
       } else if (tags.includes('stasis')) {
-        emitPatterned(out, 'breathe', t, e.id, ex, ey, 3.5, [136, 221, 255], 8);
+        emitPatterned(out, 'breathe', t, e.id, ex, ey, 3.5, [136, 221, 255], 4);
       } else if (tags.includes('invulnerable')) {
-        emitPatterned(out, 'holy', t, e.id, ex, ey, 5, HOLY_GOLD, 10);
+        emitPatterned(out, 'holy', t, e.id, ex, ey, 5, HOLY_GOLD, 5);
       } else if (tags.includes('storm_glowing')) {
-        emitPatterned(out, 'storm', t, e.id, ex, ey, 4, STORM_WHITE, 6);
+        emitPatterned(out, 'storm', t, e.id, ex, ey, 4, STORM_WHITE, 3);
       } else if (tags.includes('soul_glowing')) {
-        emitPatterned(out, 'occult', t, e.id, ex, ey, 4, SOUL_GREEN, 8);
+        emitPatterned(out, 'occult', t, e.id, ex, ey, 4, SOUL_GREEN, 4);
       } else if (tags.includes('blood_glowing')) {
-        emitPatterned(out, 'heartbeat', t, e.id, ex, ey, 3, BLOOD_RED, 6);
+        emitPatterned(out, 'heartbeat', t, e.id, ex, ey, 3, BLOOD_RED, 3);
       } else if (tags.includes('venom_glowing')) {
-        emitPatterned(out, 'biolum', t, e.id, ex, ey, 3, VENOM_GREEN, 6);
+        emitPatterned(out, 'biolum', t, e.id, ex, ey, 3, VENOM_GREEN, 3);
       } else if (tags.includes('caustic_glowing')) {
-        emitPatterned(out, 'pulse', t, e.id, ex, ey, 3, CAUSTIC_LIME, 6);
+        emitPatterned(out, 'pulse', t, e.id, ex, ey, 3, CAUSTIC_LIME, 3);
       } else if (tags.includes('agony')) {
-        emitPatterned(out, 'occult', t, e.id, ex, ey, 3, SHADOW_PURPLE, 8);
-        emitVoid(out, t, e.id, ex, ey, 2.5, 0.35, 10);  // shadow magic drinks nearby light
+        emitPatterned(out, 'occult', t, e.id, ex, ey, 3, SHADOW_PURPLE, 4);
+        emitVoid(out, t, e.id, ex, ey, 2.5, 0.35, 5);
       } else if (tags.includes('legendary_glowing')) {
-        emitPatterned(out, 'pulse', t, e.id, ex, ey, 5, paletteGlow('legendary_chest') || LANTERN_GOLD, 10);
+        emitPatterned(out, 'pulse', t, e.id, ex, ey, 5, paletteGlow('legendary_chest') || LANTERN_GOLD, 5);
       } else if (tags.includes('glowing')) {
-        emitPatterned(out, 'ember', t, e.id, ex, ey, 4, LANTERN_GOLD, 8);
+        emitPatterned(out, 'ember', t, e.id, ex, ey, 4, LANTERN_GOLD, 4);
       } else if (tags.includes('epic_glowing')) {
-        emitPatterned(out, 'breathe', t, e.id, ex, ey, 4, paletteGlow('epic_chest') || [200, 100, 255], 8);
+        emitPatterned(out, 'breathe', t, e.id, ex, ey, 4, paletteGlow('epic_chest') || [200, 100, 255], 4);
       } else if (tags.includes('rare_glowing')) {
-        emitPatterned(out, 'breathe', t, e.id, ex, ey, 3, paletteGlow('magic_chest') || [100, 160, 255], 6);
+        emitPatterned(out, 'breathe', t, e.id, ex, ey, 3, paletteGlow('magic_chest') || [100, 160, 255], 3);
       }
       // Potion glow — bioluminescent shimmer
       if (tags.includes('potion_glow')) {
         const col = paletteGlow(kind) || paletteGlow('potion') || [120, 220, 200];
-        emitPatterned(out, 'biolum', t, e.id, ex, ey, 2.5, col, 6);
+        emitPatterned(out, 'biolum', t, e.id, ex, ey, 2.5, col, 3);
       }
       // Gold glow — gentle pulse
       if (tags.includes('gold_glow')) {
-        emitPatterned(out, 'candle', t, e.id, ex, ey, 1.5, [255, 210, 80], 4);
+        emitPatterned(out, 'candle', t, e.id, ex, ey, 1.5, [255, 210, 80], 2);
       }
       // Natural gems: pure interaction — no intrinsic emission.
       // Deferred to interaction pass so we can scan complete non-gem source list.
@@ -352,13 +352,12 @@ export function collectLightSources(view, opts = {}) {
       }
       // Burning entities — fire light that reads as something on fire
       if (tags.includes('burning')) {
-        emitPatterned(out, 'ember', t, e.id, ex, ey, 3.5, FIRE_RED, 12);
+        emitPatterned(out, 'ember', t, e.id, ex, ey, 3.5, FIRE_RED, 6);
       }
       // Void aura — entities that actively devour light.
       // shadow_glowing: shadow creatures, void weapons, dark artifacts
-      // The darkness has soft edges (softness 12) so it bleeds around corners.
       if (tags.includes('shadow_glowing')) {
-        emitVoid(out, t, e.id, ex, ey, 3.5, 0.8, 12);
+        emitVoid(out, t, e.id, ex, ey, 3.5, 0.8, 6);
       }
 
       // Floating eye gaze beams — directional cone from eye toward player.
@@ -387,9 +386,11 @@ export function collectLightSources(view, opts = {}) {
       let causticCount = 0;
       let didAbsorb    = false;
 
-      // Gem palette color — used for caustic so each gem projects its own color,
-      // not just a tint of the source. Ruby → red pool. Emerald → green. Diamond → cold white.
+      // Gem palette color — used for caustic so each gem projects its own color.
+      // Ruby → red pool. Emerald → green. Diamond → rainbow split.
       const gemCol = paletteGlow(kind) || [200, 180, 255];
+      // Opal flag — play-of-color via diffraction, not dispersion. Animated color wheel.
+      const isOpal = kind === 'gem_opal' || kind === 'gem_black_opal';
 
       for (let si = 0; si < baseLightCount; si++) {
         const src = out[si];
@@ -412,11 +413,25 @@ export function collectLightSources(view, opts = {}) {
             const cx  = gx + ndx * 1.8,  cy  = gy + ndy * 1.8;
             const r   = opt.lightPass * 3.5;
 
-            if (opt.dispersion >= 0.20) {
+            if (isOpal) {
+              // Opal: play-of-color via diffraction interference — NOT dispersion.
+              // Three caustics whose colors rotate around the color wheel over time.
+              // Each opal entity has its own phase offset from id so they don't sync.
+              const phase  = t * 0.4 + (id % 256) * 0.41;
+              const c1 = [Math.round(128 + 127 * Math.sin(phase)),
+                          Math.round(128 + 127 * Math.sin(phase + 2.094)),
+                          Math.round(128 + 127 * Math.sin(phase + 4.189))];
+              const c2 = [Math.round(128 + 127 * Math.sin(phase + 1.047)),
+                          Math.round(128 + 127 * Math.sin(phase + 3.142)),
+                          Math.round(128 + 127 * Math.sin(phase + 5.236))];
+              const px = -ndy, py = ndx;
+              out.push({ x: cx + px * 0.5, y: cy + py * 0.5, radius: r * 0.7, color: c1, softness: 3, flicker: strength * 0.8 });
+              out.push({ x: cx - px * 0.5, y: cy - py * 0.5, radius: r * 0.7, color: c2, softness: 3, flicker: strength * 0.8 });
+            } else if (opt.dispersion >= 0.20) {
               // Dispersive: three offset caustics — red, green, blue at spread angles.
               // Perpendicular axis (rotated 90° from light direction).
               const px = -ndy, py = ndx;
-              const spread = opt.dispersion * 1.2; // tile offset per channel
+              const spread = opt.dispersion * 1.2;
               out.push({ x: cx + px * spread, y: cy + py * spread,
                 radius: r * 0.8, color: [255, 40,  20 ], softness: 2, flicker: strength * 0.85 });
               out.push({ x: cx,               y: cy,
@@ -424,7 +439,7 @@ export function collectLightSources(view, opts = {}) {
               out.push({ x: cx - px * spread, y: cy - py * spread,
                 radius: r * 0.8, color: [60,  80,  255], softness: 2, flicker: strength * 0.85 });
             } else {
-              // Non-dispersive: single tinted caustic using gem palette color.
+              // Non-dispersive: single colored caustic using gem palette color.
               out.push({ x: cx, y: cy, radius: r, color: gemCol, softness: 3, flicker: strength });
             }
             causticCount++;
@@ -445,6 +460,47 @@ export function collectLightSources(view, opts = {}) {
               softness: 2,
               flicker:  Math.min(1, gStr * 3.0),
             });
+          }
+        }
+
+        // Color bleed — transmitted light illuminates the gem face itself.
+        // Ruby in torchlight glows red on its tile. Emerald glows green.
+        // Only for transmissive gems (lightPass > 0.3). Soft, localised.
+        if (opt.lightPass > 0.3 && distSq <= GLINT_DIST_SQ) {
+          const srcI    = src.flicker != null ? src.flicker : 1.0;
+          const bStr    = opt.lightPass * srcI * Math.max(0, 1 - Math.sqrt(distSq) / 5) * 0.55;
+          if (bStr > 0.04) {
+            out.push({
+              x: gx, y: gy,
+              radius:   1.4,
+              color:    gemCol,
+              softness: 8,
+              flicker:  bStr,
+            });
+          }
+        }
+
+        // Chatoyancy — chrysoberyl cat's-eye: tight perpendicular band.
+        // A bright stripe oriented 90° to the light direction.
+        if (kind === 'gem_chrysoberyl' && distSq <= GLINT_DIST_SQ) {
+          const dist   = Math.sqrt(distSq);
+          const srcI   = src.flicker != null ? src.flicker : 1.0;
+          const cStr   = srcI * Math.max(0, 1 - dist / 5);
+          if (cStr > 0.05) {
+            // Perpendicular axis to incoming light
+            const ndx = dx / dist, ndy = dy / dist;
+            const px = -ndy, py = ndx;
+            // Three tight points along the perpendicular — forms a bright stripe
+            for (let si2 = -1; si2 <= 1; si2++) {
+              out.push({
+                x:        gx + px * si2 * 0.5,
+                y:        gy + py * si2 * 0.5,
+                radius:   0.35,
+                color:    [220, 255, 180],
+                softness: 1,
+                flicker:  cStr * (si2 === 0 ? 1.0 : 0.6),
+              });
+            }
           }
         }
 
