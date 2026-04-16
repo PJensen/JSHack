@@ -129,7 +129,7 @@ export const MATERIAL_CATALOG = [
     flammability:0.0, ignitionTempC:Infinity, burnSeverity:0.0, meltPointC:1670,
     wetAbsorbency:0.0, conductivity:0.01, corrosionResist:0.95,
     lightPass:0.7, lightReflect:0.1, lightAbsorb:0.2, lightEmit:0.0, glowColorTempK:0,
-    dispersion:0.24,
+    dispersion:0.05,
     radShieldAlpha:1.0, radShieldBeta:0.9, radShieldGamma:0.28, radShieldNeutron:0.2, radActivation:0.0
   }},
   { id:'ice', Material:{
@@ -349,7 +349,7 @@ export const MATERIAL_CATALOG = [
     flammability:0.0, ignitionTempC:Infinity, burnSeverity:0.0, meltPointC:2040,
     wetAbsorbency:0.0, conductivity:0.05, corrosionResist:0.98,
     lightPass:0.75, lightReflect:0.10, lightAbsorb:0.15, lightEmit:0.0, glowColorTempK:0,
-    dispersion:0.36,
+    dispersion:0.08,
     radShieldAlpha:1.0, radShieldBeta:0.92, radShieldGamma:0.32, radShieldNeutron:0.22, radActivation:0.0
   }},
   { id:'beryl', Material:{
@@ -357,7 +357,7 @@ export const MATERIAL_CATALOG = [
     flammability:0.0, ignitionTempC:Infinity, burnSeverity:0.0, meltPointC:Infinity,
     wetAbsorbency:0.0, conductivity:0.02, corrosionResist:0.96,
     lightPass:0.82, lightReflect:0.08, lightAbsorb:0.10, lightEmit:0.0, glowColorTempK:0,
-    dispersion:0.28,
+    dispersion:0.06,
     radShieldAlpha:1.0, radShieldBeta:0.90, radShieldGamma:0.26, radShieldNeutron:0.18, radActivation:0.0
   }},
   { id:'zircon', Material:{
@@ -373,7 +373,7 @@ export const MATERIAL_CATALOG = [
     flammability:0.0, ignitionTempC:Infinity, burnSeverity:0.0, meltPointC:Infinity,
     wetAbsorbency:0.0, conductivity:0.02, corrosionResist:0.96,
     lightPass:0.84, lightReflect:0.08, lightAbsorb:0.08, lightEmit:0.0, glowColorTempK:0,
-    dispersion:0.28,
+    dispersion:0.06,
     radShieldAlpha:1.0, radShieldBeta:0.90, radShieldGamma:0.30, radShieldNeutron:0.20, radActivation:0.0
   }},
   { id:'chrysoberyl', Material:{
@@ -389,7 +389,7 @@ export const MATERIAL_CATALOG = [
     flammability:0.0, ignitionTempC:Infinity, burnSeverity:0.0, meltPointC:Infinity,
     wetAbsorbency:0.05, conductivity:0.01, corrosionResist:0.88,
     lightPass:0.70, lightReflect:0.15, lightAbsorb:0.15, lightEmit:0.0, glowColorTempK:0,
-    dispersion:0.55,
+    dispersion:0.0,
     radShieldAlpha:1.0, radShieldBeta:0.86, radShieldGamma:0.20, radShieldNeutron:0.14, radActivation:0.0
   }},
   { id:'fluorite', Material:{
@@ -405,7 +405,7 @@ export const MATERIAL_CATALOG = [
     flammability:0.0, ignitionTempC:Infinity, burnSeverity:0.0, meltPointC:Infinity,
     wetAbsorbency:0.0, conductivity:0.02, corrosionResist:0.95,
     lightPass:0.72, lightReflect:0.10, lightAbsorb:0.18, lightEmit:0.0, glowColorTempK:0,
-    dispersion:0.48,
+    dispersion:0.62,
     radShieldAlpha:1.0, radShieldBeta:0.90, radShieldGamma:0.30, radShieldNeutron:0.20, radActivation:0.0
   }},
   { id:'turquoise', Material:{
