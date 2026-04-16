@@ -85,6 +85,7 @@ export const MATERIAL_CATALOG = [
     flammability:0.0, ignitionTempC:Infinity, burnSeverity:0.0, meltPointC:1000,
     wetAbsorbency:0.0, conductivity:0.02, corrosionResist:0.9,
     lightPass:0.0, lightReflect:0.15, lightAbsorb:0.25, lightEmit:0.0, glowColorTempK:0,
+    dispersion:0.0,
     radShieldAlpha:1.0, radShieldBeta:0.9, radShieldGamma:0.25, radShieldNeutron:0.2, radActivation:0.0
   }},
   { id:'clay', Material:{
@@ -106,6 +107,7 @@ export const MATERIAL_CATALOG = [
     flammability:0.0, ignitionTempC:Infinity, burnSeverity:0.0, meltPointC:600,
     wetAbsorbency:0.0, conductivity:0.05, corrosionResist:0.9,
     lightPass:0.9, lightReflect:0.05, lightAbsorb:0.05, lightEmit:0.0, glowColorTempK:0,
+    dispersion:0.18,
     radShieldAlpha:1.0, radShieldBeta:0.8, radShieldGamma:0.20, radShieldNeutron:0.1, radActivation:0.0
   }},
   { id:'sand', Material:{
@@ -127,6 +129,7 @@ export const MATERIAL_CATALOG = [
     flammability:0.0, ignitionTempC:Infinity, burnSeverity:0.0, meltPointC:1670,
     wetAbsorbency:0.0, conductivity:0.01, corrosionResist:0.95,
     lightPass:0.7, lightReflect:0.1, lightAbsorb:0.2, lightEmit:0.0, glowColorTempK:0,
+    dispersion:0.24,
     radShieldAlpha:1.0, radShieldBeta:0.9, radShieldGamma:0.28, radShieldNeutron:0.2, radActivation:0.0
   }},
   { id:'ice', Material:{
@@ -338,6 +341,7 @@ export const MATERIAL_CATALOG = [
     flammability:0.0, ignitionTempC:900, burnSeverity:0.1, meltPointC:Infinity,
     wetAbsorbency:0.0, conductivity:0.9, corrosionResist:0.98,
     lightPass:0.92, lightReflect:0.17, lightAbsorb:0.03, lightEmit:0.0, glowColorTempK:0,
+    dispersion:0.88,
     radShieldAlpha:1.0, radShieldBeta:0.88, radShieldGamma:0.30, radShieldNeutron:0.18, radActivation:0.0
   }},
   { id:'corundum', Material:{
@@ -345,6 +349,7 @@ export const MATERIAL_CATALOG = [
     flammability:0.0, ignitionTempC:Infinity, burnSeverity:0.0, meltPointC:2040,
     wetAbsorbency:0.0, conductivity:0.05, corrosionResist:0.98,
     lightPass:0.75, lightReflect:0.10, lightAbsorb:0.15, lightEmit:0.0, glowColorTempK:0,
+    dispersion:0.36,
     radShieldAlpha:1.0, radShieldBeta:0.92, radShieldGamma:0.32, radShieldNeutron:0.22, radActivation:0.0
   }},
   { id:'beryl', Material:{
@@ -352,6 +357,7 @@ export const MATERIAL_CATALOG = [
     flammability:0.0, ignitionTempC:Infinity, burnSeverity:0.0, meltPointC:Infinity,
     wetAbsorbency:0.0, conductivity:0.02, corrosionResist:0.96,
     lightPass:0.82, lightReflect:0.08, lightAbsorb:0.10, lightEmit:0.0, glowColorTempK:0,
+    dispersion:0.28,
     radShieldAlpha:1.0, radShieldBeta:0.90, radShieldGamma:0.26, radShieldNeutron:0.18, radActivation:0.0
   }},
   { id:'zircon', Material:{
@@ -359,6 +365,7 @@ export const MATERIAL_CATALOG = [
     flammability:0.0, ignitionTempC:Infinity, burnSeverity:0.0, meltPointC:2550,
     wetAbsorbency:0.0, conductivity:0.03, corrosionResist:0.97,
     lightPass:0.80, lightReflect:0.12, lightAbsorb:0.08, lightEmit:0.0, glowColorTempK:0,
+    dispersion:0.76,
     radShieldAlpha:1.0, radShieldBeta:0.93, radShieldGamma:0.38, radShieldNeutron:0.26, radActivation:0.02
   }},
   { id:'topaz', Material:{
@@ -366,6 +373,7 @@ export const MATERIAL_CATALOG = [
     flammability:0.0, ignitionTempC:Infinity, burnSeverity:0.0, meltPointC:Infinity,
     wetAbsorbency:0.0, conductivity:0.02, corrosionResist:0.96,
     lightPass:0.84, lightReflect:0.08, lightAbsorb:0.08, lightEmit:0.0, glowColorTempK:0,
+    dispersion:0.28,
     radShieldAlpha:1.0, radShieldBeta:0.90, radShieldGamma:0.30, radShieldNeutron:0.20, radActivation:0.0
   }},
   { id:'chrysoberyl', Material:{
@@ -373,6 +381,7 @@ export const MATERIAL_CATALOG = [
     flammability:0.0, ignitionTempC:Infinity, burnSeverity:0.0, meltPointC:Infinity,
     wetAbsorbency:0.0, conductivity:0.03, corrosionResist:0.97,
     lightPass:0.80, lightReflect:0.10, lightAbsorb:0.10, lightEmit:0.0, glowColorTempK:0,
+    dispersion:0.30,
     radShieldAlpha:1.0, radShieldBeta:0.91, radShieldGamma:0.31, radShieldNeutron:0.21, radActivation:0.0
   }},
   { id:'opal', Material:{
@@ -380,6 +389,7 @@ export const MATERIAL_CATALOG = [
     flammability:0.0, ignitionTempC:Infinity, burnSeverity:0.0, meltPointC:Infinity,
     wetAbsorbency:0.05, conductivity:0.01, corrosionResist:0.88,
     lightPass:0.70, lightReflect:0.15, lightAbsorb:0.15, lightEmit:0.0, glowColorTempK:0,
+    dispersion:0.55,
     radShieldAlpha:1.0, radShieldBeta:0.86, radShieldGamma:0.20, radShieldNeutron:0.14, radActivation:0.0
   }},
   { id:'fluorite', Material:{
@@ -387,6 +397,7 @@ export const MATERIAL_CATALOG = [
     flammability:0.0, ignitionTempC:Infinity, burnSeverity:0.0, meltPointC:1360,
     wetAbsorbency:0.0, conductivity:0.01, corrosionResist:0.90,
     lightPass:0.78, lightReflect:0.08, lightAbsorb:0.14, lightEmit:0.0, glowColorTempK:0,
+    dispersion:0.14,
     radShieldAlpha:1.0, radShieldBeta:0.88, radShieldGamma:0.28, radShieldNeutron:0.18, radActivation:0.0
   }},
   { id:'garnet', Material:{
@@ -394,6 +405,7 @@ export const MATERIAL_CATALOG = [
     flammability:0.0, ignitionTempC:Infinity, burnSeverity:0.0, meltPointC:Infinity,
     wetAbsorbency:0.0, conductivity:0.02, corrosionResist:0.95,
     lightPass:0.72, lightReflect:0.10, lightAbsorb:0.18, lightEmit:0.0, glowColorTempK:0,
+    dispersion:0.48,
     radShieldAlpha:1.0, radShieldBeta:0.90, radShieldGamma:0.30, radShieldNeutron:0.20, radActivation:0.0
   }},
   { id:'turquoise', Material:{
@@ -401,6 +413,7 @@ export const MATERIAL_CATALOG = [
     flammability:0.0, ignitionTempC:Infinity, burnSeverity:0.0, meltPointC:Infinity,
     wetAbsorbency:0.05, conductivity:0.01, corrosionResist:0.86,
     lightPass:0.10, lightReflect:0.12, lightAbsorb:0.18, lightEmit:0.0, glowColorTempK:0,
+    dispersion:0.10,
     radShieldAlpha:1.0, radShieldBeta:0.87, radShieldGamma:0.24, radShieldNeutron:0.16, radActivation:0.0
   }},
   { id:'amber', Material:{
@@ -408,6 +421,7 @@ export const MATERIAL_CATALOG = [
     flammability:0.85, ignitionTempC:250, burnSeverity:0.85, meltPointC:250,
     wetAbsorbency:0.02, conductivity:0.0, corrosionResist:0.70,
     lightPass:0.55, lightReflect:0.07, lightAbsorb:0.12, lightEmit:0.0, glowColorTempK:0,
+    dispersion:0.14,
     radShieldAlpha:1.0, radShieldBeta:0.55, radShieldGamma:0.10, radShieldNeutron:0.10, radActivation:0.0
   }},
   { id:'jet', Material:{
@@ -415,6 +429,7 @@ export const MATERIAL_CATALOG = [
     flammability:0.75, ignitionTempC:300, burnSeverity:0.80, meltPointC:Infinity,
     wetAbsorbency:0.04, conductivity:0.01, corrosionResist:0.65,
     lightPass:0.0, lightReflect:0.03, lightAbsorb:0.92, lightEmit:0.0, glowColorTempK:0,
+    dispersion:0.0,
     radShieldAlpha:1.0, radShieldBeta:0.58, radShieldGamma:0.12, radShieldNeutron:0.10, radActivation:0.0
   }},
   { id:'jadeite', Material:{
@@ -422,6 +437,7 @@ export const MATERIAL_CATALOG = [
     flammability:0.0, ignitionTempC:Infinity, burnSeverity:0.0, meltPointC:Infinity,
     wetAbsorbency:0.0, conductivity:0.02, corrosionResist:0.94,
     lightPass:0.35, lightReflect:0.10, lightAbsorb:0.15, lightEmit:0.0, glowColorTempK:0,
+    dispersion:0.12,
     radShieldAlpha:1.0, radShieldBeta:0.90, radShieldGamma:0.28, radShieldNeutron:0.20, radActivation:0.0
   }},
   { id:'nephrite', Material:{
@@ -429,6 +445,7 @@ export const MATERIAL_CATALOG = [
     flammability:0.0, ignitionTempC:Infinity, burnSeverity:0.0, meltPointC:Infinity,
     wetAbsorbency:0.0, conductivity:0.02, corrosionResist:0.94,
     lightPass:0.22, lightReflect:0.10, lightAbsorb:0.16, lightEmit:0.0, glowColorTempK:0,
+    dispersion:0.10,
     radShieldAlpha:1.0, radShieldBeta:0.89, radShieldGamma:0.25, radShieldNeutron:0.18, radActivation:0.0
   }},
 ];
