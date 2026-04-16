@@ -780,6 +780,7 @@ export function createBoltFxController({ world, cam, fx, getPosition }) {
     const out = [];
     for (let i = 0; i < _boltFx.length; i++) {
       const b = _boltFx[i];
+      if ((b.style || 'bolt') === 'bolt') continue; // bolt is pure visual — no lighting contribution
       const u = b.progress;
       const style = getLineFxStyle(b.style);
       out.push({
@@ -792,7 +793,8 @@ export function createBoltFxController({ world, cam, fx, getPosition }) {
     }
     for (let i = 0; i < _lightPulses.length; i++) {
       const p = _lightPulses[i];
-      out.push({ x: p.x, y: p.y, radius: 6 * p.alpha, color: Array.isArray(p.color) ? p.color : [220, 230, 255] });
+      if (!Array.isArray(p.color)) continue; // uncolored pulses (spell:bolt) are pure visual — no lighting contribution
+      out.push({ x: p.x, y: p.y, radius: 6 * p.alpha, color: p.color });
     }
     for (let i = 0; i < _fireBreathFx.length; i++) {
       const fb = _fireBreathFx[i];
