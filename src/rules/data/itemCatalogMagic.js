@@ -273,7 +273,7 @@ export const MAGIC_ITEMS = {
   potion_vigor: {
     id: "potion_vigor",
     catalogKind: "magic",
-    name: "Potion of Vigor",
+    name: "Health Potion",
     type: "potion",
     slot: "bag",
     material: "glass",
@@ -308,7 +308,7 @@ export const MAGIC_ITEMS = {
   potion_adrenaline: {
     id: "potion_adrenaline",
     catalogKind: "magic",
-    name: "Potion of Adrenaline",
+    name: "Berserk Potion",
     type: "potion",
     slot: "bag",
     material: "glass",
@@ -394,7 +394,7 @@ export const MAGIC_ITEMS = {
   potion_endurance: {
     id: "potion_endurance",
     catalogKind: "magic",
-    name: "Potion of Endurance",
+    name: "Stamina Potion",
     type: "potion",
     slot: "bag",
     material: "glass",
@@ -426,7 +426,7 @@ export const MAGIC_ITEMS = {
   potion_second_wind: {
     id: "potion_second_wind",
     catalogKind: "magic",
-    name: "Potion of Second Wind",
+    name: "Stamina Elixir",
     type: "potion",
     slot: "bag",
     material: "glass",
@@ -458,7 +458,7 @@ export const MAGIC_ITEMS = {
   potion_resist_fire: {
     id: "potion_resist_fire",
     catalogKind: "magic",
-    name: "Potion of Fire Resistance",
+    name: "Fire Ward Potion",
     type: "potion",
     slot: "bag",
     material: "glass",
@@ -503,7 +503,7 @@ export const MAGIC_ITEMS = {
   potion_resist_poison: {
     id: "potion_resist_poison",
     catalogKind: "magic",
-    name: "Potion of Poison Resistance",
+    name: "Poison Ward Potion",
     type: "potion",
     slot: "bag",
     material: "glass",
@@ -587,7 +587,7 @@ export const MAGIC_ITEMS = {
   potion_resist_electric: {
     id: "potion_resist_electric",
     catalogKind: "magic",
-    name: "Potion of Lightning Resistance",
+    name: "Lightning Ward Potion",
     type: "potion",
     slot: "bag",
     material: "glass",
@@ -632,7 +632,7 @@ export const MAGIC_ITEMS = {
   potion_resist_acid: {
     id: "potion_resist_acid",
     catalogKind: "magic",
-    name: "Potion of Acid Resistance",
+    name: "Acid Ward Potion",
     type: "potion",
     slot: "bag",
     material: "glass",
@@ -2566,7 +2566,7 @@ export const MAGIC_ITEMS = {
   potion_mana_surge: {
     id: "potion_mana_surge",
     catalogKind: "magic",
-    name: "Potion of Mana Surge",
+    name: "Mana Elixir",
     type: "potion",
     slot: "bag",
     material: "glass",
@@ -2612,7 +2612,7 @@ export const MAGIC_ITEMS = {
   potion_keen_edge: {
     id: "potion_keen_edge",
     catalogKind: "magic",
-    name: "Potion of Keen Edge",
+    name: "Potion of Precision",
     type: "potion",
     slot: "bag",
     material: "glass",
@@ -2656,7 +2656,7 @@ export const MAGIC_ITEMS = {
   potion_lethargy: {
     id: "potion_lethargy",
     catalogKind: "magic",
-    name: "Potion of Lethargy",
+    name: "Potion of Sluggishness",
     type: "potion",
     slot: "bag",
     material: "glass",

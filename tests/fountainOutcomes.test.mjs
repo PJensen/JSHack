@@ -544,7 +544,7 @@ Deno.test("dip: potion becomes diluted and display name reflects condition", () 
   assert(rustSeed, "should find a seed that lands in water-damage band");
 
   const potion = makeDipWorld(rustSeed.seed, 20, "uncursed", {
-    name: "Potion of Vigor",
+    name: "Health Potion",
     identity: "potion_vigor",
     type: "potion",
     slot: "bag",
