@@ -159,7 +159,7 @@ Deno.test("thrown potion_paralysis stuns target on landing tile", () => {
   assert(!inventoryContains(world, actor, pot), "potion should be consumed");
 });
 
-Deno.test("thrown potion_hallucination splashes hallucinating effect", () => {
+Deno.test("thrown potion_hallucination splashes confused effect", () => {
   const world = new World({ seed: 9011 });
   const actor = world.create();
   world.add(actor, Inventory, { items: [], maxWeight: 999 });
@@ -181,7 +181,7 @@ Deno.test("thrown potion_hallucination splashes hallucinating effect", () => {
   throwSystem(world);
 
   assertEquals(splashEvents.length, 1);
-  assertEquals(splashEvents[0].effectKey, "hallucinating");
+  assertEquals(splashEvents[0].effectKey, "confused");
 });
 
 Deno.test("thrown potion_sickness poisons and damages target", () => {
