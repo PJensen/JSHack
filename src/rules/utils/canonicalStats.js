@@ -52,6 +52,7 @@ export function resolveCanonicalStats(world, entityId) {
     spellAvoid: Number(resolved?.spellAvoid || 0) + Number(passive?.spellAvoidDerived || 0),
     kineticDR: Number(resolved?.kineticDR || 0) + Number(passive?.kineticDRDerived || 0),
     fireResist: Number(resolved?.fireResist || 0) + Number(passive?.fireResistDerived || 0),
+    coldResist: Number(resolved?.coldResist || 0) + Number(passive?.coldResistDerived || 0),
     poisonResist: Number(resolved?.poisonResist || 0) + Number(passive?.poisonResistDerived || 0),
     acidResist: Number(resolved?.acidResist || 0) + Number(passive?.acidResistDerived || 0),
     radiationResist: Number(resolved?.radiationResist || 0) + Number(passive?.radiationResistDerived || 0),

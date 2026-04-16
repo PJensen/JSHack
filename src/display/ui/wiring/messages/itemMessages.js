@@ -98,6 +98,13 @@ export function installItemMessages(ctx) {
     }
   });
 
+  world.on('item:destroyed:element', ({ target, itemId, itemName, element, verb }) => {
+    const pe = playerEntity(world);
+    if (!pe || Number(target || 0) !== pe.id) return;
+    const label = bracketizeName(String(itemName || nameOfItem(itemId)));
+    log(`Your ${label} ${verb}!`, 'danger');
+  });
+
   world.on('item:ruinedByWater', ({ actor, itemId }) => {
     const pe = playerEntity(world);
     if (!pe || Number(actor || 0) !== Number(pe.id || 0)) return;
