@@ -59,6 +59,14 @@ const _gazeBeams = new Map();
 /** @type {Array<{x:number, y:number, age:number, maxAge:number, color:[number,number,number]}>} */
 const _chestBlooms = [];
 
+// Fluorite phosphorescence charges — entity id → charge (0-1).
+// Charged by energetic (blue/UV) light sources, decays slowly over ~18s.
+// Physically: fluorescence named after this mineral; glows after excitation removed.
+/** @type {Map<number, number>} */
+const _fluoCharges = new Map();
+const FLUO_DECAY       = 0.055;  // per-second — full fade ~18s
+const FLUO_CHARGE_RATE = 0.9;    // gain per unit strength — fast charge from lightning
+
 // Holy beams — brief transient light beams (sunsword blinding ray).
 /** @type {Array<{fx:number, fy:number, tx:number, ty:number, age:number, maxAge:number}>} */
 const _holyBeams = [];
@@ -330,7 +338,8 @@ export function collectLightSources(view, opts = {}) {
       } else if (tags.includes('legendary_glowing')) {
         emitPatterned(out, 'pulse', t, e.id, ex, ey, 5, paletteGlow('legendary_chest') || LANTERN_GOLD, 5);
       } else if (tags.includes('glowing')) {
-        emitPatterned(out, 'ember', t, e.id, ex, ey, 4, LANTERN_GOLD, 4);
+        // Suppress generic amber for gems — gemOptical.emissive handles their emission instead
+        if (!e.gemOptical) emitPatterned(out, 'ember', t, e.id, ex, ey, 4, LANTERN_GOLD, 4);
       } else if (tags.includes('epic_glowing')) {
         emitPatterned(out, 'breathe', t, e.id, ex, ey, 4, paletteGlow('epic_chest') || [200, 100, 255], 4);
       } else if (tags.includes('rare_glowing')) {
@@ -391,6 +400,36 @@ export function collectLightSources(view, opts = {}) {
       const gemCol = paletteGlow(kind) || [200, 180, 255];
       // Opal flag — play-of-color via diffraction, not dispersion. Animated color wheel.
       const isOpal = kind === 'gem_opal' || kind === 'gem_black_opal';
+      // Fluorite flag — fluorescence: absorbs energetic (blue/UV) light, re-emits cyan-green.
+      // Named literally after this mineral. Glows brilliantly under lightning, barely at all under torch.
+      const isFluo = kind === 'gem_fluorite';
+
+      // Temporal pattern — per-material character for refracted effects and emission.
+      // Evaluated once per gem (not per source) to avoid redundant calls.
+      const pat = evaluatePattern(opt.pattern || 'gem_quartz', t, id);
+
+      // Fluorite phosphorescence — decay existing charge this frame, accumulate during source scan
+      let fluoCharge = 0;
+      if (isFluo) {
+        fluoCharge = Math.max(0, (_fluoCharges.get(id) || 0) - dt * FLUO_DECAY);
+      }
+
+      // Magical gem base emission — independent of nearby light sources.
+      // Dilithium, enchanted gems, legendary gems emit their own patterned light.
+      if (opt.emissive) {
+        const emitR = opt.dispersion >= 0.20 ? 5.0 : 3.5;
+        out.push({
+          x: gx, y: gy,
+          radius: emitR,
+          color: [
+            Math.max(0, Math.min(255, gemCol[0] * (1 + pat.r))),
+            Math.max(0, Math.min(255, gemCol[1] * (1 + pat.g))),
+            Math.max(0, Math.min(255, gemCol[2] * (1 + pat.b))),
+          ],
+          flicker: pat.intensity,
+          softness: 5,
+        });
+      }
 
       for (let si = 0; si < baseLightCount; si++) {
         const src = out[si];
@@ -407,13 +446,22 @@ export function collectLightSources(view, opts = {}) {
           const dist     = Math.sqrt(distSq);
           const srcI     = src.flicker != null ? src.flicker : 1.0;
           const falloff  = Math.max(0, 1 - dist / 9);
-          const strength = opt.lightPass * srcI * falloff;
+          const strength = opt.lightPass * srcI * falloff * pat.intensity;
           if (strength > 0.05) {
             const ndx = dx / dist, ndy = dy / dist;
             const cx  = gx + ndx * 1.8,  cy  = gy + ndy * 1.8;
             const r   = opt.lightPass * 3.5;
 
-            if (isOpal) {
+            if (isFluo) {
+              // Fluorite: charge from energetic sources only — emission handled after scan.
+              // "Fluorescence" named after this mineral. Charges fast, fades slow (~18s).
+              const srcBlue = src.color[2] || 0;
+              const srcRed  = src.color[0] || 1;
+              if (srcBlue > srcRed * 1.08) {  // blue-dominant = energetic/UV proxy
+                fluoCharge = Math.min(1, fluoCharge + strength * FLUO_CHARGE_RATE);
+              }
+              causticCount++;
+            } else if (isOpal) {
               // Opal: play-of-color via diffraction interference — NOT dispersion.
               // Three caustics whose colors rotate around the color wheel over time.
               // Each opal entity has its own phase offset from id so they don't sync.
@@ -450,7 +498,7 @@ export function collectLightSources(view, opts = {}) {
         // Large enough to be visible at tile scale.
         if (opt.lightReflect > 0.06 && distSq <= GLINT_DIST_SQ) {
           const srcI  = src.flicker != null ? src.flicker : 1.0;
-          const gStr  = opt.lightReflect * srcI * Math.max(0, 1 - Math.sqrt(distSq) / 5);
+          const gStr  = opt.lightReflect * srcI * Math.max(0, 1 - Math.sqrt(distSq) / 5) * pat.intensity;
           if (gStr > 0.01) {
             out.push({
               x:        gx,
@@ -468,7 +516,7 @@ export function collectLightSources(view, opts = {}) {
         // Only for transmissive gems (lightPass > 0.3). Soft, localised.
         if (opt.lightPass > 0.3 && distSq <= GLINT_DIST_SQ) {
           const srcI    = src.flicker != null ? src.flicker : 1.0;
-          const bStr    = opt.lightPass * srcI * Math.max(0, 1 - Math.sqrt(distSq) / 5) * 0.55;
+          const bStr    = opt.lightPass * srcI * Math.max(0, 1 - Math.sqrt(distSq) / 5) * 0.55 * pat.intensity;
           if (bStr > 0.04) {
             out.push({
               x: gx, y: gy,
@@ -508,6 +556,32 @@ export function collectLightSources(view, opts = {}) {
         if (!didAbsorb && opt.lightAbsorb > 0.5 && distSq <= ABSORB_DIST_SQ) {
           emitVoid(out, t, id, gx, gy, opt.lightAbsorb * 2.0, (opt.lightAbsorb - 0.5) * 0.8, 6);
           didAbsorb = true;
+        }
+      }
+
+      // Fluorite phosphorescent emission — save charge, emit from accumulated glow.
+      // Fires even when no energetic source is currently nearby (the mineral remembers).
+      if (isFluo) {
+        _fluoCharges.set(id, fluoCharge);
+        if (fluoCharge > 0.015) {
+          const fluoPhase = t * 1.1 + (id % 256) * 0.37;
+          const fluoStr   = fluoCharge * (0.85 + 0.15 * Math.sin(fluoPhase));
+          // Core bloom at gem — radius swells with charge
+          out.push({ x: gx, y: gy,
+            radius: 1.5 + fluoCharge * 2.8,
+            color: [40, 230, 180],
+            softness: 4,
+            flicker: fluoStr,
+          });
+          // Wider ambient corona when strongly charged (hit by full lightning bolt)
+          if (fluoCharge > 0.45) {
+            out.push({ x: gx, y: gy,
+              radius: fluoCharge * 4.5,
+              color: [30, 180, 140],
+              softness: 7,
+              flicker: fluoStr * 0.45,
+            });
+          }
         }
       }
     }
@@ -814,6 +888,7 @@ export function installLightEventListeners(world, getPosition) {
     _gazeBeams.clear();
     _chestBlooms.length = 0;
     _holyBeams.length = 0;
+    _fluoCharges.clear();
   });
 
   // Chest reveal bloom — brief upward light flash on open
