@@ -204,6 +204,122 @@ function voidPattern(t, id) {
   return out(v, 0, 0, 0);
 }
 
+// ---- Gem patterns -----------------------------------------------------------
+
+/**
+ * gem_diamond — cold precision. Never dims below 0.92. Barely moves.
+ * Two very slow micro-drifts, never in sync. Faint blue-cold color shift.
+ * Range: 0.91 – 1.01.
+ */
+function gem_diamond(t, id) {
+  const p = id * 1.13;
+  const v = 0.95
+    + 0.04 * Math.sin(t * 0.28 + p)
+    + 0.02 * Math.sin(t * 0.71 + p * 0.5);
+  return out(v, -0.02, -0.01, 0.03);  // faint cold blue cast
+}
+
+/**
+ * gem_corundum — deep saturated swell. Ruby / sapphire.
+ * Slow, full-amplitude breath. ~4s period. Rich, unhurried.
+ * Range: 0.72 – 1.02.
+ */
+function gem_corundum(t, id) {
+  const p = id * 0.83;
+  const v = 0.87
+    + 0.16 * Math.sin(t * 0.25 + p)
+    + 0.05 * Math.sin(t * 0.61 + p * 1.4);
+  return out(v, 0, 0, 0);
+}
+
+/**
+ * gem_amber — warm organic drift. Light through ancient resin.
+ * Occasional micro-dip: trapped inclusions casting tiny shadows.
+ * Warm orange color shift throughout.
+ * Range: 0.74 – 0.98.
+ */
+function gem_amber(t, id) {
+  const phase = t * 0.35 + id * 1.2;
+  const base  = 0.88
+    + 0.07 * Math.sin(phase)
+    + 0.03 * Math.sin(phase * 2.1 + 0.7);
+  // Rare micro-dip — inclusion briefly occludes
+  const dipCycle = (t * 0.08 + id * 0.44) % 1.0;
+  const dip = dipCycle > 0.90 ? (1 - (dipCycle - 0.90) / 0.10) * 0.14 : 0;
+  return out(base - dip, 0.05, 0.01, -0.04);  // warm orange push
+}
+
+/**
+ * gem_fluorite — eerie fluorescence. Slow dim base punctuated by
+ * periodic cold bright flares. The mineral literally fluoresces.
+ * Range: 0.63 – 1.02.
+ */
+function gem_fluorite(t, id) {
+  const p    = id * 0.67;
+  const base = 0.73 + 0.10 * Math.sin(t * 0.5 + p);
+  // Fluorescence flash: brief cold spike every ~5s per entity
+  const flashCycle = (t * 0.20 + id * 0.31) % 1.0;
+  const flash      = flashCycle > 0.88 ? (flashCycle - 0.88) / 0.12 : 0;
+  const fs         = flash * flash * (3 - 2 * flash);  // smoothstep
+  return out(base + fs * 0.30, -fs * 0.08, fs * 0.05, fs * 0.14);  // cold blue-green flare
+}
+
+/**
+ * gem_opal — never settles. Four incommensurate frequencies with no
+ * shared period — true aperiodic shimmer. Color handled in caustic
+ * pass (play-of-color via diffraction), pattern handles intensity drift.
+ * Range: 0.64 – 1.01.
+ */
+function gem_opal(t, id) {
+  const p = id * 0.53;
+  const v = 0.78
+    + 0.09 * Math.sin(t * 0.31 + p)
+    + 0.07 * Math.sin(t * 0.73 + p * 1.7)
+    + 0.05 * Math.sin(t * 1.19 + p * 0.3)
+    + 0.04 * Math.sin(t * 1.97 + p * 2.1);
+  const drift = Math.sin(t * 0.41 + p) * 0.04;
+  return out(v, drift, -drift * 0.5, drift * 0.9);
+}
+
+/**
+ * gem_zircon — high dispersion, sharp glittering. Steady bright base
+ * with rapid micro-crackle. Like diamond but more chaotic, more fire.
+ * Range: 0.83 – 1.04.
+ */
+function gem_zircon(t, id) {
+  const p      = id * 1.03;
+  const base   = 0.90 + 0.06 * Math.sin(t * 0.8 + p);
+  const crackle = 0.04 * Math.sin(t * 7.3 + p * 2.1)
+                + 0.03 * Math.sin(t * 13.1 + p);
+  return out(base + crackle, 0, 0, 0.02);
+}
+
+/**
+ * gem_garnet — deep smoldering red warmth. Long slow swell.
+ * Red shift baked in — the light it casts feels like embers.
+ * Range: 0.70 – 1.01.
+ */
+function gem_garnet(t, id) {
+  const p = id * 0.91;
+  const v = 0.78
+    + 0.18 * Math.sin(t * 0.22 + p)
+    + 0.06 * Math.sin(t * 0.55 + p * 1.3);
+  return out(v, 0.07, -0.02, -0.05);  // deep red push
+}
+
+/**
+ * gem_quartz — clean, barely there. Moonlight through clear stone.
+ * Near-steady with very slow shallow drift. Faint cool cast.
+ * Range: 0.83 – 0.97.
+ */
+function gem_quartz(t, id) {
+  const p = id * 1.41;
+  const v = 0.90
+    + 0.06 * Math.sin(t * 0.45 + p)
+    + 0.03 * Math.sin(t * 0.9 + p * 0.7);
+  return out(v, 0, 0, 0.01);
+}
+
 // ---- Registry -------------------------------------------------------------
 
 /** @type {Record<string, (t:number, id:number) => PatternResult>} */
@@ -219,6 +335,14 @@ const PATTERNS = {
   candle,
   holy,
   void: voidPattern,
+  gem_diamond,
+  gem_corundum,
+  gem_amber,
+  gem_fluorite,
+  gem_opal,
+  gem_zircon,
+  gem_garnet,
+  gem_quartz,
 };
 
 /**

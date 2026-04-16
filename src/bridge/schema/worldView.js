@@ -565,19 +565,19 @@ function computeVisualOffset(id) {
 
 // Material → temporal pattern for gem base emission (magical gems only, future use)
 const MATERIAL_PATTERN = {
-	diamond:     'holy',
-	corundum:    'breathe',
-	beryl:       'breathe',
-	zircon:      'pulse',
-	topaz:       'candle',
-	chrysoberyl: 'pulse',
-	opal:        'biolum',
-	fluorite:    'biolum',
-	garnet:      'breathe',
-	turquoise:   'breathe',
-	amber:       'candle',
-	quartz:      'breathe',
-	glass:       'breathe',
+	diamond:     'gem_diamond',
+	corundum:    'gem_corundum',
+	beryl:       'gem_quartz',    // low-key, emerald/aqua cool tones
+	zircon:      'gem_zircon',
+	topaz:       'gem_amber',     // warm drift suits topaz
+	chrysoberyl: 'gem_quartz',    // subtle base; chatoyancy is the star
+	opal:        'gem_opal',
+	fluorite:    'gem_fluorite',
+	garnet:      'gem_garnet',
+	turquoise:   'gem_quartz',    // opaque, minimal flicker
+	amber:       'gem_amber',
+	quartz:      'gem_quartz',
+	glass:       'gem_quartz',    // plain glass — barely there
 };
 
 // Material → RGB tint multipliers for caustic/interaction color filtering.
