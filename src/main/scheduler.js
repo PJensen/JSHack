@@ -58,6 +58,7 @@ import { hazardSystem } from "../rules/systems/hazardSystem.js";
 import { installMonsterDeathHooks } from "../rules/systems/monsterDeathHookSystem.js";
 import { installScoreListener } from "../rules/systems/scoreSystem.js";
 import { installMaterialReactionListeners, materialReactionSystem } from "../rules/systems/materialReactionSystem.js";
+import { installItemDestructionListener } from "../rules/systems/itemDestructionSystem.js";
 import { foodDecaySystem } from "../rules/systems/foodDecaySystem.js";
 import { itemCooldownSystem } from "../rules/systems/itemCooldownSystem.js";
 import { spellCooldownSystem } from "../rules/systems/spellCooldownSystem.js";
@@ -135,6 +136,8 @@ export function configureWorld(world) {
   installTileStepEffectListener(world);
   // Material reactions consume semantic reaction events (water splash/dip, etc.).
   installMaterialReactionListeners(world);
+  // Elemental damage destroys vulnerable inventory items (fire→scrolls, cold→potions, etc.)
+  installItemDestructionListener(world);
   // Polymorph requests (e.g. mimic reveal on touch).
   installPolymorphListener(world);
   installCurseHooks(world);

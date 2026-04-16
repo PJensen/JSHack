@@ -55,6 +55,7 @@ export const Equipment = defineComponent('Equipment', {
   maxStaminaDerived: 0,
   kineticDRDerived: 0,
   fireResistDerived: 0,
+  coldResistDerived: 0,
   poisonResistDerived: 0,
   acidResistDerived: 0,
   radiationResistDerived: 0,

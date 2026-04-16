@@ -183,6 +183,14 @@ export function resolveResistance(world, targetId, rawAmount, type, armorPenetra
       const effectiveMult = Math.max(0, (resist.thermal?.burnMult ?? 1.0) - bonus);
       return Math.max(0, Math.floor(rawAmount * effectiveMult));
     }
+    case 'cold':
+    case 'frost': {
+      const bonus = Number(resolved?.coldResist ?? 0)
+        + activeResistBonus(world, targetId, "resist_cold")
+        + activeResistBonus(world, targetId, "frost_blood");
+      const effectiveMult = Math.max(0, 1.0 - bonus);
+      return Math.max(0, Math.floor(rawAmount * effectiveMult));
+    }
     case 'poison': {
       const bonus = Number(resolved?.poisonResist ?? 0) + activeResistBonus(world, targetId, "resist_poison");
       const effectiveMult = Math.max(0, (resist.chemical?.toxMult ?? 1.0) - bonus);

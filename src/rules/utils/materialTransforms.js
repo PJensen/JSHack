@@ -29,6 +29,9 @@ export function resolveMaterialTransform(spec = {}) {
   if (requested === "mud") {
     return Number(state?.wetness || 0) >= 0.1 ? "mud" : null;
   }
+  if (requested === "shatter") {
+    return "shatter";
+  }
 
   if (stimulusKind === "water" && isAshIdentity(identity)) {
     return Number(state?.wetness || 0) >= 0.1 ? "mud" : null;
@@ -89,6 +92,42 @@ export function applyMaterialTransform(world, itemId, transformId) {
       state.heatC = Math.min(Number(state.heatC || 20), 200);
     }
     return { applied: true, result: "ash" };
+  }
+
+  if (transform === "shatter") {
+    if (ni) {
+      ni.name = "Glass shards";
+      ni.identity = "glass_shards";
+    } else {
+      world.add(id, NamedIdentity, { name: "Glass shards", identity: "glass_shards" });
+    }
+
+    if (info) {
+      info.type = "junk";
+      info.slot = "bag";
+      info.description = "A scattering of broken glass.";
+      info.weight = 0.03;
+      info.value = 0;
+      info.count = Math.max(1, Number(info.count || 1) | 0);
+      info.affixes = [];
+      info.bonuses = {};
+      info.damageDice = null;
+      info.staminaCost = null;
+      info.subtype = null;
+      info.range = null;
+      info.rarity = 1;
+      info.rarityName = "common";
+    }
+
+    if (mat) mat.kind = "glass";
+    else world.add(id, Material, { kind: "glass" });
+
+    if (state) {
+      state.primary = "glass";
+      state.burning = false;
+      state.heatC = Math.min(Number(state.heatC || 20), 20);
+    }
+    return { applied: true, result: "shatter" };
   }
 
   if (transform === "mud") {

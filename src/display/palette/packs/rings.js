@@ -6,6 +6,8 @@ export const rings = {
   ring_arcana:    { glyph:"◌", fg:"#a480ff", glow:"#a480ff", baseScale: S_RING },
   ring_fire_resist:   { glyph:"◌", fg:"#ff9a5c", glow:"#ff6f2e", baseScale: S_RING },
   ring_poison_resist: { glyph:"◌", fg:"#9bdc7a", glow:"#6ca84f", baseScale: S_RING },
+  ring_cold_resist:   { glyph:"◌", fg:"#7ec8e3", glow:"#4a9ec0", baseScale: S_RING },
+  ring_shock_resist:  { glyph:"◌", fg:"#ffe066", glow:"#ccb033", baseScale: S_RING },
   ring_endurance:     { glyph:"◌", fg:"#f0cf7c", glow:"#c8a658", baseScale: S_RING },
   ring_sorcery:       { glyph:"◌", fg:"#9f8dff", glow:"#7360cf", baseScale: S_RING },
   ring_channeling:    { glyph:"◌", fg:"#7fd3ff", glow:"#4b9bc7", baseScale: S_RING },
