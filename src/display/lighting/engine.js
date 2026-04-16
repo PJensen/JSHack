@@ -861,7 +861,7 @@ export function createLightingEngine() {
 
           const dist = Math.sqrt(dist2);
           const atten = 1.0 - dist * invLrSub;
-          const atten2 = atten * atten * pen;   // quadratic falloff × penumbra
+          const atten2 = atten * atten * atten * pen;   // cubic falloff × penumbra — punchy core, fast drop
 
           // Near-wall diffuse catch-light (sub-cell threshold ≈ 0.5 tiles)
           const wallThresh = 4;
