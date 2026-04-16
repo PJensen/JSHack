@@ -416,8 +416,10 @@ export const MAGIC_ITEMS = {
     },
     hooks: {
       on_throw: createPotionSplashThrowHook({
+        effectKey: "stamina_restore",
+        duration: 50,
+        potency: 1,
         sourceKind: "potion_endurance",
-        eventName: "potion:splash:dud",
       }),
     },
   },
@@ -446,8 +448,10 @@ export const MAGIC_ITEMS = {
     },
     hooks: {
       on_throw: createPotionSplashThrowHook({
+        effectKey: "stamina_regen_boost",
+        duration: 12,
+        potency: 3,
         sourceKind: "potion_second_wind",
-        eventName: "potion:splash:dud",
       }),
     },
   },
