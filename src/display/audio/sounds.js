@@ -31,6 +31,8 @@ const SOUNDS = {
   "item:drop:weapon":      { file: "drop_weapon.wav",     bus: "items" },
   "item:drop:armor":       { file: "drop_armor.wav",      bus: "items" },
   "item:drop:potion":      { file: "drop_potion.wav",     bus: "items" },
+  "item:drop:gem":         { file: "drop_gem.wav",        bus: "items" },
+  "item:drop:gem:glass":   { file: "drop_gem_lesser.wav", bus: "items" },
   "item:drop:generic":     { file: "drop_generic.wav",    bus: "items" },
 
   "item:equip:weapon":     { file: "equip_weapon.wav",    bus: "items" },

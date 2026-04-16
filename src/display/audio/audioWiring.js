@@ -155,9 +155,17 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
 
   world.on('item:dropped', ({ itemId, at }) => {
     const cat = itemCategory(getItemInfo, itemId);
-    const dropId = (cat === "weapon" || cat === "armor" || cat === "potion")
-      ? `item:drop:${cat}`
-      : "item:drop:generic";
+    let dropId;
+    if (cat === "weapon" || cat === "armor" || cat === "potion") {
+      dropId = `item:drop:${cat}`;
+    } else if (cat === "gem") {
+      const info = getItemInfo(itemId);
+      const mat = info?.material;
+      dropId = mat && mat !== "gemstone" ? `item:drop:gem:${mat}` : "item:drop:gem";
+      if (!resolve(dropId)) dropId = "item:drop:gem";
+    } else {
+      dropId = "item:drop:generic";
+    }
     sfxAt(dropId, at, pp());
   });
 
