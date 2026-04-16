@@ -123,6 +123,7 @@ export function renderCharacterSheet(panel, data) {
   const resistRows = [
     ['Kinetic DR', Number(stats.kineticDR || 0)],
     ['Fire Resist', Number(stats.fireResist || 0)],
+    ['Cold Resist', Number(stats.coldResist || 0)],
     ['Poison Resist', Number(stats.poisonResist || 0)],
     ['Acid Resist', Number(stats.acidResist || 0)],
     ['Rad Resist', Number(stats.radiationResist || 0)],
