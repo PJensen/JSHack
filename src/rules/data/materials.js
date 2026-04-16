@@ -331,6 +331,106 @@ export const MATERIAL_CATALOG = [
     lightPass:0.0, lightReflect:0.25, lightAbsorb:0.3, lightEmit:0.05, glowColorTempK:1800,
     radShieldAlpha:1.0, radShieldBeta:0.85, radShieldGamma:0.45, radShieldNeutron:0.3, radActivation:0.4
   }},
+
+  /* ------------------ GEM MATERIALS / MINERALOGIC ------------------ */
+  { id:'diamond', Material:{
+    kind:'diamond', mohsHardness:10.0, density_g_cm3:3.52, brittleness:0.55,
+    flammability:0.0, ignitionTempC:900, burnSeverity:0.1, meltPointC:Infinity,
+    wetAbsorbency:0.0, conductivity:0.9, corrosionResist:0.98,
+    lightPass:0.92, lightReflect:0.17, lightAbsorb:0.03, lightEmit:0.0, glowColorTempK:0,
+    radShieldAlpha:1.0, radShieldBeta:0.88, radShieldGamma:0.30, radShieldNeutron:0.18, radActivation:0.0
+  }},
+  { id:'corundum', Material:{
+    kind:'corundum', mohsHardness:9.0, density_g_cm3:4.00, brittleness:0.65,
+    flammability:0.0, ignitionTempC:Infinity, burnSeverity:0.0, meltPointC:2040,
+    wetAbsorbency:0.0, conductivity:0.05, corrosionResist:0.98,
+    lightPass:0.75, lightReflect:0.10, lightAbsorb:0.15, lightEmit:0.0, glowColorTempK:0,
+    radShieldAlpha:1.0, radShieldBeta:0.92, radShieldGamma:0.32, radShieldNeutron:0.22, radActivation:0.0
+  }},
+  { id:'beryl', Material:{
+    kind:'beryl', mohsHardness:7.75, density_g_cm3:2.77, brittleness:0.60,
+    flammability:0.0, ignitionTempC:Infinity, burnSeverity:0.0, meltPointC:Infinity,
+    wetAbsorbency:0.0, conductivity:0.02, corrosionResist:0.96,
+    lightPass:0.82, lightReflect:0.08, lightAbsorb:0.10, lightEmit:0.0, glowColorTempK:0,
+    radShieldAlpha:1.0, radShieldBeta:0.90, radShieldGamma:0.26, radShieldNeutron:0.18, radActivation:0.0
+  }},
+  { id:'zircon', Material:{
+    kind:'zircon', mohsHardness:7.5, density_g_cm3:4.65, brittleness:0.68,
+    flammability:0.0, ignitionTempC:Infinity, burnSeverity:0.0, meltPointC:2550,
+    wetAbsorbency:0.0, conductivity:0.03, corrosionResist:0.97,
+    lightPass:0.80, lightReflect:0.12, lightAbsorb:0.08, lightEmit:0.0, glowColorTempK:0,
+    radShieldAlpha:1.0, radShieldBeta:0.93, radShieldGamma:0.38, radShieldNeutron:0.26, radActivation:0.02
+  }},
+  { id:'topaz', Material:{
+    kind:'topaz', mohsHardness:8.0, density_g_cm3:3.50, brittleness:0.72,
+    flammability:0.0, ignitionTempC:Infinity, burnSeverity:0.0, meltPointC:Infinity,
+    wetAbsorbency:0.0, conductivity:0.02, corrosionResist:0.96,
+    lightPass:0.84, lightReflect:0.08, lightAbsorb:0.08, lightEmit:0.0, glowColorTempK:0,
+    radShieldAlpha:1.0, radShieldBeta:0.90, radShieldGamma:0.30, radShieldNeutron:0.20, radActivation:0.0
+  }},
+  { id:'chrysoberyl', Material:{
+    kind:'chrysoberyl', mohsHardness:8.5, density_g_cm3:3.75, brittleness:0.62,
+    flammability:0.0, ignitionTempC:Infinity, burnSeverity:0.0, meltPointC:Infinity,
+    wetAbsorbency:0.0, conductivity:0.03, corrosionResist:0.97,
+    lightPass:0.80, lightReflect:0.10, lightAbsorb:0.10, lightEmit:0.0, glowColorTempK:0,
+    radShieldAlpha:1.0, radShieldBeta:0.91, radShieldGamma:0.31, radShieldNeutron:0.21, radActivation:0.0
+  }},
+  { id:'opal', Material:{
+    kind:'opal', mohsHardness:6.0, density_g_cm3:2.10, brittleness:0.70,
+    flammability:0.0, ignitionTempC:Infinity, burnSeverity:0.0, meltPointC:Infinity,
+    wetAbsorbency:0.05, conductivity:0.01, corrosionResist:0.88,
+    lightPass:0.70, lightReflect:0.15, lightAbsorb:0.15, lightEmit:0.0, glowColorTempK:0,
+    radShieldAlpha:1.0, radShieldBeta:0.86, radShieldGamma:0.20, radShieldNeutron:0.14, radActivation:0.0
+  }},
+  { id:'fluorite', Material:{
+    kind:'fluorite', mohsHardness:4.0, density_g_cm3:3.18, brittleness:0.78,
+    flammability:0.0, ignitionTempC:Infinity, burnSeverity:0.0, meltPointC:1360,
+    wetAbsorbency:0.0, conductivity:0.01, corrosionResist:0.90,
+    lightPass:0.78, lightReflect:0.08, lightAbsorb:0.14, lightEmit:0.0, glowColorTempK:0,
+    radShieldAlpha:1.0, radShieldBeta:0.88, radShieldGamma:0.28, radShieldNeutron:0.18, radActivation:0.0
+  }},
+  { id:'garnet', Material:{
+    kind:'garnet', mohsHardness:7.25, density_g_cm3:3.95, brittleness:0.58,
+    flammability:0.0, ignitionTempC:Infinity, burnSeverity:0.0, meltPointC:Infinity,
+    wetAbsorbency:0.0, conductivity:0.02, corrosionResist:0.95,
+    lightPass:0.72, lightReflect:0.10, lightAbsorb:0.18, lightEmit:0.0, glowColorTempK:0,
+    radShieldAlpha:1.0, radShieldBeta:0.90, radShieldGamma:0.30, radShieldNeutron:0.20, radActivation:0.0
+  }},
+  { id:'turquoise', Material:{
+    kind:'turquoise', mohsHardness:5.5, density_g_cm3:2.70, brittleness:0.62,
+    flammability:0.0, ignitionTempC:Infinity, burnSeverity:0.0, meltPointC:Infinity,
+    wetAbsorbency:0.05, conductivity:0.01, corrosionResist:0.86,
+    lightPass:0.10, lightReflect:0.12, lightAbsorb:0.18, lightEmit:0.0, glowColorTempK:0,
+    radShieldAlpha:1.0, radShieldBeta:0.87, radShieldGamma:0.24, radShieldNeutron:0.16, radActivation:0.0
+  }},
+  { id:'amber', Material:{
+    kind:'amber', mohsHardness:2.25, density_g_cm3:1.08, brittleness:0.35,
+    flammability:0.85, ignitionTempC:250, burnSeverity:0.85, meltPointC:250,
+    wetAbsorbency:0.02, conductivity:0.0, corrosionResist:0.70,
+    lightPass:0.55, lightReflect:0.07, lightAbsorb:0.12, lightEmit:0.0, glowColorTempK:0,
+    radShieldAlpha:1.0, radShieldBeta:0.55, radShieldGamma:0.10, radShieldNeutron:0.10, radActivation:0.0
+  }},
+  { id:'jet', Material:{
+    kind:'jet', mohsHardness:3.0, density_g_cm3:1.30, brittleness:0.28,
+    flammability:0.75, ignitionTempC:300, burnSeverity:0.80, meltPointC:Infinity,
+    wetAbsorbency:0.04, conductivity:0.01, corrosionResist:0.65,
+    lightPass:0.0, lightReflect:0.03, lightAbsorb:0.92, lightEmit:0.0, glowColorTempK:0,
+    radShieldAlpha:1.0, radShieldBeta:0.58, radShieldGamma:0.12, radShieldNeutron:0.10, radActivation:0.0
+  }},
+  { id:'jadeite', Material:{
+    kind:'jadeite', mohsHardness:6.75, density_g_cm3:3.34, brittleness:0.30,
+    flammability:0.0, ignitionTempC:Infinity, burnSeverity:0.0, meltPointC:Infinity,
+    wetAbsorbency:0.0, conductivity:0.02, corrosionResist:0.94,
+    lightPass:0.35, lightReflect:0.10, lightAbsorb:0.15, lightEmit:0.0, glowColorTempK:0,
+    radShieldAlpha:1.0, radShieldBeta:0.90, radShieldGamma:0.28, radShieldNeutron:0.20, radActivation:0.0
+  }},
+  { id:'nephrite', Material:{
+    kind:'nephrite', mohsHardness:6.25, density_g_cm3:2.95, brittleness:0.22,
+    flammability:0.0, ignitionTempC:Infinity, burnSeverity:0.0, meltPointC:Infinity,
+    wetAbsorbency:0.0, conductivity:0.02, corrosionResist:0.94,
+    lightPass:0.22, lightReflect:0.10, lightAbsorb:0.16, lightEmit:0.0, glowColorTempK:0,
+    radShieldAlpha:1.0, radShieldBeta:0.89, radShieldGamma:0.25, radShieldNeutron:0.18, radActivation:0.0
+  }},
 ];
 
 const MATERIAL_BY_KIND = new Map();
@@ -354,6 +454,11 @@ export const MATERIAL_TAGS = Object.freeze({
   paper: new Set(["paper"]),
   wood: new Set(["wood"]),
   glass: new Set(["glass", "soul-glass", "glass-fiber"]),
+  gemstone: new Set([
+    "diamond", "corundum", "beryl", "zircon", "topaz", "chrysoberyl",
+    "opal", "fluorite", "garnet", "turquoise", "amber", "jet",
+    "jadeite", "nephrite", "quartz", "obsidian",
+  ]),
   organic: new Set([
     "flesh", "leather", "wool", "cloth", "bone", "ivory", "horn", "shell",
   ]),
