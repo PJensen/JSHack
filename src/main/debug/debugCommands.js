@@ -163,19 +163,18 @@ const AUDIO_MONSTERS = [
 
 // Dungeon decorations / features / traps spawned via materializeSpawn.
 // Each entry: { label (section heading), items: [{ kind, params? }] }
+// Traps rendered first (top row) before items/monsters.
+const AUDIO_TRAPS = [
+  { kind: "trap", params: { type: "spike"  } },
+  { kind: "trap", params: { type: "shock"  } },
+  { kind: "trap", params: { type: "pit"    } },
+  { kind: "trap", params: { type: "siphon" } },
+  { kind: "trap", params: { type: "rust"   } },
+  { kind: "trap", params: { type: "swarm"  } },
+  { kind: "trap", params: { type: "snake"  } },
+];
+
 const AUDIO_DECOR_SECTIONS = [
-  {
-    label: "TRAPS",
-    items: [
-      { kind: "trap", params: { type: "spike"  } },
-      { kind: "trap", params: { type: "shock"  } },
-      { kind: "trap", params: { type: "pit"    } },
-      { kind: "trap", params: { type: "siphon" } },
-      { kind: "trap", params: { type: "rust"   } },
-      { kind: "trap", params: { type: "swarm"  } },
-      { kind: "trap", params: { type: "snake"  } },
-    ],
-  },
   {
     label: "DUNGEON FEATURES",
     items: [
@@ -350,6 +349,22 @@ export function applyDebugCommands({ world, runtimeConfig }) {
     let curRow = pos.y - 2; // start 2 rows above player
     let maxX   = itemsX;
     let placed = 0;
+
+    // Traps — top row.
+    placeSign("TRAPS", curRow);
+    let trapCol = 0;
+    for (const entry of AUDIO_TRAPS) {
+      const x = itemsX + trapCol * ITEM_STRIDE;
+      maxX = Math.max(maxX, x);
+      try {
+        materializeSpawn(world, { kind: entry.kind, x, y: curRow, params: entry.params || {} });
+      } catch (err) {
+        console.warn(`[?audio] Failed to spawn "${entry.kind}":`, err);
+      }
+      trapCol++;
+      if (trapCol >= SECTION_COLS) { trapCol = 0; curRow++; }
+    }
+    curRow += 2;
 
     for (const section of AUDIO_SECTIONS) {
       placeSign(section.label, curRow);
