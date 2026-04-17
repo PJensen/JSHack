@@ -416,7 +416,7 @@ export const basePalette = {
   trap_spike: { glyph: "^", fg: "#a84000", glow: "#d65d1f" },
   trap_snake: { glyph: "^", fg: "#55aa44", glow: "#338822" },
   trap_shock: { glyph: "^", fg: "#66ddff", glow: "#2299cc" },
-  trap_pit: { glyph: "🕳️", fg: "#111118", glow: "#0d0d1a" },
+  trap_pit: { glyph: "🕳️", fg: "#111118", glow: "#000000" },
   trap_siphon: { glyph: "^", fg: "#8a7dff", glow: "#5345bb" },
   trap_rust: { glyph: "^", fg: "#c7793d", glow: "#864824" },
   trap_swarm: { glyph: "^", fg: "#8dbb55", glow: "#527a2d" },
