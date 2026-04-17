@@ -151,53 +151,40 @@ registerScript('trap_snake', {
   }
 });
 
-// Pit trap: floor collapse that primarily forces repositioning.
-// Params: { dropDepth?: number, percent?: number }
+// Pit trap: trapdoor that drops the player one floor down at the same world position.
+// Params: { percent?: number }
+// The placement constraint (N+1 forward look) ensures the landing tile on the next
+// floor is always TILE_FLOOR; see populate.js / isPitLandingViable.
 registerScript("trap_pit", {
   [ScriptVerb.TrapTrigger]: (world, ctx) => {
     const trapId = Number(ctx?.trapId || 0) | 0;
     const target = Number(ctx?.targetId || 0) | 0;
     if (!(trapId > 0) || !(target > 0) || !world.isAlive(target)) return;
     const trapPos = world.get(trapId, Position);
-    const from = world.get(target, Position);
-    if (!trapPos || !from) return;
+    if (!trapPos) return;
 
-    const dropDepth = clampInt(ctx?.params?.dropDepth, 1, 1);
     const damagePct = clamp01Or(ctx?.params?.percent, 0.08);
-    const radius = Math.max(2, dropDepth * 3);
 
-    const candidate = findNearestValidTileAround(world, trapPos, {
-      maxDistance: radius,
-      exclude: [{ x: from.x, y: from.y }],
-    });
-
-    if (candidate) {
-      world.set(target, Position, { x: candidate.x | 0, y: candidate.y | 0 });
-      world.emit?.("moved", {
-        id: target,
-        from: { x: from.x | 0, y: from.y | 0 },
-        to: { x: candidate.x | 0, y: candidate.y | 0 },
-        cause: "trap_pit",
-      });
-      world.emit?.("trap:pit:drop", {
-        trapId,
-        targetId: target,
-        from: { x: from.x | 0, y: from.y | 0 },
-        to: { x: candidate.x | 0, y: candidate.y | 0 },
-        dropDepth,
+    // Deal blunt fall damage before the floor transition so it's visible.
+    const vit = world.get(target, Vitality);
+    if (vit) {
+      const amount = Math.max(1, Math.floor(Number(vit.maxHp || 0) * damagePct));
+      dealDamage(world, {
+        target,
+        amount,
+        source: trapId,
+        type: "blunt",
+        cause: "a long fall into a pit",
+        at: { x: trapPos.x | 0, y: trapPos.y | 0 },
       });
     }
 
-    const vit = world.get(target, Vitality);
-    if (!vit) return;
-    const amount = Math.max(1, Math.floor(Number(vit.maxHp || 0) * damagePct));
-    dealDamage(world, {
-      target,
-      amount,
-      source: trapId,
-      type: "blunt",
-      cause: "a long fall into a pit",
-      at: candidate ? { x: candidate.x | 0, y: candidate.y | 0 } : { x: from.x | 0, y: from.y | 0 },
+    // Signal transition controller — player drops to next floor at same XY.
+    world.emit?.("trap:pit:fall", {
+      trapId,
+      targetId: target,
+      x: trapPos.x | 0,
+      y: trapPos.y | 0,
     });
   },
 });

@@ -3,11 +3,12 @@
 
 import { createRng } from '../../../lib/ecs-js/rng.js';
 import { floorSeed } from './seed.js';
-import { CHUNK_SIZE } from './constants.js';
+import { CHUNK_SIZE, TILE_FLOOR } from './constants.js';
 import { dungeonConfig } from './dungeonConfig.js';
 import { OVERWORLD_EXTENT } from './overworld.js';
 import { pickProfile } from './profiles/index.js';
 import { clamp } from '../../../shared/math/math.js';
+import { generateChunk } from './chunk.js';
 
 function resolveBaseFootprintRadius(scale) {
   if (scale <= 0.15) return 0;
@@ -274,4 +275,30 @@ export function stairWorldPos(stair) {
     x: stair.chunkX * CHUNK_SIZE + stair.localX,
     y: stair.chunkY * CHUNK_SIZE + stair.localY,
   };
+}
+
+/**
+ * Read-only tile probe — does NOT load into the global tileMap.
+ * Used for pit-trap N+1 lookahead: verify the landing tile on the next floor
+ * is TILE_FLOOR before allowing placement.
+ * @param {number} worldSeed
+ * @param {number} depth  — the floor to probe (i.e. currentDepth + 1)
+ * @param {number} worldX
+ * @param {number} worldY
+ * @returns {number} tile constant at (worldX, worldY) on that floor
+ */
+export function probeFloorTile(worldSeed, depth, worldX, worldY) {
+  const cx = Math.floor(worldX / CHUNK_SIZE);
+  const cy = Math.floor(worldY / CHUNK_SIZE);
+  const lx = ((worldX % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
+  const ly = ((worldY % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
+  const plan = generateFloorPlan(worldSeed, depth);
+  const chunkData = generateChunk(worldSeed, depth, cx, cy, plan.profile ?? null, plan);
+  return chunkData.tiles[ly * CHUNK_SIZE + lx];
+}
+
+/** Convenience: returns true only if the tile at (worldX, worldY) on `depth` is walkable floor. */
+export function isPitLandingViable(worldSeed, depth, worldX, worldY) {
+  if (!(worldSeed > 0) || depth < 1) return false;
+  return probeFloorTile(worldSeed, depth, worldX, worldY) === TILE_FLOOR;
 }
