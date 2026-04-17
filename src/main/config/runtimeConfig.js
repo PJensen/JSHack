@@ -113,5 +113,6 @@ export function readRuntimeConfig() {
     facingTurnCost: parseBooleanish(facingTurnCostParam, parseBooleanish(facingTurnCostStored, false)),
     identifyItems: params.get("identify") !== "off",
     dungeonType:  params.get("dungeonType") || null,
+    audioMode:    params.has("audio"),
   };
 }
