@@ -202,10 +202,8 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     sfx(direction === 'up' ? "stair:ascend" : "stair:descend");
   });
 
-  world.on('shrine:communion', ({ targetId }) => {
-    const shrineId = Number(targetId || 0) | 0;
-    const pos = shrineId > 0 ? getPosition(shrineId) : null;
-    sfxAt("shrine:communion", pos, pp());
+  world.on('shrine:communion', () => {
+    sfx("deity:omen");
   });
 
   world.on('deity:omen', () => {
