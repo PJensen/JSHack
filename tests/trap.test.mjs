@@ -225,7 +225,7 @@ Deno.test("trap:avoided event emitted on avoidance", () => {
   assert(emitted.type === 'spike', `type should be spike, got ${emitted.type}`);
 });
 
-Deno.test("pit trap forces reposition and applies minor damage", () => {
+Deno.test("pit trap emits fall event and applies minor damage", () => {
   clearAll();
   try {
     loadChunk(0, 0, new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR));
@@ -243,16 +243,20 @@ Deno.test("pit trap forces reposition and applies minor damage", () => {
       armed: true,
       revealed: false,
       script: "trap_pit",
-      params: { dropDepth: 1, percent: 0.08 },
+      params: { percent: 0.08 },
       difficulty: 21,
     });
 
+    let fallEvent = null;
+    world.on('trap:pit:fall', (ev) => { fallEvent = ev; });
+
     trapSystem(world);
 
-    const pos = world.get(player, Position);
     const vit = world.get(player, Vitality);
-    assert(!(pos.x === 10 && pos.y === 10), "pit trap should move target off the trigger tile");
     assert(vit.hp <= 92, `pit trap should deal minor damage, hp=${vit.hp}`);
+    assert(fallEvent !== null, "pit trap should emit trap:pit:fall");
+    assert(fallEvent.x === 10 && fallEvent.y === 10, "fall event should carry trap coords");
+    assert(fallEvent.targetId === player, "fall event should reference the player");
   } finally {
     clearAll();
   }
