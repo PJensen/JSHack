@@ -1036,7 +1036,7 @@ export function createLightingEngine() {
         // For below-grade surfaces we intentionally reduce this lift so the
         // depression profile can remain visible instead of flattening out.
         const inLava = lavaMask[i] === 1;
-        const visLift = sight * (inLava ? 0.48 : 0.85);
+        const visLift = sight * (inLava ? 0.19 : 0.30);
         const lightLift = brightness;
         let totalLift = Math.min(1, visLift + lightLift);
         let extraDark = 0;

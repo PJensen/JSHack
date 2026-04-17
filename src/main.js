@@ -4733,7 +4733,7 @@ function render(worldView) {
       vx1,
       vy1,
       _ambient,
-      undefined,
+      210,
       _roofMask,
       _visionDef,
       surfaceAreaFx.getSurfaceRegions(),
