@@ -56,6 +56,7 @@ import { BaseStats } from "../../rules/components/BaseStats.js";
 import { Physiology } from "../../rules/components/Physiology.js";
 import { resolveEquippedWeaponVfx } from "./weaponVfxResolver.js";
 import { getMaterialIntrinsic } from '../../rules/data/materials.js';
+import { Material } from '../../rules/components/Material.js';
 import { getGem } from '../../rules/data/gems.js';
 import {
 	clearPerceptionMemory,
@@ -602,8 +603,9 @@ const MATERIAL_LIGHT_TINT = {
  * @param {string} kind
  * @param {any} itemInfo
  * @param {EntityView} rec
+ * @param {string|null} matKind  — Material.kind from the ECS component, if present
  */
-function projectItemAffixDisplayTags(kind, itemInfo, rec) {
+function projectItemAffixDisplayTags(kind, itemInfo, rec, matKind) {
 	if (itemInfo && String(itemInfo.type || '').toLowerCase() === 'potion' && !POTION_GLOW_DISABLED_KINDS.has(String(kind || ''))) {
 		if (!rec.tags.includes('potion_glow')) rec.tags.push('potion_glow');
 	}
@@ -618,18 +620,19 @@ function projectItemAffixDisplayTags(kind, itemInfo, rec) {
 			const gemDef = getGem(String(kind || ''));
 			if (gemDef?.material === 'gemstone') {
 				// Dilithium crystal — inherently magical; emits its own light like a power source.
-				rec.gemOptical = {
+				rec.matOptical = {
 					lightPass: 0.85, lightReflect: 0.7, lightAbsorb: 0.0,
 					dispersion: 0.35, tint: [0.92, 0.96, 1.0],
 					pattern: 'gem_diamond', emissive: true,
+					emitK: 0, emitIntensity: 0,
 				};
 			} else {
-				// Natural gems: no intrinsic emission. Attach gemOptical for interaction-only rendering.
+				// Natural gems: no intrinsic emission. Attach matOptical for interaction-only rendering.
 				// Gem in darkness = invisible. Gem in torchlight = alive.
 				// Magical affixes (glowing, rarity glow) set emissive=true later in this function.
 				const mat = getMaterialIntrinsic(gemDef?.material || 'quartz');
 				if (mat) {
-					rec.gemOptical = {
+					rec.matOptical = {
 						lightPass:    mat.lightPass,
 						lightReflect: mat.lightReflect,
 						lightAbsorb:  mat.lightAbsorb,
@@ -637,6 +640,8 @@ function projectItemAffixDisplayTags(kind, itemInfo, rec) {
 						tint:         MATERIAL_LIGHT_TINT[mat.kind] || [1.0, 1.0, 1.0],
 						pattern:      MATERIAL_PATTERN[mat.kind] || 'gem_quartz',
 						emissive:     false,
+						emitK:        0,
+						emitIntensity: 0,
 					};
 				}
 			}
@@ -683,12 +688,31 @@ function projectItemAffixDisplayTags(kind, itemInfo, rec) {
 	}
 	// Enchanted gem: upgrade to emissive so the display layer uses gem-specific patterns.
 	// The generic 'glowing' (amber/ember) tag is suppressed in sources/index.js for gems;
-	// the gem interaction pass owns both refracted effects and emitted light.
-	if (rec.gemOptical && !rec.gemOptical.emissive) {
+	// the mat interaction pass owns both refracted effects and emitted light.
+	if (rec.matOptical && !rec.matOptical.emissive) {
 		const EMIT_TAGS = ['glowing', 'legendary_glowing', 'epic_glowing', 'rare_glowing',
 		                   'storm_glowing', 'soul_glowing', 'blood_glowing', 'venom_glowing', 'caustic_glowing'];
 		if (EMIT_TAGS.some(tag => rec.tags.includes(tag))) {
-			rec.gemOptical.emissive = true;
+			rec.matOptical.emissive = true;
+		}
+	}
+	// Non-gem items: attach matOptical for materials with meaningful optical effects.
+	// Metals get glints from lightReflect; void materials get darkness aura; emissive
+	// materials (aetherium, radiant-alloy, etc.) inject a physics-based K-temp light.
+	if (!rec.matOptical && matKind) {
+		const mat = getMaterialIntrinsic(matKind);
+		if (mat && (mat.lightReflect > 0.15 || mat.lightEmit > 0 || mat.lightAbsorb > 0.5)) {
+			rec.matOptical = {
+				lightPass:     mat.lightPass    || 0,
+				lightReflect:  mat.lightReflect || 0,
+				lightAbsorb:   mat.lightAbsorb  || 0,
+				dispersion:    0.0,
+				tint:          [1.0, 1.0, 1.0],
+				pattern:       mat.lightEmit > 0 ? 'breathe' : 'gem_quartz',
+				emissive:      false,
+				emitK:         mat.glowColorTempK || 0,
+				emitIntensity: mat.lightEmit      || 0,
+			};
 		}
 	}
 }
@@ -991,7 +1015,7 @@ export function buildWorldView(world) {
 			projectDisplayTags(world, id, rec);
 			projectEquipmentDisplayTags(world, id, rec);
 			projectMonsterDefTags(kind, rec);
-			projectItemAffixDisplayTags(kind, itemInfo, rec);
+			projectItemAffixDisplayTags(kind, itemInfo, rec, world.get(id, Material)?.kind ?? null);
 			projectCombatUi(world, id, rec, playerFactionKey);
 			projectProcStateTags(world, id, rec);
 			projectFacing(world, id, rec);
@@ -1084,7 +1108,7 @@ export function buildWorldView(world) {
 			projectDisplayTags(world, id, rec);
 			projectEquipmentDisplayTags(world, id, rec);
 			projectMonsterDefTags(kind, rec);
-			projectItemAffixDisplayTags(kind, itemInfo, rec);
+			projectItemAffixDisplayTags(kind, itemInfo, rec, world.get(id, Material)?.kind ?? null);
 			projectCombatUi(world, id, rec, '');
 			projectProcStateTags(world, id, rec);
 			projectFacing(world, id, rec);

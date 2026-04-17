@@ -48,6 +48,40 @@ const SHADOW_PURPLE = [160, 80, 220];   // shadow / agony magic
 const GAZE_VIOLET   = [220, 80, 255];  // floating eye gaze beam
 const CHEST_GOLD    = [255, 230, 140];  // chest reveal bloom
 
+// ---- Blackbody colour temperature → RGB -------------------------------------
+// Planckian locus approximation (Tanner Helland algorithm).
+// K: correlated colour temperature in Kelvin (valid ~1000–40000).
+// Returns [R, G, B] each 0–255.
+function kelvinToRGB(K) {
+  const t = Math.max(1000, Math.min(40000, K)) / 100;
+  let r, g, b;
+  // Red
+  if (t <= 66) {
+    r = 255;
+  } else {
+    r = 329.698727446 * Math.pow(t - 60, -0.1332047592);
+  }
+  // Green
+  if (t <= 66) {
+    g = 99.4708025861 * Math.log(t) - 161.1195681661;
+  } else {
+    g = 288.1221695283 * Math.pow(t - 60, -0.0755148492);
+  }
+  // Blue
+  if (t >= 66) {
+    b = 255;
+  } else if (t <= 19) {
+    b = 0;
+  } else {
+    b = 138.5177312231 * Math.log(t - 10) - 305.0447927307;
+  }
+  return [
+    Math.max(0, Math.min(255, Math.round(r))),
+    Math.max(0, Math.min(255, Math.round(g))),
+    Math.max(0, Math.min(255, Math.round(b))),
+  ];
+}
+
 // ---- Transient light state (event-driven) --------------------------------
 
 // Floating eye gaze beams — tracked per eye entity ID.
@@ -239,10 +273,10 @@ export function collectLightSources(view, opts = {}) {
   }
 
   // ---- Entity-derived lights --------------------------------------------
-  // Gems with optical data are deferred here and processed after the loop,
-  // so the interaction pass can scan the complete non-gem source list.
+  // Items with material optical data are deferred here and processed after the loop,
+  // so the interaction pass can scan the complete base source list.
   /** @type {Array<{id:number, x:number, y:number, kind:string, opt:object}>} */
-  const gemInteractors = [];
+  const matInteractors = [];
 
   if (Array.isArray(view.entities)) {
     for (let i = 0; i < view.entities.length; i++) {
@@ -338,8 +372,8 @@ export function collectLightSources(view, opts = {}) {
       } else if (tags.includes('legendary_glowing')) {
         emitPatterned(out, 'pulse', t, e.id, ex, ey, 5, paletteGlow('legendary_chest') || LANTERN_GOLD, 5);
       } else if (tags.includes('glowing')) {
-        // Suppress generic amber for gems — gemOptical.emissive handles their emission instead
-        if (!e.gemOptical) emitPatterned(out, 'ember', t, e.id, ex, ey, 4, LANTERN_GOLD, 4);
+        // Suppress generic amber for mat-optical items — matOptical.emissive handles their emission instead
+        if (!e.matOptical) emitPatterned(out, 'ember', t, e.id, ex, ey, 4, LANTERN_GOLD, 4);
       } else if (tags.includes('epic_glowing')) {
         emitPatterned(out, 'breathe', t, e.id, ex, ey, 4, paletteGlow('epic_chest') || [200, 100, 255], 4);
       } else if (tags.includes('rare_glowing')) {
@@ -354,10 +388,10 @@ export function collectLightSources(view, opts = {}) {
       if (tags.includes('gold_glow')) {
         emitPatterned(out, 'candle', t, e.id, ex, ey, 1.5, [255, 210, 80], 2);
       }
-      // Natural gems: pure interaction — no intrinsic emission.
-      // Deferred to interaction pass so we can scan complete non-gem source list.
-      if (e.gemOptical) {
-        gemInteractors.push({ id: e.id, x: ex, y: ey, kind, opt: e.gemOptical });
+      // Material optical items: pure interaction (or emissive if flagged).
+      // Deferred to interaction pass so we can scan the complete base source list.
+      if (e.matOptical) {
+        matInteractors.push({ id: e.id, x: ex, y: ey, kind, opt: e.matOptical });
       }
       // Burning entities — fire light that reads as something on fire
       if (tags.includes('burning')) {
@@ -379,19 +413,20 @@ export function collectLightSources(view, opts = {}) {
     }
   }
 
-  // ---- Gem light-material interaction pass --------------------------------
-  // Pure interaction — no base emission. Gems respond to incoming light only.
-  // baseLightCount snapshots the source list before any gem contributions,
-  // so gem responses never trigger other gems (no cross-gem caustic chains).
-  if (gemInteractors.length > 0) {
+  // ---- Material optical interaction pass ----------------------------------
+  // Gems: pure interaction (respond to incoming light only).
+  // Emissive materials: inject their own light plus respond to incoming.
+  // baseLightCount snapshots the source list before any mat contributions,
+  // so mat responses never trigger other mats (no cross-item caustic chains).
+  if (matInteractors.length > 0) {
     const baseLightCount  = out.length;
     const MAX_CAUSTICS    = 2;
     const CAUSTIC_DIST_SQ = 8 * 8;
     const GLINT_DIST_SQ   = 5 * 5;
     const ABSORB_DIST_SQ  = 5 * 5;
 
-    for (let gi = 0; gi < gemInteractors.length; gi++) {
-      const { id, x: gx, y: gy, kind, opt } = gemInteractors[gi];
+    for (let gi = 0; gi < matInteractors.length; gi++) {
+      const { id, x: gx, y: gy, kind, opt } = matInteractors[gi];
       let causticCount = 0;
       let didAbsorb    = false;
 
@@ -428,6 +463,20 @@ export function collectLightSources(view, opts = {}) {
           ],
           flicker: pat.intensity,
           softness: 5,
+        });
+      }
+      // Physics-based emission from material colour temperature (non-gem items:
+      // aetherium, radiant-alloy, soul-glass, blood-iron, starmetal, ectoplasm…).
+      // Uses Planckian locus K→RGB — colour is intrinsic to the material, not palette.
+      if (opt.emitK > 0 && opt.emitIntensity > 0) {
+        const emitCol = kelvinToRGB(opt.emitK);
+        const emitR   = opt.emitIntensity * 5.0 * pat.intensity;
+        out.push({
+          x: gx, y: gy,
+          radius:   emitR,
+          color:    emitCol,
+          flicker:  pat.intensity,
+          softness: 6,
         });
       }
 
