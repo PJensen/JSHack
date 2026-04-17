@@ -600,20 +600,51 @@ export function collectLightSources(view, opts = {}) {
           }
         }
 
-        // Specular glint — hard bright point at the gem from a nearby source.
-        // Large enough to be visible at tile scale.
+        // Specular glint — anisotropic streak, not a blob.
+        // Real glints are rays: light reflects off surface microstructure (blade edge,
+        // grain, facet edge) and spreads along a preferred axis perpendicular to the
+        // incoming light direction. As the torch moves, the streak rotates with it.
+        // Two arms form a cross: primary (perpendicular) + secondary (along light ray).
+        // Cubic distance falloff makes glints pop at close range and vanish quickly —
+        // matches the angle-sensitivity of real specular reflection.
         if (opt.lightReflect > 0.06 && distSq <= GLINT_DIST_SQ) {
+          const dist  = Math.sqrt(distSq);
           const srcI  = src.flicker != null ? src.flicker : 1.0;
-          const gStr  = opt.lightReflect * srcI * Math.max(0, 1 - Math.sqrt(distSq) / 5) * pat.intensity;
+          // Cubic falloff — sharper than linear, realistic angle-sensitivity
+          const dFall = Math.max(0, 1 - dist / 3.5);
+          const gStr  = opt.lightReflect * srcI * dFall * dFall * dFall * pat.intensity;
           if (gStr > 0.01) {
-            out.push({
-              x:        gx,
-              y:        gy,
-              radius:   opt.lightReflect * 6.0,
-              color:    [255, 252, 245],
-              softness: 2,
-              flicker:  Math.min(1, gStr * 3.0),
-            });
+            const ndx = dx / dist, ndy = dy / dist;
+            // Perpendicular axis = primary streak direction (anisotropic specular)
+            const px = -ndy, py = ndx;
+            // Spacing scales with reflectivity: polished gold > rough iron
+            const spacing = 0.28 + opt.lightReflect * 0.18;
+            const HALF = 2;  // 5 points: -2 -1 0 +1 +2
+            // Primary arm — perpendicular to light, bell-curve falloff along streak
+            for (let k = -HALF; k <= HALF; k++) {
+              const bell = 1 - (k * k) / ((HALF + 0.8) * (HALF + 0.8));
+              out.push({
+                x:        gx + px * k * spacing,
+                y:        gy + py * k * spacing,
+                radius:   0.25,
+                color:    [255, 253, 248],
+                softness: 0,
+                flicker:  Math.min(1, gStr * 2.5 * bell),
+              });
+            }
+            // Secondary arm — along light direction, shorter and dimmer
+            // Skip center (k=0) — already covered by primary arm above
+            for (let k = -1; k <= 1; k++) {
+              if (k === 0) continue;
+              out.push({
+                x:        gx + ndx * k * spacing * 0.55,
+                y:        gy + ndy * k * spacing * 0.55,
+                radius:   0.18,
+                color:    [255, 253, 248],
+                softness: 0,
+                flicker:  Math.min(1, gStr * 1.1),
+              });
+            }
           }
         }
 
