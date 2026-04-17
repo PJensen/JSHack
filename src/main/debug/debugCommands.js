@@ -14,7 +14,8 @@ import { setTile } from "../../rules/environment/dungeon/tileMap.js";
 import { TILE_VOID, TILE_GRASS, CHUNK_SIZE } from "../../rules/environment/dungeon/constants.js";
 import { spawnMonsterEntity } from "../../rules/utils/spawnMonsterEntity.js";
 import { getMonster } from "../../rules/data/monsters.js";
-import { Sign } from "../../rules/archetypes/Sign.js";
+import { materializeSpawn } from "../../rules/environment/dungeon/populate.js";
+import { HomeSign } from "../../rules/archetypes/Overworld.js";
 import { createFrom } from "../../lib/ecs-js/archetype.js";
 
 // All player-castable spells (from SPELL_DEFS) granted instantly in ?audio mode.
@@ -158,6 +159,57 @@ const AUDIO_MONSTERS = [
   "lichen",        "nymph",           "rust_monster",     "centipede",
 ];
 
+// Dungeon decorations / features / traps spawned via materializeSpawn.
+// Each entry: { label (section heading), items: [{ kind, params? }] }
+const AUDIO_DECOR_SECTIONS = [
+  {
+    label: "DUNGEON FEATURES",
+    items: [
+      { kind: "fountain" },
+      { kind: "altar" },
+      { kind: "shrine" },
+      { kind: "statue" },
+      { kind: "pillar" },
+      { kind: "urn" },
+      { kind: "web" },
+      { kind: "mushrooms" },
+      { kind: "torch" },
+      { kind: "sarcophagus", params: { depth: 5 } },
+      { kind: "weapon_rack",  params: { depth: 5 } },
+      { kind: "bone_chime_rack" },
+      { kind: "flayed_man" },
+      { kind: "hanging_chains" },
+      { kind: "drain_throat" },
+      { kind: "steam_vent",     params: { periodTurns: 4, activeTurns: 2, range: 3, dirX: 0, dirY: 1, pushForce: 1, damage: 2 } },
+      { kind: "pressure_plinth",params: { linkId: "audio_link_1" } },
+      { kind: "chain_winch",    params: { linkId: "audio_link_1", togglesTo: "raised" } },
+      { kind: "portcullis",     params: { linkId: "audio_link_1" } },
+      { kind: "flood_gate_wheel", params: { floodRadius: 3 } },
+    ],
+  },
+  {
+    label: "CHESTS",
+    items: [
+      { kind: "chest", params: { lootTable: "chest:basic",     depth: 1 } },
+      { kind: "chest", params: { lootTable: "chest:magic",     depth: 5 } },
+      { kind: "chest", params: { lootTable: "chest:epic",      depth: 8 } },
+      { kind: "chest", params: { lootTable: "chest:legendary", depth: 12 } },
+    ],
+  },
+  {
+    label: "TRAPS",
+    items: [
+      { kind: "trap", params: { type: "spike"  } },
+      { kind: "trap", params: { type: "shock"  } },
+      { kind: "trap", params: { type: "pit"    } },
+      { kind: "trap", params: { type: "siphon" } },
+      { kind: "trap", params: { type: "rust"   } },
+      { kind: "trap", params: { type: "swarm"  } },
+      { kind: "trap", params: { type: "snake"  } },
+    ],
+  },
+];
+
 /**
  * Apply URL-param debug commands (?give, ?effects) to the player.
  * @param {{ world: import('../../lib/ecs-js/index.js').World, runtimeConfig: { giveParam?: string, effectsParam?: string } }} deps
@@ -259,9 +311,11 @@ export function applyDebugCommands({ world, runtimeConfig }) {
     const signX   = itemsX - 2;
 
     // Helper: place a labeled sign entity at (signX, y).
+    // Uses "house_sign" identity — already in palette as glyph "!".
     function placeSign(label, y) {
-      const eid = createFrom(world, Sign, { x: signX, y });
-      world.add(eid, NamedIdentity, { name: label, identity: "audio_sign" });
+      const eid = world.create();
+      world.add(eid, Position,      { x: signX, y });
+      world.add(eid, NamedIdentity, { name: label, identity: "house_sign" });
     }
 
     // Helper: place one item on the floor.
@@ -316,7 +370,7 @@ export function applyDebugCommands({ world, runtimeConfig }) {
       try {
         const def = getMonster(AUDIO_MONSTERS[i]);
         if (!def) { console.warn(`[?audio] Unknown monster: "${AUDIO_MONSTERS[i]}"`); continue; }
-        const mid = spawnMonsterEntity(world, { ...def, x, y });
+        const mid = spawnMonsterEntity(world, { ...def, identity: def.id, x, y });
         if (mid > 0) {
           const ae = world.get(mid, ActiveEffects);
           const stasisEffect = { key: "stasis", turnsLeft: 999999, potency: 1, stacks: 1 };
@@ -332,7 +386,26 @@ export function applyDebugCommands({ world, runtimeConfig }) {
     }
     curRow += Math.ceil(AUDIO_MONSTERS.length / SECTION_COLS) + 2;
 
-    // 4. Nuke all overworld tiles to TILE_VOID.
+    // 4. Decor sections — features, chests, traps via materializeSpawn.
+    for (const section of AUDIO_DECOR_SECTIONS) {
+      curRow++;
+      placeSign(section.label, curRow);
+      let col = 0;
+      for (const entry of section.items) {
+        const x = itemsX + col * ITEM_STRIDE;
+        maxX = Math.max(maxX, x);
+        try {
+          materializeSpawn(world, { kind: entry.kind, x, y: curRow, params: entry.params || {} });
+        } catch (err) {
+          console.warn(`[?audio] Failed to spawn "${entry.kind}":`, err);
+        }
+        col++;
+        if (col >= SECTION_COLS) { col = 0; curRow++; }
+      }
+      curRow += 2;
+    }
+
+    // 6. Nuke all overworld tiles to TILE_VOID.
     const mapMin = -2 * CHUNK_SIZE;
     const mapMax =  3 * CHUNK_SIZE;
     for (let wx = mapMin; wx < mapMax; wx++) {
@@ -341,7 +414,7 @@ export function applyDebugCommands({ world, runtimeConfig }) {
       }
     }
 
-    // 5. Carve walkable grass stage — covers player, signs, full item + monster grid.
+    // 7. Carve walkable grass stage — covers player, signs, full item + monster grid.
     const stageLeft   = pos.x - 3;
     const stageRight  = maxX + 3;
     const stageTop    = pos.y - 5;
@@ -352,7 +425,7 @@ export function applyDebugCommands({ world, runtimeConfig }) {
       }
     }
 
-    // 6. Learn every player-castable spell directly (mirrors mutations.js learnSpell).
+    // 8. Learn every player-castable spell directly (mirrors mutations.js learnSpell).
     let brain = world.get(pe.id, Brain);
     if (!brain) {
       try { world.add(pe.id, Brain, {}); } catch {}
