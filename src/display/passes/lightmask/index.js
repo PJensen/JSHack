@@ -6,7 +6,7 @@
  * ctx is assumed to be under the camera/world transform already.
  * visible is a Set of "x,y" tile keys or a predicate (x,y)=>boolean.
  */
-export function drawLightMask(ctx, visible, vx0, vy0, vx1, vy1, alpha = 0.72) {
+export function drawLightMask(ctx, visible, vx0, vy0, vx1, vy1, alpha = 0.90) {
   const isVisible = (typeof visible === 'function')
     ? visible
     : (x, y) => !!(visible && visible.has(`${x},${y}`));
