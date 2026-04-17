@@ -34,6 +34,9 @@ export const TILE_FARMLAND       = 19; // tilled soil  ░  — walkable, transp
 export const TILE_FENCE          = 20; // wooden fence #  — NOT walkable, transparent, flyable
 export const TILE_COBBLESTONE    = 21; // grey stone cobble ·  — walkable, transparent
 
+// Dungeon hazard tiles
+export const TILE_PIT            = 22; // open pit     🕳  — walkable (triggers fall), transparent, NOT flyable
+
 // BSP partition parameters
 export const MIN_LEAF_SIZE   = 5;   // smallest BSP leaf dimension
 export const MIN_ROOM_SIZE   = 3;   // smallest room interior (excl. walls)

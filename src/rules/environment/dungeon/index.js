@@ -14,6 +14,7 @@ export {
   TILE_WATER,
   TILE_MOUNTAIN,
   TILE_TREE,
+  TILE_PIT,
 } from './constants.js';
 export { chunkSeed, floorSeed, edgeSeed } from './seed.js';
 export { generateChunk, edgeGate, findDoorPositions } from './chunk.js';
