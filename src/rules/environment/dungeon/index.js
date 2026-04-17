@@ -282,7 +282,7 @@ export function generateFloor(world, worldSeed, depth, tombstoneRepo = null, onP
       // Populate chunk with monsters and items
       const popSeed = chunkSeed(worldSeed, depth, cx, cy) ^ 0xDEAD;
       const popRng = createRng(popSeed >>> 0);
-      chunkData.spawns = populateChunk(chunkData, floorPlan, popRng, tombstoneRepo);
+      chunkData.spawns = populateChunk(chunkData, floorPlan, popRng, tombstoneRepo, worldSeed);
 
       // Register tile data
       tileMapLoad(cx, cy, chunkData.tiles);

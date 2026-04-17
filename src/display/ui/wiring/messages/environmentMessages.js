@@ -496,6 +496,11 @@ export function installEnvironmentMessages(ctx) {
     const trapNames = { spike: "Spike Trap", snake: "Snake Trap", shock: "Shock Trap", pit: "Pit Trap", siphon: "Siphon Trap", rust: "Rust Trap", swarm: "Swarm Trap" };
     log(`Your fingers slip on the ${trapNames[trapType] || 'trap'} mechanism \u2014 CLICK! It triggers!`, 'danger');
   });
+  world.on('trap:pit:fall', ({ targetId }) => {
+    const pe = playerEntity(world);
+    if (!pe || pe.id !== (Number(targetId) | 0)) return;
+    log('The floor gives way \u2014 you plunge into darkness!', 'danger');
+  });
   world.on('trap:gas_explosion', () => {
     log('The gas pocket ignites \u2014 BOOM! A fireball fills the corridor!', 'danger');
   });

@@ -115,6 +115,7 @@ import {
   TILE_ICE, TILE_SHALLOW_WATER, TILE_LAVA, TILE_WALL,
 } from './constants.js';
 import { setTile, getTile } from './tileMap.js';
+import { isPitLandingViable } from './floorPlan.js';
 import { appraiseItemValue, getUnidentifiedGemAppraisal } from '../../utils/shopAppraisal.js';
 import { spawnMonsterEntity } from '../../utils/spawnMonsterEntity.js';
 import { spawnCentipede } from '../../utils/spawnCentipede.js';
@@ -499,7 +500,7 @@ function addClosetSurprises(chunk, floorPlan, rng, spawns, isSolid, markSolid) {
  * @param {Object} [tombstoneRepo] - Tombstone repository for placing tombstones
  * @returns {SpawnPoint[]}
  */
-export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
+export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null, worldSeed = 0) {
   const spawns = [];
   const diff = floorPlan.difficultyMult;
   const SPAWNER_CHANCE_PER_MONSTER = 0.35; // Convert room monster budget into a per-room nest chance.
@@ -810,6 +811,7 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
         } while (isSolid(tx, ty) && attempts < 10);
         if (isSolid(tx, ty)) continue;
         const trap = pickTrap(rng, floorPlan.depth);
+        if (trap.type === 'pit' && !isPitLandingViable(worldSeed, floorPlan.depth + 1, tx, ty)) continue;
         spawns.push({ x: tx, y: ty, kind: 'trap', params: trap });
       }
     }
@@ -939,6 +941,7 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
         const idx = rng.int(0, corridorCandidates.length - 1);
         const pos = corridorCandidates.splice(idx, 1)[0];
         const trap = pickTrap(rng, floorPlan.depth);
+        if (trap.type === 'pit' && !isPitLandingViable(worldSeed, floorPlan.depth + 1, pos.x, pos.y)) continue;
         spawns.push({ x: pos.x, y: pos.y, kind: 'trap', params: trap });
       }
     }
@@ -1105,6 +1108,7 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null) {
       isSolid,
       markSolid,
       theme,
+      worldSeed,
     });
   }
 
@@ -1369,7 +1373,7 @@ function pickRoomInteriorSpot(room, rng, isBlocked, reserved = new Set(), tries 
 }
 
 function applyDeadEndTheme(ctx) {
-  const { room, rng, spawns, floorPlan, chunk, isSolid, markSolid, theme } = ctx;
+  const { room, rng, spawns, floorPlan, chunk, isSolid, markSolid, theme, worldSeed = 0 } = ctx;
   const reserved = new Set();
 
   switch (theme) {
@@ -1408,12 +1412,10 @@ function applyDeadEndTheme(ctx) {
       }
       const trapPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
       if (trapPos) {
-        spawns.push({
-          x: trapPos.x,
-          y: trapPos.y,
-          kind: 'trap',
-          params: pickTrap(rng, floorPlan.depth),
-        });
+        const trap = pickTrap(rng, floorPlan.depth);
+        if (trap.type !== 'pit' || isPitLandingViable(worldSeed, floorPlan.depth + 1, trapPos.x, trapPos.y)) {
+          spawns.push({ x: trapPos.x, y: trapPos.y, kind: 'trap', params: trap });
+        }
       }
       break;
     }
@@ -1491,7 +1493,10 @@ function applyDeadEndTheme(ctx) {
       }
       const trapPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
       if (trapPos) {
-        spawns.push({ x: trapPos.x, y: trapPos.y, kind: 'trap', params: pickTrap(rng, floorPlan.depth) });
+        const trap = pickTrap(rng, floorPlan.depth);
+        if (trap.type !== 'pit' || isPitLandingViable(worldSeed, floorPlan.depth + 1, trapPos.x, trapPos.y)) {
+          spawns.push({ x: trapPos.x, y: trapPos.y, kind: 'trap', params: trap });
+        }
       }
       break;
     }
@@ -1549,7 +1554,10 @@ function applyDeadEndTheme(ctx) {
       }
       const trapPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
       if (trapPos) {
-        spawns.push({ x: trapPos.x, y: trapPos.y, kind: 'trap', params: pickTrap(rng, floorPlan.depth) });
+        const trap = pickTrap(rng, floorPlan.depth);
+        if (trap.type !== 'pit' || isPitLandingViable(worldSeed, floorPlan.depth + 1, trapPos.x, trapPos.y)) {
+          spawns.push({ x: trapPos.x, y: trapPos.y, kind: 'trap', params: trap });
+        }
       }
       break;
     }

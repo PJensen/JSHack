@@ -261,6 +261,14 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
       queueDepth(targetDepth, { targetPos: { x: targetX, y: targetY }, fragActorsAtTarget: true });
     });
 
+    world.on('trap:pit:fall', ({ targetId, x, y }) => {
+      const pe = playerEntity();
+      if (!pe || pe.id !== (Number(targetId) | 0)) return;
+      let currentDepth = 1;
+      for (const [, ds] of world.query(DungeonState)) { currentDepth = ds.currentDepth; break; }
+      queueDepth(currentDepth + 1, { targetPos: { x: x | 0, y: y | 0 } });
+    });
+
     world.on("dungeon:transitioned", () => {
       destroyReturnPortals();
     });
