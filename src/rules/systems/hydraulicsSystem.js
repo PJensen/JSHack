@@ -1,6 +1,5 @@
 import { Collider } from "../components/Collider.js";
 import { HazardArea } from "../components/HazardArea.js";
-import { HydraulicsLink } from "../components/HydraulicsLink.js";
 import { Interactable } from "../components/Interactable.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { KnockbackPending } from "../components/KnockbackPending.js";
@@ -9,64 +8,25 @@ import { ObjectState } from "../components/ObjectState.js";
 import { Position } from "../components/Position.js";
 import { Vitality } from "../components/Vitality.js";
 import { Weight } from "../components/Weight.js";
+import { HydraulicsLink } from "../components/HydraulicsLink.js";
 import { isWalkable } from "../environment/dungeon/tileMap.js";
 import { spawnHazard } from "../utils/hazardSpawn.js";
+import { entitiesAtPoint } from "../utils/spatialIndex.js";
+import { setLinkedPortcullisState } from "../utils/hydraulicsUtils.js";
 
 function isSolidBlockedAt(world, x, y, ignoreId = 0) {
-  const tx = x | 0;
-  const ty = y | 0;
-  for (const [id, pos, col] of world.query(Position, Collider)) {
+  for (const id of entitiesAtPoint(world, x | 0, y | 0)) {
     if ((id | 0) === (ignoreId | 0)) continue;
-    if (!col?.solid) continue;
-    if ((pos.x | 0) !== tx || (pos.y | 0) !== ty) continue;
-    return true;
+    const col = world.get(id, Collider);
+    if (col?.solid) return true;
   }
   return false;
 }
 
-function setPortcullisRaised(world, gateId, raised, source = "hydraulics") {
-  const state = raised ? "raised" : "lowered";
-  try { world.set(gateId, ObjectState, { state }); } catch { /* */ }
-  try {
-    const col = world.get(gateId, Collider);
-    const next = { solid: !raised, blocksSight: !raised };
-    if (col) world.set(gateId, Collider, next);
-    else world.add(gateId, Collider, next);
-  } catch { /* */ }
-  try {
-    const pos = world.get(gateId, Position);
-    world.emit?.("hydraulics:portcullis", {
-      gateId,
-      raised: !!raised,
-      state,
-      source,
-      at: pos ? { x: pos.x | 0, y: pos.y | 0 } : null,
-    });
-  } catch { /* */ }
-}
-
-function setLinkedPortcullisState(world, linkId, raised, source = "hydraulics") {
-  const wanted = String(linkId || "").trim();
-  if (!wanted) return 0;
-  let changed = 0;
-  for (const [id, link] of world.query(HydraulicsLink)) {
-    if (String(link?.role || "") !== "portcullis") continue;
-    if (String(link?.linkId || "") !== wanted) continue;
-    const currentlyRaised = String(world.get(id, ObjectState)?.state || "lowered") === "raised";
-    if (currentlyRaised === !!raised) continue;
-    setPortcullisRaised(world, id | 0, !!raised, source);
-    changed++;
-  }
-  return changed;
-}
-
 function tileWeight(world, x, y, plinthId) {
   let total = 0;
-  const tx = x | 0;
-  const ty = y | 0;
-  for (const [id, pos] of world.query(Position)) {
+  for (const id of entitiesAtPoint(world, x | 0, y | 0)) {
     if ((id | 0) === (plinthId | 0)) continue;
-    if ((pos.x | 0) !== tx || (pos.y | 0) !== ty) continue;
     const w = world.get(id, Weight);
     if (w && Number.isFinite(w.total) && Number(w.total) > 0) {
       total += Number(w.total);
@@ -94,7 +54,7 @@ function processPressurePlinths(world) {
     if (prevState === nextState) continue;
     world.set(id, ObjectState, { state: nextState });
     const changed = setLinkedPortcullisState(world, String(link?.linkId || ""), pressed, "pressure_plinth");
-    world.emit?.("hydraulics:plinth", {
+    world.emit("hydraulics:plinth", {
       plinthId: id | 0,
       linkId: String(link?.linkId || ""),
       pressed,
@@ -113,11 +73,12 @@ function pushGasHazards(world, x, y, dx, dy) {
   const toY = fromY + (dy | 0);
   if (!isWalkable(toX, toY) || isSolidBlockedAt(world, toX, toY)) return 0;
   let moved = 0;
-  for (const [hazardId, pos, hazard] of world.query(Position, HazardArea)) {
-    if ((pos.x | 0) !== fromX || (pos.y | 0) !== fromY) continue;
-    const kind = String(hazard?.kind || "").toLowerCase();
+  for (const id of entitiesAtPoint(world, fromX, fromY)) {
+    const hazard = world.get(id, HazardArea);
+    if (!hazard) continue;
+    const kind = String(hazard.kind || "").toLowerCase();
     if (kind !== "gas" && kind !== "steam") continue;
-    world.set(hazardId, Position, { x: toX, y: toY });
+    world.set(id, Position, { x: toX, y: toY });
     moved++;
   }
   return moved;
@@ -167,15 +128,15 @@ function processSteamVents(world) {
         meta: { source: "steam_vent", lineStep: d },
       });
 
-      for (const [targetId, targetPos] of world.query(Position, Vitality)) {
-        if ((targetPos.x | 0) !== tx || (targetPos.y | 0) !== ty) continue;
+      for (const targetId of entitiesAtPoint(world, tx, ty)) {
+        if (!world.has(targetId, Vitality)) continue;
         if (world.has(targetId, KnockbackPending)) continue;
         world.add(targetId, KnockbackPending, { dx, dy, force: pushForce });
       }
       pushedHazards += pushGasHazards(world, tx, ty, dx, dy);
     }
 
-    world.emit?.("hydraulics:steamVent", {
+    world.emit("hydraulics:steamVent", {
       ventId: id | 0,
       at: { x: pos.x | 0, y: pos.y | 0 },
       dir: { dx, dy },
@@ -201,4 +162,3 @@ export function hydraulicsSystem(world) {
   processPressurePlinths(world);
   processSteamVents(world);
 }
-

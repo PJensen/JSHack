@@ -81,6 +81,7 @@ import { buildNoticeBoardPayload } from "../../quests/localGenerator.js";
 import { GroundStackOrder } from "../../components/GroundStackOrder.js";
 import { HazardArea } from "../../components/HazardArea.js";
 import { HydraulicsLink } from "../../components/HydraulicsLink.js";
+import { setPortcullisRaised, setLinkedPortcullisState } from "../../utils/hydraulicsUtils.js";
 import { emitSafe } from "../../utils/emitSafe.js";
 import { isWalkable, forEachLoadedTile, setTile, getTile } from "../../environment/dungeon/tileMap.js";
 import { TILE_SHALLOW_WATER, TILE_FLOOR } from "../../environment/dungeon/constants.js";
@@ -351,46 +352,6 @@ function hasFloorFireHazardAt(world, x, y) {
     return true;
   }
   return false;
-}
-
-function setPortcullisRaised(world, gateId, raised, sourceAction = "") {
-  const state = raised ? "raised" : "lowered";
-  try { world.set(gateId, ObjectState, { state }); } catch { /* */ }
-  try {
-    const col = world.get(gateId, Collider);
-    const next = {
-      solid: !raised,
-      blocksSight: !raised,
-    };
-    if (col) world.set(gateId, Collider, next);
-    else world.add(gateId, Collider, next);
-  } catch { /* */ }
-  try {
-    const pos = world.get(gateId, Position);
-    world.emit?.("hydraulics:portcullis", {
-      gateId,
-      raised: !!raised,
-      state,
-      at: pos ? { x: pos.x | 0, y: pos.y | 0 } : null,
-      sourceAction,
-    });
-  } catch { /* */ }
-}
-
-function setLinkedPortcullisState(world, linkId, raised, sourceAction = "") {
-  const wanted = String(linkId || "").trim();
-  if (!wanted) return 0;
-  let changed = 0;
-  for (const [id, link] of world.query(HydraulicsLink)) {
-    if (String(link?.role || "") !== "portcullis") continue;
-    if (String(link?.linkId || "") !== wanted) continue;
-    const current = String(world.get(id, ObjectState)?.state || "lowered");
-    const isRaised = current === "raised";
-    if (isRaised === !!raised) continue;
-    setPortcullisRaised(world, id, !!raised, sourceAction);
-    changed++;
-  }
-  return changed;
 }
 
 function toggleFloodArea(world, cx, cy, radius, toFlood) {

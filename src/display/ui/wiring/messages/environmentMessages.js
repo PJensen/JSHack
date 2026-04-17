@@ -568,6 +568,28 @@ export function installEnvironmentMessages(ctx) {
     log('*** your ears ring like a struck bell ***', 'danger');
   });
 
+  // === Hydraulics / mechanical features ===
+  world.on('hydraulics:portcullis', ({ raised, source }) => {
+    if (raised) log('The portcullis grinds upward with a clank of iron.', 'info');
+    else log('The portcullis crashes down.', 'info');
+  });
+
+  world.on('hydraulics:winch', ({ gatesChanged, raised, ok, reason }) => {
+    if (ok === false) { log('The chain winch turns freely — nothing linked.', 'info'); return; }
+    if (!gatesChanged) { log('Nothing moves.', 'info'); return; }
+    log(raised ? 'You heave the chain winch. Iron groans above.' : 'You work the winch in reverse. A heavy thud echoes.', 'info');
+  });
+
+  world.on('boneChime:rung', ({ actor }) => {
+    const pe = playerEntity(world);
+    const playerId = Number(pe?.id || 0) | 0;
+    if (playerId > 0 && (Number(actor || 0) | 0) === playerId) {
+      log('The bone chimes clatter and ring — the sound carries far.', 'ambient');
+    } else {
+      log('Somewhere nearby, bone chimes rattle.', 'ambient');
+    }
+  });
+
   // === Calendar events ===
   world.on('calendar:newDay', ({ next }) => { /* quiet */ });
   world.on('calendar:newMonth', ({ name }) => { log(`The month turns. ${name} begins.`, 'ambient'); });
