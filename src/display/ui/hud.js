@@ -1817,7 +1817,8 @@ function createQuickSlot(opts = {}) {
 
   /** @type {Array<{id:number, identity?:string, type:string, slot?:string, name:string, count:number, rarityName?:string, glyph?:string, glyphColor?:string, hasScrollOfIdentify?:boolean, details?:any, interacted?:boolean, addedAt:number}>} */
   const stack = [];
-  const AUTO_DISMISS_MS = 4000;
+  const AUTO_DISMISS_MS = 6000;
+  const AUTO_FADE_MS = 800;
 
   function normalizeQuickItem(item) {
     const id = Number(item?.id || 0) | 0;
@@ -1890,10 +1891,11 @@ function createQuickSlot(opts = {}) {
     const topChip = el.firstElementChild instanceof HTMLElement ? el.firstElementChild : null;
     if (topChip) {
       topChip.style.opacity = '1';
-      topChip.style.transition = `opacity ${AUTO_DISMISS_MS}ms linear`;
+      topChip.style.transition = '';
       fadeTimer = setTimeout(() => {
+        topChip.style.transition = `opacity ${AUTO_FADE_MS}ms ease-in`;
         topChip.style.opacity = '0';
-      }, 16);
+      }, AUTO_DISMISS_MS - AUTO_FADE_MS);
     }
     dismissTimer = setTimeout(() => {
       stack.pop();
