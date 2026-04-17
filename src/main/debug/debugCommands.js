@@ -165,6 +165,18 @@ const AUDIO_MONSTERS = [
 // Each entry: { label (section heading), items: [{ kind, params? }] }
 const AUDIO_DECOR_SECTIONS = [
   {
+    label: "TRAPS",
+    items: [
+      { kind: "trap", params: { type: "spike"  } },
+      { kind: "trap", params: { type: "shock"  } },
+      { kind: "trap", params: { type: "pit"    } },
+      { kind: "trap", params: { type: "siphon" } },
+      { kind: "trap", params: { type: "rust"   } },
+      { kind: "trap", params: { type: "swarm"  } },
+      { kind: "trap", params: { type: "snake"  } },
+    ],
+  },
+  {
     label: "DUNGEON FEATURES",
     items: [
       { kind: "fountain" },
@@ -196,18 +208,6 @@ const AUDIO_DECOR_SECTIONS = [
       { kind: "chest", params: { lootTable: "chest:magic",     depth: 5 } },
       { kind: "chest", params: { lootTable: "chest:epic",      depth: 8 } },
       { kind: "chest", params: { lootTable: "chest:legendary", depth: 12 } },
-    ],
-  },
-  {
-    label: "TRAPS",
-    items: [
-      { kind: "trap", params: { type: "spike"  } },
-      { kind: "trap", params: { type: "shock"  } },
-      { kind: "trap", params: { type: "pit"    } },
-      { kind: "trap", params: { type: "siphon" } },
-      { kind: "trap", params: { type: "rust"   } },
-      { kind: "trap", params: { type: "swarm"  } },
-      { kind: "trap", params: { type: "snake"  } },
     ],
   },
 ];
