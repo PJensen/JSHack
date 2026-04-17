@@ -48,7 +48,6 @@ const SOUNDS = {
   "door:open":        { file: "door_open.wav",     bus: "ambient" },
   "fountain":         { file: "fountain.wav",      bus: "ambient" },
   "deity:omen":       { file: "harp_reverb.wav",   bus: "ambient", maxVoices: 2 },
-  "shrine:communion": { file: "harp_reverb.wav",   bus: "ambient", maxVoices: 2 },
 
   // ── Spells (cast / launch) ─────────────────────
   "spell:bolt":          { file: "spell_bolt.wav",          bus: "spells" },
