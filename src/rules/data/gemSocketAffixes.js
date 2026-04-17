@@ -16,6 +16,8 @@ import {
   effectAddCritChance,
 } from "../utils/statProcAuthoring.js";
 import { GemSocketNode } from "../components/GemSocketNode.js";
+import { Equipment } from "../components/Equipment.js";
+import { ItemInfo } from "../components/ItemInfo.js";
 
 // ── Passive script keys ──────────────────────────────────────────
 const S_RUBY     = "gem_socket:ruby:passive";
@@ -29,7 +31,14 @@ const S_OBSIDIAN = "gem_socket:obsidian:passive";
 const S_GARNET   = "gem_socket:garnet:passive";
 const S_JACINTH  = "gem_socket:jacinth:passive";
 const S_AQUAMARINE = "gem_socket:aquamarine:passive";
-const S_VOIDSTONE = "gem_socket:voidstone:passive";
+const S_VOIDSTONE  = "gem_socket:voidstone:passive";
+const S_FLUORITE   = "gem_socket:fluorite:passive";
+
+// ── Fluorite charge/discharge thresholds ─────────────────────────
+const FLUO_MAX_CHARGES      = 6;  // stacks to full charge
+const FLUO_DISCHARGE_MIN    = 3;  // minimum stacks to discharge
+const FLUO_DAMAGE_PER_STACK = 2;  // bonus electric damage per charge consumed
+const FLUO_SHRINE_STANDING_MIN = 5; // normalized standing threshold for shrine gift (out of 8)
 
 // ── Register passive scripts ─────────────────────────────────────
 registerScript(S_RUBY,     { [ScriptVerb.AffixPassive]: (_w, ctx) => ctx.addBonus("fireResist", 0.10) });
@@ -43,7 +52,8 @@ registerScript(S_OBSIDIAN, { [ScriptVerb.AffixPassive]: (_w, ctx) => ctx.addBonu
 registerScript(S_GARNET,   { [ScriptVerb.AffixPassive]: (_w, ctx) => ctx.addBonus("fireResist", 0.20) });
 registerScript(S_JACINTH,  { [ScriptVerb.AffixPassive]: (_w, ctx) => ctx.addBonus("acidResist", 0.10) });
 registerScript(S_AQUAMARINE, { [ScriptVerb.AffixPassive]: (_w, ctx) => ctx.addBonus("manaRegen", 0.5) });
-registerScript(S_VOIDSTONE, { [ScriptVerb.AffixPassive]: (_w, ctx) => { ctx.addBonus("accuracy", 3); ctx.addBonus("damagePower", 3); } });
+registerScript(S_VOIDSTONE,  { [ScriptVerb.AffixPassive]: (_w, ctx) => { ctx.addBonus("accuracy", 3); ctx.addBonus("damagePower", 3); } });
+registerScript(S_FLUORITE,   { [ScriptVerb.AffixPassive]: (_w, ctx) => ctx.addBonus("electricOhms", 20) });
 
 // ── Register affix definitions (weight:0 = not randomly generated) ──
 [
@@ -59,7 +69,50 @@ registerScript(S_VOIDSTONE, { [ScriptVerb.AffixPassive]: (_w, ctx) => { ctx.addB
   ["gem_socket:jacinth",    { name: "Jacinth Socket",    slots: ["weapon", "armor"], weight: 0, passiveRefs: [S_JACINTH] }],
   ["gem_socket:aquamarine", { name: "Aquamarine Socket", slots: ["weapon", "armor"], weight: 0, passiveRefs: [S_AQUAMARINE] }],
   ["gem_socket:voidstone",  { name: "Voidstone Socket",  slots: ["weapon", "armor"], weight: 0, passiveRefs: [S_VOIDSTONE] }],
+  ["gem_socket:fluorite",   { name: "Fluorite Socket",   slots: ["weapon", "armor"], weight: 0, passiveRefs: [S_FLUORITE] }],
 ].forEach(([id, spec]) => registerAffixDefinition(id, spec));
+
+// ── Fluorite proc scripts ────────────────────────────────────────
+// Charge script: fires on onDamaged — absorbs incoming electric energy.
+// Two stacks per electric hit; shrine-induced charge handled separately.
+registerScript("gem_socket:fluorite:charge", {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (ctx.kind !== "onDamaged") return;
+    const dmgType = String(ctx.damage?.type || "");
+    if (dmgType !== "electric" && dmgType !== "lightning") return;
+    const item = Number(ctx?.item || 0) | 0;
+    const info = world.get(item, ItemInfo);
+    if (!info) return;
+    const max = Number(info.maxCharges || 0);
+    if (!max) return;
+    const curr = Number(info.charges || 0);
+    if (curr >= max) return;
+    info.charges = Math.min(max, curr + 2);  // electric hits charge fast
+    ctx.proc.emit("proc:fluorite:charge", {
+      actor: ctx.source, item, charges: info.charges, maxCharges: max, source: "electric",
+    });
+  },
+});
+
+// Discharge script: fires on onBeforeHit — releases stored charge as a blinding flash.
+// Requires >= FLUO_DISCHARGE_MIN stacks. Bonus electric damage = stacks * FLUO_DAMAGE_PER_STACK.
+registerScript("gem_socket:fluorite:discharge", {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    if (ctx.kind !== "onBeforeHit") return;
+    const item = Number(ctx?.item || 0) | 0;
+    const info = world.get(item, ItemInfo);
+    if (!info) return;
+    const curr = Number(info.charges || 0);
+    if (curr < FLUO_DISCHARGE_MIN) return;
+    const dmg = curr * FLUO_DAMAGE_PER_STACK;
+    ctx.proc.addBonusDamage(dmg, dmg, "electric");
+    ctx.proc.applyStatus(ctx.target, "blinded", 1, 1);  // phosphorescent flash
+    info.charges = 0;
+    ctx.proc.emit("proc:fluorite:discharge", {
+      actor: ctx.source, target: ctx.target, item, chargesSpent: curr,
+    });
+  },
+});
 
 // ── Proc builders — gems that trigger on-hit effects ─────────────
 // Structure: weapon → GemSocketNode → ProcNode → gates + effects
@@ -140,6 +193,26 @@ const GEM_PROC_BUILDERS = {
       effects: [effectBonusDamageFlat(3, 3, "void"), effectRestoreResource("hp", 3, { target: "source" })],
     });
   },
+  gem_fluorite(world, weaponId, socketNodeId) {
+    // Initialize charge state on the weapon — persists across combat
+    const info = world.get(weaponId, ItemInfo);
+    if (info) {
+      info.charges = 0;
+      info.maxCharges = FLUO_MAX_CHARGES;
+    }
+    // Charge proc: take electric/lightning damage → absorb 2 stacks
+    attachProcNode(world, socketNodeId, {
+      gates: [gateEventKind("onDamaged")],
+      script: "gem_socket:fluorite:charge",
+      priority: 1,
+    });
+    // Discharge proc: on next hit when >= 3 stacks → blinding electric burst
+    attachProcNode(world, socketNodeId, {
+      gates: [gateEventKind("onBeforeHit")],
+      script: "gem_socket:fluorite:discharge",
+      priority: 2,
+    });
+  },
 };
 
 /**
@@ -170,5 +243,30 @@ export function installGemSocketListener(world) {
     } catch (e) {
       console.debug("[gemSocketAffixes] attachGemSocketNodes failed:", e);
     }
+  });
+
+  // Shrine proximity charges fluorite — divine favor near a shrine (good standing).
+  // +1 stack per combat hit while in divine favor range.
+  world.on("shrine:combat:scaling", ({ attacker, mult }) => {
+    if (!(mult > 1)) return;  // only divine favor, not wrath
+    const actorId = Number(attacker) | 0;
+    if (!(actorId > 0)) return;
+    const eq = world.get(actorId, Equipment);
+    if (!eq) return;
+    // Check main hand weapon for fluorite socket
+    const weaponId = Number(eq.hand || 0) | 0;
+    if (!(weaponId > 0)) return;
+    const info = world.get(weaponId, ItemInfo);
+    if (!info) return;
+    const max = Number(info.maxCharges || 0);
+    if (!max) return;
+    const sockets = Array.isArray(info.sockets) ? info.sockets : [];
+    if (!sockets.includes("gem_fluorite")) return;
+    const curr = Number(info.charges || 0);
+    if (curr >= max) return;
+    info.charges = Math.min(max, curr + 1);
+    world.emit?.("proc:fluorite:charge", {
+      actor: actorId, item: weaponId, charges: info.charges, maxCharges: max, source: "shrine",
+    });
   });
 }
