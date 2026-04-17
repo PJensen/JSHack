@@ -199,6 +199,7 @@ export function installEnvironmentMessages(ctx) {
       else if (inter?.identity === 'apothecary_sign') log('Neat lettering on glass: "The Apothecary \u2014 Cures, Salves & Things Best Not Named."', 'system');
       else if (inter?.identity === 'gem_shop_sign') log('A polished sign gleams: "Gem Dealer \u2014 Cuts, Settings & Appraisals."', 'system');
       else if (inter?.identity === 'tombstone') log('The weathered stone reads: "Rest eternal, faithful soul."', 'system');
+      else if (inter?.name) log(`Sign reads: "${inter.name}"`, 'system');
       else log('You squint at the sign and read it.', 'system');
     }
   });

@@ -111,7 +111,7 @@ export function readRuntimeConfig() {
     disableFov: parseBooleanish(disableFovParam, parseBooleanish(disableFovStored, false)),
     disableFovCone: parseBooleanish(disableFovConeParam, parseBooleanish(disableFovConeStored, true)),
     facingTurnCost: parseBooleanish(facingTurnCostParam, parseBooleanish(facingTurnCostStored, false)),
-    identifyItems: params.get("identify") !== "off",
+    identifyItems: params.has("audio") ? false : params.get("identify") !== "off",
     dungeonType:  params.get("dungeonType") || null,
     audioMode:    params.has("audio"),
   };

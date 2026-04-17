@@ -9,8 +9,13 @@ import { addToInventory } from "../../rules/utils/inventoryFacade.js";
 import { inventoryItems } from "../../rules/utils/inventoryFacade.js";
 import { Brain } from "../../rules/components/Brain.js";
 import { Position } from "../../rules/components/Position.js";
+import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 import { setTile } from "../../rules/environment/dungeon/tileMap.js";
 import { TILE_VOID, TILE_GRASS, CHUNK_SIZE } from "../../rules/environment/dungeon/constants.js";
+import { spawnMonsterEntity } from "../../rules/utils/spawnMonsterEntity.js";
+import { getMonster } from "../../rules/data/monsters.js";
+import { Sign } from "../../rules/archetypes/Sign.js";
+import { createFrom } from "../../lib/ecs-js/archetype.js";
 
 // All player-castable spells (from SPELL_DEFS) granted instantly in ?audio mode.
 const AUDIO_SPELLS = [
@@ -27,69 +32,130 @@ const AUDIO_SPELLS = [
   "thorn_burst", "touchstone", "verdant_ward", "war_cry",
 ];
 
-// Items scattered on the floor around the player in ?audio mode.
-// Each entry is either a string (count=1) or { id, count }.
-const AUDIO_FLOOR_ITEMS = [
-  // --- Gems: precious ---
-  "gem_dilithium", "gem_diamond", "gem_ruby", "gem_jacinth", "gem_sapphire",
-  "gem_black_opal", "gem_emerald", "gem_turquoise", "gem_citrine", "gem_aquamarine",
-  "gem_amber", "gem_topaz", "gem_jet", "gem_opal", "gem_chrysoberyl",
-  "gem_garnet", "gem_amethyst", "gem_jasper", "gem_fluorite", "gem_jade",
-  "gem_obsidian", "gem_voidstone", "gem_agate",
-  // --- Gems: glass ---
-  "glass_white", "glass_blue", "glass_red", "glass_brown", "glass_orange",
-  "glass_yellow", "glass_black", "glass_green", "glass_violet",
-  // --- Stones ---
-  "stone_luckstone", "stone_loadstone", "stone_touchstone", "stone_flint", "stone_rock",
-  // --- Lights ---
-  "lantern", "lantern", "lantern", "torch", "torch", "torch",
-  // --- Named / unique weapons ---
-  "sunsword", "dawnbreaker", "sun_vessel",
-  // --- Legendary / epic weapons ---
-  "stormcaller_blade", "soulreaver_axe", "blade_of_echoes", "tolling_blade",
-  "debtbringer", "hollow_greatsword", "soul_ascendant_scythe", "thundergod_maul",
-  "cataclysm_axe", "eclipse_maul", "howling_maul", "doom_crossbow",
-  "predator_stakebow", "wardkeeper_shield", "aegis_of_the_ancient",
-  // --- Common / magic weapons ---
-  "staff_oak", "longsword", "sword_plain", "dagger_quick", "axe_heavy",
-  "iron_mace", "morningstar", "bow_short", "bow_recurve", "bow_long",
-  "warhammer", "flail", "iron_pickaxe",
-  // --- Potions: beneficial ---
-  "potion_health", "potion_water", "potion_holy_water", "potion_stoneskin",
-  "potion_vigor", "potion_adrenaline", "potion_mana", "potion_endurance",
-  "potion_second_wind", "potion_resist_fire", "potion_resist_poison",
-  "potion_anti_venom", "potion_resist_electric", "potion_resist_acid",
-  "potion_radiance",
-  // --- Potions: cursed / bad ---
-  "potion_poison", "potion_sickness", "potion_paralysis", "potion_hallucination",
-  "potion_blindness", "potion_weakness", "potion_mana_surge", "potion_keen_edge",
-  "potion_lethargy", "potion_confusion",
-  // --- Scrolls ---
-  "scroll_mapping", "scroll_blastwave", "scroll_homecoming", "scroll_heal",
-  "scroll_summon_skeleton", "scroll_taming", "scroll_identify", "scroll_remove_curse",
-  "scroll_amnesia", "scroll_fire", "scroll_aggravation", "scroll_genocide",
-  "scroll_teleportation", "scroll_polymorph", "scroll_cursing", "scroll_summoning",
-  "scroll_decay",
-  // --- Ammo (stacks of 20) ---
-  { id: "ammo_arrows",          count: 20 },
-  { id: "ammo_fire_arrows",     count: 20 },
-  { id: "ammo_piercing_arrows", count: 20 },
-  { id: "ammo_bodkin_arrows",   count: 20 },
-  { id: "ammo_blunt_arrows",    count: 20 },
-  // --- Spellbooks (one of every player-readable book) ---
-  "book_agony", "book_arcane_bolt", "book_barkskin", "book_blastwave", "book_blind",
-  "book_blink", "book_blizzard", "book_bloodthirst", "book_cheap_shot", "book_cleave",
-  "book_consecrate", "book_corpses", "book_dead", "book_divine_shield", "book_drain_life",
-  "book_earthshatter", "book_entangle", "book_evocation", "book_fireball", "book_firestorm",
-  "book_flash_heal", "book_frost", "book_gridbugs", "book_harmony_ward", "book_heal",
-  "book_hearthstone", "book_homecoming", "book_holy_strike", "book_ignite_weapons",
-  "book_iron_flesh", "book_kitty", "book_leech_spores", "book_lightning",
-  "book_mark_of_death", "book_meteor", "book_natures_touch", "book_phase_strike",
-  "book_plague_swarm", "book_poison_blade", "book_primal_roar", "book_purify",
-  "book_quicken", "book_rampage", "book_savage_strike", "book_scorch",
-  "book_shadow_bolt", "book_shadow_veil", "book_smite", "book_smoke_bomb",
-  "book_snakes", "book_spikes", "book_summon_skeleton", "book_thorn_burst",
-  "book_touchstone", "book_verdant_ward", "book_war_cry",
+// Sections for the ?audio layout.
+// Each section occupies its own row(s) with a labeled sign at the left.
+// Items are 2 tiles apart horizontally; SECTION_COLS items per row.
+// 2 blank rows separate sections.
+// Each entry: string = count 1, { id, count } = explicit count.
+const SECTION_COLS = 10;
+const ITEM_STRIDE  = 2; // horizontal tiles between item centers
+
+const AUDIO_SECTIONS = [
+  {
+    label: "GEMS: PRECIOUS",
+    items: [
+      "gem_dilithium", "gem_diamond",   "gem_ruby",       "gem_jacinth",   "gem_sapphire",
+      "gem_black_opal","gem_emerald",   "gem_turquoise",  "gem_citrine",   "gem_aquamarine",
+      "gem_amber",     "gem_topaz",     "gem_jet",        "gem_opal",      "gem_chrysoberyl",
+      "gem_garnet",    "gem_amethyst",  "gem_jasper",     "gem_fluorite",  "gem_jade",
+      "gem_obsidian",  "gem_voidstone", "gem_agate",
+    ],
+  },
+  {
+    label: "GEMS: GLASS + STONES",
+    items: [
+      "glass_white",  "glass_blue",   "glass_red",    "glass_brown",  "glass_orange",
+      "glass_yellow", "glass_black",  "glass_green",  "glass_violet",
+      "stone_luckstone", "stone_loadstone", "stone_touchstone", "stone_flint", "stone_rock",
+    ],
+  },
+  {
+    label: "LIGHTS",
+    items: ["lantern", "lantern", "lantern", "torch", "torch", "torch"],
+  },
+  {
+    label: "WEAPONS: NAMED",
+    items: ["sunsword", "dawnbreaker", "sun_vessel"],
+  },
+  {
+    label: "WEAPONS: LEGENDARY + EPIC",
+    items: [
+      "stormcaller_blade",    "soulreaver_axe",     "blade_of_echoes",  "tolling_blade",
+      "debtbringer",          "hollow_greatsword",  "soul_ascendant_scythe", "thundergod_maul",
+      "cataclysm_axe",        "eclipse_maul",       "howling_maul",     "doom_crossbow",
+      "predator_stakebow",    "wardkeeper_shield",  "aegis_of_the_ancient",
+    ],
+  },
+  {
+    label: "WEAPONS: COMMON + MAGIC",
+    items: [
+      "staff_oak", "longsword",  "sword_plain", "dagger_quick", "axe_heavy",
+      "iron_mace", "morningstar","bow_short",   "bow_recurve",  "bow_long",
+      "warhammer", "flail",      "iron_pickaxe",
+    ],
+  },
+  {
+    label: "POTIONS: BENEFICIAL",
+    items: [
+      "potion_health",       "potion_water",        "potion_holy_water",   "potion_stoneskin",
+      "potion_vigor",        "potion_adrenaline",   "potion_mana",         "potion_endurance",
+      "potion_second_wind",  "potion_resist_fire",  "potion_resist_poison","potion_anti_venom",
+      "potion_resist_electric","potion_resist_acid","potion_radiance",
+    ],
+  },
+  {
+    label: "POTIONS: CURSED",
+    items: [
+      "potion_poison",  "potion_sickness",    "potion_paralysis",   "potion_hallucination",
+      "potion_blindness","potion_weakness",   "potion_mana_surge",  "potion_keen_edge",
+      "potion_lethargy","potion_confusion",
+    ],
+  },
+  {
+    label: "SCROLLS",
+    items: [
+      "scroll_mapping",     "scroll_blastwave",   "scroll_homecoming",  "scroll_heal",
+      "scroll_summon_skeleton","scroll_taming",   "scroll_identify",    "scroll_remove_curse",
+      "scroll_amnesia",     "scroll_fire",         "scroll_aggravation", "scroll_genocide",
+      "scroll_teleportation","scroll_polymorph",  "scroll_cursing",     "scroll_summoning",
+      "scroll_decay",
+    ],
+  },
+  {
+    label: "AMMO",
+    items: [
+      { id: "ammo_arrows",          count: 20 },
+      { id: "ammo_fire_arrows",     count: 20 },
+      { id: "ammo_piercing_arrows", count: 20 },
+      { id: "ammo_bodkin_arrows",   count: 20 },
+      { id: "ammo_blunt_arrows",    count: 20 },
+    ],
+  },
+  {
+    label: "SPELLBOOKS",
+    items: [
+      "book_agony",       "book_arcane_bolt", "book_barkskin",    "book_blastwave",  "book_blind",
+      "book_blink",       "book_blizzard",    "book_bloodthirst", "book_cheap_shot", "book_cleave",
+      "book_consecrate",  "book_corpses",     "book_dead",        "book_divine_shield","book_drain_life",
+      "book_earthshatter","book_entangle",    "book_evocation",   "book_fireball",   "book_firestorm",
+      "book_flash_heal",  "book_frost",       "book_gridbugs",    "book_harmony_ward","book_heal",
+      "book_hearthstone", "book_homecoming",  "book_holy_strike", "book_ignite_weapons","book_iron_flesh",
+      "book_kitty",       "book_leech_spores","book_lightning",   "book_mark_of_death","book_meteor",
+      "book_natures_touch","book_phase_strike","book_plague_swarm","book_poison_blade","book_primal_roar",
+      "book_purify",      "book_quicken",     "book_rampage",     "book_savage_strike","book_scorch",
+      "book_shadow_bolt", "book_shadow_veil", "book_smite",       "book_smoke_bomb", "book_snakes",
+      "book_spikes",      "book_summon_skeleton","book_thorn_burst","book_touchstone","book_verdant_ward",
+      "book_war_cry",
+    ],
+  },
+];
+
+// All monster IDs — spawned frozen (stasis) in a dedicated row.
+const AUDIO_MONSTERS = [
+  "rat",           "goblin",          "goblin_archer",    "loot_goblin",
+  "bandit",        "bandit_archer",   "boar",             "bat",
+  "flaming_bat",   "grid_bug",        "cave_snake",       "cave_spider",
+  "snake",         "pit_viper",       "cave_bear",        "dragon_whelp",
+  "skeleton_archer","skeletal_shadow_caster","floating_eye","kobold_shaman",
+  "bone_bowman",   "dire_wolf",       "bandit_captain",   "acid_spitter",
+  "skeletal_agony_warlock","orc",     "skeleton",         "orc_shaman",
+  "hobgoblin",     "phase_spider",    "wight",            "spider",
+  "druid",         "skeletal_marksman","skeleton_sharpshooter","troll",
+  "wraith",        "ogre",            "carrion_shade",    "dark_acolyte",
+  "orc_warchief",  "death_archer",    "demon",            "dragon",
+  "lich",          "stone_taunter",   "killer_bee",       "gelatinous_cube",
+  "cockatrice",    "shrieker",        "rot_grub",         "gas_spore",
+  "lichen",        "nymph",           "rust_monster",     "centipede",
 ];
 
 /**
@@ -180,7 +246,7 @@ export function applyDebugCommands({ world, runtimeConfig }) {
   }
 
   // Process ?audio: nuke overworld to void, carve a grass stage, grant all spells,
-  // and scatter audio-relevant items on the floor.
+  // and lay out audio-relevant items by section (each section = its own labeled rows).
   if (runtimeConfig.audioMode) {
     const pe = playerEntity(world);
     if (!pe) return;
@@ -188,35 +254,105 @@ export function applyDebugCommands({ world, runtimeConfig }) {
     const pos = world.get(pe.id, Position);
     if (!pos) return;
 
-    // Layout constants — compute before carving so stage bounds are correct.
-    const COLS    = 14;
-    const startX  = pos.x + 3;
-    const startY  = pos.y - Math.floor(AUDIO_FLOOR_ITEMS.length / COLS / 2);
-    const rows    = Math.ceil(AUDIO_FLOOR_ITEMS.length / COLS);
+    // Item grid origin: 4 tiles east of player, signs 2 tiles left of items.
+    const itemsX  = pos.x + 4;
+    const signX   = itemsX - 2;
 
-    // 1. Nuke all overworld tiles to TILE_VOID (0).
-    //    Overworld extent: chunks cx/cy -2..2, each CHUNK_SIZE tiles wide.
+    // Helper: place a labeled sign entity at (signX, y).
+    function placeSign(label, y) {
+      const eid = createFrom(world, Sign, { x: signX, y });
+      world.add(eid, NamedIdentity, { name: label, identity: "audio_sign" });
+    }
+
+    // Helper: place one item on the floor.
+    function placeItem(entry, x, y) {
+      const itemId = typeof entry === "string" ? entry : entry.id;
+      const count  = typeof entry === "string" ? 1     : (entry.count ?? 1);
+      try {
+        const eid = createItemById(world, itemId, { count });
+        if (eid !== null) {
+          world.add(eid, Position, { x, y });
+          return true;
+        }
+        console.warn(`[?audio] Unknown item: "${itemId}"`);
+      } catch (err) {
+        console.warn(`[?audio] Failed to create "${itemId}":`, err);
+      }
+      return false;
+    }
+
+    // 1. Destroy every entity except the player (buildings, NPCs, spawns, etc.).
+    for (const id of Array.from(world.alive)) {
+      if (id !== pe.id) world.destroy(id);
+    }
+
+    // 2. Lay out sections; track the furthest row used.
+    let curRow = pos.y - 2; // start 2 rows above player
+    let maxX   = itemsX;
+    let placed = 0;
+
+    for (const section of AUDIO_SECTIONS) {
+      placeSign(section.label, curRow);
+      let col = 0;
+      for (const entry of section.items) {
+        const x = itemsX + col * ITEM_STRIDE;
+        if (placeItem(entry, x, curRow)) placed++;
+        maxX = Math.max(maxX, x);
+        col++;
+        if (col >= SECTION_COLS) { col = 0; curRow++; }
+      }
+      curRow += 2; // 2-row gap between sections
+    }
+
+    // 3. Monster row — label + all monsters frozen in stasis, 2 apart.
+    curRow++;
+    placeSign("MONSTERS (STASIS)", curRow);
+    for (let i = 0; i < AUDIO_MONSTERS.length; i++) {
+      const col = i % SECTION_COLS;
+      const row = Math.floor(i / SECTION_COLS);
+      const x   = itemsX + col * ITEM_STRIDE;
+      const y   = curRow + row;
+      maxX = Math.max(maxX, x);
+      try {
+        const def = getMonster(AUDIO_MONSTERS[i]);
+        if (!def) { console.warn(`[?audio] Unknown monster: "${AUDIO_MONSTERS[i]}"`); continue; }
+        const mid = spawnMonsterEntity(world, { ...def, x, y });
+        if (mid > 0) {
+          const ae = world.get(mid, ActiveEffects);
+          const stasisEffect = { key: "stasis", turnsLeft: 999999, potency: 1, stacks: 1 };
+          if (ae && Array.isArray(ae.effects)) {
+            ae.effects.push(stasisEffect);
+          } else {
+            world.add(mid, ActiveEffects, { effects: [stasisEffect] });
+          }
+        }
+      } catch (err) {
+        console.warn(`[?audio] Failed to spawn monster "${AUDIO_MONSTERS[i]}":`, err);
+      }
+    }
+    curRow += Math.ceil(AUDIO_MONSTERS.length / SECTION_COLS) + 2;
+
+    // 4. Nuke all overworld tiles to TILE_VOID.
     const mapMin = -2 * CHUNK_SIZE;
-    const mapMax =  3 * CHUNK_SIZE; // exclusive
+    const mapMax =  3 * CHUNK_SIZE;
     for (let wx = mapMin; wx < mapMax; wx++) {
       for (let wy = mapMin; wy < mapMax; wy++) {
         setTile(wx, wy, TILE_VOID);
       }
     }
 
-    // 2. Carve a walkable grass stage: covers player standing area + full item grid
-    //    with a 3-tile border on all sides.
-    const stageLeft   = Math.min(pos.x, startX) - 3;
-    const stageRight  = startX + COLS + 2;
-    const stageTop    = startY - 3;
-    const stageBottom = startY + rows + 2;
+    // 5. Carve walkable grass stage — covers player, signs, full item + monster grid.
+    const stageLeft   = pos.x - 3;
+    const stageRight  = maxX + 3;
+    const stageTop    = pos.y - 5;
+    const stageBottom = curRow + 1;
     for (let wx = stageLeft; wx <= stageRight; wx++) {
       for (let wy = stageTop; wy <= stageBottom; wy++) {
         setTile(wx, wy, TILE_GRASS);
       }
     }
 
-    // 3. Learn every player-castable spell directly (mirrors mutations.js learnSpell).
+    // 6. Learn every player-castable spell directly (mirrors mutations.js learnSpell).
     let brain = world.get(pe.id, Brain);
     if (!brain) {
       try { world.add(pe.id, Brain, {}); } catch {}
@@ -225,33 +361,11 @@ export function applyDebugCommands({ world, runtimeConfig }) {
     if (brain) {
       if (!Array.isArray(brain.learnedSpellIds)) brain.learnedSpellIds = [];
       for (const spellId of AUDIO_SPELLS) {
-        if (!brain.learnedSpellIds.includes(spellId)) {
-          brain.learnedSpellIds.push(spellId);
-        }
+        if (!brain.learnedSpellIds.includes(spellId)) brain.learnedSpellIds.push(spellId);
       }
       console.debug(`[?audio] Learned ${AUDIO_SPELLS.length} spells.`);
     }
 
-    // 4. Scatter floor items in a grid east of player spawn.
-    let placed = 0;
-    for (let i = 0; i < AUDIO_FLOOR_ITEMS.length; i++) {
-      const entry  = AUDIO_FLOOR_ITEMS[i];
-      const itemId = typeof entry === "string" ? entry : entry.id;
-      const count  = typeof entry === "string" ? 1     : (entry.count ?? 1);
-      const col    = i % COLS;
-      const row    = Math.floor(i / COLS);
-      try {
-        const eid = createItemById(world, itemId, { count });
-        if (eid !== null) {
-          world.add(eid, Position, { x: startX + col, y: startY + row });
-          placed++;
-        } else {
-          console.warn(`[?audio] Unknown item: "${itemId}"`);
-        }
-      } catch (err) {
-        console.warn(`[?audio] Failed to create "${itemId}":`, err);
-      }
-    }
-    console.debug(`[?audio] Placed ${placed} items on floor.`);
+    console.debug(`[?audio] Placed ${placed} items across ${AUDIO_SECTIONS.length} sections.`);
   }
 }
