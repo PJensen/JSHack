@@ -17,6 +17,7 @@ const SOUNDS = {
   "ranged:shot":      { file: "ranged_shot.wav",   bus: "combat", randomPitch: 35 },
   "death":            { file: "death.wav",          bus: "combat", maxVoices: 3 },
   "player:death":     { file: "player_death.wav",   bus: "combat", maxVoices: 1 },
+  "player:death:heavy": { file: "player_death_2.wav", bus: "combat", maxVoices: 1 },
 
   // ── Items (by type) ─────────────────────────────
   "item:pickup:weapon":    { file: "pickup_weapon.wav",   bus: "items" },
@@ -46,6 +47,8 @@ const SOUNDS = {
   "stair:ascend":     { file: "stair_ascend.wav",  bus: "ambient" },
   "door:open":        { file: "door_open.wav",     bus: "ambient" },
   "fountain":         { file: "fountain.wav",      bus: "ambient" },
+  "deity:omen":       { file: "harp_reverb.wav",   bus: "ambient", maxVoices: 2 },
+  "shrine:communion": { file: "harp_reverb.wav",   bus: "ambient", maxVoices: 2 },
 
   // ── Spells (cast / launch) ─────────────────────
   "spell:bolt":          { file: "spell_bolt.wav",          bus: "spells" },

@@ -139,7 +139,8 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
   world.on('died', ({ id }) => {
     const pos = getPosition(id);
     if (isPlayer(id)) {
-      sfx("player:death"); // player death is always full volume center
+      const deathId = Math.random() < 0.34 ? "player:death:heavy" : "player:death";
+      sfx(deathId); // player death is always full volume center
     } else {
       sfxAt("death", pos, pp());
     }
@@ -198,6 +199,16 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
 
   world.on('stair:traverse', ({ direction }) => {
     sfx(direction === 'up' ? "stair:ascend" : "stair:descend");
+  });
+
+  world.on('shrine:communion', ({ targetId }) => {
+    const shrineId = Number(targetId || 0) | 0;
+    const pos = shrineId > 0 ? getPosition(shrineId) : null;
+    sfxAt("shrine:communion", pos, pp());
+  });
+
+  world.on('deity:omen', () => {
+    sfx("deity:omen");
   });
 
   // ── Spells (cast / launch sounds) ─────────────────────────
