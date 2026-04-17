@@ -350,7 +350,7 @@ export function applyDebugCommands({ world, runtimeConfig }) {
     let maxX   = itemsX;
     let placed = 0;
 
-    // Traps — top row.
+    // 2a. Traps — top row.
     placeSign("TRAPS", curRow);
     let trapCol = 0;
     for (const entry of AUDIO_TRAPS) {
@@ -366,6 +366,26 @@ export function applyDebugCommands({ world, runtimeConfig }) {
     }
     curRow += 2;
 
+    // 2b. Decor sections — features, chests.
+    for (const section of AUDIO_DECOR_SECTIONS) {
+      curRow++;
+      placeSign(section.label, curRow);
+      let col = 0;
+      for (const entry of section.items) {
+        const x = itemsX + col * ITEM_STRIDE;
+        maxX = Math.max(maxX, x);
+        try {
+          materializeSpawn(world, { kind: entry.kind, x, y: curRow, params: entry.params || {} });
+        } catch (err) {
+          console.warn(`[?audio] Failed to spawn "${entry.kind}":`, err);
+        }
+        col++;
+        if (col >= SECTION_COLS) { col = 0; curRow++; }
+      }
+      curRow += 2;
+    }
+
+    // 2c. Item sections (gems, potions, weapons, etc.).
     for (const section of AUDIO_SECTIONS) {
       placeSign(section.label, curRow);
       let col = 0;
@@ -376,10 +396,10 @@ export function applyDebugCommands({ world, runtimeConfig }) {
         col++;
         if (col >= SECTION_COLS) { col = 0; curRow++; }
       }
-      curRow += 2; // 2-row gap between sections
+      curRow += 2;
     }
 
-    // 3. Monster row — label + all monsters frozen in stasis, 2 apart.
+    // 3. Monster row — last, label + all monsters frozen in stasis, 2 apart.
     curRow++;
     placeSign("MONSTERS (STASIS)", curRow);
     for (let i = 0; i < AUDIO_MONSTERS.length; i++) {
@@ -411,25 +431,6 @@ export function applyDebugCommands({ world, runtimeConfig }) {
       }
     }
     curRow += Math.ceil(AUDIO_MONSTERS.length / SECTION_COLS) + 2;
-
-    // 4. Decor sections — features, chests, traps via materializeSpawn.
-    for (const section of AUDIO_DECOR_SECTIONS) {
-      curRow++;
-      placeSign(section.label, curRow);
-      let col = 0;
-      for (const entry of section.items) {
-        const x = itemsX + col * ITEM_STRIDE;
-        maxX = Math.max(maxX, x);
-        try {
-          materializeSpawn(world, { kind: entry.kind, x, y: curRow, params: entry.params || {} });
-        } catch (err) {
-          console.warn(`[?audio] Failed to spawn "${entry.kind}":`, err);
-        }
-        col++;
-        if (col >= SECTION_COLS) { col = 0; curRow++; }
-      }
-      curRow += 2;
-    }
 
     // 6. Nuke all overworld tiles to TILE_VOID.
     const mapMin = -2 * CHUNK_SIZE;
