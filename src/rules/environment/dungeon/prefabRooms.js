@@ -3,6 +3,7 @@
 
 import boulderPuzzleDef from "../../data/rooms/room_boulder_puzzle.js";
 import lavaDeadEndDef from "../../data/rooms/room_lava_puzzle_dead_end.js";
+import shamanDarkShrineDef from "../../data/rooms/room_shaman_dark_shrine.js";
 import {
   TILE_VOID, TILE_FLOOR, TILE_WALL, TILE_DOOR, TILE_LAVA,
 } from './constants.js';
@@ -12,6 +13,7 @@ const TILE_MAP = { floor: TILE_FLOOR, wall: TILE_WALL, door: TILE_DOOR, lava: TI
 const PREFAB_REGISTRY = {
   room_boulder_puzzle: boulderPuzzleDef,
   room_lava_puzzle_dead_end: lavaDeadEndDef,
+  room_shaman_dark_shrine: shamanDarkShrineDef,
 };
 
 /**

@@ -215,6 +215,9 @@ export function generateFloorPlan(worldSeed, depth, priorDownStairPositions = nu
     prefabRules.push("room_boulder_puzzle");
     prefabRules.push("room_lava_puzzle_dead_end");
   }
+  if (depth >= 3 && depth <= 6) {
+    prefabRules.push("room_shaman_dark_shrine");
+  }
 
   // Derive chunk extent from the furthest stair plus a scale-driven footprint
   // radius.
