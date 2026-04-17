@@ -1692,24 +1692,6 @@ function applyDeadEndTheme(ctx) {
         });
       }
 
-      const wheelPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
-      if (wheelPos) {
-        markSolid(wheelPos.x, wheelPos.y);
-        spawns.push({
-          x: wheelPos.x,
-          y: wheelPos.y,
-          kind: 'flood_gate_wheel',
-          params: { floodRadius: rng.int(1, 2), active: false },
-        });
-      }
-
-      const drainCount = rng.int(1, 3);
-      for (let i = 0; i < drainCount; i++) {
-        const drainPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
-        if (!drainPos) break;
-        spawns.push({ x: drainPos.x, y: drainPos.y, kind: 'drain_throat', params: {} });
-      }
-
       const ventPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
       if (ventPos) {
         const dirs = [
