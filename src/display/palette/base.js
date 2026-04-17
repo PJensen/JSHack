@@ -410,6 +410,7 @@ export const basePalette = {
   pressure_plinth_pressed: { glyph: "▣", fg: "#d1bf8f", glow: "#8a7445" },
   bone_chime_rack: { glyph: "#", fg: "#c8c2b4", glow: "#8e8678" },
   steam_blast: { glyph: "≋", fg: "#dce7ed", glow: "#9eb3bf" },
+  effigy:      { glyph: "🎯", fg: "#dd4422", glow: "#882211" },
 
   // Tombstones (player death markers)
   tombstone: { glyph: "†", fg: "#888888", glow: "#444444" },
