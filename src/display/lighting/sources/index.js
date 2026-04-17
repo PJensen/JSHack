@@ -367,6 +367,12 @@ export function collectLightSources(view, opts = {}) {
         }
       }
 
+      // Revealed pit trap — void light: the abyss absorbs surrounding illumination.
+      if (kind === 'trap_pit') {
+        emitVoid(out, t, e.id, ex, ey, 2.0, 0.5, 4);
+        continue;
+      }
+
       if (!tags) continue;
 
       // Torch-bearing NPCs/monsters
