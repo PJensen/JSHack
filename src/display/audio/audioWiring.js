@@ -136,10 +136,11 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     sfxAt("ranged:shot", pos, pp());
   });
 
-  world.on('died', ({ id }) => {
+  world.on('died', ({ id, critical, amount }) => {
     const pos = getPosition(id);
     if (isPlayer(id)) {
-      const deathId = Math.random() < 0.34 ? "player:death:heavy" : "player:death";
+      const heavyDeath = critical || (Number(amount) >= 15);
+      const deathId = heavyDeath ? "player:death:heavy" : "player:death";
       sfx(deathId); // player death is always full volume center
     } else {
       sfxAt("death", pos, pp());
