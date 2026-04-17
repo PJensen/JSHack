@@ -349,6 +349,11 @@ export function installEnvironmentMessages(ctx) {
     log('The shrine is cold. Silent. No one answers.', 'system');
   });
 
+  world.on('deity:gift:fluorite', ({ playerId, deityName }) => {
+    if (nameOfEntity(playerId) !== 'You') return;
+    log(`${deityName || 'A divine presence'} is pleased. A phosphorescent stone materializes at your feet.`, 'deity');
+  });
+
   world.on('mushroom:hallucinate', ({ actor }) => {
     if (nameOfEntity(actor) !== 'You') return;
     if (_playerHas('hallucinating')) log('Another mushroom. The walls were already breathing \u2014 now they\u2019re screaming.', 'danger');

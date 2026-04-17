@@ -36,6 +36,8 @@ import { getSpell } from "../data/spells.js";
 import { getHungerLevel } from "../data/food.js";
 import { TURNS_PER_DAY } from "../data/calendar.js";
 import { findNearestValidTileAround } from "../utils/queries.js";
+import { forEachInRadius } from "../utils/spatialIndex.js";
+import { materializeDrop } from "../data/lootResolver.js";
 
 /** @type {Map<string, import('../../lib/deity-js/deity.js').Deity>} */
 const _deities = new Map();
@@ -63,6 +65,10 @@ const OFFENSE_WRATH_GRACE_TURNS = 3;
 const SHRINE_TOUCH_COOLDOWN_TURNS = 30;
 const SHRINE_TOUCH_PROTECT_MAGNITUDE = 0.35;
 const SHRINE_TOUCH_PLEA_VALUE = 0.25;
+// Fluorite gift: deity manifests a fluorite stone when player kills near a shrine in good standing.
+const FLUO_GIFT_SHRINE_RADIUS   = 5;    // Chebyshev distance — same as shrine combat radius
+const FLUO_GIFT_STANDING_MIN    = 5;    // requires standing >= 5 out of 8 cap (well-liked)
+const FLUO_GIFT_CHANCE          = 0.12; // 12% chance per qualifying kill
 const GLUTTONOUS_FOOD_URGENCY_BONUS = 0.12;
 const GLUTTONOUS_MIRACLE_FEED_BONUS = 80;
 const GLUTTONOUS_FOOD_REACTION_MULT = 1.2;
@@ -641,6 +647,33 @@ function wireWorldEvents(world) {
         });
       }
     });
+
+    // Fluorite gift — deity manifests a fluorite stone for kills near a shrine in high standing.
+    // The stone is already charged by holy light and ready to socket.
+    if (world.has(Number(killer) | 0, Player)) {
+      const killerPos = world.get(Number(killer) | 0, Position);
+      if (killerPos && scoreDeityStanding(resolved.deity) >= FLUO_GIFT_STANDING_MIN
+          && world.rand() < FLUO_GIFT_CHANCE) {
+        let nearShrine = false;
+        forEachInRadius(world, killerPos.x, killerPos.y, FLUO_GIFT_SHRINE_RADIUS, (sid) => {
+          if (nearShrine) return;
+          if (world.get(sid, NamedIdentity)?.identity === "shrine") nearShrine = true;
+        });
+        if (nearShrine) {
+          const eid = materializeDrop(world, { kind: "gem", params: { gemId: "gem_fluorite" } },
+            { x: killerPos.x, y: killerPos.y });
+          if (eid) {
+            world.emit?.("item:dropped", { itemId: eid, count: 1, at: { x: killerPos.x, y: killerPos.y } });
+            world.emit?.("deity:gift:fluorite", {
+              playerId: Number(killer) | 0,
+              deityId: resolved.deityId,
+              deityName: resolved.deity.name,
+              at: { x: killerPos.x, y: killerPos.y },
+            });
+          }
+        }
+      }
+    }
   });
 
   // Heal events → deity.action('heal')

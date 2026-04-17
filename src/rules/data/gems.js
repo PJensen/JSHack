@@ -37,7 +37,7 @@ export const GEM_DEFS = {
   gem_garnet:      { id: 'gem_garnet',      name: 'Garnet Stone',        appearance: 'Red Gem',             value: 700,  weight: 1, hardness: 'soft', prob: 12,  material: 'garnet',     socketable: true, socketAffixId: 'gem_socket:garnet' },
   gem_amethyst:    { id: 'gem_amethyst',    name: 'Amethyst Stone',      appearance: 'Violet Gem',          value: 600,  weight: 1, hardness: 'soft', prob: 14,  material: 'quartz',     socketable: true, socketAffixId: 'gem_socket:amethyst' },
   gem_jasper:      { id: 'gem_jasper',      name: 'Jasper Stone',        appearance: 'Red Gem',             value: 500,  weight: 1, hardness: 'soft', prob: 15,  material: 'quartz' },
-  gem_fluorite:    { id: 'gem_fluorite',    name: 'Fluorite Stone',      appearance: 'Green Gem',           value: 400,  weight: 1, hardness: 'soft', prob: 15,  material: 'fluorite' },
+  gem_fluorite:    { id: 'gem_fluorite',    name: 'Fluorite Stone',      appearance: 'Green Gem',           value: 400,  weight: 1, hardness: 'soft', prob: 15,  material: 'fluorite',   socketable: true, socketAffixId: 'gem_socket:fluorite' },
   gem_jade:        { id: 'gem_jade',        name: 'Jade Stone',          appearance: 'Green Gem',           value: 300,  weight: 1, hardness: 'soft', prob: 10,  material: 'jadeite' },
   gem_obsidian:    { id: 'gem_obsidian',    name: 'Obsidian Stone',      appearance: 'Black Gem',           value: 200,  weight: 1, hardness: 'soft', prob: 9,   material: 'obsidian',   socketable: true, socketAffixId: 'gem_socket:obsidian' },
   gem_voidstone:   { id: 'gem_voidstone',   name: 'Voidstone',           appearance: 'Black Gem',           value: 5000, weight: 1, hardness: 'hard', prob: 1,   material: 'voidstone',  socketable: true, socketAffixId: 'gem_socket:voidstone' },
@@ -114,6 +114,11 @@ const GEM_SOCKET_DETAIL_LINES = Object.freeze({
   gem_voidstone: Object.freeze([
     "Socketed: +3 attack, +3 damage power.",
     "On hit: 25% chance to drain 3 HP from the target.",
+  ]),
+  gem_fluorite: Object.freeze([
+    "Socketed: +20 electrical resistance.",
+    "Absorbs electric energy (taking lightning damage, fighting near a shrine in good standing).",
+    "At 3+ charges: next hit discharges as blinding phosphorescent flash — bonus electric damage + blinds target.",
   ]),
 });
 

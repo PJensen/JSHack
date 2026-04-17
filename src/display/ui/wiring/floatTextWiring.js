@@ -841,6 +841,32 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     });
   });
 
+  // ── Fluorite charge/discharge ───────────────────────────────────────
+
+  world.on('proc:fluorite:charge', ({ actor, charges, maxCharges, source }) => {
+    if (charges < maxCharges) return;  // only show float text when fully charged
+    const pos = getPosition(Number(actor || 0));
+    if (!pos || !canShowAt(pos.x, pos.y)) return;
+    const label = source === 'shrine' ? 'SHRINE CHARGE' : 'CHARGED';
+    ftext.addStatus(pos.x, pos.y - 0.45, label, {
+      color: '#36f5c0',
+      life: 1.1,
+      scaleStart: 1.3,
+      scaleEnd: 0.9,
+    });
+  });
+
+  world.on('proc:fluorite:discharge', ({ actor, chargesSpent }) => {
+    const pos = getPosition(Number(actor || 0));
+    if (!pos || !canShowAt(pos.x, pos.y)) return;
+    ftext.addStatus(pos.x, pos.y - 0.55, 'DISCHARGE!', {
+      color: '#2dffc0',
+      life: 1.2,
+      scaleStart: 1.6,
+      scaleEnd: 1.0,
+    });
+  });
+
   // ── Spirit spell boost ──────────────────────────────────────────────
 
   world.on('spirit:spellBoost', ({ targetId }) => {

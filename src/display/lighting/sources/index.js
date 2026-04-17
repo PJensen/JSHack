@@ -983,6 +983,27 @@ export function installLightEventListeners(world, getPosition) {
     });
   });
 
+  // Fluorite discharge — blinding cyan-green phosphorescent blast at target position
+  world.on("proc:fluorite:discharge", ({ target, chargesSpent }) => {
+    const pos = getPosition(Number(target) | 0);
+    if (!pos) return;
+    const spent = Math.max(3, Number(chargesSpent || 3));
+    // Core blast — bright cyan, size scales with charges spent
+    _chestBlooms.push({
+      x: pos.x + 0.5, y: pos.y + 0.5,
+      age: 0, maxAge: 0.55,
+      color: [50, 245, 195],
+      radius: 4 + spent * 0.4,
+    });
+    // Second wider wash — the "phosphorescent" spread
+    _chestBlooms.push({
+      x: pos.x + 0.5, y: pos.y + 0.5,
+      age: 0, maxAge: 0.35,
+      color: [30, 200, 160],
+      radius: 6 + spent * 0.6,
+    });
+  });
+
   // Shrine communion — bloom at shrine on touch, record position for miracle beam
   world.on('shrine:communion', ({ actor, targetId, effect }) => {
     const shrineId = Number(targetId) | 0;
