@@ -99,3 +99,4 @@ export { CalendarState } from './CalendarState.js';
 export { GroundStackOrder } from './GroundStackOrder.js';
 export { CentipedeSegment } from './CentipedeSegment.js';
 export { CorpseAdaptation } from './CorpseAdaptation.js';
+export { HydraulicsLink } from './HydraulicsLink.js';

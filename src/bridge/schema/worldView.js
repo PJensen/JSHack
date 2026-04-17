@@ -975,6 +975,10 @@ export function buildWorldView(world) {
 				kind = objState.state === "working" ? "anvil_active" : "anvil";
 			} else if (objState && ident?.identity === "lantern_post") {
 				kind = objState.state === "lit" ? "lantern_post" : "lantern_post_unlit";
+			} else if (objState && ident?.identity === "portcullis") {
+				kind = objState.state === "raised" ? "portcullis_raised" : "portcullis";
+			} else if (objState && ident?.identity === "pressure_plinth") {
+				kind = objState.state === "pressed" ? "pressure_plinth_pressed" : "pressure_plinth";
 			} else if (isPlayer) {
 				kind = ident?.identity || "player";
 			} else {
@@ -1068,6 +1072,10 @@ export function buildWorldView(world) {
 				kind = objState.state === "working" ? "anvil_active" : "anvil";
 			} else if (objState && ident?.identity === "lantern_post") {
 				kind = objState.state === "lit" ? "lantern_post" : "lantern_post_unlit";
+			} else if (objState && ident?.identity === "portcullis") {
+				kind = objState.state === "raised" ? "portcullis_raised" : "portcullis";
+			} else if (objState && ident?.identity === "pressure_plinth") {
+				kind = objState.state === "pressed" ? "pressure_plinth_pressed" : "pressure_plinth";
 			} else if (isPlayer) {
 				kind = ident?.identity || "player";
 			} else {

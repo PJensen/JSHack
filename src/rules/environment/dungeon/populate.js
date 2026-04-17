@@ -122,7 +122,8 @@ import { spawnCentipede } from '../../utils/spawnCentipede.js';
 import {
   Fountain, Altar, Shrine, Statue,
   Sarcophagus, Pillar, WeaponRack, Mushrooms, Web, Torch, Urn,
-  FlayedMan, HangingChains,
+  FlayedMan, HangingChains, Portcullis, ChainWinch, FloodGateWheel,
+  DrainThroat, SteamVent, PressurePlinth, BoneChimeRack,
 } from '../../archetypes/RoomFeatures.js';
 
 // Simple spawn kinds: just `createFrom(world, Archetype, { x, y })` with no extra logic.
@@ -159,6 +160,13 @@ const SIMPLE_SPAWN_TABLE = {
   fountain: Fountain, altar: Altar, shrine: Shrine, statue: Statue, pillar: Pillar,
   mushrooms: Mushrooms, web: Web, torch: Torch, urn: Urn,
   flayed_man: FlayedMan, hanging_chains: HangingChains,
+  portcullis: Portcullis,
+  chain_winch: ChainWinch,
+  flood_gate_wheel: FloodGateWheel,
+  drain_throat: DrainThroat,
+  steam_vent: SteamVent,
+  pressure_plinth: PressurePlinth,
+  bone_chime_rack: BoneChimeRack,
 };
 
 // Weighted room feature table. Weight determines relative likelihood.
@@ -186,6 +194,7 @@ const DEAD_END_ROOM_THEMES = [
   { kind: 'armory', weight: 6 },
   { kind: 'obliiette', weight: 4 },
   { kind: 'kitchen', weight: 6 },
+  { kind: 'hydraulics', weight: 5 },
   { kind: 'dragon_hoard', weight: 3 },
 ];
 const DEAD_END_THEME_TOTAL_WEIGHT = DEAD_END_ROOM_THEMES.reduce((s, f) => s + f.weight, 0);
@@ -552,6 +561,7 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null, world
   const SOLID_PREFAB_KINDS = new Set([
     'statue', 'urn', 'pillar', 'sarcophagus', 'fountain', 'altar', 'shrine',
     'mushrooms', 'weapon_rack', 'web', 'flayed_man', 'hanging_chains',
+    'portcullis', 'chain_winch', 'flood_gate_wheel', 'bone_chime_rack',
   ]);
   const SACRED_FEATURE_KINDS = new Set(['altar', 'shrine', 'church_altar']);
 
@@ -1632,6 +1642,108 @@ function applyDeadEndTheme(ctx) {
       }
       break;
     }
+    case 'hydraulics': {
+      if (roomContainsStairTile(room, chunk)) break;
+      removeRoomSpawns(
+        spawns,
+        room,
+        (spawn) => (
+          spawn.kind === 'monster'
+          || spawn.kind === 'centipede'
+          || spawn.kind === 'spawner'
+          || spawn.kind === 'shopkeeper'
+        ),
+      );
+
+      const linkId = `hyd:${floorPlan.depth}:${room.x},${room.y}`;
+      const thresholdWeight = rng.int(20, 40);
+
+      const winchPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
+      if (winchPos) {
+        markSolid(winchPos.x, winchPos.y);
+        spawns.push({
+          x: winchPos.x,
+          y: winchPos.y,
+          kind: 'chain_winch',
+          params: { depth: floorPlan.depth, linkId },
+        });
+      }
+
+      const plinthPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
+      if (plinthPos) {
+        spawns.push({
+          x: plinthPos.x,
+          y: plinthPos.y,
+          kind: 'pressure_plinth',
+          params: { depth: floorPlan.depth, linkId, thresholdWeight },
+        });
+      }
+
+      const gateCount = rng.int(1, 2);
+      for (let i = 0; i < gateCount; i++) {
+        const gatePos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
+        if (!gatePos) break;
+        markSolid(gatePos.x, gatePos.y);
+        spawns.push({
+          x: gatePos.x,
+          y: gatePos.y,
+          kind: 'portcullis',
+          params: { depth: floorPlan.depth, linkId },
+        });
+      }
+
+      const wheelPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
+      if (wheelPos) {
+        markSolid(wheelPos.x, wheelPos.y);
+        spawns.push({
+          x: wheelPos.x,
+          y: wheelPos.y,
+          kind: 'flood_gate_wheel',
+          params: { floodRadius: rng.int(1, 2), active: false },
+        });
+      }
+
+      const drainCount = rng.int(1, 3);
+      for (let i = 0; i < drainCount; i++) {
+        const drainPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
+        if (!drainPos) break;
+        spawns.push({ x: drainPos.x, y: drainPos.y, kind: 'drain_throat', params: {} });
+      }
+
+      const ventPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
+      if (ventPos) {
+        const dirs = [
+          { dx: 1, dy: 0 },
+          { dx: -1, dy: 0 },
+          { dx: 0, dy: 1 },
+          { dx: 0, dy: -1 },
+        ];
+        const dir = dirs[rng.int(0, dirs.length - 1)];
+        spawns.push({
+          x: ventPos.x,
+          y: ventPos.y,
+          kind: 'steam_vent',
+          params: {
+            periodTurns: rng.int(5, 8),
+            activeTurns: rng.int(1, 2),
+            range: rng.int(3, 5),
+            dirX: dir.dx,
+            dirY: dir.dy,
+            pushForce: 1,
+            damage: rng.int(1, 3),
+          },
+        });
+      }
+
+      if (rng.next() < 0.45) {
+        const chimePos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
+        if (chimePos) {
+          markSolid(chimePos.x, chimePos.y);
+          spawns.push({ x: chimePos.x, y: chimePos.y, kind: 'bone_chime_rack', params: {} });
+        }
+      }
+      break;
+    }
     case 'kitchen': {
       if (roomContainsStairTile(room, chunk)) break;
       // Kitchen dead end: food cache + active fire, inspired by tavern corner usage.
@@ -1764,7 +1876,10 @@ export function equipMonster(world, entityId, equipment) {
 export function materializeSpawn(world, spawn) {
   // Fast path: trivial spawn kinds that are just createFrom(arch, { x, y }).
   const simpleArch = SIMPLE_SPAWN_TABLE[spawn.kind];
-  if (simpleArch) return createFrom(world, simpleArch, { x: spawn.x, y: spawn.y });
+  if (simpleArch) {
+    const extra = (spawn.params && typeof spawn.params === "object") ? spawn.params : null;
+    return createFrom(world, simpleArch, { x: spawn.x, y: spawn.y, ...(extra || {}) });
+  }
 
   switch (spawn.kind) {
     case 'monster': {

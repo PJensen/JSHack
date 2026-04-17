@@ -400,6 +400,16 @@ export const basePalette = {
   urn:         { glyph: "⚱", fg: "#c8a060", glow: "#8a6030" },
   flayed_man:  { glyph: "╳", fg: "#3a2213", glow: "#aaaaaa" },
   hanging_chains: { glyph: "⛓", fg: "#8f9299", glow: "#aaaaaa" },
+  portcullis: { glyph: "⛓", fg: "#98a0aa", glow: "#5a6470" },
+  portcullis_raised: { glyph: "┬", fg: "#98a0aa", glow: "#5a6470" },
+  chain_winch: { glyph: "⚙", fg: "#c0c7cf", glow: "#7b838c" },
+  flood_gate_wheel: { glyph: "◍", fg: "#76b9d9", glow: "#3f7996" },
+  drain_throat: { glyph: "⊚", fg: "#72808c", glow: "#47535f" },
+  steam_vent: { glyph: "≋", fg: "#cfd8dd", glow: "#9eb3bf" },
+  pressure_plinth: { glyph: "▣", fg: "#9f8f76", glow: "#6f5f46" },
+  pressure_plinth_pressed: { glyph: "▣", fg: "#d1bf8f", glow: "#8a7445" },
+  bone_chime_rack: { glyph: "#", fg: "#c8c2b4", glow: "#8e8678" },
+  steam_blast: { glyph: "≋", fg: "#dce7ed", glow: "#9eb3bf" },
 
   // Tombstones (player death markers)
   tombstone: { glyph: "†", fg: "#888888", glow: "#444444" },
