@@ -213,10 +213,12 @@ export function createHudFeeds(world, deps) {
     const damageMult = Number(combat?.damageMult ?? 1);
     const atk = Math.max(0, Math.floor((avgRoll + flatBonus) * damageMult));
 
-    // Simulate canonical attacker: send reference hit through player's resistance pipeline
+    // DEF%: average mitigation across all physical subtypes (blunt/slash/pierce).
     const CANONICAL_HIT = 100;
-    const afterResist = resolveResistance(world, pe.id, CANONICAL_HIT, 'physical');
-    const def = CANONICAL_HIT - afterResist;
+    const afterBlunt  = resolveResistance(world, pe.id, CANONICAL_HIT, 'blunt');
+    const afterSlash  = resolveResistance(world, pe.id, CANONICAL_HIT, 'slash');
+    const afterPierce = resolveResistance(world, pe.id, CANONICAL_HIT, 'pierce');
+    const def = Math.round(CANONICAL_HIT - (afterBlunt + afterSlash + afterPierce) / 3);
 
     const luck = Number(combat?.luck ?? canonical?.luck ?? 0);
     const evade = Number(canonical?.evade ?? 0);
