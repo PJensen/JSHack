@@ -10,6 +10,8 @@ import { Material } from "../components/Material.js";
 import { Inventory } from "../components/Inventory.js";
 import { HarvestNode } from "../components/HarvestNode.js";
 import { Pushable } from "../components/Pushable.js";
+import { ObjectState } from "../components/ObjectState.js";
+import { HydraulicsLink } from "../components/HydraulicsLink.js";
 
 // --- Interactive features ---
 
@@ -130,4 +132,103 @@ export const HangingChains = defineArchetype(
   [NamedIdentity, { name: "Hanging Chains", identity: "hanging_chains" }],
   [Material, { kind: "iron" }],
   [Collider, { solid: true, blocksSight: false }],
+);
+
+// --- New mechanical/hydraulics features ---
+
+export const Portcullis = defineArchetype(
+  "Portcullis",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Portcullis", identity: "portcullis" }],
+  [Material, { kind: "iron" }],
+  [Collider, { solid: true, blocksSight: true }],
+  [ObjectState, { state: "lowered" }],
+  [HydraulicsLink, (/** @type {any} */ p) => ({ linkId: String(p.linkId || ""), role: "portcullis" })],
+);
+
+export const ChainWinch = defineArchetype(
+  "ChainWinch",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Chain Winch", identity: "chain_winch" }],
+  [Material, { kind: "iron" }],
+  [Collider, { solid: true, blocksSight: false }],
+  [Interactable, (/** @type {any} */ p) => ({
+    action: "operateChainWinch",
+    params: {
+      linkId: String(p.linkId || ""),
+      togglesTo: "toggle",
+    },
+  })],
+  [ObjectState, { state: "idle" }],
+  [HydraulicsLink, (/** @type {any} */ p) => ({ linkId: String(p.linkId || ""), role: "winch" })],
+);
+
+export const PressurePlinth = defineArchetype(
+  "PressurePlinth",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Pressure Plinth", identity: "pressure_plinth" }],
+  [Material, { kind: "stone" }],
+  [Collider, { solid: false, blocksSight: false }],
+  [ObjectState, { state: "unpressed" }],
+  [HydraulicsLink, (/** @type {any} */ p) => ({ linkId: String(p.linkId || ""), role: "plinth" })],
+  [Interactable, (/** @type {any} */ p) => ({
+    action: "inspectPressurePlinth",
+    params: {
+      linkId: String(p.linkId || ""),
+      thresholdWeight: Number.isFinite(p.thresholdWeight) ? Number(p.thresholdWeight) : 25,
+    },
+  })],
+);
+
+export const FloodGateWheel = defineArchetype(
+  "FloodGateWheel",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Flood Gate Wheel", identity: "flood_gate_wheel" }],
+  [Material, { kind: "iron" }],
+  [Collider, { solid: true, blocksSight: false }],
+  [Interactable, (/** @type {any} */ p) => ({
+    action: "toggleFloodGateWheel",
+    params: {
+      floodRadius: Number.isFinite(p.floodRadius) ? (p.floodRadius | 0) : 2,
+      active: !!p.active,
+    },
+  })],
+  [ObjectState, { state: "closed" }],
+);
+
+export const DrainThroat = defineArchetype(
+  "DrainThroat",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Drain Throat", identity: "drain_throat" }],
+  [Material, { kind: "stone" }],
+  [Collider, { solid: false, blocksSight: false }],
+);
+
+export const SteamVent = defineArchetype(
+  "SteamVent",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Steam Vent", identity: "steam_vent" }],
+  [Material, { kind: "stone" }],
+  [Collider, { solid: false, blocksSight: false }],
+  [Interactable, (/** @type {any} */ p) => ({
+    action: "inspectSteamVent",
+    params: {
+      periodTurns: Number.isFinite(p.periodTurns) ? (p.periodTurns | 0) : 6,
+      activeTurns: Number.isFinite(p.activeTurns) ? (p.activeTurns | 0) : 2,
+      range: Number.isFinite(p.range) ? (p.range | 0) : 4,
+      dirX: Number.isFinite(p.dirX) ? Math.sign(p.dirX | 0) : 0,
+      dirY: Number.isFinite(p.dirY) ? Math.sign(p.dirY | 0) : 1,
+      pushForce: Number.isFinite(p.pushForce) ? (p.pushForce | 0) : 1,
+      damage: Number.isFinite(p.damage) ? (p.damage | 0) : 2,
+    },
+  })],
+);
+
+export const BoneChimeRack = defineArchetype(
+  "BoneChimeRack",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Bone Chime Rack", identity: "bone_chime_rack" }],
+  [Material, { kind: "organic" }],
+  [Collider, { solid: true, blocksSight: false }],
+  [Interactable, { action: "ringBoneChime", params: null }],
 );

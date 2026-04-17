@@ -894,7 +894,7 @@ Deno.test("obliiette dead-end rooms place flayed man and hanging chains decorati
     profile: { shopChance: 0, doorFeatureRate: 0, featurePool: null, monsterFilter: null },
   };
   const rng = {
-    next: () => 0.85, // picks obliiette in DEAD_END_ROOM_THEMES
+    next: () => 0.78, // picks obliiette in DEAD_END_ROOM_THEMES
     int: (min) => min,
     choice: (arr) => arr[0],
     float: (min) => min,
@@ -934,7 +934,7 @@ Deno.test("kitchen dead-end rooms place cooking fire, food chest, and pantry foo
     profile: { shopChance: 0, doorFeatureRate: 0, featurePool: null, monsterFilter: null },
   };
   const rng = {
-    next: () => 0.9, // picks kitchen in DEAD_END_ROOM_THEMES
+    next: () => 0.84, // picks kitchen in DEAD_END_ROOM_THEMES
     int: (min) => min,
     choice: (arr) => arr[0],
     float: (min) => min,

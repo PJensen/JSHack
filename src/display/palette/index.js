@@ -26,6 +26,9 @@ const _CORPSE_SKIP_KEYS = new Set([
   'fountain', 'altar', 'shrine', 'statue', 'sarcophagus',
   'pillar', 'weapon_rack', 'mushrooms', 'web', 'torch',
   'urn', 'ashes',
+  'portcullis', 'portcullis_raised', 'chain_winch', 'flood_gate_wheel',
+  'drain_throat', 'steam_vent', 'steam_blast', 'pressure_plinth',
+  'pressure_plinth_pressed', 'bone_chime_rack',
   'lantern', 'hearthstone',
   'seed_wheat', 'seed_carrot', 'seed_corn',
 ]);

@@ -78,6 +78,7 @@ import { channelingSystem, installDrainLifeDamageInterruptListener } from "../ru
 import { installGenocideListener } from "../rules/systems/genocideSystem.js";
 import { installTamingListener } from "../rules/systems/tamingSystem.js";
 import { workstationStateSystem } from "../rules/systems/workstationStateSystem.js";
+import { hydraulicsSystem } from "../rules/systems/hydraulicsSystem.js";
 import { defineInventoryVirtuals, installVirtuals } from "../rules/utils/inventoryVirtuals.js";
 import { defineDerivedStatVirtuals } from "../rules/utils/derivedStats.js";
 import { definePassiveBonusVirtuals } from "../rules/utils/passiveBonuses.js";
@@ -253,6 +254,7 @@ export function configureWorld(world) {
   registerSystem(entrancePressureSystem, 'effects');
   registerSystem(districtConditionSystem, 'effects');
   registerSystem(workstationStateSystem, 'effects');
+  registerSystem(hydraulicsSystem, 'effects');
   // Post-move auto-pickup runs after intents, within the same tick
   registerSystem(autoPickupPostMoveSystem, 'effects');
   // Spawners tick in the effects phase

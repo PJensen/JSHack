@@ -80,6 +80,7 @@ import { effectiveMaxHp, effectiveMaxMana, effectiveMaxStamina } from "../../uti
 import { buildNoticeBoardPayload } from "../../quests/localGenerator.js";
 import { GroundStackOrder } from "../../components/GroundStackOrder.js";
 import { HazardArea } from "../../components/HazardArea.js";
+import { HydraulicsLink } from "../../components/HydraulicsLink.js";
 import { emitSafe } from "../../utils/emitSafe.js";
 import { isWalkable, forEachLoadedTile, setTile, getTile } from "../../environment/dungeon/tileMap.js";
 import { TILE_SHALLOW_WATER, TILE_FLOOR } from "../../environment/dungeon/constants.js";
@@ -89,6 +90,7 @@ import { upsertTimedEffect } from "../../utils/effectSemantics.js";
 import { spawnMonsterEntity } from "../../utils/spawnMonsterEntity.js";
 import { findNearestValidTileAround } from "../../utils/queries.js";
 import { isEntityOnCurrentFloor } from "../../utils/floorEntities.js";
+import { SoundEmitter } from "../../components/SoundEmitter.js";
 import {
   applyWaterExposure,
 } from "../../utils/waterExposure.js";
@@ -349,6 +351,69 @@ function hasFloorFireHazardAt(world, x, y) {
     return true;
   }
   return false;
+}
+
+function setPortcullisRaised(world, gateId, raised, sourceAction = "") {
+  const state = raised ? "raised" : "lowered";
+  try { world.set(gateId, ObjectState, { state }); } catch { /* */ }
+  try {
+    const col = world.get(gateId, Collider);
+    const next = {
+      solid: !raised,
+      blocksSight: !raised,
+    };
+    if (col) world.set(gateId, Collider, next);
+    else world.add(gateId, Collider, next);
+  } catch { /* */ }
+  try {
+    const pos = world.get(gateId, Position);
+    world.emit?.("hydraulics:portcullis", {
+      gateId,
+      raised: !!raised,
+      state,
+      at: pos ? { x: pos.x | 0, y: pos.y | 0 } : null,
+      sourceAction,
+    });
+  } catch { /* */ }
+}
+
+function setLinkedPortcullisState(world, linkId, raised, sourceAction = "") {
+  const wanted = String(linkId || "").trim();
+  if (!wanted) return 0;
+  let changed = 0;
+  for (const [id, link] of world.query(HydraulicsLink)) {
+    if (String(link?.role || "") !== "portcullis") continue;
+    if (String(link?.linkId || "") !== wanted) continue;
+    const current = String(world.get(id, ObjectState)?.state || "lowered");
+    const isRaised = current === "raised";
+    if (isRaised === !!raised) continue;
+    setPortcullisRaised(world, id, !!raised, sourceAction);
+    changed++;
+  }
+  return changed;
+}
+
+function toggleFloodArea(world, cx, cy, radius, toFlood) {
+  const r = Math.max(1, Number(radius || 1) | 0);
+  let changed = 0;
+  for (let y = (cy | 0) - r; y <= (cy | 0) + r; y++) {
+    for (let x = (cx | 0) - r; x <= (cx | 0) + r; x++) {
+      const dx = Math.abs((x | 0) - (cx | 0));
+      const dy = Math.abs((y | 0) - (cy | 0));
+      if (Math.max(dx, dy) > r) continue;
+      const tile = getTile(x, y);
+      if (toFlood) {
+        if (tile !== TILE_FLOOR) continue;
+        setTile(x, y, TILE_SHALLOW_WATER);
+        changed++;
+      } else {
+        if (tile !== TILE_SHALLOW_WATER) continue;
+        setTile(x, y, TILE_FLOOR);
+        changed++;
+      }
+    }
+  }
+  return changed;
 }
 
 function setFountainState(world, targetId, updates) {
@@ -1414,6 +1479,141 @@ export const INTERACT_PAYLOADS = {
     onInteract(ctx) {
       const { world, actor, targetId } = ctx;
       world.emit?.("bell:rung", { actor, targetId });
+    },
+  },
+
+  operateChainWinch: {
+    onInteract(ctx) {
+      const { world, actor, targetId } = ctx;
+      const inter = world.get(targetId, Interactable);
+      const params = (inter?.params && typeof inter.params === "object") ? { ...inter.params } : {};
+      const linkId = String(params.linkId || "").trim();
+      if (!linkId) {
+        world.emit?.("hydraulics:winch", {
+          actor,
+          targetId,
+          ok: false,
+          reason: "unlinked",
+        });
+        return;
+      }
+
+      let hasRaised = false;
+      let hasLowered = false;
+      for (const [id, link] of world.query(HydraulicsLink)) {
+        if ((id | 0) === (targetId | 0)) continue;
+        if (String(link?.role || "") !== "portcullis") continue;
+        if (String(link?.linkId || "") !== linkId) continue;
+        const state = String(world.get(id, ObjectState)?.state || "lowered");
+        if (state === "raised") hasRaised = true;
+        else hasLowered = true;
+      }
+      const toRaised = hasLowered || !hasRaised;
+      const changed = setLinkedPortcullisState(world, linkId, toRaised, "operateChainWinch");
+      if (changed > 0) {
+        world.set(targetId, ObjectState, { state: toRaised ? "pull_up" : "pull_down" });
+        world.set(targetId, Interactable, {
+          action: inter.action,
+          params: {
+            ...params,
+            togglesTo: toRaised ? "lower" : "raise",
+            activeUntilStep: (Number(world.step || 0) | 0) + 2,
+            idleState: "idle",
+          },
+        });
+      }
+      world.emit?.("hydraulics:winch", {
+        actor,
+        targetId,
+        linkId,
+        gatesChanged: changed,
+        raised: toRaised,
+      });
+    },
+  },
+
+  toggleFloodGateWheel: {
+    onInteract(ctx) {
+      const { world, actor, targetId } = ctx;
+      const inter = world.get(targetId, Interactable);
+      const params = (inter?.params && typeof inter.params === "object") ? { ...inter.params } : {};
+      const floodRadius = Math.max(1, Number(params.floodRadius || 2) | 0);
+      const currentlyActive = !!params.active;
+      const nextActive = !currentlyActive;
+      const pos = world.get(targetId, Position);
+      if (!pos) return;
+
+      const changed = toggleFloodArea(world, pos.x | 0, pos.y | 0, floodRadius, nextActive);
+      world.set(targetId, ObjectState, { state: nextActive ? "open" : "closed" });
+      world.set(targetId, Interactable, {
+        action: inter.action,
+        params: {
+          ...params,
+          active: nextActive,
+          activeUntilStep: (Number(world.step || 0) | 0) + 2,
+          idleState: nextActive ? "open" : "closed",
+        },
+      });
+      world.emit?.("hydraulics:floodgate", {
+        actor,
+        targetId,
+        active: nextActive,
+        floodRadius,
+        tilesChanged: changed,
+      });
+    },
+  },
+
+  inspectPressurePlinth: {
+    onInteract(ctx) {
+      const { world, actor, targetId } = ctx;
+      const inter = world.get(targetId, Interactable);
+      const thresholdWeight = Math.max(1, Number(inter?.params?.thresholdWeight || 25) | 0);
+      const state = String(world.get(targetId, ObjectState)?.state || "unpressed");
+      world.emit?.("hydraulics:plinthInspect", {
+        actor,
+        targetId,
+        thresholdWeight,
+        state,
+      });
+    },
+  },
+
+  inspectSteamVent: {
+    onInteract(ctx) {
+      const { world, actor, targetId } = ctx;
+      const inter = world.get(targetId, Interactable);
+      const params = (inter?.params && typeof inter.params === "object") ? inter.params : {};
+      world.emit?.("hydraulics:ventInspect", {
+        actor,
+        targetId,
+        periodTurns: Math.max(1, Number(params.periodTurns || 6) | 0),
+        activeTurns: Math.max(1, Number(params.activeTurns || 2) | 0),
+        range: Math.max(1, Number(params.range || 4) | 0),
+      });
+    },
+  },
+
+  ringBoneChime: {
+    onInteract(ctx) {
+      const { world, actor, targetId } = ctx;
+      const pos = world.get(targetId, Position);
+      const sourceId = (actor | 0) > 0 ? actor | 0 : targetId | 0;
+      const emitter = world.get(sourceId, SoundEmitter);
+      if (emitter) {
+        world.set(sourceId, SoundEmitter, {
+          ambient: Number(emitter.ambient || 0) | 0,
+          lastActionNoise: Math.max(Number(emitter.lastActionNoise || 0) | 0, 88),
+        });
+      } else {
+        world.add(sourceId, SoundEmitter, { ambient: 0, lastActionNoise: 88 });
+      }
+      world.emit?.("boneChime:rung", {
+        actor,
+        targetId,
+        at: pos ? { x: pos.x | 0, y: pos.y | 0 } : null,
+        sourceDbAt1Tile: 88,
+      });
     },
   },
 
