@@ -123,7 +123,7 @@ import {
   Fountain, Altar, Shrine, Statue,
   Sarcophagus, Pillar, WeaponRack, Mushrooms, Web, Torch, Urn,
   FlayedMan, HangingChains, Portcullis, ChainWinch, FloodGateWheel,
-  DrainThroat, SteamVent, PressurePlinth, BoneChimeRack,
+  DrainThroat, SteamVent, PressurePlinth, BoneChimeRack, Effigy,
 } from '../../archetypes/RoomFeatures.js';
 
 // Simple spawn kinds: just `createFrom(world, Archetype, { x, y })` with no extra logic.
@@ -167,6 +167,7 @@ const SIMPLE_SPAWN_TABLE = {
   steam_vent: SteamVent,
   pressure_plinth: PressurePlinth,
   bone_chime_rack: BoneChimeRack,
+  effigy: Effigy,
 };
 
 // Weighted room feature table. Weight determines relative likelihood.
@@ -181,6 +182,7 @@ const ROOM_FEATURES = [
   { kind: 'mushrooms',   weight: 8 },
   { kind: 'torch',       weight: 0 }, // handled by dedicated wall-torch pass
   { kind: 'urn',         weight: 7 },
+  { kind: 'effigy',     weight: 5 },
 ];
 const ROOM_FEATURE_TOTAL_WEIGHT = ROOM_FEATURES.reduce((s, f) => s + f.weight, 0);
 const DEAD_END_ROOM_THEMES = [
@@ -562,6 +564,7 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null, world
     'statue', 'urn', 'pillar', 'sarcophagus', 'fountain', 'altar', 'shrine',
     'mushrooms', 'weapon_rack', 'web', 'flayed_man', 'hanging_chains',
     'portcullis', 'chain_winch', 'flood_gate_wheel', 'bone_chime_rack',
+    'effigy',
   ]);
   const SACRED_FEATURE_KINDS = new Set(['altar', 'shrine', 'church_altar']);
 

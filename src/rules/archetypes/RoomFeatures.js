@@ -12,6 +12,7 @@ import { HarvestNode } from "../components/HarvestNode.js";
 import { Pushable } from "../components/Pushable.js";
 import { ObjectState } from "../components/ObjectState.js";
 import { HydraulicsLink } from "../components/HydraulicsLink.js";
+import { Vitality } from "../components/Vitality.js";
 
 // --- Interactive features ---
 
@@ -116,6 +117,15 @@ export const Urn = defineArchetype(
   [Material, { kind: "stone" }],
   [Collider, { solid: true, blocksSight: false }],
   [Interactable, { action: "breakUrn", params: null }],
+);
+
+export const Effigy = defineArchetype(
+  "Effigy",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Training Effigy", identity: "effigy" }],
+  [Material, { kind: "wood" }],
+  [Collider, { solid: true, blocksSight: false }],
+  [Vitality, { maxHp: 30, hp: 30 }],
 );
 
 export const FlayedMan = defineArchetype(
