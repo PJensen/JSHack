@@ -49,7 +49,7 @@ function makeFluoGem() {
     tags:       [],
     layer:      250,
     kind:       'gem_fluorite',
-    gemOptical: { ...fluoOptical },
+    matOptical: { ...fluoOptical },
   };
 }
 

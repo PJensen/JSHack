@@ -16,6 +16,9 @@ import { addToInventory } from "../src/rules/utils/inventoryFacade.js";
 import { clearAll, loadChunk } from "../src/rules/environment/dungeon/tileMap.js";
 import { CHUNK_SIZE, TILE_FLOOR } from "../src/rules/environment/dungeon/constants.js";
 import { buildCatalogItem } from "../src/rules/data/itemCatalogLoader.js";
+import "../src/content/items/sunsword.js";
+import { installContent } from "../src/content/install.js";
+installContent();
 
 function makeEquipItem(world, identity, name, slot) {
   const id = world.create();
