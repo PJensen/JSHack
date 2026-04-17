@@ -23,6 +23,7 @@ import { flyIntentSystem } from "../rules/systems/flyIntentSystem.js";
 import { praySystem } from "../rules/systems/praySystem.js";
 import { castSpellSystem } from "../rules/systems/castSpellSystem.js";
 import { aiChaseSystem, installAggroFromDamageListener, installAggroFromStealthOffenseListener } from "../rules/systems/aiChaseSystem.js";
+import { aiPolicySystem } from "../rules/systems/aiPolicySystem.js";
 import { aiTownfolkSystem, installTownfolkDoorListener, installBellListener } from "../rules/systems/aiTownfolkSystem.js";
 import { aiScurrySystem } from "../rules/systems/aiScurrySystem.js";
 import { aiFarmAnimalSystem } from "../rules/systems/aiFarmAnimalSystem.js";
@@ -166,6 +167,9 @@ export function configureWorld(world) {
   registerSystem(aiFarmAnimalSystem, 'ai');
   registerSystem(aiTownfolkSystem, 'ai');
   registerSystem(aiChaseSystem, 'ai');
+  // Policy override: neural net replaces/improves intents for intel ≥ 7 monsters.
+  // Runs after chase so alert state and whileLOS hooks are already resolved.
+  registerSystem(aiPolicySystem, 'ai');
   // Weapon pickup after chase so the monster's hunt state is settled first.
   registerSystem(aiWeaponPickupSystem, 'ai');
   // Corpse eating after weapon pickup — idle scavengers and tactical devourers.
