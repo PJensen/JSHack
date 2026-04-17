@@ -36,6 +36,19 @@ defineItem('sunsword', {
   damageType:  'slash',
   staminaCost: 8,
 
+  swingProfile: {
+    lengthCm:    116,
+    length:      1.18,
+    widthScale:  0.96,
+    handleStart: 0.22,
+    alphaStops: [
+      [0.00, 0.22],
+      [0.45, 0.60],
+      [0.86, 0.95],
+      [1.00, 1.00],
+    ],
+  },
+
   // ── Abilities ─────────────────────────────────────────────────
   // Declared here, shows up in the spell bar automatically.
   // Targeting, cooldown, and activation — all in one place.

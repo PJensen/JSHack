@@ -7,6 +7,9 @@ import {
   isWeaponCatalogItem,
   resolveWeaponVisualMeta,
 } from "../src/rules/data/weaponVisuals.js";
+import "../src/content/items/sunsword.js";
+import { installContent } from "../src/content/install.js";
+installContent();
 
 Deno.test("every catalog weapon has canonical lengthCm and vfx profile", () => {
   const weaponEntries = Object.entries(ITEM_CATALOG)

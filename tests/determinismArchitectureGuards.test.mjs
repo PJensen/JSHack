@@ -46,7 +46,12 @@ Deno.test("deterministic layers avoid non-deterministic random/time APIs", async
     for (let i = 0; i < files.length; i++) {
       const absPath = files[i];
       const relPath = absPath.slice(root.length + 1);
-      const text = await Deno.readTextFile(absPath);
+      const raw = await Deno.readTextFile(absPath);
+      // Strip single-line comments before scanning so doc-comments don't trigger.
+      const text = raw.split("\n").map((line) => {
+        const ci = line.indexOf("//");
+        return ci >= 0 ? line.slice(0, ci) : line;
+      }).join("\n");
       for (let t = 0; t < FORBIDDEN_RANDOM_APIS.length; t++) {
         const token = FORBIDDEN_RANDOM_APIS[t];
         if (text.includes(token)) offenders.push(`${relPath}::${token}`);

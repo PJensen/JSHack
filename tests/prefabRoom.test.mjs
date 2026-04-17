@@ -105,8 +105,8 @@ Deno.test("floor plan at depth 1 includes authored prefab rooms in non-origin ch
   }
 });
 
-Deno.test("floor plan at depth > 1 has no prefabRooms", () => {
-  const plan = generateFloorPlan(42, 3);
+Deno.test("floor plan at depth 2 has no authored prefabRooms", () => {
+  const plan = generateFloorPlan(42, 2);
   assert(Array.isArray(plan.prefabRooms));
   assertEquals(plan.prefabRooms.length, 0);
 });

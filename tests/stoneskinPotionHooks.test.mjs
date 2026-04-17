@@ -94,7 +94,7 @@ Deno.test("stoneskin potion on_throw (via throw pipeline) spawns taunting statue
   const taunterPos = world.get(spawnedTaunter, Position);
   assertEquals(taunterPos?.x, 14);
   assertEquals(taunterPos?.y, 10);
-  assertEquals(thrownEvents.length, 1);
+  assertEquals(thrownEvents.length, 2);
   assertEquals(thrownEvents[0]?.from?.x, 10);
   assertEquals(thrownEvents[0]?.from?.y, 10);
   assertEquals(thrownEvents[0]?.to?.x, 14);

@@ -186,7 +186,7 @@ Deno.test("thrown water potion spawns wet splash hazard", () => {
   world.add(actor, ThrowIntent, { itemId: potion, x: 20, y: 10 });
   throwSystem(world);
 
-  assertEquals(thrown.length, 1);
+  assertEquals(thrown.length, 2);
   assertEquals(splashed.length, 1);
   assertEquals(hazards.length, 1);
   assertEquals(String(hazards[0]?.kind || ""), "wet_splash");

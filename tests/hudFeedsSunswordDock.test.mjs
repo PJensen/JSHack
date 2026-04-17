@@ -8,6 +8,9 @@ import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 import { ItemCooldown } from "../src/rules/components/ItemCooldown.js";
 import { Stamina } from "../src/rules/components/Stamina.js";
+import "../src/content/items/sunsword.js";
+import { installContent } from "../src/content/install.js";
+installContent();
 
 function installTestWindow() {
   const hadWindow = Object.prototype.hasOwnProperty.call(globalThis, "window");

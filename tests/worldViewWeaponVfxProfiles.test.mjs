@@ -8,6 +8,9 @@ import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 import { Equipment } from "../src/rules/components/Equipment.js";
 import { Brain } from "../src/rules/components/Brain.js";
 import { buildCatalogItem } from "../src/rules/data/itemCatalogLoader.js";
+import "../src/content/items/sunsword.js";
+import { installContent } from "../src/content/install.js";
+installContent();
 
 function createItem(world, {
   identity,

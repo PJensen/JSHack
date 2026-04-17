@@ -32,30 +32,27 @@ Deno.test("single message in a batch does NOT activate --More--", async () => {
   assertEquals(getClearCount() >= 1, true, "onClear should have fired");
 });
 
-Deno.test("two messages activate --More-- and advance works", async () => {
+Deno.test("two messages: first is displayed, no gating (display-only mode)", async () => {
   const { q, displayed, getClearCount } = makeHarness();
   q.beginBatch();
-  const clearBefore = getClearCount();
   q.push({ text: "Msg1", type: "combat" });
   q.push({ text: "Msg2", type: "combat" });
   // Microtask fires
   await Promise.resolve();
   await Promise.resolve();
-  assertEquals(q.isActive(), true, "should be gating after 2 messages");
-  // First displayed message is Msg1 with hasMore=true
+  // Display-only mode: never gates
+  assertEquals(q.isActive(), false, "display-only mode never gates");
+  // First message is displayed with hasMore flag
   const last = displayed[displayed.length - 1];
   assertEquals(last.message.text, "Msg1");
   assertEquals(last.hasMore, true);
 
-  // Advance to Msg2
+  // advance() is a no-op in display-only mode
   q.advance();
-  const next = displayed[displayed.length - 1];
-  assertEquals(next.message.text, "Msg2");
-  assertEquals(next.hasMore, false);
-  assertEquals(q.isActive(), false, "should unlock after last message");
+  assertEquals(displayed[displayed.length - 1].message.text, "Msg1", "advance is a no-op");
 });
 
-Deno.test("three messages require two advances", async () => {
+Deno.test("three messages: first is displayed, advance is a no-op (display-only mode)", async () => {
   const { q, displayed } = makeHarness();
   q.beginBatch();
   q.push({ text: "A", type: "default" });
@@ -63,18 +60,14 @@ Deno.test("three messages require two advances", async () => {
   q.push({ text: "C", type: "default" });
   await Promise.resolve();
   await Promise.resolve();
-  assertEquals(q.isActive(), true);
+  assertEquals(q.isActive(), false, "display-only mode never gates");
   assertEquals(displayed[displayed.length - 1].message.text, "A");
 
-  q.advance(); // → B
-  assertEquals(displayed[displayed.length - 1].message.text, "B");
-  assertEquals(displayed[displayed.length - 1].hasMore, true);
-  assertEquals(q.isActive(), true);
-
-  q.advance(); // → C (last)
-  assertEquals(displayed[displayed.length - 1].message.text, "C");
-  assertEquals(displayed[displayed.length - 1].hasMore, false);
-  assertEquals(q.isActive(), false);
+  // advance() is a no-op — display stays on A
+  q.advance();
+  assertEquals(displayed[displayed.length - 1].message.text, "A");
+  q.advance();
+  assertEquals(displayed[displayed.length - 1].message.text, "A");
 });
 
 Deno.test("beginBatch flushes stale queue", async () => {
@@ -84,11 +77,12 @@ Deno.test("beginBatch flushes stale queue", async () => {
   q.push({ text: "Old2", type: "default" });
   await Promise.resolve();
   await Promise.resolve();
-  assertEquals(q.isActive(), true);
+  // display-only mode: never gating
+  assertEquals(q.isActive(), false);
 
-  // New action before advancing — stale queue flushed
+  // New action — stale queue flushed
   q.beginBatch();
-  assertEquals(q.isActive(), false, "beginBatch should unlock");
+  assertEquals(q.isActive(), false, "beginBatch should not gate");
   assertEquals(q.pending().length, 0, "queue should be empty");
 });
 

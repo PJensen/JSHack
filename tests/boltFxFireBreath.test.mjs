@@ -81,11 +81,12 @@ Deno.test("boltFx renders sunsword holy beam as non-blocking styled line light",
     });
     controller.installListeners();
 
-    world.emit("sunsword:ray:vfx", {
+    world.emit("content:beam:vfx", {
       fromX: 1,
       fromY: 1,
-      x: 4,
-      y: 1,
+      toX: 4,
+      toY: 1,
+      style: "holy",
     });
 
     assertEquals(controller.isBlocking(), false);
