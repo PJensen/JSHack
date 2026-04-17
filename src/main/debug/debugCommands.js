@@ -15,8 +15,10 @@ import { TILE_VOID, TILE_GRASS, CHUNK_SIZE } from "../../rules/environment/dunge
 import { spawnMonsterEntity } from "../../rules/utils/spawnMonsterEntity.js";
 import { getMonster } from "../../rules/data/monsters.js";
 import { materializeSpawn } from "../../rules/environment/dungeon/populate.js";
-import { HomeSign } from "../../rules/archetypes/Overworld.js";
-import { createFrom } from "../../lib/ecs-js/archetype.js";
+import { Collider } from "../../rules/components/Collider.js";
+import { Interactable } from "../../rules/components/Interactable.js";
+import { Material } from "../../rules/components/Material.js";
+import { AggroState } from "../../rules/components/AggroState.js";
 
 // All player-castable spells (from SPELL_DEFS) granted instantly in ?audio mode.
 const AUDIO_SPELLS = [
@@ -311,11 +313,15 @@ export function applyDebugCommands({ world, runtimeConfig }) {
     const signX   = itemsX - 2;
 
     // Helper: place a labeled sign entity at (signX, y).
-    // Uses "house_sign" identity — already in palette as glyph "!".
+    // "audio_sign" identity is in the palette (yellow !). Falls through to
+    // the inter?.name fallback in environmentMessages so we see the label.
     function placeSign(label, y) {
       const eid = world.create();
       world.add(eid, Position,      { x: signX, y });
-      world.add(eid, NamedIdentity, { name: label, identity: "house_sign" });
+      world.add(eid, NamedIdentity, { name: label, identity: "audio_sign" });
+      world.add(eid, Material,      { kind: "wood" });
+      world.add(eid, Collider,      { solid: true, blocksSight: false });
+      world.add(eid, Interactable,  { action: "readText", params: { textId: "audio_sign" } });
     }
 
     // Helper: place one item on the floor.
@@ -372,12 +378,17 @@ export function applyDebugCommands({ world, runtimeConfig }) {
         if (!def) { console.warn(`[?audio] Unknown monster: "${AUDIO_MONSTERS[i]}"`); continue; }
         const mid = spawnMonsterEntity(world, { ...def, identity: def.id, x, y });
         if (mid > 0) {
+          // Lock aggro to unaware so AI never chases.
+          const aggro = world.get(mid, AggroState);
+          if (aggro) world.mutate(mid, AggroState, r => { r.alertLevel = "unaware"; });
+
+          // Apply permanent stasis — same pattern as wand_stasis in scrollWandWiring.js.
+          const stasis = { key: "stasis", turnsLeft: 999999, potency: 1, stacks: 1 };
           const ae = world.get(mid, ActiveEffects);
-          const stasisEffect = { key: "stasis", turnsLeft: 999999, potency: 1, stacks: 1 };
-          if (ae && Array.isArray(ae.effects)) {
-            ae.effects.push(stasisEffect);
+          if (ae) {
+            ae.effects.push(stasis);
           } else {
-            world.add(mid, ActiveEffects, { effects: [stasisEffect] });
+            try { world.add(mid, ActiveEffects, { effects: [stasis] }); } catch {}
           }
         }
       } catch (err) {

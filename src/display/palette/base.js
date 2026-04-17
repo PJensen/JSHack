@@ -277,7 +277,8 @@ export const basePalette = {
     { glyph: "▪", fg: "#d8d4cb", glow: "#a09080", dx: -0.14, dy: -0.06, scale: 0.75 },
     ]
   },
-  house_sign: { glyph: "!", fg: "#d8c08a", glow: "#8b6f3f" },
+  house_sign:  { glyph: "!", fg: "#d8c08a", glow: "#8b6f3f" },
+  audio_sign:  { glyph: "!", fg: "#ffe066", glow: "#ccaa00" },
   alchemy_bench: { glyph: "⚗", fg: "#93def6", glow: "#4f7fa1" },
   potion_shelf:  { glyph: "=", fg: "#7986cb", glow: "#3949ab" },
   herb_chest:    { glyph: "]", fg: "#66bb6a", glow: "#2e7d32" },
