@@ -159,30 +159,32 @@ const SHRINE_STANDING_CAP = 8;    // standing ±8 maps to ±1 normalized
 
 /**
  * Compute shrine proximity damage multiplier for an attacker.
- * Returns { mult: number, label: string|null, standing: number, dist: number }
+ * Returns { mult: number, label: string|null, standing: number, dist: number, shrineId: number, shrineX: number, shrineY: number }
  * where mult is the raw multiplier (e.g. 1.20 for +20%, 0.85 for -15%).
  * Returns mult=1 when no shrine is in range or attacker has no deity.
  */
 function computeShrineCombatScaling(world, attackerId) {
     const resolved = resolvePlayerActiveDeity(world, attackerId);
-    if (!resolved) return { mult: 1, label: null, standing: 0, dist: -1 };
+    if (!resolved) return { mult: 1, label: null, standing: 0, dist: -1, shrineId: -1, shrineX: 0, shrineY: 0 };
 
     const atkPos = world.get(attackerId, Position);
-    if (!atkPos) return { mult: 1, label: null, standing: 0, dist: -1 };
+    if (!atkPos) return { mult: 1, label: null, standing: 0, dist: -1, shrineId: -1, shrineX: 0, shrineY: 0 };
 
     // Find nearest shrine within radius (Chebyshev)
     let nearestDist = Infinity;
+    let nearestId = -1;
+    let nearestX = 0, nearestY = 0;
     forEachInRadius(world, atkPos.x, atkPos.y, SHRINE_COMBAT_RADIUS, (id, pos) => {
         const ni = world.get(id, NamedIdentity);
         if (ni?.identity !== 'shrine') return;
         const d = Math.max(Math.abs(atkPos.x - pos.x), Math.abs(atkPos.y - pos.y));
-        if (d < nearestDist) nearestDist = d;
+        if (d < nearestDist) { nearestDist = d; nearestId = id; nearestX = pos.x; nearestY = pos.y; }
     });
 
-    if (!Number.isFinite(nearestDist)) return { mult: 1, label: null, standing: 0, dist: -1 };
+    if (!Number.isFinite(nearestDist)) return { mult: 1, label: null, standing: 0, dist: -1, shrineId: -1, shrineX: 0, shrineY: 0 };
 
     const standing = scoreDeityStanding(resolved.deity);
-    if (standing === -999) return { mult: 1, label: null, standing: 0, dist: nearestDist };
+    if (standing === -999) return { mult: 1, label: null, standing: 0, dist: nearestDist, shrineId: nearestId, shrineX: nearestX, shrineY: nearestY };
 
     // Normalize standing to [-1, +1]
     const normalized = Math.max(-1, Math.min(1, standing / SHRINE_STANDING_CAP));
@@ -197,7 +199,7 @@ function computeShrineCombatScaling(world, attackerId) {
         label = scalingAmount > 0 ? 'DIVINE FAVOR' : 'DIVINE WRATH';
     }
 
-    return { mult, label, standing, dist: nearestDist };
+    return { mult, label, standing, dist: nearestDist, shrineId: nearestId, shrineX: nearestX, shrineY: nearestY };
 }
 
 /** @param {import('../../lib/ecs-js/index.js').World} world @param {{attacker:number, defender:number, weaponId:number, damage:number, world:any}} base */
@@ -438,6 +440,9 @@ function resolveHitRoll(world, {
                 delta: dmg - preShrDmg,
                 standing: shrineScaling.standing,
                 dist: shrineScaling.dist,
+                shrineId: shrineScaling.shrineId,
+                shrineX: shrineScaling.shrineX,
+                shrineY: shrineScaling.shrineY,
             });
         }
     }

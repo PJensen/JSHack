@@ -122,6 +122,36 @@ function _parseHexToRgb(hex) {
 const _contentLights = new Map();
 const _CONTENT_LIGHT_TTL = 90; // ~1.5 seconds at 60fps — enough to survive between game ticks
 
+// Shrine light states — updated by shrine:communion and shrine:combat:scaling events.
+// standing: normalized [-1, +1] (positive = deity favors player, negative = wrath).
+// Unknown shrines render at standing=0 (neutral) until an event updates them.
+/** @type {Map<number, {standing: number}>} */
+const _shrineLightStates = new Map();
+
+// Shrine positions collected this frame — cleared at start of collectLightSources,
+// populated during entity scan. Used for fluorite proximity charging.
+/** @type {Map<number, {x:number, y:number}>} */
+const _shrinePosThisFrame = new Map();
+
+// Last shrine touched per player — stored on shrine:communion so deity:intervention
+// (which fires immediately after) knows where to draw the miracle beam from.
+/** @type {Map<number, {x:number, y:number}>} */
+const _lastShrineTouched = new Map();
+
+/**
+ * Map normalized deity standing [-1, +1] to shrine base color [R,G,B] and radius.
+ * Blessed shrines burn brighter and warmer; wrath shrines dim and redden.
+ * @param {number} s — normalized standing, clamped [-1, +1]
+ * @returns {[[number,number,number], number]}
+ */
+function _shrineLightFromStanding(s) {
+  if (s > 0.5)   return [[255, 238, 140], 5.5];   // highly favored: bright warm gold, wide
+  if (s > 0.15)  return [[230, 205, 100], 4.8];   // favored: rich gold
+  if (s > -0.15) return [[204, 170,  51], 4.0];   // neutral: default palette
+  if (s > -0.5)  return [[155, 130,  52], 3.2];   // disfavored: dimmer, cooler
+                 return [[185,  72,  40], 2.5];   // wrath: reddish embers, narrow
+}
+
 /**
  * Apply a named temporal pattern to a light definition and push it.
  * Evaluates the pattern waveform, applies intensity to radius/flicker,
@@ -213,6 +243,7 @@ export function collectLightSources(view, opts = {}) {
   /** @type {LightDef[]} */
   const out   = [];
   const playerId = Number(view.player?.id || 0) | 0;
+  _shrinePosThisFrame.clear();
 
   // ---- Player vision (NOT a light — handled separately as vision mask) ----
   // Smooth the eye radius between frames for blind recovery transitions.
@@ -306,10 +337,17 @@ export function collectLightSources(view, opts = {}) {
       // Dungeon furniture — palette-driven atmospheric lighting.
       // Each kind gets a temporal pattern that matches its character.
       {
+        // Shrine: standing-reactive color/radius, position tracked for fluorite charging.
+        if (kind === 'shrine') {
+          _shrinePosThisFrame.set(e.id | 0, { x: ex, y: ey });
+          const state = _shrineLightStates.get(e.id | 0);
+          const [shrineCol, shrineRadius] = _shrineLightFromStanding(state?.standing ?? 0);
+          emitPatterned(out, 'holy', t, e.id, ex, ey, shrineRadius, shrineCol, 4);
+          continue;
+        }
         const FURNITURE_LIGHT = {
           fountain:    { radius: 3.5, pattern: 'breathe' },
           altar:       { radius: 4.5, pattern: 'breathe', softness: 4 },
-          shrine:      { radius: 4,   pattern: 'holy',   softness: 4 },
           mushrooms:   { radius: 3,   pattern: 'biolum' },
         };
         const fl = FURNITURE_LIGHT[kind];
@@ -447,6 +485,19 @@ export function collectLightSources(view, opts = {}) {
       let fluoCharge = 0;
       if (isFluo) {
         fluoCharge = Math.max(0, (_fluoCharges.get(id) || 0) - dt * FLUO_DECAY);
+        // Shrine holy light is UV-rich (divine energy ≈ energetic radiation).
+        // Charges fluorite slowly — ambient saturation, not lightning-fast.
+        // Rate designed to reach ~full charge after ~4s standing adjacent.
+        if (_shrinePosThisFrame.size > 0) {
+          for (const [, sp] of _shrinePosThisFrame) {
+            const sdx = gx - sp.x, sdy = gy - sp.y;
+            const sdistSq = sdx * sdx + sdy * sdy;
+            if (sdistSq <= CAUSTIC_DIST_SQ) {
+              const falloff = Math.max(0, 1 - Math.sqrt(sdistSq) / 8);
+              fluoCharge = Math.min(1, fluoCharge + falloff * 0.28 * dt * FLUO_CHARGE_RATE);
+            }
+          }
+        }
       }
 
       // Magical gem base emission — independent of nearby light sources.
@@ -932,12 +983,58 @@ export function installLightEventListeners(world, getPosition) {
     });
   });
 
+  // Shrine communion — bloom at shrine on touch, record position for miracle beam
+  world.on('shrine:communion', ({ actor, targetId, effect }) => {
+    const shrineId = Number(targetId) | 0;
+    const actorId  = Number(actor) | 0;
+    const shrinePos = getPosition(shrineId);
+    if (!shrinePos) return;
+    _lastShrineTouched.set(actorId, { x: shrinePos.x, y: shrinePos.y });
+    if (effect === 'blessing') {
+      // Warm gold bloom — divine acknowledgment
+      _chestBlooms.push({ x: shrinePos.x + 0.5, y: shrinePos.y + 0.5, age: 0, maxAge: 0.8, color: [255, 235, 120], radius: 6 });
+    } else if (effect === 'cooldown') {
+      // Subdued flicker — the shrine remembers you
+      _chestBlooms.push({ x: shrinePos.x + 0.5, y: shrinePos.y + 0.5, age: 0, maxAge: 0.3, color: [170, 150, 80], radius: 2.5 });
+    }
+  });
+
+  // Shrine combat scaling — update standing state, pulse gold (favor) or red (wrath)
+  world.on('shrine:combat:scaling', ({ shrineId, shrineX, shrineY, mult, standing }) => {
+    const sid = Number(shrineId) | 0;
+    if (sid > 0 && Number.isFinite(standing)) {
+      _shrineLightStates.set(sid, { standing: Math.max(-1, Math.min(1, standing / 8)) });
+    }
+    if (!Number.isFinite(shrineX) || !Number.isFinite(shrineY)) return;
+    const color = mult > 1
+      ? [255, 222, 90]   // divine favor — gold burst
+      : [210, 65, 35];   // divine wrath — harsh red
+    _chestBlooms.push({ x: shrineX + 0.5, y: shrineY + 0.5, age: 0, maxAge: 0.28, color, radius: 3.5 });
+  });
+
+  // Deity shrine blessing miracle — holy beam from shrine to player, radiant bloom at shrine
+  world.on('deity:intervention', ({ playerId, kind }) => {
+    if (kind !== 'shrine_blessing') return;
+    const actorId = Number(playerId) | 0;
+    const lastShrine = _lastShrineTouched.get(actorId);
+    const playerPos = getPosition(actorId);
+    if (!lastShrine || !playerPos) return;
+    _holyBeams.push({
+      fx: lastShrine.x + 0.5, fy: lastShrine.y + 0.5,
+      tx: playerPos.x + 0.5, ty: playerPos.y + 0.5,
+      age: 0, maxAge: 0.8,
+    });
+    _chestBlooms.push({ x: lastShrine.x + 0.5, y: lastShrine.y + 0.5, age: 0, maxAge: 1.0, color: [HOLY_GOLD[0], HOLY_GOLD[1], HOLY_GOLD[2]], radius: 7 });
+  });
+
   // Clear gaze beams on level transition
   world.on('dungeon:transitioned', () => {
     _gazeBeams.clear();
     _chestBlooms.length = 0;
     _holyBeams.length = 0;
     _fluoCharges.clear();
+    _shrineLightStates.clear();
+    _lastShrineTouched.clear();
   });
 
   // Chest reveal bloom — brief upward light flash on open
