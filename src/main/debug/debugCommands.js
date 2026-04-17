@@ -9,6 +9,8 @@ import { addToInventory } from "../../rules/utils/inventoryFacade.js";
 import { inventoryItems } from "../../rules/utils/inventoryFacade.js";
 import { Brain } from "../../rules/components/Brain.js";
 import { Position } from "../../rules/components/Position.js";
+import { setTile } from "../../rules/environment/dungeon/tileMap.js";
+import { TILE_VOID, TILE_GRASS, CHUNK_SIZE } from "../../rules/environment/dungeon/constants.js";
 
 // All player-castable spells (from SPELL_DEFS) granted instantly in ?audio mode.
 const AUDIO_SPELLS = [
@@ -177,12 +179,44 @@ export function applyDebugCommands({ world, runtimeConfig }) {
     }
   }
 
-  // Process ?audio: grant all spells + scatter audio-relevant items on the floor.
+  // Process ?audio: nuke overworld to void, carve a grass stage, grant all spells,
+  // and scatter audio-relevant items on the floor.
   if (runtimeConfig.audioMode) {
     const pe = playerEntity(world);
     if (!pe) return;
 
-    // Learn every player-castable spell directly (mirrors mutations.js learnSpell).
+    const pos = world.get(pe.id, Position);
+    if (!pos) return;
+
+    // Layout constants — compute before carving so stage bounds are correct.
+    const COLS    = 14;
+    const startX  = pos.x + 3;
+    const startY  = pos.y - Math.floor(AUDIO_FLOOR_ITEMS.length / COLS / 2);
+    const rows    = Math.ceil(AUDIO_FLOOR_ITEMS.length / COLS);
+
+    // 1. Nuke all overworld tiles to TILE_VOID (0).
+    //    Overworld extent: chunks cx/cy -2..2, each CHUNK_SIZE tiles wide.
+    const mapMin = -2 * CHUNK_SIZE;
+    const mapMax =  3 * CHUNK_SIZE; // exclusive
+    for (let wx = mapMin; wx < mapMax; wx++) {
+      for (let wy = mapMin; wy < mapMax; wy++) {
+        setTile(wx, wy, TILE_VOID);
+      }
+    }
+
+    // 2. Carve a walkable grass stage: covers player standing area + full item grid
+    //    with a 3-tile border on all sides.
+    const stageLeft   = Math.min(pos.x, startX) - 3;
+    const stageRight  = startX + COLS + 2;
+    const stageTop    = startY - 3;
+    const stageBottom = startY + rows + 2;
+    for (let wx = stageLeft; wx <= stageRight; wx++) {
+      for (let wy = stageTop; wy <= stageBottom; wy++) {
+        setTile(wx, wy, TILE_GRASS);
+      }
+    }
+
+    // 3. Learn every player-castable spell directly (mirrors mutations.js learnSpell).
     let brain = world.get(pe.id, Brain);
     if (!brain) {
       try { world.add(pe.id, Brain, {}); } catch {}
@@ -198,21 +232,14 @@ export function applyDebugCommands({ world, runtimeConfig }) {
       console.debug(`[?audio] Learned ${AUDIO_SPELLS.length} spells.`);
     }
 
-    // Scatter floor items in a grid east of player spawn.
-    const pos = world.get(pe.id, Position);
-    if (!pos) return;
-
-    const COLS = 14;
-    const startX = pos.x + 3;
-    const startY = pos.y - Math.floor(AUDIO_FLOOR_ITEMS.length / COLS / 2);
-
+    // 4. Scatter floor items in a grid east of player spawn.
     let placed = 0;
     for (let i = 0; i < AUDIO_FLOOR_ITEMS.length; i++) {
-      const entry = AUDIO_FLOOR_ITEMS[i];
+      const entry  = AUDIO_FLOOR_ITEMS[i];
       const itemId = typeof entry === "string" ? entry : entry.id;
-      const count  = typeof entry === "string" ? 1      : (entry.count ?? 1);
-      const col = i % COLS;
-      const row = Math.floor(i / COLS);
+      const count  = typeof entry === "string" ? 1     : (entry.count ?? 1);
+      const col    = i % COLS;
+      const row    = Math.floor(i / COLS);
       try {
         const eid = createItemById(world, itemId, { count });
         if (eid !== null) {
