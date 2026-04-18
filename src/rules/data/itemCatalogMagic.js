@@ -2696,6 +2696,54 @@ export const MAGIC_ITEMS = {
     },
   },
 
+  potion_speed: {
+    id: "potion_speed",
+    catalogKind: "magic",
+    name: "Potion of Speed",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 2,
+    rarityName: "magic",
+    value: 55,
+    description: "A crackling silver draught. Everything slows but you.",
+    weight: 0.5,
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [],
+      toxicity: null,
+      feel: "The world snaps into sharp focus. You feel impossibly fast.",
+    },
+    hooks: {
+      on_drink: (ctx, state) => {
+        const actorId = Number(state?.actor || ctx.actor || 0) | 0;
+        const targetId = ctx.rules.resolveTarget(actorId);
+        const turns = ctx.helpers.int(20, 30);
+        ctx.helpers.addEffect(targetId, {
+          key: "hastened",
+          potency: 2,
+          turnsLeft: turns,
+          onsetLeft: 0,
+          peakLeft: 0,
+          stack: "refresh",
+          maxStacks: 1,
+          sourceId: Number(state?.itemId || ctx.primary || 0) | 0,
+          meta: { source: "potion_speed", masked: !state.identified },
+        });
+        ctx.io.emit("potion:speed", { actor: actorId, turns });
+        return { hastened: true, turns };
+      },
+      on_throw: createPotionSplashThrowHook({
+        effectKey: "slowed",
+        duration: 10,
+        potency: 2,
+        sourceKind: "potion_speed",
+      }),
+    },
+  },
+
   potion_confusion: {
     id: "potion_confusion",
     catalogKind: "magic",

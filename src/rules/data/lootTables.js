@@ -198,6 +198,7 @@ export const LOOT_TABLES = {
       { type: "item",      weight: 10, itemId: "potion_mana_surge" },
       { type: "item",      weight: 5,  itemId: "potion_keen_edge" },
       { type: "item",      weight: 6,  itemId: "potion_lethargy" },
+      { type: "item",      weight: 7,  itemId: "potion_speed" },
     ],
   },
 

@@ -19,7 +19,8 @@ import { areFactionsHostile } from '../utils/factionHostility.js';
 import { resolveCombatSnapshot } from '../utils/resolveCombatSnapshot.js';
 import { applyWeaponCoatingOnHit, WEAPON_COATING_DEFS } from '../data/weaponCoatings.js';
 import { createStatusEvent } from '../../shared/events/statusEvent.js';
-import { Beatitude, BUC_CURSED } from '../components/Beatitude.js';
+import { Beatitude, BUC_CURSED, BUC_BLESSED } from '../components/Beatitude.js';
+import { CreatureType, CREATURE_TYPES } from '../components/CreatureType.js';
 import { Traits } from '../components/Traits.js';
 import {
     createLegacyCombatFrame,
@@ -410,6 +411,30 @@ function resolveHitRoll(world, {
     if ((Number(atkSnapshot?.posture?.lastMoveStep ?? -1) | 0) === (Number(world.step || 0) | 0)) {
         dmg += 1; // momentum chip from same-turn movement commitment
     }
+
+    // Blessed weapon bonus vs undead and demons
+    if (weaponId) {
+        const weaponBeat = world.get(weaponId, Beatitude);
+        if (weaponBeat?.state === BUC_BLESSED) {
+            const ct = world.get(target, CreatureType);
+            const isHolyTarget = ct?.type === CREATURE_TYPES.undead || ct?.type === CREATURE_TYPES.demon;
+            if (isHolyTarget) {
+                dmg += 2;
+                // 5% chance to proc holy smite (burst of pure light damage)
+                const smiteSeed = combatSeed(world.seed, world.step, source, target, 0xB1E55);
+                if (pct(mulberry32(smiteSeed), 5)) {
+                    dealDamage(world, {
+                        target, amount: 3, source,
+                        type: 'holy', cause: 'holy_smite',
+                    });
+                    emitSafe(world, 'combat:holy_smite', {
+                        attacker: source, defender: target, weaponId, damage: 3,
+                    });
+                }
+            }
+        }
+    }
+
     let armorPenetration = Math.max(0, Number(atkSnapshot.physicalPenetration || 0));
     if (damageType === 'blunt') armorPenetration += Math.max(0, Number(atkSnapshot.bluntPenetration || 0));
     if (damageType === 'slash') armorPenetration += Math.max(0, Number(atkSnapshot.slashPenetration || 0));

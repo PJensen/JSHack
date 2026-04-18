@@ -371,10 +371,17 @@ export function createWaterPotionHooks() {
       const beatitude = normalizeBeatitude(ctx.query.get(itemId, Beatitude)?.state);
       const waterType = waterTypeFromBeatitude(beatitude);
       const hadBurn = ctx.helpers.hasStatus(targetId, "burning") || ctx.helpers.hasStatus(targetId, "burn");
+      const hadCursed = ctx.helpers.hasStatus(targetId, "cursed");
+      const hadHallucination = ctx.helpers.hasStatus(targetId, "hallucinating");
 
       ctx.helpers.clearEffects(targetId, ["burn", "burning"]);
 
       if (waterType === "holy") {
+        // Holy water removes cursed status before blessing — drinking consecrated water purges corruption
+        if (hadCursed) {
+          ctx.helpers.clearEffects(targetId, ["cursed", "curse"]);
+          ctx.io.emit("water:curse_lifted", { actor: actorId, itemId, targetId, waterType });
+        }
         ctx.helpers.addEffect(targetId, {
           key: "blessed",
           potency: 1,
@@ -398,6 +405,10 @@ export function createWaterPotionHooks() {
           sourceId: itemId,
           meta: { source: "potion_water", waterType: "unholy", masked: !state.identified },
         });
+      } else if (waterType === "plain" && hadHallucination) {
+        // Plain water while hallucinating: the cold clarity cuts through the visions
+        ctx.helpers.clearEffects(targetId, ["hallucinating", "hallucination"]);
+        ctx.io.emit("water:hallucination_cleared", { actor: actorId, itemId, targetId });
       }
 
       ctx.io.emit("water:drank", {
@@ -406,8 +417,15 @@ export function createWaterPotionHooks() {
         targetId,
         waterType,
         removedBurn: hadBurn ? 1 : 0,
+        removedCurse: waterType === "holy" && hadCursed ? 1 : 0,
+        removedHallucination: waterType === "plain" && hadHallucination ? 1 : 0,
       });
-      return { waterType, removedBurn: hadBurn ? 1 : 0 };
+      return {
+        waterType,
+        removedBurn: hadBurn ? 1 : 0,
+        removedCurse: waterType === "holy" && hadCursed ? 1 : 0,
+        removedHallucination: waterType === "plain" && hadHallucination ? 1 : 0,
+      };
     },
     on_throw: (ctx, state) => {
       const actorId = Number(state?.actor || ctx.actor || 0) | 0;
