@@ -861,4 +861,54 @@ export function installCombatMessages(ctx) {
   world.on('combat:target-flying', () => {
     log('Out of reach!', 'info');
   });
+
+  // === Weapon coating proc messages ===
+  world.on('proc:blinded', ({ actor, target }) => {
+    if (!_playerCanSee([actor, target])) return;
+    const who = nameOfEntity(actor);
+    const tgt = nameOfEntity(target);
+    if (tgt === 'You') { log('The coating sears your eyes \u2014 everything goes dark!', 'danger'); return; }
+    if (who === 'You') { log(`Blinding liquid coats ${tgt}'s eyes!`, 'combat'); return; }
+    log(`${who}'s coated weapon blinds ${tgt}!`, 'combat');
+  });
+  world.on('proc:confused', ({ actor, target }) => {
+    if (!_playerCanSee([actor, target])) return;
+    const who = nameOfEntity(actor);
+    const tgt = nameOfEntity(target);
+    if (tgt === 'You') { log('Your thoughts scatter \u2014 which way was forward?', 'danger'); return; }
+    if (who === 'You') { log(`The coating muddles ${tgt}'s mind!`, 'combat'); return; }
+    log(`${who}'s strike leaves ${tgt} reeling in confusion!`, 'combat');
+  });
+  world.on('proc:hallucinating', ({ actor, target }) => {
+    if (!_playerCanSee([actor, target])) return;
+    const who = nameOfEntity(actor);
+    const tgt = nameOfEntity(target);
+    if (tgt === 'You') { log('Oh wow, the ceiling is made of bees! Wait\u2014', 'danger'); return; }
+    if (who === 'You') { log(`${tgt} stumbles, eyes wide and glassy!`, 'combat'); return; }
+    log(`${tgt} starts seeing things that aren\u2019t there!`, 'combat');
+  });
+  world.on('proc:weakened', ({ actor, target }) => {
+    if (!_playerCanSee([actor, target])) return;
+    const who = nameOfEntity(actor);
+    const tgt = nameOfEntity(target);
+    if (tgt === 'You') { log('Strength drains from your limbs!', 'danger'); return; }
+    if (who === 'You') { log(`The coating saps ${tgt}'s strength!`, 'combat'); return; }
+    log(`${who}'s coated weapon weakens ${tgt}!`, 'combat');
+  });
+  world.on('proc:acid_splash', ({ actor, target }) => {
+    if (!_playerCanSee([actor, target])) return;
+    const who = nameOfEntity(actor);
+    const tgt = nameOfEntity(target);
+    if (tgt === 'You') { log('Acid eats into your flesh!', 'danger'); return; }
+    if (who === 'You') { log(`Acid sizzles across ${tgt}'s skin!`, 'combat'); return; }
+    log(`${who}'s acid-coated weapon burns ${tgt}!`, 'combat');
+  });
+  world.on('proc:ignited', ({ actor, target }) => {
+    if (!_playerCanSee([actor, target])) return;
+    const who = nameOfEntity(actor);
+    const tgt = nameOfEntity(target);
+    if (tgt === 'You') { log('Your attacker\u2019s oiled blade sets you ablaze!', 'danger'); return; }
+    if (who === 'You') { log(`The oil-slicked blade ignites ${tgt}!`, 'combat'); return; }
+    log(`${who}'s oiled weapon sets ${tgt} alight!`, 'combat');
+  });
 }

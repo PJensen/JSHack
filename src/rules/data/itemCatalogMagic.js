@@ -492,6 +492,18 @@ export const MAGIC_ITEMS = {
         ctx.io.emit("status", createStatusEvent({ id: targetId, kind: "buff", effect: "resist_fire", source: Number(state?.actor || ctx.actor || 0) | 0, masked: !state.identified }));
         return { resist: "fire", duration: 40 };
       },
+      can_dip_target: canStonecoatDipTarget,
+      on_dip: (ctx, state) => {
+        const targetId = Number(state?.targetId || ctx.target || 0) | 0;
+        if (!(targetId > 0)) return { applied: false, consumedTool: false, resultType: "nothing" };
+        const info = ctx.query.itemInfo(targetId);
+        const bonuses = (info?.bonuses && typeof info.bonuses === "object") ? { ...info.bonuses } : {};
+        bonuses.fireResist = Math.min(0.5, Number(bonuses.fireResist || 0) + 0.1);
+        const targetName = resolveApplyTargetName(ctx, state, "item");
+        ctx.helpers.patchItemInfo(targetId, { bonuses, description: `${String(info?.description || "Item")} Infused with fire resistance (+10%).` });
+        ctx.io.emit("item:applied", { actor: state.actor, toolId: state.toolId, targetId, result: { type: "resist_enchant", resistType: "fire", bonus: 0.1, message: `You infuse ${targetName} with fire resistance (+10%, max 50%).` } });
+        return { applied: true, consumedTool: true, resultType: "resist_fire_enchant" };
+      },
       on_throw: createPotionSplashThrowHook({
         effectKey: "resist_fire",
         duration: 20,
@@ -536,6 +548,18 @@ export const MAGIC_ITEMS = {
         });
         ctx.io.emit("status", createStatusEvent({ id: targetId, kind: "buff", effect: "resist_poison", source: Number(state?.actor || ctx.actor || 0) | 0, masked: !state.identified }));
         return { resist: "poison", duration: 40 };
+      },
+      can_dip_target: canStonecoatDipTarget,
+      on_dip: (ctx, state) => {
+        const targetId = Number(state?.targetId || ctx.target || 0) | 0;
+        if (!(targetId > 0)) return { applied: false, consumedTool: false, resultType: "nothing" };
+        const info = ctx.query.itemInfo(targetId);
+        const bonuses = (info?.bonuses && typeof info.bonuses === "object") ? { ...info.bonuses } : {};
+        bonuses.poisonResist = Math.min(0.5, Number(bonuses.poisonResist || 0) + 0.1);
+        const targetName = resolveApplyTargetName(ctx, state, "item");
+        ctx.helpers.patchItemInfo(targetId, { bonuses, description: `${String(info?.description || "Item")} Infused with poison resistance (+10%).` });
+        ctx.io.emit("item:applied", { actor: state.actor, toolId: state.toolId, targetId, result: { type: "resist_enchant", resistType: "poison", bonus: 0.1, message: `You infuse ${targetName} with poison resistance (+10%, max 50%).` } });
+        return { applied: true, consumedTool: true, resultType: "resist_poison_enchant" };
       },
       on_throw: createPotionSplashThrowHook({
         effectKey: "resist_poison",
@@ -621,6 +645,18 @@ export const MAGIC_ITEMS = {
         ctx.io.emit("status", createStatusEvent({ id: targetId, kind: "buff", effect: "resist_electric", source: Number(state?.actor || ctx.actor || 0) | 0, masked: !state.identified }));
         return { resist: "electric", duration: 40 };
       },
+      can_dip_target: canStonecoatDipTarget,
+      on_dip: (ctx, state) => {
+        const targetId = Number(state?.targetId || ctx.target || 0) | 0;
+        if (!(targetId > 0)) return { applied: false, consumedTool: false, resultType: "nothing" };
+        const info = ctx.query.itemInfo(targetId);
+        const bonuses = (info?.bonuses && typeof info.bonuses === "object") ? { ...info.bonuses } : {};
+        bonuses.electricResist = Math.min(0.5, Number(bonuses.electricResist || 0) + 0.1);
+        const targetName = resolveApplyTargetName(ctx, state, "item");
+        ctx.helpers.patchItemInfo(targetId, { bonuses, description: `${String(info?.description || "Item")} Infused with lightning resistance (+10%).` });
+        ctx.io.emit("item:applied", { actor: state.actor, toolId: state.toolId, targetId, result: { type: "resist_enchant", resistType: "electric", bonus: 0.1, message: `You infuse ${targetName} with lightning resistance (+10%, max 50%).` } });
+        return { applied: true, consumedTool: true, resultType: "resist_electric_enchant" };
+      },
       on_throw: createPotionSplashThrowHook({
         effectKey: "resist_electric",
         duration: 20,
@@ -665,6 +701,18 @@ export const MAGIC_ITEMS = {
         });
         ctx.io.emit("status", createStatusEvent({ id: targetId, kind: "buff", effect: "resist_acid", source: Number(state?.actor || ctx.actor || 0) | 0, masked: !state.identified }));
         return { resist: "acid", duration: 40 };
+      },
+      can_dip_target: canStonecoatDipTarget,
+      on_dip: (ctx, state) => {
+        const targetId = Number(state?.targetId || ctx.target || 0) | 0;
+        if (!(targetId > 0)) return { applied: false, consumedTool: false, resultType: "nothing" };
+        const info = ctx.query.itemInfo(targetId);
+        const bonuses = (info?.bonuses && typeof info.bonuses === "object") ? { ...info.bonuses } : {};
+        bonuses.acidResist = Math.min(0.5, Number(bonuses.acidResist || 0) + 0.1);
+        const targetName = resolveApplyTargetName(ctx, state, "item");
+        ctx.helpers.patchItemInfo(targetId, { bonuses, description: `${String(info?.description || "Item")} Infused with acid resistance (+10%).` });
+        ctx.io.emit("item:applied", { actor: state.actor, toolId: state.toolId, targetId, result: { type: "resist_enchant", resistType: "acid", bonus: 0.1, message: `You infuse ${targetName} with acid resistance (+10%, max 50%).` } });
+        return { applied: true, consumedTool: true, resultType: "resist_acid_enchant" };
       },
       on_throw: createPotionSplashThrowHook({
         effectKey: "resist_acid",
@@ -2414,6 +2462,19 @@ export const MAGIC_ITEMS = {
       feel: "The colours... they're singing.",
     },
     hooks: {
+      can_dip_target: canParalysisDipTarget, // weapons & ammo
+      on_dip: (ctx, state) => {
+        const targetInfo = state?.targetInfo;
+        if (!targetInfo) return { applied: false, consumedTool: false, resultType: "nothing" };
+        const currentCharges = Math.max(0, Number(targetInfo?.coating?.charges || 0) | 0);
+        const chargesGranted = 4;
+        const nextCharges = currentCharges + chargesGranted;
+        const coating = { kind: "hallucination", charges: nextCharges };
+        const targetName = resolveApplyTargetName(ctx, state, "weapon");
+        ctx.helpers.patchItemInfo(state.targetId, { coating });
+        ctx.io.emit("item:applied", { actor: state.actor, toolId: state.toolId, targetId: state.targetId, result: { type: "hallucination_coat", coating, chargesGranted, chargesTotal: nextCharges, message: `You coat ${targetName} with mind-bending vapour (+${chargesGranted} charges, total ${nextCharges}).` } });
+        return { applied: true, consumedTool: true, resultType: "hallucination_coat" };
+      },
       on_drink: (ctx, state) => {
         const actor = Number(state?.actor || ctx.actor || 0) | 0;
         ctx.io.emit("potion:hallucination", { actor });
@@ -2467,6 +2528,19 @@ export const MAGIC_ITEMS = {
         });
         ctx.io.emit("potion:blindness", { actor });
         return { consumed: true };
+      },
+      can_dip_target: canParalysisDipTarget,
+      on_dip: (ctx, state) => {
+        const targetInfo = state?.targetInfo;
+        if (!targetInfo) return { applied: false, consumedTool: false, resultType: "nothing" };
+        const currentCharges = Math.max(0, Number(targetInfo?.coating?.charges || 0) | 0);
+        const chargesGranted = 6;
+        const nextCharges = currentCharges + chargesGranted;
+        const coating = { kind: "blindness", charges: nextCharges };
+        const targetName = resolveApplyTargetName(ctx, state, "weapon");
+        ctx.helpers.patchItemInfo(state.targetId, { coating });
+        ctx.io.emit("item:applied", { actor: state.actor, toolId: state.toolId, targetId: state.targetId, result: { type: "blindness_coat", coating, chargesGranted, chargesTotal: nextCharges, message: `You coat ${targetName} with blinding ichor (+${chargesGranted} charges, total ${nextCharges}).` } });
+        return { applied: true, consumedTool: true, resultType: "blindness_coat" };
       },
       on_throw: (ctx, state) => {
         const actorId = Number(state?.actor || ctx.actor || 0) | 0;
@@ -2548,6 +2622,19 @@ export const MAGIC_ITEMS = {
         }
         ctx.io.emit("potion:weakness", { actor, hpLost: 8, staminaLost: 8 });
         return { consumed: true };
+      },
+      can_dip_target: canParalysisDipTarget,
+      on_dip: (ctx, state) => {
+        const targetInfo = state?.targetInfo;
+        if (!targetInfo) return { applied: false, consumedTool: false, resultType: "nothing" };
+        const currentCharges = Math.max(0, Number(targetInfo?.coating?.charges || 0) | 0);
+        const chargesGranted = 8;
+        const nextCharges = currentCharges + chargesGranted;
+        const coating = { kind: "weakness", charges: nextCharges };
+        const targetName = resolveApplyTargetName(ctx, state, "weapon");
+        ctx.helpers.patchItemInfo(state.targetId, { coating });
+        ctx.io.emit("item:applied", { actor: state.actor, toolId: state.toolId, targetId: state.targetId, result: { type: "weakness_coat", coating, chargesGranted, chargesTotal: nextCharges, message: `You coat ${targetName} with enervating tincture (+${chargesGranted} charges, total ${nextCharges}).` } });
+        return { applied: true, consumedTool: true, resultType: "weakness_coat" };
       },
       on_throw: createPotionSplashThrowHook({
         effectKey: "weakened",
@@ -2771,12 +2858,152 @@ export const MAGIC_ITEMS = {
         ctx.io.emit("potion:confusion", { actor });
         return { consumed: true };
       },
+      can_dip_target: canParalysisDipTarget,
+      on_dip: (ctx, state) => {
+        const targetInfo = state?.targetInfo;
+        if (!targetInfo) return { applied: false, consumedTool: false, resultType: "nothing" };
+        const currentCharges = Math.max(0, Number(targetInfo?.coating?.charges || 0) | 0);
+        const chargesGranted = 5;
+        const nextCharges = currentCharges + chargesGranted;
+        const coating = { kind: "confusion", charges: nextCharges };
+        const targetName = resolveApplyTargetName(ctx, state, "weapon");
+        ctx.helpers.patchItemInfo(state.targetId, { coating });
+        ctx.io.emit("item:applied", { actor: state.actor, toolId: state.toolId, targetId: state.targetId, result: { type: "confusion_coat", coating, chargesGranted, chargesTotal: nextCharges, message: `You coat ${targetName} with disorienting vapour (+${chargesGranted} charges, total ${nextCharges}).` } });
+        return { applied: true, consumedTool: true, resultType: "confusion_coat" };
+      },
       on_throw: createPotionSplashThrowHook({
         effectKey: "confused",
         duration: 12,
         potency: 1,
         sourceKind: "potion_confusion",
       }),
+    },
+  },
+
+  // ── Acid Potion ──────────────────────────────────────────────────────
+  potion_acid: {
+    id: "potion_acid",
+    catalogKind: "magic",
+    name: "Potion of Acid",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 2,
+    rarityName: "magic",
+    value: 40,
+    weight: 0.5,
+    description: "A hissing viridian brew that eats through most things it touches.",
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [],
+      toxicity: null,
+      feel: "Your stomach burns like a forge. Not your best decision.",
+    },
+    hooks: {
+      can_dip_target: canParalysisDipTarget,
+      on_dip: (ctx, state) => {
+        const targetInfo = state?.targetInfo;
+        if (!targetInfo) return { applied: false, consumedTool: false, resultType: "nothing" };
+        const currentCharges = Math.max(0, Number(targetInfo?.coating?.charges || 0) | 0);
+        const chargesGranted = 8;
+        const nextCharges = currentCharges + chargesGranted;
+        const coating = { kind: "acid", charges: nextCharges };
+        const targetName = resolveApplyTargetName(ctx, state, "weapon");
+        ctx.helpers.patchItemInfo(state.targetId, { coating });
+        ctx.io.emit("item:applied", { actor: state.actor, toolId: state.toolId, targetId: state.targetId, result: { type: "acid_coat", coating, chargesGranted, chargesTotal: nextCharges, message: `You coat ${targetName} with caustic acid (+${chargesGranted} charges, total ${nextCharges}).` } });
+        return { applied: true, consumedTool: true, resultType: "acid_coat" };
+      },
+      on_drink: (ctx, state) => {
+        const actor = Number(state?.actor || ctx.actor || 0) | 0;
+        const targetId = ctx.rules.resolveTarget(actor);
+        const dmg = ctx.helpers.roll("2d6");
+        ctx.helpers.damage(targetId, dmg, "acid");
+        ctx.helpers.addEffect(targetId, { key: "burning", potency: 1, turnsLeft: 3, onsetLeft: 0, peakLeft: 0, stack: "refresh", maxStacks: 1, sourceId: Number(state?.itemId || ctx.primary || 0) | 0, meta: { source: "potion_acid" } });
+        ctx.io.emit("potion:acid_drink", { actor, damage: dmg });
+        return { consumed: true };
+      },
+      on_throw: createPotionSplashThrowHook({
+        effectKey: "burning",
+        duration: 3,
+        potency: 1,
+        sourceKind: "potion_acid",
+      }),
+    },
+  },
+
+  // ── Oil Potion ────────────────────────────────────────────────────────
+  potion_oil: {
+    id: "potion_oil",
+    catalogKind: "magic",
+    name: "Flask of Oil",
+    type: "potion",
+    slot: "bag",
+    material: "glass",
+    rarity: 2,
+    rarityName: "magic",
+    value: 30,
+    weight: 0.5,
+    description: "Thick, flammable oil. Coat a weapon in it, throw it, or drink it (not recommended).",
+    potion: {
+      route: "oral",
+      doses: 1,
+      channels: [],
+      effects: [],
+      toxicity: null,
+      feel: "Oily, slick, and deeply wrong. Your throat is now a fire hazard.",
+    },
+    hooks: {
+      can_dip_target: canParalysisDipTarget,
+      on_dip: (ctx, state) => {
+        const targetInfo = state?.targetInfo;
+        if (!targetInfo) return { applied: false, consumedTool: false, resultType: "nothing" };
+        const currentCharges = Math.max(0, Number(targetInfo?.coating?.charges || 0) | 0);
+        const chargesGranted = 10;
+        const nextCharges = currentCharges + chargesGranted;
+        const coating = { kind: "oil", charges: nextCharges };
+        const targetName = resolveApplyTargetName(ctx, state, "weapon");
+        ctx.helpers.patchItemInfo(state.targetId, { coating });
+        ctx.io.emit("item:applied", { actor: state.actor, toolId: state.toolId, targetId: state.targetId, result: { type: "oil_coat", coating, chargesGranted, chargesTotal: nextCharges, message: `You slick ${targetName} with oil (+${chargesGranted} charges, total ${nextCharges}).` } });
+        return { applied: true, consumedTool: true, resultType: "oil_coat" };
+      },
+      on_drink: (ctx, state) => {
+        const actor = Number(state?.actor || ctx.actor || 0) | 0;
+        const targetId = ctx.rules.resolveTarget(actor);
+        ctx.helpers.addEffect(targetId, { key: "burning", potency: 2, turnsLeft: 5, onsetLeft: 0, peakLeft: 0, stack: "refresh", maxStacks: 1, sourceId: Number(state?.itemId || ctx.primary || 0) | 0, meta: { source: "potion_oil" } });
+        ctx.io.emit("potion:oil_drink", { actor });
+        return { consumed: true };
+      },
+      on_throw: (ctx, state) => {
+        const actorId = Number(state?.actor || ctx.actor || 0) | 0;
+        const itemId = Number(state?.itemId || ctx.primary || 0) | 0;
+        const throwSpec = (state?.throw && typeof state.throw === "object") ? state.throw : null;
+        const fallback = ctx.helpers.adjacentPoint(actorId);
+        const at = {
+          x: Number.isFinite(Number(throwSpec?.to?.x)) ? (Number(throwSpec.to.x) | 0) : (fallback.x | 0),
+          y: Number.isFinite(Number(throwSpec?.to?.y)) ? (Number(throwSpec.to.y) | 0) : (fallback.y | 0),
+        };
+        ctx.helpers.hazardSpawn({
+          kind: "fire",
+          medium: "floor",
+          turnsLeft: 4,
+          radius: 1,
+          tickDamage: 3,
+          damageType: "fire",
+          cause: "oil_splash",
+          sourceId: actorId,
+          sourceKind: "potion_oil",
+          identity: "oil_fire",
+          name: "Oil Fire",
+          meta: { source: "potion_oil", delivery: "thrown" },
+        }, at);
+        const fromRaw = throwSpec?.from;
+        const from = fromRaw ? { x: Number(fromRaw.x) | 0, y: Number(fromRaw.y) | 0 } : null;
+        ctx.io.emit("item:thrown", { actor: actorId, itemId, from, to: { ...at }, path: "itemHooks", result: { type: "oil_splash" } });
+        ctx.io.emit("potion:oil_splash", { actor: actorId, at });
+        return { consumed: true, at, hazardKind: "fire" };
+      },
     },
   },
 

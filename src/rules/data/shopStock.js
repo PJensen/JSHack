@@ -155,6 +155,8 @@ export function generateAlchemyShopItem(world, rng) {
         { id: "potion_resist_acid", weight: 4 },
         { id: "potion_mana_surge", weight: 6 },
         { id: "potion_speed", weight: 5 },
+        { id: "potion_acid", weight: 4 },
+        { id: "potion_oil", weight: 4 },
     ]);
     if (!pick?.id) return stripPosition(world, createFrom(world, HealthPotion, {}));
     const itemId = createItemById(world, pick.id);

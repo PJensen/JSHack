@@ -23,6 +23,56 @@ export const WEAPON_COATING_DEFS = Object.freeze({
     elementTint: null,
     effect: Object.freeze({ key: 'stun', turnsLeft: 4, potency: 1, stacks: 1 }),
   }),
+  blindness: Object.freeze({
+    chancePct: 50,
+    consumeOnHit: true,
+    seedSalt: 0xc0470003,
+    emitEvent: 'proc:blinded',
+    elementTint: null,
+    effect: Object.freeze({ key: 'blinded', turnsLeft: 3, potency: 1, stacks: 1 }),
+  }),
+  confusion: Object.freeze({
+    chancePct: 45,
+    consumeOnHit: true,
+    seedSalt: 0xc0470004,
+    emitEvent: 'proc:confused',
+    elementTint: null,
+    effect: Object.freeze({ key: 'confused', turnsLeft: 3, potency: 1, stacks: 1 }),
+  }),
+  hallucination: Object.freeze({
+    chancePct: 35,
+    consumeOnHit: true,
+    seedSalt: 0xc0470005,
+    emitEvent: 'proc:hallucinating',
+    elementTint: null,
+    effect: Object.freeze({ key: 'hallucinating', turnsLeft: 5, potency: 1, stacks: 1 }),
+  }),
+  weakness: Object.freeze({
+    chancePct: 50,
+    consumeOnHit: true,
+    seedSalt: 0xc0470006,
+    emitEvent: 'proc:weakened',
+    elementTint: null,
+    effect: Object.freeze({ key: 'weakened', turnsLeft: 4, potency: 1, stacks: 1 }),
+  }),
+  acid: Object.freeze({
+    chancePct: 65,
+    consumeOnHit: true,
+    seedSalt: 0xc0470007,
+    emitEvent: 'proc:acid_splash',
+    elementTint: 'acid',
+    effect: Object.freeze({ key: 'burning', turnsLeft: 2, potency: 1, stacks: 1 }),
+    bonusDamage: 2,
+    bonusDamageType: 'acid',
+  }),
+  oil: Object.freeze({
+    chancePct: 60,
+    consumeOnHit: true,
+    seedSalt: 0xc0470008,
+    emitEvent: 'proc:ignited',
+    elementTint: 'fire',
+    effect: Object.freeze({ key: 'burning', turnsLeft: 3, potency: 2, stacks: 1 }),
+  }),
 });
 
 function upsertEffect(world, entityId, effect) {
@@ -76,6 +126,16 @@ export function applyWeaponCoatingOnHit(world, ctx) {
   }
 
   if (def.effect) upsertEffect(world, defender, { ...def.effect });
+
+  if ((def.bonusDamage | 0) > 0) {
+    world.emit?.("damage", {
+      target: defender,
+      amount: def.bonusDamage | 0,
+      source: attacker,
+      type: String(def.bonusDamageType || "physical"),
+      cause: `coating_${kind}`,
+    });
+  }
 
   if (def.emitEvent) {
     world.emit?.(String(def.emitEvent), { actor: attacker, target: defender });

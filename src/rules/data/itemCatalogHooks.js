@@ -519,6 +519,17 @@ export function createWaterPotionHooks() {
         waterType,
       });
 
+      // Holy water on a corpse: sanctify it (prevents undead reanimation)
+      const targetIdentity = String(state?.targetIdentity || "").toLowerCase();
+      if (waterType === "holy" && targetIdentity.startsWith("corpse_")) {
+        ctx.io.emit("corpse:holy_water", {
+          actor: actorId,
+          itemId: targetId,
+          corpseName: targetIdentity.replace(/^corpse_/, "").replace(/_/g, " "),
+          sanctified: true,
+        });
+      }
+
       return { applied: true, consumedTool: true, resultType: "water_dip", waterType };
     },
   };

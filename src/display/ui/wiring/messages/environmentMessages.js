@@ -591,6 +591,117 @@ export function installEnvironmentMessages(ctx) {
     }
   });
 
+  // === Pet death ===
+  world.on('pet:died', ({ petId, ownerId, name }) => {
+    const pe = playerEntity(world);
+    if (!pe || (Number(ownerId || 0) | 0) !== pe.id) return;
+    const label = String(name || 'your companion');
+    log(`${label} is dead. Another loss you\u2019ll carry.`, 'danger');
+  });
+
+  // === Shop exit blocked ===
+  world.on('shop:exit-blocked', ({ actor, bill }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    const gold = Math.max(0, Number(bill || 0) | 0);
+    log(`"You haven\u2019t paid!" The shopkeeper blocks your exit. (Bill: ${gold} gold)`, 'warning');
+  });
+
+  // === Deity events ===
+  world.on('deity:offense', ({ playerId, deityId, deityName, offense, severity, victimName }) => {
+    if (nameOfEntity(playerId) !== 'You') return;
+    const deity = String(deityName || 'A deity');
+    const OFFENSE_MSGS = {
+      pet_murder:      `${deity} watches in silence as you cut down your own companion. The air grows cold.`,
+      shopkeeper_kill: `${deity} recoils at the slaughter of an innocent. Blood money leaves a stain.`,
+      desecration:     `${deity} turns away. You have defiled something sacred.`,
+      sacrifice_wrong: `${deity} rejects the offering. This is not what was asked of you.`,
+    };
+    log(OFFENSE_MSGS[offense] || `${deity} is displeased. You have transgressed.`, severity === 'grave' ? 'danger' : 'deity');
+  });
+
+  world.on('deity:wrath', ({ playerId, deityId, deityName, intensity, damage, cursed }) => {
+    if (nameOfEntity(playerId) !== 'You') return;
+    const deity = String(deityName || 'A deity');
+    const dmg = Math.max(0, Number(damage || 0) | 0);
+    const i = Number(intensity || 0);
+    if (i >= 0.8) {
+      log(`${deity}\u2019s fury falls upon you like a hammer! (-${dmg} HP)${cursed ? ' A curse settles over your gear!' : ''}`, 'danger');
+    } else if (i >= 0.4) {
+      log(`${deity}\u2019s displeasure manifests as searing pain. (-${dmg} HP)`, 'danger');
+    } else {
+      log(`${deity} reaches down and delivers a sharp rebuke. (-${dmg} HP)`, 'deity');
+    }
+  });
+
+  world.on('deity:demand', ({ deityId, deityName, tick }) => {
+    const pe = playerEntity(world);
+    if (!pe) return;
+    const dev = compGet(pe.id, Devotion);
+    if (!dev || dev.deityId !== deityId) return;
+    const deity = String(deityName || 'Your deity');
+    log(`${deity} grows impatient. Make an offering at the altar.`, 'deity');
+  });
+
+  world.on('deity:omen', ({ deityId, deityName }) => {
+    const pe = playerEntity(world);
+    if (!pe) return;
+    const dev = compGet(pe.id, Devotion);
+    if (!dev || dev.deityId !== deityId) return;
+    const deity = String(deityName || 'Your deity');
+    log(`An omen from ${deity}. Something shifts in the unseen.`, 'deity');
+  });
+
+  world.on('deity:moodShift', ({ deityId, deityName, to }) => {
+    const pe = playerEntity(world);
+    if (!pe) return;
+    const dev = compGet(pe.id, Devotion);
+    if (!dev || dev.deityId !== deityId) return;
+    const deity = String(deityName || 'Your deity');
+    const mood = String(to || 'neutral');
+    if (mood === 'pleased' || mood === 'content') log(`${deity}\u2019s presence feels warm and attentive.`, 'deity');
+    else if (mood === 'angry' || mood === 'wrathful') log(`${deity}\u2019s presence darkens. Tread carefully.`, 'deity');
+    else if (mood === 'indifferent') log(`${deity} turns their gaze elsewhere.`, 'deity');
+  });
+
+  world.on('deity:utterance', ({ deityId, deityName, dominant }) => {
+    const pe = playerEntity(world);
+    if (!pe) return;
+    const dev = compGet(pe.id, Devotion);
+    if (!dev || dev.deityId !== deityId) return;
+    const deity = String(deityName || 'Your deity');
+    const d = String(dominant || '');
+    if (d === 'positive') log(`${deity} murmurs approval. You feel watched over.`, 'deity');
+    else if (d === 'negative') log(`${deity} whispers a warning. You feel judged.`, 'deity');
+    else log(`${deity} speaks, though the words are beyond mortal comprehension.`, 'deity');
+  });
+
+  world.on('deity:miracle', ({ playerId, deityId, deityName, effect, amount, itemName }) => {
+    if (nameOfEntity(playerId) !== 'You') return;
+    const deity = String(deityName || 'Your deity');
+    const e = String(effect || '');
+    if (e === 'heal') log(`${deity} reaches down and restores your flesh. (+${Math.max(0, Number(amount || 0) | 0)} HP)`, 'legendary');
+    else if (e === 'mana') log(`${deity} fills you with divine energy. (+${Math.max(0, Number(amount || 0) | 0)} MP)`, 'legendary');
+    else if (e === 'uncurse') log(`${deity}\u2019s light burns through every curse on your person!`, 'legendary');
+    else if (e === 'item' && itemName) log(`${deity} conjures ${bracketizeName(String(itemName))} from thin air!`, 'legendary');
+    else log(`${deity} works a miracle. The air crackles with divine purpose.`, 'legendary');
+  });
+
+  // === Hydraulics: steam vent ===
+  world.on('hydraulics:steamVent', ({ at, damage }) => {
+    const pe = playerEntity(world);
+    if (!pe) return;
+    const ppos = compGet(pe.id, Position);
+    if (!ppos || !at) return;
+    const dist = Math.max(Math.abs(ppos.x - (Number(at.x) | 0)), Math.abs(ppos.y - (Number(at.y) | 0)));
+    if (dist > 5) return;
+    if (dist === 0) {
+      const dmg = Math.max(0, Number(damage || 0) | 0);
+      log(`A geyser of superheated steam erupts beneath you! (-${dmg} HP)`, 'danger');
+    } else {
+      log('A scalding column of steam vents nearby!', 'warning');
+    }
+  });
+
   // === Calendar events ===
   world.on('calendar:newDay', ({ next }) => { /* quiet */ });
   world.on('calendar:newMonth', ({ name }) => { log(`The month turns. ${name} begins.`, 'ambient'); });
