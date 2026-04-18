@@ -846,6 +846,11 @@ export function installCombatMessages(ctx) {
   world.on('proc:blessed_resist_rust', ({ itemName }) => {
     log(`The blessing on your ${bracketizeName(String(itemName || 'equipment'))} flares, repelling the corrosion!`, 'system');
   });
+  world.on('combat:holy_smite', ({ attacker, damage }) => {
+    const pe = playerEntity(world);
+    if (!pe || Number(attacker || 0) !== pe.id) return;
+    log(`Your blessed blade erupts in holy light! (+${damage} holy)`, 'legendary');
+  });
   world.on('holy_water:undead', ({ target }) => {
     const tname = nameOfEntity(target) || 'undead';
     log(`The holy water scalds ${tname}!`, 'system');
