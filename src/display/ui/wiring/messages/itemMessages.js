@@ -96,11 +96,11 @@ export function installItemMessages(ctx) {
     } else if (kind === "diluted") {
       log(`${name} is diluted.`, 'warning');
     } else if (kind === "blessed") {
-      log(`${name} glows with a soft golden light!`, 'system');
+      log(`${name} glows blue.`, 'system');
     } else if (kind === "uncursed") {
-      log(`The black aura fades from ${name}.`, 'system');
+      log(`${name} softly glows.`, 'system');
     } else if (kind === "cursed") {
-      log(`${name} is surrounded by a dark aura!`, 'danger');
+      log(`${name} is surrounded by a black aura.`, 'danger');
     }
   });
 
@@ -155,16 +155,16 @@ export function installItemMessages(ctx) {
     if (!pe || Number(actor || 0) !== pe.id) return;
     const label = String(name || trait || 'unknown');
     const TRAIT_MESSAGES = {
-      iron_stomach: `Your stomach hardens \u2014 you've developed an ${label}!`,
-      serpent_blood: `Venom runs cold through your veins \u2014 you've gained ${label}!`,
-      venom_tolerance: `Your body shrugs off toxins \u2014 you've gained ${label}!`,
-      thick_hide: `Your skin toughens like bark \u2014 you've gained ${label}!`,
-      deathless: `Undeath whispers through your bones \u2014 you are ${label}.`,
-      third_eye: `A third eye opens in your mind \u2014 you sense life beyond walls.`,
-      demon_fire: `Hellfire smolders in your fists \u2014 ${label} is yours.`,
-      dragonheart: `Scales shimmer beneath your skin \u2014 the ${label} beats within you!`,
+      iron_stomach:    `You have developed an iron stomach.`,
+      serpent_blood:   `You feel cold-blooded.`,
+      venom_tolerance: `You feel immune to venom.`,
+      thick_hide:      `Your skin feels tougher.`,
+      deathless:       `You feel deathless.`,
+      third_eye:       `You feel a strange awareness.`,
+      demon_fire:      `Your hands feel hot.`,
+      dragonheart:     `You feel draconic.`,
     };
-    log(TRAIT_MESSAGES[trait] || `Something fundamental shifts \u2014 you've gained ${label}!`, 'legendary');
+    log(TRAIT_MESSAGES[trait] || `You feel different.`, 'legendary');
   });
 
   world.on('corpse:shocked', ({ actor }) => {
@@ -356,16 +356,16 @@ export function installItemMessages(ctx) {
   world.on('corpse:holy_water', ({ actor, corpseName }) => {
     if (nameOfEntity(actor) !== 'You') return;
     const label = String(corpseName || 'corpse');
-    log(`You pour holy water over the ${label} corpse. The flesh shimmers with pale light \u2014 it is sanctified.`, 'system');
+    log(`The ${label} corpse shudders. It looks more at peace.`, 'system');
   });
 
   // === Water splash (thrown water potion) ===
   world.on('water:splashed', ({ actor, waterType }) => {
     if (nameOfEntity(actor) !== 'You') return;
     const wt = String(waterType || 'plain');
-    if (wt === 'holy') log('The holy water shatters in a spray of blessed liquid!', 'system');
-    else if (wt === 'unholy') log('The unholy water splashes outward with a foul hiss!', 'danger');
-    else log('The water potion shatters and soaks the area.', 'system');
+    if (wt === 'holy') log('The bottle shatters. Blessed water soaks the area.', 'system');
+    else if (wt === 'unholy') log('The bottle shatters. Unholy water soaks the area.', 'danger');
+    else log('The bottle shatters. Water soaks the area.', 'system');
   });
 
   // === Curse events ===
@@ -374,13 +374,13 @@ export function installItemMessages(ctx) {
     if (!pe || Number(actor || 0) !== pe.id) return;
     const name = bracketizeName(nameOfItem(itemId));
     if (source === 'scroll_cursing') return; // scroll:cursing handler covers this
-    log(`A dark force settles over ${name}!`, 'danger');
+    log(`${name} is surrounded by a black aura.`, 'danger');
   });
   world.on('curse:removed', ({ actor, itemId, name, source }) => {
     const pe = playerEntity(world);
     if (!pe || Number(actor || 0) !== pe.id) return;
     const label = bracketizeName(String(name || nameOfItem(itemId) || 'item'));
-    log(`The corruption is purged from ${label}. It feels clean again.`, 'system');
+    log(`The black aura fades from ${label}.`, 'system');
   });
 
   // === Bad scroll messages (unhandled) ===
@@ -397,21 +397,21 @@ export function installItemMessages(ctx) {
   });
   world.on('scroll:genocide', ({ actor }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    log('The parchment hums with finality. Name a creature, and it shall cease to exist.', 'legendary');
+    log('Which species do you wish to genocide?', 'legendary');
   });
   world.on('scroll:polymorph', ({ actor }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    log('Reality bends at the edges. The nearest creature begins to change...', 'system');
+    log('You feel a change coming over you.', 'system');
   });
   world.on('scroll:taming', ({ actor }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    log('The words sing from the parchment. Something nearby grows calm and docile.', 'system');
+    log('You feel in harmony with the creatures around you.', 'system');
   });
 
   // === Wand messages ===
   world.on('wand:stasis', ({ actor }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    log('A cone of pale light freezes your target outside of time!', 'system');
+    log('Time stops.', 'system');
   });
 
   // === Hunger / food messages ===
@@ -426,19 +426,19 @@ export function installItemMessages(ctx) {
   world.on('hunger:sickened', ({ actor, type }) => {
     if (nameOfEntity(actor) !== 'You') return;
     const msgs = {
-      decay:        'Ugh \u2014 that was rotten! Your stomach lurches violently.',
-      disease:      'Something in that meal sits very wrong\u2026',
-      poison:       'A burning sensation floods your gut!',
+      decay:        'Blecch! Rotten food!',
+      disease:      'Something in that meal sits very wrong.',
+      poison:       'A burning sensation floods your gut.',
       hallucination:'The meal tastes\u2026 wrong. The walls melt sideways.',
-      shock:        'A jolt runs through you as you swallow!',
+      shock:        'A jolt runs through you as you swallow.',
       frost:        'Ice crystals form in your veins as you eat.',
       weakened:     'The meal drains rather than restores you.',
       mindwipe:     'A foggy numbness crawls through your thoughts\u2026',
       agony:        'Searing pain explodes in your chest!',
-      hellfire:     'Hellfire scorches you from the inside out!',
+      hellfire:     'Tastes like hellfire.',
       shade_taint:  'Cold shadow seeps into your soul.',
-      petrify:      'Your limbs feel like stone \u2014 spreading inward!',
-      mimic_disease:'That was NO normal meal. You feel very ill.',
+      petrify:      'You feel stiff.',
+      mimic_disease:'That was not food. You feel very ill.',
     };
     log(msgs[type] || 'Something in that meal makes you violently ill.', 'danger');
   });
@@ -469,15 +469,15 @@ export function installItemMessages(ctx) {
     if (nameOfEntity(actor) !== 'You') return;
     if (waterType === 'holy') {
       if (removedCurse) {
-        log('As the holy water passes your lips, a warm light fills your chest.', 'system');
+        log('You feel less burdened.', 'system');
       } else {
-        log('The blessed liquid tingles as it goes down.', 'system');
+        log('You feel righteous.', 'system');
       }
     } else if (waterType === 'unholy') {
-      log('The foul water burns like acid going down. You gag.', 'danger');
+      log('You gag. The aftertaste is indescribable.', 'danger');
     } else {
       if (removedHallucination) {
-        log('The cold water shocks you back to clarity. Your vision snaps to normal.', 'system');
+        log('Your vision clears.', 'system');
       } else {
         log('Tastes like dungeon water. But you drank it anyway.', 'system');
       }
@@ -486,26 +486,26 @@ export function installItemMessages(ctx) {
 
   world.on('water:curse_lifted', ({ actor }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    log('The darkness lifts from your soul! The curse is gone.', 'system');
+    log('You feel the curse lift.', 'system');
   });
 
   world.on('water:hallucination_cleared', ({ actor }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    log('You blink. The colours stop screaming. Reality reasserts itself.', 'system');
+    log('Your vision clears.', 'system');
   });
 
   world.on('potion:speed', ({ actor, turns }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    log(`The world snaps into sharp focus. You feel impossibly fast! (${turns} turns)`, 'system');
+    log(`You feel very quick. (${turns} turns)`, 'system');
   });
   world.on('potion:acid_drink', ({ actor, damage }) => {
     if (nameOfEntity(actor) !== 'You') return;
     const n = Math.max(0, Number(damage || 0) | 0);
-    log(`The acid eats through your stomach lining on the way down! (-${n} HP)`, 'danger');
+    log(`That was a bad idea. (-${n} HP)`, 'danger');
   });
   world.on('potion:oil_drink', ({ actor }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    log('Your throat is now a fire hazard. You are burning from the inside out!', 'danger');
+    log('You are on fire.', 'danger');
   });
   world.on('potion:oil_splash', ({ actor }) => {
     if (nameOfEntity(actor) !== 'You') return;
@@ -513,23 +513,21 @@ export function installItemMessages(ctx) {
   });
 
   const SPLASH_EFFECT_MSG = Object.freeze({
-    stun:           'The potion shatters \u2014 paralytic liquid drenches the area!',
-    hallucinating:  'The potion shatters \u2014 iridescent fumes swirl outward!',
-    blinded:        'The potion shatters \u2014 inky darkness splashes across the ground!',
-    weakened:       'The potion shatters \u2014 a grey mist saps the air!',
-    poison:         'The potion shatters \u2014 toxic sludge splashes everywhere!',
-    confused:       'The potion shatters \u2014 disorienting vapour billows out!',
-    lethargic:      'The potion shatters \u2014 a thick grey fog clings to the ground!',
-    berserk:        'The potion shatters \u2014 liquid adrenaline sprays everywhere!',
-    resist_fire:    'The potion shatters \u2014 a shimmering heat ward splashes outward!',
-    resist_poison:  'The potion shatters \u2014 emerald tonic coats the area!',
-    resist_electric:'The potion shatters \u2014 crackling energy grounds outward!',
-    resist_acid:    'The potion shatters \u2014 thick amber syrup coats the area!',
-    mana_drain:     'The potion shatters \u2014 arcane static crackles through the air!',
-    slowed:         'The potion shatters \u2014 silver liquid slows everything it touches!',
-    burning:        'The potion shatters \u2014 caustic liquid scorches everything nearby!',
-    weakened:       'The potion shatters \u2014 grey vapour drains the strength of all nearby!',
-    blinded:        'The potion shatters \u2014 black ichor blinds everything it touches!',
+    stun:           'The potion shatters. The area reeks of paralytic.',
+    hallucinating:  'The potion shatters. Iridescent fumes billow.',
+    blinded:        'The potion shatters. Everything goes dark.',
+    weakened:       'The potion shatters. Everyone feels weaker.',
+    poison:         'The potion shatters. Toxic sludge soaks the area.',
+    confused:       'The potion shatters. A bewildering vapour billows.',
+    lethargic:      'The potion shatters. Moving suddenly feels difficult.',
+    berserk:        'The potion shatters. You feel an unreasonable anger.',
+    resist_fire:    'The potion shatters. A heat ward shimmers outward.',
+    resist_poison:  'The potion shatters. Emerald tonic coats the area.',
+    resist_electric:'The potion shatters. Crackling energy grounds outward.',
+    resist_acid:    'The potion shatters. Thick amber syrup coats the area.',
+    mana_drain:     'The potion shatters. Arcane static crackles.',
+    slowed:         'The potion shatters. Time moves differently.',
+    burning:        'The potion shatters. Caustic liquid scorches the area.',
   });
   world.on('potion:splash', ({ actor, effectKey, hitCount }) => {
     if (nameOfEntity(actor) !== 'You') return;
