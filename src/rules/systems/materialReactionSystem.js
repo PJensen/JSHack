@@ -209,11 +209,12 @@ function createItemReactedEvent(spec) {
  * @param {any} info
  * @param {any} mat
  * @param {string} identity
- * @param {{ itemTypes?: string[], materials?: string[], identities?: string[] }} match
+ * @param {{ itemTypes?: string[], materials?: string[], identities?: string[], beatitudes?: string[] }} match
  * @param {{ waterType?: string } | null} sourcePayload
  * @param {{ waterTypes?: string[] }} reaction
+ * @param {string} currentBeatitude  current beatitude state of the item ("blessed"|"uncursed"|"cursed")
  */
-function matchesReaction(info, mat, identity, match, sourcePayload, reaction) {
+function matchesReaction(info, mat, identity, match, sourcePayload, reaction, currentBeatitude) {
   if (!match || typeof match !== "object") return false;
 
   const type = String(info?.type || "").toLowerCase();
@@ -229,10 +230,14 @@ function matchesReaction(info, mat, identity, match, sourcePayload, reaction) {
   const identities = Array.isArray(match.identities)
     ? match.identities.map((v) => String(v || "").toLowerCase()).filter(Boolean)
     : [];
+  const beatitudes = Array.isArray(match.beatitudes)
+    ? match.beatitudes.map((v) => String(v || "").toLowerCase()).filter(Boolean)
+    : [];
 
   if (itemTypes.length > 0 && !itemTypes.includes(type)) return false;
   if (materials.length > 0 && !materials.includes(kind)) return false;
   if (identities.length > 0 && !identities.includes(normalizedIdentity)) return false;
+  if (beatitudes.length > 0 && !beatitudes.includes(String(currentBeatitude || "uncursed").toLowerCase())) return false;
 
   const waterTypes = Array.isArray(reaction?.waterTypes)
     ? reaction.waterTypes.map((v) => String(v || "").toLowerCase()).filter(Boolean)
@@ -242,7 +247,7 @@ function matchesReaction(info, mat, identity, match, sourcePayload, reaction) {
     if (!waterTypes.includes(waterType)) return false;
   }
 
-  return itemTypes.length > 0 || materials.length > 0 || identities.length > 0;
+  return itemTypes.length > 0 || materials.length > 0 || identities.length > 0 || beatitudes.length > 0;
 }
 
 /**
@@ -377,9 +382,11 @@ function reactItem(world, spec) {
   const ni = world.get(itemId, NamedIdentity);
   const identity = String(ni?.identity || "");
 
+  const currentBeatitude = String(world.get(itemId, Beatitude)?.state || "uncursed").toLowerCase();
+
   for (let i = 0; i < rule.reactions.length; i++) {
     const reaction = rule.reactions[i];
-    if (!matchesReaction(info, mat, identity, reaction.match, sourcePayload, reaction)) continue;
+    if (!matchesReaction(info, mat, identity, reaction.match, sourcePayload, reaction, currentBeatitude)) continue;
 
     const from = snapshotItemState(world, itemId, info, mat);
     const out = applyReactionOutcome(world, itemId, info, mat, reaction, sourcePayload, sourceId);

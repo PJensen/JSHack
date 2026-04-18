@@ -105,6 +105,12 @@ export const EFFECT_DEFS = [
     statuses: ["slowed"],
   },
   {
+    id: "hastened",
+    keys: ["hastened", "haste"],
+    operation: "none",
+    statuses: ["hastened"],
+  },
+  {
     id: "silenced",
     keys: ["silenced", "silence"],
     operation: "none",
