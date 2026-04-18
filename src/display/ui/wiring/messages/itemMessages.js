@@ -95,6 +95,12 @@ export function installItemMessages(ctx) {
       log(`${name} swells from moisture.`, 'warning');
     } else if (kind === "diluted") {
       log(`${name} is diluted.`, 'warning');
+    } else if (kind === "blessed") {
+      log(`${name} glows with a soft golden light!`, 'system');
+    } else if (kind === "uncursed") {
+      log(`The black aura fades from ${name}.`, 'system');
+    } else if (kind === "cursed") {
+      log(`${name} is surrounded by a dark aura!`, 'danger');
     }
   });
 
@@ -355,6 +361,41 @@ export function installItemMessages(ctx) {
     log(`${msg} (${charges} charge${charges !== 1 ? 's' : ''} released, ${hitCount} hit)`, 'legendary');
   });
 
+  // === Water drink / dip messages ===
+  world.on('water:drank', ({ actor, waterType, removedCurse, removedHallucination }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    if (waterType === 'holy') {
+      if (removedCurse) {
+        log('As the holy water passes your lips, a warm light fills your chest.', 'system');
+      } else {
+        log('The blessed liquid tingles as it goes down.', 'system');
+      }
+    } else if (waterType === 'unholy') {
+      log('The foul water burns like acid going down. You gag.', 'danger');
+    } else {
+      if (removedHallucination) {
+        log('The cold water shocks you back to clarity. Your vision snaps to normal.', 'system');
+      } else {
+        log('Tastes like dungeon water. But you drank it anyway.', 'system');
+      }
+    }
+  });
+
+  world.on('water:curse_lifted', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('The darkness lifts from your soul! The curse is gone.', 'system');
+  });
+
+  world.on('water:hallucination_cleared', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('You blink. The colours stop screaming. Reality reasserts itself.', 'system');
+  });
+
+  world.on('potion:speed', ({ actor, turns }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log(`The world snaps into sharp focus. You feel impossibly fast! (${turns} turns)`, 'system');
+  });
+
   const SPLASH_EFFECT_MSG = Object.freeze({
     stun:           'The potion shatters \u2014 paralytic liquid drenches the area!',
     hallucinating:  'The potion shatters \u2014 iridescent fumes swirl outward!',
@@ -369,6 +410,7 @@ export function installItemMessages(ctx) {
     resist_electric:'The potion shatters \u2014 crackling energy grounds outward!',
     resist_acid:    'The potion shatters \u2014 thick amber syrup coats the area!',
     mana_drain:     'The potion shatters \u2014 arcane static crackles through the air!',
+    slowed:         'The potion shatters \u2014 silver liquid slows everything it touches!',
   });
   world.on('potion:splash', ({ actor, effectKey, hitCount }) => {
     if (nameOfEntity(actor) !== 'You') return;
