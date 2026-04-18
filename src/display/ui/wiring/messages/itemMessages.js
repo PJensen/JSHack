@@ -295,6 +295,10 @@ export function installItemMessages(ctx) {
       const touchstoneName = targetName || result.appearance || 'gem';
       if (result.hardness === 'hard') log(`You rub ${touchstoneName} on the touchstone... it makes a hard white streak!`, 'system');
       else log(`You rub ${touchstoneName} on the touchstone... it leaves a dull scratch.`, 'system');
+    } else if (result.type === 'water_dip') {
+      const wt = String(result.waterType || 'plain');
+      const waterLabel = wt === 'holy' ? 'the holy water' : wt === 'unholy' ? 'the unholy water' : 'the water';
+      log(`You dip ${bracketizeName(targetName)} into ${waterLabel}.`, 'system');
     } else if (typeof result.message === 'string' && result.message.trim().length > 0) {
       log(result.message, 'system');
     } else if (result.type === 'nothing') {
@@ -348,6 +352,105 @@ export function installItemMessages(ctx) {
     log('The urn shatters, scattering ashes on the floor.', 'system');
   });
 
+  // === Holy water on corpse ===
+  world.on('corpse:holy_water', ({ actor, corpseName }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    const label = String(corpseName || 'corpse');
+    log(`You pour holy water over the ${label} corpse. The flesh shimmers with pale light \u2014 it is sanctified.`, 'system');
+  });
+
+  // === Water splash (thrown water potion) ===
+  world.on('water:splashed', ({ actor, waterType }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    const wt = String(waterType || 'plain');
+    if (wt === 'holy') log('The holy water shatters in a spray of blessed liquid!', 'system');
+    else if (wt === 'unholy') log('The unholy water splashes outward with a foul hiss!', 'danger');
+    else log('The water potion shatters and soaks the area.', 'system');
+  });
+
+  // === Curse events ===
+  world.on('curse:equipment', ({ actor, itemId, source }) => {
+    const pe = playerEntity(world);
+    if (!pe || Number(actor || 0) !== pe.id) return;
+    const name = bracketizeName(nameOfItem(itemId));
+    if (source === 'scroll_cursing') return; // scroll:cursing handler covers this
+    log(`A dark force settles over ${name}!`, 'danger');
+  });
+  world.on('curse:removed', ({ actor, itemId, name, source }) => {
+    const pe = playerEntity(world);
+    if (!pe || Number(actor || 0) !== pe.id) return;
+    const label = bracketizeName(String(name || nameOfItem(itemId) || 'item'));
+    log(`The corruption is purged from ${label}. It feels clean again.`, 'system');
+  });
+
+  // === Bad scroll messages (unhandled) ===
+  world.on('scroll:amnesia', ({ actor, forgottenSpells }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    const n = Array.isArray(forgottenSpells) ? forgottenSpells.length : 0;
+    if (n > 0) log(`Your mind goes blank! You\u2019ve forgotten ${n} spell${n !== 1 ? 's' : ''}!`, 'danger');
+    else log('Your mind goes blank! The parchment crumbles to dust.', 'danger');
+  });
+  world.on('scroll:fire', ({ actor, damage }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    const n = Math.max(0, Number(damage || 0) | 0);
+    log(`The scroll ignites the moment you read it \u2014 WHOOOM! (-${n} HP)`, 'danger');
+  });
+  world.on('scroll:genocide', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('The parchment hums with finality. Name a creature, and it shall cease to exist.', 'legendary');
+  });
+  world.on('scroll:polymorph', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('Reality bends at the edges. The nearest creature begins to change...', 'system');
+  });
+  world.on('scroll:taming', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('The words sing from the parchment. Something nearby grows calm and docile.', 'system');
+  });
+
+  // === Wand messages ===
+  world.on('wand:stasis', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('A cone of pale light freezes your target outside of time!', 'system');
+  });
+
+  // === Hunger / food messages ===
+  world.on('hunger:ate', ({ actor, nutrition, satiation }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    const s = Number(satiation || 0);
+    if (s >= 0.9) log('You gorge yourself until you can barely move.', 'system');
+    else if (s >= 0.7) log('You eat your fill. The hunger fades.', 'system');
+    else if (s >= 0.4) log('You eat. It helps, but you could use more.', 'system');
+    else log('You eat, but barely put a dent in your hunger.', 'system');
+  });
+  world.on('hunger:sickened', ({ actor, type }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    const msgs = {
+      decay:        'Ugh \u2014 that was rotten! Your stomach lurches violently.',
+      disease:      'Something in that meal sits very wrong\u2026',
+      poison:       'A burning sensation floods your gut!',
+      hallucination:'The meal tastes\u2026 wrong. The walls melt sideways.',
+      shock:        'A jolt runs through you as you swallow!',
+      frost:        'Ice crystals form in your veins as you eat.',
+      weakened:     'The meal drains rather than restores you.',
+      mindwipe:     'A foggy numbness crawls through your thoughts\u2026',
+      agony:        'Searing pain explodes in your chest!',
+      hellfire:     'Hellfire scorches you from the inside out!',
+      shade_taint:  'Cold shadow seeps into your soul.',
+      petrify:      'Your limbs feel like stone \u2014 spreading inward!',
+      mimic_disease:'That was NO normal meal. You feel very ill.',
+    };
+    log(msgs[type] || 'Something in that meal makes you violently ill.', 'danger');
+  });
+
+  // === Item drop messages ===
+  world.on('item:dropped', ({ itemId, count, at }) => {
+    // Only log when player drops (not NPC loot spawns, quest drops, etc.)
+    // item:dropped is used broadly; we only want player-facing drops which
+    // go through interaction, but there is no actor field to filter on.
+    // Keep silent \u2014 pickup messages cover the feedback loop.
+  });
+
   // === Wild Throw Interactions ===
   const WAND_SHATTER_MSG = Object.freeze({
     electric: 'The wand explodes in a storm of lightning!',
@@ -395,6 +498,19 @@ export function installItemMessages(ctx) {
     if (nameOfEntity(actor) !== 'You') return;
     log(`The world snaps into sharp focus. You feel impossibly fast! (${turns} turns)`, 'system');
   });
+  world.on('potion:acid_drink', ({ actor, damage }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    const n = Math.max(0, Number(damage || 0) | 0);
+    log(`The acid eats through your stomach lining on the way down! (-${n} HP)`, 'danger');
+  });
+  world.on('potion:oil_drink', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('Your throat is now a fire hazard. You are burning from the inside out!', 'danger');
+  });
+  world.on('potion:oil_splash', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('The flask shatters \u2014 burning oil spreads across the ground!', 'danger');
+  });
 
   const SPLASH_EFFECT_MSG = Object.freeze({
     stun:           'The potion shatters \u2014 paralytic liquid drenches the area!',
@@ -411,6 +527,9 @@ export function installItemMessages(ctx) {
     resist_acid:    'The potion shatters \u2014 thick amber syrup coats the area!',
     mana_drain:     'The potion shatters \u2014 arcane static crackles through the air!',
     slowed:         'The potion shatters \u2014 silver liquid slows everything it touches!',
+    burning:        'The potion shatters \u2014 caustic liquid scorches everything nearby!',
+    weakened:       'The potion shatters \u2014 grey vapour drains the strength of all nearby!',
+    blinded:        'The potion shatters \u2014 black ichor blinds everything it touches!',
   });
   world.on('potion:splash', ({ actor, effectKey, hitCount }) => {
     if (nameOfEntity(actor) !== 'You') return;
