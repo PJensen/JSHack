@@ -542,55 +542,99 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
   }
 
   // --- Draw: Plasma clouds ---
+  // Overlapping additive arcs per tile + animated Bezier perimeter contour.
+  // SDF light field (getActiveLights) provides ambient ground tint on top.
   /** @param {CanvasRenderingContext2D} ctx */
   function drawPlasma(ctx) {
     if (!_plasmaCloudFx.size) return;
     ctx.save();
-    const _fxTime = getFxTime();
+    ctx.globalCompositeOperation = 'lighter';
     const TAU = Math.PI * 2;
+    const _fxTime = getFxTime();
 
     for (const cloud of _plasmaCloudFx.values()) {
       const cx = cloud.x;
       const cy = cloud.y;
       const r = Math.max(0, cloud.radius | 0);
+      const pulse = 0.5 + 0.5 * Math.sin(_fxTime * 8.5 + cloud.phase);
       const lifeFactor = Math.max(0.35, Math.min(1, (cloud.maxTurns > 0) ? (cloud.turnsLeft / cloud.maxTurns) : 1));
       const fadeFactor = cloud.fading
         ? Math.max(0, Math.min(1, (cloud.fadeMax > 0) ? (cloud.fadeLeft / cloud.fadeMax) : 0))
         : 1;
-      const alphaScale = lifeFactor * fadeFactor;
-      if (alphaScale < 0.01) continue;
       const flashBoost = cloud.flash > 0 ? (cloud.flash / 0.26) : 0;
+      const alphaScale = lifeFactor * fadeFactor;
 
+      // Mark every hazardous tile with overlapping circular plasma pools.
       for (let dy = -r; dy <= r; dy++) {
         for (let dx = -r; dx <= r; dx++) {
-          if (Math.max(Math.abs(dx), Math.abs(dy)) > r) continue;
+          const dist = Math.max(Math.abs(dx), Math.abs(dy));
+          if (dist > r) continue;
+
           const tx = cx + dx;
           const ty = cy + dy;
+          const ring = 1 - (dist / (r + 1));
+          const alpha = (0.10 + ring * 0.08 + pulse * 0.05 + flashBoost * 0.08) * alphaScale;
 
-          // Crackling cyan fill
-          const crackle = 0.4 + 0.6 * Math.sin(_fxTime * 9.3 + cloud.phase + dx * 3.1 + dy * 2.7)
-                                    * Math.sin(_fxTime * 6.1 + cloud.phase * 0.5 + dx * 1.4);
-          const fillA = (0.06 + Math.max(0, crackle) * 0.07 + flashBoost * 0.10) * alphaScale;
-          ctx.globalCompositeOperation = 'source-over';
-          ctx.fillStyle = `rgba(30,60,100,${fillA.toFixed(3)})`;
+          ctx.fillStyle = `rgba(80,220,255,${alpha.toFixed(3)})`;
           ctx.beginPath();
-          ctx.rect(tx - 0.5, ty - 0.5, 1, 1);
+          ctx.arc(tx, ty, 0.62 + 0.04 * pulse, 0, TAU);
           ctx.fill();
 
-          // Electric arc glow
-          ctx.globalCompositeOperation = 'lighter';
-          const arc = 0.5 + 0.5 * Math.sin(_fxTime * 12.0 + cloud.phase + dx * 4.7 + dy * 3.3);
-          const glowA = (0.05 + arc * 0.06 + flashBoost * 0.12) * alphaScale;
-          const grad = ctx.createRadialGradient(tx, ty, 0.02, tx, ty, 0.35);
-          grad.addColorStop(0, `rgba(180,240,255,${glowA.toFixed(3)})`);
-          grad.addColorStop(0.55, `rgba(60,160,220,${(glowA * 0.5).toFixed(3)})`);
-          grad.addColorStop(1, 'rgba(20,60,120,0)');
-          ctx.fillStyle = grad;
+          ctx.fillStyle = `rgba(180,250,255,${(alpha * 0.45).toFixed(3)})`;
           ctx.beginPath();
-          ctx.arc(tx, ty, 0.35, 0, TAU);
+          ctx.arc(tx, ty, 0.34 + 0.03 * pulse, 0, TAU);
           ctx.fill();
         }
       }
+
+      // Wobbling closed quadratic-Bezier contour around the hazardous footprint.
+      const points = [];
+      const pointCount = Math.max(12, 14 + r * 8);
+      const baseR = r + 0.92;
+      const driftX = 0.09 * Math.sin(_fxTime * 1.7 + cloud.phase);
+      const driftY = 0.09 * Math.cos(_fxTime * 1.5 + cloud.phase * 0.7);
+      for (let i = 0; i < pointCount; i++) {
+        const t = i / pointCount;
+        const a = t * TAU;
+        const wobble =
+          0.14 * Math.sin(_fxTime * 3.9 + a * 3.0 + cloud.phase) +
+          0.09 * Math.sin(_fxTime * 5.3 + a * 5.0 - cloud.phase * 0.6);
+        const rrX = baseR + wobble + 0.06 * pulse;
+        const rrY = baseR + wobble * 0.75 + 0.05 * pulse;
+        points.push({
+          x: cx + driftX + Math.cos(a) * rrX,
+          y: cy + driftY + Math.sin(a) * rrY,
+        });
+      }
+      if (points.length >= 3) {
+        const p0 = points[0];
+        const p1 = points[1];
+        const firstMid = { x: (p0.x + p1.x) * 0.5, y: (p0.y + p1.y) * 0.5 };
+        ctx.beginPath();
+        ctx.moveTo(firstMid.x, firstMid.y);
+        for (let i = 1; i <= points.length; i++) {
+          const p = points[i % points.length];
+          const n = points[(i + 1) % points.length];
+          const mid = { x: (p.x + n.x) * 0.5, y: (p.y + n.y) * 0.5 };
+          ctx.quadraticCurveTo(p.x, p.y, mid.x, mid.y);
+        }
+        ctx.closePath();
+
+        const blobA = (0.12 + pulse * 0.07 + flashBoost * 0.10) * alphaScale;
+        ctx.fillStyle = `rgba(95,230,255,${blobA.toFixed(3)})`;
+        ctx.fill();
+
+        const edgeA = (0.25 + pulse * 0.08 + flashBoost * 0.16) * alphaScale;
+        ctx.strokeStyle = `rgba(190,250,255,${edgeA.toFixed(3)})`;
+        ctx.lineWidth = 0.08;
+        ctx.stroke();
+      }
+
+      // Core energetic haze at cloud origin.
+      ctx.fillStyle = `rgba(210,255,255,${((0.12 + pulse * 0.10 + flashBoost * 0.18) * alphaScale).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 0.28 + pulse * 0.08, 0, TAU);
+      ctx.fill();
     }
 
     ctx.restore();
