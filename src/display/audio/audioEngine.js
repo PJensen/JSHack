@@ -173,20 +173,55 @@ const DEFAULT_MAX_VOICES = 3;
  */
 const _voices = new Map();
 
-function trackVoice(url, src, maxVoices) {
+/**
+ * Global voice registry for cross-URL priority management.
+ * Each entry: { src, priority, volume }
+ * priority 1 = player-triggered or player-origin — immune to eviction.
+ * priority 0 = spatial/distant — evicted (quietest first) when a priority-1 sound plays.
+ */
+const _globalVoices = [];
+
+function _removeGlobal(src) {
+  const i = _globalVoices.findIndex(v => v.src === src);
+  if (i !== -1) _globalVoices.splice(i, 1);
+}
+
+/**
+ * When a priority-1 sound plays, kill quiet non-priority voices to clear the mix.
+ * Threshold 0.5 ≈ sounds 9+ tiles away (next-room-over combat noise).
+ */
+function _evictLowPriorityVoices() {
+  for (let i = _globalVoices.length - 1; i >= 0; i--) {
+    const v = _globalVoices[i];
+    if (v.priority === 0 && v.volume < 0.5) {
+      try { v.src.stop(); } catch (_) { /* already stopped */ }
+      _globalVoices.splice(i, 1);
+    }
+  }
+}
+
+function trackVoice(url, src, maxVoices, priority = 0, volume = 1) {
   if (!_voices.has(url)) _voices.set(url, []);
   const list = _voices.get(url);
 
-  // Kill oldest voices if we're at the cap
+  // Kill oldest voices if we're at the per-URL cap
   while (list.length >= maxVoices) {
     const old = list.shift();
     try { old.stop(); } catch (_) { /* already stopped */ }
+    _removeGlobal(old);
   }
 
+  // Priority sound playing — clear quiet distant voices from the mix
+  if (priority > 0) _evictLowPriorityVoices();
+
   list.push(src);
+  const gEntry = { src, priority, volume };
+  _globalVoices.push(gEntry);
+
   src.onended = () => {
     const idx = list.indexOf(src);
     if (idx !== -1) list.splice(idx, 1);
+    _removeGlobal(src);
   };
 }
 
@@ -476,7 +511,8 @@ function _playBuffer(url, buf, opts) {
     }
 
     const maxV = Number(opts?.maxVoices ?? DEFAULT_MAX_VOICES);
-    trackVoice(url, src, maxV);
+    const priority = Number(opts?.priority ?? 0);
+    trackVoice(url, src, maxV, priority, vol);
 
     const when = opts?.delay ? ac.currentTime + opts.delay : 0;
     src.start(when);
