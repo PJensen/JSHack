@@ -564,8 +564,8 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
       const alphaScale = lifeFactor * fadeFactor;
 
       // Drifting core offset — churning internal motion.
-      const driftX = 0.08 * Math.sin(_fxTime * 1.3 + cloud.phase);
-      const driftY = 0.08 * Math.cos(_fxTime * 1.1 + cloud.phase * 0.7);
+      const driftX = 0.22 * Math.sin(_fxTime * 1.3 + cloud.phase);
+      const driftY = 0.22 * Math.cos(_fxTime * 1.1 + cloud.phase * 0.7);
       const kx = cx + driftX;
       const ky = cy + driftY;
 
@@ -574,12 +574,13 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
       // --- Layer 1: Volumetric depth — four nested radial gradients ---
 
       // Outer bloom — electrifies the surrounding air.
-      let grad = ctx.createRadialGradient(kx, ky, 0, kx, ky, r + 2.2);
-      grad.addColorStop(0,   `rgba(20,80,160,${((0.04 + flashBoost * 0.03) * alphaScale).toFixed(3)})`);
+      let grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r + 2.2);
+      grad.addColorStop(0,   `rgba(20,80,160,${((0.12 + flashBoost * 0.08) * alphaScale).toFixed(3)})`);
+      grad.addColorStop(0.5, `rgba(10,40,100,${((0.06) * alphaScale).toFixed(3)})`);
       grad.addColorStop(1,   'rgba(0,10,40,0)');
       ctx.fillStyle = grad;
       ctx.beginPath();
-      ctx.arc(kx, ky, r + 2.2, 0, TAU);
+      ctx.arc(cx, cy, r + 2.2, 0, TAU);
       ctx.fill();
 
       // Outer diffuse haze.
@@ -642,14 +643,17 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
         ctx.quadraticCurveTo(mx, my, bx, by);
         ctx.stroke();
 
-        // Branch — forks off the midpoint of the main arc toward a random offset.
+        // Branch — forks from a point on the main arc, stays inside the cloud volume.
         const branchT = 0.3 + rnd() * 0.4;
-        const fpx = ax + (mx - ax) * branchT * 2;   // approx point on curve at branchT
-        const fpy = ay + (my - ay) * branchT * 2;
-        const bex = fpx + (rnd() - 0.5) * vol * 0.8;
-        const bey = fpy + (rnd() - 0.5) * vol * 0.8;
-        const bmx = (fpx + bex) * 0.5 + (rnd() - 0.5) * 0.3;
-        const bmy = (fpy + bey) * 0.5 + (rnd() - 0.5) * 0.3;
+        // Proper quadratic Bezier point at t: (1-t)^2*A + 2(1-t)t*M + t^2*B
+        const bt1 = 1 - branchT;
+        const fpx = bt1 * bt1 * ax + 2 * bt1 * branchT * mx + branchT * branchT * bx;
+        const fpy = bt1 * bt1 * ay + 2 * bt1 * branchT * my + branchT * branchT * by;
+        // Endpoint clamped to inner half of volume so branch stays lit.
+        const bex = cx + (fpx - cx) * 0.4 + (rnd() - 0.5) * vol * 0.5;
+        const bey = cy + (fpy - cy) * 0.4 + (rnd() - 0.5) * vol * 0.5;
+        const bmx = (fpx + bex) * 0.5 + (rnd() - 0.5) * 0.25;
+        const bmy = (fpy + bey) * 0.5 + (rnd() - 0.5) * 0.25;
         ctx.lineWidth = 0.012 + pulse * 0.006;
         ctx.strokeStyle = hot
           ? `rgba(210,245,255,${(arcA * 0.55).toFixed(3)})`
