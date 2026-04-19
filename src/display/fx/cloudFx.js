@@ -1131,18 +1131,45 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
       }
     }
 
-    // -- Plasma: subdued cyan, no time-varying flicker --
+    // -- Plasma: field lights + animated perimeter lights --
     for (const [, cloud] of _plasmaCloudFx) {
       const r = Math.max(0, cloud.radius | 0);
       const life = Math.max(0.35, Math.min(1, cloud.maxTurns > 0 ? cloud.turnsLeft / cloud.maxTurns : 1));
       const fade = cloud.fading ? Math.max(0, cloud.fadeMax > 0 ? cloud.fadeLeft / cloud.fadeMax : 0) : 1;
       const a = life * fade;
       if (a < 0.01) continue;
+
+      // Field: per-tile with gentle pulse flicker.
+      const fieldPulse = 0.78 + 0.22 * Math.sin(_fxTime * 8.5 + cloud.phase);
       for (let dy = -r; dy <= r; dy++) {
         for (let dx = -r; dx <= r; dx++) {
           if (Math.max(Math.abs(dx), Math.abs(dy)) > r) continue;
-          out.push({ x: cloud.x + dx, y: cloud.y + dy, radius: 0.5, color: [60, 140, 200], flicker: a });
+          out.push({ x: cloud.x + dx, y: cloud.y + dy, radius: 0.7, color: [60, 140, 200], flicker: a * fieldPulse });
         }
+      }
+
+      // Contour: sample the same animated perimeter used by drawPlasma.
+      const TAU = Math.PI * 2;
+      const pulse = 0.5 + 0.5 * Math.sin(_fxTime * 8.5 + cloud.phase);
+      const baseR = r + 0.92;
+      const driftX = 0.09 * Math.sin(_fxTime * 1.7 + cloud.phase);
+      const driftY = 0.09 * Math.cos(_fxTime * 1.5 + cloud.phase * 0.7);
+      const sampleCount = Math.max(8, 10 + r * 4);
+      for (let i = 0; i < sampleCount; i++) {
+        const t = i / sampleCount;
+        const ang = t * TAU;
+        const wobble =
+          0.14 * Math.sin(_fxTime * 3.9 + ang * 3.0 + cloud.phase) +
+          0.09 * Math.sin(_fxTime * 5.3 + ang * 5.0 - cloud.phase * 0.6);
+        const rrX = baseR + wobble + 0.06 * pulse;
+        const rrY = baseR + wobble * 0.75 + 0.05 * pulse;
+        out.push({
+          x: cloud.x + driftX + Math.cos(ang) * rrX,
+          y: cloud.y + driftY + Math.sin(ang) * rrY,
+          radius: 0.8,
+          color: [120, 220, 255],
+          flicker: a * (0.7 + 0.3 * Math.sin(_fxTime * 11.0 + ang * 2.3 + cloud.phase)),
+        });
       }
     }
 
