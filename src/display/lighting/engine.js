@@ -8,6 +8,11 @@ const SUB = 8;             // sub-cells per tile edge  (64 cells/tile)
 const INV_SUB = 1 / SUB;   // tile-units per sub-cell
 const SQRT2 = 1.4142;
 
+// How much player vision lifts darkness (0=pitch black in sight, 1=fully revealed).
+// Lava uses a lower value so the below-grade depression profile stays legible.
+const VIS_LIFT       = 0.77;
+const VIS_LIFT_LAVA  = 0.44;
+
 /**
  * @typedef {{
  *   x: number,           // tile-space X (fractional OK)
@@ -1036,7 +1041,7 @@ export function createLightingEngine() {
         // For below-grade surfaces we intentionally reduce this lift so the
         // depression profile can remain visible instead of flattening out.
         const inLava = lavaMask[i] === 1;
-        const visLift = sight * (inLava ? 0.19 : 0.30);
+        const visLift = sight * (inLava ? VIS_LIFT_LAVA : VIS_LIFT);
         const lightLift = brightness;
         let totalLift = Math.min(1, visLift + lightLift);
         let extraDark = 0;
