@@ -542,8 +542,8 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
   }
 
   // --- Draw: Plasma clouds ---
-  // Volumetric layered glow + turbulent cellular shimmer + discrete-snap internal crackle arcs.
-  // No perimeter contour — halo provided by the SDF light field (getActiveLights contour points).
+  // Volumetric layered glow + discrete-snap branching crackle arcs.
+  // No perimeter contour — halo from SDF light field (getActiveLights contour points).
   /** @param {CanvasRenderingContext2D} ctx */
   function drawPlasma(ctx) {
     if (!_plasmaCloudFx.size) return;
@@ -563,48 +563,61 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
       const flashBoost = cloud.flash > 0 ? (cloud.flash / 0.26) : 0;
       const alphaScale = lifeFactor * fadeFactor;
 
+      // Drifting core offset — churning internal motion.
+      const driftX = 0.08 * Math.sin(_fxTime * 1.3 + cloud.phase);
+      const driftY = 0.08 * Math.cos(_fxTime * 1.1 + cloud.phase * 0.7);
+      const kx = cx + driftX;
+      const ky = cy + driftY;
+
       ctx.globalCompositeOperation = 'lighter';
 
-      // --- Layer 1: Volumetric depth — three nested radial gradients ---
+      // --- Layer 1: Volumetric depth — four nested radial gradients ---
+
+      // Outer bloom — electrifies the surrounding air.
+      let grad = ctx.createRadialGradient(kx, ky, 0, kx, ky, r + 2.2);
+      grad.addColorStop(0,   `rgba(20,80,160,${((0.04 + flashBoost * 0.03) * alphaScale).toFixed(3)})`);
+      grad.addColorStop(1,   'rgba(0,10,40,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(kx, ky, r + 2.2, 0, TAU);
+      ctx.fill();
+
       // Outer diffuse haze.
-      let grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r + 1.1);
+      grad = ctx.createRadialGradient(kx, ky, 0, kx, ky, r + 1.1);
       grad.addColorStop(0,   `rgba(30,120,200,${((0.16 + flashBoost * 0.10) * alphaScale).toFixed(3)})`);
-      grad.addColorStop(0.45,`rgba(15, 70,150,${((0.08) * alphaScale).toFixed(3)})`);
+      grad.addColorStop(0.45,`rgba(15,70,150,${((0.08) * alphaScale).toFixed(3)})`);
       grad.addColorStop(1,   'rgba(0,20,60,0)');
       ctx.fillStyle = grad;
       ctx.beginPath();
-      ctx.arc(cx, cy, r + 1.1, 0, TAU);
+      ctx.arc(kx, ky, r + 1.1, 0, TAU);
       ctx.fill();
 
       // Mid volume — primary bulk colour.
-      grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r + 0.55);
+      grad = ctx.createRadialGradient(kx, ky, 0, kx, ky, r + 0.55);
       grad.addColorStop(0,   `rgba(60,190,255,${((0.22 + pulse * 0.10 + flashBoost * 0.14) * alphaScale).toFixed(3)})`);
       grad.addColorStop(0.5, `rgba(30,120,210,${((0.12) * alphaScale).toFixed(3)})`);
       grad.addColorStop(1,   'rgba(5,40,100,0)');
       ctx.fillStyle = grad;
       ctx.beginPath();
-      ctx.arc(cx, cy, r + 0.55, 0, TAU);
+      ctx.arc(kx, ky, r + 0.55, 0, TAU);
       ctx.fill();
 
-      // Hot energetic core.
+      // Hot energetic core (drifts with kx/ky).
       const coreR = Math.max(0.25, r * 0.45 + 0.25 + pulse * 0.12);
-      grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR);
+      grad = ctx.createRadialGradient(kx, ky, 0, kx, ky, coreR);
       grad.addColorStop(0,   `rgba(210,255,255,${((0.35 + pulse * 0.22 + flashBoost * 0.28) * alphaScale).toFixed(3)})`);
       grad.addColorStop(0.35,`rgba(90,210,255,${((0.22 + pulse * 0.10) * alphaScale).toFixed(3)})`);
       grad.addColorStop(1,   'rgba(15,70,150,0)');
       ctx.fillStyle = grad;
       ctx.beginPath();
-      ctx.arc(cx, cy, coreR, 0, TAU);
+      ctx.arc(kx, ky, coreR, 0, TAU);
       ctx.fill();
 
-      // --- Layer 2: Internal crackle arcs — discrete-snap at ~12fps ---
-      // Bucket the time so arc positions jump rather than smoothly animate.
+      // --- Layer 2: Branching crackle arcs — discrete-snap at ~12fps ---
       const bucket = Math.floor(_fxTime * 12);
       const crackCount = 3 + (r * 3);
-      const vol = r + 0.5; // half-width of arc endpoint scatter
-      ctx.lineWidth = 0.025 + pulse * 0.015;
+      const vol = r + 0.5;
       for (let c = 0; c < crackCount; c++) {
-        // LCG per (bucket, cloud.phase, arc index) — deterministic, no Math.random().
         let s = (((bucket * 1664525 + (cloud.phase * 7919 | 0)) >>> 0) ^ (c * 22695477 >>> 0)) >>> 0;
         const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 0xFFFFFFFF; };
 
@@ -617,13 +630,33 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
 
         const brightness = rnd();
         const arcA = (0.40 + brightness * 0.40 + flashBoost * 0.20) * alphaScale;
-        ctx.strokeStyle = brightness > 0.65
-          ? `rgba(230,250,255,${arcA.toFixed(3)})`   // hot white-blue
-          : `rgba(100,200,255,${arcA.toFixed(3)})`;  // cooler cyan
+        const hot = brightness > 0.65;
+        ctx.strokeStyle = hot
+          ? `rgba(230,250,255,${arcA.toFixed(3)})`
+          : `rgba(100,200,255,${arcA.toFixed(3)})`;
 
+        // Main arc.
+        ctx.lineWidth = 0.025 + pulse * 0.015;
         ctx.beginPath();
         ctx.moveTo(ax, ay);
         ctx.quadraticCurveTo(mx, my, bx, by);
+        ctx.stroke();
+
+        // Branch — forks off the midpoint of the main arc toward a random offset.
+        const branchT = 0.3 + rnd() * 0.4;
+        const fpx = ax + (mx - ax) * branchT * 2;   // approx point on curve at branchT
+        const fpy = ay + (my - ay) * branchT * 2;
+        const bex = fpx + (rnd() - 0.5) * vol * 0.8;
+        const bey = fpy + (rnd() - 0.5) * vol * 0.8;
+        const bmx = (fpx + bex) * 0.5 + (rnd() - 0.5) * 0.3;
+        const bmy = (fpy + bey) * 0.5 + (rnd() - 0.5) * 0.3;
+        ctx.lineWidth = 0.012 + pulse * 0.006;
+        ctx.strokeStyle = hot
+          ? `rgba(210,245,255,${(arcA * 0.55).toFixed(3)})`
+          : `rgba(80,170,240,${(arcA * 0.55).toFixed(3)})`;
+        ctx.beginPath();
+        ctx.moveTo(fpx, fpy);
+        ctx.quadraticCurveTo(bmx, bmy, bex, bey);
         ctx.stroke();
       }
     }
