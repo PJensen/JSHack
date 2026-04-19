@@ -542,13 +542,12 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
   }
 
   // --- Draw: Plasma clouds ---
-  // Overlapping additive arcs per tile + animated Bezier perimeter contour.
-  // SDF light field (getActiveLights) provides ambient ground tint on top.
+  // Volumetric layered glow + turbulent cellular shimmer + discrete-snap internal crackle arcs.
+  // No perimeter contour — halo provided by the SDF light field (getActiveLights contour points).
   /** @param {CanvasRenderingContext2D} ctx */
   function drawPlasma(ctx) {
     if (!_plasmaCloudFx.size) return;
     ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
     const TAU = Math.PI * 2;
     const _fxTime = getFxTime();
 
@@ -564,77 +563,69 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
       const flashBoost = cloud.flash > 0 ? (cloud.flash / 0.26) : 0;
       const alphaScale = lifeFactor * fadeFactor;
 
-      // Mark every hazardous tile with overlapping circular plasma pools.
-      for (let dy = -r; dy <= r; dy++) {
-        for (let dx = -r; dx <= r; dx++) {
-          const dist = Math.max(Math.abs(dx), Math.abs(dy));
-          if (dist > r) continue;
+      ctx.globalCompositeOperation = 'lighter';
 
-          const tx = cx + dx;
-          const ty = cy + dy;
-          const ring = 1 - (dist / (r + 1));
-          const alpha = (0.10 + ring * 0.08 + pulse * 0.05 + flashBoost * 0.08) * alphaScale;
+      // --- Layer 1: Volumetric depth — three nested radial gradients ---
+      // Outer diffuse haze.
+      let grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r + 1.1);
+      grad.addColorStop(0,   `rgba(30,120,200,${((0.16 + flashBoost * 0.10) * alphaScale).toFixed(3)})`);
+      grad.addColorStop(0.45,`rgba(15, 70,150,${((0.08) * alphaScale).toFixed(3)})`);
+      grad.addColorStop(1,   'rgba(0,20,60,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r + 1.1, 0, TAU);
+      ctx.fill();
 
-          ctx.fillStyle = `rgba(80,220,255,${alpha.toFixed(3)})`;
-          ctx.beginPath();
-          ctx.arc(tx, ty, 0.62 + 0.04 * pulse, 0, TAU);
-          ctx.fill();
+      // Mid volume — primary bulk colour.
+      grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r + 0.55);
+      grad.addColorStop(0,   `rgba(60,190,255,${((0.22 + pulse * 0.10 + flashBoost * 0.14) * alphaScale).toFixed(3)})`);
+      grad.addColorStop(0.5, `rgba(30,120,210,${((0.12) * alphaScale).toFixed(3)})`);
+      grad.addColorStop(1,   'rgba(5,40,100,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r + 0.55, 0, TAU);
+      ctx.fill();
 
-          ctx.fillStyle = `rgba(180,250,255,${(alpha * 0.45).toFixed(3)})`;
-          ctx.beginPath();
-          ctx.arc(tx, ty, 0.34 + 0.03 * pulse, 0, TAU);
-          ctx.fill();
-        }
-      }
+      // Hot energetic core.
+      const coreR = Math.max(0.25, r * 0.45 + 0.25 + pulse * 0.12);
+      grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR);
+      grad.addColorStop(0,   `rgba(210,255,255,${((0.35 + pulse * 0.22 + flashBoost * 0.28) * alphaScale).toFixed(3)})`);
+      grad.addColorStop(0.35,`rgba(90,210,255,${((0.22 + pulse * 0.10) * alphaScale).toFixed(3)})`);
+      grad.addColorStop(1,   'rgba(15,70,150,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, coreR, 0, TAU);
+      ctx.fill();
 
-      // Wobbling closed quadratic-Bezier contour around the hazardous footprint.
-      const points = [];
-      const pointCount = Math.max(12, 14 + r * 8);
-      const baseR = r + 0.92;
-      const driftX = 0.09 * Math.sin(_fxTime * 1.7 + cloud.phase);
-      const driftY = 0.09 * Math.cos(_fxTime * 1.5 + cloud.phase * 0.7);
-      for (let i = 0; i < pointCount; i++) {
-        const t = i / pointCount;
-        const a = t * TAU;
-        const wobble =
-          0.14 * Math.sin(_fxTime * 3.9 + a * 3.0 + cloud.phase) +
-          0.09 * Math.sin(_fxTime * 5.3 + a * 5.0 - cloud.phase * 0.6);
-        const rrX = baseR + wobble + 0.06 * pulse;
-        const rrY = baseR + wobble * 0.75 + 0.05 * pulse;
-        points.push({
-          x: cx + driftX + Math.cos(a) * rrX,
-          y: cy + driftY + Math.sin(a) * rrY,
-        });
-      }
-      if (points.length >= 3) {
-        const p0 = points[0];
-        const p1 = points[1];
-        const firstMid = { x: (p0.x + p1.x) * 0.5, y: (p0.y + p1.y) * 0.5 };
+      // --- Layer 2: Internal crackle arcs — discrete-snap at ~12fps ---
+      // Bucket the time so arc positions jump rather than smoothly animate.
+      const bucket = Math.floor(_fxTime * 12);
+      const crackCount = 3 + (r * 3);
+      const vol = r + 0.5; // half-width of arc endpoint scatter
+      ctx.lineWidth = 0.025 + pulse * 0.015;
+      for (let c = 0; c < crackCount; c++) {
+        // LCG per (bucket, cloud.phase, arc index) — deterministic, no Math.random().
+        let s = (((bucket * 1664525 + (cloud.phase * 7919 | 0)) >>> 0) ^ (c * 22695477 >>> 0)) >>> 0;
+        const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 0xFFFFFFFF; };
+
+        const ax = cx + (rnd() * 2 - 1) * vol;
+        const ay = cy + (rnd() * 2 - 1) * vol;
+        const bx = cx + (rnd() * 2 - 1) * vol;
+        const by = cy + (rnd() * 2 - 1) * vol;
+        const mx = (ax + bx) * 0.5 + (rnd() - 0.5) * vol * 0.7;
+        const my = (ay + by) * 0.5 + (rnd() - 0.5) * vol * 0.7;
+
+        const brightness = rnd();
+        const arcA = (0.40 + brightness * 0.40 + flashBoost * 0.20) * alphaScale;
+        ctx.strokeStyle = brightness > 0.65
+          ? `rgba(230,250,255,${arcA.toFixed(3)})`   // hot white-blue
+          : `rgba(100,200,255,${arcA.toFixed(3)})`;  // cooler cyan
+
         ctx.beginPath();
-        ctx.moveTo(firstMid.x, firstMid.y);
-        for (let i = 1; i <= points.length; i++) {
-          const p = points[i % points.length];
-          const n = points[(i + 1) % points.length];
-          const mid = { x: (p.x + n.x) * 0.5, y: (p.y + n.y) * 0.5 };
-          ctx.quadraticCurveTo(p.x, p.y, mid.x, mid.y);
-        }
-        ctx.closePath();
-
-        const blobA = (0.12 + pulse * 0.07 + flashBoost * 0.10) * alphaScale;
-        ctx.fillStyle = `rgba(95,230,255,${blobA.toFixed(3)})`;
-        ctx.fill();
-
-        const edgeA = (0.25 + pulse * 0.08 + flashBoost * 0.16) * alphaScale;
-        ctx.strokeStyle = `rgba(190,250,255,${edgeA.toFixed(3)})`;
-        ctx.lineWidth = 0.08;
+        ctx.moveTo(ax, ay);
+        ctx.quadraticCurveTo(mx, my, bx, by);
         ctx.stroke();
       }
-
-      // Core energetic haze at cloud origin.
-      ctx.fillStyle = `rgba(210,255,255,${((0.12 + pulse * 0.10 + flashBoost * 0.18) * alphaScale).toFixed(3)})`;
-      ctx.beginPath();
-      ctx.arc(cx, cy, 0.28 + pulse * 0.08, 0, TAU);
-      ctx.fill();
     }
 
     ctx.restore();
