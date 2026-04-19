@@ -39,12 +39,15 @@ function spatialize(sourcePos, playerPos) {
 // ── Sound playback helpers ──────────────────────────────────
 
 /** Play a registered sound with optional spatial + overrides. */
+// priority defaults to 1 — direct sfx() calls are always player-triggered.
+// sfxAt() overrides this via extraOpts based on distance.
 function sfx(id, opts) {
   const s = resolve(id);
   if (!s) return;
   play(s.url, {
     bus: s.bus, maxVoices: s.maxVoices, randomPitch: s.randomPitch,
     volume: s.volume, rate: s.rate, detune: s.detune,
+    priority: 1,
     ...opts,
   });
 }
@@ -53,7 +56,10 @@ function sfx(id, opts) {
 function sfxAt(id, sourcePos, playerPos, extraOpts) {
   const spatial = spatialize(sourcePos, playerPos);
   if (spatial.volume <= 0) return; // too far, don't play
-  sfx(id, { pan: spatial.pan, volume: spatial.volume, ...extraOpts });
+  // Sounds at/adjacent to player (volume >= 0.95) keep priority 1.
+  // Everything else is priority 0 and evictable when player acts.
+  const priority = spatial.volume >= 0.95 ? 1 : 0;
+  sfx(id, { pan: spatial.pan, volume: spatial.volume, priority, ...extraOpts });
 }
 
 /**
