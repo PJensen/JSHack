@@ -571,15 +571,26 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
 
       ctx.globalCompositeOperation = 'lighter';
 
-      // Single-tile drifting hot core.
+      // Outer diffuse glow.
       const coreR = 0.55 + pulse * 0.12 + flashBoost * 0.10;
-      const grad = ctx.createRadialGradient(kx, ky, 0, kx, ky, coreR);
+      let grad = ctx.createRadialGradient(kx, ky, 0, kx, ky, coreR);
       grad.addColorStop(0,   `rgba(210,255,255,${((0.45 + pulse * 0.25 + flashBoost * 0.30) * alphaScale).toFixed(3)})`);
       grad.addColorStop(0.4, `rgba(80,190,255,${((0.25 + pulse * 0.10) * alphaScale).toFixed(3)})`);
       grad.addColorStop(1,   'rgba(10,50,120,0)');
       ctx.fillStyle = grad;
       ctx.beginPath();
       ctx.arc(kx, ky, coreR, 0, TAU);
+      ctx.fill();
+
+      // Tight inner hot point — overdriven near-white center.
+      const pinR = 0.13 + pulse * 0.04;
+      grad = ctx.createRadialGradient(kx, ky, 0, kx, ky, pinR);
+      grad.addColorStop(0,   `rgba(255,255,255,${((0.70 + pulse * 0.20 + flashBoost * 0.20) * alphaScale).toFixed(3)})`);
+      grad.addColorStop(0.5, `rgba(180,240,255,${((0.40 + pulse * 0.15) * alphaScale).toFixed(3)})`);
+      grad.addColorStop(1,   'rgba(60,160,220,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(kx, ky, pinR, 0, TAU);
       ctx.fill();
     }
 
@@ -1083,9 +1094,11 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
       const fade = cloud.fading ? Math.max(0, cloud.fadeMax > 0 ? cloud.fadeLeft / cloud.fadeMax : 0) : 1;
       const a = life * fade;
       if (a < 0.01) continue;
+      const driftX = 0.22 * Math.sin(_fxTime * 1.3 + cloud.phase);
+      const driftY = 0.22 * Math.cos(_fxTime * 1.1 + cloud.phase * 0.7);
       const shimmer = 0.65 + 0.35 * Math.sin(_fxTime * 8.5 + cloud.phase)
                                * Math.sin(_fxTime * 13.1 + cloud.phase * 0.6);
-      out.push({ x: cloud.x, y: cloud.y, radius: 1.2, color: [120, 220, 255], flicker: a * Math.max(0.4, shimmer) });
+      out.push({ x: cloud.x + driftX, y: cloud.y + driftY, radius: 1.2, color: [120, 220, 255], flicker: a * Math.max(0.4, shimmer) });
     }
 
     // -- Poison: dim green, high-freq dual-sin bubbling --
