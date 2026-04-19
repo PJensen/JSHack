@@ -571,98 +571,16 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
 
       ctx.globalCompositeOperation = 'lighter';
 
-      // --- Layer 1: Volumetric depth — four nested radial gradients ---
-
-      // Outer bloom — electrifies the surrounding air.
-      let grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r + 2.2);
-      grad.addColorStop(0,   `rgba(20,80,160,${((0.12 + flashBoost * 0.08) * alphaScale).toFixed(3)})`);
-      grad.addColorStop(0.5, `rgba(10,40,100,${((0.06) * alphaScale).toFixed(3)})`);
-      grad.addColorStop(1,   'rgba(0,10,40,0)');
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.arc(cx, cy, r + 2.2, 0, TAU);
-      ctx.fill();
-
-      // Outer diffuse haze.
-      grad = ctx.createRadialGradient(kx, ky, 0, kx, ky, r + 1.1);
-      grad.addColorStop(0,   `rgba(30,120,200,${((0.16 + flashBoost * 0.10) * alphaScale).toFixed(3)})`);
-      grad.addColorStop(0.45,`rgba(15,70,150,${((0.08) * alphaScale).toFixed(3)})`);
-      grad.addColorStop(1,   'rgba(0,20,60,0)');
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.arc(kx, ky, r + 1.1, 0, TAU);
-      ctx.fill();
-
-      // Mid volume — primary bulk colour.
-      grad = ctx.createRadialGradient(kx, ky, 0, kx, ky, r + 0.55);
-      grad.addColorStop(0,   `rgba(60,190,255,${((0.22 + pulse * 0.10 + flashBoost * 0.14) * alphaScale).toFixed(3)})`);
-      grad.addColorStop(0.5, `rgba(30,120,210,${((0.12) * alphaScale).toFixed(3)})`);
-      grad.addColorStop(1,   'rgba(5,40,100,0)');
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.arc(kx, ky, r + 0.55, 0, TAU);
-      ctx.fill();
-
-      // Hot energetic core (drifts with kx/ky).
-      const coreR = Math.max(0.25, r * 0.45 + 0.25 + pulse * 0.12);
-      grad = ctx.createRadialGradient(kx, ky, 0, kx, ky, coreR);
-      grad.addColorStop(0,   `rgba(210,255,255,${((0.35 + pulse * 0.22 + flashBoost * 0.28) * alphaScale).toFixed(3)})`);
-      grad.addColorStop(0.35,`rgba(90,210,255,${((0.22 + pulse * 0.10) * alphaScale).toFixed(3)})`);
-      grad.addColorStop(1,   'rgba(15,70,150,0)');
+      // Single-tile drifting hot core.
+      const coreR = 0.55 + pulse * 0.12 + flashBoost * 0.10;
+      const grad = ctx.createRadialGradient(kx, ky, 0, kx, ky, coreR);
+      grad.addColorStop(0,   `rgba(210,255,255,${((0.45 + pulse * 0.25 + flashBoost * 0.30) * alphaScale).toFixed(3)})`);
+      grad.addColorStop(0.4, `rgba(80,190,255,${((0.25 + pulse * 0.10) * alphaScale).toFixed(3)})`);
+      grad.addColorStop(1,   'rgba(10,50,120,0)');
       ctx.fillStyle = grad;
       ctx.beginPath();
       ctx.arc(kx, ky, coreR, 0, TAU);
       ctx.fill();
-
-      // --- Layer 2: Branching crackle arcs — discrete-snap at ~12fps ---
-      const bucket = Math.floor(_fxTime * 12);
-      const crackCount = 3 + (r * 3);
-      const vol = r + 0.5;
-      for (let c = 0; c < crackCount; c++) {
-        let s = (((bucket * 1664525 + (cloud.phase * 7919 | 0)) >>> 0) ^ (c * 22695477 >>> 0)) >>> 0;
-        const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 0xFFFFFFFF; };
-
-        const ax = cx + (rnd() * 2 - 1) * vol;
-        const ay = cy + (rnd() * 2 - 1) * vol;
-        const bx = cx + (rnd() * 2 - 1) * vol;
-        const by = cy + (rnd() * 2 - 1) * vol;
-        const mx = (ax + bx) * 0.5 + (rnd() - 0.5) * vol * 0.7;
-        const my = (ay + by) * 0.5 + (rnd() - 0.5) * vol * 0.7;
-
-        const brightness = rnd();
-        const arcA = (0.40 + brightness * 0.40 + flashBoost * 0.20) * alphaScale;
-        const hot = brightness > 0.65;
-        ctx.strokeStyle = hot
-          ? `rgba(230,250,255,${arcA.toFixed(3)})`
-          : `rgba(100,200,255,${arcA.toFixed(3)})`;
-
-        // Main arc.
-        ctx.lineWidth = 0.025 + pulse * 0.015;
-        ctx.beginPath();
-        ctx.moveTo(ax, ay);
-        ctx.quadraticCurveTo(mx, my, bx, by);
-        ctx.stroke();
-
-        // Branch — forks from a point on the main arc, stays inside the cloud volume.
-        const branchT = 0.3 + rnd() * 0.4;
-        // Proper quadratic Bezier point at t: (1-t)^2*A + 2(1-t)t*M + t^2*B
-        const bt1 = 1 - branchT;
-        const fpx = bt1 * bt1 * ax + 2 * bt1 * branchT * mx + branchT * branchT * bx;
-        const fpy = bt1 * bt1 * ay + 2 * bt1 * branchT * my + branchT * branchT * by;
-        // Endpoint clamped to inner half of volume so branch stays lit.
-        const bex = cx + (fpx - cx) * 0.4 + (rnd() - 0.5) * vol * 0.5;
-        const bey = cy + (fpy - cy) * 0.4 + (rnd() - 0.5) * vol * 0.5;
-        const bmx = (fpx + bex) * 0.5 + (rnd() - 0.5) * 0.25;
-        const bmy = (fpy + bey) * 0.5 + (rnd() - 0.5) * 0.25;
-        ctx.lineWidth = 0.012 + pulse * 0.006;
-        ctx.strokeStyle = hot
-          ? `rgba(210,245,255,${(arcA * 0.55).toFixed(3)})`
-          : `rgba(80,170,240,${(arcA * 0.55).toFixed(3)})`;
-        ctx.beginPath();
-        ctx.moveTo(fpx, fpy);
-        ctx.quadraticCurveTo(bmx, bmy, bex, bey);
-        ctx.stroke();
-      }
     }
 
     ctx.restore();
@@ -1159,46 +1077,15 @@ export function createCloudFxController({ world, cam, fx, getFxTime, getPosition
       }
     }
 
-    // -- Plasma: field lights + animated perimeter lights --
+    // -- Plasma: single hot point on the death tile, high-freq shimmer --
     for (const [, cloud] of _plasmaCloudFx) {
-      const r = Math.max(0, cloud.radius | 0);
       const life = Math.max(0.35, Math.min(1, cloud.maxTurns > 0 ? cloud.turnsLeft / cloud.maxTurns : 1));
       const fade = cloud.fading ? Math.max(0, cloud.fadeMax > 0 ? cloud.fadeLeft / cloud.fadeMax : 0) : 1;
       const a = life * fade;
       if (a < 0.01) continue;
-
-      // Field: per-tile with gentle pulse flicker.
-      const fieldPulse = 0.78 + 0.22 * Math.sin(_fxTime * 8.5 + cloud.phase);
-      for (let dy = -r; dy <= r; dy++) {
-        for (let dx = -r; dx <= r; dx++) {
-          if (Math.max(Math.abs(dx), Math.abs(dy)) > r) continue;
-          out.push({ x: cloud.x + dx, y: cloud.y + dy, radius: 0.7, color: [60, 140, 200], flicker: a * fieldPulse });
-        }
-      }
-
-      // Contour: sample the same animated perimeter used by drawPlasma.
-      const TAU = Math.PI * 2;
-      const pulse = 0.5 + 0.5 * Math.sin(_fxTime * 8.5 + cloud.phase);
-      const baseR = r + 0.92;
-      const driftX = 0.09 * Math.sin(_fxTime * 1.7 + cloud.phase);
-      const driftY = 0.09 * Math.cos(_fxTime * 1.5 + cloud.phase * 0.7);
-      const sampleCount = Math.max(8, 10 + r * 4);
-      for (let i = 0; i < sampleCount; i++) {
-        const t = i / sampleCount;
-        const ang = t * TAU;
-        const wobble =
-          0.14 * Math.sin(_fxTime * 3.9 + ang * 3.0 + cloud.phase) +
-          0.09 * Math.sin(_fxTime * 5.3 + ang * 5.0 - cloud.phase * 0.6);
-        const rrX = baseR + wobble + 0.06 * pulse;
-        const rrY = baseR + wobble * 0.75 + 0.05 * pulse;
-        out.push({
-          x: cloud.x + driftX + Math.cos(ang) * rrX,
-          y: cloud.y + driftY + Math.sin(ang) * rrY,
-          radius: 0.8,
-          color: [120, 220, 255],
-          flicker: a * (0.7 + 0.3 * Math.sin(_fxTime * 11.0 + ang * 2.3 + cloud.phase)),
-        });
-      }
+      const shimmer = 0.65 + 0.35 * Math.sin(_fxTime * 8.5 + cloud.phase)
+                               * Math.sin(_fxTime * 13.1 + cloud.phase * 0.6);
+      out.push({ x: cloud.x, y: cloud.y, radius: 1.2, color: [120, 220, 255], flicker: a * Math.max(0.4, shimmer) });
     }
 
     // -- Poison: dim green, high-freq dual-sin bubbling --

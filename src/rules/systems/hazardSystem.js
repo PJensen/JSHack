@@ -438,9 +438,17 @@ export function hazardSystem(world) {
 
         if (!inHazardRadius(tpos.x, tpos.y, pos.x, pos.y, radius, metric)) continue;
 
+        // Plasma: Chebyshev distance falloff — center=full, dist1=half, dist2+=none.
+        let amount = tickDamage;
+        if (kind === "plasma") {
+          const dist = Math.max(Math.abs(tpos.x - pos.x), Math.abs(tpos.y - pos.y));
+          if (dist >= 2) continue;
+          if (dist === 1) amount = Math.max(1, tickDamage >> 1);
+        }
+
         const hit = dealDamage(world, {
           target: id,
-          amount: tickDamage,
+          amount,
           type: damageType,
           source: hazardId,
           at: { x: tpos.x, y: tpos.y },
