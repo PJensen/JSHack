@@ -69,6 +69,7 @@ import { fountainRegrowthSystem } from "../rules/systems/fountainRegrowthSystem.
 import { weatherSystem } from "../rules/systems/weatherSystem.js";
 import { calendarSystem } from "../rules/systems/calendarSystem.js";
 import { townSimulationSystem } from "../rules/systems/townSimulationSystem.js";
+import { townfolkAmbientDialogueSystem } from "../rules/systems/townfolkAmbientDialogueSystem.js";
 import { entrancePressureSystem } from "../rules/systems/entrancePressureSystem.js";
 import { districtConditionSystem } from "../rules/systems/districtConditionSystem.js";
 import { installTileStepEffectListener } from "../rules/systems/tileStepEffectSystem.js";
@@ -251,6 +252,7 @@ export function configureWorld(world) {
   registerSystem(calendarSystem, 'effects');
   registerSystem(weatherSystem, 'effects');
   registerSystem(townSimulationSystem, 'effects');
+  registerSystem(townfolkAmbientDialogueSystem, 'effects');
   registerSystem(entrancePressureSystem, 'effects');
   registerSystem(districtConditionSystem, 'effects');
   registerSystem(workstationStateSystem, 'effects');
