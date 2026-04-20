@@ -1016,7 +1016,7 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     const pos = anchored || getPosition(owner);
     if (!pos || !canShowAt(pos.x, pos.y)) return;
 
-    ftext.addStatus(pos.x, pos.y - 1.3, 'QUEST COMPLETE!', {
+    ftext.addBanner(pos.x, pos.y - 0.9, 'QUEST COMPLETE!', {
       color: '#ffd85a',
       life: 3.0,
       scaleStart: 1.72,

@@ -18,6 +18,22 @@ Deno.test("floatText addStatus respects caller overrides", () => {
   assertEquals(rec.scaleEnd, 0.9);
 });
 
+Deno.test("floatText addBanner uses large banner flavor", () => {
+  const ftext = new FloatText();
+  const rec = ftext.addBanner(4, 5, "QUEST COMPLETE!", {
+    color: "#ffd85a",
+    life: 2.5,
+    scaleStart: 1.8,
+    scaleEnd: 1.0,
+  });
+
+  assertEquals(rec.color, "#ffd85a");
+  assertEquals(rec.life, 2.5);
+  assertEquals(rec.scaleStart, 1.8);
+  assertEquals(rec.scaleEnd, 1.0);
+  assertEquals(rec.flavor, "banner");
+});
+
 Deno.test("floatText wiring restores damage number emission with crit and delay", () => {
   const world = new World({ seed: 7 });
   const target = world.create();
@@ -99,5 +115,39 @@ Deno.test("floatText wiring shows quest progress status text", () => {
   assertEquals(calls[0].x, 6);
   assertEquals(calls[0].y, 6.05);
   assertEquals(calls[0].text, "RATS 3/5");
+  assertEquals(calls[0].opts?.color, "#ffd85a");
+});
+
+Deno.test("floatText wiring shows quest completion banner text", () => {
+  const world = new World({ seed: 9 });
+  const player = world.create();
+  const calls = [];
+  const ftext = {
+    addStatus() {},
+    addBanner(x, y, text, opts) { calls.push({ x, y, text, opts }); },
+    addHeal() {},
+    addDamage() {},
+    addGold() {},
+  };
+  const fx = { pool: { spawn() {} } };
+
+  installFloatTextWiring({
+    world,
+    ftext,
+    fx,
+    getPosition: (id) => (id === player ? { x: 8, y: 5 } : null),
+    isPet: () => false,
+    isPlayer: (id) => id === player,
+  });
+
+  world.emit("quest:completed", {
+    questId: "starter.rat_infestation",
+    playerId: player,
+  });
+
+  assertEquals(calls.length, 1);
+  assertEquals(calls[0].x, 8);
+  assertEquals(calls[0].y, 4.1);
+  assertEquals(calls[0].text, "QUEST COMPLETE!");
   assertEquals(calls[0].opts?.color, "#ffd85a");
 });
