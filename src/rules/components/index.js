@@ -95,6 +95,7 @@ export { QuestState } from './QuestState.js';
 export { QuestVars } from './QuestVars.js';
 export { QuestBindings } from './QuestBindings.js';
 export { QuestLog } from './QuestLog.js';
+export { RunObjectiveTarget } from './RunObjectiveTarget.js';
 export { CalendarState } from './CalendarState.js';
 export { GroundStackOrder } from './GroundStackOrder.js';
 export { CentipedeSegment } from './CentipedeSegment.js';
