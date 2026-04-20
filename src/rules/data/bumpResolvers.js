@@ -145,7 +145,10 @@ const petSwap = {
     if (!(ctx.target > 0) || ctx.target === actor) return false;
     if (world.has(ctx.target, Pet)) return true;
     const fac = world.get(ctx.target, Faction);
-    return fac?.key === 'summoned';
+    return fac?.key === "summoned"
+      || fac?.key === "shopkeeper"
+      || fac?.key === "neutral"
+      || fac?.key === "townfolk";
   },
   resolve(world, actor, ctx) {
     const actorPos = world.get(actor, Position);

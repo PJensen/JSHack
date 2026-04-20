@@ -107,6 +107,33 @@ Deno.test("bumpResolvers: neutral NPC with Interactable triggers interact, not a
   } finally { clearAll(); }
 });
 
+Deno.test("bumpResolvers: player bumping townfolk swaps positions instead of interacting", () => {
+  loadFloorChunk();
+  try {
+    const world = new World({ seed: 44 });
+    const actor = world.create();
+    world.add(actor, Player, {});
+    world.add(actor, Position, { x: 3, y: 3 });
+    world.add(actor, Faction, { key: "player" });
+
+    const npc = world.create();
+    world.add(npc, Position, { x: 4, y: 3 });
+    world.add(npc, Faction, { key: "townfolk" });
+    world.add(npc, Interactable, { action: "talkToNPC" });
+
+    let interacted = false;
+    world.on("bump:interact", () => { interacted = true; });
+
+    const ctx = makeBumpCtx(world, { nx: 4, ny: 3, mdx: 1, mdy: 0, target: npc });
+    const handled = resolveBump(world, actor, ctx);
+
+    assert(handled, "townfolk bump should be handled");
+    assertEquals(interacted, false, "swap should not also trigger interaction");
+    assertEquals(world.get(actor, Position), { x: 4, y: 3 });
+    assertEquals(world.get(npc, Position), { x: 3, y: 3 });
+  } finally { clearAll(); }
+});
+
 // ── object interact ─────────────────────────────────────────────────
 
 Deno.test("bumpResolvers: player bumps door (interactable, no living target)", () => {
