@@ -8,11 +8,11 @@
  *  vx:number, vy:number,
  *  scaleStart:number, scaleEnd:number,
  *  batch:boolean, value:number|null, sign:number, justSpawned:boolean,
- *  flavor:'damage'|'gold'|'heal'|'status'|'custom', crit?:boolean,
+ *  flavor:'damage'|'gold'|'heal'|'status'|'banner'|'custom', crit?:boolean,
  *  delay:number
  * }} FTItem */
 /** @typedef {{
- *  flavor?: 'damage'|'gold'|'heal'|'status'|'custom',
+ *  flavor?: 'damage'|'gold'|'heal'|'status'|'banner'|'custom',
  *  color?: string,
  *  life?: number,
  *  scaleBase?: number,
@@ -34,7 +34,8 @@ export class FloatText {
       damage: { life: 0.9, color: '#ffd966', scaleBase: 1.0 },
       gold:   { life: 0.8, color: '#c37f09', scaleBase: 1.0 },
       heal:   { life: 0.9, color: '#7BFF7B', scaleBase: 1.0 },
-      status: { life: 0.7, color: '#c0c8d0', scaleBase: 1.0 }
+      status: { life: 0.7, color: '#c0c8d0', scaleBase: 1.0 },
+      banner: { life: 1.4, color: '#ffffff', scaleBase: 1.0 },
     };
   }
 
@@ -54,6 +55,7 @@ export class FloatText {
   const isGold = flavor === 'gold';
   const isHeal = flavor === 'heal';
   const isStatus = flavor === 'status';
+  const isBanner = flavor === 'banner';
 
   const crit = !!(opts.crit);
     const scaleBase = (opts.scaleBase || base.scaleBase || 1.0) * (crit ? 1.3 : 1.0);
@@ -98,7 +100,7 @@ export class FloatText {
     } else if (isHeal) {
       vy = -0.55;
       vx = 0;
-    } else if (isStatus) {
+    } else if (isStatus || isBanner) {
       vy = -0.5;
       vx = 0;
     } else {
@@ -116,7 +118,7 @@ export class FloatText {
       value: isNumber ? (parseInt(String(text),10)|0) : null,
       sign: isNumber ? (String(text).trim().startsWith('-')?-1:1) : 0,
       justSpawned: true,
-      flavor: (isDamage?'damage':(isGold?'gold':(isHeal?'heal':(isStatus?'status':'custom')))),
+      flavor: (isDamage?'damage':(isGold?'gold':(isHeal?'heal':(isStatus?'status':(isBanner?'banner':'custom'))))),
       crit,
       delay: Math.max(0, Number(opts.delay || 0)),
     };
@@ -159,6 +161,14 @@ export class FloatText {
     const base = /** @type {FTOptions} */({ flavor:'status', color, scaleStart: 1.02, scaleEnd: 0.98, life: 0.8 });
     return this.add(x,y,String(text||''), /** @type {FTOptions} */({ ...base, ...opts, flavor: 'status', color: (opts && opts.color) || color }));
   }
+  /** Add large banner-style text for major events.
+   *  @param {number} x @param {number} y @param {string} text
+   *  @param {FTOptions} [opts]
+   */
+  addBanner(x, y, text, opts = {}){
+    const base = /** @type {FTOptions} */({ flavor: 'banner', color: ((opts && opts.color) || '#ffe27a'), scaleStart: 1.4, scaleEnd: 1.0, life: 1.6 });
+    return this.add(x, y, String(text || ''), /** @type {FTOptions} */({ ...base, ...opts, flavor: 'banner', color: (opts && opts.color) || base.color }));
+  }
 
   /** @param {number} dt */
   step(dt){
@@ -199,7 +209,7 @@ export class FloatText {
   const easeOutBack = (u)=>{ const c1=1.70158, c3=c1+1; return 1 + c3*Math.pow(u-1,3) + c1*Math.pow(u-1,2); };
       let ease = t;
       if (p.flavor === 'damage') ease = easeOutBack(t);
-      else if (p.flavor === 'heal' || p.flavor === 'status') {
+      else if (p.flavor === 'heal' || p.flavor === 'status' || p.flavor === 'banner') {
         // gentle quad ease
         ease = t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t+2, 2)/2;
       }
@@ -210,7 +220,7 @@ export class FloatText {
       ctx.translate(p.x, p.y);
       ctx.scale(scale, scale);
       // Keep text upright and roughly tile-sized
-      const fontPx = (p.flavor === 'damage' || p.flavor === 'gold' || p.flavor === 'heal') ? worldFontPx : smallFontPx;
+      const fontPx = (p.flavor === 'damage' || p.flavor === 'gold' || p.flavor === 'heal' || p.flavor === 'banner') ? worldFontPx : smallFontPx;
       ctx.font = `${fontPx}px monospace`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
