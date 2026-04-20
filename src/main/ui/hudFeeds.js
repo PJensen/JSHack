@@ -178,20 +178,29 @@ export function createHudFeeds(world, deps) {
     };
   }
 
+  function listEligibleQuestTrackerEntries(playerId) {
+    const active = [];
+    for (const [, def, state, vars, bindings] of world.query(QuestDefRef, QuestState, QuestVars, QuestBindings)) {
+      if (String(state?.status || "active") !== "active") continue;
+      if (Number(bindings?.player || 0) !== Number(playerId || 0)) continue;
+      if (vars?.data?.accepted === false) continue;
+      active.push(buildQuestTrackerEntry(def?.id, getQuestDef(def?.id), state, vars));
+    }
+    return active;
+  }
+
+  function pickFocusedQuestTrackerEntry(entries) {
+    const active = Array.isArray(entries) ? entries.slice() : [];
+    active.sort((a, b) => b.priority - a.priority || b.sortKey - a.sortKey || a.title.localeCompare(b.title));
+    return active[0] || null;
+  }
+
   function updateQuestTrackerHUD() {
     const pe = playerEntity(world);
     if (!pe) return;
 
-    const active = [];
-    for (const [, def, state, vars, bindings] of world.query(QuestDefRef, QuestState, QuestVars, QuestBindings)) {
-      if (String(state?.status || "active") !== "active") continue;
-      if (Number(bindings?.player || 0) !== Number(pe.id || 0)) continue;
-      if (vars?.data?.accepted === false) continue;
-      active.push(buildQuestTrackerEntry(def?.id, getQuestDef(def?.id), state, vars));
-    }
-
-    active.sort((a, b) => b.priority - a.priority || b.sortKey - a.sortKey || a.title.localeCompare(b.title));
-    const focused = active[0] || null;
+    const active = listEligibleQuestTrackerEntries(pe.id);
+    const focused = pickFocusedQuestTrackerEntry(active);
     const sig = JSON.stringify({
       focused: focused ? {
         questId: focused.questId,
