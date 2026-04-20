@@ -18,7 +18,9 @@ function resolveBaseFootprintRadius(scale) {
 
 function resolveGrowthBudget(scale, depth) {
   const delta = Math.max(0, depth - 1);
-  return delta + Math.floor(delta * Math.max(0, scale) * 0.5);
+  if (delta <= 0) return 0;
+  const growthFactor = 1 + Math.min(2, Math.max(0, scale)) * 0.75;
+  return Math.floor(Math.sqrt(delta) * growthFactor);
 }
 
 function resolveFloorProfile(profile, depth) {

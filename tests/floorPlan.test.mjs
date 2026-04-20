@@ -145,3 +145,49 @@ Deno.test("floor profile respects configured room sparsity", () => {
     dungeonConfig.roomSparsity = previousSparsity;
   }
 });
+
+Deno.test("default floor footprint growth stays sublinear at compact scale", () => {
+  const previousScale = dungeonConfig.dungeonScale;
+  try {
+    dungeonConfig.dungeonScale = 0.3;
+
+    const depth4 = generateFloorPlan(42, 4);
+    const depth10 = generateFloorPlan(42, 10);
+    const depth20 = generateFloorPlan(42, 20);
+
+    assert(extentChunkCount(depth4) < extentChunkCount(depth10), "mid-depth floors should still grow");
+    assert(extentChunkCount(depth10) < extentChunkCount(depth20), "late floors should still grow");
+    assert(
+      extentChunkCount(depth20) < extentChunkCount(depth10) * 2,
+      "compact-scale footprint should not balloon near-linearly by late depths",
+    );
+  } finally {
+    dungeonConfig.dungeonScale = previousScale;
+  }
+});
+
+Deno.test("compact scale keeps floor 2 footprint tight", () => {
+  const previousScale = dungeonConfig.dungeonScale;
+  try {
+    dungeonConfig.dungeonScale = 0.3;
+
+    const floor1 = generateFloorPlan(42, 1);
+    const floor2 = generateFloorPlan(42, 2);
+    const floor3 = generateFloorPlan(42, 3);
+
+    assert(
+      extentChunkCount(floor2) <= 9,
+      "floor 2 should remain compact at the default dungeon scale",
+    );
+    assert(
+      extentChunkCount(floor1) <= extentChunkCount(floor2),
+      "floor 2 should not shrink below floor 1",
+    );
+    assert(
+      extentChunkCount(floor2) <= extentChunkCount(floor3),
+      "floor 3 should be at least as large as floor 2",
+    );
+  } finally {
+    dungeonConfig.dungeonScale = previousScale;
+  }
+});
