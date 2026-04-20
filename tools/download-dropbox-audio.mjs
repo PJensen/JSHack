@@ -90,6 +90,14 @@ async function exists(path) {
   }
 }
 
+async function removeIfExists(path) {
+  try {
+    await Deno.remove(path);
+  } catch (error) {
+    if (!(error instanceof Deno.errors.NotFound)) throw error;
+  }
+}
+
 async function downloadToFile(url, outPath) {
   const response = await fetch(url, { redirect: "follow" });
   if (!response.ok) {
@@ -271,17 +279,17 @@ async function main() {
 
   await Deno.mkdir(outputDir, { recursive: true });
 
-  if (!options.overwrite && !options.dryRun && await exists(outputFile)) {
-    console.log(`Skipping existing file: ${outputFile.pathname}`);
-    return;
-  }
-
   const tempDir = await Deno.makeTempDir({
     dir: fileUrlToPath(outputDir),
     prefix: "dropbox-audio-",
   });
 
   try {
+    if (!options.dryRun) {
+      await removeIfExists(outputFile);
+      log(options, `Removed previous zip: ${outputFile.pathname}`);
+    }
+
     if (options.dryRun) {
       console.log(`Would download: ${downloadUrl}`);
       console.log(`Would write zip: ${outputFile.pathname}`);
