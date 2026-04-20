@@ -65,3 +65,39 @@ Deno.test("floatText wiring restores damage number emission with crit and delay"
   assertEquals(calls[0].opts?.delay, 0.25);
   assertEquals(calls[0].opts?.color, "#ff6060");
 });
+
+Deno.test("floatText wiring shows quest progress status text", () => {
+  const world = new World({ seed: 8 });
+  const player = world.create();
+  const calls = [];
+  const ftext = {
+    addStatus(x, y, text, opts) { calls.push({ x, y, text, opts }); },
+    addHeal() {},
+    addDamage() {},
+    addGold() {},
+  };
+  const fx = { pool: { spawn() {} } };
+
+  installFloatTextWiring({
+    world,
+    ftext,
+    fx,
+    getPosition: (id) => (id === player ? { x: 6, y: 7 } : null),
+    isPet: () => false,
+    isPlayer: (id) => id === player,
+  });
+
+  world.emit("quest:progress", {
+    questId: "starter.rat_infestation",
+    playerId: player,
+    progress: 3,
+    target: 5,
+    label: "RATS",
+  });
+
+  assertEquals(calls.length, 1);
+  assertEquals(calls[0].x, 6);
+  assertEquals(calls[0].y, 6.05);
+  assertEquals(calls[0].text, "RATS 3/5");
+  assertEquals(calls[0].opts?.color, "#ffd85a");
+});
