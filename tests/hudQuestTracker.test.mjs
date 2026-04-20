@@ -31,7 +31,7 @@ function installTestWindow() {
   };
 }
 
-Deno.test("hud quest tracker publishes only accepted focused quests", () => {
+Deno.test("hud quest tracker prioritizes accepted measurable progress quests", () => {
   const restoreWindow = installTestWindow();
 
   try {
@@ -49,12 +49,12 @@ Deno.test("hud quest tracker publishes only accepted focused quests", () => {
     }, {}, { node: "hunt" });
     world.set(ratQuest, QuestVars, { data: { accepted: true, killCount: 3, reported: false } });
 
-    const unacceptedQuest = instantiateQuest(world, STARTER_PRIEST_FETCH_QUEST_ID, {
+    const acceptedPriestQuest = instantiateQuest(world, STARTER_PRIEST_FETCH_QUEST_ID, {
       player,
       giver: 12,
       target: 12,
     }, {}, { node: "recover" });
-    world.set(unacceptedQuest, QuestVars, { data: { accepted: false, recovered: false, delivered: false } });
+    world.set(acceptedPriestQuest, QuestVars, { data: { accepted: true, recovered: false, delivered: false } });
 
     const hudFeeds = createHudFeeds(world, {
       getPlayerMana: () => ({ mana: 10, maxMana: 10 }),
