@@ -171,3 +171,26 @@ Deno.test("pet-swap: non-player cannot swap with pet", () => {
     assert(attacked, "enemy bumping pet should attack, not swap");
   } finally { clearAll(); }
 });
+
+Deno.test("pet-swap: player bumping shopkeeper swaps positions", () => {
+  loadFloorChunk();
+  try {
+    const world = new World({ seed: 52 });
+
+    const player = world.create();
+    world.add(player, Player);
+    world.add(player, Position, { x: 5, y: 5 });
+    world.add(player, Faction, { key: "player" });
+
+    const shopkeeper = world.create();
+    world.add(shopkeeper, Position, { x: 6, y: 5 });
+    world.add(shopkeeper, Faction, { key: "shopkeeper" });
+
+    const ctx = makeBumpCtx(world, { nx: 6, ny: 5, mdx: 1, mdy: 0, target: shopkeeper });
+    const handled = resolveBump(world, player, ctx);
+
+    assert(handled, "player should be able to swap with shopkeeper");
+    assertEquals(world.get(player, Position), { x: 6, y: 5 });
+    assertEquals(world.get(shopkeeper, Position), { x: 5, y: 5 });
+  } finally { clearAll(); }
+});
