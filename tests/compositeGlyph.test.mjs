@@ -29,3 +29,12 @@ Deno.test("existing single-glyph entries are unaffected", () => {
   assert(corpse, "corpse_rat missing");
   assertEquals(corpse.glyph, "%");
 });
+
+Deno.test("tree overworld variants share a grass background", () => {
+  const palette = buildPalette();
+  const grassBg = palette["grass"]?.bg;
+  assertEquals(palette["tree"]?.bg, grassBg);
+  assertEquals(palette["tree_stump"]?.bg, grassBg);
+  assertEquals(palette["tree_sapling"]?.bg, grassBg);
+  assertEquals(palette["tree_harvest"]?.bg, grassBg);
+});
