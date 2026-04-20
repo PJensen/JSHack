@@ -5,7 +5,7 @@ import { composeScheduler, registerSystem, clearSystems, getOrderedSystems, inst
 /** @typedef {import('../lib/ecs-js/index.js').World} World */
 import { drinkSystem } from "../rules/systems/drinkSystem.js";
 import { scriptTickSystem } from "../rules/systems/scriptTickSystem.js";
-import { itemPickupSystem, autoPickupPostMoveSystem } from "../rules/systems/itemPickupSystem.js";
+import { itemPickupSystem } from "../rules/systems/itemPickupSystem.js";
 import { itemDropSystem } from "../rules/systems/itemDropSystem.js";
 import { equipItemSystem } from "../rules/systems/equipItemSystem.js";
 import { useItemSystem } from "../rules/systems/useItemSystem.js";
@@ -259,8 +259,6 @@ export function configureWorld(world) {
   registerSystem(districtConditionSystem, 'effects');
   registerSystem(workstationStateSystem, 'effects');
   registerSystem(hydraulicsSystem, 'effects');
-  // Post-move auto-pickup runs after intents, within the same tick
-  registerSystem(autoPickupPostMoveSystem, 'effects');
   // Spawners tick in the effects phase
   registerSystem(monsterSpawnerSystem, 'effects');
   // Deity mood ticks in the effects phase (after combat results are emitted)

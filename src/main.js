@@ -154,7 +154,7 @@ import { getDeity } from "./rules/data/deities.js";
 import { showCharCreation } from "./display/ui/charCreation.js";
 import { installPluralizationExtensions } from "./shared/utils/pluralization.js";
 import { pickRandomSeed } from "./shared/utils/funSeeds.js";
-import { ensureStarterQuests } from "./rules/quests/runtime.js";
+import { ensureStarterQuests, getQuestRecord } from "./rules/quests/runtime.js";
 import { ensureStarterFetchQuestItem } from "./rules/quests/definitions/graveyardWatch.js";
 import {
   acceptNoticeBoardOffer,
@@ -764,9 +764,18 @@ function _finalizeNewGame(classData) {
   });
 
   ensureStarterQuests(world);
+  const runContractExisting = getQuestRecord(world, "run.contract", pe.id);
   ensureRunContractQuest(world, { playerId: pe.id });
   ensureLocalGeneratedQuest(world);
   ensureStarterFetchQuestItem(world);
+
+  if (!_savegameLoaded && !runContractExisting) {
+    const runContract = getQuestRecord(world, "run.contract", pe.id);
+    const title = String(runContract?.def?.id ? (runContract?.vars?.data?.titleOverride || "The Town Wants a Trophy") : "The Town Wants a Trophy");
+    const objective = String(runContract?.vars?.data?.objective || "").trim();
+    messageLog.log({ text: `New quest: "${title}".`, type: 'system' });
+    if (objective) messageLog.log({ text: `Objective: ${objective}`, type: 'system' });
+  }
 
   bootAdvance(_savegameLoaded ? "Restored saved player state" : "Spawned player state");
 

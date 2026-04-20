@@ -7,7 +7,7 @@
 //   3. Position update and blocking reservation
 //
 // Side effects like auto-pickup are handled by listeners
-// on the "moved" event and by autoPickupPostMoveSystem respectively.
+// on the "moved" event.
 
 import { Position } from "../components/Position.js";
 import { MoveIntent } from "../components/Intents/MoveIntent.js";
