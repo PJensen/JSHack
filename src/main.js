@@ -2640,6 +2640,7 @@ const _healthBarSeen = new Set();
 /** @type {Set<string>} */
 const _roofCoverKeys = new Set();
 const _aboveRoofEntities = [];  // entities tagged flying/above_roof, collected during main loop
+const _postLightingGlyphs = []; // blocker glyphs that should stay readable after darkness overlay
 /** @type {Map<string, number>} */
 const _roofParticleStamp = new Map();
 /** Separate stamp for large smoldering smoke particles (slower rate). @type {Map<string, number>} */
@@ -3168,6 +3169,11 @@ function hasAnyTag(entity, tags) {
     if (entity.tags.includes(tags[i])) return true;
   }
   return false;
+}
+
+function needsPostLightingRedraw(entity) {
+  const kind = typeof entity?.kind === "string" ? entity.kind : "";
+  return kind === "tree" || kind === "tree_harvest" || kind === "tree_sapling";
 }
 
 function lootLabelColorFromTags(tags) {
@@ -4101,6 +4107,7 @@ function render(worldView) {
   // Draw order: doors/stairs (200) → items (250) → actors (300) → player (400)
   // Entities are sorted by layer, so drawing inline gives correct z-order.
   _aboveRoofEntities.length = 0;
+  _postLightingGlyphs.length = 0;
 
   for (let i = 0; i < renderEntities.length; i++) {
     const e = renderEntities[i];
@@ -4229,6 +4236,13 @@ function render(worldView) {
 
     drawFlyingShadow(bctx, flyingPresentation);
     drawEntityGlyph(glyphAtlas, bctx, renderEntity, entityScale, entityRotation);
+    if (needsPostLightingRedraw(renderEntity)) {
+      _postLightingGlyphs.push({
+        entity: renderEntity,
+        scale: entityScale,
+        rotation: entityRotation,
+      });
+    }
     if (_renderTagSet.has('esp_sensed')) {
       drawEspSenseHalo(bctx, renderEntity, _fxTime);
     }
@@ -4740,6 +4754,13 @@ function render(worldView) {
       _fxTime,
       worldView.currentDepth ?? 0,
     );
+  }
+
+  if (_postLightingGlyphs.length > 0) {
+    for (let i = 0; i < _postLightingGlyphs.length; i++) {
+      const rec = _postLightingGlyphs[i];
+      drawEntityGlyph(glyphAtlas, bctx, rec.entity, rec.scale, rec.rotation);
+    }
   }
 
   drawWorldEffects({
