@@ -24,6 +24,8 @@ export const S_BOOTS    = 0.65;
 export const S_LEGS     = 0.75;
 export const S_SHIELD   = 0.85;
 
+const OVERWORLD_GRASS_BG = "#1e3214";
+
 export const basePalette = {
   // Actors
   player:         { glyph: "@", fg: "#e8f7ff", glow: "#6cf" },
@@ -100,7 +102,7 @@ export const basePalette = {
   // Tiles
   floor: { glyph: ".", fg: "#446", glow: "#224", bg: "#1a1c28" },
   grass_a:  { glyph: "'", fg: "#cce07a", glow: "#8ab850", bg: "#2a3a1a" },  // sparse/bare
-  grass:    { glyph: ",", fg: "#90c858", glow: "#5a9038", bg: "#1e3214" },  // light
+  grass:    { glyph: ",", fg: "#90c858", glow: "#5a9038", bg: OVERWORLD_GRASS_BG },  // light
   grass_c:  { glyph: ";", fg: "#6aaa42", glow: "#447828", bg: "#182c10" },  // medium
   grass_d:  { glyph: "`", fg: "#94c04e", glow: "#5a8030", bg: "#223616" },  // thick/lush
   water:      { glyph: "~", fg: "#5ea8d4", glow: "#3a6a90", bg: "#0e2a3a" },  // shallow
@@ -109,7 +111,7 @@ export const basePalette = {
   mountain:   { glyph: "⛰", fg: "#9da0a4", glow: "#5a5d61", bg: "#2a2c2e" },  // foothills
   mountain_b: { glyph: "∧", fg: "#bec1c4", glow: "#6e7174", bg: "#343638" },  // mid-peak
   mountain_c: { glyph: "▲", fg: "#e0e3e6", glow: "#969ea4", bg: "#3e4042" },  // high-peak
-  tree: { glyph: "🌲", fg: "#3f7b3d", glow: "#275026", bg: "#142610" },
+  tree: { glyph: "🌲", fg: "#3f7b3d", glow: "#275026", bg: OVERWORLD_GRASS_BG },
   farmland:  { glyph: "░", fg: "#8b7355", glow: "#5a4a38", bg: "#302818" },
   fence:     { glyph: "f", fg: "#a08050", glow: "#6b5530", bg: "#1e3214" },
   roof_thatch_shadow: { glyph: "▓", fg: "#9c7f2c", glow: "#6b5418", bg: "#4a3c14" },
@@ -313,9 +315,9 @@ export const basePalette = {
   furnace_unlit: { glyph: "🫕", fg: "#8a6040", glow: "#553320" },
   cooking_fire: { glyph: "♨", fg: "#ff9944", glow: "#dd5500" },
   // Tree harvest stages
-  tree_stump:    { glyph: ".", fg: "#8b6914", glow: "#5a4a10" },
-  tree_sapling:  { glyph: "🌱", fg: "#5a9040", glow: "#3a6020" },
-  tree_harvest:  { glyph: "🌳", fg: "#2d8b2d", glow: "#1a5a1a" },
+  tree_stump:    { glyph: ".", fg: "#8b6914", glow: "#5a4a10", bg: OVERWORLD_GRASS_BG },
+  tree_sapling:  { glyph: "🌱", fg: "#5a9040", glow: "#3a6020", bg: OVERWORLD_GRASS_BG },
+  tree_harvest:  { glyph: "🌳", fg: "#2d8b2d", glow: "#1a5a1a", bg: OVERWORLD_GRASS_BG },
   // Growth stage glyphs
   farmland_tilled: { glyph: "⁙", fg: "#8b7355", glow: "#5a4a38" },
   seedling:      { glyph: "🌱", fg: "#7ecc5a", glow: "#4a9030" },
