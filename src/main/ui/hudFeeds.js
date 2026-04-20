@@ -26,6 +26,13 @@ import { getItemCooldown } from "../../rules/utils/itemCooldowns.js";
 import { spellCost, spellCostResource } from "../../rules/data/spells.js";
 import { getCatalogItem } from "../../rules/data/itemCatalog.js";
 import { impactTracker } from "../../display/fx/projectileImpactTracker.js";
+import { QuestBindings } from "../../rules/components/QuestBindings.js";
+import { QuestDefRef } from "../../rules/components/QuestDefRef.js";
+import { QuestState } from "../../rules/components/QuestState.js";
+import { QuestVars } from "../../rules/components/QuestVars.js";
+import { getQuestDef } from "../../rules/quests/registry.js";
+import { STARTER_RAT_QUEST_ID } from "../../rules/quests/runtime.js";
+import { REQUIRED_RAT_KILLS } from "../../rules/quests/definitions/ratInfestation.js";
 
 /**
  * Provides HUD feed updaters that cache the last dispatched values.
@@ -58,6 +65,7 @@ export function createHudFeeds(world, deps) {
   let lastPetState = "";
   let lastSpellResourceSig = "";
   let lastCalendarDay = -1;
+  let lastQuestTrackerSig = "";
   let _lastSpellBarSig = '';
   let _lastPinnedSpellBarSig = '';
   /** @type {Set<string>} */
@@ -119,6 +127,92 @@ export function createHudFeeds(world, deps) {
       total += Math.max(0, Number(info.count || 0) | 0);
     }
     return Math.max(0, total | 0);
+  }
+
+  function buildQuestTrackerEntry(defId, questDef, state, vars) {
+    const questId = String(defId || "");
+    const title = String(questDef?.title || questId || "Quest");
+    const node = String(state?.node || "");
+    const data = vars?.data && typeof vars.data === "object" ? vars.data : {};
+
+    let progress = 0;
+    let target = 0;
+    if (questId === STARTER_RAT_QUEST_ID) {
+      progress = Math.max(0, Number(data.killCount || 0) | 0);
+      target = REQUIRED_RAT_KILLS;
+    } else if (Number.isFinite(Number(data.target || NaN)) && Number(data.target || 0) > 0) {
+      target = Math.max(0, Number(data.target || 0) | 0);
+      progress = Math.max(0, Number(data.progress || 0) | 0);
+    } else if (Array.isArray(data.checklist) && data.checklist.length > 0) {
+      target = data.checklist.length;
+      progress = data.checklist.reduce((sum, entry) => sum + (entry?.done ? 1 : 0), 0);
+    }
+
+    let summary = String(data.objective || "").trim();
+    if (!summary && questId === STARTER_RAT_QUEST_ID) {
+      if (node === "hunt") summary = "Clear the tavern cellar";
+      else if (node === "report") summary = "Return to the barkeep";
+      else if (node === "offer") summary = "Talk to the barkeep";
+    }
+    if (!summary && node === "report") summary = "Turn it in";
+
+    let icon = "✦";
+    if (questId === STARTER_RAT_QUEST_ID) icon = "🐀";
+    else if (questId === "starter.priest_fetch") icon = "📕";
+    else if (summary.toLowerCase().includes("return")) icon = "↩";
+
+    return {
+      questId,
+      title,
+      node,
+      progress,
+      target,
+      summary,
+      icon,
+      sortKey: Number(state?.t0 || 0),
+    };
+  }
+
+  function updateQuestTrackerHUD() {
+    const pe = playerEntity(world);
+    if (!pe) return;
+
+    const active = [];
+    for (const [, def, state, vars, bindings] of world.query(QuestDefRef, QuestState, QuestVars, QuestBindings)) {
+      if (String(state?.status || "active") !== "active") continue;
+      if (Number(bindings?.player || 0) !== Number(pe.id || 0)) continue;
+      if (vars?.data?.accepted === false) continue;
+      active.push(buildQuestTrackerEntry(def?.id, getQuestDef(def?.id), state, vars));
+    }
+
+    active.sort((a, b) => a.sortKey - b.sortKey || a.title.localeCompare(b.title));
+    const focused = active[0] || null;
+    const sig = JSON.stringify({
+      focused: focused ? {
+        questId: focused.questId,
+        node: focused.node,
+        progress: focused.progress,
+        target: focused.target,
+        summary: focused.summary,
+      } : null,
+    });
+    if (sig === lastQuestTrackerSig) return;
+    lastQuestTrackerSig = sig;
+
+    try {
+      window.dispatchEvent(new CustomEvent("ui:updateQuestTracker", {
+        detail: {
+          focused: focused ? {
+            questId: focused.questId,
+            title: focused.title,
+            progress: focused.progress,
+            target: focused.target,
+            summary: focused.summary,
+            icon: focused.icon,
+          } : null,
+        },
+      }));
+    } catch (e) { console.debug("[hudFeeds] dispatch ui:updateQuestTracker:", e); }
   }
 
   /**
@@ -538,5 +632,6 @@ export function createHudFeeds(world, deps) {
     updatePetHUD,
     updateActiveSpellHUD,
     updateCalendarHUD,
+    updateQuestTrackerHUD,
   };
 }

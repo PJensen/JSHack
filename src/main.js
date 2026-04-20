@@ -4959,6 +4959,7 @@ function frame(now) {
   hudFeeds.updatePetHUD();
   hudFeeds.updateActiveSpellHUD();
   hudFeeds.updateCalendarHUD();
+  hudFeeds.updateQuestTrackerHUD();
   bubbleDialog?.layout();
 
   // Render
