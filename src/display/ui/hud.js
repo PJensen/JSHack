@@ -409,23 +409,27 @@ export function initHUD() {
   let clockLabel = '00:00';
 
   function syncSkyChip() {
-    moonPhaseEl.textContent = `${moonEmoji} ${clockEmoji}`;
+    moonPhaseEl.textContent = `${moonEmoji} ${clockEmoji} ${clockLabel}`;
     moonPhaseEl.title = `${moonLabel} • ${clockLabel}`;
   }
 
   Object.assign(moonPhaseEl.style, {
-    minWidth: '40px',
-    height: '16px',
-    padding: '0 4px',
-    borderRadius: '8px',
-    border: '1px solid rgba(90,110,150,0.45)',
-    background: 'rgba(18,24,36,0.7)',
-    color: '#d7e4ff',
-    fontSize: '12px',
-    lineHeight: '14px',
+    minWidth: '104px',
+    minHeight: '28px',
+    padding: '4px 10px',
+    borderRadius: '14px',
+    border: '1px solid rgba(132,162,215,0.55)',
+    background: 'linear-gradient(180deg, rgba(28,36,56,0.92) 0%, rgba(14,20,34,0.94) 100%)',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.06)',
+    color: '#f2f7ff',
+    fontSize: '16px',
+    fontWeight: '700',
+    lineHeight: '20px',
+    letterSpacing: '0.02em',
     textAlign: 'center',
     whiteSpace: 'nowrap',
     pointerEvents: 'none',
+    textShadow: '0 1px 0 rgba(0,0,0,0.7)',
   });
   syncSkyChip();
 
@@ -448,8 +452,8 @@ export function initHUD() {
     marginTop: '4px',
     pointerEvents: 'auto',
   });
-  zoomHud.appendChild(moonPhaseEl);
   zoomHud.appendChild(zoomBar);
+  zoomHud.appendChild(moonPhaseEl);
 
   // Active effects HUD: vertical stack below the gauge on the right side.
   // Effects HUD — anchored top-left, horizontal flex row across the top.
