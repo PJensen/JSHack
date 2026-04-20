@@ -3,8 +3,16 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 AUDIO_DIR="$ROOT_DIR/assets/audio"
+LOCK_FILE="$ROOT_DIR/logs/audio-sync.lock"
 
 cd "$ROOT_DIR"
+mkdir -p "$ROOT_DIR/logs"
+
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+  echo "Audio sync already running; exiting."
+  exit 0
+fi
 
 before_file="$(mktemp)"
 after_file="$(mktemp)"
