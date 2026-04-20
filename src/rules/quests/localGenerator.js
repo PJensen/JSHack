@@ -168,6 +168,13 @@ function activeQuestRows(world, playerId) {
       node: String(state?.node || ""),
       progress,
       target,
+      summary: String(vars?.data?.objective || ""),
+      checklist: Array.isArray(vars?.data?.checklist)
+        ? vars.data.checklist.map((entry) => ({
+          text: String(entry?.text || ""),
+          done: !!entry?.done,
+        }))
+        : [],
       source: String(vars?.data?.templateKey || "local"),
       sourceDistrict: String(vars?.data?.sourceDistrict || ""),
       offerTag: String(vars?.data?.offerTag || ""),

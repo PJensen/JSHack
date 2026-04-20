@@ -88,6 +88,7 @@ import { installDialogRuntime } from "../rules/dialogues/runtime.js";
 import { installQuestRuntime } from "../rules/quests/runtime.js";
 import { installStarterFetchQuestHooks } from "../rules/quests/definitions/graveyardWatch.js";
 import { installRatQuestHooks } from "../rules/quests/definitions/ratInfestation.js";
+import { installRunContractHooks } from "../rules/quests/definitions/runContract.js";
 // Side-effect: registers script handlers at import time
 import "../rules/scripts/traps.js";
 import "../rules/scripts/monsters.js";
@@ -113,6 +114,7 @@ export function configureWorld(world) {
   installQuestRuntime(world);
   installStarterFetchQuestHooks(world);
   installRatQuestHooks(world);
+  installRunContractHooks(world);
 
   installTownfolkDoorListener(world);
   installBellListener(world);

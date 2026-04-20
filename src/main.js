@@ -56,6 +56,7 @@ import { registerBuiltinCommands } from "./main/debug/consoleCommands.js";
 import { createCanvasSetup } from "./main/bootstrap/canvasSetup.js";
 import { installInventoryDataProvider } from "./main/ui/inventoryDataProvider.js";
 import { shouldSuppressRecentPickupChipForEquippedDuplicate } from "./main/ui/quickChipPolicy.js";
+import { ensureRunContractQuest } from "./rules/quests/definitions/runContract.js";
 import { impactTracker } from "./display/fx/projectileImpactTracker.js";
 import { createThrowFxController } from "./display/fx/throwFxController.js";
 import { createPickupFxController } from "./display/fx/pickupFxController.js";
@@ -763,6 +764,7 @@ function _finalizeNewGame(classData) {
   });
 
   ensureStarterQuests(world);
+  ensureRunContractQuest(world, { playerId: pe.id });
   ensureLocalGeneratedQuest(world);
   ensureStarterFetchQuestItem(world);
 

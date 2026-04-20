@@ -44,6 +44,7 @@ import { isChestIdentity } from "../../shared/chests.js";
 import { getPassiveBonuses } from "../../rules/utils/passiveBonuses.js";
 import { QuestDefRef } from "../../rules/components/QuestDefRef.js";
 import { QuestState } from "../../rules/components/QuestState.js";
+import { QuestVars } from "../../rules/components/QuestVars.js";
 import { Encumbrance } from "../../rules/components/Encumbrance.js";
 import { Traits } from "../../rules/components/Traits.js";
 import { getQuestDef } from "../../rules/quests/registry.js";
@@ -829,7 +830,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
 
   addEventListener('ui:requestQuestJournalData', () => {
     const questMap = new Map();
-    for (const [, def, state] of world.query(QuestDefRef, QuestState)) {
+    for (const [, def, state, vars] of world.query(QuestDefRef, QuestState, QuestVars)) {
       const questDef = getQuestDef(def.id);
       const rec = {
         questId: String(def.id || ''),
@@ -837,6 +838,13 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
         status: String(state.status || 'active'),
         node: String(state.node || ''),
         t0: Number(state.t0 || 0),
+        summary: String(vars?.data?.objective || ''),
+        checklist: Array.isArray(vars?.data?.checklist)
+          ? vars.data.checklist.map((entry) => ({
+            text: String(entry?.text || ''),
+            done: !!entry?.done,
+          }))
+          : [],
       };
       const prev = questMap.get(rec.questId);
       if (!prev || rec.t0 >= prev.t0) questMap.set(rec.questId, rec);

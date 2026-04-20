@@ -408,7 +408,7 @@ function questNodeLabel(node, status) {
 
 /**
  * @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel
- * @param {Array<{questId:string, title:string, status:string, node:string, t0:number}>} quests
+ * @param {Array<{questId:string, title:string, status:string, node:string, t0:number, summary?:string, checklist?:Array<{text?:string, done?:boolean}>}>} quests
  */
 export function renderQuestJournal(panel, quests) {
   const el = /** @type {HTMLDivElement} */ (/** @type {any} */ (panel)._inner);
@@ -449,9 +449,6 @@ export function renderQuestJournal(panel, quests) {
     for (const q of items) {
       const row = document.createElement('div');
       Object.assign(row.style, {
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
         padding: '7px 10px',
         marginBottom: '4px',
         background: '#0a111f',
@@ -460,9 +457,16 @@ export function renderQuestJournal(panel, quests) {
         fontSize: '13px',
       });
 
+      const header = document.createElement('div');
+      Object.assign(header.style, {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+      });
+
       const titleEl = document.createElement('span');
       titleEl.textContent = q.title || q.questId;
-      row.appendChild(titleEl);
+      header.appendChild(titleEl);
 
       const badge = document.createElement('span');
       const nodeLabel = questNodeLabel(q.node, q.status);
@@ -479,7 +483,29 @@ export function renderQuestJournal(panel, quests) {
         color: isComplete ? '#5ecb72' : (q.node === 'report' ? '#f5c043' : '#5fb3ff'),
         border: isComplete ? '1px solid #2a6e38' : (q.node === 'report' ? '1px solid #7a5a10' : '1px solid #1e4a7e'),
       });
-      row.appendChild(badge);
+      header.appendChild(badge);
+      row.appendChild(header);
+
+      if (q.summary) {
+        const summary = document.createElement('div');
+        summary.textContent = String(q.summary || '');
+        Object.assign(summary.style, { fontSize: '11px', opacity: '0.84', marginTop: '4px' });
+        row.appendChild(summary);
+      }
+
+      const checklist = Array.isArray(q.checklist) ? q.checklist : [];
+      for (const entry of checklist) {
+        if (!entry?.text) continue;
+        const line = document.createElement('div');
+        line.textContent = `${entry.done ? '[x]' : '[ ]'} ${String(entry.text || '')}`;
+        Object.assign(line.style, {
+          fontSize: '10px',
+          opacity: entry.done ? '0.8' : '0.65',
+          marginTop: '3px',
+        });
+        row.appendChild(line);
+      }
+
       el.appendChild(row);
     }
   }
@@ -494,7 +520,7 @@ export function renderQuestJournal(panel, quests) {
  *   districts?: Array<{label?:string, opportunities?:string[], shortages?:string[]}>,
  *   questBoard?: {
  *     generatedAt?: number,
- *     active?: Array<{title?:string, status?:string, progress?:number, target?:number}>,
+ *     active?: Array<{title?:string, status?:string, progress?:number, target?:number, summary?:string, checklist?:Array<{text?:string, done?:boolean}>}>,
  *     offers?: Array<{title?:string, objective?:string, sourceLabel?:string, urgency?:string, accepted?:boolean}>,
  *     sectors?: string[],
  *   }
@@ -560,6 +586,20 @@ export function renderTownBoard(panel, data) {
         progress.textContent = `Progress: ${Number(quest?.progress || 0)}/${Number(quest?.target || 0)}`;
         Object.assign(progress.style, { fontSize: '11px', opacity: '0.8', marginTop: '2px' });
         row.appendChild(progress);
+      }
+      if (quest?.summary) {
+        const summary = document.createElement('div');
+        summary.textContent = String(quest.summary || '');
+        Object.assign(summary.style, { fontSize: '11px', opacity: '0.82', marginTop: '3px' });
+        row.appendChild(summary);
+      }
+      const checklist = Array.isArray(quest?.checklist) ? quest.checklist : [];
+      for (const entry of checklist) {
+        if (!entry?.text) continue;
+        const line = document.createElement('div');
+        line.textContent = `${entry.done ? '[x]' : '[ ]'} ${String(entry.text || '')}`;
+        Object.assign(line.style, { fontSize: '10px', opacity: entry.done ? '0.78' : '0.62', marginTop: '2px' });
+        row.appendChild(line);
       }
       el.appendChild(row);
     }
@@ -1764,4 +1804,3 @@ export function renderDeathLog(panel, records) {
     else if (k === 'Escape') { hide(panel); e.preventDefault(); }
   });
 }
-
