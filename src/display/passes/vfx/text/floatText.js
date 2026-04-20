@@ -211,7 +211,7 @@ export class FloatText {
       ctx.scale(scale, scale);
       // Keep text upright and roughly tile-sized
       const fontPx = (p.flavor === 'damage' || p.flavor === 'gold' || p.flavor === 'heal') ? worldFontPx : smallFontPx;
-      ctx.font = (p.flavor === 'gold' ? 'bold ' : '') + `${fontPx}px monospace`;
+      ctx.font = `${fontPx}px monospace`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.globalAlpha *= Math.max(0, Math.min(1, alpha));
