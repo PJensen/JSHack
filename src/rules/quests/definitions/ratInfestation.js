@@ -28,6 +28,19 @@ function killCount(world, qid) {
   return Number(rec?.data?.killCount || 0);
 }
 
+function ratProgressPayload(ctx) {
+  const playerId = Number(ctx.bind.player || 0) | 0;
+  const pos = playerId > 0 ? ctx.world.get(playerId, Position) : null;
+  return {
+    questId: RAT_INFESTATION_QUEST_ID,
+    playerId,
+    progress: killCount(ctx.world, ctx.qid),
+    target: REQUIRED_RAT_KILLS,
+    label: "RATS",
+    at: pos ? { x: Number(pos.x) | 0, y: Number(pos.y) | 0 } : null,
+  };
+}
+
 export function installRatQuestHooks(world) {
   if (world[RAT_HOOKS_KEY]) return;
   world[RAT_HOOKS_KEY] = true;
@@ -157,6 +170,7 @@ export const RatInfestationQuest = registerQuest({
             },
             actions: [
               incVar("killCount", 1),
+              emit("quest:progress", ratProgressPayload),
               emit("quest:advanced", (ctx) => ({
                 questId: RAT_INFESTATION_QUEST_ID,
                 playerId: ctx.bind.player,
@@ -173,6 +187,7 @@ export const RatInfestationQuest = registerQuest({
             },
             actions: [
               incVar("killCount", 1),
+              emit("quest:progress", ratProgressPayload),
             ],
             to: "hunt",
           },

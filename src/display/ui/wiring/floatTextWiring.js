@@ -984,6 +984,28 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     ftext.addGold(pos.x, pos.y - 0.45, qty);
   });
 
+  world.on('quest:progress', ({ questId, playerId, progress, target, label, at }) => {
+    const qid = String(questId || '');
+    const owner = Number(playerId || 0) | 0;
+    const current = Math.max(0, Number(progress || 0) | 0);
+    const total = Math.max(0, Number(target || 0) | 0);
+    if (!qid || !(owner > 0) || total <= 0 || current <= 0) return;
+    if (!_throttle(`quest:progress:vfx:${qid}:${current}`, 250)) return;
+    const anchored = at && Number.isFinite(Number(at.x)) && Number.isFinite(Number(at.y))
+      ? { x: Number(at.x), y: Number(at.y) }
+      : null;
+    const pos = anchored || getPosition(owner);
+    if (!pos || !canShowAt(pos.x, pos.y)) return;
+
+    const prefix = String(label || 'QUEST').trim().toUpperCase();
+    ftext.addStatus(pos.x, pos.y - 0.95, `${prefix} ${current}/${total}`, {
+      color: '#ffd85a',
+      life: 1.15,
+      scaleStart: 1.18,
+      scaleEnd: 0.98,
+    });
+  });
+
   world.on('quest:completed', ({ questId, playerId, at }) => {
     const qid = String(questId || '');
     const owner = Number(playerId || 0) | 0;
