@@ -981,32 +981,7 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     const pos = getPosition(Number(ownerId || 0));
     if (!pos || !canShowAt(pos.x, pos.y)) return;
 
-    ftext.addGold(pos.x, pos.y - 0.45, qty, {
-      life: 1.95,
-      scaleStart: .5,
-      scaleEnd: 0.22,
-      color: '#ffa200',
-    });
-
-    for (let i = 0; i < 12; i++) {
-      const angle = -Math.PI / 2 + (Math.random() - 0.5) * 1.35;
-      const speed = 0.22 + Math.random() * 0.42;
-      fx.pool.spawn(new Particle({
-        x: pos.x + (Math.random() - 0.5) * 0.24,
-        y: pos.y - 0.08 + (Math.random() - 0.5) * 0.14,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed - 0.36,
-        ay: 0.72,
-        life: 0.28 + Math.random() * 0.22,
-        size0: 0.08 + Math.random() * 0.04,
-        size1: 0.01,
-        r: 255,
-        g: 206 + ((Math.random() * 28) | 0),
-        b: 92 + ((Math.random() * 38) | 0),
-        a0: 0.92,
-        a1: 0.0,
-      }));
-    }
+    ftext.addGold(pos.x, pos.y - 0.45, qty);
   });
 
   world.on('quest:completed', ({ questId, playerId, at }) => {
