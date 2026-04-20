@@ -56,6 +56,13 @@ Deno.test("hud quest tracker prioritizes accepted measurable progress quests", (
     }, {}, { node: "recover" });
     world.set(acceptedPriestQuest, QuestVars, { data: { accepted: true, recovered: false, delivered: false } });
 
+    const unacceptedRatQuest = instantiateQuest(world, RAT_INFESTATION_QUEST_ID, {
+      player,
+      giver: 13,
+      target: 13,
+    }, {}, { node: "hunt", allowDuplicate: true });
+    world.set(unacceptedRatQuest, QuestVars, { data: { accepted: false, killCount: 5, reported: false } });
+
     const hudFeeds = createHudFeeds(world, {
       getPlayerMana: () => ({ mana: 10, maxMana: 10 }),
       ensureActiveSpell: () => null,
