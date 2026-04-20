@@ -170,6 +170,11 @@ export function createHudFeeds(world, deps) {
       summary,
       icon,
       sortKey: Number(state?.t0 || 0),
+      priority: (
+        (target > 0 ? 100 : 0)
+        + (progress > 0 ? 20 : 0)
+        + (node === "report" ? 10 : 0)
+      ),
     };
   }
 
@@ -185,7 +190,7 @@ export function createHudFeeds(world, deps) {
       active.push(buildQuestTrackerEntry(def?.id, getQuestDef(def?.id), state, vars));
     }
 
-    active.sort((a, b) => a.sortKey - b.sortKey || a.title.localeCompare(b.title));
+    active.sort((a, b) => b.priority - a.priority || b.sortKey - a.sortKey || a.title.localeCompare(b.title));
     const focused = active[0] || null;
     const sig = JSON.stringify({
       focused: focused ? {
