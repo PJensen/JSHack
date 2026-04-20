@@ -32,6 +32,7 @@ import { getTile, setTile, isLoaded, isWalkable } from "../environment/dungeon/t
 import { TILE_VOID } from "../environment/dungeon/constants.js";
 import { STAMINA_REGEN_COOLDOWN } from "./regenConstants.js";
 import { emitSafe } from "../utils/emitSafe.js";
+import { hasActiveDialogSession } from "../dialogues/runtime.js";
 
 /**
  * @typedef {{
@@ -145,10 +146,11 @@ const petSwap = {
     if (!(ctx.target > 0) || ctx.target === actor) return false;
     if (world.has(ctx.target, Pet)) return true;
     const fac = world.get(ctx.target, Faction);
-    return fac?.key === "summoned"
-      || fac?.key === "shopkeeper"
-      || fac?.key === "neutral"
-      || fac?.key === "townfolk";
+    if (fac?.key === "summoned") return true;
+    if (fac?.key === "shopkeeper" || fac?.key === "neutral" || fac?.key === "townfolk") {
+      return hasActiveDialogSession(world, actor, ctx.target);
+    }
+    return false;
   },
   resolve(world, actor, ctx) {
     const actorPos = world.get(actor, Position);

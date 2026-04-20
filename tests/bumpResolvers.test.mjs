@@ -3,6 +3,7 @@ import { World } from "../src/lib/ecs-js/index.js";
 import { Position } from "../src/rules/components/Position.js";
 import { Vitality } from "../src/rules/components/Vitality.js";
 import { Faction } from "../src/rules/components/Faction.js";
+import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { Player } from "../src/rules/components/Player.js";
 import { Equipment } from "../src/rules/components/Equipment.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
@@ -11,6 +12,8 @@ import { Interactable } from "../src/rules/components/Interactable.js";
 import { Collider } from "../src/rules/components/Collider.js";
 import { AttackIntent } from "../src/rules/components/Intents/AttackIntent.js";
 import { resolveBump, BUMP_RESOLVERS } from "../src/rules/data/bumpResolvers.js";
+import { clearDialogRegistry, registerDialog } from "../src/rules/dialogues/registry.js";
+import { installDialogRuntime } from "../src/rules/dialogues/runtime.js";
 import { loadChunk, clearAll, getTile, setTile } from "../src/rules/environment/dungeon/tileMap.js";
 import { CHUNK_SIZE, TILE_FLOOR, TILE_WALL, TILE_TREE, TILE_GRASS } from "../src/rules/environment/dungeon/constants.js";
 import { getTileQuerySnapshot } from "../src/rules/utils/tileQueryCache.js";
@@ -107,10 +110,12 @@ Deno.test("bumpResolvers: neutral NPC with Interactable triggers interact, not a
   } finally { clearAll(); }
 });
 
-Deno.test("bumpResolvers: player bumping townfolk swaps positions instead of interacting", () => {
+Deno.test("bumpResolvers: player bumping townfolk with active dialog swaps positions instead of interacting", () => {
   loadFloorChunk();
   try {
+    clearDialogRegistry();
     const world = new World({ seed: 44 });
+    installDialogRuntime(world);
     const actor = world.create();
     world.add(actor, Player, {});
     world.add(actor, Position, { x: 3, y: 3 });
@@ -118,8 +123,21 @@ Deno.test("bumpResolvers: player bumping townfolk swaps positions instead of int
 
     const npc = world.create();
     world.add(npc, Position, { x: 4, y: 3 });
+    world.add(npc, NamedIdentity, { name: "Villager", identity: "townfolk_villager" });
     world.add(npc, Faction, { key: "townfolk" });
     world.add(npc, Interactable, { action: "talkToNPC" });
+
+    registerDialog({
+      id: "test:npc_swap_dialog",
+      start: "root",
+      nodes: {
+        root: {
+          text: "Hello.",
+          choices: [{ id: "bye", label: "Bye", close: true }],
+        },
+      },
+    });
+    world.emit("dialog:openRequest", { actorId: actor, targetId: npc, dialogId: "test:npc_swap_dialog" });
 
     let interacted = false;
     world.on("bump:interact", () => { interacted = true; });

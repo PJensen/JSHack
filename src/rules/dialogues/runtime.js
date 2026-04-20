@@ -11,6 +11,16 @@ function getSessions(world) {
   return world[DIALOG_SESSIONS_KEY];
 }
 
+export function hasActiveDialogSession(world, actorId, targetId) {
+  const actor = Number(actorId || 0) | 0;
+  const target = Number(targetId || 0) | 0;
+  if (!(actor > 0) || !(target > 0)) return false;
+  for (const session of getSessions(world).values()) {
+    if (session.actorId === actor && session.targetId === target) return true;
+  }
+  return false;
+}
+
 function nextSessionId(world) {
   const next = (Number(world[DIALOG_SESSION_NEXT_KEY] || 0) | 0) + 1;
   world[DIALOG_SESSION_NEXT_KEY] = next;

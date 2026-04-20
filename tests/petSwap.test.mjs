@@ -9,7 +9,11 @@ import { Equipment } from "../src/rules/components/Equipment.js";
 import { Stamina } from "../src/rules/components/Stamina.js";
 import { Facing } from "../src/rules/components/Facing.js";
 import { MoveIntent } from "../src/rules/components/Intents/MoveIntent.js";
+import { Interactable } from "../src/rules/components/Interactable.js";
 import { resolveBump, BUMP_RESOLVERS } from "../src/rules/data/bumpResolvers.js";
+import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
+import { clearDialogRegistry, registerDialog } from "../src/rules/dialogues/registry.js";
+import { installDialogRuntime } from "../src/rules/dialogues/runtime.js";
 import { movementSystem } from "../src/rules/systems/movementSystem.js";
 import { installBumpAttackListener, resolveMeleeAttack } from "../src/rules/systems/combatSystem.js";
 import { loadChunk, clearAll } from "../src/rules/environment/dungeon/tileMap.js";
@@ -172,10 +176,12 @@ Deno.test("pet-swap: non-player cannot swap with pet", () => {
   } finally { clearAll(); }
 });
 
-Deno.test("pet-swap: player bumping shopkeeper swaps positions", () => {
+Deno.test("pet-swap: player bumping shopkeeper talks first, then swaps once dialog is active", () => {
   loadFloorChunk();
   try {
+    clearDialogRegistry();
     const world = new World({ seed: 52 });
+    installDialogRuntime(world);
 
     const player = world.create();
     world.add(player, Player);
@@ -184,12 +190,34 @@ Deno.test("pet-swap: player bumping shopkeeper swaps positions", () => {
 
     const shopkeeper = world.create();
     world.add(shopkeeper, Position, { x: 6, y: 5 });
+    world.add(shopkeeper, NamedIdentity, { name: "Shopkeeper", identity: "shopkeeper" });
     world.add(shopkeeper, Faction, { key: "shopkeeper" });
+    world.add(shopkeeper, Interactable, { action: "openShop" });
+    registerDialog({
+      id: "test:shopkeeper_swap_dialog",
+      start: "root",
+      nodes: {
+        root: {
+          text: "Welcome.",
+          choices: [{ id: "close", label: "Close", close: true }],
+        },
+      },
+    });
 
     const ctx = makeBumpCtx(world, { nx: 6, ny: 5, mdx: 1, mdy: 0, target: shopkeeper });
-    const handled = resolveBump(world, player, ctx);
+    let interacted = false;
+    world.on("bump:interact", () => { interacted = true; });
+    const firstHandled = resolveBump(world, player, ctx);
 
-    assert(handled, "player should be able to swap with shopkeeper");
+    assert(firstHandled, "first bump should be handled");
+    assert(interacted, "first bump should interact with shopkeeper");
+    assertEquals(world.get(player, Position), { x: 5, y: 5 });
+    assertEquals(world.get(shopkeeper, Position), { x: 6, y: 5 });
+
+    world.emit("dialog:openRequest", { actorId: player, targetId: shopkeeper, dialogId: "test:shopkeeper_swap_dialog" });
+    const secondHandled = resolveBump(world, player, ctx);
+
+    assert(secondHandled, "second bump with active dialog should swap");
     assertEquals(world.get(player, Position), { x: 6, y: 5 });
     assertEquals(world.get(shopkeeper, Position), { x: 5, y: 5 });
   } finally { clearAll(); }
