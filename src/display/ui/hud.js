@@ -458,7 +458,7 @@ export function initHUD() {
     position: 'fixed',
     left: 'calc(8px + env(safe-area-inset-left, 0px))',
     top: 'calc(8px + env(safe-area-inset-top, 0px))',
-    display: 'flex', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', gap: '4px',
+    display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px',
     padding: '6px 8px', borderRadius: '6px',
     background: 'rgba(10,14,22,0.55)', border: '1px solid #2d3b52',
     pointerEvents: 'none',
@@ -474,7 +474,16 @@ export function initHUD() {
   });
   const affixRow = document.createElement('div');
   Object.assign(affixRow.style, { display: 'flex', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', gap: '4px' });
+  const questRow = document.createElement('div');
+  Object.assign(questRow.style, {
+    display: 'none',
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    gap: '4px',
+    width: 'min(280px, calc(100vw - 32px))',
+  });
   effectsHud.appendChild(statusRow);
+  effectsHud.appendChild(questRow);
   effectsHud.appendChild(affixRow);
   topRightHud.appendChild(vitals);
   topRightHud.appendChild(zoomHud);
@@ -1353,6 +1362,94 @@ export function initHUD() {
       });
       affixRow.appendChild(chip);
     }
+  });
+
+  window.addEventListener('ui:updateQuestTracker', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const focused = e?.detail?.focused || null;
+
+    questRow.replaceChildren();
+    if (!focused) {
+      questRow.style.display = 'none';
+      return;
+    }
+
+    questRow.style.display = 'flex';
+
+    const card = document.createElement('div');
+    Object.assign(card.style, {
+      display: 'grid',
+      gridTemplateColumns: 'auto 1fr auto',
+      alignItems: 'center',
+      gap: '6px',
+      minHeight: '28px',
+      padding: '5px 7px',
+      borderRadius: '7px',
+      border: '1px solid #5d5122',
+      background: 'linear-gradient(180deg, rgba(44,34,12,0.88) 0%, rgba(22,18,10,0.88) 100%)',
+      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)',
+    });
+
+    const icon = document.createElement('div');
+    icon.textContent = String(focused?.icon || '✦');
+    Object.assign(icon.style, {
+      fontSize: '14px',
+      lineHeight: '1',
+      filter: 'drop-shadow(0 1px 0 rgba(0,0,0,.6))',
+    });
+
+    const textWrap = document.createElement('div');
+    Object.assign(textWrap.style, {
+      minWidth: '0',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '1px',
+    });
+
+    const title = document.createElement('div');
+    title.textContent = String(focused?.title || 'Quest');
+    Object.assign(title.style, {
+      fontSize: '11px',
+      lineHeight: '1.1',
+      color: '#fff1ba',
+      whiteSpace: 'nowrap',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      letterSpacing: '0.02em',
+    });
+
+    const summary = document.createElement('div');
+    const summaryText = String(focused?.summary || '').trim();
+    summary.textContent = summaryText || 'Active objective';
+    Object.assign(summary.style, {
+      fontSize: '10px',
+      lineHeight: '1.1',
+      color: 'rgba(255,245,210,0.72)',
+      whiteSpace: 'nowrap',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+    });
+
+    const progress = document.createElement('div');
+    const current = Math.max(0, Number(focused?.progress || 0) | 0);
+    const target = Math.max(0, Number(focused?.target || 0) | 0);
+    progress.textContent = target > 0 ? `${current}/${target}` : '';
+    Object.assign(progress.style, {
+      minWidth: '36px',
+      textAlign: 'right',
+      fontSize: '11px',
+      fontWeight: '700',
+      color: '#ffd85a',
+      textShadow: '0 1px 0 rgba(0,0,0,.8)',
+    });
+
+    textWrap.appendChild(title);
+    textWrap.appendChild(summary);
+    card.appendChild(icon);
+    card.appendChild(textWrap);
+    card.appendChild(progress);
+    questRow.appendChild(card);
   });
 
   // --- Action bar spell slots (WoW-style, desktop only) ---
