@@ -177,6 +177,18 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     sfxAt(dropId, at, pp());
   });
 
+  world.on('potion:splash', ({ at }) => {
+    sfxAt("item:impact:potion", at, pp());
+  });
+
+  world.on('potion:splash:dud', ({ at }) => {
+    sfxAt("item:impact:potion", at, pp());
+  });
+
+  world.on('potion:oil_splash', ({ at }) => {
+    sfxAt("item:impact:potion", at, pp());
+  });
+
   world.on('item:equipped', ({ itemId }) => {
     const cat = itemCategory(getItemInfo, itemId);
     const equipId = (cat === "weapon" || cat === "armor")
