@@ -485,6 +485,7 @@ export function initHUD() {
     alignItems: 'stretch',
     gap: '4px',
     width: 'min(280px, calc(100vw - 32px))',
+    pointerEvents: 'auto',
   });
   effectsHud.appendChild(statusRow);
   effectsHud.appendChild(questRow);
@@ -1393,6 +1394,21 @@ export function initHUD() {
       border: '1px solid #5d5122',
       background: 'linear-gradient(180deg, rgba(44,34,12,0.88) 0%, rgba(22,18,10,0.88) 100%)',
       boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)',
+      cursor: 'pointer',
+      pointerEvents: 'auto',
+      touchAction: 'manipulation',
+    });
+    card.title = 'Open quest journal';
+    card.setAttribute('role', 'button');
+    card.tabIndex = 0;
+    card.addEventListener('click', () => {
+      try { window.dispatchEvent(new CustomEvent('ui:openQuests')); } catch (err) { console.debug('[hud] dispatch ui:openQuests:', err); }
+    });
+    card.addEventListener('keydown', (ke) => {
+      const key = String(ke?.key || '');
+      if (key !== 'Enter' && key !== ' ') return;
+      ke.preventDefault();
+      try { window.dispatchEvent(new CustomEvent('ui:openQuests')); } catch (err) { console.debug('[hud] dispatch ui:openQuests:', err); }
     });
 
     const icon = document.createElement('div');
