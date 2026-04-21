@@ -81,6 +81,9 @@ export const GraveyardWatchQuest = registerQuest({
   id: STARTER_PRIEST_FETCH_QUEST_ID,
   title: "The Book Below",
   version: 1,
+  journal: {
+    flavorText: "Father Tovin sent you below the graveyard chapel after a funerary volume that should never have been left in the dark this long.",
+  },
   vars: {
     accepted: false,
     recovered: false,

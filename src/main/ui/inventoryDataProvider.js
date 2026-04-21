@@ -61,6 +61,72 @@ const _installed = Symbol.for('inventoryDataProvider');
 const _uiEventTarget = globalThis.window || globalThis;
 const _itemPalette = buildPalette();
 
+function titleCaseWords(value) {
+  return String(value || "")
+    .split(/[\s_\-]+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+function questJournalFlavorText(questDef, vars, questId) {
+  const explicit = String(questDef?.journal?.flavorText || vars?.journalFlavorText || "").trim();
+  if (explicit) return explicit;
+
+  const district = String(vars?.sourceLabel || vars?.sourceDistrict || "").trim();
+  if (district) {
+    return `The town board posted this work for ${district}. Finish the route and report back with proof the job is done.`;
+  }
+
+  if (String(questId || "") === "starter.priest_fetch") {
+    return "The priest swore a forbidden volume was lost beneath town. He wants it recovered before grave-damp and grave-robbers ruin it completely.";
+  }
+  if (String(questId || "") === "starter.rat_infestation") {
+    return "The barkeep wants the cellar cleared before vermin spread through the kegs, floorboards, and sleeping rooms.";
+  }
+  if (String(questId || "") === "run.contract") {
+    return "Town wants a visible victory. Bring back a named trophy and make sure everyone knows the roads are safer for it.";
+  }
+
+  return "A standing job logged in your journal.";
+}
+
+function questJournalRewardText(questDef, vars, questId) {
+  const parts = [];
+  const rewardGold = Math.max(0, Number(vars?.rewardGold || 0) | 0);
+  if (rewardGold > 0) parts.push(`${rewardGold} gold`);
+  const rewardItems = Array.isArray(questDef?.journal?.rewardItems)
+    ? questDef.journal.rewardItems
+    : [];
+  for (const item of rewardItems) {
+    const label = String(item?.label || "").trim();
+    if (!label) continue;
+    const count = Math.max(1, Number(item?.count || 1) | 0);
+    parts.push(count > 1 ? `${count}x ${label}` : label);
+  }
+  const explicit = String(vars?.rewardText || questDef?.journal?.rewardText || "").trim();
+  if (parts.length <= 0 && explicit) return explicit;
+  if (parts.length > 0) return parts.join(" and ");
+  return "No reward recorded.";
+}
+
+function questJournalCompletionText(state, vars) {
+  const status = String(state?.status || "active");
+  if (status === "complete") {
+    const completed = String(vars?.completionText || vars?.objective || "").trim();
+    return completed || "Quest complete.";
+  }
+
+  const objective = String(vars?.objective || "").trim();
+  if (objective) return objective;
+
+  const progress = Math.max(0, Number(vars?.progress || 0) | 0);
+  const target = Math.max(0, Number(vars?.target || 0) | 0);
+  if (target > 0) return `Progress: ${progress}/${target}`;
+
+  return "";
+}
+
 /**
  * Install event listeners that supply inventory/use/throw/apply/message/death
  * data to the display overlays.
@@ -832,6 +898,8 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
     const questMap = new Map();
     for (const [, def, state, vars] of world.query(QuestDefRef, QuestState, QuestVars)) {
       const questDef = getQuestDef(def.id);
+      const rewardText = questJournalRewardText(questDef, vars?.data, def.id);
+      const completionText = questJournalCompletionText(state, vars?.data);
       const rec = {
         questId: String(def.id || ''),
         title: String(questDef?.title || def.id || ''),
@@ -839,6 +907,11 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
         node: String(state.node || ''),
         t0: Number(state.t0 || 0),
         summary: String(vars?.data?.objective || ''),
+        flavorText: questJournalFlavorText(questDef, vars?.data, def.id),
+        rewardText,
+        completionText,
+        progress: Math.max(0, Number(vars?.data?.progress || 0) | 0),
+        target: Math.max(0, Number(vars?.data?.target || 0) | 0),
         checklist: Array.isArray(vars?.data?.checklist)
           ? vars.data.checklist.map((entry) => ({
             text: String(entry?.text || ''),
