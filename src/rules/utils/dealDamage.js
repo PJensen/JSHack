@@ -395,8 +395,8 @@ export function dealDamage(world, spec) {
     ensureEquippedAffixTopology(world, target);
     const out = evaluateEquippedAffixProcs(world, target, {
       kind: "onDamaged",
-      source,
-      target,
+      source: target,
+      target: source,
       damage: {
         amount: finalAmount,
         type,
