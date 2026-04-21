@@ -1632,7 +1632,7 @@ export const MONSTERS = [
       chemical: { toxMult: 0 },
       thermal: { burnMult: 0.8 },
     },
-    speed: 4,
+    speed: 3,
     hooks: {
       onHit: [statusEffectOnHit(40, 0xdead0511, { key: "poison", turnsLeft: 4, potency: 1 }, "proc:poisoned")],
     },
