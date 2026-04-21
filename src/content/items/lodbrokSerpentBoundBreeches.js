@@ -18,7 +18,7 @@ defineItem('lodbrok_serpent_bound_breeches', {
   rarity: 'epic',
   material: 'serpenthide',
 
-  description: "Woven from hide, spite, and one king's refusal to die politely.",
+  description: "Cursed serpenthide mail that hardens into a thorned ward under pressure, then answers with spectral snakes when you slip the trap.",
 
   tags: [
     'armor',
@@ -48,7 +48,7 @@ defineItem('lodbrok_serpent_bound_breeches', {
       icon: '🐍',
       targeting: 'none',
       cooldown: 100,
-      description: 'Breaks snares, roots, webs, freezing, grapples, and constriction. Spectral serpents retaliate for 10 turns.',
+      description: 'Breaks snares, roots, webs, freezing, grapples, and constriction. Grants serpent-hide for 8 turns and spectral-serpent retaliation for 10.',
       onActivate(ctx) {
         ctx.cure(ctx.user, [
           'slowed',

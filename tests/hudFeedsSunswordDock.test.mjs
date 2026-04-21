@@ -9,6 +9,7 @@ import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 import { ItemCooldown } from "../src/rules/components/ItemCooldown.js";
 import { Stamina } from "../src/rules/components/Stamina.js";
 import "../src/content/items/sunsword.js";
+import "../src/content/items/lodbrokSerpentBoundBreeches.js";
 import { installContent } from "../src/content/install.js";
 installContent();
 
@@ -149,6 +150,66 @@ Deno.test("hudFeeds prepends equipped Sunsword action into the desktop spell doc
     assertEquals(String(slots[1]?.id || ""), "heal");
     assertEquals(String(slots[5]?.id || ""), "lightning");
     assert(!slots.some((entry) => String(entry?.id || "") === "smite"), "expected last action bar spell to be spliced out when Sunsword occupies the dock");
+  } finally {
+    restoreWindow();
+  }
+});
+
+Deno.test("hudFeeds prepends equipped leg-slot content abilities into the spell dock", () => {
+  const restoreWindow = installTestWindow();
+
+  try {
+    const world = new World({ seed: 14 });
+    const player = world.create();
+    world.add(player, Player, {});
+    world.add(player, Position, { x: 0, y: 0 });
+    world.add(player, Equipment, {});
+    world.add(player, Stamina, { stamina: 10, maxStamina: 10, staminaRegen: 1, regenCooldown: 0 });
+
+    const breeches = world.create();
+    world.add(breeches, NamedIdentity, { name: "Loðbrók's Serpent-Bound Breeches", identity: "lodbrok_serpent_bound_breeches" });
+    world.add(breeches, ItemInfo, {
+      type: "equip",
+      slot: "legs",
+      count: 1,
+      bonuses: {},
+      rarity: 4,
+      rarityName: "epic",
+      affixes: [],
+    });
+    world.add(breeches, ItemCooldown, { turnsRemaining: 9, turnsMax: 100, dueTurn: 9 });
+    world.get(player, Equipment).legs = breeches;
+
+    const actionBarSlots = ["heal", "fireball", "arcane_bolt", "shadow_bolt", "lightning", "smite"];
+    const hudFeeds = createHudFeeds(world, {
+      getPlayerMana: () => ({ mana: 10, maxMana: 10 }),
+      ensureActiveSpell: () => "heal",
+      updateActiveSpellLabel: () => {},
+      knownSpellIds: () => actionBarSlots.slice(),
+      getActionBarSlots: () => actionBarSlots.slice(),
+      getPinnedSpellSlots: () => [],
+      autoAssignSlot: () => -1,
+      autoAssignPinnedSlot: () => -1,
+    });
+
+    /** @type {any[]} */
+    const payloads = [];
+    const onUpdate = (ev) => payloads.push(ev?.detail || null);
+    window.addEventListener("ui:updateSpellBar", onUpdate);
+    hudFeeds.updateActiveSpellHUD();
+    window.removeEventListener("ui:updateSpellBar", onUpdate);
+
+    assert(payloads.length > 0, "expected desktop spell dock payload");
+    const detail = payloads[payloads.length - 1];
+    const slots = Array.isArray(detail?.slots) ? detail.slots : [];
+    assertEquals(slots.length, 6);
+    assertEquals(slots[0]?.kind, "item-use");
+    assertEquals(slots[0]?.identity, "lodbrok_serpent_bound_breeches");
+    assertEquals(String(slots[0]?.abilityId || ""), "laugh_at_the_pit");
+    assertEquals(Number(slots[0]?.itemId || 0), breeches);
+    assertEquals(Number(slots[0]?.cdRemaining || 0), 9);
+    assertEquals(String(slots[1]?.id || ""), "heal");
+    assert(!slots.some((entry) => String(entry?.id || "") === "smite"), "expected last action bar spell to be spliced out when breeches occupy the dock");
   } finally {
     restoreWindow();
   }

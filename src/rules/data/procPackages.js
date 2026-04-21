@@ -118,6 +118,15 @@ function spawnSpectralSnakes(world, ownerId, count = 3, turnsLeft = 10) {
   return placed.length;
 }
 
+function normalizedVector(from, to) {
+  const dx = (Number(to?.x || 0) | 0) - (Number(from?.x || 0) | 0);
+  const dy = (Number(to?.y || 0) | 0) - (Number(from?.y || 0) | 0);
+  return {
+    dx: Math.sign(dx),
+    dy: Math.sign(dy),
+  };
+}
+
 const NEAR_EPSILON = 1e-6;
 
 function isNear(a, b, range = 1, epsilon = NEAR_EPSILON) {
@@ -1223,11 +1232,16 @@ registerScript(PROC_PACKAGE_KEYS.SerpentBoundBreeches, {
       if (getEffect(world, wearer, 'serpent_specters')) {
         ctx.proc.applyStatus(attacker, 'poison', 6, 2);
         const spawned = spawnSpectralSnakes(world, wearer, 3, 10);
+        const wearerPos = world.get(wearer, Position);
+        const attackerPos = world.get(attacker, Position);
         emit(world, 'proc:serpentBound:spectralSnakes', {
           actor: wearer,
           target: attacker,
           turns: 10,
           spawned,
+          from: wearerPos ? { x: wearerPos.x | 0, y: wearerPos.y | 0 } : null,
+          to: attackerPos ? { x: attackerPos.x | 0, y: attackerPos.y | 0 } : null,
+          direction: (wearerPos && attackerPos) ? normalizedVector(wearerPos, attackerPos) : { dx: 0, dy: 0 },
         });
         emit(world, 'proc:serpentBound:spectralPoison', {
           actor: wearer,
