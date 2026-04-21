@@ -376,7 +376,14 @@ Deno.test("serpent_specters emits spectral snake spawn signal on damaged retalia
   const wearer = world.create();
   const attacker = world.create();
   let snakeSignalCount = 0;
-  world.on("proc:serpentBound:spectralSnakes", () => { snakeSignalCount += 1; });
+  /** @type {any} */
+  let snakeSignal = null;
+  world.on("proc:serpentBound:spectralSnakes", (payload) => {
+    snakeSignalCount += 1;
+    snakeSignal = payload;
+  });
+  world.add(wearer, Position, { x: 5, y: 5 });
+  world.add(attacker, Position, { x: 6, y: 5 });
   world.add(wearer, ActiveEffects, {
     effects: [
       { key: "serpent_hide", turnsLeft: 8, potency: 1, stacks: 1 },
@@ -394,6 +401,9 @@ Deno.test("serpent_specters emits spectral snake spawn signal on damaged retalia
   runScript(PROC_PACKAGE_KEYS.SerpentBoundBreeches, ScriptVerb.ProcEvaluate, world, onDamaged);
 
   assertEquals(snakeSignalCount, 1, "expected spectral snake spawn signal");
+  assertEquals(snakeSignal?.from, { x: 5, y: 5 }, "expected spectral snakes to originate at the wearer");
+  assertEquals(snakeSignal?.to, { x: 6, y: 5 }, "expected spectral snakes to target the attacker position");
+  assertEquals(snakeSignal?.direction, { dx: 1, dy: 0 }, "expected stable wearer-to-attacker direction");
   assert(
     onDamaged.statusesToApply.some((s) => s.target === attacker && s.key === "poison"),
     "expected poison application during serpent_specters retaliation",

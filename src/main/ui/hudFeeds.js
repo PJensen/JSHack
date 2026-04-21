@@ -230,34 +230,44 @@ export function createHudFeeds(world, deps) {
   }
 
   /**
-   * Generic resolver: checks equipped weapon for content-DSL abilities.
+   * Generic resolver: checks equipped gear for content-DSL abilities.
+   * Weapon abilities stay first, then the rest of the loadout in slot order.
    * Returns action objects for the spell bar, or empty array.
    */
-  function resolveContentWeaponAbilities(playerId) {
+  function resolveEquippedContentAbilities(playerId) {
     const eq = /** @type any */ (world.get(playerId, Equipment));
-    const itemId = Number(eq?.weapon || 0) | 0;
-    if (!(itemId > 0)) return [];
-    const identity = String(world.get(itemId, NamedIdentity)?.identity || '').toLowerCase();
-    if (!identity) return [];
-    const def = getCatalogItem(identity);
-    if (!def?._contentAbilities) return [];
+    if (!eq) return [];
     const results = [];
-    for (const [abilityId, spec] of Object.entries(def._contentAbilities)) {
-      const cd = getItemCooldown(world, itemId);
-      results.push({
-        kind: 'item-use',
-        id: `item-use:${identity}:${abilityId}:${itemId}`,
-        itemId,
-        identity,
-        abilityId,
-        name: spec.name || abilityId,
-        symbol: spec.icon || '?',
-        cost: spec.cost || 0,
-        costKind: spec.costKind || 'item',
-        cdRemaining: cd ? Math.max(0, Number(cd.remaining || 0) | 0) : 0,
-        cdMax: cd ? Math.max(0, Number(cd.max || 0) | 0) : (spec.cooldown || 0),
-        auto: true,
-      });
+    const seenItems = new Set();
+    const slotOrder = ['weapon', ...NON_AMMO_GEAR_SLOTS.filter((slot) => slot !== 'weapon')];
+
+    for (const slot of slotOrder) {
+      const itemId = Number(eq?.[slot] || 0) | 0;
+      if (!(itemId > 0) || seenItems.has(itemId)) continue;
+      seenItems.add(itemId);
+
+      const identity = String(world.get(itemId, NamedIdentity)?.identity || '').toLowerCase();
+      if (!identity) continue;
+      const def = getCatalogItem(identity);
+      if (!def?._contentAbilities) continue;
+
+      for (const [abilityId, spec] of Object.entries(def._contentAbilities)) {
+        const cd = getItemCooldown(world, itemId);
+        results.push({
+          kind: 'item-use',
+          id: `item-use:${identity}:${abilityId}:${itemId}`,
+          itemId,
+          identity,
+          abilityId,
+          name: spec.name || abilityId,
+          symbol: spec.icon || '?',
+          cost: spec.cost || 0,
+          costKind: spec.costKind || 'item',
+          cdRemaining: cd ? Math.max(0, Number(cd.remaining || 0) | 0) : 0,
+          cdMax: cd ? Math.max(0, Number(cd.max || 0) | 0) : (spec.cooldown || 0),
+          auto: true,
+        });
+      }
     }
     return results;
   }
@@ -536,7 +546,7 @@ export function createHudFeeds(world, deps) {
     if (typeof deps.getActionBarSlots === 'function') {
       const slots = deps.getActionBarSlots();
       const resolved = [];
-      if (pe) resolved.push(...resolveContentWeaponAbilities(pe.id));
+      if (pe) resolved.push(...resolveEquippedContentAbilities(pe.id));
       for (let i = 0; i < slots.length && resolved.length < slots.length; i++) {
         const id = slots[i];
         if (!id) {
@@ -582,7 +592,7 @@ export function createHudFeeds(world, deps) {
       const pSlots = deps.getPinnedSpellSlots();
       const hasSpells = typeof deps.knownSpellIds === 'function' && deps.knownSpellIds().length > 0;
       const resolved = [];
-      if (pe) resolved.push(...resolveContentWeaponAbilities(pe.id));
+      if (pe) resolved.push(...resolveEquippedContentAbilities(pe.id));
       for (let i = 0; i < pSlots.length && resolved.length < pSlots.length; i++) {
         const id = pSlots[i];
         if (!id) {

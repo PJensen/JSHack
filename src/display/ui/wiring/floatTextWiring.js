@@ -86,6 +86,38 @@ function resolveStatusLabel(kind, effect) {
   return kindKey ? kindKey.toUpperCase() : 'STATUS';
 }
 
+function spawnSpectralShimmerTrail(fx, from, to) {
+  const dx = Number(to?.x || 0) - Number(from?.x || 0);
+  const dy = Number(to?.y || 0) - Number(from?.y || 0);
+  const dist = Math.hypot(dx, dy);
+  if (!(dist > 0.01)) return;
+  const ux = dx / dist;
+  const uy = dy / dist;
+  const count = Math.max(6, Math.min(14, Math.round(dist * 5)));
+  for (let i = 0; i < count; i++) {
+    const t = count <= 1 ? 1 : i / (count - 1);
+    const wobble = (Math.random() - 0.5) * 0.16;
+    const px = from.x + (dx * t) + (-uy * wobble);
+    const py = from.y + (dy * t) + (ux * wobble);
+    fx.pool.spawn(new Particle({
+      x: px + 0.5,
+      y: py + 0.35,
+      vx: ux * (0.18 + Math.random() * 0.12) + ((Math.random() - 0.5) * 0.08),
+      vy: uy * (0.18 + Math.random() * 0.12) - 0.04 + ((Math.random() - 0.5) * 0.08),
+      ax: 0,
+      ay: -0.04,
+      life: 0.24 + Math.random() * 0.16,
+      size0: 0.11 + Math.random() * 0.03,
+      size1: 0.02,
+      r: 158 + ((Math.random() * 24) | 0),
+      g: 232,
+      b: 168 + ((Math.random() * 36) | 0),
+      a0: 0.82,
+      a1: 0,
+    }));
+  }
+}
+
 /**
  * Install float text + proc VFX event listeners.
  * @param {{
@@ -1467,7 +1499,7 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     spawnBloodBurst(pos.x, pos.y, { amount: 8, hue: 'blood' });
   });
 
-  world.on('proc:serpentBound:spectralSnakes', ({ actor }) => {
+  world.on('proc:serpentBound:spectralSnakes', ({ actor, target, from, to }) => {
     const pos = getPosition(Number(actor || 0));
     if (!pos || !canShowAt(pos.x, pos.y)) return;
     ftext.addStatus(pos.x, pos.y - 0.45, 'SPECTRAL SNAKES', {
@@ -1476,6 +1508,15 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
       scaleStart: 1.35,
       scaleEnd: 0.95,
     });
+    const start = (from && Number.isFinite(from.x) && Number.isFinite(from.y))
+      ? { x: Number(from.x), y: Number(from.y) }
+      : pos;
+    const targetPos = (to && Number.isFinite(to.x) && Number.isFinite(to.y))
+      ? { x: Number(to.x), y: Number(to.y) }
+      : getPosition(Number(target || 0));
+    if (targetPos && canShowAt(targetPos.x, targetPos.y)) {
+      spawnSpectralShimmerTrail(fx, start, targetPos);
+    }
   });
 
   world.on('hunger:choke', () => {
