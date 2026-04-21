@@ -135,6 +135,7 @@ export function defineItem(id, def) {
     if (def.combatFlavor) catalogEntry.combatFlavor = def.combatFlavor;
     if (def.range) catalogEntry.range = def.range;
     if (def.affixes) catalogEntry.affixes = def.affixes;
+    if (Array.isArray(def.procPackages) && def.procPackages.length > 0) catalogEntry.procPackages = def.procPackages.slice();
     if (def.tags) catalogEntry.tags = def.tags;
 
     // Swing profile — authored weapon VFX identity

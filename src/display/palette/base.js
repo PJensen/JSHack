@@ -88,6 +88,7 @@ export const basePalette = {
   skeleton_sharpshooter: { glyph: "s", fg: "#c0bca8", glow: "#807c68" },
   troll:    { glyph: "T", fg: "#66aa66", glow: "#448844" },
   wraith:   { glyph: "W", fg: "#aabbff", glow: "#7799dd" },
+  spectral_snake: { glyph: "S", fg: "#9cc7ff", glow: "#5b78c0" },
   ogre:     { glyph: "O", fg: "#cc9966", glow: "#996633" },
   // Tier 3
   death_archer: { glyph: "s", fg: "#a0a8b0", glow: "#6070a0" },

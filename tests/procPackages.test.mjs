@@ -5,6 +5,9 @@ import { DerivedExpression } from "../src/rules/components/DerivedExpression.js"
 import { Equipment } from "../src/rules/components/Equipment.js";
 import { Faction } from "../src/rules/components/Faction.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
+import { Lifespan } from "../src/rules/components/Lifespan.js";
+import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
+import { Owner } from "../src/rules/components/Owner.js";
 import { Position } from "../src/rules/components/Position.js";
 import { ProcNode } from "../src/rules/components/ProcNode.js";
 import { ProcPackageNode } from "../src/rules/components/ProcPackageNode.js";
@@ -12,6 +15,7 @@ import { Vitality } from "../src/rules/components/Vitality.js";
 import { CHUNK_SIZE, TILE_FLOOR, TILE_WALL } from "../src/rules/environment/dungeon/constants.js";
 import { clearAll, loadChunk } from "../src/rules/environment/dungeon/tileMap.js";
 import { dealDamage } from "../src/rules/utils/dealDamage.js";
+import { resolveCombatSnapshot } from "../src/rules/utils/resolveCombatSnapshot.js";
 import {
   attachProcPackage,
   detachProcPackages,
@@ -306,4 +310,128 @@ Deno.test("grave current package grants item charges on kill", () => {
   });
   info = world.get(focus, ItemInfo);
   assertEquals(info.charges, 1, "expected charge gain on kill");
+});
+
+Deno.test("serpentBoundBreeches onHit applies serpent_hide + thorns (no stoneskin bridge)", () => {
+  const world = new World({ seed: 41 });
+  const wearer = world.create();
+  const target = world.create();
+  world.add(wearer, ActiveEffects, { effects: [] });
+  world.rand = () => 0.0; // force proc
+
+  const onHit = makeProcContext({
+    source: wearer,
+    target,
+    kind: "onHit",
+    damage: { amount: 9, type: "physical", crit: false },
+  });
+  runScript(PROC_PACKAGE_KEYS.SerpentBoundBreeches, ScriptVerb.ProcEvaluate, world, onHit);
+
+  const effects = world.get(wearer, ActiveEffects)?.effects || [];
+  assert(effects.some((e) => e.key === "serpent_hide" && e.turnsLeft === 8), "expected serpent_hide 8t");
+  assert(effects.some((e) => e.key === "thorns" && e.turnsLeft === 8), "expected thorns 8t");
+  assert(!effects.some((e) => e.key === "stoneskin"), "serpent breeches should not apply stoneskin");
+});
+
+Deno.test("serpent_hide contributes mitigation through combat snapshot (bridge removed)", () => {
+  const world = new World({ seed: 43 });
+  const actor = world.create();
+  world.add(actor, Equipment, { evadeDerived: 0 });
+  world.add(actor, ActiveEffects, { effects: [{ key: "serpent_hide", turnsLeft: 8, potency: 1, stacks: 1 }] });
+
+  const snap = resolveCombatSnapshot(world, actor, { mode: "melee" });
+  assertEquals(snap.armorClass, 12, "serpent_hide should grant +2 AC at potency 1");
+  assert(
+    snap.modifiers.some((m) => m.source === "status:serpent_hide" && m.value === 2),
+    "expected serpent_hide modifier breadcrumb",
+  );
+});
+
+Deno.test("serpentBoundBreeches retaliation remains active while serpent_hide is up", () => {
+  const world = new World({ seed: 47 });
+  const wearer = world.create();
+  const attacker = world.create();
+  let spawnedSpectralSnakes = false;
+  world.on("proc:serpentBound:spectralSnakes", () => { spawnedSpectralSnakes = true; });
+  world.add(wearer, ActiveEffects, { effects: [{ key: "serpent_hide", turnsLeft: 8, potency: 1, stacks: 1 }] });
+  world.rand = () => 0.0; // force retaliation gate
+
+  const onDamaged = makeProcContext({
+    source: wearer,
+    target: attacker,
+    kind: "onDamaged",
+    damage: { amount: 5, type: "physical", crit: false },
+  });
+  runScript(PROC_PACKAGE_KEYS.SerpentBoundBreeches, ScriptVerb.ProcEvaluate, world, onDamaged);
+
+  assert(
+    onDamaged.directDamage.some((d) => d.target === attacker && d.type === "nature" && d.amount === 2),
+    "expected nature retaliation damage while serpent_hide active",
+  );
+  assertEquals(spawnedSpectralSnakes, false, "spectral snakes should require serpent_specters state");
+});
+
+Deno.test("serpent_specters emits spectral snake spawn signal on damaged retaliation", () => {
+  const world = new World({ seed: 49 });
+  const wearer = world.create();
+  const attacker = world.create();
+  let snakeSignalCount = 0;
+  world.on("proc:serpentBound:spectralSnakes", () => { snakeSignalCount += 1; });
+  world.add(wearer, ActiveEffects, {
+    effects: [
+      { key: "serpent_hide", turnsLeft: 8, potency: 1, stacks: 1 },
+      { key: "serpent_specters", turnsLeft: 10, potency: 1, stacks: 1 },
+    ],
+  });
+  world.rand = () => 0.0;
+
+  const onDamaged = makeProcContext({
+    source: wearer,
+    target: attacker,
+    kind: "onDamaged",
+    damage: { amount: 5, type: "physical", crit: false },
+  });
+  runScript(PROC_PACKAGE_KEYS.SerpentBoundBreeches, ScriptVerb.ProcEvaluate, world, onDamaged);
+
+  assertEquals(snakeSignalCount, 1, "expected spectral snake spawn signal");
+  assert(
+    onDamaged.statusesToApply.some((s) => s.target === attacker && s.key === "poison"),
+    "expected poison application during serpent_specters retaliation",
+  );
+});
+
+Deno.test("serpent_specters spawns three summoned spectral snakes with 10-turn lifespan", () => {
+  const world = new World({ seed: 51 });
+  clearAll();
+  loadChunk(0, 0, new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR));
+  const wearer = world.create();
+  const attacker = world.create();
+  world.add(wearer, Position, { x: 5, y: 5 });
+  world.add(attacker, Position, { x: 6, y: 5 });
+  world.add(wearer, ActiveEffects, {
+    effects: [
+      { key: "serpent_hide", turnsLeft: 8, potency: 1, stacks: 1 },
+      { key: "serpent_specters", turnsLeft: 10, potency: 1, stacks: 1 },
+    ],
+  });
+  world.rand = () => 0.0;
+
+  const onDamaged = makeProcContext({
+    source: wearer,
+    target: attacker,
+    kind: "onDamaged",
+    damage: { amount: 5, type: "physical", crit: false },
+  });
+  runScript(PROC_PACKAGE_KEYS.SerpentBoundBreeches, ScriptVerb.ProcEvaluate, world, onDamaged);
+
+  const spawned = [];
+  for (const [id, named, fac, owner, life] of world.query(NamedIdentity, Faction, Owner, Lifespan)) {
+    if (named.identity !== "spectral_snake") continue;
+    spawned.push({ id, fac, owner, life });
+  }
+
+  assertEquals(spawned.length, 3, "expected exactly three spectral snakes");
+  assert(spawned.every((entry) => String(entry.fac?.key || "") === "summoned"), "spectral snakes should be allied summons");
+  assert(spawned.every((entry) => Number(entry.owner?.ownerId || 0) === wearer), "spectral snakes should be owned by wearer");
+  assert(spawned.every((entry) => Number(entry.life?.turnsLeft || 0) === 10), "spectral snakes should last 10 turns");
 });

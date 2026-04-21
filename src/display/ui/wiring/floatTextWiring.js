@@ -1467,6 +1467,17 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     spawnBloodBurst(pos.x, pos.y, { amount: 8, hue: 'blood' });
   });
 
+  world.on('proc:serpentBound:spectralSnakes', ({ actor }) => {
+    const pos = getPosition(Number(actor || 0));
+    if (!pos || !canShowAt(pos.x, pos.y)) return;
+    ftext.addStatus(pos.x, pos.y - 0.45, 'SPECTRAL SNAKES', {
+      color: '#9fe889',
+      life: 1.0,
+      scaleStart: 1.35,
+      scaleEnd: 0.95,
+    });
+  });
+
   world.on('hunger:choke', () => {
     const pe = playerEntity(world);
     if (!pe) return;

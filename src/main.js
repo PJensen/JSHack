@@ -293,6 +293,7 @@ import './content/items/potionOfRadiance.js';
 import './content/items/sunVessel.js';
 import './content/items/dawnbreaker.js';
 import './content/items/sunsword.js';
+import './content/items/lodbrokSerpentBoundBreeches.js';
 import './content/monsters/barrowWight.js';
 import { installContent } from './content/install.js';
 installContent();

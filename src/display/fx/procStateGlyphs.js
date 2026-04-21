@@ -29,6 +29,9 @@ export const PROC_STATE_VIS = {
 	eclipse_phase:      { glyph: '\u25D0',       r: 180, g: 160, b: 230 },  // ◐ eclipse phase
 	arrow_instinct:     { glyph: '\u27B3',       r: 120, g: 210, b: 235 },  // ➳ ready shot
 	tollwarden_count:   { glyph: '\u{1F514}',    r: 250, g: 185, b: 100 },  // 🔔 toll count
+	serpent_hide:       { glyph: '\u{1F40D}',    r: 100, g: 170, b: 85  },  // 🐍 serpent-hide ward
+	serpent_riposte:    { glyph: '\u2694',       r: 145, g: 215, b: 125 },  // ⚔ primed riposte
+	serpent_specters:   { glyph: '\u{1F47B}',    r: 125, g: 220, b: 145 },  // 👻 spectral serpents
 };
 
 const DEFAULT_PROC_VIS = Object.freeze({ glyph: '\u2736', r: 170, g: 185, b: 220 });
