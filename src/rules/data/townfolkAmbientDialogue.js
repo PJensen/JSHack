@@ -84,6 +84,69 @@ const TOWN_RUMORS = Object.freeze([
   "folk hear more than they admit before supper",
 ]);
 
+const ROLE_GOSSIP = Object.freeze({
+  farmer: Object.freeze([
+    "the barkeep's stew kept half the dungeon runners alive last month",
+    "heard the herbalist found something strange growing by the east wall",
+    "the mill's been grinding day and night — someone's working hard",
+  ]),
+  woodcutter: Object.freeze([
+    "the mason's patching faster than the walls can crack",
+    "the smith's been burning through coal like his life depends on it",
+    "heard the miner came up with something dark last week",
+  ]),
+  miner: Object.freeze([
+    "the smith's been shouting at his forge more than usual",
+    "the mason says the town's settling in strange places",
+    "the farmer's worrying about his north field",
+  ]),
+  smith: Object.freeze([
+    "the miner brought something dark up from below",
+    "the mason's patching faster than stones can fall",
+    "heard the woodcutter found ironwood deeper than he should",
+  ]),
+  priest: Object.freeze([
+    "the miner's seen things that shouldn't be in the deep dark",
+    "the herbalist speaks of plants that remember blood",
+    "folk are praying more these days — they feel it too",
+  ]),
+  barkeep: Object.freeze([
+    "the smith's been working through the night again",
+    "heard the farmer's north field is failing",
+    "the herbalist's stock is running thin",
+  ]),
+  villager: Object.freeze([
+    "the barkeep knows everything — he hears it all",
+    "the priest says something's stirring below the stone",
+    "the smith's hammer sounds angrier than before",
+  ]),
+  mason: Object.freeze([
+    "the miner says the deep stone is waking up",
+    "the smith's repairs are holding better now",
+    "the herbalist brought strange roots to the priest",
+  ]),
+  herbalist: Object.freeze([
+    "the priest asked about plants that bind spirits",
+    "the alchemist's been very quiet lately",
+    "the farmer mentioned odd growths in his back field",
+  ]),
+  alchemist: Object.freeze([
+    "the herbalist found moonleaf growing where it shouldn't",
+    "the priest's asked for items I've never heard of before",
+    "something's stirring the potions in their bottles at night",
+  ]),
+  gem_vendor: Object.freeze([
+    "heard the adventurer's carrying something that glows",
+    "the book vendor says there's demand for strange knowledge",
+    "the smith's being asked for work that shouldn't exist",
+  ]),
+  book_vendor: Object.freeze([
+    "folks are buying books about binding and wards",
+    "the priest's been looking at old journals",
+    "someone's asking questions about the deep places",
+  ]),
+});
+
 const ROLE_LEXICON = Object.freeze({
   farmer: Object.freeze({
     title: "farmer",
@@ -392,6 +455,16 @@ const TOPICS = Object.freeze([
       "Everybody wants certainty, but most of them bring me guesses.",
     ]),
   }),
+  Object.freeze({
+    key: "gossip",
+    baseWeight: 4,
+    templates: Object.freeze([
+      "{gossipItem}.",
+      "Heard word that {gossipItem}.",
+      "Between us, {gossipItem}.",
+      "Folk are saying {gossipItem}.",
+    ]),
+  }),
 ]);
 
 function pick(rng, list, fallback = "") {
@@ -452,6 +525,7 @@ function topicWeight(topic, ctx) {
   if (topic.key === "trade" && (ctx.speakerRole === "barkeep" || ctx.speakerRole === "gem_vendor" || ctx.speakerRole === "book_vendor" || ctx.speakerRole === "alchemist")) weight += 3;
   if (topic.key === "work" && ctx.phase === "work") weight += 4;
   if (topic.key === "grievance" && ctx.weather === "heavy_rain") weight += 2;
+  if (topic.key === "gossip" && ctx.phase === "pub") weight += 3;
   if (ctx.previousTopic && ctx.previousTopic === topic.key) weight *= 0.35;
   return weight;
 }
@@ -469,6 +543,7 @@ function buildVars(ctx, rng) {
   const weather = WEATHER_PHRASES[ctx.weather] || WEATHER_PHRASES.clear;
   const phasePlaces = PHASE_PLACES[ctx.phase] || PHASE_PLACES.default;
   const shortages = shortagePool(ctx.townState);
+  const speakerGossip = ROLE_GOSSIP[ctx.speakerRole] || ROLE_GOSSIP.villager;
 
   return {
     listenerTitle: lowerTitle(ctx.listenerName, ctx.listenerRole),
@@ -487,6 +562,7 @@ function buildVars(ctx, rng) {
     mountainRumor: pick(rng, MOUNTAIN_RUMORS, "the mountain is holding its breath"),
     townRumor: pick(rng, TOWN_RUMORS, "folk are saying too much and too little at once"),
     moonSign: pick(rng, MOON_SIGNS, "the night feels restless"),
+    gossipItem: pick(rng, speakerGossip, "something strange is happening in town"),
   };
 }
 

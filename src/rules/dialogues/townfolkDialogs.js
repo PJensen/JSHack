@@ -4,8 +4,216 @@ import { getDistrictBulletin } from "../utils/townInterpretationVirtuals.js";
 import { registerDialog } from "./registry.js";
 import { STARTER_PRIEST_FETCH_QUEST_ID, getQuestRecord } from "../quests/runtime.js";
 import { RAT_INFESTATION_QUEST_ID, REQUIRED_RAT_KILLS } from "../quests/definitions/ratInfestation.js";
+import { getTownState, getWeather } from "../utils/townStateAccess.js";
+import { Vitality } from "../components/Vitality.js";
+import { Equipment } from "../components/Equipment.js";
+import { Status } from "../components/Status.js";
+import { NamedIdentity } from "../components/NamedIdentity.js";
 
 const PRIEST_FETCH_ITEM_ID = "book_dead";
+
+const MOOD_POOLS = {
+  farmer: [
+    { text: "Crops won't wait. But when there's no one buying, what's the point?", cond: (ts) => ts.lowFood },
+    { text: "The heavens are angry today. Lost two hours' work to that downpour.", cond: (ts, w) => w === "heavy_rain" },
+    { text: "Sell the surplus, plant anew, pray for sun. That's all any of us do.", cond: (ts) => ts.morale < 35 },
+  ],
+  woodcutter: [
+    { text: "Timber's rotting in the yard faster than anyone can carry it off.", cond: (ts) => ts.lowMaterials },
+    { text: "Can't fell a tree in this muck. The whole forest's turned to marsh.", cond: (ts, w) => w === "heavy_rain" },
+    { text: "Everything feels heavy lately. Even the axe.", cond: (ts) => ts.morale < 35 },
+  ],
+  miner: [
+    { text: "Ore's getting scarce. Dig deeper, find worse. That's how it works.", cond: (ts) => ts.lowMaterials },
+    { text: "Something stirred down there. Came up darker. The ground feels wrong.", cond: (ts) => ts.threatLevel > 0 },
+    { text: "Dust in my lungs, stone in my heart. Hard to remember why I go down.", cond: (ts) => ts.morale < 35 },
+  ],
+  smith: [
+    { text: "No iron, no coal — I'm hammering air these days. Come back when the shipment arrives.", cond: (ts) => ts.lowMaterials },
+    { text: "The forge goes cold when supplies run low. Nothing to do but wait.", cond: (ts) => ts.morale < 35 },
+  ],
+  priest: [
+    { text: "The sick are piling up. We're running short on medicines and shorter on answers.", cond: (ts) => ts.lowMedicine },
+    { text: "Something stirs in the dark below. The prayers feel thin against it.", cond: (ts) => ts.threatLevel > 0 },
+    { text: "The gods seem distant lately. I pray less now. It helps more.", cond: (ts) => ts.morale < 35 },
+  ],
+  barkeep: [
+    { text: "Kitchen's nearly empty. The travelers aren't coming, but the mouths still need feeding.", cond: (ts) => ts.lowFood },
+    { text: "Nobody's buying ale when they're scared for their lives. Escort work is all.", cond: (ts) => ts.threatLevel > 0 },
+    { text: "This town's forgetting how to laugh. Quiet nights. Worried faces.", cond: (ts) => ts.morale < 35 },
+  ],
+  villager: [
+    { text: "There's not enough to eat and too many people. The sums don't work.", cond: (ts) => ts.lowFood },
+    { text: "Something's wrong under the streets. We all feel it.", cond: (ts) => ts.threatLevel > 0 },
+    { text: "Nothing left to hope about. Just getting through the day.", cond: (ts) => ts.morale < 35 },
+  ],
+  mason: [
+    { text: "The walls are cracking faster than I can patch them. Something's shifting underneath.", cond: (ts) => ts.lowMaterials },
+    { text: "The rain gets in everywhere now. Rot spreads like a sickness.", cond: (ts, w) => w === "heavy_rain" },
+    { text: "Stones don't fail. The town fails. And I get to watch it happen.", cond: (ts) => ts.morale < 35 },
+  ],
+  herbalist: [
+    { text: "The sick are coming faster than the herbs grow. I'll run dry soon.", cond: (ts) => ts.lowMedicine },
+    { text: "The rain carries sickness in it. The plants know. They won't grow.", cond: (ts, w) => w === "heavy_rain" },
+    { text: "Healing's just delaying. We're all just delaying.", cond: (ts) => ts.morale < 35 },
+  ],
+  alchemist: [
+    { text: "Reagents are scarce. The deeper plants are wilting. The market won't replace them fast enough.", cond: (ts) => ts.lowMedicine },
+    { text: "Potions don't work on despair. Trust me, I've tried.", cond: (ts) => ts.morale < 35 },
+  ],
+  gem_vendor: [
+    { text: "Gems don't sell when people are starving. Beauty's a luxury.", cond: (ts) => ts.lowFood },
+    { text: "The fear in this town is real. Nobody's buying pretty things when they're buying weapons.", cond: (ts) => ts.threatLevel > 0 },
+  ],
+  book_vendor: [
+    { text: "Stories don't feed anyone. But at least I've still got the stock.", cond: (ts) => ts.lowFood },
+    { text: "The apocalypse sells better than romance these days.", cond: (ts) => ts.threatLevel > 0 },
+  ],
+};
+
+const PLAYER_OBSERVATION_POOLS = {
+  generic_near_death: [
+    "You're barely standing. If you step much further, you'll fall.",
+    "The gods must favor you to still be breathing.",
+  ],
+  generic_wounded: [
+    "That's a nasty wound. Might get worse if you're not careful.",
+    "You've seen some trouble down there.",
+  ],
+  herbalist_poisoned: [
+    "You've got venom in your blood. I've got something for that, if you're willing to pay.",
+    "That poison's marked you. Let me brew a counter before it spreads.",
+  ],
+  priest_poisoned: [
+    "The gods grant protection against venom. Let me pray over you.",
+  ],
+  generic_poisoned: [
+    "That color in your blood — that's poison. You should fix that.",
+  ],
+  herbalist_cursed: [
+    "A curse sits on you heavy. The plants recoil from you.",
+    "Curses fade, but slowly. Bring rare herbs and I'll weaken it.",
+  ],
+  priest_cursed: [
+    "I feel the darkness clinging to you. Come, we will banish it together.",
+    "A curse has marked you. The church can help, but the price is steep.",
+  ],
+  generic_cursed: [
+    "You're carrying something dark. Be careful it doesn't spread.",
+  ],
+  barkeep_hungry: [
+    "You look half-starved. Bowl of stew's on the house — you need it more than I do.",
+    "When was the last time you ate a proper meal?",
+  ],
+  farmer_hungry: [
+    "You're looking lean. Hard on the road, is it?",
+  ],
+  generic_hungry: [
+    "You should eat something. You're going to need the strength.",
+  ],
+  smith_fine_weapon: [
+    "That's quality work on your weapon. Mine? I recognize the polish.",
+  ],
+  generic_fine_weapon: [
+    "That's a good blade you're carrying. Where'd you find it?",
+  ],
+  priest_blessed: [
+    "The light follows you. You've been blessed.",
+  ],
+};
+
+function getPlayerObservation(world, playerId, npcRole) {
+  if (!(playerId > 0)) return null;
+
+  const vit = world.get(playerId, Vitality);
+  const status = world.get(playerId, Status);
+  const eq = world.get(playerId, Equipment);
+
+  const hpRatio = vit ? vit.hp / Math.max(1, vit.maxHp) : 1;
+
+  // Near death (highest priority)
+  if (hpRatio < 0.25) {
+    const pool = PLAYER_OBSERVATION_POOLS.generic_near_death;
+    return pool[Math.floor(world.rand?.() * pool.length || 0)];
+  }
+
+  // Wounded
+  if (hpRatio < 0.5) {
+    const pool = PLAYER_OBSERVATION_POOLS.generic_wounded;
+    return pool[Math.floor(world.rand?.() * pool.length || 0)];
+  }
+
+  // Check for notable status conditions
+  const statuses = status?.statuses || [];
+  const statusStrs = new Set(statuses.map(s => String(s.type || "")));
+
+  // Poison: herbalist/priest react specifically
+  if (statusStrs.has("poisoned")) {
+    if (npcRole === "herbalist") {
+      const pool = PLAYER_OBSERVATION_POOLS.herbalist_poisoned;
+      return pool[Math.floor(world.rand?.() * pool.length || 0)];
+    }
+    if (npcRole === "priest") {
+      const pool = PLAYER_OBSERVATION_POOLS.priest_poisoned;
+      if (pool.length) return pool[Math.floor(world.rand?.() * pool.length || 0)];
+    }
+    const pool = PLAYER_OBSERVATION_POOLS.generic_poisoned;
+    return pool[Math.floor(world.rand?.() * pool.length || 0)];
+  }
+
+  // Curse: priest reacts strongly
+  if (statusStrs.has("cursed")) {
+    if (npcRole === "priest") {
+      const pool = PLAYER_OBSERVATION_POOLS.priest_cursed;
+      return pool[Math.floor(world.rand?.() * pool.length || 0)];
+    }
+    if (npcRole === "herbalist") {
+      const pool = PLAYER_OBSERVATION_POOLS.herbalist_cursed;
+      return pool[Math.floor(world.rand?.() * pool.length || 0)];
+    }
+    const pool = PLAYER_OBSERVATION_POOLS.generic_cursed;
+    return pool[Math.floor(world.rand?.() * pool.length || 0)];
+  }
+
+  // Hunger: barkeep/farmer react
+  if (statusStrs.has("hungry") || statusStrs.has("famished") || statusStrs.has("starving")) {
+    if (npcRole === "barkeep") {
+      const pool = PLAYER_OBSERVATION_POOLS.barkeep_hungry;
+      return pool[Math.floor(world.rand?.() * pool.length || 0)];
+    }
+    if (npcRole === "farmer") {
+      const pool = PLAYER_OBSERVATION_POOLS.farmer_hungry;
+      return pool[Math.floor(world.rand?.() * pool.length || 0)];
+    }
+    const pool = PLAYER_OBSERVATION_POOLS.generic_hungry;
+    return pool[Math.floor(world.rand?.() * pool.length || 0)];
+  }
+
+  // Blessed: priest notices
+  if (statusStrs.has("blessed") && npcRole === "priest") {
+    const pool = PLAYER_OBSERVATION_POOLS.priest_blessed;
+    return pool[Math.floor(world.rand?.() * pool.length || 0)];
+  }
+
+  // Check equipment: notable weapons
+  if (eq?.weapon > 0) {
+    const weaponId = eq.weapon;
+    const weaponIdent = String(world.get(weaponId, NamedIdentity)?.identity || "");
+    const isFine = weaponIdent.includes("boss") || weaponIdent.includes("elite") ||
+                   weaponIdent.includes("void") || weaponIdent.includes("runed") ||
+                   weaponIdent.includes("divine") || weaponIdent.includes("ancient");
+    if (isFine) {
+      if (npcRole === "smith") {
+        const pool = PLAYER_OBSERVATION_POOLS.smith_fine_weapon;
+        return pool[Math.floor(world.rand?.() * pool.length || 0)];
+      }
+      const pool = PLAYER_OBSERVATION_POOLS.generic_fine_weapon;
+      return pool[Math.floor(world.rand?.() * pool.length || 0)];
+    }
+  }
+
+  return null;
+}
 
 function priestQuest(world, actorId) {
   return getQuestRecord(world, STARTER_PRIEST_FETCH_QUEST_ID, actorId);
@@ -61,7 +269,28 @@ function priestAmbientText(ctx, fallback) {
 
 function ambientTownfolkText(def, ctx) {
   const fallback = String(def?.dialogue || "Good day.");
-  switch (String(def?.role || "")) {
+  const role = String(def?.role || "");
+
+  // Priority 1: Player observation (most immediate)
+  const observation = getPlayerObservation(ctx.world, ctx.targetId, role);
+  if (observation) return observation;
+
+  // Priority 2: Mood variance from town state
+  const townState = getTownState(ctx.world);
+  const weather = getWeather(ctx.world);
+  if (townState) {
+    const moodPool = MOOD_POOLS[role];
+    if (moodPool) {
+      for (const entry of moodPool) {
+        if (entry.cond(townState, weather)) {
+          return entry.text;
+        }
+      }
+    }
+  }
+
+  // Priority 3: Existing bulletin-based variation
+  switch (role) {
     case "smith":
       return smithAmbientText(ctx, fallback);
     case "barkeep":
