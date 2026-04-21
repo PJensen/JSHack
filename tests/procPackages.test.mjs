@@ -312,7 +312,7 @@ Deno.test("grave current package grants item charges on kill", () => {
   assertEquals(info.charges, 1, "expected charge gain on kill");
 });
 
-Deno.test("serpentBoundBreeches onHit applies serpent_hide + thorns (no stoneskin bridge)", () => {
+Deno.test("serpentBoundBreeches onHit applies serpent_hide", () => {
   const world = new World({ seed: 41 });
   const wearer = world.create();
   const target = world.create();
@@ -329,7 +329,6 @@ Deno.test("serpentBoundBreeches onHit applies serpent_hide + thorns (no stoneski
 
   const effects = world.get(wearer, ActiveEffects)?.effects || [];
   assert(effects.some((e) => e.key === "serpent_hide" && e.turnsLeft === 8), "expected serpent_hide 8t");
-  assert(effects.some((e) => e.key === "thorns" && e.turnsLeft === 8), "expected thorns 8t");
   assert(!effects.some((e) => e.key === "stoneskin"), "serpent breeches should not apply stoneskin");
 });
 

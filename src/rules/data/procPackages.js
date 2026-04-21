@@ -91,7 +91,7 @@ function spawnSpectralSnakes(world, ownerId, count = 3, turnsLeft = 10, anchors 
   for (let i = 0; i < count; i += 1) {
     let tile = null;
     for (let j = 0; j < searchOrigins.length; j += 1) {
-      tile = findNearestValidTileAround(world, searchOrigins[j], { maxDistance: 2, exclude: excluded });
+      tile = findNearestValidTileAround(world, searchOrigins[j], { maxDistance: 8, exclude: excluded });
       if (tile) break;
     }
     if (!tile) break;
@@ -1198,7 +1198,6 @@ registerScript(PROC_PACKAGE_KEYS.SerpentBoundBreeches, {
       if (!ae) return;
 
       upsertTimedEffect(ae.effects, { key: 'serpent_hide', turnsLeft: 8, stacks: 1, potency: 1 });
-      upsertTimedEffect(ae.effects, { key: 'thorns', turnsLeft: 8, stacks: 1, potency: 1 });
 
       emit(world, 'proc:serpentBound:coat', { actor: wearer, turns: 8 });
       return;
@@ -1245,23 +1244,26 @@ registerScript(PROC_PACKAGE_KEYS.SerpentBoundBreeches, {
         ctx.proc.applyStatus(attacker, 'poison', 6, 2);
         const wearerPos = world.get(wearer, Position);
         const attackerPos = world.get(attacker, Position);
-        const spawned = spawnSpectralSnakes(
-          world,
-          wearer,
-          3,
-          10,
-          attackerPos ? [{ x: attackerPos.x | 0, y: attackerPos.y | 0 }] : [],
-        );
-        if (spawned > 0) {
-          emit(world, 'proc:serpentBound:spectralSnakes', {
-            actor: wearer,
-            target: attacker,
-            turns: 10,
-            spawned,
-            from: wearerPos ? { x: wearerPos.x | 0, y: wearerPos.y | 0 } : null,
-            to: attackerPos ? { x: attackerPos.x | 0, y: attackerPos.y | 0 } : null,
-            direction: (wearerPos && attackerPos) ? normalizedVector(wearerPos, attackerPos) : { dx: 0, dy: 0 },
-          });
+
+        if (wearerPos && attackerPos) {
+          const spawned = spawnSpectralSnakes(
+            world,
+            wearer,
+            3,
+            10,
+            [{ x: attackerPos.x | 0, y: attackerPos.y | 0 }],
+          );
+          if (spawned > 0) {
+            emit(world, 'proc:serpentBound:spectralSnakes', {
+              actor: wearer,
+              target: attacker,
+              turns: 10,
+              spawned,
+              from: { x: wearerPos.x | 0, y: wearerPos.y | 0 },
+              to: { x: attackerPos.x | 0, y: attackerPos.y | 0 },
+              direction: normalizedVector(wearerPos, attackerPos),
+            });
+          }
         }
         emit(world, 'proc:serpentBound:spectralPoison', {
           actor: wearer,
