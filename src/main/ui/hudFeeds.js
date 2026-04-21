@@ -111,7 +111,7 @@ export function createHudFeeds(world, deps) {
     const halfHourSlot = Math.round(totalMinutes / 30) % 48;
     const hour12 = ((Math.floor(halfHourSlot / 2) + 11) % 12) + 1;
     const isHalf = (halfHourSlot % 2) === 1;
-    const emoji = isHalf ? CLOCK_HALVES[(hour12 + 11) % 12] : CLOCK_HOURS[(hour12 + 11) % 12];
+    const emoji = isHalf ? CLOCK_HALVES[hour12 % 12] : CLOCK_HOURS[hour12 % 12];
 
     const label = `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
     return { turnOfDay, emoji, label };
