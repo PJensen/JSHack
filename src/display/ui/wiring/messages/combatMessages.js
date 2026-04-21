@@ -911,4 +911,12 @@ export function installCombatMessages(ctx) {
     if (who === 'You') { log(`The oil-slicked blade ignites ${tgt}!`, 'combat'); return; }
     log(`${who}'s oiled weapon sets ${tgt} alight!`, 'combat');
   });
+  world.on('proc:serpentBound:spectralSnakes', ({ actor, target }) => {
+    if (!_playerCanSee([actor, target])) return;
+    const who = nameOfEntity(actor);
+    const tgt = nameOfEntity(target);
+    if (tgt === 'You') { log('Spectral serpents coil and bite at your legs!', 'danger'); return; }
+    if (who === 'You') { log(`Spectral serpents surge from your breeches and lash ${tgt}.`, 'combat'); return; }
+    log(`Spectral serpents whirl around ${who} and strike ${tgt}.`, 'combat');
+  });
 }

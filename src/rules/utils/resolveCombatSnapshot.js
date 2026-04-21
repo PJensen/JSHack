@@ -80,6 +80,7 @@ export function resolveCombatSnapshot(world, entityId, context = {}) {
     cursed: statusStrength(world, id, "cursed"),
     blessed: statusStrength(world, id, "blessed"),
     stoneskin: statusStrength(world, id, "stoneskin"),
+    serpent_hide: statusStrength(world, id, "serpent_hide"),
     berserk: statusStrength(world, id, "berserk"),
     // Corpse-eat timed buffs
     cunning_reflex: statusStrength(world, id, "cunning_reflex"),
@@ -194,8 +195,11 @@ export function resolveCombatSnapshot(world, entityId, context = {}) {
 
   if (rules.includeStoneskin) {
     pushModifier(modifiers, "defense", "status:stoneskin", statusTotals.stoneskin, "stoneskin-bonus");
+    // serpent_hide mirrors the prior breeches mitigation envelope:
+    // potency 1 ≈ old stoneskin potency 2 bridge (+2 AC).
+    pushModifier(modifiers, "defense", "status:serpent_hide", statusTotals.serpent_hide * 2, "serpent-hide-bonus");
     pushModifier(modifiers, "defense", "status:ogre_bulk", statusTotals.ogre_bulk * 3, "ogre-bulk-bonus");
-    defenseContribution += statusTotals.stoneskin + (statusTotals.ogre_bulk * 3);
+    defenseContribution += statusTotals.stoneskin + (statusTotals.serpent_hide * 2) + (statusTotals.ogre_bulk * 3);
   }
 
   const blindedDefensePenalty = getBlindedDefensePenalty(statusTotals.blinded, mode);

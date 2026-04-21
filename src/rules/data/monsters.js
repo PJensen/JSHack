@@ -1612,6 +1612,33 @@ export const MONSTERS = [
     specials: [],
     description: 'An animated stone idol that heckles anything that breathes.',
   },
+  {
+    id: 'spectral_snake',
+    name: 'Spectral Snake',
+    tags: ['undead', 'spectral', 'beast', 'venomous'],
+    goreType: 'none',
+    tier: 99,
+    rare: true,
+    intelligence: 3,
+    baseHp: 6,
+    hpPerLevel: 0,
+    attack: 2,
+    defense: 1,
+    damageDice: '1d3',
+    sizeClass: 'XS',
+    massKg: 0.2,
+    resistances: {
+      kinetic: { DR: 1, bluntMult: 0.7, slashMult: 0.7, pierceMult: 0.5 },
+      chemical: { toxMult: 0 },
+      thermal: { burnMult: 0.8 },
+    },
+    speed: 3,
+    hooks: {
+      onHit: [statusEffectOnHit(30, 0xdead0511, { key: "poison", turnsLeft: 3, potency: 1 }, "proc:poisoned")],
+    },
+    specials: ["Poison 30%", "Summoned by serpent specters"],
+    description: 'A hissing ghost-serpent called from a curse-wrapped hide.',
+  },
   // ── Killer Bee (tier 0, minDepth 2) — flying poison swarm ────────────
   {
     id: 'killer_bee',

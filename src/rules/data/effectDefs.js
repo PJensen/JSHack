@@ -165,6 +165,12 @@ export const EFFECT_DEFS = [
     statuses: ["stoneskin"],
   },
   {
+    id: "serpent_hide",
+    keys: ["serpent_hide", "serpenthide"],
+    operation: "none",
+    statuses: ["serpent_hide"],
+  },
+  {
     id: "taunt",
     keys: ["taunt", "taunted"],
     operation: "none",

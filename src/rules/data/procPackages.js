@@ -3,7 +3,10 @@ import { destroySubtree } from "../../lib/ecs-js/hierarchy.js";
 import { ActiveEffects } from "../components/ActiveEffects.js";
 import { Faction } from "../components/Faction.js";
 import { ItemInfo } from "../components/ItemInfo.js";
+import { Lifespan } from "../components/Lifespan.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
+import { Owner } from "../components/Owner.js";
+import { PetState } from "../components/PetState.js";
 import { Position } from "../components/Position.js";
 import { ProcPackageNode } from "../components/ProcPackageNode.js";
 import { Vitality } from "../components/Vitality.js";
@@ -13,6 +16,8 @@ import { ensureActiveEffects } from "../utils/effects.js";
 import { upsertTimedEffect } from "../utils/effectSemantics.js";
 import { areFactionsHostile } from "../utils/factionHostility.js";
 import { chebyshevScalar } from "../utils/distance.js";
+import { findNearestValidTileAround } from "../utils/queries.js";
+import { spawnMonsterEntity } from "../utils/spawnMonsterEntity.js";
 import {
   addAttachedComponent,
   attachDerivedExpression,
@@ -43,6 +48,7 @@ export const PROC_PACKAGE_KEYS = Object.freeze({
   GlacierSigil: "procPackage:glacierSigil",
   ConductionLens: "procPackage:conductionLens",
   EchoGrimoire: "procPackage:echoGrimoire",
+  SerpentBoundBreeches: "procPackage:serpentBoundBreeches",
 });
 
 function getEffect(world, entityId, key) {
@@ -66,6 +72,50 @@ function emit(world, name, payload) {
   } catch {
     // package scripts should remain harmless until a real host wires them in
   }
+}
+
+function spawnSpectralSnakes(world, ownerId, count = 3, turnsLeft = 10) {
+  const origin = world.get(ownerId, Position);
+  if (!origin) return 0;
+  const placed = [];
+  const excluded = [{ x: origin.x | 0, y: origin.y | 0 }];
+
+  for (let i = 0; i < count; i += 1) {
+    const tile = findNearestValidTileAround(world, origin, { maxDistance: 2, exclude: excluded });
+    if (!tile) break;
+    excluded.push(tile);
+
+    const id = spawnMonsterEntity(world, {
+      identity: "spectral_snake",
+      x: tile.x | 0,
+      y: tile.y | 0,
+      faction: "summoned",
+    });
+    if (!(id > 0)) continue;
+
+    try {
+      world.add(id, Owner, { ownerId });
+    } catch {}
+    try {
+      world.add(id, PetState, {
+        state: "aggressive",
+        targetX: null,
+        targetY: null,
+        targetItemId: 0,
+        stateEnteredTurn: world.step | 0,
+        lastPlayerX: origin.x | 0,
+        lastPlayerY: origin.y | 0,
+        commandCooldown: 0,
+        rangedCooldown: 0,
+      });
+    } catch {}
+    try {
+      world.add(id, Lifespan, { turnsLeft: Math.max(1, Number(turnsLeft || 10) | 0), onExpiry: "remove", expiryEvent: "" });
+    } catch {}
+    placed.push(id);
+  }
+
+  return placed.length;
 }
 
 const NEAR_EPSILON = 1e-6;
@@ -1112,6 +1162,84 @@ registerScript("procPackage:graveCurrent", {
   },
 });
 
+registerScript(PROC_PACKAGE_KEYS.SerpentBoundBreeches, {
+  [ScriptVerb.ProcEvaluate]: (world, ctx) => {
+    const wearer = Number(ctx?.source || 0) | 0;
+    const other = Number(ctx?.target || 0) | 0;
+    const kind = String(ctx?.kind || '');
+
+    if (!(wearer > 0)) return;
+
+    if (kind === 'onHit') {
+      if (world.rand() >= 0.28) return;
+
+      const ae = ensureActiveEffects(world, wearer);
+      if (!ae) return;
+
+      upsertTimedEffect(ae.effects, { key: 'serpent_hide', turnsLeft: 8, stacks: 1, potency: 1 });
+      upsertTimedEffect(ae.effects, { key: 'thorns', turnsLeft: 8, stacks: 1, potency: 1 });
+
+      emit(world, 'proc:serpentBound:coat', { actor: wearer, turns: 8 });
+      return;
+    }
+
+    if (kind === 'onMiss') {
+      if (!(hasTag(ctx, 'dodged') || hasTag(ctx, 'parried'))) return;
+
+      const ae = ensureActiveEffects(world, wearer);
+      if (!ae) return;
+
+      upsertTimedEffect(ae.effects, { key: 'serpent_riposte', turnsLeft: 4, stacks: 1, potency: 1 });
+      emit(world, 'proc:serpentBound:riposteReady', { actor: wearer, turns: 4 });
+      return;
+    }
+
+    if (kind === 'onBeforeHit') {
+      if (!getEffect(world, wearer, 'serpent_riposte')) return;
+
+      ctx.proc.addBonusDamage(3, 5, 'nature');
+      if (other > 0 && world.rand() < 0.35) {
+        ctx.proc.applyStatus(other, 'slowed', 4, 1);
+      }
+
+      removeEffect(world, wearer, 'serpent_riposte');
+      emit(world, 'proc:serpentBound:riposteSpent', { actor: wearer, target: other });
+      return;
+    }
+
+    if (kind === 'onDamaged') {
+      const attacker = other;
+      if (!(attacker > 0)) return;
+
+      if (getEffect(world, wearer, 'serpent_hide') && world.rand() < 0.5) {
+        ctx.proc.dealDamage(attacker, 2, 'nature', {
+          source: wearer,
+          cause: 'procPackage:serpentBoundBreeches',
+          noTrigger: true,
+          nonLethal: true,
+        });
+      }
+
+      if (getEffect(world, wearer, 'serpent_specters')) {
+        ctx.proc.applyStatus(attacker, 'poison', 6, 2);
+        const spawned = spawnSpectralSnakes(world, wearer, 3, 10);
+        emit(world, 'proc:serpentBound:spectralSnakes', {
+          actor: wearer,
+          target: attacker,
+          turns: 10,
+          spawned,
+        });
+        emit(world, 'proc:serpentBound:spectralPoison', {
+          actor: wearer,
+          target: attacker,
+          turns: 6,
+        });
+      }
+    }
+  },
+});
+
+
 const PROC_PACKAGE_SPECS = Object.freeze([
   Object.freeze({
     id: "echoStrike",
@@ -1440,6 +1568,20 @@ const PROC_PACKAGE_SPECS = Object.freeze([
     procTrees: Object.freeze([
       Object.freeze({ trigger: "onMiss", script: "procPackage:shadowParry", priority: 10 }),
       Object.freeze({ trigger: "onDamaged", script: "procPackage:shadowParry", priority: 20 }),
+    ]),
+  }),
+  Object.freeze({
+    id: "serpentBoundBreeches",
+    name: "Serpent-Bound Breeches",
+    summary: "On hit, chance to coat in serpent-hide and thorns. Dodges/parries prime a nature riposte that can slow. Spectral-serpent windows poison melee attackers.",
+    stateKeys: Object.freeze(["serpent_hide", "serpent_riposte", "serpent_specters"]),
+    hostIdeas: Object.freeze(["survivalist legguards", "mail hunter kits", "raider serpenthide"]),
+    passiveExpressions: Object.freeze([]),
+    procTrees: Object.freeze([
+      Object.freeze({ trigger: "onHit", script: PROC_PACKAGE_KEYS.SerpentBoundBreeches, priority: 10 }),
+      Object.freeze({ trigger: "onMiss", script: PROC_PACKAGE_KEYS.SerpentBoundBreeches, priority: 20 }),
+      Object.freeze({ trigger: "onBeforeHit", script: PROC_PACKAGE_KEYS.SerpentBoundBreeches, priority: 30 }),
+      Object.freeze({ trigger: "onDamaged", script: PROC_PACKAGE_KEYS.SerpentBoundBreeches, priority: 40 }),
     ]),
   }),
   Object.freeze({

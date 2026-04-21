@@ -15,6 +15,13 @@ export const MATERIAL_CATALOG = [
     lightPass:0.0, lightReflect:0.10, lightAbsorb:0.20, lightEmit:0.0, glowColorTempK:0,
     radShieldAlpha:1.0, radShieldBeta:0.7, radShieldGamma:0.25, radShieldNeutron:0.2, radActivation:0.0
   }},
+  { id:'serpenthide', Material:{
+    kind:'serpenthide', mohsHardness:3.2, density_g_cm3:1.05, brittleness:0.12,
+    flammability:0.18, ignitionTempC:260, burnSeverity:0.35, meltPointC:Infinity,
+    wetAbsorbency:0.15, conductivity:0.03, corrosionResist:0.82,
+    lightPass:0.0, lightReflect:0.12, lightAbsorb:0.18, lightEmit:0.0, glowColorTempK:0,
+    radShieldAlpha:1.0, radShieldBeta:0.75, radShieldGamma:0.28, radShieldNeutron:0.24, radActivation:0.0
+  }},
   { id:'wool', Material:{
     kind:'wool', mohsHardness:2.0, density_g_cm3:1.3, brittleness:0.05,
     flammability:0.4, ignitionTempC:570, burnSeverity:0.5, meltPointC:Infinity,
