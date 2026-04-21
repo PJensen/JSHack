@@ -48,7 +48,7 @@ defineItem('lodbrok_serpent_bound_breeches', {
       icon: '🐍',
       targeting: 'none',
       cooldown: 100,
-      description: 'Breaks snares, roots, webs, freezing, grapples, and constriction. Grants serpent-hide for 8 turns and spectral-serpent retaliation for 10.',
+      description: 'Breaks snares, roots, webs, freezing, grapples, and constriction. Summons 3 spectral serpents and grants serpent-hide for 8 turns.',
       onActivate(ctx) {
         ctx.cure(ctx.user, [
           'slowed',
@@ -61,12 +61,13 @@ defineItem('lodbrok_serpent_bound_breeches', {
           'constricted',
         ]);
 
-        ctx.apply(ctx.user, 'serpent_specters', 10, { potency: 1 });
         ctx.apply(ctx.user, 'serpent_hide', 8, { potency: 1 });
 
         ctx.setCooldown(100);
         ctx.message('{user} laughs at the pit — spectral serpents coil around them.', 'good');
         ctx.present('laugh_at_the_pit', { user: ctx.user, turns: 10 });
+
+        ctx.emit('lodbrok:laugh_at_pit', { actor: ctx.user });
       },
     },
   },

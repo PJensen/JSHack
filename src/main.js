@@ -170,6 +170,7 @@ import { AggroState, AGGRO_LEVELS, SEARCH_TURNS_HUNTING_GRACE } from "./rules/co
 import { spawnMonsterEntity } from "./rules/utils/spawnMonsterEntity.js";
 import { pickMonster } from "./rules/environment/dungeon/tables.js";
 import { isApplyTool, listApplyTargetsForTool } from "./rules/content/items/applyPayloads.js";
+import { installLodbrokSpawnWiring } from "./rules/data/procPackages.js";
 import { createTargetingController, scanVisibleEnemies, clampTargetToRange, worldToTile, bracketizeName } from "./main/targeting/targetingController.js";
 import { installScrollWandWiring } from "./main/wiring/scrollWandWiring.js";
 import { installContentAbilityHandler } from "./content/abilityHandler.js";
@@ -1335,6 +1336,7 @@ targeting.installKeyboardHandlers();
 installScrollWandWiring({ world, targeting, playerEntity: () => playerEntity(world) });
 installContentAbilityHandler({ world, targeting, playerEntity: () => playerEntity(world), scanVisibleEnemies });
 installPetWiring({ world, playerEntity: () => playerEntity(world) });
+installLodbrokSpawnWiring(world);
 
 function buildQuickItemPinDetailFromWorld(itemId) {
   const id = Number(itemId || 0) | 0;

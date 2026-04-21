@@ -1239,42 +1239,39 @@ registerScript(PROC_PACKAGE_KEYS.SerpentBoundBreeches, {
           nonLethal: true,
         });
       }
-
-      if (getEffect(world, wearer, 'serpent_specters')) {
-        ctx.proc.applyStatus(attacker, 'poison', 6, 2);
-        const wearerPos = world.get(wearer, Position);
-        const attackerPos = world.get(attacker, Position);
-
-        if (wearerPos && attackerPos) {
-          const spawned = spawnSpectralSnakes(
-            world,
-            wearer,
-            3,
-            10,
-            [{ x: attackerPos.x | 0, y: attackerPos.y | 0 }],
-          );
-          if (spawned > 0) {
-            emit(world, 'proc:serpentBound:spectralSnakes', {
-              actor: wearer,
-              target: attacker,
-              turns: 10,
-              spawned,
-              from: { x: wearerPos.x | 0, y: wearerPos.y | 0 },
-              to: { x: attackerPos.x | 0, y: attackerPos.y | 0 },
-              direction: normalizedVector(wearerPos, attackerPos),
-            });
-          }
-        }
-        emit(world, 'proc:serpentBound:spectralPoison', {
-          actor: wearer,
-          target: attacker,
-          turns: 6,
-        });
-      }
     }
   },
 });
 
+// ── Loðbrók's Serpent-Bound Breeches: ability event → spawn ─────────
+// Listen for ability activation and spawn snakes directly (not via proc)
+const _lodbrokSpawnInstalled = Symbol.for('jshack:proc:lodbrok:spawn:installed');
+
+export function installLodbrokSpawnWiring(world) {
+  if (/** @type {any} */ (world)[_lodbrokSpawnInstalled]) return;
+  /** @type {any} */ (world)[_lodbrokSpawnInstalled] = true;
+
+  world.on?.('lodbrok:laugh_at_pit', ({ actor }) => {
+    const actorId = Number(actor || 0) | 0;
+    if (!(actorId > 0)) return;
+
+    const spawned = spawnSpectralSnakes(world, actorId, 3, 10, []);
+    if (spawned > 0) {
+      const actorPos = world.get(actorId, Position);
+      if (actorPos) {
+        emit(world, 'proc:serpentBound:spectralSnakes', {
+          actor: actorId,
+          target: 0,
+          turns: 10,
+          spawned,
+          from: { x: actorPos.x | 0, y: actorPos.y | 0 },
+          to: { x: actorPos.x | 0, y: actorPos.y | 0 },
+          direction: { dx: 0, dy: 0 },
+        });
+      }
+    }
+  });
+}
 
 const PROC_PACKAGE_SPECS = Object.freeze([
   Object.freeze({
