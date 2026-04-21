@@ -330,6 +330,9 @@ export const RunContractQuest = registerQuest({
   id: RUN_CONTRACT_QUEST_ID,
   title: "The Town Wants a Trophy",
   version: 1,
+  journal: {
+    flavorText: "A standing contract from town leadership: kill the marked threat, recover its relic, and bring home something the whole settlement can point to.",
+  },
   vars: {
     accepted: true,
     progress: 0,

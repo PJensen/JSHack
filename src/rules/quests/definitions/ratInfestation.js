@@ -66,6 +66,12 @@ export const RatInfestationQuest = registerQuest({
   id: RAT_INFESTATION_QUEST_ID,
   title: "Rat Infestation",
   version: 1,
+  journal: {
+    flavorText: "The barkeep is tired of hearing claws in the cellar walls. He wants the infestation culled before the tavern loses its stores.",
+    rewardItems: [
+      { label: "a hot stew from the barkeep", count: 1 },
+    ],
+  },
   vars: {
     accepted: false,
     killCount: 0,

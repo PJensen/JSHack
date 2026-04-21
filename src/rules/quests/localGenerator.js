@@ -221,6 +221,9 @@ function buildOfferQuestDef(world, playerId, offer) {
     id: questId,
     title,
     version: LOCAL_QUEST_VERSION,
+    journal: {
+      flavorText: `A posted contract from ${sourceLabel}. The work is routine, but the district needs someone reliable to finish it cleanly.`,
+    },
     vars: {
       accepted: true,
       progress: 0,
@@ -421,6 +424,9 @@ export function buildLocalGeneratedQuest(world, opts = {}) {
     id: questId,
     title,
     version: LOCAL_QUEST_VERSION,
+    journal: {
+      flavorText: `A locally generated patrol order for floor ${depth}. Walk the route, keep notes, and come back with the work done.`,
+    },
     vars: {
       accepted: true,
       progress: 0,

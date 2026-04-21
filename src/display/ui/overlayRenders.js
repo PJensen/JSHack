@@ -408,7 +408,7 @@ function questNodeLabel(node, status) {
 
 /**
  * @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel
- * @param {Array<{questId:string, title:string, status:string, node:string, t0:number, summary?:string, checklist?:Array<{text?:string, done?:boolean}>}>} quests
+ * @param {Array<{questId:string, title:string, status:string, node:string, t0:number, summary?:string, flavorText?:string, rewardText?:string, completionText?:string, progress?:number, target?:number, checklist?:Array<{text?:string, done?:boolean}>}>} quests
  */
 export function renderQuestJournal(panel, quests) {
   const el = /** @type {HTMLDivElement} */ (/** @type {any} */ (panel)._inner);
@@ -424,6 +424,14 @@ export function renderQuestJournal(panel, quests) {
 
   const active = quests.filter(q => q.status !== 'complete');
   const done   = quests.filter(q => q.status === 'complete');
+  const storedExpanded = String((/** @type {any} */ (panel))._expandedQuestId || '');
+  const fallbackExpanded = active[0]?.questId || done[0]?.questId || '';
+  const expandedQuestId = storedExpanded || fallbackExpanded;
+
+  function setExpandedQuest(id) {
+    (/** @type {any} */ (panel))._expandedQuestId = String(id || '');
+    renderQuestJournal(panel, quests);
+  }
 
   function appendSection(label, items) {
     const sectionLabel = document.createElement('div');
@@ -449,24 +457,69 @@ export function renderQuestJournal(panel, quests) {
     for (const q of items) {
       const row = document.createElement('div');
       Object.assign(row.style, {
-        padding: '7px 10px',
-        marginBottom: '4px',
-        background: '#0a111f',
-        border: '1px solid #1e2d45',
-        borderRadius: '6px',
+        marginBottom: '6px',
+        background: q.questId === expandedQuestId ? 'linear-gradient(180deg, #0f1828 0%, #0a111c 100%)' : '#0a111f',
+        border: q.questId === expandedQuestId ? '1px solid #436a8f' : '1px solid #1e2d45',
+        borderRadius: '8px',
         fontSize: '13px',
+        boxShadow: q.questId === expandedQuestId ? '0 0 0 1px rgba(115, 173, 227, 0.08) inset' : 'none',
       });
 
-      const header = document.createElement('div');
+      const header = document.createElement('button');
+      header.type = 'button';
       Object.assign(header.style, {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
+        width: '100%',
+        padding: '9px 10px',
+        background: 'transparent',
+        border: '0',
+        color: '#d7e6f5',
+        cursor: 'pointer',
+        textAlign: 'left',
+      });
+      header.setAttribute('aria-expanded', q.questId === expandedQuestId ? 'true' : 'false');
+      header.addEventListener('click', () => {
+        setExpandedQuest(q.questId === expandedQuestId ? '' : q.questId);
+      });
+
+      const titleWrap = document.createElement('div');
+      Object.assign(titleWrap.style, {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '2px',
+        minWidth: '0',
+        flex: '1 1 auto',
       });
 
       const titleEl = document.createElement('span');
       titleEl.textContent = q.title || q.questId;
-      header.appendChild(titleEl);
+      Object.assign(titleEl.style, {
+        fontWeight: 'bold',
+        letterSpacing: '0.01em',
+      });
+      titleWrap.appendChild(titleEl);
+
+      const subtitle = document.createElement('span');
+      const progressText = (Number(q.target || 0) > 0)
+        ? `${Math.max(0, Number(q.progress || 0) | 0)}/${Math.max(0, Number(q.target || 0) | 0)}`
+        : '';
+      subtitle.textContent = [questNodeLabel(q.node, q.status), progressText].filter(Boolean).join(' · ');
+      Object.assign(subtitle.style, {
+        fontSize: '11px',
+        color: q.questId === expandedQuestId ? '#a8c7e6' : '#7f9ab6',
+      });
+      titleWrap.appendChild(subtitle);
+      header.appendChild(titleWrap);
+
+      const rightWrap = document.createElement('div');
+      Object.assign(rightWrap.style, {
+        display: 'flex',
+        alignItems: 'center',
+        flexShrink: '0',
+        marginLeft: '8px',
+      });
 
       const badge = document.createElement('span');
       const nodeLabel = questNodeLabel(q.node, q.status);
@@ -483,27 +536,94 @@ export function renderQuestJournal(panel, quests) {
         color: isComplete ? '#5ecb72' : (q.node === 'report' ? '#f5c043' : '#5fb3ff'),
         border: isComplete ? '1px solid #2a6e38' : (q.node === 'report' ? '1px solid #7a5a10' : '1px solid #1e4a7e'),
       });
-      header.appendChild(badge);
+      rightWrap.appendChild(badge);
+
+      const chevron = document.createElement('span');
+      chevron.textContent = q.questId === expandedQuestId ? '▾' : '▸';
+      Object.assign(chevron.style, {
+        marginLeft: '8px',
+        color: q.questId === expandedQuestId ? '#9dcaef' : '#6285aa',
+        fontSize: '14px',
+      });
+      rightWrap.appendChild(chevron);
+      header.appendChild(rightWrap);
       row.appendChild(header);
 
-      if (q.summary) {
-        const summary = document.createElement('div');
-        summary.textContent = String(q.summary || '');
-        Object.assign(summary.style, { fontSize: '11px', opacity: '0.84', marginTop: '4px' });
-        row.appendChild(summary);
-      }
-
-      const checklist = Array.isArray(q.checklist) ? q.checklist : [];
-      for (const entry of checklist) {
-        if (!entry?.text) continue;
-        const line = document.createElement('div');
-        line.textContent = `${entry.done ? '[x]' : '[ ]'} ${String(entry.text || '')}`;
-        Object.assign(line.style, {
-          fontSize: '10px',
-          opacity: entry.done ? '0.8' : '0.65',
-          marginTop: '3px',
+      if (q.questId === expandedQuestId) {
+        const body = document.createElement('div');
+        Object.assign(body.style, {
+          padding: '0 10px 10px',
+          borderTop: '1px solid rgba(70, 99, 132, 0.45)',
         });
-        row.appendChild(line);
+
+        const sections = [
+          { label: 'Objective', value: String(q.summary || '') },
+          { label: 'Details', value: String(q.flavorText || '') },
+          { label: 'Completion', value: String(q.completionText || '') },
+          { label: 'Reward', value: String(q.rewardText || '') },
+        ].filter((entry) => entry.value);
+
+        for (const section of sections) {
+          const block = document.createElement('div');
+          Object.assign(block.style, { marginTop: '10px' });
+
+          const labelEl = document.createElement('div');
+          labelEl.textContent = section.label;
+          Object.assign(labelEl.style, {
+            fontSize: '10px',
+            color: '#7ba7cc',
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
+            marginBottom: '3px',
+          });
+          block.appendChild(labelEl);
+
+          const valueEl = document.createElement('div');
+          valueEl.textContent = section.value;
+          Object.assign(valueEl.style, {
+            fontSize: '12px',
+            lineHeight: '1.45',
+            color: '#dbe9f6',
+            opacity: '0.9',
+          });
+          block.appendChild(valueEl);
+          body.appendChild(block);
+        }
+
+        const checklist = Array.isArray(q.checklist) ? q.checklist : [];
+        if (checklist.length > 0) {
+          const checklistWrap = document.createElement('div');
+          Object.assign(checklistWrap.style, { marginTop: '10px' });
+
+          const checklistLabel = document.createElement('div');
+          checklistLabel.textContent = 'Objectives';
+          Object.assign(checklistLabel.style, {
+            fontSize: '10px',
+            color: '#7ba7cc',
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
+            marginBottom: '4px',
+          });
+          checklistWrap.appendChild(checklistLabel);
+
+          for (const entry of checklist) {
+            if (!entry?.text) continue;
+            const line = document.createElement('div');
+            line.textContent = `${entry.done ? '[x]' : '[ ]'} ${String(entry.text || '')}`;
+            Object.assign(line.style, {
+              fontSize: '11px',
+              lineHeight: '1.4',
+              opacity: entry.done ? '0.9' : '0.72',
+              color: entry.done ? '#9fe0ac' : '#c9d9ea',
+              marginTop: '4px',
+            });
+            checklistWrap.appendChild(line);
+          }
+
+          body.appendChild(checklistWrap);
+        }
+
+        row.appendChild(body);
       }
 
       el.appendChild(row);
