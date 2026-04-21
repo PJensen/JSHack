@@ -1619,12 +1619,12 @@ export const MONSTERS = [
     goreType: 'none',
     tier: 99,
     rare: true,
-    intelligence: 3,
+    intelligence: 5,
     baseHp: 6,
     hpPerLevel: 0,
-    attack: 2,
+    attack: 4,
     defense: 1,
-    damageDice: '1d3',
+    damageDice: '1d4+1',
     sizeClass: 'XS',
     massKg: 0.2,
     resistances: {
@@ -1632,12 +1632,12 @@ export const MONSTERS = [
       chemical: { toxMult: 0 },
       thermal: { burnMult: 0.8 },
     },
-    speed: 3,
+    speed: 4,
     hooks: {
-      onHit: [statusEffectOnHit(30, 0xdead0511, { key: "poison", turnsLeft: 3, potency: 1 }, "proc:poisoned")],
+      onHit: [statusEffectOnHit(40, 0xdead0511, { key: "poison", turnsLeft: 4, potency: 1 }, "proc:poisoned")],
     },
-    specials: ["Poison 30%", "Summoned by serpent specters"],
-    description: 'A hissing ghost-serpent called from a curse-wrapped hide.',
+    specials: ["Poison 40%", "Summoned by serpent specters", "Lightning-fast strikes"],
+    description: 'A hissing ghost-serpent called from a curse-wrapped hide, striking with supernatural speed.',
   },
   // ── Killer Bee (tier 0, minDepth 2) — flying poison swarm ────────────
   {
