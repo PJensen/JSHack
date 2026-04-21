@@ -1437,14 +1437,6 @@ pickupFx.installListeners();
 world.on('item:pickup', ({ actor, itemId, count }) => {
   const id = Number(itemId || 0) | 0;
   if (id > 0) { deathLootArcFx.removeItem(id); }
-  const info = world.get(itemId, ItemInfo);
-  if (!info || info.type !== 'currency') return;
-  const pos = world.get(actor, Position);
-  if (!pos) return;
-  const n = Number.isFinite(count) ? Number(count) : Number(info.count||1);
-  if (n > 0) {
-    ftext.addGold(pos.x, pos.y, n, { color: '#ffcd45' });
-  }
 });
 
 function lootRarityColorHex(itemInfo) {
