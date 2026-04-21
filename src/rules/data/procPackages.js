@@ -74,7 +74,7 @@ function emit(world, name, payload) {
   }
 }
 
-function spawnSpectralSnakes(world, ownerId, count = 3, turnsLeft = 10, anchors = []) {
+function spawnSpectralSnakes(world, ownerId, count = 3, turnsLeft = 10, anchors = [], targetId = 0) {
   const origin = world.get(ownerId, Position);
   if (!origin) return 0;
   const placed = [];
@@ -87,6 +87,9 @@ function spawnSpectralSnakes(world, ownerId, count = 3, turnsLeft = 10, anchors 
     searchOrigins.push({ x: Number(anchor.x) | 0, y: Number(anchor.y) | 0 });
   }
   searchOrigins.push({ x: origin.x | 0, y: origin.y | 0 });
+
+  const resolvedTargetId = Number(targetId || 0) | 0;
+  const targetPos = resolvedTargetId > 0 ? world.get(resolvedTargetId, Position) : null;
 
   for (let i = 0; i < count; i += 1) {
     let tile = null;
@@ -111,12 +114,12 @@ function spawnSpectralSnakes(world, ownerId, count = 3, turnsLeft = 10, anchors 
     try {
       world.add(id, PetState, {
         state: "aggressive",
-        targetX: null,
-        targetY: null,
+        targetX: targetPos ? targetPos.x | 0 : null,
+        targetY: targetPos ? targetPos.y | 0 : null,
         targetItemId: 0,
         stateEnteredTurn: world.step | 0,
-        lastPlayerX: origin.x | 0,
-        lastPlayerY: origin.y | 0,
+        lastPlayerX: targetPos ? targetPos.x | 0 : origin.x | 0,
+        lastPlayerY: targetPos ? targetPos.y | 0 : origin.y | 0,
         commandCooldown: 0,
         rangedCooldown: 0,
       });
