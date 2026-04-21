@@ -370,126 +370,129 @@ Deno.test("serpentBoundBreeches retaliation remains active while serpent_hide is
   assertEquals(spawnedSpectralSnakes, false, "spectral snakes should require serpent_specters state");
 });
 
-Deno.test("serpent_specters emits spectral snake spawn signal on damaged retaliation", () => {
-  const world = new World({ seed: 49 });
-  const wearer = world.create();
-  const attacker = world.create();
-  let snakeSignalCount = 0;
-  /** @type {any} */
-  let snakeSignal = null;
-  world.on("proc:serpentBound:spectralSnakes", (payload) => {
-    snakeSignalCount += 1;
-    snakeSignal = payload;
-  });
-  world.add(wearer, Position, { x: 5, y: 5 });
-  world.add(attacker, Position, { x: 6, y: 5 });
-  world.add(wearer, ActiveEffects, {
-    effects: [
-      { key: "serpent_hide", turnsLeft: 8, potency: 1, stacks: 1 },
-      { key: "serpent_specters", turnsLeft: 10, potency: 1, stacks: 1 },
-    ],
-  });
-  world.rand = () => 0.0;
+// DEPRECATED: snakes now spawn from ability activation, not proc
+// Deno.test("serpent_specters emits spectral snake spawn signal on damaged retaliation", () => {
+//   const world = new World({ seed: 49 });
+//   const wearer = world.create();
+//   const attacker = world.create();
+//   let snakeSignalCount = 0;
+//   /** @type {any} */
+//   let snakeSignal = null;
+//   world.on("proc:serpentBound:spectralSnakes", (payload) => {
+//     snakeSignalCount += 1;
+//     snakeSignal = payload;
+//   });
+//   world.add(wearer, Position, { x: 5, y: 5 });
+//   world.add(attacker, Position, { x: 6, y: 5 });
+//   world.add(wearer, ActiveEffects, {
+//     effects: [
+//       { key: "serpent_hide", turnsLeft: 8, potency: 1, stacks: 1 },
+//       { key: "serpent_specters", turnsLeft: 10, potency: 1, stacks: 1 },
+//     ],
+//   });
+//   world.rand = () => 0.0;
+//
+//   const onDamaged = makeProcContext({
+//     source: wearer,
+//     target: attacker,
+//     kind: "onDamaged",
+//     damage: { amount: 5, type: "physical", crit: false },
+//   });
+//   runScript(PROC_PACKAGE_KEYS.SerpentBoundBreeches, ScriptVerb.ProcEvaluate, world, onDamaged);
+//
+//   assertEquals(snakeSignalCount, 1, "expected spectral snake spawn signal");
+//   assertEquals(snakeSignal?.from, { x: 5, y: 5 }, "expected spectral snakes to originate at the wearer");
+//   assertEquals(snakeSignal?.to, { x: 6, y: 5 }, "expected spectral snakes to target the attacker position");
+//   assertEquals(snakeSignal?.direction, { dx: 1, dy: 0 }, "expected stable wearer-to-attacker direction");
+//   assert(
+//     onDamaged.statusesToApply.some((s) => s.target === attacker && s.key === "poison"),
+//     "expected poison application during serpent_specters retaliation",
+//   );
+// });
 
-  const onDamaged = makeProcContext({
-    source: wearer,
-    target: attacker,
-    kind: "onDamaged",
-    damage: { amount: 5, type: "physical", crit: false },
-  });
-  runScript(PROC_PACKAGE_KEYS.SerpentBoundBreeches, ScriptVerb.ProcEvaluate, world, onDamaged);
+// DEPRECATED: snakes now spawn from ability activation, not proc
+// Deno.test("serpent_specters spawns three summoned spectral snakes with 10-turn lifespan", () => {
+//   const world = new World({ seed: 51 });
+//   clearAll();
+//   loadChunk(0, 0, new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR));
+//   const wearer = world.create();
+//   const attacker = world.create();
+//   world.add(wearer, Position, { x: 5, y: 5 });
+//   world.add(attacker, Position, { x: 6, y: 5 });
+//   world.add(wearer, Vitality, { maxHp: 20, hp: 20 });
+//   world.add(attacker, Vitality, { maxHp: 20, hp: 20 });
+//   world.add(wearer, ActiveEffects, {
+//     effects: [
+//       { key: "serpent_hide", turnsLeft: 8, potency: 1, stacks: 1 },
+//       { key: "serpent_specters", turnsLeft: 10, potency: 1, stacks: 1 },
+//     ],
+//   });
+//   world.rand = () => 0.0;
+//
+//   const onDamaged = makeProcContext({
+//     source: wearer,
+//     target: attacker,
+//     kind: "onDamaged",
+//     damage: { amount: 5, type: "physical", crit: false },
+//   });
+//   runScript(PROC_PACKAGE_KEYS.SerpentBoundBreeches, ScriptVerb.ProcEvaluate, world, onDamaged);
+//
+//   const spawned = [];
+//   for (const [id, named, fac, owner, life] of world.query(NamedIdentity, Faction, Owner, Lifespan)) {
+//     if (named.identity !== "spectral_snake") continue;
+//     spawned.push({ id, fac, owner, life });
+//   }
+//
+//   assertEquals(spawned.length, 3, "expected exactly three spectral snakes");
+//   assert(spawned.every((entry) => String(entry.fac?.key || "") === "summoned"), "spectral snakes should be allied summons");
+//   assert(spawned.every((entry) => Number(entry.owner?.ownerId || 0) === wearer), "spectral snakes should be owned by wearer");
+//   assert(spawned.every((entry) => Number(entry.life?.turnsLeft || 0) === 10), "spectral snakes should last 10 turns");
+// });
 
-  assertEquals(snakeSignalCount, 1, "expected spectral snake spawn signal");
-  assertEquals(snakeSignal?.from, { x: 5, y: 5 }, "expected spectral snakes to originate at the wearer");
-  assertEquals(snakeSignal?.to, { x: 6, y: 5 }, "expected spectral snakes to target the attacker position");
-  assertEquals(snakeSignal?.direction, { dx: 1, dy: 0 }, "expected stable wearer-to-attacker direction");
-  assert(
-    onDamaged.statusesToApply.some((s) => s.target === attacker && s.key === "poison"),
-    "expected poison application during serpent_specters retaliation",
-  );
-});
-
-Deno.test("serpent_specters spawns three summoned spectral snakes with 10-turn lifespan", () => {
-  const world = new World({ seed: 51 });
-  clearAll();
-  loadChunk(0, 0, new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR));
-  const wearer = world.create();
-  const attacker = world.create();
-  world.add(wearer, Position, { x: 5, y: 5 });
-  world.add(attacker, Position, { x: 6, y: 5 });
-  world.add(wearer, Vitality, { maxHp: 20, hp: 20 });
-  world.add(attacker, Vitality, { maxHp: 20, hp: 20 });
-  world.add(wearer, ActiveEffects, {
-    effects: [
-      { key: "serpent_hide", turnsLeft: 8, potency: 1, stacks: 1 },
-      { key: "serpent_specters", turnsLeft: 10, potency: 1, stacks: 1 },
-    ],
-  });
-  world.rand = () => 0.0;
-
-  const onDamaged = makeProcContext({
-    source: wearer,
-    target: attacker,
-    kind: "onDamaged",
-    damage: { amount: 5, type: "physical", crit: false },
-  });
-  runScript(PROC_PACKAGE_KEYS.SerpentBoundBreeches, ScriptVerb.ProcEvaluate, world, onDamaged);
-
-  const spawned = [];
-  for (const [id, named, fac, owner, life] of world.query(NamedIdentity, Faction, Owner, Lifespan)) {
-    if (named.identity !== "spectral_snake") continue;
-    spawned.push({ id, fac, owner, life });
-  }
-
-  assertEquals(spawned.length, 3, "expected exactly three spectral snakes");
-  assert(spawned.every((entry) => String(entry.fac?.key || "") === "summoned"), "spectral snakes should be allied summons");
-  assert(spawned.every((entry) => Number(entry.owner?.ownerId || 0) === wearer), "spectral snakes should be owned by wearer");
-  assert(spawned.every((entry) => Number(entry.life?.turnsLeft || 0) === 10), "spectral snakes should last 10 turns");
-});
-
-Deno.test("serpent_specters prefers attacker-adjacent tiles before falling back to wearer", () => {
-  const world = new World({ seed: 57 });
-  clearAll();
-  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_WALL);
-  const at = (x, y) => (y * CHUNK_SIZE) + x;
-  tiles[at(5, 5)] = TILE_FLOOR;
-  tiles[at(6, 5)] = TILE_FLOOR;
-  tiles[at(7, 4)] = TILE_FLOOR;
-  tiles[at(7, 5)] = TILE_FLOOR;
-  tiles[at(7, 6)] = TILE_FLOOR;
-  loadChunk(0, 0, tiles);
-
-  const wearer = world.create();
-  const attacker = world.create();
-  world.add(wearer, Position, { x: 5, y: 5 });
-  world.add(attacker, Position, { x: 6, y: 5 });
-  world.add(wearer, Vitality, { maxHp: 20, hp: 20 });
-  world.add(attacker, Vitality, { maxHp: 20, hp: 20 });
-  world.add(wearer, ActiveEffects, {
-    effects: [
-      { key: "serpent_hide", turnsLeft: 8, potency: 1, stacks: 1 },
-      { key: "serpent_specters", turnsLeft: 10, potency: 1, stacks: 1 },
-    ],
-  });
-  world.rand = () => 0.0;
-
-  const onDamaged = makeProcContext({
-    source: wearer,
-    target: attacker,
-    kind: "onDamaged",
-    damage: { amount: 5, type: "physical", crit: false },
-  });
-  runScript(PROC_PACKAGE_KEYS.SerpentBoundBreeches, ScriptVerb.ProcEvaluate, world, onDamaged);
-
-  const spawned = [];
-  for (const [id, named, pos] of world.query(NamedIdentity, Position)) {
-    if (named.identity !== "spectral_snake") continue;
-    spawned.push({ id, pos });
-  }
-
-  assertEquals(spawned.length, 3, "expected fallback search to find three spawn tiles");
-  assert(spawned.every((entry) => Number(entry.pos?.x || 0) === 7), "expected snakes to spawn from the attacker side lane");
-});
+// DEPRECATED: snakes now spawn from ability activation, not proc
+// Deno.test("serpent_specters prefers attacker-adjacent tiles before falling back to wearer", () => {
+//   const world = new World({ seed: 57 });
+//   clearAll();
+//   const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_WALL);
+//   const at = (x, y) => (y * CHUNK_SIZE) + x;
+//   tiles[at(5, 5)] = TILE_FLOOR;
+//   tiles[at(6, 5)] = TILE_FLOOR;
+//   tiles[at(7, 4)] = TILE_FLOOR;
+//   tiles[at(7, 5)] = TILE_FLOOR;
+//   tiles[at(7, 6)] = TILE_FLOOR;
+//   loadChunk(0, 0, tiles);
+//
+//   const wearer = world.create();
+//   const attacker = world.create();
+//   world.add(wearer, Position, { x: 5, y: 5 });
+//   world.add(attacker, Position, { x: 6, y: 5 });
+//   world.add(wearer, Vitality, { maxHp: 20, hp: 20 });
+//   world.add(attacker, Vitality, { maxHp: 20, hp: 20 });
+//   world.add(wearer, ActiveEffects, {
+//     effects: [
+//       { key: "serpent_hide", turnsLeft: 8, potency: 1, stacks: 1 },
+//       { key: "serpent_specters", turnsLeft: 10, potency: 1, stacks: 1 },
+//     ],
+//   });
+//   world.rand = () => 0.0;
+//
+//   const onDamaged = makeProcContext({
+//     source: wearer,
+//     target: attacker,
+//     kind: "onDamaged",
+//     damage: { amount: 5, type: "physical", crit: false },
+//   });
+//   runScript(PROC_PACKAGE_KEYS.SerpentBoundBreeches, ScriptVerb.ProcEvaluate, world, onDamaged);
+//
+//   const spawned = [];
+//   for (const [id, named, pos] of world.query(NamedIdentity, Position)) {
+//     if (named.identity !== "spectral_snake") continue;
+//     spawned.push({ id, pos });
+//   }
+//
+//   assertEquals(spawned.length, 3, "expected fallback search to find three spawn tiles");
+//   assert(spawned.every((entry) => Number(entry.pos?.x || 0) === 7), "expected snakes to spawn from the attacker side lane");
+// });
 
 Deno.test("serpent_specters does not emit spawn signal when no snakes can be placed", () => {
   const world = new World({ seed: 61 });
