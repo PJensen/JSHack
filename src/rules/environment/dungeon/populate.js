@@ -522,8 +522,7 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null, world
   const markSolid = (x, y) => solidPositions.add(`${x},${y}`);
 
   // Cap shrine and altar spawns to max 1 each per floor
-  let shrineCount = 0;
-  let altarCount = 0;
+  const featureCounts = { shrine: 0, altar: 0 };
 
   // Pre-mark stair tiles so monsters, traps, and other spawns never land on them.
   for (let ly = 0; ly < CHUNK_SIZE; ly++) {
@@ -599,10 +598,10 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null, world
       let featureKind = _pickFeature(rng, floorPlan.profile?.featurePool ?? null);
 
       // Cap shrine and altar to 1 each per floor
-      if (featureKind === 'shrine' && shrineCount > 0) {
+      if (featureKind === 'shrine' && featureCounts.shrine > 0) {
         featureKind = 'pillar'; // fallback to pillar
       }
-      if (featureKind === 'altar' && altarCount > 0) {
+      if (featureKind === 'altar' && featureCounts.altar > 0) {
         featureKind = 'pillar'; // fallback to pillar
       }
 
@@ -632,8 +631,8 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null, world
       if (!skipFeature && !isSolid(cx, cy)) {
         spawns.push({ x: cx, y: cy, kind: featureKind, params: { depth: floorPlan.depth } });
         if (featureKind === 'weapon_rack') roomHasWeaponRack = true;
-        if (featureKind === 'shrine') shrineCount++;
-        if (featureKind === 'altar') altarCount++;
+        if (featureKind === 'shrine') featureCounts.shrine++;
+        if (featureKind === 'altar') featureCounts.altar++;
         if (SACRED_FEATURE_KINDS.has(featureKind)) roomIsSacred = true;
         markSolid(cx, cy);
 
@@ -1135,6 +1134,7 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null, world
       markSolid,
       theme,
       worldSeed,
+      featureCounts,
     });
   }
 
@@ -1455,7 +1455,7 @@ function findRoomExitCorridor(room, chunk) {
 }
 
 function applyDeadEndTheme(ctx) {
-  const { room, rng, spawns, floorPlan, chunk, isSolid, markSolid, theme, worldSeed = 0 } = ctx;
+  const { room, rng, spawns, floorPlan, chunk, isSolid, markSolid, theme, worldSeed = 0, featureCounts } = ctx;
   const reserved = new Set();
 
   switch (theme) {
@@ -1507,9 +1507,9 @@ function applyDeadEndTheme(ctx) {
       let sanctuaryKind = featureRoll < 0.34 ? 'fountain' : (featureRoll < 0.67 ? 'shrine' : 'altar');
 
       // Cap shrine and altar to 1 each per floor
-      if (sanctuaryKind === 'shrine' && shrineCount > 0) {
+      if (sanctuaryKind === 'shrine' && featureCounts.shrine > 0) {
         sanctuaryKind = 'fountain';
-      } else if (sanctuaryKind === 'altar' && altarCount > 0) {
+      } else if (sanctuaryKind === 'altar' && featureCounts.altar > 0) {
         sanctuaryKind = 'fountain';
       }
 
@@ -1517,8 +1517,8 @@ function applyDeadEndTheme(ctx) {
       if (featurePos) {
         markSolid(featurePos.x, featurePos.y);
         spawns.push({ x: featurePos.x, y: featurePos.y, kind: sanctuaryKind, params: { depth: floorPlan.depth } });
-        if (sanctuaryKind === 'shrine') shrineCount++;
-        if (sanctuaryKind === 'altar') altarCount++;
+        if (sanctuaryKind === 'shrine') featureCounts.shrine++;
+        if (sanctuaryKind === 'altar') featureCounts.altar++;
       }
       const itemPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
       if (itemPos) {
