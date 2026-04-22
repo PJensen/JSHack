@@ -1400,7 +1400,8 @@ function pickRoomInteriorSpot(room, rng, isBlocked, reserved = new Set(), tries 
 
 /**
  * Find a corridor tile adjacent to a room that could be used to place
- * a blocking feature like a portcullis. Returns world coords {x, y} or null.
+ * a blocking feature like a portcullis. Returns the FURTHEST exit by
+ * distance from room center. Returns world coords {x, y} or null.
  */
 function findRoomExitCorridor(room, chunk) {
   const ox = chunk.chunkX * CHUNK_SIZE;
@@ -1411,6 +1412,10 @@ function findRoomExitCorridor(room, chunk) {
   const rh = room.h;
   const tiles = chunk.tiles;
 
+  // Room center for distance calculation
+  const roomCenterX = room.x + rw / 2;
+  const roomCenterY = room.y + rh / 2;
+
   function getTile(x, y) {
     if (x < 0 || y < 0 || x >= CHUNK_SIZE || y >= CHUNK_SIZE) return -1;
     return tiles[y * CHUNK_SIZE + x];
@@ -1420,7 +1425,7 @@ function findRoomExitCorridor(room, chunk) {
     return tile === TILE_FLOOR || tile === TILE_DOOR;
   }
 
-  // Try to find an exit in order: west, east, north, south
+  // Find all exits
   const exits = [];
 
   // Check west exit
@@ -1451,7 +1456,21 @@ function findRoomExitCorridor(room, chunk) {
     }
   }
 
-  return exits.length > 0 ? exits[0] : null;
+  if (exits.length === 0) return null;
+
+  // Pick the exit furthest from room center
+  let furthest = exits[0];
+  let maxDist = Math.hypot(exits[0].x - roomCenterX, exits[0].y - roomCenterY);
+
+  for (let i = 1; i < exits.length; i++) {
+    const dist = Math.hypot(exits[i].x - roomCenterX, exits[i].y - roomCenterY);
+    if (dist > maxDist) {
+      maxDist = dist;
+      furthest = exits[i];
+    }
+  }
+
+  return furthest;
 }
 
 function applyDeadEndTheme(ctx) {
