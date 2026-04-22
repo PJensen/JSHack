@@ -1,4 +1,5 @@
 import { isGoreDisabled } from "../../../ui/wiring/goreEngine.js";
+import { evaluatePattern } from "../../../lighting/sources/temporalPatterns.js";
 
 const INSTALLED_KEY = Symbol.for("jshack:display:statusEmitters:installed");
 
@@ -138,9 +139,16 @@ export function createStatusEmitterController({ world, fx }) {
           if (tag === "bleeding" && isGoreDisabled()) continue;
           const key = `${sc.prefix}:${e.id}`;
           seenEmitterKeys.add(key);
+          const emitter = fx.ensureEmitter(key, { continuous: true, ...sc.cfg });
           if (!sc.tracker.has(e.id)) {
-            fx.ensureEmitter(key, { continuous: true, ...sc.cfg });
             sc.tracker.add(e.id);
+          }
+          // Sync torch particles with light flicker intensity
+          if (tag === "torch" && emitter) {
+            const pattern = evaluatePattern('torch', fxTime, e.id);
+            emitter.alphaMultiplier = pattern.intensity;
+            emitter.rateMultiplier = pattern.intensity;
+            emitter.sizeMultiplier = pattern.intensity;
           }
           const origin = { x: e.pos.x, y: e.pos.y };
           if (tag === "regen") {
@@ -197,9 +205,16 @@ export function createStatusEmitterController({ world, fx }) {
         if (e.kind === "familiar" && familiarCooldowns.has(e.id)) continue;
         const key = `${kc.prefix}:${e.id}`;
         seenEmitterKeys.add(key);
+        const emitter = fx.ensureEmitter(key, kc.cfg);
         if (!kc.tracker.has(e.id)) {
-          fx.ensureEmitter(key, kc.cfg);
           kc.tracker.add(e.id);
+        }
+        // Sync torch particles with light flicker intensity
+        if (e.kind === "torch" && emitter) {
+          const pattern = evaluatePattern('torch', fxTime, e.id);
+          emitter.alphaMultiplier = pattern.intensity;
+          emitter.rateMultiplier = pattern.intensity;
+          emitter.sizeMultiplier = pattern.intensity;
         }
         origins.push({ key, x: e.pos.x, y: e.pos.y });
         if (e.kind === "familiar") {

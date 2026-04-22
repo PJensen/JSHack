@@ -1022,6 +1022,10 @@ export function buildWorldView(world) {
 			projectItemAffixDisplayTags(kind, itemInfo, rec, world.get(id, Material)?.kind ?? null);
 			projectCombatUi(world, id, rec, playerFactionKey);
 			projectProcStateTags(world, id, rec);
+			// Placed torches get the torch tag for particle/light sync
+			if (kind === 'torch' && !rec.tags.includes('torch')) {
+				rec.tags.push('torch');
+			}
 			projectFacing(world, id, rec);
 			const petState = /** @type {any} */ (world.get(id, PetState));
 			const isFamiliar = String(rec.kind || "").toLowerCase() === "familiar";
