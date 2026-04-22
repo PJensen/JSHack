@@ -10,10 +10,10 @@ import { pickProfile } from './profiles/index.js';
 import { clamp } from '../../../shared/math/math.js';
 import { generateChunk } from './chunk.js';
 
-function resolveBaseFootprintRadius(scale) {
-  if (scale <= 0.15) return 0;
+function resolveBaseFootprintRadius(scale, depth) {
   if (scale <= 0.5) return 0;
-  return Math.min(12, Math.max(1, Math.round(scale * 2) - 1));
+  const multiplier = depth === 1 ? 0.8 : 2.0;
+  return Math.min(12, Math.round(scale * multiplier) - 1);
 }
 
 function resolveGrowthBudget(scale, depth) {
@@ -28,10 +28,14 @@ function resolveFloorProfile(profile, depth) {
   if (profile.roomSparsity != null) return profile;
 
   const base = clamp(Number(dungeonConfig.roomSparsity) || 0, 0, 1);
+  // Floor 1 way denser: lower sparsity = more rooms
+  const sparsity = depth === 1
+    ? clamp(base * 0.4, 0.05, 0.75)
+    : clamp(base, 0.05, 0.75);
 
   return {
     ...profile,
-    roomSparsity: clamp(base, 0.05, 0.75),
+    roomSparsity: sparsity,
   };
 }
 
@@ -148,7 +152,7 @@ export function generateFloorPlan(worldSeed, depth, priorDownStairPositions = nu
   const rng = createRng(seed);
 
   const scale = Math.max(0.1, Number(dungeonConfig.dungeonScale) || 0.3);
-  const baseRadius = resolveBaseFootprintRadius(scale);
+  const baseRadius = resolveBaseFootprintRadius(scale, depth);
   const growthBudget = resolveGrowthBudget(scale, depth);
   const paddingX = growthBudget <= 0
     ? baseRadius
@@ -230,8 +234,12 @@ export function generateFloorPlan(worldSeed, depth, priorDownStairPositions = nu
   const profile = resolveFloorProfile(pickProfile(rng, depth, opts.dungeonType ?? null), depth);
 
   // Prefab rooms: hand-authored set pieces placed in non-origin chunks.
+  // Only place if there's ample space (don't force extent expansion).
   const prefabRooms = [];
-  if (prefabRules.length > 0) {
+  const extentSize = (extent.maxCX - extent.minCX + 1) * (extent.maxCY - extent.minCY + 1);
+  const hasAmpleSpace = extentSize >= 9; // at least 3x3 chunks
+
+  if (prefabRules.length > 0 && hasAmpleSpace) {
     const candidates = ensurePrefabCandidates(collectPrefabCandidates(extent), prefabRules.length);
     const orderedCandidates = candidates
       .slice()
@@ -246,11 +254,12 @@ export function generateFloorPlan(worldSeed, depth, priorDownStairPositions = nu
       });
     for (let i = 0; i < prefabRules.length && i < orderedCandidates.length; i++) {
       const pick = orderedCandidates[i];
-      const roomId = prefabRules[i];
-      prefabRooms.push({ chunkX: pick.chunkX, chunkY: pick.chunkY, roomId });
-    }
-    if (prefabRooms.length > 0) {
-      extent = expandExtentToInclude(extent, prefabRooms);
+      // Only include if it's already within the planned extent
+      if (pick.chunkX >= extent.minCX && pick.chunkX <= extent.maxCX &&
+          pick.chunkY >= extent.minCY && pick.chunkY <= extent.maxCY) {
+        const roomId = prefabRules[i];
+        prefabRooms.push({ chunkX: pick.chunkX, chunkY: pick.chunkY, roomId });
+      }
     }
   }
 
