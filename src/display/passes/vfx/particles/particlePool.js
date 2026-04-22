@@ -198,6 +198,9 @@ export class ParticleEmitter {
     this._rng = makeRng(seed>>>0);
     this._acc = 0;
     this._didBurst = false;
+    this.alphaMultiplier = 1.0;  // dynamic alpha sync
+    this.rateMultiplier = 1.0;   // dynamic spawn rate sync
+    this.sizeMultiplier = 1.0;   // dynamic size sync
   }
 
   onEnable(pool, ox, oy) {
@@ -209,7 +212,8 @@ export class ParticleEmitter {
     if (!this.enabled) return;
 
     if (this.continuous && this.rate > 0) {
-      this._acc += dt * this.rate;
+      const effectiveRate = this.rate * this.rateMultiplier;
+      this._acc += dt * effectiveRate;
       const n = this._acc | 0;
       if (n > 0) {
         this._acc -= n;
@@ -241,9 +245,9 @@ export class ParticleEmitter {
       vy: Math.sin(theta)*spd + this.vy + ovy,
       ax: this.ax, ay: this.ay,
       life,
-      size0: this.size, size1: this.sizeEnd,
+      size0: this.size * this.sizeMultiplier, size1: this.sizeEnd * this.sizeMultiplier,
       r: this.r, g: this.g, b: this.b,
-      a0: this.alpha0, a1: this.alpha1,
+      a0: this.alpha0 * this.alphaMultiplier, a1: this.alpha1 * this.alphaMultiplier,
       rotVel: this.rotVel,
     }));
   }

@@ -12,6 +12,8 @@
 // Usage in collectLightSources:
 //   const p = evaluatePattern('torch', fxTime, entityId);
 //   out.push({ ..., radius: base * p.intensity, flicker: p.intensity });
+//
+// CRITICAL: returns shared scratch. Caller must consume immediately or copy.
 
 /** @typedef {{ intensity: number, r: number, g: number, b: number }} PatternResult */
 
@@ -29,14 +31,14 @@ function out(intensity, r, g, b) {
 
 /**
  * Torch — warm, organic flicker. Slow sway + medium wobble + shimmer + jitter.
- * Range: ~0.76 – 1.15.  The classic.
+ * Deeper troughs: range ~0.50 – 1.10. Same peak brightness, dips much lower.
  */
 function torch(t, id) {
-  const v = 1.0
-    + 0.10 * Math.sin(t * 1.4  + id)
-    + 0.06 * Math.sin(t * 3.1  + id * 0.7)
-    + 0.04 * Math.sin(t * 5.9)
-    + 0.04 * (Math.random() - 0.5);
+  const v = 0.80
+    + 0.15 * Math.sin(t * 1.4  + id)
+    + 0.09 * Math.sin(t * 3.1  + id * 0.7)
+    + 0.06 * Math.sin(t * 5.9)
+    + 0.06 * (Math.random() - 0.5);
   return out(v, 0, 0, 0);
 }
 
