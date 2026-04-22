@@ -400,7 +400,7 @@ export const basePalette = {
   mushrooms:   { glyph: "`", fg: "#88cc88", glow: "#558855" },
   mushrooms_picked: { glyph: " " },
   web:         { glyph: "🕸", fg: "#c8c8c8", glow: "#888888" },
-  torch:       { glyph: "🕯", fg: "#ffaa44", glow: "#ff6600" },
+  torch:       { glyph: "╻", fg: "#ffaa44", glow: "#ff6600" },
   urn:         { glyph: "⚱", fg: "#c8a060", glow: "#8a6030" },
   flayed_man:  { glyph: "╳", fg: "#3a2213", glow: "#aaaaaa" },
   hanging_chains: { glyph: "⛓", fg: "#8f9299", glow: "#aaaaaa" },
