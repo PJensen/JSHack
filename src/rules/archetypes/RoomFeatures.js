@@ -154,6 +154,7 @@ export const Portcullis = defineArchetype(
   [Collider, { solid: true, blocksSight: true }],
   [ObjectState, { state: "lowered" }],
   [HydraulicsLink, (/** @type {any} */ p) => ({ linkId: String(p.linkId || ""), role: "portcullis" })],
+  [Interactable, { action: "bumpPortcullis", params: null }],
 );
 
 export const ChainWinch = defineArchetype(

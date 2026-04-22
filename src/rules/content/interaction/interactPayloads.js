@@ -2110,6 +2110,41 @@ export const INTERACT_PAYLOADS = {
       }
     },
   },
+
+  // ── Portcullis ─────────────────────────────────────────────────────────────
+
+  bumpPortcullis: {
+    onInteract(ctx) {
+      const { world, actor, targetId } = ctx;
+      const os = world.get(targetId, ObjectState);
+      const isRaised = os?.state === "raised";
+
+      if (isRaised) {
+        // Gate is open, no message needed
+        return;
+      }
+
+      // Gate is lowered — player bumped it. Emit a message.
+      const messages = [
+        "The gate is closed.",
+        "Hmm, closed.",
+        "It feels closed. Maybe something opens this.",
+        "You pull at the bars. It's shut.",
+        "You have a sneaky suspicion this is opened elsewhere.",
+        "The portcullis won't budge.",
+        "Locked in place by some mechanism.",
+      ];
+
+      const messageIdx = (world.step || 0) % messages.length;
+      const message = messages[messageIdx];
+
+      world.emit?.("bump:message", {
+        actor,
+        targetId,
+        message,
+      });
+    },
+  },
 };
 
 // ─── Altar offer helper ───────────────────────────────────────────────────────

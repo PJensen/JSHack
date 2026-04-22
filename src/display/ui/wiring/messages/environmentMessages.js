@@ -711,4 +711,11 @@ export function installEnvironmentMessages(ctx) {
     log(`${label} has arrived. ${flavors[label] || ''}`, 'ambient');
   });
   world.on('calendar:newYear', ({ next }) => { log(`A new year dawns \u2014 Year ${next}. The world turns.`, 'ambient'); });
+
+  // === Bump messages ===
+  world.on('bump:message', ({ actor, message }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    if (!message) return;
+    log(message, 'navigation');
+  });
 }
