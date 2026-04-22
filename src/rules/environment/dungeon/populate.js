@@ -521,6 +521,10 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null, world
   const isSolid = (x, y) => solidPositions.has(`${x},${y}`);
   const markSolid = (x, y) => solidPositions.add(`${x},${y}`);
 
+  // Cap shrine and altar spawns to max 1 each per floor
+  let shrineCount = 0;
+  let altarCount = 0;
+
   // Pre-mark stair tiles so monsters, traps, and other spawns never land on them.
   for (let ly = 0; ly < CHUNK_SIZE; ly++) {
     for (let lx = 0; lx < CHUNK_SIZE; lx++) {
@@ -592,7 +596,16 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null, world
     let roomIsSacred = false;
     const featureRate = floorPlan.profile?.doorFeatureRate ?? 0.50;
     if (!isEntryRoom && rng.next() < featureRate) {
-      const featureKind = _pickFeature(rng, floorPlan.profile?.featurePool ?? null);
+      let featureKind = _pickFeature(rng, floorPlan.profile?.featurePool ?? null);
+
+      // Cap shrine and altar to 1 each per floor
+      if (featureKind === 'shrine' && shrineCount > 0) {
+        featureKind = 'pillar'; // fallback to pillar
+      }
+      if (featureKind === 'altar' && altarCount > 0) {
+        featureKind = 'pillar'; // fallback to pillar
+      }
+
       const cx = room.x + Math.floor(room.w / 2);
       const cy = room.y + Math.floor(room.h / 2);
 
@@ -619,6 +632,8 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null, world
       if (!skipFeature && !isSolid(cx, cy)) {
         spawns.push({ x: cx, y: cy, kind: featureKind, params: { depth: floorPlan.depth } });
         if (featureKind === 'weapon_rack') roomHasWeaponRack = true;
+        if (featureKind === 'shrine') shrineCount++;
+        if (featureKind === 'altar') altarCount++;
         if (SACRED_FEATURE_KINDS.has(featureKind)) roomIsSacred = true;
         markSolid(cx, cy);
 
@@ -1383,6 +1398,62 @@ function pickRoomInteriorSpot(room, rng, isBlocked, reserved = new Set(), tries 
   return null;
 }
 
+/**
+ * Find a corridor tile adjacent to a room that could be used to place
+ * a blocking feature like a portcullis. Returns world coords {x, y} or null.
+ */
+function findRoomExitCorridor(room, chunk) {
+  const ox = chunk.chunkX * CHUNK_SIZE;
+  const oy = chunk.chunkY * CHUNK_SIZE;
+  const rx = room.x - ox;
+  const ry = room.y - oy;
+  const rw = room.w;
+  const rh = room.h;
+  const tiles = chunk.tiles;
+
+  function getTile(x, y) {
+    if (x < 0 || y < 0 || x >= CHUNK_SIZE || y >= CHUNK_SIZE) return -1;
+    return tiles[y * CHUNK_SIZE + x];
+  }
+
+  function isPassable(tile) {
+    return tile === TILE_FLOOR || tile === TILE_DOOR;
+  }
+
+  // Try to find an exit in order: west, east, north, south
+  const exits = [];
+
+  // Check west exit
+  for (let y = ry; y < ry + rh; y++) {
+    if (isPassable(getTile(rx - 1, y))) {
+      exits.push({ x: ox + rx - 1, y: oy + y });
+    }
+  }
+
+  // Check east exit
+  for (let y = ry; y < ry + rh; y++) {
+    if (isPassable(getTile(rx + rw, y))) {
+      exits.push({ x: ox + rx + rw, y: oy + y });
+    }
+  }
+
+  // Check north exit
+  for (let x = rx; x < rx + rw; x++) {
+    if (isPassable(getTile(x, ry - 1))) {
+      exits.push({ x: ox + x, y: oy + ry - 1 });
+    }
+  }
+
+  // Check south exit
+  for (let x = rx; x < rx + rw; x++) {
+    if (isPassable(getTile(x, ry + rh))) {
+      exits.push({ x: ox + x, y: oy + ry + rh });
+    }
+  }
+
+  return exits.length > 0 ? exits[0] : null;
+}
+
 function applyDeadEndTheme(ctx) {
   const { room, rng, spawns, floorPlan, chunk, isSolid, markSolid, theme, worldSeed = 0 } = ctx;
   const reserved = new Set();
@@ -1432,12 +1503,22 @@ function applyDeadEndTheme(ctx) {
     }
     case 'sanctuary': {
       removeRoomSpawns(spawns, room, (spawn) => spawn.kind === 'monster' || spawn.kind === 'spawner' || spawn.kind === 'trap');
-      const featureRoll = rng.next();
-      const sanctuaryKind = featureRoll < 0.34 ? 'fountain' : (featureRoll < 0.67 ? 'shrine' : 'altar');
+      let featureRoll = rng.next();
+      let sanctuaryKind = featureRoll < 0.34 ? 'fountain' : (featureRoll < 0.67 ? 'shrine' : 'altar');
+
+      // Cap shrine and altar to 1 each per floor
+      if (sanctuaryKind === 'shrine' && shrineCount > 0) {
+        sanctuaryKind = 'fountain';
+      } else if (sanctuaryKind === 'altar' && altarCount > 0) {
+        sanctuaryKind = 'fountain';
+      }
+
       const featurePos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
       if (featurePos) {
         markSolid(featurePos.x, featurePos.y);
         spawns.push({ x: featurePos.x, y: featurePos.y, kind: sanctuaryKind, params: { depth: floorPlan.depth } });
+        if (sanctuaryKind === 'shrine') shrineCount++;
+        if (sanctuaryKind === 'altar') altarCount++;
       }
       const itemPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
       if (itemPos) {
@@ -1680,14 +1761,13 @@ function applyDeadEndTheme(ctx) {
         });
       }
 
-      const gateCount = rng.int(1, 2);
-      for (let i = 0; i < gateCount; i++) {
-        const gatePos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
-        if (!gatePos) break;
-        markSolid(gatePos.x, gatePos.y);
+      // Place portcullis on corridor to block exit from hydraulics room
+      const exitCorridor = findRoomExitCorridor(room, chunk);
+      if (exitCorridor) {
+        markSolid(exitCorridor.x, exitCorridor.y);
         spawns.push({
-          x: gatePos.x,
-          y: gatePos.y,
+          x: exitCorridor.x,
+          y: exitCorridor.y,
           kind: 'portcullis',
           params: { depth: floorPlan.depth, linkId },
         });
