@@ -404,6 +404,10 @@
 
 			window.__JSHACK_BOOT_DONE = () => {
 				hideBootLoader();
+				// Prevent auto-rotation on mobile
+				if (screen.orientation && screen.orientation.lock) {
+					screen.orientation.lock('portrait-primary').catch(() => {});
+				}
 			};
 
 			if (hasSavegame() && !hasValidFloorOverride()) bootLabel.textContent = 'Loading from Save';
