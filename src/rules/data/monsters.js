@@ -21,6 +21,7 @@ import {
   typedDamageOnHit,
   spillLootAndShortBlinkOnDamaged,
   burrowAndDieOnHit,
+  slimedOnHit,
 } from "./callbacks/combat.js";
 import { selfThrowNearTargetOnSeen, gazeOnLOS, fireBreathLineOnLOS, castSpellOnLOS } from "./callbacks/ai.js";
 import { spawnPlasmaCloudOnDeath, centipedeSplitOnDeath, spawnFirePuffOnDeath, gasSporeExplodeOnDeath } from "./callbacks/death.js";
@@ -1687,7 +1688,10 @@ export const MONSTERS = [
     },
     speed: 1,          // very slow (actEvery = 3)
     hooks: {
-      onHit: [statusEffectOnHit(30, 0xdead0070, { key: "stun", turnsLeft: 2, potency: 1 }, "proc:stunned")],
+      onHit: [
+        statusEffectOnHit(30, 0xdead0070, { key: "stun", turnsLeft: 2, potency: 1 }, "proc:stunned"),
+        slimedOnHit(40, "proc:slimed"),
+      ],
       onDamaged: [retaliateOnDamaged(2, "proc:gelatinous_cube:acid")],
     },
     specials: ["Paralyze 30%", "Acid retaliation (2 dmg)", "Poison/shock resistant"],
