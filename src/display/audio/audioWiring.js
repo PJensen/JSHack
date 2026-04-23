@@ -119,6 +119,7 @@ const SPELL_IMPACT_MAP = {
 };
 
 export const SPELL_CAST_SOUND_EVENTS = Object.freeze([
+  'spell:agony',
   'spell:bolt',
   'spell:frost',
   'spell:shadow_bolt',
@@ -197,6 +198,10 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     if (cause === 'spell' || cause === 'magic') {
       const impactId = SPELL_IMPACT_MAP[type] || "spell:impact:physical";
       sfxAt(impactId, pos, pp());
+    }
+    // Electrocution sound for electric/lightning damage
+    if ((type === 'electric' || type === 'lightning') && cause === 'spell') {
+      sfxAt("status:electrocuted", pos, pp(), { priority: 1 });
     }
   });
 
@@ -329,6 +334,16 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
   world.on('bell:rung', ({ targetId }) => {
     const pos = targetId != null ? getPosition(targetId) : null;
     sfxAt("church:bell", pos, pp(), { priority: 1 });
+  });
+
+  world.on('fountain:drink', ({ targetId, effect }) => {
+    const pos = targetId != null ? getPosition(targetId) : null;
+    sfxAt("fountain:sip", pos, pp());
+  });
+
+  world.on('fountain:dip', ({ targetId, effect }) => {
+    const pos = targetId != null ? getPosition(targetId) : null;
+    sfxAt("fountain:sip", pos, pp());
   });
 
   world.on('status', ({ id, kind, at }) => {
