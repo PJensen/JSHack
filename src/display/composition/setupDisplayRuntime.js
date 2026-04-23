@@ -19,6 +19,9 @@ import { installFloatTextWiring } from "../ui/wiring/floatTextWiring.js";
 import { installEventUiWiring } from "../ui/wiring/eventUiWiring.js";
 import { createDeathVfxController } from "../fx/deathVfxController.js";
 import { installAudioWiring } from "../audio/audioWiring.js";
+import { createFountainAmbientController } from "../audio/fountainAmbientController.js";
+import { createLocalEmitterAmbientController } from "../audio/localEmitterAmbientController.js";
+import { createWorldAmbientController } from "../audio/worldAmbientController.js";
 import { installContentVfxWiring } from "../../content/vfxWiring.js";
 
 /**
@@ -41,6 +44,7 @@ export function setupDisplayRuntime({
   isPlayer,
   getPlayerEntity,
   getItemInfo,
+  getItemMaterial,
   resolveItemDisplayName,
   dispatchRulesAction,
   classifySurfaceTile,
@@ -134,8 +138,14 @@ export function setupDisplayRuntime({
   installAudioWiring({
     world,
     isPlayer,
-    getItemInfo,
+    getItemInfo: (id) => {
+      const info = getItemInfo(id);
+      if (!info) return null;
+      const material = getItemMaterial ? getItemMaterial(id) : null;
+      return material ? { ...info, material } : info;
+    },
     getPosition,
+    getIdentity: getEntityIdentity,
     getPlayerPosition: () => {
       const pe = getPlayerEntity();
       return pe ? getPosition(pe.id ?? pe) : null;
@@ -143,5 +153,10 @@ export function setupDisplayRuntime({
     getDepth: getDepth || (() => 0),
   });
 
-  return { statusEmitterFx, statusPresentationDelayFx, boltFx, delayedDeathFx, projectileFx, spellAreaFx, cloudFx, surfaceAreaFx, spiritWispFx, bumpFx, meleeSlashFx, recoilFx, hitstopFx, deathEssenceFx, deathVfx, ftext, goreTick };
+  const fountainAmbientFx = createFountainAmbientController({ world });
+  fountainAmbientFx.installListeners();
+  const localEmitterAmbientFx = createLocalEmitterAmbientController();
+  const worldAmbientFx = createWorldAmbientController();
+
+  return { statusEmitterFx, statusPresentationDelayFx, boltFx, delayedDeathFx, projectileFx, spellAreaFx, cloudFx, surfaceAreaFx, spiritWispFx, bumpFx, meleeSlashFx, recoilFx, hitstopFx, deathEssenceFx, deathVfx, fountainAmbientFx, localEmitterAmbientFx, worldAmbientFx, ftext, goreTick };
 }

@@ -41,6 +41,7 @@ import { DistrictProfile } from "../../rules/components/DistrictProfile.js";
 import { EntranceProfile } from "../../rules/components/EntranceProfile.js";
 import { GroundStackOrder } from "../../rules/components/GroundStackOrder.js";
 import { Facing } from "../../rules/components/Facing.js";
+import { Interactable } from "../../rules/components/Interactable.js";
 import { canonicalStatusKey } from "../../rules/utils/effectSemantics.js";
 import { listProcPackages } from "../../rules/data/procPackages.js";
 import {
@@ -195,6 +196,24 @@ function makePerceptionEcho(src, extraTags, at, kindOverride = undefined) {
 		facing: null,
 		weaponVfx: null,
 	};
+}
+
+/**
+ * Project interactable-only display tags that the presentation layer needs to
+ * react to immediately on first world sync.
+ * @param {any} world
+ * @param {number} id
+ * @param {string} kind
+ * @param {EntityView} rec
+ */
+function projectInteractableDisplayTags(world, id, kind, rec) {
+	if (String(kind || "").toLowerCase() !== "fountain") return;
+	const inter = world.get(id, Interactable);
+	const params = (inter?.params && typeof inter.params === "object") ? inter.params : null;
+	const charges = Number(params?.chargesRemaining);
+	if (Number.isFinite(charges) && charges <= 0 && !rec.tags.includes("inactive")) {
+		rec.tags.push("inactive");
+	}
 }
 
 function isRoofBearingTile(tile) {
@@ -1018,6 +1037,7 @@ export function buildWorldView(world) {
 			// Project select status types into tags for display-only logic.
 			projectDisplayTags(world, id, rec);
 			projectEquipmentDisplayTags(world, id, rec);
+			projectInteractableDisplayTags(world, id, kind, rec);
 			projectMonsterDefTags(kind, rec);
 			projectItemAffixDisplayTags(kind, itemInfo, rec, world.get(id, Material)?.kind ?? null);
 			projectCombatUi(world, id, rec, playerFactionKey);
@@ -1119,6 +1139,7 @@ export function buildWorldView(world) {
 			// Project select status types into tags for display-only logic.
 			projectDisplayTags(world, id, rec);
 			projectEquipmentDisplayTags(world, id, rec);
+			projectInteractableDisplayTags(world, id, kind, rec);
 			projectMonsterDefTags(kind, rec);
 			projectItemAffixDisplayTags(kind, itemInfo, rec, world.get(id, Material)?.kind ?? null);
 			projectCombatUi(world, id, rec, '');

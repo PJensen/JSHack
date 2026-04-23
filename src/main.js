@@ -31,6 +31,7 @@ import {
   drawRulesProfilerOverlay,
   applyHallucinationSway,
 } from "./display/composition/index.js";
+import { shouldPostLightingRedrawKind } from "./display/composition/postLightingRedraw.js";
 
 // display/ particles (pure display-side FX; no ECS, no rules)
 import { Particle, ParticleFX } from "./display/passes/vfx/particles/particlePool.js";
@@ -107,10 +108,11 @@ import { Trap } from "./rules/components/Trap.js";
 import { buildWorldView } from "./bridge/schema/worldView.js";
 import { followEntity } from "./display/camera/follow.js";
 import { ActiveEffects } from "./rules/components/ActiveEffects.js";
+import { Material } from "./rules/components/Material.js";
 import { getSpell, describeSpellDetailLines, describeSpellTargetEffects } from "./rules/data/spells.js";
 import { getSpellCooldown } from "./rules/utils/spellCooldowns.js";
 import { buildPalette } from "./display/palette/index.js";
-import { createGlyphAtlas, drawKind, drawKindScaled } from "./display/passes/glyphs/atlas.js";
+import { createGlyphAtlas, drawKind, drawKindForeground, drawKindScaled, drawKindScaledForeground } from "./display/passes/glyphs/atlas.js";
 import { aegisWard as drawAegisWardGlyphFx } from "./display/passes/vfx/glyph/effects/aegisWard.js";
 import { Settings } from "./rules/components/Settings.js";
 import { Vitality } from "./rules/components/Vitality.js";
@@ -671,6 +673,11 @@ if (_pendingSavegame) {
 // or immediately (savegame loaded). Creates the player, applies class loadout,
 // initializes deity, then starts the simulation and render loop.
 function _finalizeNewGame(classData) {
+  // Fade in game world (4s, matches enter_world.mp3 dramatic moment)
+  canvas.style.opacity = '0';
+  canvas.style.transition = 'opacity 4s ease-out';
+  requestAnimationFrame(() => { canvas.style.opacity = '1'; });
+
   const classDef = classData ? getClass(classData.classId) : null;
 
   // Apply tutorial preference from character creation.
@@ -2539,6 +2546,7 @@ const displayRuntime = setupDisplayRuntime({
   getPlayerEntity,
   getPosition,
   getItemInfo,
+  getItemMaterial: (id) => String(world.get(Number(id || 0) | 0, Material)?.kind || ""),
   resolveItemDisplayName: resolveDisplayName,
   dispatchRulesAction,
   classifySurfaceTile,
@@ -2584,6 +2592,9 @@ const {
   hitstopFx,
   deathEssenceFx,
   deathVfx,
+  fountainAmbientFx,
+  localEmitterAmbientFx,
+  worldAmbientFx,
   ftext,
   goreTick,
 } = displayRuntime;
@@ -2646,7 +2657,8 @@ const _healthBarSeen = new Set();
 /** @type {Set<string>} */
 const _roofCoverKeys = new Set();
 const _aboveRoofEntities = [];  // entities tagged flying/above_roof, collected during main loop
-const _postLightingGlyphs = []; // blocker glyphs that should stay readable after darkness overlay
+const _postLightingTiles = []; // overworld tile stamps that should sit above the darkness overlay
+const _postLightingGlyphs = []; // overworld structure/entity stamps that should sit above the darkness overlay
 /** @type {Map<string, number>} */
 const _roofParticleStamp = new Map();
 /** Separate stamp for large smoldering smoke particles (slower rate). @type {Map<string, number>} */
@@ -3177,11 +3189,6 @@ function hasAnyTag(entity, tags) {
   return false;
 }
 
-function needsPostLightingRedraw(entity) {
-  const kind = typeof entity?.kind === "string" ? entity.kind : "";
-  return kind === "tree" || kind === "tree_harvest" || kind === "tree_sapling";
-}
-
 function lootLabelColorFromTags(tags) {
   const list = Array.isArray(tags) ? tags : [];
   if (list.includes("legendary_glowing")) return "#ff9a5a";
@@ -3327,6 +3334,19 @@ function drawEntityGlyph(atlas, ctx, entity, scale = 1, rotation = 0) {
     ctx.globalAlpha *= 0.94;
   }
   drawKindScaled(atlas, ctx, kind, entity.pos.x + jx, entity.pos.y + jy, scale, rotation);
+  ctx.restore();
+}
+
+function drawEntityGlyphForeground(atlas, ctx, entity, scale = 1, rotation = 0) {
+  const kind = resolveRenderableKind(atlas, entity);
+  const memoryRecent = hasTag(entity, 'memory_recent');
+  const memoryTampered = hasTag(entity, 'memory_tampered');
+  const espSensed = hasTag(entity, 'esp_sensed');
+  if (memoryRecent || espSensed) return;
+  const jx = memoryTampered ? Math.sin(_fxTime * 14 + (entity.id | 0) * 0.73) * 0.045 : 0;
+  const jy = memoryTampered ? Math.cos(_fxTime * 13 + (entity.id | 0) * 0.51) * 0.045 : 0;
+  ctx.save();
+  drawKindScaledForeground(atlas, ctx, kind, entity.pos.x + jx, entity.pos.y + jy, scale, rotation);
   ctx.restore();
 }
 
@@ -3998,6 +4018,7 @@ function render(worldView) {
     const tx1 = Math.ceil(vx1),  ty1 = Math.ceil(vy1);
     /** @type {Record<number, string>} */ const tileKinds = /** @type {any} */ (_tileKindMap);
     _exploredTileBuffer.length = 0;
+    _postLightingTiles.length = 0;
     // When the lighting engine is active, draw ALL explored tiles at full
     // alpha and let the vision mask handle visibility visually.  This
     // eliminates the blocky tile-level FOV boundary entirely — the smooth
@@ -4010,7 +4031,12 @@ function render(worldView) {
       worldView.tileGrid.forEachTileInRect(tx0, ty0, tx1, ty1, (/** @type {number} */ x, /** @type {number} */ y, /** @type {number} */ tile) => {
         if ((isVisible && isVisible(x, y)) || (isExplored && isExplored(x, y))) {
           const kind = tileKinds[tile];
-          if (kind) drawKind(glyphAtlas, bctx, kind, x, y);
+          if (kind) {
+            drawKind(glyphAtlas, bctx, kind, x, y);
+            if (shouldPostLightingRedrawKind(palette, kind, { isOverworld: !!worldView.isOverworld })) {
+              _postLightingTiles.push(kind, x, y);
+            }
+          }
         }
       });
     } else {
@@ -4242,7 +4268,7 @@ function render(worldView) {
 
     drawFlyingShadow(bctx, flyingPresentation);
     drawEntityGlyph(glyphAtlas, bctx, renderEntity, entityScale, entityRotation);
-    if (needsPostLightingRedraw(renderEntity)) {
+    if (shouldPostLightingRedrawKind(palette, renderEntity.kind, { isOverworld: !!worldView.isOverworld, layer: renderEntity.layer })) {
       _postLightingGlyphs.push({
         entity: renderEntity,
         scale: entityScale,
@@ -4762,10 +4788,16 @@ function render(worldView) {
     );
   }
 
+  if (_postLightingTiles.length > 0) {
+    for (let i = 0; i < _postLightingTiles.length; i += 3) {
+      drawKindForeground(glyphAtlas, bctx, _postLightingTiles[i], _postLightingTiles[i + 1], _postLightingTiles[i + 2]);
+    }
+  }
+
   if (_postLightingGlyphs.length > 0) {
     for (let i = 0; i < _postLightingGlyphs.length; i++) {
       const rec = _postLightingGlyphs[i];
-      drawEntityGlyph(glyphAtlas, bctx, rec.entity, rec.scale, rec.rotation);
+      drawEntityGlyphForeground(glyphAtlas, bctx, rec.entity, rec.scale, rec.rotation);
     }
   }
 
@@ -4972,6 +5004,9 @@ function frame(now) {
 
   // Sync spirit wisp depth (dungeon only)
   spiritWispFx.setDepth(view.currentDepth ?? 0);
+  fountainAmbientFx.syncWorldView(view);
+  localEmitterAmbientFx.syncWorldView(view);
+  worldAmbientFx.syncWorldView(view);
 
   // Status particle emitter reconciliation + advance particles
   if (PERF.particleCapacity > 0) {

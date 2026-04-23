@@ -542,6 +542,7 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null, world
     ? chunk.rooms[0]
     : null;
   const eligibleDeadEndRooms = chunk.rooms.filter((room) => {
+    if (room.isolated) return false;
     const isDeadEnd = countRoomEntrances(room, chunk) === 1;
     const hasStair = roomContainsStairTile(room, chunk);
     const isEntryRoom = !!entryRoom &&
@@ -570,6 +571,8 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null, world
   const SACRED_FEATURE_KINDS = new Set(['altar', 'shrine', 'church_altar']);
 
   for (const room of chunk.rooms) {
+    if (room.isolated) continue;
+
     // Prefab rooms use their own spawn list — skip normal population entirely.
     if (room.prefab && Array.isArray(room.prefabSpawns)) {
       for (const s of room.prefabSpawns) {

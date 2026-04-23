@@ -688,6 +688,50 @@ export function createLightingEngine() {
         vision[i] = v;
       }
     }
+
+    liftOpaqueTileVision();
+  }
+
+  function liftOpaqueTileVision() {
+    const w = lmW;
+    const h = lmH;
+    if (w <= 0 || h <= 0) return;
+    const source = vision.slice();
+    const tilesW = (w * INV_SUB) | 0;
+    const tilesH = (h * INV_SUB) | 0;
+
+    for (let ty = 0; ty < tilesH; ty++) {
+      const sy0 = ty * SUB;
+      const sy1 = sy0 + SUB - 1;
+      for (let tx = 0; tx < tilesW; tx++) {
+        const sx0 = tx * SUB;
+        const sx1 = sx0 + SUB - 1;
+        const cx = sx0 + (SUB >> 1);
+        const cy = sy0 + (SUB >> 1);
+        if (sdf[cy * w + cx] > 0) continue;
+
+        let maxVision = 0;
+        for (let sy = Math.max(0, sy0 - 1); sy <= Math.min(h - 1, sy1 + 1); sy++) {
+          const row = sy * w;
+          for (let sx = Math.max(0, sx0 - 1); sx <= Math.min(w - 1, sx1 + 1); sx++) {
+            if (sx >= sx0 && sx <= sx1 && sy >= sy0 && sy <= sy1) continue;
+            const i = row + sx;
+            if (sdf[i] <= 0) continue;
+            const v = source[i];
+            if (v > maxVision) maxVision = v;
+          }
+        }
+        if (maxVision <= 0) continue;
+
+        const lifted = Math.min(1, maxVision * 0.92);
+        for (let sy = sy0; sy <= sy1; sy++) {
+          const row = sy * w;
+          for (let sx = sx0; sx <= sx1; sx++) {
+            vision[row + sx] = lifted;
+          }
+        }
+      }
+    }
   }
 
   // ---- SDF ray-march (sphere tracing) for shadow occlusion --------------
@@ -1031,9 +1075,8 @@ export function createLightingEngine() {
       pixels[pi]     = 0;
       pixels[pi + 1] = 0;
       pixels[pi + 2] = 0;
-      if (sdf[i] <= 0) {
-        pixels[pi + 3] = DARK;
-      } else {
+      {
+        const opaqueCell = sdf[i] <= 0;
         const lightSum = lightR[i] + lightG[i] + lightB[i];
         const brightness = Math.min(1, lightSum * 0.5);
         const sight = vision[i];  // 0-1 vision mask
@@ -1048,7 +1091,7 @@ export function createLightingEngine() {
 
         // Generic floor relief shading (debug): digs/piles should be legible
         // as terrain, independent of surface tags.
-        if (!inLava && surfType[i] === 0) {
+        if (!opaqueCell && !inLava && surfType[i] === 0) {
           const hRel = floorH[i];
           const gx = floorGX[i];
           const gy = floorGY[i];
@@ -1062,7 +1105,7 @@ export function createLightingEngine() {
         // Lava below-grade basin: dark lip → lit inner wall → emissive interior.
         // Important: this applies both additive emissive lift and subtractive cut shadow
         // so the basin reads as carved below the surrounding floor.
-        if (inLava) {
+        if (!opaqueCell && inLava) {
           const sd = lavaEdgeDist[i];
           const lipBand = Math.max(0, 1 - (sd - 0.85) / 1.45); // steep drop edge
           const wallBand = Math.max(0, 1 - Math.abs(sd - 2.0) / 1.15);
@@ -1072,7 +1115,7 @@ export function createLightingEngine() {
           totalLift = Math.max(0, Math.min(1, totalLift - cutShadow + emissiveLift));
           // Negative-wall read: allow the lip to go darker than global DARK cap.
           extraDark += lipBand * 92 + wallBand * 15;
-        } else {
+        } else if (!opaqueCell) {
           // Slight outside rim darkening helps the cut boundary read as "below grade".
           const rimD = lavaEdgeDist[i];
           if (rimD < 1.4) extraDark += 28 * (1 - rimD / 1.4);
@@ -1101,12 +1144,9 @@ export function createLightingEngine() {
     // ---- Pass 2: warm colour tint (additive via 'lighter') --------------
     for (let i = 0; i < n; i++) {
       const pi = i << 2;
-      if (sdf[i] <= 0) {
-        pixels[pi] = 0; pixels[pi + 1] = 0; pixels[pi + 2] = 0; pixels[pi + 3] = 0;
-        continue;
-      }
+      const opaqueCell = sdf[i] <= 0;
       const st = surfType[i];
-      if (st > 0 && surfSdf[i] > 0) {
+      if (!opaqueCell && st > 0 && surfSdf[i] > 0) {
         // Surface sub-cell: neutral tone + depth-based color
         const sd = surfSdf[i];
         const depth = Math.min(1, sd / MAX_SURF_DEPTH);
@@ -1149,7 +1189,7 @@ export function createLightingEngine() {
         let g = (lg * (180 + 75 * coolBias)) | 0;
         let b = (lb * (60 + 195 * coolBias)) | 0;
         let a = (brightness * 120) | 0;
-        if (surfType[i] === 0) {
+        if (!opaqueCell && surfType[i] === 0) {
           const hRel = floorH[i];
           const gx = floorGX[i];
           const gy = floorGY[i];

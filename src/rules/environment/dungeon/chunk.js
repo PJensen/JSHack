@@ -36,11 +36,17 @@ import { manhattanScalar } from '../../utils/distance.js';
 export function generateChunk(worldSeed, depth, chunkX, chunkY, profile = null, floorPlan = null) {
   const seed = chunkSeed(worldSeed, depth, chunkX, chunkY);
   const rng = createRng(seed);
+  const isDisconnectedPocketChunk = !!floorPlan?.disconnectedPocket
+    && floorPlan.disconnectedPocket.chunkX === chunkX
+    && floorPlan.disconnectedPocket.chunkY === chunkY;
 
   let tiles;
   let localRooms; // chunk-local coords; offset to world coords below
 
-  if (profile?.generator) {
+  if (isDisconnectedPocketChunk) {
+    tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
+    localRooms = [];
+  } else if (profile?.generator) {
     // Custom generator bypasses BSP entirely.
     // Returns { tiles, rooms } where rooms is chunk-local and synthesised for
     // stair / edge-gate placement (the noise field is the real floor area).
@@ -114,6 +120,16 @@ export function generateChunk(worldSeed, depth, chunkX, chunkY, profile = null, 
   }
 
   _ensureConnectedWalkable(tiles, worldSeed, depth, chunkX, chunkY);
+  const isolatedPocket = _carveLevelOnePocket(tiles, depth, chunkX, chunkY, floorPlan);
+  if (isolatedPocket) {
+    rooms.push({
+      x: isolatedPocket.x + ox,
+      y: isolatedPocket.y + oy,
+      w: isolatedPocket.w,
+      h: isolatedPocket.h,
+      isolated: true,
+    });
+  }
   sanitizeDoorTiles(tiles, CHUNK_SIZE);
 
   // Detect door positions after the final floor geometry is settled so doors
@@ -322,6 +338,11 @@ export function sanitizeDoorTiles(tiles, stride) {
  * Each edge connects to the adjacent chunk's matching gate position.
  */
 function _carveEdgeGates(tiles, worldSeed, depth, cx, cy, localRooms, rng, floorPlan = null) {
+  const disconnectedPocket = floorPlan?.disconnectedPocket || null;
+  const chunkIsDisconnectedPocket = !!disconnectedPocket
+    && disconnectedPocket.chunkX === cx
+    && disconnectedPocket.chunkY === cy;
+  if (chunkIsDisconnectedPocket) return;
   if (localRooms.length === 0) return;
 
   // 4 neighbors: east, west, north, south
@@ -338,6 +359,9 @@ function _carveEdgeGates(tiles, worldSeed, depth, cx, cy, localRooms, rng, floor
       if (nb.ncx < minCX || nb.ncx > maxCX || nb.ncy < minCY || nb.ncy > maxCY) {
         continue;
       }
+    }
+    if (disconnectedPocket && disconnectedPocket.chunkX === nb.ncx && disconnectedPocket.chunkY === nb.ncy) {
+      continue;
     }
 
     const gatePos = edgeGate(worldSeed, depth, cx, cy, nb.ncx, nb.ncy);
@@ -433,6 +457,68 @@ function _ensureConnectedWalkable(tiles, worldSeed, depth, chunkX, chunkY) {
       bestPair.to.x,
       bestPair.to.y,
     );
+  }
+}
+
+function _carveLevelOnePocket(tiles, depth, chunkX, chunkY, floorPlan = null) {
+  const target = floorPlan?.disconnectedPocket;
+  if (
+    depth !== 1
+    || !target
+    || target.chunkX !== chunkX
+    || target.chunkY !== chunkY
+  ) return null;
+
+  const candidates = [
+    { x: Math.floor(CHUNK_SIZE / 2) - 2, y: Math.floor(CHUNK_SIZE / 2) - 2, w: 4, h: 4 },
+    { x: 2, y: 2, w: 4, h: 4 },
+    { x: CHUNK_SIZE - 6, y: 2, w: 4, h: 4 },
+    { x: 2, y: CHUNK_SIZE - 6, w: 4, h: 4 },
+    { x: CHUNK_SIZE - 6, y: CHUNK_SIZE - 6, w: 4, h: 4 },
+  ];
+
+  for (const room of candidates) {
+    if (!_canPlaceDisconnectedPocket(tiles, room)) continue;
+    _paintDisconnectedPocket(tiles, room);
+    return room;
+  }
+
+  return null;
+}
+
+function _canPlaceDisconnectedPocket(tiles, room) {
+  const minX = room.x - 1;
+  const maxX = room.x + room.w;
+  const minY = room.y - 1;
+  const maxY = room.y + room.h;
+
+  if (minX < 1 || minY < 1 || maxX >= CHUNK_SIZE - 1 || maxY >= CHUNK_SIZE - 1) {
+    return false;
+  }
+
+  for (let y = minY; y <= maxY; y++) {
+    for (let x = minX; x <= maxX; x++) {
+      if (_isWalkableTile(tiles[y * CHUNK_SIZE + x])) return false;
+    }
+  }
+
+  return true;
+}
+
+function _paintDisconnectedPocket(tiles, room) {
+  const minX = room.x - 1;
+  const maxX = room.x + room.w;
+  const minY = room.y - 1;
+  const maxY = room.y + room.h;
+
+  for (let y = minY; y <= maxY; y++) {
+    for (let x = minX; x <= maxX; x++) {
+      const isInterior = x >= room.x
+        && x < room.x + room.w
+        && y >= room.y
+        && y < room.y + room.h;
+      tiles[y * CHUNK_SIZE + x] = isInterior ? TILE_FLOOR : TILE_WALL;
+    }
   }
 }
 

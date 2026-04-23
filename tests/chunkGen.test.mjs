@@ -1,6 +1,7 @@
 import { assert } from "jsr:@std/assert";
 import { createRng } from '../src/lib/ecs-js/rng.js';
 import { generateChunk, edgeGate, findDoorPositions, isDoorFrameAt, sanitizeDoorTiles } from '../src/rules/environment/dungeon/chunk.js';
+import { generateFloorPlan } from '../src/rules/environment/dungeon/floorPlan.js';
 import { CHUNK_SIZE, TILE_VOID, TILE_FLOOR, TILE_WALL, TILE_DOOR } from '../src/rules/environment/dungeon/constants.js';
 import { dungeonConfig } from '../src/rules/environment/dungeon/dungeonConfig.js';
 
@@ -159,7 +160,7 @@ Deno.test("adjacent chunks north/south share floor at gate", () => {
 
 Deno.test("all rooms within a chunk are connected (internal flood-fill)", () => {
   for (const seed of [1, 42, 123, 777]) {
-    const chunk = generateChunk(seed, 1, 0, 0);
+    const chunk = generateChunk(seed, 2, 0, 0);
     if (chunk.rooms.length < 2) continue;
 
     const ox = chunk.chunkX * CHUNK_SIZE;
@@ -177,6 +178,23 @@ Deno.test("all rooms within a chunk are connected (internal flood-fill)", () => 
         `room center (${cx},${cy}) reachable [seed=${seed}]`);
     }
   }
+});
+
+Deno.test("level 1 designated pocket chunk includes one disconnected pocket room", () => {
+  const plan = generateFloorPlan(42, 1);
+  const target = plan.disconnectedPocket;
+  assert(target, "expected a disconnected pocket target chunk");
+  const chunk = generateChunk(42, 1, target.chunkX, target.chunkY, plan.profile, plan);
+  const pocket = chunk.rooms.find((room) => room.isolated);
+
+  assert(pocket, "expected an isolated pocket room");
+  assert(chunk.rooms.length === 1, "pocket chunk should only contain the isolated room");
+
+  const ox = chunk.chunkX * CHUNK_SIZE;
+  const oy = chunk.chunkY * CHUNK_SIZE;
+  const pocketX = pocket.x - ox + Math.floor(pocket.w / 2);
+  const pocketY = pocket.y - oy + Math.floor(pocket.h / 2);
+  assert(chunk.tiles[pocketY * CHUNK_SIZE + pocketX] === TILE_FLOOR, "pocket center should be floor");
 });
 
 Deno.test("rooms have world-coordinate positions", () => {
