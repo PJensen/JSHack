@@ -62,7 +62,7 @@ const SOUNDS = {
   "ambient:tavern":   { file: "ambient_tavern.mp3",        bus: "ambient" },
   "ambient:chick":    { file: "chick.mp3",                 bus: "ambient", maxVoices: 4, volume: 0.35 },
   "ambient:chicken":  { file: "chicken.mp3",               bus: "ambient", maxVoices: 4, volume: 0.35 },
-  "ears:ringing":     { file: "ears_ringing.mp3",          bus: "ui", maxVoices: 1 },
+  "ears:ringing":     { files: ["ears_ringing.mp3", "ears_ringing_2.mp3"], bus: "ui", maxVoices: 1 },
   "character:select":  { file: "character_select.mp3",      bus: "ui", maxVoices: 1 },
   "enter:world":       { file: "enter_world.mp3",           bus: "ui", maxVoices: 1 },
   "snake:alert":      { file: "snake_alerted.mp3",         bus: "combat", maxVoices: 2, randomPitch: 18 },
@@ -75,7 +75,7 @@ const SOUNDS = {
   "spell:bolt":          { file: "spell_bolt.wav",          bus: "spells" },
   "spell:frost":         { file: "spell_frost.wav",         bus: "spells" },
   "spell:shadow_bolt":   { file: "spell_shadow_bolt.wav",   bus: "spells" },
-  "spell:fireball":      { file: "spell_fire.mp3",          bus: "spells" },
+  "spell:fireball":      { files: ["spell_fire.mp3", "spell_fireball.mp3"], bus: "spells" },
   "spell:meteor":        { file: "spell_meteor.wav",        bus: "spells" },
   "spell:blizzard":      { file: "spell_blizzard.wav",      bus: "spells" },
   "spell:firestorm":     { file: "spell_firestorm.wav",     bus: "spells" },
@@ -91,7 +91,7 @@ const SOUNDS = {
   "spell:rampage":       { file: "spell_rampage.wav",       bus: "spells" },
   "spell:phase_strike":  { file: "spell_phase_strike.wav",  bus: "spells" },
   "spell:shield_bash":   { file: "spell_shield_bash.wav",   bus: "spells" },
-  "spell:wolf_howl":     { file: "spell_wolf_howl.wav",     bus: "spells" },
+  "spell:wolf_howl":     { files: ["spell_wolf_howl.wav", "spell_wolf_howl.mp3"], bus: "spells" },
   "spell:boar_charge":   { file: "spell_boar_charge.wav",   bus: "spells" },
   "spell:consecrate":    { file: "spell_consecrate.wav",    bus: "spells" },
   "spell:divine_shield": { file: "spell_buff.mp3",          bus: "spells" },
@@ -100,10 +100,10 @@ const SOUNDS = {
   "spell:verdant_ward":  { file: "spell_buff.mp3",          bus: "spells" },
   "spell:harmony_ward":  { file: "spell_buff.mp3",          bus: "spells" },
   "spell:shadow_veil":   { file: "spell_shadow_veil.wav",   bus: "spells" },
-  "spell:smoke_bomb":    { file: "spell_smoke_bomb.wav",    bus: "spells" },
+  "spell:smoke_bomb":    { files: ["spell_smoke_bomb.wav", "spell_smoke_bomb.mp3"], bus: "spells" },
   "spell:poison_blade":  { file: "spell_poison_blade.wav",  bus: "spells" },
   "spell:lifetap":       { file: "spell_lifetap.wav",       bus: "spells" },
-  "spell:acid_spit":     { file: "spell_acid_spit.wav",     bus: "spells" },
+  "spell:acid_spit":     { files: ["spell_acid_spit.wav", "spell_acid_spit.mp3"], bus: "spells" },
   "spell:web_spit":      { files: ["spider_attack_web_1.mp3", "spider_attack_web_2.mp3"], bus: "spells", randomPitch: 20 },
   "spell:spider_lunge":  { files: ["spider_attack_1.mp3", "spider_attack_2.mp3", "spider_attack_3.mp3"], bus: "spells", randomPitch: 25 },
   "spell:entangle":      { file: "spell_entangle.mp3",      bus: "spells" },
@@ -122,7 +122,7 @@ const SOUNDS = {
 
   // ── Spell impacts (hit after travel) ───────────
   "spell:impact:fire":      { file: "impact_fire.wav",      bus: "spells", maxVoices: 4 },
-  "spell:impact:meteor":    { file: "spell_meteor_impact.mp3", bus: "spells", maxVoices: 3 },
+  "spell:impact:meteor":    { files: ["spell_meteor_impact.mp3", "spell_meteor_impact_2.mp3"], bus: "spells", maxVoices: 3 },
   "spell:impact:ice":       { file: "impact_ice.wav",       bus: "spells", maxVoices: 4 },
   "spell:impact:lightning":  { file: "impact_lightning.wav",  bus: "spells", maxVoices: 4 },
   "spell:impact:shadow":    { file: "impact_shadow.wav",    bus: "spells", maxVoices: 4 },
@@ -134,6 +134,28 @@ const SOUNDS = {
   "thunder":          { file: "weather_lightning_strike.mp3",          bus: "ambient", maxVoices: 2 },
   "thunder:distant":  { file: "weather_lightning_strike_distant.mp3",  bus: "ambient", maxVoices: 2 },
   "rain:loop":        { file: "weather_rain.mp3",                      bus: "ambient" },
+
+  // ── Crafting / Smithy ───────────────────────────
+  "smithy:anvil:hit": { files: ["anvil_hit_1.mp3", "anvil_hit_2.mp3"], bus: "ambient", maxVoices: 3, randomPitch: 40 },
+
+  // ── Status Effects ──────────────────────────────
+  "status:electrocuted": { file: "electrocuted.mp3", bus: "combat", maxVoices: 1 },
+  "status:slimed":       { file: "slimed.mp3",       bus: "combat", maxVoices: 1 },
+
+  // ── Interactions ────────────────────────────────
+  "fountain:sip":     { file: "fountain_sip.mp3",    bus: "items" },
+  "torch:ignite":     { file: "light_fire.mp3",      bus: "ambient" },
+  "shop:enter":       { file: "shop_door_chime.mp3", bus: "ui", maxVoices: 1 },
+  "quest:completed":  { file: "quest_complete.mp3",  bus: "ui", maxVoices: 1 },
+
+  // ── Creatures (vocalizations) ───────────────────
+  "creature:pet:meow": { file: "pet_meow_1.mp3", bus: "ambient", maxVoices: 2 },
+
+  // ── Soundscapes ─────────────────────────────────
+  "soundscape":       { file: "soundscape.mp3",      bus: "ambient" },
+
+  // ── Additional Spell Variants ───────────────────
+  "spell:agony":      { file: "spell_agony.mp3",     bus: "spells" },
 
   // ── UI / Misc ───────────────────────────────────
   "level:up":         { file: "level_up.wav",   bus: "ui", maxVoices: 1 },
