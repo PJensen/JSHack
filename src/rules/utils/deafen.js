@@ -54,5 +54,9 @@ export function deafen(world, targetId, toValue, rampIn, holdFor, rampOut, endVa
     hold:    holdFor | 0,
     rampOut: rampOut | 0,
   });
+
+  // Notify audio/display systems of deafness application
+  world.emit?.('status:deafened', { target: id, severity: toValue });
+
   return true;
 }

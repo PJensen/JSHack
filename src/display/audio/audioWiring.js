@@ -355,6 +355,12 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     sfxAt(soundId, pos, pp(), { priority: 1 });
   });
 
+  world.on('status:deafened', ({ target, severity }) => {
+    if (isPlayer(target) && severity >= 1) {
+      sfx("ears:ringing", { volume: 0.8 });
+    }
+  });
+
   // ── Spells (cast / launch sounds) ─────────────────────────
   // Each spell gets its own sound on cast. Impact sounds fire
   // separately via the 'damaged' handler above when the spell
@@ -393,10 +399,6 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     const spatial = spatialize({ x, y }, playerPos);
     const thunderId = spatial.volume <= 0.45 ? "thunder:distant" : "thunder";
     sfxAt(thunderId, { x, y }, playerPos);
-  });
-
-  world.on('weather:lightning', ({ hitPlayer }) => {
-    if (hitPlayer) sfx("ears:ringing", { volume: 0.8 });
   });
 
   // Floor transitions — stop rain, adjust reverb for environment
