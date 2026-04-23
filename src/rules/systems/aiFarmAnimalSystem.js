@@ -7,13 +7,18 @@ import { Faction } from "../components/Faction.js";
 import { CreatureType, CREATURE_TYPES } from "../components/CreatureType.js";
 import { MoveIntent } from "../components/Intents/MoveIntent.js";
 import { DungeonState } from "../components/DungeonState.js";
+import { NamedIdentity } from "../components/NamedIdentity.js";
 import { canActThisTurn } from "../utils/speedGate.js";
 import { CARDINAL_DIRS } from "../utils/directions.js";
 import { isWalkable } from "../environment/dungeon/tileMap.js";
 import { playerEntity } from "../utils/queries.js";
 import { forEachInRadius } from "../utils/spatialIndex.js";
 
-const ACTIVE_RADIUS = 20;
+const ACTIVE_RADIUS = 8;
+const VOCALIZATION_COOLDOWN = 200; // turns between vocalizations per chicken
+
+/** Track vocalization cooldown per entity (Map<id, turnsLeft>) */
+const _vocalizationCooldowns = new Map();
 
 /** @param {import('../../lib/ecs-js/index.js').World} world */
 export function aiFarmAnimalSystem(world) {
@@ -38,6 +43,25 @@ export function aiFarmAnimalSystem(world) {
 
     if (!canActThisTurn(world, id)) return;
     if (world.has(id, MoveIntent)) return;
+
+    // Decrement vocalization cooldown
+    const cooldown = _vocalizationCooldowns.get(id) ?? 0;
+    if (cooldown > 0) {
+      _vocalizationCooldowns.set(id, cooldown - 1);
+    }
+
+    // 5% chance to vocalize (if not on cooldown) — chickens cluck/cheep occasionally
+    if (cooldown === 0 && world.rand() < 0.05) {
+      const identity = world.get(id, NamedIdentity)?.identity;
+      if (identity) {
+        world.emit?.('creature:vocalize', {
+          id,
+          identity,
+          at: { x: pos.x | 0, y: pos.y | 0 },
+        });
+        _vocalizationCooldowns.set(id, VOCALIZATION_COOLDOWN);
+      }
+    }
 
     // 70% chance to rest — chickens mostly peck in place.
     if (world.rand() < 0.7) return;

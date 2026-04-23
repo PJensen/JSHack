@@ -7,6 +7,28 @@
 import { play, preload, startLoop, stopLoop, setReverbMix } from "./audioEngine.js";
 import { resolve, allUrls } from "./sounds.js";
 
+export const ALERT_SOUND_BY_IDENTITY = Object.freeze({
+  snake: "snake:alert",
+  cave_snake: "snake:alert",
+  pit_viper: "snake:alert",
+  spider: "spider:alert",
+  cave_spider: "spider:alert",
+  phase_spider: "spider:alert",
+  cave_bear: "cave_bear:alert",
+  rat: "rat:alert",
+});
+
+export const CREATURE_ATTACK_SOUNDS = Object.freeze({
+  cave_bear: "cave_bear:attack",
+  rat: "rat:attack",
+});
+
+export const CREATURE_VOCALIZE_SOUNDS = Object.freeze({
+  chick: "ambient:chick",
+  chicken_hen: "ambient:chicken",
+  chicken_rooster: "ambient:chicken",
+});
+
 // ── Spatial helpers ─────────────────────────────────────────
 
 /** Max tile distance at which a sound is still audible. Beyond this → silent. */
@@ -96,6 +118,43 @@ const SPELL_IMPACT_MAP = {
   acid:      "spell:impact:poison",
 };
 
+export const SPELL_CAST_SOUND_EVENTS = Object.freeze([
+  'spell:bolt',
+  'spell:frost',
+  'spell:shadow_bolt',
+  'spell:fireball',
+  'spell:blizzard',
+  'spell:firestorm',
+  'spell:blastwave',
+  'spell:flash_heal',
+  'spell:smite',
+  'spell:death_volley',
+  'spell:blink',
+  'spell:plague_swarm',
+  'spell:earthshatter',
+  'spell:war_cry',
+  'spell:cleave',
+  'spell:rampage',
+  'spell:phase_strike',
+  'spell:shield_bash',
+  'spell:wolf_howl',
+  'spell:boar_charge',
+  'spell:consecrate',
+  'spell:divine_shield',
+  'spell:purify',
+  'spell:bloodthirst',
+  'spell:verdant_ward',
+  'spell:harmony_ward',
+  'spell:shadow_veil',
+  'spell:smoke_bomb',
+  'spell:poison_blade',
+  'spell:lifetap',
+  'spell:acid_spit',
+  'spell:web_spit',
+  'spell:spider_lunge',
+  'spell:entangle',
+]);
+
 /**
  * Install audio event listeners on the ECS world.
  * Call once during display setup.
@@ -106,10 +165,11 @@ const SPELL_IMPACT_MAP = {
  *   getItemInfo: (id: number) => object|null,
  *   getPlayerPosition: () => { x: number, y: number } | null,
  *   getPosition: (id: number) => { x: number, y: number } | null,
+ *   getIdentity?: (id: number) => string | null,
  *   getDepth: () => number,
  * }} deps
  */
-export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosition, getPosition, getDepth }) {
+export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosition, getPosition, getIdentity, getDepth }) {
 
   // No preload — sounds are fetched on first play. Missing files fail once
   // and are blacklisted so they never retry or flood the network.
@@ -119,8 +179,18 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
 
   // ── Combat ────────────────────────────────────────────────
 
-  world.on('damaged', ({ cause, critical, type, at, target }) => {
+  world.on('damaged', ({ cause, critical, type, at, target, source }) => {
     const pos = at || (target != null ? getPosition(target) : null);
+    // Creature attack vocalizations (roars, squeaks, etc.)
+    if ((cause === 'melee' || cause === 'offhand') && source > 0 && typeof getIdentity === "function") {
+      const srcIdentity = String(getIdentity(source) || "");
+      const creatureAttackId = CREATURE_ATTACK_SOUNDS[srcIdentity];
+      if (creatureAttackId) {
+        const srcPos = source != null ? getPosition(source) : null;
+        sfxAt(creatureAttackId, srcPos, pp(), { priority: 1 });
+      }
+    }
+    // Impact sounds on hit
     if (cause === 'melee' || cause === 'offhand') {
       sfxAt(critical ? "melee:crit" : "melee:hit", pos, pp());
     }
@@ -134,6 +204,18 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     if (ctx.missed) {
       const pos = ctx.at || (ctx.target != null ? getPosition(ctx.target) : null);
       sfxAt("melee:miss", pos, pp());
+    }
+  });
+
+  world.on('shield:guarded', ({ id, at }) => {
+    const pos = at || (id != null ? getPosition(id) : null);
+    sfxAt("shield:blocked", pos, pp(), { priority: 1 });
+  });
+
+  world.on('creature:vocalize', ({ identity, at }) => {
+    const soundId = CREATURE_VOCALIZE_SOUNDS[identity];
+    if (soundId) {
+      sfxAt(soundId, at, pp());
     }
   });
 
@@ -164,7 +246,15 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
   world.on('item:dropped', ({ itemId, at }) => {
     const cat = itemCategory(getItemInfo, itemId);
     let dropId;
-    if (cat === "weapon" || cat === "armor" || cat === "potion") {
+    if (cat === "weapon") {
+      const material = String(getItemInfo(itemId)?.material || "").toLowerCase();
+      if (material === "bone") {
+        dropId = "item:drop:bone";
+      } else {
+        const metallic = material === "iron" || material === "steel" || material === "silver" || material === "gold" || material === "copper" || material === "bronze";
+        dropId = metallic ? "item:drop:weapon:metal" : "item:drop:weapon";
+      }
+    } else if (cat === "armor" || cat === "potion") {
       dropId = `item:drop:${cat}`;
     } else if (cat === "gem") {
       const info = getItemInfo(itemId);
@@ -175,6 +265,14 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
       dropId = "item:drop:generic";
     }
     sfxAt(dropId, at, pp());
+  });
+
+  world.on('interaction', ({ action, result, targetId }) => {
+    if (action === 'toggleDoor') {
+      const doorSoundId = result === 'opened' ? 'door:open' : 'door:close';
+      const pos = targetId != null ? getPosition(targetId) : null;
+      sfxAt(doorSoundId, pos, pp(), { priority: 0, volume: 0.6 });
+    }
   });
 
   world.on('potion:splash', ({ at }) => {
@@ -228,54 +326,39 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     sfx("deity:omen");
   });
 
+  world.on('bell:rung', ({ targetId }) => {
+    const pos = targetId != null ? getPosition(targetId) : null;
+    sfxAt("church:bell", pos, pp(), { priority: 1 });
+  });
+
+  world.on('status', ({ id, kind, at }) => {
+    if (kind !== 'alert' || !(id > 0) || typeof getIdentity !== "function") return;
+    const identity = String(getIdentity(id) || "");
+    const soundId = ALERT_SOUND_BY_IDENTITY[identity];
+    if (!soundId) return;
+    const pos = at || getPosition(id);
+    sfxAt(soundId, pos, pp(), { priority: 1 });
+  });
+
   // ── Spells (cast / launch sounds) ─────────────────────────
   // Each spell gets its own sound on cast. Impact sounds fire
   // separately via the 'damaged' handler above when the spell
   // actually hits after travel time.
 
-  const spellEvents = [
-    'spell:bolt',
-    'spell:frost',
-    'spell:shadow_bolt',
-    'spell:fireball',
-    'spell:meteor',
-    'spell:blizzard',
-    'spell:firestorm',
-    'spell:blastwave',
-    'spell:flash_heal',
-    'spell:smite',
-    'spell:death_volley',
-    'spell:blink',
-    'spell:plague_swarm',
-    'spell:earthshatter',
-    'spell:war_cry',
-    'spell:cleave',
-    'spell:rampage',
-    'spell:phase_strike',
-    'spell:shield_bash',
-    'spell:wolf_howl',
-    'spell:boar_charge',
-    'spell:consecrate',
-    'spell:divine_shield',
-    'spell:purify',
-    'spell:bloodthirst',
-    'spell:verdant_ward',
-    'spell:harmony_ward',
-    'spell:shadow_veil',
-    'spell:smoke_bomb',
-    'spell:poison_blade',
-    'spell:lifetap',
-    'spell:acid_spit',
-    'spell:web_spit',
-  ];
-
-  for (const ev of spellEvents) {
+  for (const ev of SPELL_CAST_SOUND_EVENTS) {
     world.on(ev, (payload) => {
       // Spells carry origin info in various fields
       const pos = payload?.at || payload?.origin || payload?.from || null;
       sfxAt(ev, pos, pp());
     });
   }
+
+  // Meteor should land one impact sound at the resolved strike point,
+  // not a cast sound and not one sound per damaged target.
+  world.on('spell:meteor', (payload) => {
+    const pos = payload?.origin || payload?.at || null;
+    sfxAt("spell:impact:meteor", pos, pp(), { priority: 1 });
+  });
 
   // ── Weather ───────────────────────────────────────────────
 
@@ -291,7 +374,14 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
   });
 
   world.on('weather:lightning', ({ x, y }) => {
-    sfxAt("thunder", { x, y }, pp());
+    const playerPos = pp();
+    const spatial = spatialize({ x, y }, playerPos);
+    const thunderId = spatial.volume <= 0.45 ? "thunder:distant" : "thunder";
+    sfxAt(thunderId, { x, y }, playerPos);
+  });
+
+  world.on('weather:lightning', ({ hitPlayer }) => {
+    if (hitPlayer) sfx("ears:ringing", { volume: 0.8 });
   });
 
   // Floor transitions — stop rain, adjust reverb for environment

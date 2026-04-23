@@ -4,6 +4,7 @@
 import { versionLoaded, getVersionState } from '../../shared/version.js';
 import { pickRandomCharacterName } from '../../shared/utils/characterNames.js';
 import { getHighscoreVersionLabel, getHighscores } from '../../shared/tombstoneApi.js';
+import { play, startLoop, stopLoop } from '../audio/audioEngine.js';
 
 /**
  * @param {{
@@ -744,6 +745,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
       dots[i].style.background = i === classIndex ? UI.accent : UI.low;
       dots[i].style.transform = i === classIndex ? 'scale(1.3)' : 'scale(1)';
     }
+    play('./assets/audio/character_select.mp3', { bus: 'ui', volume: 0.7, priority: 1 });
   }
 
   prevBtn.addEventListener('pointerdown', () => {
@@ -997,6 +999,13 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
     const tutorial = !!tutInput.checked;
     const disableGore = !!goreInput.checked;
     writeSavedName(name);
+
+    // Play enter world transition (8s: 4s dramatic moment + 4s fade to world)
+    play('./assets/audio/enter_world.mp3', { bus: 'ui', volume: 0.8, priority: 2 });
+    // Fade out soundscape quickly to let enter_world take over
+    stopLoop('./assets/audio/soundscape.mp3', { fadeOut: 0.5 });
+
+    // Start game immediately (enters while enter_world plays)
     onConfirm({ name, classId: classes[classIndex].id, seed: seedVal, difficulty, tutorial, disableGore });
     dispose();
   }
@@ -1160,6 +1169,9 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
   panel.appendChild(box);
   document.body.appendChild(panel);
 
+  // Start character creation soundscape
+  startLoop('./assets/audio/soundscape.mp3', { volume: 0.5, fadeIn: 1.5, bus: 'ambient' });
+
   try {
     box.animate(
       [
@@ -1253,6 +1265,8 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
   }, { passive: true });
 
   function dispose() {
+    // Stop character creation soundscape
+    stopLoop('./assets/audio/soundscape.mp3', { fadeOut: 1.0 });
     if (bgRafId !== null) cancelAnimationFrame(bgRafId);
     if (ctaPulseAnim) { try { ctaPulseAnim.cancel(); } catch {} ctaPulseAnim = null; }
     window.removeEventListener('resize', resizeBgCanvas);

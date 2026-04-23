@@ -1805,7 +1805,7 @@ function ensureEffectsStack(container) {
 
   const hsla = (h, a = 0.2) => `hsla(${h} 80% 50% / ${a})`;
   const shadowColor = (h) => `hsl(${h} 55% 35%)`;
-  const VIS_SCALE = 0.8;
+  const VIS_SCALE = 1.2;
   const scaledPx = (px) => `${Math.max(1, Math.round(px * VIS_SCALE))}px`;
 
   function createBadge(spec, total) {

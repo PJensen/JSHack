@@ -7,11 +7,12 @@
 const BASE = "./assets/audio/";
 
 /**
- * Each entry:  id → { file, bus, maxVoices?, volume?, rate?, detune?, randomPitch? }
+ * Each entry:  id → { file|files, bus, maxVoices?, volume?, rate?, detune?, randomPitch? }
  */
 const SOUNDS = {
   // ── Combat ──────────────────────────────────────
   "melee:hit":        { file: "melee_hit.wav",     bus: "combat", randomPitch: 55 },
+  "shield:blocked":   { files: ["melee_shield_hit_1.mp3", "melee_shield_hit_2.mp3", "melee_shield_hit_3.mp3", "melee_shield_hit_4.mp3", "melee_shield_hit_5.mp3", "melee_shield_hit_6.mp3"], bus: "combat", randomPitch: 45 },
   "melee:crit":       { file: "melee_crit.wav",    bus: "combat", randomPitch: 40 },
   "melee:miss":       { file: "melee_miss.wav",    bus: "combat" },
   "ranged:shot":      { file: "ranged_shot.wav",   bus: "combat", randomPitch: 35 },
@@ -30,10 +31,12 @@ const SOUNDS = {
   "item:pickup:generic":   { file: "pickup_generic.wav",  bus: "items" },
 
   "item:drop:weapon":      { file: "drop_weapon.wav",     bus: "items" },
+  "item:drop:weapon:metal": { file: "drop_weapon_metal.mp3", bus: "items" },
   "item:drop:armor":       { file: "drop_armor.wav",      bus: "items" },
   "item:drop:potion":      { file: "drop_potion.wav",     bus: "items" },
   "item:impact:potion":    { file: "impact_potion.wav",   bus: "items", maxVoices: 4 },
   "item:drop:gem":         { file: "drop_gem.wav",        bus: "items" },
+  "item:drop:bone":        { file: "bone_dropped.mp3",    bus: "items", maxVoices: 3 },
   "item:drop:gem:glass":   { file: "drop_gem_lesser.wav", bus: "items" },
   "item:drop:generic":     { file: "drop_generic.wav",    bus: "items" },
 
@@ -44,17 +47,35 @@ const SOUNDS = {
   "chest:open":            { file: "chest_open.wav",      bus: "items" },
 
   // ── Environment ─────────────────────────────────
-  "stair:descend":    { file: "stair_descend.wav", bus: "ambient" },
-  "stair:ascend":     { file: "stair_ascend.wav",  bus: "ambient" },
-  "door:open":        { file: "door_open.wav",     bus: "ambient" },
-  "fountain":         { file: "fountain.wav",      bus: "ambient" },
+  "stair:descend":    { file: "transition_coating.mp3", bus: "ambient" },
+  "stair:ascend":     { file: "transition_coating.mp3", bus: "ambient" },
+  "door:open":        { file: "door_open.mp3",     bus: "ambient" },
+  "door:close":       { file: "door_close.mp3",    bus: "ambient" },
+  "fountain":         { file: "ambient_fountain.mp3",      bus: "ambient" },
+  "church:bell":      { file: "ambient_church_bells.mp3",  bus: "ambient", maxVoices: 1 },
+  "ambient:church":   { file: "ambient_church_inside.mp3", bus: "ambient" },
+  "ambient:cooking_fire": { file: "ambient_cooking_fire.mp3", bus: "ambient" },
+  "ambient:holy_site": { file: "ambient_holy_site.mp3",    bus: "ambient" },
+  "ambient:smithy":   { file: "ambient_smithy.mp3",        bus: "ambient" },
+  "ambient:torch_flames": { file: "ambient_torch_flames.mp3", bus: "ambient" },
+  "ambient:town":     { file: "ambient_town.mp3",          bus: "ambient", volume: 0.7 },
+  "ambient:tavern":   { file: "ambient_tavern.mp3",        bus: "ambient" },
+  "ambient:chick":    { file: "chick.mp3",                 bus: "ambient", maxVoices: 4, volume: 0.35 },
+  "ambient:chicken":  { file: "chicken.mp3",               bus: "ambient", maxVoices: 4, volume: 0.35 },
+  "ears:ringing":     { file: "ears_ringing.mp3",          bus: "ui", maxVoices: 1 },
+  "character:select":  { file: "character_select.mp3",      bus: "ui", maxVoices: 1 },
+  "enter:world":       { file: "enter_world.mp3",           bus: "ui", maxVoices: 1 },
+  "snake:alert":      { file: "snake_alerted.mp3",         bus: "combat", maxVoices: 2, randomPitch: 18 },
+  "spider:alert":     { file: "spider_alerted.mp3",        bus: "combat", maxVoices: 2, randomPitch: 20 },
+  "cave_bear:alert":  { file: "cave_bear_alerted.mp3",     bus: "combat", maxVoices: 2, randomPitch: 15 },
+  "rat:alert":        { file: "rat_alerted_1.mp3",         bus: "combat", maxVoices: 3, randomPitch: 25 },
   "deity:omen":       { file: "harp_reverb.wav",   bus: "ambient", maxVoices: 2 },
 
   // ── Spells (cast / launch) ─────────────────────
   "spell:bolt":          { file: "spell_bolt.wav",          bus: "spells" },
   "spell:frost":         { file: "spell_frost.wav",         bus: "spells" },
   "spell:shadow_bolt":   { file: "spell_shadow_bolt.wav",   bus: "spells" },
-  "spell:fireball":      { file: "spell_fireball.wav",      bus: "spells" },
+  "spell:fireball":      { file: "spell_fire.mp3",          bus: "spells" },
   "spell:meteor":        { file: "spell_meteor.wav",        bus: "spells" },
   "spell:blizzard":      { file: "spell_blizzard.wav",      bus: "spells" },
   "spell:firestorm":     { file: "spell_firestorm.wav",     bus: "spells" },
@@ -63,7 +84,7 @@ const SOUNDS = {
   "spell:smite":         { file: "spell_smite.wav",         bus: "spells" },
   "spell:death_volley":  { file: "spell_death_volley.wav",  bus: "spells" },
   "spell:blink":         { file: "spell_blink.wav",         bus: "spells" },
-  "spell:plague_swarm":  { file: "spell_plague_swarm.wav",  bus: "spells" },
+  "spell:plague_swarm":  { file: "spell_plague_swarm.mp3",  bus: "spells" },
   "spell:earthshatter":  { file: "spell_earthshatter.wav",  bus: "spells" },
   "spell:war_cry":       { file: "spell_war_cry.wav",       bus: "spells" },
   "spell:cleave":        { file: "spell_cleave.wav",        bus: "spells" },
@@ -73,17 +94,21 @@ const SOUNDS = {
   "spell:wolf_howl":     { file: "spell_wolf_howl.wav",     bus: "spells" },
   "spell:boar_charge":   { file: "spell_boar_charge.wav",   bus: "spells" },
   "spell:consecrate":    { file: "spell_consecrate.wav",    bus: "spells" },
-  "spell:divine_shield": { file: "spell_divine_shield.wav", bus: "spells" },
+  "spell:divine_shield": { file: "spell_buff.mp3",          bus: "spells" },
   "spell:purify":        { file: "spell_purify.wav",        bus: "spells" },
   "spell:bloodthirst":   { file: "spell_bloodthirst.wav",   bus: "spells" },
-  "spell:verdant_ward":  { file: "spell_verdant_ward.wav",  bus: "spells" },
-  "spell:harmony_ward":  { file: "spell_harmony_ward.wav",  bus: "spells" },
+  "spell:verdant_ward":  { file: "spell_buff.mp3",          bus: "spells" },
+  "spell:harmony_ward":  { file: "spell_buff.mp3",          bus: "spells" },
   "spell:shadow_veil":   { file: "spell_shadow_veil.wav",   bus: "spells" },
   "spell:smoke_bomb":    { file: "spell_smoke_bomb.wav",    bus: "spells" },
   "spell:poison_blade":  { file: "spell_poison_blade.wav",  bus: "spells" },
   "spell:lifetap":       { file: "spell_lifetap.wav",       bus: "spells" },
   "spell:acid_spit":     { file: "spell_acid_spit.wav",     bus: "spells" },
-  "spell:web_spit":      { file: "spell_web_spit.wav",      bus: "spells" },
+  "spell:web_spit":      { files: ["spider_attack_web_1.mp3", "spider_attack_web_2.mp3"], bus: "spells", randomPitch: 20 },
+  "spell:spider_lunge":  { files: ["spider_attack_1.mp3", "spider_attack_2.mp3", "spider_attack_3.mp3"], bus: "spells", randomPitch: 25 },
+  "spell:entangle":      { file: "spell_entangle.mp3",      bus: "spells" },
+  "cave_bear:attack":   { files: ["cave_bear_attack_1.mp3", "cave_bear_attack_2.mp3"], bus: "combat", randomPitch: 30 },
+  "rat:attack":         { file: "rat_attack_1.mp3", bus: "combat", maxVoices: 4, randomPitch: 35 },
   "spell:fizzle":        { file: "spell_fizzle.wav",        bus: "spells" },
 
   // ── Spell travel (in-flight projectile) ────────
@@ -97,6 +122,7 @@ const SOUNDS = {
 
   // ── Spell impacts (hit after travel) ───────────
   "spell:impact:fire":      { file: "impact_fire.wav",      bus: "spells", maxVoices: 4 },
+  "spell:impact:meteor":    { file: "spell_meteor_impact.mp3", bus: "spells", maxVoices: 3 },
   "spell:impact:ice":       { file: "impact_ice.wav",       bus: "spells", maxVoices: 4 },
   "spell:impact:lightning":  { file: "impact_lightning.wav",  bus: "spells", maxVoices: 4 },
   "spell:impact:shadow":    { file: "impact_shadow.wav",    bus: "spells", maxVoices: 4 },
@@ -105,8 +131,9 @@ const SOUNDS = {
   "spell:impact:physical":  { file: "impact_physical.wav",  bus: "spells", maxVoices: 4 },
 
   // ── Weather ─────────────────────────────────────
-  "thunder":          { file: "thunder.wav",    bus: "ambient", maxVoices: 2 },
-  "rain:loop":        { file: "rain_loop.wav",  bus: "ambient" },
+  "thunder":          { file: "weather_lightning_strike.mp3",          bus: "ambient", maxVoices: 2 },
+  "thunder:distant":  { file: "weather_lightning_strike_distant.mp3",  bus: "ambient", maxVoices: 2 },
+  "rain:loop":        { file: "weather_rain.mp3",                      bus: "ambient" },
 
   // ── UI / Misc ───────────────────────────────────
   "level:up":         { file: "level_up.wav",   bus: "ui", maxVoices: 1 },
@@ -115,17 +142,29 @@ const SOUNDS = {
 /**
  * Resolve a sound ID to its full URL and default options.
  * @param {string} id
- * @returns {{ url: string, bus?: string, maxVoices?: number, randomPitch?: number, volume?: number, rate?: number, detune?: number } | null}
+ * @returns {{ url: string, file: string, files?: string[], bus?: string, maxVoices?: number, randomPitch?: number, volume?: number, rate?: number, detune?: number } | null}
  */
 export function resolve(id) {
   const entry = SOUNDS[id];
   if (!entry) return null;
-  return { ...entry, url: BASE + entry.file };
+  const files = Array.isArray(entry.files)
+    ? entry.files.filter((file) => typeof file === "string" && file.length > 0)
+    : [];
+  const file = files.length > 0
+    ? files[(Math.random() * files.length) | 0]
+    : entry.file;
+  if (typeof file !== "string" || file.length <= 0) return null;
+  return { ...entry, file, files: files.length > 0 ? files : undefined, url: BASE + file };
 }
 
 /** All registered file URLs — for preloading. */
 export function allUrls() {
-  return Object.values(SOUNDS).map(e => BASE + e.file);
+  return Object.values(SOUNDS).flatMap((entry) => {
+    if (Array.isArray(entry.files) && entry.files.length > 0) {
+      return entry.files.map((file) => BASE + file);
+    }
+    return entry.file ? [BASE + entry.file] : [];
+  });
 }
 
 /** All registered sound IDs. */

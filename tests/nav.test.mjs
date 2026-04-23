@@ -66,6 +66,22 @@ function collectWalkable() {
   return out;
 }
 
+function collectWalkableComponents() {
+  const allWalkable = collectWalkable();
+  const remaining = new Set(allWalkable);
+  const components = [];
+
+  while (remaining.size > 0) {
+    const start = remaining.values().next().value;
+    const [sx, sy] = start.split(',').map(Number);
+    const component = floodFillWorld(sx, sy);
+    for (const key of component) remaining.delete(key);
+    components.push(component);
+  }
+
+  return components;
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -119,14 +135,29 @@ Deno.test("all walkable tiles form one connected component", () => {
       clearAll();
       const world = new World({ seed });
       const { spawnX, spawnY } = generateFloor(world, seed, depth);
+      const components = collectWalkableComponents();
 
-      const reachable = floodFillWorld(spawnX, spawnY);
-      const allWalkable = collectWalkable();
-
-      for (const k of allWalkable) {
-        assert(reachable.has(k),
-          `depth ${depth} seed ${seed}: walkable tile ${k} not reachable from spawn (${spawnX},${spawnY})`);
+      if (depth === 1) {
+        assert(
+          components.length === 2,
+          `depth ${depth} seed ${seed}: expected main dungeon + detached pocket, got ${components.length} components`,
+        );
+        const sizes = components.map((component) => component.size).sort((a, b) => a - b);
+        assert(
+          sizes[0] === 16,
+          `depth ${depth} seed ${seed}: detached pocket should be a 4x4 room (16 tiles), got ${sizes[0]}`,
+        );
+        assert(
+          components.some((component) => component.has(`${spawnX},${spawnY}`)),
+          `depth ${depth} seed ${seed}: spawn component missing`,
+        );
+        continue;
       }
+
+      assert(
+        components.length === 1,
+        `depth ${depth} seed ${seed}: walkable graph should be fully connected, got ${components.length} components`,
+      );
     }
   }
 });
@@ -155,12 +186,9 @@ Deno.test("forced up-stairs stay connected after descent (positional-identity)",
         `seed ${seed}: forced up-stair at (${sp.x},${sp.y}) must have walkable neighbors`);
     }
 
-    // Full connectivity: all walkable tiles reachable from spawn
-    const reachable = floodFillWorld(d1.spawnX, d1.spawnY);
-    const allWalkable = collectWalkable();
-    for (const k of allWalkable) {
-      assert(reachable.has(k),
-        `seed ${seed}: walkable tile ${k} unreachable from spawn after descent`);
-    }
+    const components = collectWalkableComponents();
+    assert(components.length === 2, `seed ${seed}: expected detached pocket on depth 1 after descent`);
+    const sizes = components.map((component) => component.size).sort((a, b) => a - b);
+    assert(sizes[0] === 16, `seed ${seed}: detached pocket should remain a 4x4 room, got ${sizes[0]}`);
   }
 });

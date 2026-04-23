@@ -11,7 +11,7 @@
 let _ctx = null;
 let _master = null;
 let _muted = false;
-let _volume = 0.5;
+let _volume = 0.8;
 
 /** Map<string, AudioBuffer> — decoded file cache keyed by URL. */
 const _cache = new Map();
@@ -69,7 +69,7 @@ const BUS_DEFAULTS = {
   combat:  1.0,
   spells:  1.0,
   items:   0.8,
-  ambient: 0.6,
+  ambient: 0.9,
   ui:      1.0,
 };
 
@@ -461,6 +461,31 @@ export function stopLoop(url, opts) {
     }
   } catch (_) {
     // already stopped
+  }
+}
+
+/**
+ * Adjust the volume of an active loop without restarting it.
+ * @param {string} url
+ * @param {number} volume
+ * @param {{ ramp?: number }} [opts]
+ */
+export function setLoopVolume(url, volume, opts) {
+  const entry = _loops.get(url);
+  if (!entry) return;
+  const next = Math.max(0, Math.min(1, Number(volume ?? 1)));
+  const ramp = Math.max(0, Number(opts?.ramp || 0));
+  try {
+    if (ramp > 0) {
+      const ac = ctx();
+      entry.gain.gain.cancelScheduledValues(ac.currentTime);
+      entry.gain.gain.setValueAtTime(entry.gain.gain.value, ac.currentTime);
+      entry.gain.gain.linearRampToValueAtTime(next, ac.currentTime + ramp);
+    } else {
+      entry.gain.gain.value = next;
+    }
+  } catch (_) {
+    entry.gain.gain.value = next;
   }
 }
 

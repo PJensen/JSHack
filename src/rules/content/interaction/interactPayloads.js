@@ -1113,11 +1113,7 @@ export const INTERACT_PAYLOADS = {
     beforeInteract(ctx) {
       const { world, actor, targetId, intent } = ctx;
       const mode = String(intent?.mode || "");
-      if (mode === "drink") {
-        if (!world.get(actor, Vitality)) {
-          ctx.cancel("NO_VITALITY", "Actor has no vitality component.");
-          return;
-        }
+      if (!mode || mode === "drink") {
         const state = ensureFountainState(world, targetId);
         const charges = Number(state?.charges || 0);
         const cooldownTurns = Math.max(1, Number(state?.cooldownTurns || 1) | 0);
@@ -1133,6 +1129,13 @@ export const INTERACT_PAYLOADS = {
               : ((Number(world.step || 0) | 0) + cooldownTurns),
           });
           ctx.cancel("FOUNTAIN_DRY", "The fountain has run dry.");
+          return;
+        }
+      }
+      if (mode === "drink") {
+        if (!world.get(actor, Vitality)) {
+          ctx.cancel("NO_VITALITY", "Actor has no vitality component.");
+          return;
         }
       } else if (mode === "dip") {
         // Phase 1: no item yet — emit prompt so the UI can ask which item.

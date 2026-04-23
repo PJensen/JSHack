@@ -37,6 +37,8 @@ Deno.test("floor 1+ has both down and up stairs", () => {
   const plan = generateFloorPlan(42, 2);
   assert(p1.downStairs.length >= 1, 'floor 1 has down stairs');
   assert(p1.upStairs.length >= 1, 'floor 1 has up stairs');
+  assert(p1.disconnectedPocket, 'floor 1 reserves a disconnected pocket chunk');
+  assert(!(p1.disconnectedPocket.chunkX === 0 && p1.disconnectedPocket.chunkY === 0), 'pocket chunk is not the origin chunk');
   assert(plan.downStairs.length >= 1, 'has down stairs');
   assert(plan.upStairs.length >= 1, 'has up stairs');
 });

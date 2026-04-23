@@ -1,6 +1,7 @@
 // main/debug/consoleCommands.js
 // Built-in commands for the debug console.
 
+import { transitionToDepth } from "../../rules/environment/dungeon/transition.js";
 import { playerEntity, findNearestValidTileAround } from "../../rules/utils/queries.js";
 import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { Other } from "../../rules/archetypes/Creatures.js";
@@ -471,8 +472,55 @@ export function registerBuiltinCommands(console, { world, messageLog, lightingEn
     }
     if (n === currentDepth) return `Already on floor ${n}.`;
 
-    world.emit('dungeon:teleport-depth', { targetDepth: n });
+    const pe = playerEntity(world);
+    const pos = pe ? world.get(pe.id, Position) : null;
+    const targetPos = pos ? { x: pos.x | 0, y: pos.y | 0 } : undefined;
+    world.emit('dungeon:teleport-depth', { targetDepth: n, targetPos });
     return `Transitioning to floor ${n}...`;
+  });
+
+  // ---- z <delta> ----
+  console.registerCommand('z', 'z <delta> — debug-only exact XY depth shift; changes Z only', (argsStr) => {
+    const delta = parseInt(String(argsStr || '').trim(), 10);
+    if (!Number.isFinite(delta) || delta === 0) return 'Usage: z <delta> (non-zero integer)';
+
+    let currentDepth = 0;
+    for (const [, ds] of world.query(DungeonState)) {
+      currentDepth = Number(ds?.currentDepth || 0) | 0;
+      break;
+    }
+
+    const pe = playerEntity(world);
+    if (!pe) return 'No player entity found.';
+    const pos = world.get(pe.id, Position);
+    if (!pos) return 'Player has no Position.';
+
+    const targetDepth = Math.max(0, currentDepth + delta);
+    if (targetDepth === currentDepth) return `Already on floor ${targetDepth}.`;
+
+    transitionToDepth(world, targetDepth, { x: pos.x | 0, y: pos.y | 0 });
+    return `Shifted Z from ${currentDepth} to ${targetDepth} at (${pos.x | 0}, ${pos.y | 0}).`;
+  });
+
+  // ---- zabs <n> ----
+  console.registerCommand('zabs', 'zabs <n> — debug-only exact XY jump to absolute depth', (argsStr) => {
+    const targetDepth = parseInt(String(argsStr || '').trim(), 10);
+    if (!Number.isFinite(targetDepth) || targetDepth < 0) return 'Usage: zabs <n> (n >= 0)';
+
+    let currentDepth = 0;
+    for (const [, ds] of world.query(DungeonState)) {
+      currentDepth = Number(ds?.currentDepth || 0) | 0;
+      break;
+    }
+    if (targetDepth === currentDepth) return `Already on floor ${targetDepth}.`;
+
+    const pe = playerEntity(world);
+    if (!pe) return 'No player entity found.';
+    const pos = world.get(pe.id, Position);
+    if (!pos) return 'Player has no Position.';
+
+    transitionToDepth(world, targetDepth, { x: pos.x | 0, y: pos.y | 0 });
+    return `Shifted Z from ${currentDepth} to ${targetDepth} at (${pos.x | 0}, ${pos.y | 0}).`;
   });
 
   // ---- reveal ----
@@ -718,7 +766,7 @@ export function registerBuiltinCommands(console, { world, messageLog, lightingEn
       const r = s.resolve(id);
       if (!r) continue;
       if (filterBus && r.bus !== filterBus) continue;
-      if (r.file === 'rain_loop.wav') continue; // skip loops
+      if (r.file === 'weather_rain.mp3') continue; // skip loops
       a.play(r.url, { bus: r.bus, delay });
       delay += 0.6;
       count++;

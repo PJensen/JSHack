@@ -66,6 +66,53 @@ function expandExtentToInclude(extent, chunkPositions) {
   };
 }
 
+function pickLevelOnePocketChunk(extent, occupied) {
+  const candidates = [];
+  for (let cy = extent.minCY; cy <= extent.maxCY; cy++) {
+    for (let cx = extent.minCX; cx <= extent.maxCX; cx++) {
+      if (cx === 0 && cy === 0) continue;
+      const key = `${cx},${cy}`;
+      if (occupied.has(key)) continue;
+      candidates.push({ chunkX: cx, chunkY: cy });
+    }
+  }
+
+  candidates.sort((a, b) => {
+    const da = Math.abs(a.chunkX) + Math.abs(a.chunkY);
+    const db = Math.abs(b.chunkX) + Math.abs(b.chunkY);
+    if (da !== db) return db - da;
+    if (Math.abs(a.chunkY) !== Math.abs(b.chunkY)) return Math.abs(b.chunkY) - Math.abs(a.chunkY);
+    if (Math.abs(a.chunkX) !== Math.abs(b.chunkX)) return Math.abs(b.chunkX) - Math.abs(a.chunkX);
+    if (a.chunkY !== b.chunkY) return a.chunkY - b.chunkY;
+    return a.chunkX - b.chunkX;
+  });
+
+  return candidates[0] ?? null;
+}
+
+function ensureLevelOnePocketExtent(extent, occupied) {
+  if (pickLevelOnePocketChunk(extent, occupied)) return extent;
+
+  const fallback = [
+    { chunkX: extent.maxCX + 1, chunkY: 0 },
+    { chunkX: extent.minCX - 1, chunkY: 0 },
+    { chunkX: 0, chunkY: extent.maxCY + 1 },
+    { chunkX: 0, chunkY: extent.minCY - 1 },
+    { chunkX: extent.maxCX + 1, chunkY: extent.maxCY },
+    { chunkX: extent.maxCX + 1, chunkY: extent.minCY },
+    { chunkX: extent.minCX - 1, chunkY: extent.maxCY },
+    { chunkX: extent.minCX - 1, chunkY: extent.minCY },
+  ];
+
+  for (const candidate of fallback) {
+    if (candidate.chunkX === 0 && candidate.chunkY === 0) continue;
+    if (occupied.has(`${candidate.chunkX},${candidate.chunkY}`)) continue;
+    return expandExtentToInclude(extent, [candidate]);
+  }
+
+  return extent;
+}
+
 function collectPrefabCandidates(extent) {
   const candidates = [];
   for (let cy = extent.minCY; cy <= extent.maxCY; cy++) {
@@ -230,8 +277,13 @@ export function generateFloorPlan(worldSeed, depth, priorDownStairPositions = nu
   // radius.
   const allChunkPositions = [...downStairs, ...upStairs, { chunkX: 0, chunkY: 0 }];
   let extent = expandExtentToInclude(buildSymmetricExtent(paddingX, paddingY), allChunkPositions);
+  const occupiedChunks = new Set(allChunkPositions.map((s) => `${s.chunkX},${s.chunkY}`));
+  if (depth === 1) {
+    extent = ensureLevelOnePocketExtent(extent, occupiedChunks);
+  }
 
   const profile = resolveFloorProfile(pickProfile(rng, depth, opts.dungeonType ?? null), depth);
+  const disconnectedPocket = depth === 1 ? pickLevelOnePocketChunk(extent, occupiedChunks) : null;
 
   // Prefab rooms: hand-authored set pieces placed in non-origin chunks.
   // Only place if there's ample space (don't force extent expansion).
@@ -273,6 +325,7 @@ export function generateFloorPlan(worldSeed, depth, priorDownStairPositions = nu
     theme: profile.theme,
     profile,
     prefabRooms,
+    disconnectedPocket,
   };
 }
 

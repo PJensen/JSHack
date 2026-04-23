@@ -1406,6 +1406,40 @@ Deno.test("fountain has finite uses and becomes dry", () => {
   assert(dry.length >= 1, "dry event should be emitted once depleted");
 });
 
+Deno.test("dry fountain does not emit Drink / Dip chooser", () => {
+  const world = new World({ seed: 91 });
+  const actor = world.create();
+  const fountain = world.create();
+
+  world.add(actor, Vitality, { maxHp: 20, hp: 10 });
+  world.add(fountain, Interactable, {
+    action: "fountain",
+    params: {
+      chargesRemaining: 0,
+      maxCharges: 2,
+      primaryEffect: "heal",
+      cooldownTurns: 201,
+      dryUntilStep: 205,
+    },
+  });
+
+  const chooser = [];
+  const dry = [];
+  world.on("action:choose", (e) => chooser.push(e));
+  world.on("fountain:dry", (e) => dry.push(e));
+
+  world.add(actor, InteractIntent, { targetId: fountain });
+  interactionSystem(world);
+
+  assertEquals(
+    chooser.length,
+    0,
+    "dry fountain should not open the action chooser",
+  );
+  assertEquals(dry.length, 1, "dry fountain should still emit fountain:dry");
+  assertEquals(dry[0].targetId, fountain);
+});
+
 Deno.test("fountain beneficial effect is stable per fountain", () => {
   const world = new World({ seed: 89 });
   const actor = world.create();
