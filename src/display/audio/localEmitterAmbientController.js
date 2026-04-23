@@ -7,7 +7,7 @@ const HOLY_SITE_AUDIBLE_RADIUS_TILES = 7;
 const TORCH_AUDIBLE_RADIUS_TILES = 6;
 const COOKING_FIRE_LOOP_GAIN = 0.3;
 const HOLY_SITE_LOOP_GAIN = 0.26;
-const TORCH_LOOP_GAIN = 0.18;
+const TORCH_LOOP_GAIN = 0.35;
 const HOLY_SITE_IDENTITIES = new Set([
   "altar",
   "shrine",
