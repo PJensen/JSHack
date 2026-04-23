@@ -29,6 +29,16 @@ export const CREATURE_VOCALIZE_SOUNDS = Object.freeze({
   chicken_rooster: "ambient:chicken",
 });
 
+// Pet vocalization sound map
+const PET_VOCALIZE_SOUNDS = Object.freeze({
+  cat: "creature:pet:meow",
+  dog: "creature:pet:meow",
+  familiar: "creature:pet:meow",
+});
+
+// Cooldown tracking for pet vocalizations (Map<id, turnsLeft>)
+const _petVocalizationCooldowns = new Map();
+
 // ── Spatial helpers ─────────────────────────────────────────
 
 /** Max tile distance at which a sound is still audible. Beyond this → silent. */
@@ -224,6 +234,20 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     }
   });
 
+  // Pet vocalization with cooldown gating (called from petBehaviorSystem)
+  world.on('pet:vocalize', ({ id, identity, at }) => {
+    const petId = Number(id || 0) | 0;
+    const cooldown = _petVocalizationCooldowns.get(petId) ?? 0;
+    if (cooldown > 0) {
+      _petVocalizationCooldowns.set(petId, cooldown - 1);
+      return; // Skip this vocalization
+    }
+
+    const soundId = PET_VOCALIZE_SOUNDS[identity] || "creature:pet:meow";
+    sfxAt(soundId, at, pp());
+    _petVocalizationCooldowns.set(petId, 60); // 60-turn cooldown between vocalizations
+  });
+
   world.on('ranged:shot', ({ attacker, target }) => {
     const pos = attacker != null ? getPosition(attacker) : null;
     sfxAt("ranged:shot", pos, pp());
@@ -361,6 +385,12 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     }
   });
 
+  world.on('status:slimed', ({ target, severity }) => {
+    if (isPlayer(target) && severity > 0) {
+      sfx("status:slimed", { volume: 0.7 });
+    }
+  });
+
   // ── Spells (cast / launch sounds) ─────────────────────────
   // Each spell gets its own sound on cast. Impact sounds fire
   // separately via the 'damaged' handler above when the spell
@@ -419,5 +449,18 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
 
   world.on('spell:learned', () => {
     sfx("level:up"); // UI sounds are always center, full vol
+  });
+
+  world.on('quest:completed', () => {
+    sfx("quest:completed"); // One-shot celebration sound
+  });
+
+  world.on('hazard:ignited', ({ at }) => {
+    const pos = at || null;
+    sfxAt("torch:ignite", pos, pp());
+  });
+
+  world.on('shop:open', ({ targetId, actor }) => {
+    sfx("shop:enter"); // One-time entry chime
   });
 }

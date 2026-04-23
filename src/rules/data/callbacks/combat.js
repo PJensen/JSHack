@@ -650,3 +650,20 @@ export function spillLootAndShortBlinkOnDamaged(opts = {}) {
     state.set(defender, rec);
   };
 }
+
+/**
+ * Apply slimed status effect to defender on hit with given probability.
+ * Used by gelatinous cube and other gunk-based creatures.
+ *
+ * @param {number} chancePct probability (0-100)
+ * @param {string} [emitEvent] optional event to emit
+ */
+export function slimedOnHit(chancePct, emitEvent = "") {
+  const { applySlimed } = require("../../utils/slime.js");
+  const pct = Math.max(0, Math.min(100, Number(chancePct || 0)));
+  return (ctx) => {
+    if (!ctx.roll(pct, 0xd00d)) return;
+    applySlimed(ctx.world, ctx.defender);
+    if (emitEvent) ctx.emit(emitEvent, { target: ctx.defender });
+  };
+}
