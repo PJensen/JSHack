@@ -29,6 +29,7 @@ import {
   MAX_CORROSION_STACKS,
 } from "../../utils/corrosion.js";
 import { dropLoot } from "../lootResolver.js";
+import { applySlimed } from "../../utils/slime.js";
 
 // ── CombatCallbackContext ──────────────────────────────────────────
 
@@ -659,7 +660,6 @@ export function spillLootAndShortBlinkOnDamaged(opts = {}) {
  * @param {string} [emitEvent] optional event to emit
  */
 export function slimedOnHit(chancePct, emitEvent = "") {
-  const { applySlimed } = require("../../utils/slime.js");
   const pct = Math.max(0, Math.min(100, Number(chancePct || 0)));
   return (ctx) => {
     if (!ctx.roll(pct, 0xd00d)) return;
