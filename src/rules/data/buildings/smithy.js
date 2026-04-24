@@ -517,7 +517,7 @@ export default {
     {
       "dx": -6,
       "dy": 1,
-      "kind": "tavern_pillar"
+      "kind": "pillar"
     },
     {
       "dx": -4,

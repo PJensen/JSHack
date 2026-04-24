@@ -2,6 +2,7 @@
 // Deterministic depth-0 overworld generation (Perlin/fBM terrain + home clearing).
 
 import { perlin2, buildPermutation, fbm01 } from "./generators/noise.js";
+import { applyTownPlacement } from "./townPlacement.js";
 import {
   CHUNK_SIZE,
   TILE_FLOOR,
@@ -674,14 +675,7 @@ export function generateOverworldChunks(worldSeed) {
   carveRivers(chunks, minX, maxX, minY, maxY, worldSeed >>> 0, perm);
   carvePondsAndLakes(chunks, minX, maxX, minY, maxY, homeX, homeY, worldSeed >>> 0, perm);
 
-  // TODO: Procedural building placement system
-  // - Scan terrain for placement heuristics (fishing by water, miners by mountains, etc.)
-  // - Use building stamps from buildingRegistry
-  // - Handle building rotation/facing
-  // - Generate path network from keystones
-
-  // [NUKED: all hard-coded building placement, paths, NPCs, decorations removed]
-  // Building placement will be procedural from here forward.
+  applyTownPlacement(chunks, { minX, maxX, minY, maxY }, worldSeed >>> 0);
 
   const outChunks = [];
   for (const rec of chunks.values()) {

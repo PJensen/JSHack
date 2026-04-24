@@ -392,7 +392,7 @@ export default {
     {
       "dx": 3,
       "dy": -4,
-      "kind": "tavern_pillar"
+      "kind": "pillar"
     },
     {
       "dx": 4,

@@ -80,6 +80,7 @@ import {
   TavernChest,
   ApothecarySign,
   BookShopSign,
+  GeneralStoreSign,
   GemShopSign,
   GemDisplayCase,
   MessageBoard,
@@ -151,6 +152,7 @@ const SIMPLE_SPAWN_TABLE = {
   smithy_chest: SmithyChest, mill_chest: MillChest, lumber_chest: LumberChest,
   smithy_sign: SmithySign, herb_chest: HerbChest, tavern_chest: TavernChest,
   apothecary_sign: ApothecarySign, gem_shop_sign: GemShopSign, book_shop_sign: BookShopSign,
+  general_store_sign: GeneralStoreSign,
   message_board: MessageBoard,
   barrel: Barrel, crate: Crate, woodpile: Woodpile, hay_bale: HayBale,
   lantern_post: LanternPost, rain_barrel: RainBarrel, wheelbarrow: Wheelbarrow,
@@ -2281,6 +2283,22 @@ export function materializeSpawn(world, spawn) {
           unidentifiedGemValue: getUnidentifiedGemAppraisal(world, itemId),
         }) * 1.2);
         spawn._calculatedPrice = price;
+        spawn._itemId = itemId;
+      }
+      return itemId;
+    }
+    case 'general_store_item': {
+      const depth = spawn.params.depth || 1;
+      const shopRng = createRng(((world.seed >>> 0) ^ ((spawn.x * 0x9e3779b9) >>> 0) ^ (spawn.y * 0x45d9f3b) ^ 0x6E57) >>> 0);
+      const itemId = shopStock.generateShopItem(world, depth, shopRng);
+      if (itemId == null) return null;
+      world.add(itemId, Position, { x: spawn.x, y: spawn.y });
+      const info = world.get(itemId, ItemInfo);
+      if (info) {
+        world.mutate(itemId, ItemInfo, r => { r.identified = true; });
+        spawn._calculatedPrice = Math.ceil(appraiseItemValue(world, itemId, {
+          unidentifiedGemValue: getUnidentifiedGemAppraisal(world, itemId),
+        }) * 1.3);
         spawn._itemId = itemId;
       }
       return itemId;
