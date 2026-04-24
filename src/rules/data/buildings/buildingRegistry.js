@@ -9,6 +9,8 @@ import gemStore from './gem_store.js';
 import bookShop from './book_shop.js';
 import herbalistHut from './herbalist_hut.js';
 import generalStore from './general_store.js';
+import farm from './farm.js';
+import graveyard from './graveyard.js';
 
 export const BUILDING_DEFS = {
   tavern,
@@ -22,11 +24,14 @@ export const BUILDING_DEFS = {
   book_shop: bookShop,
   herbalist_hut: herbalistHut,
   general_store: generalStore,
+  farm,
+  graveyard,
 };
 
 export const BUILDING_POOL = [
   'tavern', 'windmill', 'cottage', 'well_plaza', 'smithy',
-  'apothecary', 'church', 'gem_store', 'book_shop', 'herbalist_hut', 'general_store'
+  'apothecary', 'church', 'gem_store', 'book_shop', 'herbalist_hut', 'general_store',
+  'farm', 'graveyard'
 ];
 
 /**
