@@ -12,6 +12,7 @@ assets/audio/wav_notes.txt
 assets/audio/unused/
 assets/audio/*.zip
 assets/audio/play_all_wavs.sh
+assets/audio/*_orig.*
 
 
 # VS Code
