@@ -45,7 +45,8 @@ import {
 } from "./constants.js";
 import { stampBuilding } from "./stampBuilding.js";
 
-const DEFAULT_ROTATIONS = Object.freeze([0]);
+const ALL_ROTATIONS = Object.freeze([0, 1, 2, 3]);
+const FIXED_ROTATION = Object.freeze([0]);
 
 const NATURAL_BUILDABLE = new Set([
   TILE_GRASS, TILE_GRASS_A, TILE_GRASS_C, TILE_GRASS_D,
@@ -83,7 +84,7 @@ const BUILDING_PLANS = Object.freeze([
   Object.freeze({ key: "cottage", district: "civic_core", coreDx: -7, coreDy: 6, wants: ["flat"], roles: ["villager"] }),
   Object.freeze({ key: "tavern", district: "market_green", coreDx: -8, coreDy: -3, wants: ["flat"], roles: ["barkeep"] }),
   Object.freeze({ key: "general_store", district: "market_green", coreDx: -3, coreDy: 9, wants: ["flat"], roles: [] }),
-  Object.freeze({ key: "smithy", district: "workshop_row", coreDx: 12, coreDy: -4, wants: ["mountain", "flat"], roles: ["smith"] }),
+  Object.freeze({ key: "smithy", district: "workshop_row", coreDx: 12, coreDy: -4, wants: ["mountain", "flat"], roles: ["smith"], rotations: FIXED_ROTATION }),
   Object.freeze({ key: "apothecary", district: "workshop_row", coreDx: 4, coreDy: 13, wants: ["forest", "water"], roles: ["alchemist"] }),
   Object.freeze({ key: "gem_store", district: "workshop_row", coreDx: -1, coreDy: 12, wants: ["flat"], roles: ["gem_vendor"] }),
   Object.freeze({ key: "book_shop", district: "civic_core", coreDx: 7, coreDy: -10, wants: ["flat"], roles: ["book_vendor"] }),
@@ -228,11 +229,29 @@ function footprint(def, anchorX, anchorY, margin = 0) {
   return keys;
 }
 
+function spawnsCanLand(chunks, def, anchorX, anchorY, exactFootprint, occupied) {
+  for (const spawn of def.spawns || []) {
+    const x = anchorX + (Number(spawn.dx) | 0);
+    const y = anchorY + (Number(spawn.dy) | 0);
+    const key = xyKey(x, y);
+    if (exactFootprint.has(key)) continue;
+    if (occupied.has(key) || !canBuildOn(chunks, x, y)) return false;
+  }
+  return true;
+}
+
 function doorFor(result, anchorX, anchorY) {
   return result.waypoints.shop_door
     || result.waypoints.front_door
     || result.waypoints.door
     || { x: anchorX, y: anchorY };
+}
+
+function doorOffsetForDef(def) {
+  const point = (def.waypoints || []).find((entry) => entry.name === "shop_door")
+    || (def.waypoints || []).find((entry) => entry.name === "front_door")
+    || (def.waypoints || []).find((entry) => String(entry.name || "").includes("door"));
+  return point ? { dx: Number(point.dx) | 0, dy: Number(point.dy) | 0 } : { dx: 0, dy: 0 };
 }
 
 function terrainScore(chunks, x, y) {
@@ -244,15 +263,26 @@ function terrainScore(chunks, x, y) {
   return flat * 3 + wet * 5 + mountain * 4 + forest * 2 - blocked * 8;
 }
 
+function waterfrontScore(chunks, x, y) {
+  const flat = countNear(chunks, x, y, 7, (t) => FLAT_TILES.has(t) || t === TILE_COBBLESTONE);
+  const blocked = countNear(chunks, x, y, 7, (t) => WET_TILES.has(t) || MOUNTAIN_TILES.has(t));
+  const waterDist = nearestScore(chunks, x, y, 24, (t) => WET_TILES.has(t));
+  const coastDist = nearestScore(chunks, x, y, 18, (t) => WATER_EDGE_TILES.has(t) || t === TILE_ROCKY_SHORE);
+  const immediateWater = countNear(chunks, x, y, 3, (t) => WET_TILES.has(t));
+  return flat * 4 + waterDist * 9 + coastDist * 5 - blocked * 7 - immediateWater * 18;
+}
+
 function chooseTownCenter(chunks, bounds, seed) {
   const rng = mulberry(seed ^ 0x5E77);
   const targetX = Math.floor((bounds.minX + bounds.maxX) / 2);
   const targetY = Math.floor((bounds.minY + bounds.maxY) / 2);
   let best = null;
-  for (let y = Math.max(bounds.minY + 26, targetY - 18); y <= Math.min(bounds.maxY - 26, targetY + 18); y += 2) {
-    for (let x = Math.max(bounds.minX + 26, targetX - 18); x <= Math.min(bounds.maxX - 26, targetX + 18); x += 2) {
-      const centerBias = 120 - Math.max(Math.abs(x - targetX), Math.abs(y - targetY)) * 6;
-      const score = terrainScore(chunks, x, y) + centerBias + rng() * 0.01;
+  for (let y = bounds.minY + 30; y <= bounds.maxY - 30; y += 2) {
+    for (let x = bounds.minX + 30; x <= bounds.maxX - 30; x += 2) {
+      const tile = getWorldTile(chunks, x, y);
+      if (!NATURAL_BUILDABLE.has(tile)) continue;
+      const centerBias = 80 - Math.max(Math.abs(x - targetX), Math.abs(y - targetY)) * 0.45;
+      const score = waterfrontScore(chunks, x, y) + terrainScore(chunks, x, y) * 0.35 + centerBias + rng() * 0.01;
       if (!best || score > best.score) best = { x, y, score };
     }
   }
@@ -334,7 +364,7 @@ function placeBuilding(chunks, bounds, plan, district, occupied, protectedTiles,
   const searchRadius = plan.resource ? 18 : 16;
   const targetX = district.x + (Number(plan.coreDx) | 0);
   const targetY = district.y + (Number(plan.coreDy) | 0);
-  const rotations = plan.rotations || DEFAULT_ROTATIONS;
+  const rotations = plan.rotations || ALL_ROTATIONS;
   for (let r = 0; r <= searchRadius; r++) {
     for (let dy = -r; dy <= r; dy++) {
       for (let dx = -r; dx <= r; dx++) {
@@ -345,10 +375,14 @@ function placeBuilding(chunks, bounds, plan, district, occupied, protectedTiles,
         for (const rotation of rotations) {
           const def = rotateBuildingDef(baseDef, rotation);
           if (!canPlaceBuilding(chunks, anchorX, anchorY, def, (x, y) => occupied.has(xyKey(x, y)) || !canBuildOn(chunks, x, y))) continue;
+          const exact = footprint(def, anchorX, anchorY, 0);
+          if (!spawnsCanLand(chunks, def, anchorX, anchorY, exact, occupied)) continue;
           const dist = Math.max(Math.abs(anchorX - targetX), Math.abs(anchorY - targetY));
+          const doorOffset = doorOffsetForDef(def);
+          const doorDist = Math.abs(anchorX + doorOffset.dx - district.x) + Math.abs(anchorY + doorOffset.dy - district.y);
           const score = wantsScore(chunks, anchorX, anchorY, plan.wants || [])
             - dist * 4
-            + (rotation === 0 ? 2 : 0)
+            - doorDist * 1.5
             + rng() * 0.01;
           if (!best || score > best.score) best = { def, anchorX, anchorY, rotation, score };
         }

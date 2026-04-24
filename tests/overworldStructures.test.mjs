@@ -137,7 +137,7 @@ Deno.test("building rotation transforms tiles, spawns, waypoints, and shop rooms
 });
 
 Deno.test("terrain heuristics bias resource buildings toward useful landscape", () => {
-  const { chunks } = generateOverworldChunks(SEED);
+  const { chunks, spawnX, spawnY } = generateOverworldChunks(SEED);
   const smithy = spawnsOfKind(chunks, "smithy_sign")[0];
   const farmCrop = spawnsOfKind(chunks, "crop_wheat")[0];
   const mill = spawnsOfKind(chunks, "millstone")[0];
@@ -145,6 +145,7 @@ Deno.test("terrain heuristics bias resource buildings toward useful landscape", 
   const mountains = new Set([TILE_MOUNTAIN, TILE_MOUNTAIN_B, TILE_MOUNTAIN_C, TILE_ROCKY_SHORE]);
   const water = new Set([TILE_WATER, TILE_WATER_DEEP, TILE_SHALLOW_WATER]);
 
+  assert(nearestTileDistance(chunks, { x: spawnX, y: spawnY }, water, 32) <= 16, "town core should form near coastline or waterfront");
   assert(nearestTileDistance(chunks, farmCrop, water, 48) <= 18, "farm should bias toward water");
   assert(nearestTileDistance(chunks, mill, water, 48) <= 18, "mill should bias toward water");
   assert(nearestTileDistance(chunks, herbStore, water, 48) <= 18, "herbal/alchemy supply should bias toward water or wet edges");
