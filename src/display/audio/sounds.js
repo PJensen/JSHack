@@ -152,7 +152,8 @@ const SOUNDS = {
   "quest:completed":  { file: "quest_complete.mp3",  bus: "ui", maxVoices: 1 },
 
   // ── Creatures (vocalizations) ───────────────────
-  "creature:pet:meow": { file: "pet_meow_1.mp3", bus: "ambient", maxVoices: 2 },
+  "creature:pet:meow":    { file: "pet_meow_1.mp3",          bus: "ambient", maxVoices: 2 },
+  "creature:pet:eating":  { file: "pet_feline_eating.mp3",   bus: "ambient", maxVoices: 2, segment: 2 },
 
   // ── Soundscapes ─────────────────────────────────
   "soundscape":       { file: "soundscape.mp3",      bus: "ambient" },

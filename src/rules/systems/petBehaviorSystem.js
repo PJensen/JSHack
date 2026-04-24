@@ -280,6 +280,7 @@ function consumeCorpseForPet(world, petId, corpseId, vit) {
     vit.hp = Math.min(vit.maxHp, vit.hp + healAmount);
     try {
       world.emit?.("healed", { id: petId, amount: healAmount });
+      world.emit?.("audio:play", { key: "creature:pet:eating" });
     } catch {}
   }
 
