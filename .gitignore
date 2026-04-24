@@ -5,6 +5,7 @@ node_modules/
 .DS_Store
 Thumbs.
 JSHack.code-workspace
+deno.lock
 
 *.zip
 assets/audio/8bitRPGHack&SlashSFX 2
@@ -35,3 +36,4 @@ end-of-day.sh
 assets/audio/unused/
 assets/audio/*.zip
 .claude/projects/-home-pjensen-Repos-JSHack/memory/feedback_additive_changes.md
+deno.lock
