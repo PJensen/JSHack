@@ -3,7 +3,7 @@
 import { basename } from "https://deno.land/std@0.208.0/path/mod.ts";
 
 const AUDIO_DIR = "./assets/audio";
-const SILENCE_THRESHOLD = 0.002; // 50dB below peak
+const SILENCE_THRESHOLD = -50; // dB below full scale
 const SILENCE_DURATION = 0.1; // 100ms
 
 async function runCmd(cmd) {
@@ -25,17 +25,23 @@ async function runCmd(cmd) {
 
 async function trimSilence(inputPath, outputPath) {
   // ffmpeg silenceremove: removes silence from beginning and end
-  // silence: threshold (0-1, default 0.001), duration in seconds
+  // silence: threshold (dB), duration in seconds
   const ext = inputPath.split(".").pop().toLowerCase();
-  const format = ext === "wav" ? "wav" : "mp3";
+  const isWav = ext === "wav";
   const cmd = [
     "/usr/bin/ffmpeg",
     "-i", inputPath,
     "-af", `silenceremove=start_periods=1:start_duration=${SILENCE_DURATION}:start_threshold=${SILENCE_THRESHOLD}dB,silenceremove=stop_periods=-1:stop_duration=${SILENCE_DURATION}:stop_threshold=${SILENCE_THRESHOLD}dB`,
-    "-f", format,
-    "-y",
-    outputPath,
+    "-f", isWav ? "wav" : "mp3",
   ];
+
+  if (isWav) {
+    cmd.push("-acodec", "pcm_s16le");
+  } else {
+    cmd.push("-acodec", "libmp3lame", "-b:a", "256k");
+  }
+
+  cmd.push("-y", outputPath);
 
   const result = await runCmd(cmd);
   if (result.status !== 0) {
