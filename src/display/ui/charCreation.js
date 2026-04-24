@@ -992,7 +992,120 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
     confirmBtn.style.boxShadow = '';
   });
 
+  let confirming = false;
+  function showGenerationPanel() {
+    box.replaceChildren();
+    Object.assign(box.style, {
+      width: 'min(420px, 88vw)',
+      padding: '28px 24px 24px',
+      textAlign: 'left',
+    });
+
+    const title = document.createElement('div');
+    title.textContent = 'Generating World';
+    Object.assign(title.style, {
+      color: '#e3edf6',
+      fontSize: '18px',
+      fontWeight: 'bold',
+      textAlign: 'center',
+      marginBottom: '8px',
+      letterSpacing: '0.02em',
+    });
+    box.appendChild(title);
+
+    const sub = document.createElement('div');
+    sub.textContent = 'The coast, town, roads, and local economy are being settled.';
+    Object.assign(sub.style, {
+      color: UI.muted,
+      fontSize: '12px',
+      lineHeight: '1.45',
+      textAlign: 'center',
+      marginBottom: '18px',
+    });
+    box.appendChild(sub);
+
+    const rows = [
+      'Carving coastline',
+      'Generating terrain',
+      'Placing buildings',
+      'Placing resources',
+      'Opening roads',
+    ].map((label) => {
+      const row = document.createElement('div');
+      Object.assign(row.style, {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px',
+        padding: '8px 0',
+        borderTop: '1px solid rgba(120, 105, 90, 0.22)',
+        color: UI.low,
+        fontSize: '12px',
+      });
+      const mark = document.createElement('span');
+      mark.textContent = '·';
+      Object.assign(mark.style, {
+        width: '18px',
+        textAlign: 'center',
+        color: '#7c8792',
+      });
+      const text = document.createElement('span');
+      text.textContent = label;
+      row.appendChild(mark);
+      row.appendChild(text);
+      box.appendChild(row);
+      return { row, mark, text };
+    });
+
+    const footer = document.createElement('div');
+    footer.textContent = 'Please wait...';
+    Object.assign(footer.style, {
+      color: '#9fb4c8',
+      fontSize: '11px',
+      textAlign: 'center',
+      marginTop: '18px',
+      textTransform: 'uppercase',
+      letterSpacing: '0.08em',
+    });
+    box.appendChild(footer);
+
+    let active = 0;
+    function render() {
+      rows.forEach((entry, i) => {
+        if (i < active) {
+          entry.mark.textContent = '✓';
+          entry.mark.style.color = '#8fbf8f';
+          entry.text.style.color = '#b8c7b8';
+        } else if (i === active) {
+          entry.mark.textContent = '>';
+          entry.mark.style.color = '#d8b56f';
+          entry.text.style.color = '#e6d1a0';
+        } else {
+          entry.mark.textContent = '·';
+          entry.mark.style.color = '#7c8792';
+          entry.text.style.color = UI.low;
+        }
+      });
+    }
+    render();
+
+    const timers = [];
+    for (let i = 1; i < rows.length; i++) {
+      timers.push(setTimeout(() => {
+        active = i;
+        render();
+      }, i * 140));
+    }
+    return {
+      readyDelayMs: rows.length * 140 + 80,
+      dispose() {
+        for (const timer of timers) clearTimeout(timer);
+      },
+    };
+  }
+
   function doConfirm() {
+    if (confirming) return;
+    confirming = true;
     const name = (nameInput.value || '').trim() || fallbackName;
     const seedVal = parseSeed(seedInput.value) ?? (entropyPool.length >= 4 ? entropyHash >>> 0 : defaultSeed >>> 0);
     const difficulty = hardInput.checked ? 'hard' : 'easy';
@@ -1005,9 +1118,13 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
     // Fade out soundscape quickly to let enter_world take over
     stopLoop('./assets/audio/soundscape.mp3', { fadeOut: 0.5 });
 
-    // Start game immediately (enters while enter_world plays)
-    onConfirm({ name, classId: classes[classIndex].id, seed: seedVal, difficulty, tutorial, disableGore });
-    dispose();
+    const generationPanel = showGenerationPanel();
+
+    setTimeout(() => {
+      onConfirm({ name, classId: classes[classIndex].id, seed: seedVal, difficulty, tutorial, disableGore });
+      generationPanel.dispose();
+      dispose();
+    }, generationPanel.readyDelayMs);
   }
 
   confirmBtn.addEventListener('pointerdown', (e) => {
