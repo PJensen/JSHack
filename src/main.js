@@ -2729,6 +2729,7 @@ if (typeof window !== "undefined") {
 const HP_BAR_MEANINGFUL_RATIO_DELTA = 0.08;
 const HP_BAR_SHOW_SECONDS = 2.25;
 const PET_HP_BAR_SHOW_SECONDS = 3.5;
+const LIGHTING_DETAIL_MAX_TILES = 3600;
 
 // ── Hit tint: brief red shift on the entity glyph on successful damage ──
 const HIT_TINT_DURATION = 0.18;
@@ -4015,6 +4016,29 @@ function drawEntityHealthBar(ctx, e) {
 // Reusable Set for per-entity tag checks in the render loop (avoids alloc per frame)
 const _renderTagSet = new Set();
 
+function resolveLightingViewport(worldView, vx0, vy0, vx1, vy1) {
+  const tw = Math.max(1, Math.ceil(vx1) - Math.floor(vx0) + 2);
+  const th = Math.max(1, Math.ceil(vy1) - Math.floor(vy0) + 2);
+  const area = tw * th;
+  if (area <= LIGHTING_DETAIL_MAX_TILES) {
+    return { vx0, vy0, vx1, vy1, capped: false, area };
+  }
+  const aspect = Math.max(0.35, Math.min(3.5, tw / th));
+  const capW = Math.max(24, Math.floor(Math.sqrt(LIGHTING_DETAIL_MAX_TILES * aspect)));
+  const capH = Math.max(18, Math.floor(LIGHTING_DETAIL_MAX_TILES / capW));
+  const center = worldView?.player?.pos || { x: (vx0 + vx1) * 0.5, y: (vy0 + vy1) * 0.5 };
+  const halfW = capW * 0.5;
+  const halfH = capH * 0.5;
+  return {
+    vx0: center.x - halfW,
+    vy0: center.y - halfH,
+    vx1: center.x + halfW,
+    vy1: center.y + halfH,
+    capped: true,
+    area,
+  };
+}
+
 function render(worldView) {
   const _rpOn = _renderProfile.enabled === true;
   const _rp = _rpOn ? {
@@ -4029,6 +4053,8 @@ function render(worldView) {
     entitiesDrawn: 0,
     postGlyphs: 0,
     roofsDrawn: 0,
+    lightingArea: 0,
+    lightingCapped: false,
     stages: {},
   } : null;
   const _rpFrameStart = _rpOn ? performance.now() : 0;
@@ -4854,6 +4880,21 @@ function render(worldView) {
     const _roofMask = worldView.isOverworld ? isRoofed : null;
     const _visionDef = getVisionDef();
     const _lightOpaque = worldView.isBlockedVision || isOpaque;
+    const _lightViewport = resolveLightingViewport(worldView, vx0, vy0, vx1, vy1);
+    if (_rp) {
+      _rp.lightingArea = _lightViewport.area;
+      _rp.lightingCapped = _lightViewport.capped;
+    }
+    if (_lightViewport.capped) {
+      bctx.save();
+      bctx.globalCompositeOperation = "source-over";
+      bctx.fillStyle = "rgba(0,0,0,0.72)";
+      if (_lightViewport.vy0 > vy0) bctx.fillRect(vx0 - 1, vy0 - 1, (vx1 - vx0) + 2, _lightViewport.vy0 - vy0);
+      if (_lightViewport.vy1 < vy1) bctx.fillRect(vx0 - 1, _lightViewport.vy1, (vx1 - vx0) + 2, vy1 - _lightViewport.vy1 + 1);
+      if (_lightViewport.vx0 > vx0) bctx.fillRect(vx0 - 1, _lightViewport.vy0, _lightViewport.vx0 - vx0, _lightViewport.vy1 - _lightViewport.vy0);
+      if (_lightViewport.vx1 < vx1) bctx.fillRect(_lightViewport.vx1, _lightViewport.vy0, vx1 - _lightViewport.vx1 + 1, _lightViewport.vy1 - _lightViewport.vy0);
+      bctx.restore();
+    }
 
     // Dirty-field: detect player movement / facing change → invalidate vision.
     // Detect game-step advance → invalidate geometry (handles pickaxe, doors, etc.)
@@ -4882,10 +4923,10 @@ function render(worldView) {
       bctx,
       _lights,
       _lightOpaque,
-      vx0,
-      vy0,
-      vx1,
-      vy1,
+      _lightViewport.vx0,
+      _lightViewport.vy0,
+      _lightViewport.vx1,
+      _lightViewport.vy1,
       _ambient,
       210,
       _roofMask,
