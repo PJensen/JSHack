@@ -488,7 +488,62 @@ function routePath(chunks, bounds, from, to, protectedTiles) {
       open.push({ x: nx, y: ny, g: ng, f: ng + h });
     }
   }
-  if (!came.has(goalKey)) return;
+  if (!came.has(goalKey)) {
+    // A* failed. From building door, find nearest network tile (in closed set), route to it.
+    let nearestNetwork = null;
+    let nearestDist = Infinity;
+    for (const closedKey of closed) {
+      const [cx, cy] = closedKey.split(",").map(Number);
+      const dist = Math.abs(cx - to.x) + Math.abs(cy - to.y);
+      if (dist < nearestDist) {
+        nearestDist = dist;
+        nearestNetwork = { x: cx, y: cy, k: closedKey };
+      }
+    }
+    if (!nearestNetwork) return;
+    // A* from building door to nearest network tile (Manhattan only)
+    const fallbackOpen = [{ x: to.x, y: to.y, f: 0, g: 0 }];
+    const fallbackCame = new Map();
+    const fallbackCost = new Map([[xyKey(to.x, to.y), 0]]);
+    const fallbackClosed = new Set();
+    const dirs4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    let pathFound = false;
+    const targetKey = nearestNetwork.k;
+    for (let steps = 0; fallbackOpen.length > 0 && steps < 5000; steps++) {
+      fallbackOpen.sort((a, b) => a.f - b.f);
+      const cur = fallbackOpen.shift();
+      if (!cur) break;
+      const curKey = xyKey(cur.x, cur.y);
+      if (fallbackClosed.has(curKey)) continue;
+      fallbackClosed.add(curKey);
+      if (curKey === targetKey) {
+        pathFound = true;
+        break;
+      }
+      for (const [dx, dy] of dirs4) {
+        const nx = cur.x + dx;
+        const ny = cur.y + dy;
+        const nk = xyKey(nx, ny);
+        if (protectedTiles.has(nk)) continue;
+        if (fallbackClosed.has(nk)) continue;
+        const ng = cur.g + 1;
+        if (ng >= (fallbackCost.get(nk) ?? Infinity)) continue;
+        fallbackCost.set(nk, ng);
+        fallbackCame.set(nk, curKey);
+        const h = Math.abs(nx - nearestNetwork.x) + Math.abs(ny - nearestNetwork.y);
+        fallbackOpen.push({ x: nx, y: ny, g: ng, f: ng + h });
+      }
+    }
+    if (pathFound) {
+      let k = targetKey;
+      while (k) {
+        const [x, y] = k.split(",").map(Number);
+        setChunkTile(chunks, x, y, TILE_COBBLESTONE);
+        k = fallbackCame.get(k);
+      }
+    }
+    return;
+  }
   let k = goalKey;
   while (k && k !== startKey) {
     const [x, y] = k.split(",").map(Number);
