@@ -540,7 +540,15 @@ function _playBuffer(url, buf, opts) {
     trackVoice(url, src, maxV, priority, vol);
 
     const when = opts?.delay ? ac.currentTime + opts.delay : 0;
-    src.start(when);
+    const segment = Number(opts?.segment || 0);
+    if (segment > 0 && buf.duration > segment) {
+      // Pick random start position for segment playback
+      const maxOffset = buf.duration - segment;
+      const offset = Math.random() * maxOffset;
+      src.start(when, offset, segment);
+    } else {
+      src.start(when);
+    }
   } catch (_) {
     // Web Audio not available — silent fail
   }
