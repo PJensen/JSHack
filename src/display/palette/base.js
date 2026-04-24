@@ -106,8 +106,28 @@ export const basePalette = {
   grass:    { glyph: ",", fg: "#90c858", glow: "#5a9038", bg: OVERWORLD_GRASS_BG },  // light
   grass_c:  { glyph: ";", fg: "#6aaa42", glow: "#447828", bg: "#182c10" },  // medium
   grass_d:  { glyph: "`", fg: "#94c04e", glow: "#5a8030", bg: "#223616" },  // thick/lush
-  water:      { glyph: "~", fg: "#5ea8d4", glow: "#3a6a90", bg: "#0e2a3a" },  // shallow
-  water_deep: { glyph: "≈", fg: "#3a6fa0", glow: "#1e3f60", bg: "#0a1828" },  // open/deep
+  water:        { glyph: "~", fg: "#5ea8d4", glow: "#3a6a90", bg: "#0e2a3a" },  // shallow water
+  water_deep:   { glyph: "≈", fg: "#1a4070", glow: "#0a1f40", bg: "#010810" },  // deep ocean
+  beach:        { glyph: "░", fg: "#e8d4a0", glow: "#c8a878", bg: "#8a7860" },  // sandy shore
+  marsh:        { glyph: "✿", fg: "#7a9a6a", glow: "#5a7a4a", bg: "#4a6a3a" },  // wet grassy
+  swamp:        { glyph: "≈", fg: "#5a8a6a", glow: "#3a6a4a", bg: "#2a5a3a" },  // boggy vegetation
+  bog:          { glyph: "≈", fg: "#4a7a5a", glow: "#2a5a3a", bg: "#1a3a2a" },  // peat bog
+  sand_dunes:   { glyph: "◊", fg: "#e8c860", glow: "#c8a840", bg: "#9a7a38" },  // desert dunes
+  mud:          { glyph: "▓", fg: "#7a6a5a", glow: "#5a4a3a", bg: "#4a3a2a" },  // mudflats
+  tidal_flat:   { glyph: "▫", fg: "#d8c8a8", glow: "#a89878", bg: "#8a7860" },  // tidal zone
+  rocky_shore:  { glyph: "•", fg: "#a9a9a9", glow: "#6a6a6a", bg: "#4a4a4a" },  // rocky beach
+  kelp_forest:  { glyph: "≋", fg: "#4a8a8a", glow: "#2a6a6a", bg: "#0a3a4a" },  // kelp beds
+  salt_marsh:   { glyph: "▒", fg: "#8aaa8a", glow: "#6a8a6a", bg: "#3a6a3a" },  // salt grass
+  shingle:      { glyph: "◌", fg: "#c0b0a0", glow: "#8a7a68", bg: "#6a5a48" },  // pebble shore
+  seagrass:     { glyph: "✿", fg: "#6a9a8a", glow: "#4a7a6a", bg: "#1a4a3a" },  // seagrass shallow
+  moorland:     { glyph: "¨", fg: "#9a8a7a", glow: "#6a5a4a", bg: "#4a3a2a" },  // open moor
+  scrubland:    { glyph: "≈", fg: "#8aaa6a", glow: "#6a8a4a", bg: "#4a6a2a" },  // scrub brush
+  badlands:     { glyph: "≈", fg: "#d8a878", glow: "#c87840", bg: "#8a5830" },  // eroded clay
+  gravel:       { glyph: "▫", fg: "#b0a8a0", glow: "#7a7268", bg: "#5a5248" },  // gravel plains
+  pine_forest:  { glyph: "🌲", fg: "#3a6a3a", glow: "#1a4a1a", bg: "#2a4a2a" },  // pine forest
+  palm_forest:  { glyph: "🌴", fg: "#4a8a4a", glow: "#2a6a2a", bg: "#1a5a1a" },  // palm forest
+  mangrove:     { glyph: "≈", fg: "#5a8a7a", glow: "#3a6a5a", bg: "#2a5a4a" },  // mangrove
+  coral_reef:   { glyph: "◇", fg: "#e8a868", glow: "#d87840", bg: "#4a3a2a" },  // coral shallow
   lava:       { glyph: "≈", fg: "#ff8b36", glow: "#8f2e10", bg: "#3a1008" },
   mountain:   { glyph: "⛰", fg: "#9da0a4", glow: "#5a5d61", bg: "#2a2c2e" },  // foothills
   mountain_b: { glyph: "∧", fg: "#bec1c4", glow: "#6e7174", bg: "#343638" },  // mid-peak
@@ -337,6 +357,8 @@ export const basePalette = {
   millstone:     { glyph: "◎", fg: "#9a9a9a", glow: "#5a5a5a" },
   millstone_active: { glyph: "◉", fg: "#d8d2b0", glow: "#b08a3a" },
   cobblestone:   { glyph: "·", fg: "#8a8e93", glow: "#555a5e", bg: "#2a2c30" },
+  ice:           { glyph: "∙", fg: "#c8e8ff", glow: "#6ab8ff", bg: "#1a4a7a" },  // slippery ice
+  pit:           { glyph: "🕳️", fg: "#111118", glow: "#000000", bg: "#1a1a1a" },  // open pit
   // Church
   church_altar:  { glyph: "⛩", fg: "#cc99ff", glow: "#9966cc" },
   church_pew:    { glyph: "▭", fg: "#8a6040", glow: "#5a3a28" },

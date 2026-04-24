@@ -37,6 +37,28 @@ export const TILE_COBBLESTONE    = 21; // grey stone cobble ·  — walkable, tr
 // Dungeon hazard tiles
 export const TILE_PIT            = 22; // open pit     🕳  — walkable (triggers fall), transparent, NOT flyable
 
+// Overworld biome tiles — expanded diversity
+export const TILE_BEACH          = 23; // sandy shore  ░  — walkable, transition to water
+export const TILE_MARSH          = 24; // wet grassy   ≈  — walkable, high moisture
+export const TILE_SWAMP          = 25; // boggy water  ≈  — walkable, thick vegetation
+export const TILE_BOG            = 26; // peat bog     ≈  — walkable, very wet
+export const TILE_SAND_DUNES     = 27; // sandy desert ◊  — walkable, arid
+export const TILE_MUD            = 28; // mudflats     ▓  — walkable, coastal mud
+export const TILE_TIDAL_FLAT     = 29; // tidal zone   ░  — walkable, exposed
+export const TILE_ROCKY_SHORE    = 30; // rocky beach  •  — walkable, rough rocks
+export const TILE_KELP_FOREST    = 31; // kelp beds    ≋  — water variant, underwater vegetation
+export const TILE_SALT_MARSH     = 32; // salt grass   ▒  — walkable, coastal wetland
+export const TILE_SHINGLE        = 33; // pebble shore ◌  — walkable, coastal pebbles
+export const TILE_SEAGRASS       = 34; // seagrass     ≈  — water variant, shallow plants
+export const TILE_MOORLAND       = 35; // open moor    ¨  — walkable, sparse vegetation
+export const TILE_SCRUBLAND      = 36; // scrub brush  ≈  — walkable, shrubby dry
+export const TILE_BADLANDS       = 37; // eroded clay  ≈  — walkable, colorful clay
+export const TILE_GRAVEL         = 38; // gravel plain ▫  — walkable, rocky ground
+export const TILE_PINE_FOREST    = 39; // pine forest  🌲  — walkable, dense conifers
+export const TILE_PALM_FOREST    = 40; // palm forest  🌴  — walkable, tropical
+export const TILE_MANGROVE       = 41; // mangrove     ≈  — walkable, coastal forest
+export const TILE_CORAL_REEF     = 42; // coral        ◇  — water variant, colorful shallow
+
 // BSP partition parameters
 export const MIN_LEAF_SIZE   = 5;   // smallest BSP leaf dimension
 export const MIN_ROOM_SIZE   = 3;   // smallest room interior (excl. walls)
