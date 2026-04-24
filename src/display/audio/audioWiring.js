@@ -260,7 +260,9 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
       const deathId = heavyDeath ? "player:death:heavy" : "player:death";
       sfx(deathId); // player death is always full volume center
     } else {
-      sfxAt("death", pos, pp());
+      const creatureId = typeof getIdentity === "function" ? String(getIdentity(id) || "") : "";
+      const deathSoundId = creatureId === "boar" ? "creature:boar:died" : "death";
+      sfxAt(deathSoundId, pos, pp());
     }
   });
 

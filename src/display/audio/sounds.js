@@ -17,6 +17,7 @@ const SOUNDS = {
   "melee:miss":       { file: "melee_miss.wav",    bus: "combat" },
   "ranged:shot":      { file: "ranged_shot.wav",   bus: "combat", randomPitch: 35 },
   "death":            { file: "death.wav",          bus: "combat", maxVoices: 3 },
+  "creature:boar:died": { file: "boar_died.mp3",      bus: "combat", maxVoices: 1 },
   "player:death":     { file: "player_death.wav",   bus: "combat", maxVoices: 1 },
   "player:death:heavy": { file: "player_death_2.wav", bus: "combat", maxVoices: 1 },
 
@@ -93,7 +94,7 @@ const SOUNDS = {
   "spell:phase_strike":  { file: "spell_phase_strike.wav",  bus: "spells" },
   "spell:shield_bash":   { file: "spell_shield_bash.wav",   bus: "spells" },
   "spell:wolf_howl":     { files: ["spell_wolf_howl.wav", "spell_wolf_howl.mp3"], bus: "spells" },
-  "spell:boar_charge":   { file: "spell_boar_charge.wav",   bus: "spells" },
+  "spell:boar_charge":   { file: "boar_charge.mp3",         bus: "spells" },
   "spell:consecrate":    { file: "spell_consecrate.wav",    bus: "spells" },
   "spell:divine_shield": { file: "spell_buff.mp3",          bus: "spells" },
   "spell:purify":        { file: "spell_purify.wav",        bus: "spells" },
@@ -145,6 +146,7 @@ const SOUNDS = {
 
   // ── Interactions ────────────────────────────────
   "fountain:sip":     { file: "fountain_sip.mp3",    bus: "items" },
+  "item:consume:food": { file: "eat_food.mp3",       bus: "items" },
   "torch:ignite":     { file: "light_fire.mp3",      bus: "ambient" },
   "shop:enter":       { file: "shop_door_chime.mp3", bus: "ui", maxVoices: 1 },
   "quest:completed":  { file: "quest_complete.mp3",  bus: "ui", maxVoices: 1 },
