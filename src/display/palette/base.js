@@ -115,7 +115,7 @@ export const basePalette = {
   sand_dunes:   { glyph: "◊", fg: "#e8c860", glow: "#c8a840", bg: "#9a7a38" },  // desert dunes
   mud:          { glyph: "▓", fg: "#7a6a5a", glow: "#5a4a3a", bg: "#4a3a2a" },  // mudflats
   tidal_flat:   { glyph: "▫", fg: "#d8c8a8", glow: "#a89878", bg: "#8a7860" },  // tidal zone
-  rocky_shore:  { glyph: "•", fg: "#a9a9a9", glow: "#6a6a6a", bg: "#4a4a4a" },  // rocky beach
+  rocky_shore:  { glyph: "*", fg: "#a9a9a9", glow: "#6a6a6a", bg: "#4a4a4a" },  // rocky beach
   kelp_forest:  { glyph: "≋", fg: "#4a8a8a", glow: "#2a6a6a", bg: "#0a3a4a" },  // kelp beds
   salt_marsh:   { glyph: "▒", fg: "#8aaa8a", glow: "#6a8a6a", bg: "#3a6a3a" },  // salt grass
   shingle:      { glyph: "◌", fg: "#c0b0a0", glow: "#8a7a68", bg: "#6a5a48" },  // pebble shore
