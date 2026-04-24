@@ -266,10 +266,11 @@ function terrainScore(chunks, x, y) {
 function waterfrontScore(chunks, x, y) {
   const flat = countNear(chunks, x, y, 7, (t) => FLAT_TILES.has(t) || t === TILE_COBBLESTONE);
   const blocked = countNear(chunks, x, y, 7, (t) => WET_TILES.has(t) || MOUNTAIN_TILES.has(t));
-  const waterDist = nearestScore(chunks, x, y, 24, (t) => WET_TILES.has(t));
+  const oceanDist = nearestScore(chunks, x, y, 32, (t) => t === TILE_WATER_DEEP || t === TILE_KELP_FOREST);
+  const waterDist = nearestScore(chunks, x, y, 18, (t) => t === TILE_WATER || t === TILE_SHALLOW_WATER || t === TILE_SEAGRASS || t === TILE_CORAL_REEF);
   const coastDist = nearestScore(chunks, x, y, 18, (t) => WATER_EDGE_TILES.has(t) || t === TILE_ROCKY_SHORE);
   const immediateWater = countNear(chunks, x, y, 3, (t) => WET_TILES.has(t));
-  return flat * 4 + waterDist * 9 + coastDist * 5 - blocked * 7 - immediateWater * 18;
+  return flat * 4 + oceanDist * 13 + waterDist * 5 + coastDist * 5 - blocked * 7 - immediateWater * 18;
 }
 
 function chooseTownCenter(chunks, bounds, seed) {
@@ -361,7 +362,7 @@ function placeBuilding(chunks, bounds, plan, district, occupied, protectedTiles,
   if (!baseDef) return null;
   const rng = mulberry((seed ^ hashKey(plan.key)) >>> 0);
   let best = null;
-  const searchRadius = plan.resource ? 18 : 16;
+  const searchRadius = plan.resource ? 36 : 16;
   const targetX = district.x + (Number(plan.coreDx) | 0);
   const targetY = district.y + (Number(plan.coreDy) | 0);
   const rotations = plan.rotations || ALL_ROTATIONS;

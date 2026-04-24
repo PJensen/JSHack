@@ -263,11 +263,11 @@ function getWorldTile(chunks, x, y) {
  * @param {Uint8Array} perm
  */
 function forceEdgeOcean(chunks, minX, maxX, minY, maxY, worldSeed, perm) {
-  const baseThickness = 6;
-  const wobbleFreq = 0.10; // longer curves
-  const wobbleAmp = 8;  // more dramatic
-  const fractalFreq = 0.35; // high-frequency jag detail
-  const fractalAmp = 2;
+  const baseThickness = 18;
+  const wobbleFreq = 0.055; // broad shoreline curves
+  const wobbleAmp = 14;
+  const fractalFreq = 0.18; // smaller coves and points
+  const fractalAmp = 5;
 
   for (let x = minX; x <= maxX; x++) {
     for (let y = minY; y <= maxY; y++) {
@@ -291,9 +291,17 @@ function forceEdgeOcean(chunks, minX, maxX, minY, maxY, worldSeed, perm) {
       const topThresh = baseThickness + topWobble;
       const bottomThresh = baseThickness + bottomWobble;
 
-      if (distFromLeft < leftThresh || distFromRight < rightThresh ||
-          distFromTop < topThresh || distFromBottom < bottomThresh) {
+      const oceanDepth = Math.max(
+        leftThresh - distFromLeft,
+        rightThresh - distFromRight,
+        topThresh - distFromTop,
+        bottomThresh - distFromBottom,
+      );
+
+      if (oceanDepth > 2) {
         setWorldTile(chunks, x, y, TILE_WATER_DEEP);
+      } else if (oceanDepth > 0) {
+        setWorldTile(chunks, x, y, TILE_WATER);
       }
     }
   }
@@ -307,7 +315,8 @@ function forceEdgeOcean(chunks, minX, maxX, minY, maxY, worldSeed, perm) {
         for (let dy = -1; dy <= 1; dy++) {
           for (let dx = -1; dx <= 1; dx++) {
             if (dx === 0 && dy === 0) continue;
-            if (getWorldTile(chunks, x + dx, y + dy) === TILE_WATER_DEEP) {
+            const near = getWorldTile(chunks, x + dx, y + dy);
+            if (near === TILE_WATER_DEEP || near === TILE_WATER) {
               if (tile !== TILE_WATER && tile !== TILE_WATER_DEEP) {
                 setWorldTile(chunks, x, y, TILE_BEACH);
               }
@@ -664,6 +673,8 @@ export function generateOverworldChunks(worldSeed) {
       fillChunkTerrain(chunks, cx, cy, worldSeed >>> 0, perm, gradientDir, minX, maxX, minY, maxY);
     }
   }
+
+  forceEdgeOcean(chunks, minX, maxX, minY, maxY, worldSeed >>> 0, perm);
 
   // Default spawn point at center of overworld
   const homeX = Math.floor((minX + maxX) / 2);
