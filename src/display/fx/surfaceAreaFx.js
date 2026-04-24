@@ -441,6 +441,7 @@ function drawLavaRegion(ctx, region, fxTime, quality) {
 export function createSurfaceAreaFxController({ getFxTime, classifySurfaceTile, fx, PERF }) {
   /** @type {ReturnType<typeof extractSurfaceRegions>} */
   let _regions = [];
+  let _regionCacheKey = "";
   /** @type {Array<{ x:number, y:number, ttl:number, max:number, radius0:number, radius1:number, alpha:number, cellKey:string }>} */
   let _waterRipples = [];
   let _rainAccum = 0;
@@ -462,7 +463,15 @@ export function createSurfaceAreaFxController({ getFxTime, classifySurfaceTile, 
   let _lavaGlowAccum = 0;
 
   function tick(dtSec, worldView, viewport, weather) {
-    _regions = extractSurfaceRegions(worldView, viewport, classifySurfaceTile);
+    const tx0 = Math.floor(Number(viewport?.vx0) || 0);
+    const ty0 = Math.floor(Number(viewport?.vy0) || 0);
+    const tx1 = Math.ceil(Number(viewport?.vx1) || 0);
+    const ty1 = Math.ceil(Number(viewport?.vy1) || 0);
+    const regionKey = `${Number(worldView?.turn || 0) | 0}:${Number(worldView?.currentDepth || 0) | 0}:${tx0},${ty0},${tx1},${ty1}`;
+    if (regionKey !== _regionCacheKey) {
+      _regionCacheKey = regionKey;
+      _regions = extractSurfaceRegions(worldView, viewport, classifySurfaceTile);
+    }
 
     /** @type {Set<string>} */
     const waterKeys = new Set();

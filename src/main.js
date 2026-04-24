@@ -29,6 +29,7 @@ import {
   drawScreenEffects,
   drawTargetingReticle,
   drawRulesProfilerOverlay,
+  drawRenderProfilerOverlay,
   applyHallucinationSway,
 } from "./display/composition/index.js";
 import { shouldPostLightingRedrawKind } from "./display/composition/postLightingRedraw.js";
@@ -184,6 +185,7 @@ import { createTransitionController } from "./main/wiring/transitionWiring.js";
 // ---- Config & canvas -------------------------------------------------------
 const runtimeConfig = readRuntimeConfig();
 const PERF = runtimeConfig.perf;
+const RENDER_PROFILE_ENABLED = runtimeConfig.renderProfile === true;
 const chosenDeityId = runtimeConfig.chosenDeityId;
 const TILE_PX = 28;
 const CAMERA_START_SCALE_DESKTOP = TILE_PX * (1.2 ** 5);
@@ -2717,6 +2719,13 @@ const _healthBarsToDraw = [];
 const _groundLootLabels = [];
 const _monsterLabels = [];
 const _memoryGlyphByKind = new Map();
+const _renderProfile = {
+  enabled: RENDER_PROFILE_ENABLED,
+  lastFrame: null,
+};
+if (typeof window !== "undefined") {
+  /** @type {any} */ (window).__JSHACK_RENDER_PROF = _renderProfile;
+}
 const HP_BAR_MEANINGFUL_RATIO_DELTA = 0.08;
 const HP_BAR_SHOW_SECONDS = 2.25;
 const PET_HP_BAR_SHOW_SECONDS = 3.5;
@@ -4007,6 +4016,32 @@ function drawEntityHealthBar(ctx, e) {
 const _renderTagSet = new Set();
 
 function render(worldView) {
+  const _rpOn = _renderProfile.enabled === true;
+  const _rp = _rpOn ? {
+    totalMs: 0,
+    fps: _fpsEMA,
+    isOverworld: worldView?.isOverworld === true,
+    tilesVisited: 0,
+    tilesDrawn: 0,
+    postTiles: 0,
+    itemStackScanned: 0,
+    entitiesVisited: 0,
+    entitiesDrawn: 0,
+    postGlyphs: 0,
+    roofsDrawn: 0,
+    stages: {},
+  } : null;
+  const _rpFrameStart = _rpOn ? performance.now() : 0;
+  let _rpStageName = "setup";
+  let _rpStageStart = _rpFrameStart;
+  function _rpStage(name) {
+    if (!_rpOn || !_rp) return;
+    const now = performance.now();
+    _rp.stages[_rpStageName] = (_rp.stages[_rpStageName] || 0) + (now - _rpStageStart);
+    _rpStageName = name;
+    _rpStageStart = now;
+  }
+
   const W = _canvasSetup.cssW;
   const H = _canvasSetup.cssH;
   const effectiveWeather = worldView.playerSheltered ? "clear" : (worldView.weather || "clear");
@@ -4021,6 +4056,7 @@ function render(worldView) {
     }
   }
   _renderPlayerBlinded = playerBlinded;
+  _rpStage("background");
 
   // Background (cache gradient by height to avoid per-frame allocations)
   bctx.save();
@@ -4034,6 +4070,7 @@ function render(worldView) {
   bctx.restore();
 
   // Camera transform for world-space draws
+  _rpStage("camera");
   bctx.save();
   const _zpOff = getZoomPunchScale(cam);
   if (_zpOff) cam.scale += _zpOff;
@@ -4056,6 +4093,7 @@ function render(worldView) {
   }
 
   // Pass 1: tiles from TileMap grid (3-state fog-of-war)
+  _rpStage("tiles");
   // Single viewport scan: draw visible tiles immediately, buffer explored-not-visible
   // tiles into a flat array, then flush at reduced alpha. This halves the
   // forEachTileInRect iteration cost vs two separate passes (critical in large
@@ -4078,21 +4116,28 @@ function render(worldView) {
 
     if (_lightingActive) {
       worldView.tileGrid.forEachTileInRect(tx0, ty0, tx1, ty1, (/** @type {number} */ x, /** @type {number} */ y, /** @type {number} */ tile) => {
+        if (_rp) _rp.tilesVisited++;
         if ((isVisible && isVisible(x, y)) || (isExplored && isExplored(x, y))) {
           const kind = tileKinds[tile];
           if (kind) {
             drawKind(glyphAtlas, bctx, kind, x, y);
+            if (_rp) _rp.tilesDrawn++;
             if (shouldPostLightingRedrawKind(palette, kind, { isOverworld: !!worldView.isOverworld })) {
               _postLightingTiles.push(kind, x, y);
+              if (_rp) _rp.postTiles++;
             }
           }
         }
       });
     } else {
       worldView.tileGrid.forEachTileInRect(tx0, ty0, tx1, ty1, (/** @type {number} */ x, /** @type {number} */ y, /** @type {number} */ tile) => {
+        if (_rp) _rp.tilesVisited++;
         if (isVisible && isVisible(x, y)) {
           const kind = tileKinds[tile];
-          if (kind) drawKind(glyphAtlas, bctx, kind, x, y);
+          if (kind) {
+            drawKind(glyphAtlas, bctx, kind, x, y);
+            if (_rp) _rp.tilesDrawn++;
+          }
         } else if (isExplored && isExplored(x, y)) {
           _exploredTileBuffer.push(tile, x, y);
         }
@@ -4109,12 +4154,16 @@ function render(worldView) {
               _exploredTileBuffer[i + 2] ?? 0,
               0.72,
             );
+            if (_rp) _rp.tilesDrawn++;
           }
         } else {
           bctx.globalAlpha = 0.35;
           for (let i = 0; i < _exploredTileBuffer.length; i += 3) {
             const kind = tileKinds[_exploredTileBuffer[i] ?? 0];
-            if (kind) drawKind(glyphAtlas, bctx, kind, _exploredTileBuffer[i + 1] ?? 0, _exploredTileBuffer[i + 2] ?? 0);
+            if (kind) {
+              drawKind(glyphAtlas, bctx, kind, _exploredTileBuffer[i + 1] ?? 0, _exploredTileBuffer[i + 2] ?? 0);
+              if (_rp) _rp.tilesDrawn++;
+            }
           }
           bctx.globalAlpha = 1.0;
         }
@@ -4122,10 +4171,12 @@ function render(worldView) {
     }
   }
 
+  _rpStage("surface");
   surfaceAreaFx.tick(_dtSec, worldView, { vx0, vx1, vy0, vy1 }, effectiveWeather);
   surfaceAreaFx.draw(bctx);
 
   // Pass 1.5: engravings on the ground (between tiles and entities)
+  _rpStage("engravings");
   if (worldView.engravings && worldView.engravings.length) {
     const isVis = worldView.isVisible;
     bctx.save();
@@ -4157,6 +4208,7 @@ function render(worldView) {
 
   // Pass 2: entities (doors, stairs, monsters, items, player)
   // Keep only the top-most ground item glyph per tile.
+  _rpStage("entity_stack");
   _stackMeta.clear(); // "x,y" -> topItemId
   _stackSeqMeta.clear(); // "x,y" -> best stackSeq seen
   _healthBarsToDraw.length = 0;
@@ -4166,6 +4218,7 @@ function render(worldView) {
   slideFx.syncWorldView(worldView.entities || []);
   delayedDeathFx.syncWorldView(worldView);
   const renderEntities = delayedDeathFx.getRenderableEntities(worldView.entities);
+  if (_rp) _rp.entitiesVisited = renderEntities.length;
   const stackMeta = _stackMeta;
   const stackSeqMeta = _stackSeqMeta;
   for (let i = 0; i < renderEntities.length; i++) {
@@ -4173,6 +4226,7 @@ function render(worldView) {
     if (e.pos.x < vx0 || e.pos.x > vx1 || e.pos.y < vy0 || e.pos.y > vy1) continue;
     const layer = Number.isFinite(e.layer) ? (e.layer | 0) : 300;
     if (layer !== 250) continue;
+    if (_rp) _rp.itemStackScanned++;
     if (throwFx.isItemHidden(e.id)) continue;
     if (delayedDeathFx.isItemHidden(e.id)) continue;
     const tileKey = `${e.pos.x},${e.pos.y}`;
@@ -4190,6 +4244,7 @@ function render(worldView) {
   _aboveRoofEntities.length = 0;
   _postLightingGlyphs.length = 0;
 
+  _rpStage("entities");
   for (let i = 0; i < renderEntities.length; i++) {
     const e = renderEntities[i];
     if (e.pos.x < vx0 || e.pos.x > vx1 || e.pos.y < vy0 || e.pos.y > vy1) continue;
@@ -4207,6 +4262,7 @@ function render(worldView) {
       const paletteBase = (glyphAtlas.get(itemKind) || glyphAtlas.get('default') || {}).baseScale || 1;
       const finalItemScale = (e.itemScale || 1) * paletteBase;
       drawKindScaled(glyphAtlas, bctx, itemKind, itemRender.pos.x, itemRender.pos.y, finalItemScale, e.rotation || 0);
+      if (_rp) _rp.entitiesDrawn++;
       // Build tag set once — avoids 15+ O(n) .includes() scans per item
       _renderTagSet.clear();
       if (Array.isArray(itemRender.tags)) for (let _t = 0; _t < itemRender.tags.length; _t++) _renderTagSet.add(itemRender.tags[_t]);
@@ -4317,12 +4373,14 @@ function render(worldView) {
 
     drawFlyingShadow(bctx, flyingPresentation);
     drawEntityGlyph(glyphAtlas, bctx, renderEntity, entityScale, entityRotation);
+    if (_rp) _rp.entitiesDrawn++;
     if (shouldPostLightingRedrawKind(palette, renderEntity.kind, { isOverworld: !!worldView.isOverworld, layer: renderEntity.layer })) {
       _postLightingGlyphs.push({
         entity: renderEntity,
         scale: entityScale,
         rotation: entityRotation,
       });
+      if (_rp) _rp.postGlyphs++;
     }
     if (_renderTagSet.has('esp_sensed')) {
       drawEspSenseHalo(bctx, renderEntity, _fxTime);
@@ -4788,6 +4846,7 @@ function render(worldView) {
   // ---- Lighting engine pass (SDF sub-tile overlay) --------------------------
   // Placed before spell FX so bolts/meteors/projectiles appear bright on top
   // of the darkness, while tiles + entities are properly darkened.
+  _rpStage("lighting");
   if (PERF.quality !== 'low') {
     const _lights = collectLightSources(worldView, { quality: PERF.quality, fxTime: _fxTime, dt: _dtSec });
     collectFxLights(_lights, { boltFx, spellAreaFx, projectileFx, cloudFx, surfaceAreaFx, statusEmitterFx, spiritWispFx });
@@ -4837,6 +4896,7 @@ function render(worldView) {
     );
   }
 
+  _rpStage("post_lighting");
   if (_postLightingTiles.length > 0) {
     for (let i = 0; i < _postLightingTiles.length; i += 3) {
       drawKindForeground(glyphAtlas, bctx, _postLightingTiles[i], _postLightingTiles[i + 1], _postLightingTiles[i + 2]);
@@ -4869,6 +4929,7 @@ function render(worldView) {
 
   // Weather particles (rain) drawn above entities but under roofs
   // Suppress when player is sheltered indoors (intact roof overhead)
+  _rpStage("weather_roofs");
   weatherFx.tick(_dtSec, effectiveWeather, { vx0, vx1, vy0, vy1 }, cam);
   weatherFx.draw(bctx, cam);
 
@@ -4880,6 +4941,7 @@ function render(worldView) {
       _roofCoverKeys.add(roofCellKey(roof.x, roof.y));
       bctx.globalAlpha = Number.isFinite(roof.alpha) ? roof.alpha : 1.0;
       drawKind(glyphAtlas, bctx, roof.kind, roof.x, roof.y);
+      if (_rp) _rp.roofsDrawn++;
       drawRoofSmoke(bctx, roof, _fxTime, fx, PERF.quality);
     }
     bctx.globalAlpha = 1.0;
@@ -4939,12 +5001,14 @@ function render(worldView) {
   bctx.restore();
 
   // Present backbuffer once (reset transform to identity for exact pixel copy)
+  _rpStage("present");
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.drawImage(back, 0, 0);
   ctx.restore();
 
   // Heavy rain dark tint overlay (also suppressed indoors)
+  _rpStage("screen_fx");
   weatherFx.drawScreenTint(ctx, W, H, effectiveWeather);
 
   // Night / dawn / dusk tints replaced by lighting engine ambient (sun/moon).
@@ -4985,7 +5049,15 @@ function render(worldView) {
   drawScreenEffects({ ctx, W, H, boltFx });
   sceneRuntime.drawSpeechBubble(ctx);
 
+  if (_rpOn && _rp) {
+    _rpStage("profile");
+    const now = performance.now();
+    _rp.stages[_rpStageName] = (_rp.stages[_rpStageName] || 0) + (now - _rpStageStart);
+    _rp.totalMs = now - _rpFrameStart;
+    _renderProfile.lastFrame = _rp;
+  }
   drawRulesProfilerOverlay({ ctx, quality: PERF.quality, prof: /** @type any */ (window).__JSHACK_RULES_PROF });
+  drawRenderProfilerOverlay({ ctx, quality: PERF.quality, prof: _renderProfile });
 }
 
 // ---- Frame loop (FXClock) --------------------------------------------------

@@ -1,5 +1,5 @@
 import { assertEquals, assert } from "jsr:@std/assert";
-import { extractSurfaceRegions, traceSurfaceHullPath } from "../src/display/fx/surfaceAreaFx.js";
+import { createSurfaceAreaFxController, extractSurfaceRegions, traceSurfaceHullPath } from "../src/display/fx/surfaceAreaFx.js";
 
 function makeWorldView(cells) {
   const byKey = new Map();
@@ -96,4 +96,39 @@ Deno.test("surfaceAreaFx hull coordinates are centered on tile positions", () =>
     { x: 6.5, y: 8.5 },
     { x: 6.5, y: 7.5 },
   ]);
+});
+
+Deno.test("surfaceAreaFx reuses regions while turn and tile viewport are unchanged", () => {
+  let scans = 0;
+  const worldView = {
+    turn: 10,
+    currentDepth: 0,
+    tileGrid: {
+      forEachTileInRect(x0, y0, x1, y1, fn) {
+        scans++;
+        for (let y = y0; y <= y1; y++) {
+          for (let x = x0; x <= x1; x++) {
+            fn(x, y, x === 1 && y === 1 ? 1 : 0);
+          }
+        }
+      },
+    },
+    isVisible() {
+      return true;
+    },
+  };
+  const fx = createSurfaceAreaFxController({
+    getFxTime: () => 0,
+    classifySurfaceTile: (tile) => tile === 1 ? { family: "water", tone: "water" } : null,
+    fx: null,
+    PERF: { quality: "high" },
+  });
+
+  fx.tick(1 / 60, worldView, { vx0: 0.2, vy0: 0.2, vx1: 3.2, vy1: 3.2 }, "clear");
+  fx.tick(1 / 60, worldView, { vx0: 0.3, vy0: 0.3, vx1: 3.1, vy1: 3.1 }, "clear");
+  assertEquals(scans, 1);
+
+  worldView.turn++;
+  fx.tick(1 / 60, worldView, { vx0: 0.3, vy0: 0.3, vx1: 3.1, vy1: 3.1 }, "clear");
+  assertEquals(scans, 2);
 });

@@ -108,6 +108,7 @@ export function readRuntimeConfig() {
     giveParam:    params.get("give")    || "",
     effectsParam: params.get("effects") || "",
     debug:        params.has("debug"),
+    renderProfile: parseBooleanish(params.get("renderProfile"), parseBooleanish(readStoredString("jshack.renderProfile", ""), false)),
     disableFov: parseBooleanish(disableFovParam, parseBooleanish(disableFovStored, false)),
     disableFovCone: parseBooleanish(disableFovConeParam, parseBooleanish(disableFovConeStored, true)),
     facingTurnCost: parseBooleanish(facingTurnCostParam, parseBooleanish(facingTurnCostStored, false)),
