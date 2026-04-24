@@ -351,8 +351,8 @@ function fillChunkTerrain(chunks, cx, cy, seed, perm) {
       // COASTAL ZONES (highly varied)
       else if (elev < 0.32) {
         if (ridge > 0.55) tile = TILE_ROCKY_SHORE;
-        else if (moist > 0.75) tile = TILE_TIDAL_FLAT;
-        else if (moist > 0.70) tile = TILE_MUD;
+        else if (moist > 0.80) tile = TILE_TIDAL_FLAT;
+        else if (moist > 0.75) tile = TILE_MUD;
         else tile = TILE_SHINGLE;
       }
       // BEACH ZONE (make very visible)
@@ -369,8 +369,8 @@ function fillChunkTerrain(chunks, cx, cy, seed, perm) {
       } else if (ridge > 0.54) {
         tile = TILE_MOUNTAIN;
       }
-      // DESERT/DUNES (make prominent)
-      else if (moist < 0.28 && elev >= 0.40 && elev <= 0.70) {
+      // DESERT/DUNES (coastal drylands only)
+      else if (moist < 0.28 && elev >= 0.36 && elev <= 0.52) {
         tile = gv > 0.6 ? TILE_BADLANDS : TILE_SAND_DUNES;
       }
       // WETLANDS (sparse, not dominant)
@@ -388,13 +388,13 @@ function fillChunkTerrain(chunks, cx, cy, seed, perm) {
         tile = TILE_MANGROVE;
       }
       // FORESTS (varied types)
-      else if (moist > 0.60 && elev >= 0.50 && elev <= 0.75) {
-        if (elev > 0.65) tile = TILE_PINE_FOREST;
+      else if (moist > 0.65 && elev >= 0.55 && elev <= 0.72) {
+        if (elev > 0.70) tile = TILE_PINE_FOREST;
         else if (moist > 0.75) tile = TILE_PALM_FOREST;
         else tile = TILE_TREE;
       }
       // MOORLAND & SCRUBLAND (arid grassland variants)
-      else if (moist < 0.50 && elev >= 0.48 && elev <= 0.68) {
+      else if (moist < 0.50 && elev >= 0.52 && elev <= 0.65) {
         tile = moist < 0.35 ? TILE_SCRUBLAND : TILE_MOORLAND;
       }
       // DEFAULT GRASSLANDS with texture
