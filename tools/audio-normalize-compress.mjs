@@ -1,9 +1,11 @@
 #!/usr/bin/env deno run --allow-read --allow-write --allow-run
 
+import { getProcessedFiles } from "./audio-utils.mjs";
+
 const AUDIO_DIR = "./assets/audio";
+const MANIFEST_FILE = "manifest.csv";
 const TARGET_LOUDNESS = -16; // LUFS
 const TARGET_BITRATE = "128k";
-const MANIFEST_FILE = "manifest.csv";
 
 async function runCmd(cmd) {
   const process = new Deno.Command("sh", {
@@ -88,12 +90,16 @@ async function main() {
     .filter(e => e.isFile && (e.name.endsWith(".mp3") || e.name.endsWith(".wav")))
     .sort((a, b) => a.name.localeCompare(b.name));
 
-  console.log(`Found ${audioFiles.length} audio files\n`);
+  const processed = await getProcessedFiles(MANIFEST_FILE);
+  const toProcess = audioFiles.filter(f => !processed.has(f.name));
 
-  let processed = 0;
+  console.log(`Found ${audioFiles.length} audio files (${toProcess.length} new)\n`);
+
+  let normalized = 0;
   let failed = 0;
+  const csvLines = [];
 
-  for (const file of audioFiles) {
+  for (const file of toProcess) {
     const inputPath = `${AUDIO_DIR}/${file.name}`;
     const ext = file.name.split(".").pop().toLowerCase();
     const tempPath = `${AUDIO_DIR}/.${file.name}.tmp`;
@@ -112,8 +118,11 @@ async function main() {
       // Replace original with normalized version
       await Deno.rename(tempPath, inputPath);
 
+      const bitrate = ext === "wav" ? "PCM" : "128";
+      csvLines.push(`${file.name},${duration},${TARGET_LOUDNESS},${bitrate}`);
+
       console.log(`  ✓ Done\n`);
-      processed++;
+      normalized++;
     } catch (err) {
       console.error(`  ✗ Error: ${err.message}\n`);
       await Deno.remove(tempPath).catch(() => {});
@@ -121,10 +130,17 @@ async function main() {
     }
   }
 
+  // Append to manifest
+  if (csvLines.length > 0) {
+    const manifest = await Deno.readTextFile(MANIFEST_FILE).catch(() => "filename,length_sec,loudness_lufs,bitrate_kbps\n");
+    const updated = manifest.trimEnd() + "\n" + csvLines.join("\n") + "\n";
+    await Deno.writeTextFile(MANIFEST_FILE, updated);
+  }
+
   console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-  console.log(`Processed: ${processed}`);
-  console.log(`Failed:    ${failed}`);
-  console.log(`Total:     ${audioFiles.length}`);
+  console.log(`Normalized: ${normalized}`);
+  console.log(`Failed:     ${failed}`);
+  console.log(`New:        ${toProcess.length}`);
 }
 
 await main();

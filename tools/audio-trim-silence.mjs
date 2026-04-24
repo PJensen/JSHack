@@ -1,8 +1,10 @@
 #!/usr/bin/env deno run --allow-read --allow-write --allow-run
 
 import { basename } from "https://deno.land/std@0.208.0/path/mod.ts";
+import { getProcessedFiles } from "./audio-utils.mjs";
 
 const AUDIO_DIR = "./assets/audio";
+const MANIFEST_FILE = "manifest.csv";
 const SILENCE_THRESHOLD = -50; // dB below full scale
 const SILENCE_DURATION = 0.1; // 100ms
 
@@ -55,25 +57,20 @@ async function main() {
     .filter(e => e.isFile && (e.name.endsWith(".mp3") || e.name.endsWith(".wav")))
     .sort((a, b) => a.name.localeCompare(b.name));
 
-  console.log(`Found ${audioFiles.length} audio files\n`);
+  const processed = await getProcessedFiles(MANIFEST_FILE);
+  const toProcess = audioFiles.filter(f => !processed.has(f.name));
 
-  let processed = 0;
+  console.log(`Found ${audioFiles.length} audio files (${toProcess.length} new)\n`);
+
+  let trimmed = 0;
   let failed = 0;
 
-  for (const file of audioFiles) {
+  for (const file of toProcess) {
     const inputPath = `${AUDIO_DIR}/${file.name}`;
-    const backupPath = `${AUDIO_DIR}/${file.name.replace(/\.(\w+)$/, "_orig.$1")}`;
     const tempPath = `${AUDIO_DIR}/.${file.name}.tmp`;
 
     try {
       console.log(`Processing: ${file.name}`);
-
-      // Skip if already backed up (already processed)
-      const backupExists = await Deno.stat(backupPath).catch(() => null);
-      if (backupExists) {
-        console.log(`  → Already processed (backup exists), skipping\n`);
-        continue;
-      }
 
       // Process to temp file
       await trimSilence(inputPath, tempPath);
@@ -83,20 +80,18 @@ async function main() {
       await Deno.rename(tempPath, inputPath);
 
       console.log(`  ✓ Done\n`);
-      processed++;
+      trimmed++;
     } catch (err) {
       console.error(`  ✗ Error: ${err.message}\n`);
-      // Clean up temp if it exists
       await Deno.remove(tempPath).catch(() => {});
       failed++;
     }
   }
 
   console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-  console.log(`Processed: ${processed}`);
+  console.log(`Trimmed:   ${trimmed}`);
   console.log(`Failed:    ${failed}`);
-  console.log(`Total:     ${audioFiles.length}`);
-  console.log(`\nBackups saved as *_orig.{mp3,wav}`);
+  console.log(`New:       ${toProcess.length}`);
 }
 
 await main();
