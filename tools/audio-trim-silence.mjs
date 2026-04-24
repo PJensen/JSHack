@@ -7,20 +7,17 @@ const SILENCE_THRESHOLD = 0.002; // 50dB below peak
 const SILENCE_DURATION = 0.1; // 100ms
 
 async function runCmd(cmd) {
-  const process = Deno.run({
-    cmd,
+  const process = new Deno.Command("sh", {
+    args: ["-c", cmd.join(" ")],
     stdout: "piped",
     stderr: "piped",
+    env: { PATH: "/usr/local/bin:/usr/bin:/bin" },
   });
 
-  const [status, stdout, stderr] = await Promise.all([
-    process.status(),
-    process.output(),
-    process.stderrOutput(),
-  ]);
+  const { code, stdout, stderr } = await process.output();
 
   return {
-    status: status.code,
+    status: code,
     stdout: new TextDecoder().decode(stdout),
     stderr: new TextDecoder().decode(stderr),
   };
@@ -29,10 +26,13 @@ async function runCmd(cmd) {
 async function trimSilence(inputPath, outputPath) {
   // ffmpeg silenceremove: removes silence from beginning and end
   // silence: threshold (0-1, default 0.001), duration in seconds
+  const ext = inputPath.split(".").pop().toLowerCase();
+  const format = ext === "wav" ? "wav" : "mp3";
   const cmd = [
-    "ffmpeg",
+    "/usr/bin/ffmpeg",
     "-i", inputPath,
     "-af", `silenceremove=start_periods=1:start_duration=${SILENCE_DURATION}:start_threshold=${SILENCE_THRESHOLD}dB,silenceremove=stop_periods=-1:stop_duration=${SILENCE_DURATION}:stop_threshold=${SILENCE_THRESHOLD}dB`,
+    "-f", format,
     "-y",
     outputPath,
   ];
@@ -93,4 +93,4 @@ async function main() {
   console.log(`\nBackups saved as *_orig.{mp3,wav}`);
 }
 
-main();
+await main();
