@@ -81,7 +81,7 @@ const STRUCTURE_TILES = new Set([TILE_FLOOR, TILE_WALL, TILE_DOOR, TILE_FARMLAND
 
 const BUILDING_PLANS = Object.freeze([
   Object.freeze({ key: "well_plaza", district: "civic_core", coreDx: 0, coreDy: 0, wants: ["flat"], roles: [] }),
-  Object.freeze({ key: "cottage", district: "civic_core", coreDx: -7, coreDy: 6, wants: ["flat"], roles: ["villager"] }),
+  Object.freeze({ key: "cottage", district: "civic_core", coreDx: -20, coreDy: 20, wants: ["flat"], roles: ["villager"] }),
   Object.freeze({ key: "tavern", district: "market_green", coreDx: -8, coreDy: -3, wants: ["flat"], roles: ["barkeep"] }),
   Object.freeze({ key: "general_store", district: "market_green", coreDx: -3, coreDy: 9, wants: ["flat"], roles: [] }),
   Object.freeze({ key: "smithy", district: "workshop_row", coreDx: 12, coreDy: -4, wants: ["mountain", "flat"], roles: ["smith"], rotations: FIXED_ROTATION }),
@@ -560,6 +560,7 @@ function addCivicFixtures(chunks, center, buildings) {
   addChunkSpawn(chunks, signPos.x, signPos.y, "home_sign");
   const chestPos = cottage?.waypoints.vendor_work || cottage?.spawns.home_bed || null;
   if (chestPos) addChunkSpawn(chunks, chestPos.x + 1, chestPos.y, "home_chest");
+  addChunkSpawn(chunks, center.x, center.y, "fountain");
   addChunkSpawn(chunks, center.x - 2, center.y, "message_board");
   if (tavern) addChunkSpawn(chunks, tavern.door.x, tavern.door.y + 2, "lantern_post");
 }
