@@ -54,6 +54,152 @@ export const OVERWORLD_EXTENT = Object.freeze({
 function chunkKey(cx, cy) { return `${cx},${cy}`; }
 
 /**
+ * Carve ponds and lakes with irregular Perlin-shaped boundaries.
+ * @param {Map<string, { chunkX:number, chunkY:number, tiles:Uint8Array, spawns:any[] }>} chunks
+ * @param {number} minX
+ * @param {number} maxX
+ * @param {number} minY
+ * @param {number} maxY
+ * @param {number} homeX
+ * @param {number} homeY
+ * @param {number} seed
+ * @param {Uint8Array} perm
+ */
+function carvePondsAndLakes(chunks, minX, maxX, minY, maxY, homeX, homeY, seed, perm) {
+  const pondCount = 6;
+  let rngSeed = seed;
+  function nextRng() {
+    rngSeed = (rngSeed * 1103515245 + 12345) >>> 0;
+    return (rngSeed / 0x100000000);
+  }
+
+  for (let pondIdx = 0; pondIdx < pondCount; pondIdx++) {
+    // Random position, avoiding center
+    let cx, cy;
+    let attempts = 0;
+    do {
+      cx = minX + Math.floor(nextRng() * (maxX - minX + 1));
+      cy = minY + Math.floor(nextRng() * (maxY - minY + 1));
+      attempts++;
+    } while (Math.sqrt((cx - homeX) ** 2 + (cy - homeY) ** 2) < 50 && attempts < 5);
+    if (attempts >= 5) continue;
+
+    // Size: lakes 7-10, ponds 3-6
+    const baseRadius = pondIdx < 2 ? 7 + Math.floor(nextRng() * 4) : 3 + Math.floor(nextRng() * 4);
+    const pondSeed = seed + pondIdx * 599;
+
+    // Fill with Perlin-warped boundary
+    for (let py = cy - baseRadius - 2; py <= cy + baseRadius + 2; py++) {
+      for (let px = cx - baseRadius - 2; px <= cx + baseRadius + 2; px++) {
+        const dx = px - cx;
+        const dy = py - cy;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        // Perlin radial noise for jagged edges
+        const angle = Math.atan2(dy, dx);
+        const perlinRadial = perlin2(Math.cos(angle * 3) * 0.5, Math.sin(angle * 3) * 0.5, perm);
+        const effectiveRadius = baseRadius * (1 + perlinRadial * 0.4);
+
+        if (dist <= effectiveRadius) {
+          const t = getWorldTile(chunks, px, py);
+          if (t === TILE_WATER_DEEP || t === TILE_WATER) continue; // don't override existing water
+
+          // Depth zones: center deep, edge shallow/mud
+          if (dist < effectiveRadius * 0.6) {
+            setWorldTile(chunks, px, py, TILE_WATER);
+          } else if (dist < effectiveRadius * 0.85) {
+            // Shallow zone with noise variation
+            const depthNoise = perlin2(px * 0.2, py * 0.2, perm);
+            setWorldTile(chunks, px, py, depthNoise > 0.3 ? TILE_WATER : TILE_SHALLOW_WATER);
+          } else {
+            setWorldTile(chunks, px, py, TILE_MUD);
+          }
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Carve rivers across the overworld with Perlin-guided steering and variable width.
+ * @param {Map<string, { chunkX:number, chunkY:number, tiles:Uint8Array, spawns:any[] }>} chunks
+ * @param {number} minX
+ * @param {number} maxX
+ * @param {number} minY
+ * @param {number} maxY
+ * @param {number} seed
+ * @param {Uint8Array} perm
+ */
+function carveRivers(chunks, minX, maxX, minY, maxY, seed, perm) {
+  const riverCount = 3;
+  let rngSeed = seed;
+  function nextRng() {
+    rngSeed = (rngSeed * 1103515245 + 12345) >>> 0;
+    return (rngSeed / 0x100000000);
+  }
+
+  for (let riverIdx = 0; riverIdx < riverCount; riverIdx++) {
+    // Pick edge and start position
+    const edge = Math.floor(nextRng() * 4); // 0=left, 1=right, 2=top, 3=bottom
+    let x, y;
+    if (edge === 0) { x = minX; y = minY + Math.floor(nextRng() * (maxY - minY)); }
+    else if (edge === 1) { x = maxX; y = minY + Math.floor(nextRng() * (maxY - minY)); }
+    else if (edge === 2) { y = minY; x = minX + Math.floor(nextRng() * (maxX - minX)); }
+    else { y = maxY; x = minX + Math.floor(nextRng() * (maxX - minX)); }
+
+    // Steering angle
+    let angle = Math.atan2(maxY / 2 - y, maxX / 2 - x);
+    const riverSeed = seed + riverIdx * 997;
+
+    // Carve until we hit ocean or boundary
+    for (let step = 0; step < 300; step++) {
+      if (x < minX || x > maxX || y < minY || y > maxY) break;
+
+      const tile = getWorldTile(chunks, x, y);
+      if (tile === TILE_WATER_DEEP || tile === TILE_WATER) break;
+
+      // Perlin-guided steering
+      const steer = perlin2((x + riverSeed) * 0.08, (y + riverSeed) * 0.08, perm);
+      angle += (steer - 0.5) * 0.6;
+
+      // Variable width based on position/noise
+      const widthNoise = perlin2((x + riverSeed + 2000) * 0.1, (y + riverSeed + 2000) * 0.1, perm);
+      const riverWidth = Math.max(1, Math.min(4, Math.floor(2 + widthNoise * 2.5)));
+
+      // Fill river footprint (circular brush)
+      for (let ry = -riverWidth; ry <= riverWidth; ry++) {
+        for (let rx = -riverWidth; rx <= riverWidth; rx++) {
+          const dist = Math.sqrt(rx * rx + ry * ry);
+          if (dist <= riverWidth) {
+            const tx = Math.round(x) + rx;
+            const ty = Math.round(y) + ry;
+            const t = getWorldTile(chunks, tx, ty);
+
+            // Center: water; edge: mud/beach if shallow ground
+            if (dist < riverWidth * 0.6) {
+              if (t !== TILE_WATER_DEEP && t !== TILE_WATER) {
+                setWorldTile(chunks, tx, ty, riverWidth === 1 ? TILE_SHALLOW_WATER : TILE_WATER);
+              }
+            } else if (dist <= riverWidth) {
+              // River bank: mud or beach
+              if (t !== TILE_WATER_DEEP && t !== TILE_WATER && t !== TILE_WATER &&
+                  t !== TILE_MOUNTAIN && t !== TILE_MOUNTAIN_B && t !== TILE_MOUNTAIN_C &&
+                  t !== TILE_TREE && t !== TILE_PINE_FOREST && t !== TILE_PALM_FOREST) {
+                setWorldTile(chunks, tx, ty, t === TILE_GRASS || t === TILE_GRASS_A || t === TILE_GRASS_C || t === TILE_GRASS_D ? TILE_MUD : TILE_BEACH);
+              }
+            }
+          }
+        }
+      }
+
+      // Step in steering direction
+      x += Math.cos(angle);
+      y += Math.sin(angle);
+    }
+  }
+}
+
+/**
  * @param {Map<string, { chunkX:number, chunkY:number, tiles:Uint8Array, spawns:any[] }>} chunks
  * @param {number} x
  * @param {number} y
@@ -96,8 +242,8 @@ function getWorldTile(chunks, x, y) {
 }
 
 /**
- * Force irregular ocean at map edges using Perlin noise.
- * Creates natural-looking jagged coastlines on all boundaries.
+ * Force irregular ocean at map edges using multi-scale Perlin noise.
+ * Creates jagged coastlines with fractal detail.
  * @param {Map<string, { chunkX:number, chunkY:number, tiles:Uint8Array, spawns:any[] }>} chunks
  * @param {number} minX
  * @param {number} maxX
@@ -106,9 +252,11 @@ function getWorldTile(chunks, x, y) {
  * @param {Uint8Array} perm
  */
 function forceEdgeOcean(chunks, minX, maxX, minY, maxY, worldSeed, perm) {
-  const baseThickness = 4;
-  const wobbleFreq = 0.15;
-  const wobbleAmp = 3;
+  const baseThickness = 6;
+  const wobbleFreq = 0.10; // longer curves
+  const wobbleAmp = 8;  // more dramatic
+  const fractalFreq = 0.35; // high-frequency jag detail
+  const fractalAmp = 2;
 
   for (let x = minX; x <= maxX; x++) {
     for (let y = minY; y <= maxY; y++) {
@@ -117,11 +265,15 @@ function forceEdgeOcean(chunks, minX, maxX, minY, maxY, worldSeed, perm) {
       const distFromTop = y - minY;
       const distFromBottom = maxY - y;
 
-      // Perlin wobble on each edge for irregularity
-      const leftWobble = perlin2((y + 1000) * wobbleFreq, 0, perm) * wobbleAmp;
-      const rightWobble = perlin2((y + 2000) * wobbleFreq, 0, perm) * wobbleAmp;
-      const topWobble = perlin2((x + 3000) * wobbleFreq, 0, perm) * wobbleAmp;
-      const bottomWobble = perlin2((x + 4000) * wobbleFreq, 0, perm) * wobbleAmp;
+      // Multi-scale Perlin wobble: low freq + high freq for fractal detail
+      const leftWobble = (perlin2((y + 1000) * wobbleFreq, 0, perm) * wobbleAmp
+        + perlin2((y + 5000) * fractalFreq, 0, perm) * fractalAmp);
+      const rightWobble = (perlin2((y + 2000) * wobbleFreq, 0, perm) * wobbleAmp
+        + perlin2((y + 6000) * fractalFreq, 0, perm) * fractalAmp);
+      const topWobble = (perlin2((x + 3000) * wobbleFreq, 0, perm) * wobbleAmp
+        + perlin2((x + 7000) * fractalFreq, 0, perm) * fractalAmp);
+      const bottomWobble = (perlin2((x + 4000) * wobbleFreq, 0, perm) * wobbleAmp
+        + perlin2((x + 8000) * fractalFreq, 0, perm) * fractalAmp);
 
       const leftThresh = baseThickness + leftWobble;
       const rightThresh = baseThickness + rightWobble;
@@ -131,6 +283,27 @@ function forceEdgeOcean(chunks, minX, maxX, minY, maxY, worldSeed, perm) {
       if (distFromLeft < leftThresh || distFromRight < rightThresh ||
           distFromTop < topThresh || distFromBottom < bottomThresh) {
         setWorldTile(chunks, x, y, TILE_WATER_DEEP);
+      }
+    }
+  }
+
+  // Bleed beach strip inward from water edges
+  for (let x = minX; x <= maxX; x++) {
+    for (let y = minY; y <= maxY; y++) {
+      const tile = getWorldTile(chunks, x, y);
+      if (tile !== TILE_WATER_DEEP) {
+        // Check if adjacent to ocean; if so, replace with beach if terrain
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            if (dx === 0 && dy === 0) continue;
+            if (getWorldTile(chunks, x + dx, y + dy) === TILE_WATER_DEEP) {
+              if (tile !== TILE_WATER && tile !== TILE_WATER_DEEP) {
+                setWorldTile(chunks, x, y, TILE_BEACH);
+              }
+              break;
+            }
+          }
+        }
       }
     }
   }
@@ -183,7 +356,7 @@ function fillChunkTerrain(chunks, cx, cy, seed, perm) {
         else tile = TILE_SHINGLE;
       }
       // BEACH ZONE (make very visible)
-      else if (elev < 0.40) {
+      else if (elev < 0.43) {
         if (moist > 0.65) tile = TILE_SALT_MARSH;
         else if (gv > 0.7) tile = TILE_SHINGLE;
         else tile = TILE_BEACH;
@@ -197,17 +370,17 @@ function fillChunkTerrain(chunks, cx, cy, seed, perm) {
         tile = TILE_MOUNTAIN;
       }
       // DESERT/DUNES (make prominent)
-      else if (moist < 0.30 && elev >= 0.40 && elev <= 0.70) {
+      else if (moist < 0.28 && elev >= 0.40 && elev <= 0.70) {
         tile = gv > 0.6 ? TILE_BADLANDS : TILE_SAND_DUNES;
       }
       // WETLANDS (sparse, not dominant)
-      else if (moist > 0.85 && elev >= 0.40 && elev <= 0.55) {
+      else if (moist > 0.90 && elev >= 0.40 && elev <= 0.55) {
         tile = TILE_BOG;
       }
-      else if (moist > 0.78 && elev >= 0.42 && elev <= 0.58) {
+      else if (moist > 0.84 && elev >= 0.42 && elev <= 0.58) {
         tile = TILE_SWAMP;
       }
-      else if (moist > 0.70 && elev >= 0.44 && elev <= 0.60) {
+      else if (moist > 0.76 && elev >= 0.44 && elev <= 0.60) {
         tile = TILE_MARSH;
       }
       // MANGROVE: coastal forest transition
@@ -451,7 +624,7 @@ export function generateOverworldChunks(worldSeed) {
   const minY = extent.minCY * CHUNK_SIZE;
   const maxY = (extent.maxCY + 1) * CHUNK_SIZE - 1;
 
-  // Force irregular ocean at all map edges using Perlin wobble + rivers
+  // Force irregular ocean at all map edges using Perlin wobble
   forceEdgeOcean(chunks, minX, maxX, minY, maxY, worldSeed >>> 0, perm);
 
   // Default spawn point at center of overworld
@@ -459,6 +632,10 @@ export function generateOverworldChunks(worldSeed) {
   const homeY = Math.floor((minY + maxY) / 2);
   const spawnX = homeX;
   const spawnY = homeY;
+
+  // Carve rivers and ponds
+  carveRivers(chunks, minX, maxX, minY, maxY, worldSeed >>> 0, perm);
+  carvePondsAndLakes(chunks, minX, maxX, minY, maxY, homeX, homeY, worldSeed >>> 0, perm);
 
   // TODO: Procedural building placement system
   // - Scan terrain for placement heuristics (fishing by water, miners by mountains, etc.)
