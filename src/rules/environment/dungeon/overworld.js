@@ -122,6 +122,7 @@ function carvePondsAndLakes(chunks, minX, maxX, minY, maxY, homeX, homeY, seed, 
 
 /**
  * Carve rivers across the overworld with Perlin-guided steering and variable width.
+ * Rivers originating from high elevation carve deeper (fjords).
  * @param {Map<string, { chunkX:number, chunkY:number, tiles:Uint8Array, spawns:any[] }>} chunks
  * @param {number} minX
  * @param {number} maxX
@@ -131,7 +132,7 @@ function carvePondsAndLakes(chunks, minX, maxX, minY, maxY, homeX, homeY, seed, 
  * @param {Uint8Array} perm
  */
 function carveRivers(chunks, minX, maxX, minY, maxY, seed, perm) {
-  const riverCount = 3;
+  const riverCount = 4;
   let rngSeed = seed;
   function nextRng() {
     rngSeed = (rngSeed * 1103515245 + 12345) >>> 0;
@@ -139,34 +140,40 @@ function carveRivers(chunks, minX, maxX, minY, maxY, seed, perm) {
   }
 
   for (let riverIdx = 0; riverIdx < riverCount; riverIdx++) {
-    // Pick edge and start position
-    const edge = Math.floor(nextRng() * 4); // 0=left, 1=right, 2=top, 3=bottom
+    // Pick high-elevation starting point (mountain source)
     let x, y;
-    if (edge === 0) { x = minX; y = minY + Math.floor(nextRng() * (maxY - minY)); }
-    else if (edge === 1) { x = maxX; y = minY + Math.floor(nextRng() * (maxY - minY)); }
-    else if (edge === 2) { y = minY; x = minX + Math.floor(nextRng() * (maxX - minX)); }
-    else { y = maxY; x = minX + Math.floor(nextRng() * (maxX - minX)); }
+    let attempts = 0;
+    do {
+      x = minX + Math.floor(nextRng() * (maxX - minX + 1));
+      y = minY + Math.floor(nextRng() * (maxY - minY + 1));
+      attempts++;
+    } while (attempts < 10 && getWorldTile(chunks, x, y) < TILE_MOUNTAIN); // prefer mountains
+    if (attempts >= 10) continue; // skip if no mountain found
 
-    // Steering angle
-    let angle = Math.atan2(maxY / 2 - y, maxX / 2 - x);
+    // Steering angle: flow toward ocean (low elev)
+    let angle = Math.atan2(minY - y, minX - x) + (nextRng() - 0.5) * 0.5;
     const riverSeed = seed + riverIdx * 997;
+    let riverLength = 0;
 
     // Carve until we hit ocean or boundary
-    for (let step = 0; step < 300; step++) {
-      if (x < minX || x > maxX || y < minY || y > maxY) break;
+    for (let step = 0; step < 500; step++) {
+      if (x < minX - 5 || x > maxX + 5 || y < minY - 5 || y > maxY + 5) break;
+      riverLength++;
 
       const tile = getWorldTile(chunks, x, y);
-      if (tile === TILE_WATER_DEEP || tile === TILE_WATER) break;
+      if (tile === TILE_WATER_DEEP) break; // stop at deep ocean
+      if (tile === TILE_WATER) break; // stop at shallow water (already carved)
 
-      // Perlin-guided steering
+      // Perlin-guided steering with downslope bias
       const steer = perlin2((x + riverSeed) * 0.08, (y + riverSeed) * 0.08, perm);
       angle += (steer - 0.5) * 0.6;
 
-      // Variable width based on position/noise
+      // Width increases with length (wider as river flows) + noise variation
       const widthNoise = perlin2((x + riverSeed + 2000) * 0.1, (y + riverSeed + 2000) * 0.1, perm);
-      const riverWidth = Math.max(1, Math.min(4, Math.floor(2 + widthNoise * 2.5)));
+      const baseFjordWidth = 2 + (riverLength / 100) * 2; // grows as river flows
+      const riverWidth = Math.max(2, Math.min(6, Math.floor(baseFjordWidth + widthNoise * 1.5)));
 
-      // Fill river footprint (circular brush)
+      // Fill river footprint (circular brush) — carve through mountains for fjords
       for (let ry = -riverWidth; ry <= riverWidth; ry++) {
         for (let rx = -riverWidth; rx <= riverWidth; rx++) {
           const dist = Math.sqrt(rx * rx + ry * ry);
@@ -175,17 +182,20 @@ function carveRivers(chunks, minX, maxX, minY, maxY, seed, perm) {
             const ty = Math.round(y) + ry;
             const t = getWorldTile(chunks, tx, ty);
 
-            // Center: water; edge: mud/beach if shallow ground
+            // Center: always water (carves through mountains for fjords)
             if (dist < riverWidth * 0.6) {
-              if (t !== TILE_WATER_DEEP && t !== TILE_WATER) {
-                setWorldTile(chunks, tx, ty, riverWidth === 1 ? TILE_SHALLOW_WATER : TILE_WATER);
+              if (t !== TILE_WATER_DEEP) {
+                setWorldTile(chunks, tx, ty, TILE_WATER);
               }
             } else if (dist <= riverWidth) {
-              // River bank: mud or beach
-              if (t !== TILE_WATER_DEEP && t !== TILE_WATER && t !== TILE_WATER &&
-                  t !== TILE_MOUNTAIN && t !== TILE_MOUNTAIN_B && t !== TILE_MOUNTAIN_C &&
-                  t !== TILE_TREE && t !== TILE_PINE_FOREST && t !== TILE_PALM_FOREST) {
-                setWorldTile(chunks, tx, ty, t === TILE_GRASS || t === TILE_GRASS_A || t === TILE_GRASS_C || t === TILE_GRASS_D ? TILE_MUD : TILE_BEACH);
+              // River bank: mud/beach, but preserve some rocky areas
+              if (t !== TILE_WATER_DEEP && t !== TILE_WATER && t !== TILE_WATER_DEEP) {
+                const bankChoice = perlin2(tx * 0.15, ty * 0.15, perm);
+                if (bankChoice > 0.4) {
+                  setWorldTile(chunks, tx, ty, t === TILE_GRASS || t === TILE_GRASS_A || t === TILE_GRASS_C || t === TILE_GRASS_D ? TILE_MUD : TILE_BEACH);
+                } else if (t === TILE_MOUNTAIN || t === TILE_MOUNTAIN_B || t === TILE_MOUNTAIN_C) {
+                  setWorldTile(chunks, tx, ty, TILE_ROCKY_SHORE); // rocky fjord walls
+                }
               }
             }
           }
@@ -312,13 +322,19 @@ function forceEdgeOcean(chunks, minX, maxX, minY, maxY, worldSeed, perm) {
 /**
  * Generate diverse overworld terrain with multiple biomes.
  * Elevation determines base terrain; moisture adds forests, marshes, swamps.
+ * Elevation is biased by a global gradient in the direction of gradientDir.
  * @param {Map<string, { chunkX:number, chunkY:number, tiles:Uint8Array, spawns:any[] }>} chunks
  * @param {number} cx
  * @param {number} cy
  * @param {number} seed
  * @param {Uint8Array} perm
+ * @param {string} gradientDir - 'north', 'south', 'east', 'west'; gradient climbs toward this direction
+ * @param {number} minX
+ * @param {number} maxX
+ * @param {number} minY
+ * @param {number} maxY
  */
-function fillChunkTerrain(chunks, cx, cy, seed, perm) {
+function fillChunkTerrain(chunks, cx, cy, seed, perm, gradientDir, minX, maxX, minY, maxY) {
   const chunk = getChunk(chunks, cx, cy);
   if (!chunk) return;
   const elevCfg = { scale: 0.035, oct: 4, persist: 0.55, lacun: 2.0 };
@@ -328,11 +344,29 @@ function fillChunkTerrain(chunks, cx, cy, seed, perm) {
   const saltX = ((seed ^ 0xA53) & 1023) - 512;
   const saltY = ((seed ^ 0xC17) & 1023) - 512;
 
+  // Compute gradient bias: 0.3 elevation difference across world
+  const worldWidth = maxX - minX;
+  const worldHeight = maxY - minY;
+  const gradientScale = 0.3;
+
   for (let ly = 0; ly < CHUNK_SIZE; ly++) {
     for (let lx = 0; lx < CHUNK_SIZE; lx++) {
       const wx = ox + lx;
       const wy = oy + ly;
-      const elev = fbm01(wx + saltX, wy + saltY, perm, elevCfg);
+
+      // Base elevation noise
+      let elev = fbm01(wx + saltX, wy + saltY, perm, elevCfg);
+
+      // Apply directional gradient (0=low, 1=high toward gradient direction)
+      let gradient = 0;
+      if (gradientDir === 'north') gradient = (maxY - wy) / worldHeight;
+      else if (gradientDir === 'south') gradient = (wy - minY) / worldHeight;
+      else if (gradientDir === 'east') gradient = (maxX - wx) / worldWidth;
+      else if (gradientDir === 'west') gradient = (wx - minX) / worldWidth;
+
+      elev = elev * 0.7 + gradient * gradientScale;
+      elev = Math.max(0, Math.min(1, elev)); // clamp to [0,1]
+
       const ridge = Math.pow(elev, 1.35);
       const moist = fbm01(wx + 1000 + saltX, wy - 777 + saltY, perm, moistCfg);
 
@@ -348,15 +382,15 @@ function fillChunkTerrain(chunks, cx, cy, seed, perm) {
         // Shallow water + variants
         tile = moist > 0.80 ? TILE_SEAGRASS : TILE_WATER;
       }
-      // COASTAL ZONES (highly varied)
-      else if (elev < 0.32) {
+      // COASTAL ZONES (highly varied, tight band)
+      else if (elev < 0.30) {
         if (ridge > 0.55) tile = TILE_ROCKY_SHORE;
         else if (moist > 0.80) tile = TILE_TIDAL_FLAT;
         else if (moist > 0.75) tile = TILE_MUD;
         else tile = TILE_SHINGLE;
       }
-      // BEACH ZONE (make very visible)
-      else if (elev < 0.43) {
+      // BEACH ZONE (tight coastal strip)
+      else if (elev < 0.37) {
         if (moist > 0.65) tile = TILE_SALT_MARSH;
         else if (gv > 0.7) tile = TILE_SHINGLE;
         else tile = TILE_BEACH;
@@ -370,7 +404,7 @@ function fillChunkTerrain(chunks, cx, cy, seed, perm) {
         tile = TILE_MOUNTAIN;
       }
       // DESERT/DUNES (coastal drylands only)
-      else if (moist < 0.28 && elev >= 0.36 && elev <= 0.52) {
+      else if (moist < 0.28 && elev >= 0.37 && elev <= 0.48) {
         tile = gv > 0.6 ? TILE_BADLANDS : TILE_SAND_DUNES;
       }
       // WETLANDS (sparse, not dominant)
@@ -606,6 +640,17 @@ export function generateOverworldChunks(worldSeed) {
   /** @type {Map<string, { chunkX:number, chunkY:number, tiles:Uint8Array, spawns:any[] }>} */
   const chunks = new Map();
 
+  const minX = extent.minCX * CHUNK_SIZE;
+  const maxX = (extent.maxCX + 1) * CHUNK_SIZE - 1;
+  const minY = extent.minCY * CHUNK_SIZE;
+  const maxY = (extent.maxCY + 1) * CHUNK_SIZE - 1;
+
+  // Pick random cardinal direction for elevation gradient
+  const directions = ['north', 'south', 'east', 'west'];
+  let rngSeed = worldSeed;
+  rngSeed = (rngSeed * 1103515245 + 12345) >>> 0;
+  const gradientDir = directions[rngSeed % 4];
+
   for (let cy = extent.minCY; cy <= extent.maxCY; cy++) {
     for (let cx = extent.minCX; cx <= extent.maxCX; cx++) {
       const rec = {
@@ -615,17 +660,9 @@ export function generateOverworldChunks(worldSeed) {
         spawns: [],
       };
       chunks.set(chunkKey(cx, cy), rec);
-      fillChunkTerrain(chunks, cx, cy, worldSeed >>> 0, perm);
+      fillChunkTerrain(chunks, cx, cy, worldSeed >>> 0, perm, gradientDir, minX, maxX, minY, maxY);
     }
   }
-
-  const minX = extent.minCX * CHUNK_SIZE;
-  const maxX = (extent.maxCX + 1) * CHUNK_SIZE - 1;
-  const minY = extent.minCY * CHUNK_SIZE;
-  const maxY = (extent.maxCY + 1) * CHUNK_SIZE - 1;
-
-  // Force irregular ocean at all map edges using Perlin wobble
-  forceEdgeOcean(chunks, minX, maxX, minY, maxY, worldSeed >>> 0, perm);
 
   // Default spawn point at center of overworld
   const homeX = Math.floor((minX + maxX) / 2);
