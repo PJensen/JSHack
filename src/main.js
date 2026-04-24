@@ -998,6 +998,10 @@ const _TILE_NAMES = {
   6:'grass', 7:'water', 8:'mountain', 9:'tree', 10:'grass_a', 11:'grass_c',
   12:'grass_d', 13:'mountain_b', 14:'mountain_c', 15:'water_deep',
   16:'ice', 17:'shallow_water', 18:'lava', 19:'farmland', 20:'fence', 21:'cobblestone',
+  22:'pit', 23:'beach', 24:'marsh', 25:'swamp', 26:'bog', 27:'sand_dunes', 28:'mud',
+  29:'tidal_flat', 30:'rocky_shore', 31:'kelp_forest', 32:'salt_marsh', 33:'shingle',
+  34:'seagrass', 35:'moorland', 36:'scrubland', 37:'badlands', 38:'gravel',
+  39:'pine_forest', 40:'palm_forest', 41:'mangrove', 42:'coral_reef',
 };
 window.dispatchEvent(new CustomEvent('debug:registerTileInspectorSampler', {
   detail: {
