@@ -21,13 +21,20 @@ async function runCmd(cmd) {
   };
 }
 
-async function getFileSizeKb(path) {
-  try {
-    const stat = await Deno.stat(path);
-    return (stat.size / 1024).toFixed(1);
-  } catch {
-    return "0";
+async function getDuration(inputPath) {
+  const cmd = [
+    "/usr/bin/ffprobe",
+    "-v", "error",
+    "-show_entries", "format=duration",
+    "-of", "default=noprint_wrappers=1:nokey=1",
+    inputPath,
+  ];
+
+  const result = await runCmd(cmd);
+  if (result.status === 0) {
+    return parseFloat(result.stdout.trim()).toFixed(2);
   }
+  return "unknown";
 }
 
 async function measureLoudness(inputPath) {
@@ -83,10 +90,6 @@ async function main() {
 
   console.log(`Found ${audioFiles.length} audio files\n`);
 
-  const csvLines = [
-    "filename,original_bitrate_kbps,original_loudness_lufs,normalized_loudness_lufs,new_bitrate_kbps,size_before_kb,size_after_kb,status",
-  ];
-
   let processed = 0;
   let failed = 0;
 
@@ -98,46 +101,30 @@ async function main() {
     try {
       console.log(`Processing: ${file.name}`);
 
-      // Get original loudness
-      console.log(`  → Measuring loudness...`);
-      const origLoudness = await measureLoudness(inputPath);
-      const origSize = await getFileSizeKb(inputPath);
+      // Get duration
+      console.log(`  → Getting duration...`);
+      const duration = await getDuration(inputPath);
 
       // Normalize and compress
       console.log(`  → Normalizing to ${TARGET_LOUDNESS} LUFS at ${TARGET_BITRATE}...`);
       await normalizeAndCompress(inputPath, tempPath, ext);
 
-      // Get new file size
-      const newSize = await getFileSizeKb(tempPath);
-
       // Replace original with normalized version
       await Deno.rename(tempPath, inputPath);
 
-      const origBitrate = ext === "wav" ? "PCM" : "256";
-      const newBitrate = ext === "wav" ? "PCM" : "128";
-
-      csvLines.push(
-        `${file.name},${origBitrate},${origLoudness},${TARGET_LOUDNESS},${newBitrate},${origSize},${newSize},success`
-      );
-
-      console.log(`  ✓ Done (${origSize} KB → ${newSize} KB)\n`);
+      console.log(`  ✓ Done\n`);
       processed++;
     } catch (err) {
       console.error(`  ✗ Error: ${err.message}\n`);
       await Deno.remove(tempPath).catch(() => {});
-      csvLines.push(`${file.name},unknown,unknown,${TARGET_LOUDNESS},unknown,0,0,failed`);
       failed++;
     }
   }
-
-  // Write manifest
-  await Deno.writeTextFile(MANIFEST_FILE, csvLines.join("\n") + "\n");
 
   console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
   console.log(`Processed: ${processed}`);
   console.log(`Failed:    ${failed}`);
   console.log(`Total:     ${audioFiles.length}`);
-  console.log(`\nManifest saved to ${MANIFEST_FILE}`);
 }
 
 await main();
