@@ -5,7 +5,7 @@ node_modules/
 .DS_Store
 Thumbs.
 JSHack.code-workspace
-deno.lock
+                                                    deno.lock
 
 *.zip
 assets/audio/8bitRPGHack&SlashSFX 2
