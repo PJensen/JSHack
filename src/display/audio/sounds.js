@@ -45,6 +45,7 @@ const SOUNDS = {
   "item:equip:generic":    { file: "equip_generic.wav",   bus: "items" },
 
   "chest:open":            { file: "chest_open.wav",      bus: "items" },
+  "item:chest:opened":     { file: "chest_opened.mp3",    bus: "items" },
 
   // ── Environment ─────────────────────────────────
   "stair:descend":    { file: "transition_coating.mp3", bus: "ambient" },

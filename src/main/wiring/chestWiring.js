@@ -2,6 +2,7 @@ import { Equipment, GEAR_SLOTS } from "../../rules/components/Equipment.js";
 import { Inventory } from "../../rules/components/Inventory.js";
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
+import { Position } from "../../rules/components/Position.js";
 import {
   inventoryItems, inventoryContains, addToInventory,
   removeFromInventory, hasCapacityForItem, transferItem,
@@ -64,6 +65,7 @@ export function installChestWiring({ world, playerEntity, log, bracketizeName })
     const ni = world.get(chestId, NamedIdentity);
     const name = (ni && ni.name) || "Chest";
     log(`You open the ${name.toLowerCase()}.`);
+    world.emit("audio:play", { key: "item:chest:opened", x: world.get(chestId, Position)?.x || 0, y: world.get(chestId, Position)?.y || 0 });
     try { window.dispatchEvent(new CustomEvent("ui:openChest", { detail: { chestId, label: name } })); } catch (e) { console.debug('[chestWiring] dispatch ui:openChest:', e); }
     dispatchChestData(chestId);
   });
