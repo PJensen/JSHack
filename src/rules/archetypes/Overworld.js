@@ -770,3 +770,12 @@ export const Trellis = defineArchetype(
   [Material, { kind: "wood" }],
   [Collider, { solid: false, blocksSight: false }],
 );
+
+export const Fountain = defineArchetype(
+  "Fountain",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Fountain", identity: "fountain" }],
+  [Material, { kind: "stone" }],
+  [Collider, { solid: true, blocksSight: false }],
+  [Interactable, { action: "fountain", params: null }],
+);

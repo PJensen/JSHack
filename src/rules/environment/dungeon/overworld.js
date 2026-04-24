@@ -640,6 +640,44 @@ function addOutdoorSpawn(chunks, pos, kind, predicate = null) {
   addSpawn(chunks, target.x, target.y, kind);
 }
 
+function spawnOverworldCreatures(chunks, townCenter, bounds, worldSeed) {
+  const WET = new Set([TILE_WATER, TILE_WATER_DEEP, TILE_SHALLOW_WATER, TILE_KELP_FOREST, TILE_SEAGRASS, TILE_CORAL_REEF]);
+  const MOUNTAIN = new Set([TILE_MOUNTAIN, TILE_MOUNTAIN_B, TILE_MOUNTAIN_C, TILE_ROCKY_SHORE, TILE_BADLANDS]);
+
+  const creatures = [
+    { kind: "rat", minDist: 30, maxDist: 80, count: 8 },
+    { kind: "cave_bear", minDist: 40, maxDist: 100, count: 4 },
+    { kind: "snake", minDist: 35, maxDist: 90, count: 6 },
+    { kind: "boar", minDist: 40, maxDist: 100, count: 5 },
+  ];
+  const rng = new (function(seed) {
+    this.seed = seed >>> 0;
+    this.next = function() {
+      this.seed = (this.seed * 1103515245 + 12345) >>> 0;
+      return this.seed / 4294967296;
+    };
+  })(worldSeed);
+
+  for (const creatureType of creatures) {
+    let placed = 0;
+    for (let r = creatureType.minDist; r <= creatureType.maxDist && placed < creatureType.count; r += 5) {
+      for (let dx = -r; dx <= r && placed < creatureType.count; dx += 3) {
+        for (let dy = -r; dy <= r && placed < creatureType.count; dy += 3) {
+          if (Math.abs(dx) + Math.abs(dy) < r) continue;
+          if (rng.next() > 0.3) continue;
+          const x = townCenter.x + dx;
+          const y = townCenter.y + dy;
+          if (x < bounds.minX + 5 || x > bounds.maxX - 5 || y < bounds.minY + 5 || y > bounds.maxY - 5) continue;
+          const tile = getWorldTile(chunks, x, y);
+          if (WET.has(tile) || MOUNTAIN.has(tile)) continue;
+          addSpawn(chunks, x, y, "creature_" + creatureType.kind);
+          placed++;
+        }
+      }
+    }
+  }
+}
+
 /**
  * @param {number} worldSeed
  * @returns {{ extent:{minCX:number,maxCX:number,minCY:number,maxCY:number}, chunks:Array<{chunkX:number,chunkY:number,depth:number,seed:number,tiles:Uint8Array,rooms:any[],doors:any[],spawns:any[]}>, spawnX:number, spawnY:number }}
@@ -691,6 +729,9 @@ export function generateOverworldChunks(worldSeed) {
     spawnX = townPlan.center.x;
     spawnY = townPlan.center.y;
   }
+
+  // Spawn creatures in hinterlands (far from town)
+  spawnOverworldCreatures(chunks, townPlan?.center || { x: spawnX, y: spawnY }, { minX, maxX, minY, maxY }, worldSeed >>> 0);
 
   const outChunks = [];
   for (const rec of chunks.values()) {
