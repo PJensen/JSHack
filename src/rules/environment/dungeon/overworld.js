@@ -668,14 +668,18 @@ export function generateOverworldChunks(worldSeed) {
   // Default spawn point at center of overworld
   const homeX = Math.floor((minX + maxX) / 2);
   const homeY = Math.floor((minY + maxY) / 2);
-  const spawnX = homeX;
-  const spawnY = homeY;
+  let spawnX = homeX;
+  let spawnY = homeY;
 
   // Carve rivers and ponds
   carveRivers(chunks, minX, maxX, minY, maxY, worldSeed >>> 0, perm);
   carvePondsAndLakes(chunks, minX, maxX, minY, maxY, homeX, homeY, worldSeed >>> 0, perm);
 
-  applyTownPlacement(chunks, { minX, maxX, minY, maxY }, worldSeed >>> 0);
+  const townPlan = applyTownPlacement(chunks, { minX, maxX, minY, maxY }, worldSeed >>> 0);
+  if (townPlan?.center) {
+    spawnX = townPlan.center.x;
+    spawnY = townPlan.center.y;
+  }
 
   const outChunks = [];
   for (const rec of chunks.values()) {
