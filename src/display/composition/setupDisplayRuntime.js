@@ -22,6 +22,7 @@ import { installAudioWiring } from "../audio/audioWiring.js";
 import { createFountainAmbientController } from "../audio/fountainAmbientController.js";
 import { createLocalEmitterAmbientController } from "../audio/localEmitterAmbientController.js";
 import { createWorldAmbientController } from "../audio/worldAmbientController.js";
+import { createBiomeAmbientController } from "../audio/biomeAmbientController.js";
 import { installContentVfxWiring } from "../../content/vfxWiring.js";
 
 /**
@@ -157,6 +158,7 @@ export function setupDisplayRuntime({
   fountainAmbientFx.installListeners();
   const localEmitterAmbientFx = createLocalEmitterAmbientController();
   const worldAmbientFx = createWorldAmbientController();
+  const biomeAmbientFx = createBiomeAmbientController();
 
-  return { statusEmitterFx, statusPresentationDelayFx, boltFx, delayedDeathFx, projectileFx, spellAreaFx, cloudFx, surfaceAreaFx, spiritWispFx, bumpFx, meleeSlashFx, recoilFx, hitstopFx, deathEssenceFx, deathVfx, fountainAmbientFx, localEmitterAmbientFx, worldAmbientFx, ftext, goreTick };
+  return { statusEmitterFx, statusPresentationDelayFx, boltFx, delayedDeathFx, projectileFx, spellAreaFx, cloudFx, surfaceAreaFx, spiritWispFx, bumpFx, meleeSlashFx, recoilFx, hitstopFx, deathEssenceFx, deathVfx, fountainAmbientFx, localEmitterAmbientFx, worldAmbientFx, biomeAmbientFx, ftext, goreTick };
 }

@@ -478,8 +478,8 @@ function routePath(chunks, bounds, from, to, protectedTiles) {
       const tile = getWorldTile(chunks, nx, ny);
       const endpoint = nk === goalKey || nk === startKey;
       if (!endpoint && protectedTiles.has(nk)) continue;
-      if (WET_TILES.has(tile) || MOUNTAIN_TILES.has(tile) || tile === TILE_WALL || tile === TILE_FENCE) continue;
-      const step = STRUCTURE_TILES.has(tile) ? 8 : 1;
+      if (WET_TILES.has(tile) || tile === TILE_WALL || tile === TILE_FENCE) continue;
+      const step = STRUCTURE_TILES.has(tile) ? 8 : MOUNTAIN_TILES.has(tile) ? 50 : 1;
       const ng = cur.g + step;
       if (ng >= (cost.get(nk) ?? Infinity)) continue;
       cost.set(nk, ng);
@@ -509,19 +509,54 @@ function addCivicFixtures(chunks, center, buildings) {
   if (tavern) addChunkSpawn(chunks, tavern.door.x, tavern.door.y + 2, "lantern_post");
 }
 
+function addBuildingResourceSpawns(chunks, building, buildingPlan, bounds) {
+  const kind = buildingPlan.key;
+  const doorX = building.door.x;
+  const doorY = building.door.y;
+
+  const spawns = [];
+  if (kind === "mine_camp") {
+    spawns.push(["harvest_iron_ore", (t) => MOUNTAIN_TILES.has(t), 4]);
+    spawns.push(["harvest_coal_ore", (t) => MOUNTAIN_TILES.has(t), 2]);
+    spawns.push(["harvest_stone", (t) => MOUNTAIN_TILES.has(t), 2]);
+  } else if (kind === "woodcutter_camp") {
+    spawns.push(["tree_node", (t) => t === TILE_TREE || t === TILE_PINE_FOREST || t === TILE_PALM_FOREST, 5]);
+  } else if (kind === "herbalist_hut") {
+    spawns.push(["harvest_herbs", (t) => FOREST_TILES.has(t) || WATER_EDGE_TILES.has(t), 4]);
+    spawns.push(["harvest_moonleaf", (t) => FOREST_TILES.has(t) || WATER_EDGE_TILES.has(t), 2]);
+    spawns.push(["harvest_ember_root", (t) => FOREST_TILES.has(t) || WATER_EDGE_TILES.has(t), 2]);
+  }
+
+  for (const [spawnKind, predicate, count] of spawns) {
+    let placed = 0;
+    const minR = kind === "woodcutter_camp" ? 4 : 3;
+    const maxR = kind === "woodcutter_camp" ? 14 : 12;
+    for (let r = minR; r <= maxR && placed < count; r++) {
+      for (let dx = -r; dx <= r && placed < count; dx++) {
+        for (let dy = -r; dy <= r && placed < count; dy++) {
+          if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
+          const x = doorX + dx;
+          const y = doorY + dy;
+          if (x < bounds.minX + 2 || x > bounds.maxX - 2 || y < bounds.minY + 2 || y > bounds.maxY - 2) continue;
+          if (!predicate(getWorldTile(chunks, x, y))) continue;
+          addChunkSpawn(chunks, x, y, spawnKind);
+          placed++;
+        }
+      }
+    }
+  }
+}
+
 function addResourceSpawns(chunks, center, bounds) {
   const kinds = [
     ["harvest_berries", (t) => FOREST_TILES.has(t) || FLAT_TILES.has(t)],
     ["harvest_herbs", (t) => FOREST_TILES.has(t) || WATER_EDGE_TILES.has(t)],
     ["harvest_thorn_bramble", (t) => FOREST_TILES.has(t) || t === TILE_SWAMP || t === TILE_BOG],
     ["harvest_venom_fern", (t) => FOREST_TILES.has(t) || t === TILE_MARSH || t === TILE_MANGROVE],
-    ["harvest_iron_ore", (t) => MOUNTAIN_TILES.has(t)],
-    ["harvest_coal_ore", (t) => MOUNTAIN_TILES.has(t)],
-    ["harvest_stone", (t) => MOUNTAIN_TILES.has(t) || t === TILE_GRAVEL],
   ];
   for (const [kind, predicate] of kinds) {
     let placed = 0;
-    for (let r = kind.includes("ore") ? 12 : 8; r <= 54 && placed < 3; r++) {
+    for (let r = 20; r <= 54 && placed < 3; r++) {
       for (let dx = -r; dx <= r && placed < 3; dx++) {
         for (let dy = -r; dy <= r && placed < 3; dy++) {
           if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
@@ -529,6 +564,13 @@ function addResourceSpawns(chunks, center, bounds) {
           const y = center.y + dy;
           if (x < bounds.minX + 2 || x > bounds.maxX - 2 || y < bounds.minY + 2 || y > bounds.maxY - 2) continue;
           if (!predicate(getWorldTile(chunks, x, y))) continue;
+          let nearStruct = false;
+          for (let ox = -3; ox <= 3 && !nearStruct; ox++) {
+            for (let oy = -3; oy <= 3 && !nearStruct; oy++) {
+              if (STRUCTURE_TILES.has(getWorldTile(chunks, x + ox, y + oy))) nearStruct = true;
+            }
+          }
+          if (nearStruct) continue;
           addChunkSpawn(chunks, x, y, kind);
           placed++;
         }
@@ -561,7 +603,10 @@ export function applyTownPlacement(chunks, bounds, seed) {
       ? (plan.resources[buildingPlan.resource] || plan.byDistrict[buildingPlan.district] || plan.districts[0])
       : (plan.byDistrict[buildingPlan.district] || plan.districts[0]);
     const placed = placeBuilding(chunks, bounds, buildingPlan, district, occupied, protectedTiles, seed);
-    if (placed) buildings.push(placed);
+    if (placed) {
+      buildings.push(placed);
+      addBuildingResourceSpawns(chunks, placed, buildingPlan, bounds);
+    }
   }
 
   const tavern = buildings.find((b) => b.key === "tavern");

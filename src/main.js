@@ -2643,6 +2643,7 @@ const {
   fountainAmbientFx,
   localEmitterAmbientFx,
   worldAmbientFx,
+  biomeAmbientFx,
   ftext,
   goreTick,
 } = displayRuntime;
@@ -5055,6 +5056,7 @@ function frame(now) {
   fountainAmbientFx.syncWorldView(view);
   localEmitterAmbientFx.syncWorldView(view);
   worldAmbientFx.syncWorldView(view);
+  biomeAmbientFx.syncWorldView(view);
 
   // Status particle emitter reconciliation + advance particles
   if (PERF.particleCapacity > 0) {
