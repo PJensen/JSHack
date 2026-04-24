@@ -137,6 +137,44 @@ function fillChunkTerrain(chunks, cx, cy, seed, perm) {
 }
 
 /**
+ * Carve a jagged vertical coastline at a given x, with Perlin wobble irregularity.
+ * Water (east of line) to the right; grass (west) to the left for building stamps.
+ * @param {Map<string, { chunkX:number, chunkY:number, tiles:Uint8Array, spawns:any[] }>} chunks
+ * @param {number} coastlineX - world x coordinate of the coastline
+ * @param {number} minY - north boundary
+ * @param {number} maxY - south boundary
+ * @param {Uint8Array} perm - Perlin permutation table
+ */
+function carveCoastline(chunks, coastlineX, minY, maxY, perm) {
+  const wobbleFreq = 0.3;
+  const wobbleAmp = 2.5;
+  for (let y = minY; y <= maxY; y++) {
+    // Perlin wobble varies the exact x position of the coast edge
+    const noise = perlin2((y + 7000) * wobbleFreq, (coastlineX + 8000) * wobbleFreq, perm);
+    const wobble = noise * wobbleAmp;
+    const edgeX = coastlineX + wobble;
+    // Carve east of edge to water, ensure west side is passable land
+    for (let x = Math.floor(edgeX) - 1; x <= Math.floor(edgeX) + 5; x++) {
+      const cur = getWorldTile(chunks, x, y);
+      // Skip roofed/structure tiles (farmland, doors, walls, etc.)
+      if (cur === TILE_DOOR || cur === TILE_WALL || cur === TILE_FLOOR || cur === TILE_FARMLAND
+       || cur === TILE_FENCE || cur === TILE_COBBLESTONE || cur === TILE_STAIR_DOWN) continue;
+      const distFromEdge = x - edgeX;
+      // East of coast: set water
+      if (distFromEdge > 0.5) {
+        setWorldTile(chunks, x, y, distFromEdge > 2 ? TILE_WATER : TILE_SHALLOW_WATER);
+      }
+      // West of coast: ensure grass (walkable for building placement)
+      else if (distFromEdge <= -0.5) {
+        if (cur === TILE_WATER || cur === TILE_WATER_DEEP) {
+          setWorldTile(chunks, x, y, TILE_GRASS);
+        }
+      }
+    }
+  }
+}
+
+/**
  * @param {Map<string, { chunkX:number, chunkY:number, tiles:Uint8Array, spawns:any[] }>} chunks
  * @param {number} cx
  * @param {number} cy
@@ -349,6 +387,9 @@ export function generateOverworldChunks(worldSeed) {
   const maxX = (extent.maxCX + 1) * CHUNK_SIZE - 1;
   const minY = extent.minCY * CHUNK_SIZE;
   const maxY = (extent.maxCY + 1) * CHUNK_SIZE - 1;
+
+  // Carve jagged coastline at x:43 with Perlin wobble
+  carveCoastline(chunks, 43, minY, maxY, perm);
   const homeX = Math.floor((minX + maxX) / 2);
   const homeY = Math.floor((minY + maxY) / 2);
 
