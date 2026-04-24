@@ -10,6 +10,11 @@ import {
   TILE_ICE, TILE_SHALLOW_WATER, TILE_LAVA,
   TILE_FARMLAND, TILE_FENCE, TILE_COBBLESTONE,
   TILE_PIT,
+  TILE_WATER, TILE_WATER_DEEP,
+  TILE_BEACH, TILE_MARSH, TILE_SWAMP, TILE_BOG, TILE_SAND_DUNES, TILE_MUD,
+  TILE_TIDAL_FLAT, TILE_ROCKY_SHORE, TILE_KELP_FOREST, TILE_SALT_MARSH,
+  TILE_SHINGLE, TILE_SEAGRASS, TILE_MOORLAND, TILE_SCRUBLAND, TILE_BADLANDS,
+  TILE_GRAVEL, TILE_PINE_FOREST, TILE_PALM_FOREST, TILE_MANGROVE, TILE_CORAL_REEF,
 } from './constants.js';
 
 // chunk key: "cx,cy" -> Uint8Array (the chunk.tiles reference)
@@ -22,7 +27,7 @@ let _roofedVersion = 0;
 export function roofedVersion() { return _roofedVersion; }
 
 // Precomputed walkability per tile type (indexed by TILE_* constants)
-const _walkable = new Uint8Array(32);
+const _walkable = new Uint8Array(64);
 _walkable[TILE_FLOOR]         = 1;
 _walkable[TILE_DOOR]          = 1; // floor underneath; door entity Collider overrides
 _walkable[TILE_STAIR_DOWN]    = 1;
@@ -37,10 +42,28 @@ _walkable[TILE_LAVA]          = 1;
 _walkable[TILE_FARMLAND]      = 1;
 _walkable[TILE_COBBLESTONE]   = 1;
 _walkable[TILE_PIT]           = 1; // step into it → fall; NOT flyable
+// Biome tiles (overworld)
+_walkable[TILE_BEACH]         = 1;
+_walkable[TILE_MARSH]         = 1;
+_walkable[TILE_SWAMP]         = 1;
+_walkable[TILE_BOG]           = 1;
+_walkable[TILE_SAND_DUNES]    = 1;
+_walkable[TILE_MUD]           = 1;
+_walkable[TILE_TIDAL_FLAT]    = 1;
+_walkable[TILE_ROCKY_SHORE]   = 1;
+_walkable[TILE_SALT_MARSH]    = 1;
+_walkable[TILE_SHINGLE]       = 1;
+_walkable[TILE_MOORLAND]      = 1;
+_walkable[TILE_SCRUBLAND]     = 1;
+_walkable[TILE_BADLANDS]      = 1;
+_walkable[TILE_GRAVEL]        = 1;
+_walkable[TILE_PINE_FOREST]   = 1;
+_walkable[TILE_PALM_FOREST]   = 1;
+_walkable[TILE_MANGROVE]      = 1;
 
 // Precomputed flyability per tile type — everything except void and wall.
 // Flying entities can cross water, lava, trees, mountains, etc.
-const _flyable = new Uint8Array(32);
+const _flyable = new Uint8Array(64);
 _flyable[TILE_FLOOR]         = 1;
 _flyable[TILE_DOOR]          = 1;
 _flyable[TILE_STAIR_DOWN]    = 1;
@@ -59,14 +82,37 @@ _flyable[TILE_TREE]          = 1;
 _flyable[TILE_FARMLAND]      = 1;
 _flyable[TILE_FENCE]         = 1;
 _flyable[TILE_COBBLESTONE]   = 1;
+// Biome tiles (flyable)
+_flyable[TILE_BEACH]         = 1;
+_flyable[TILE_MARSH]         = 1;
+_flyable[TILE_SWAMP]         = 1;
+_flyable[TILE_BOG]           = 1;
+_flyable[TILE_SAND_DUNES]    = 1;
+_flyable[TILE_MUD]           = 1;
+_flyable[TILE_TIDAL_FLAT]    = 1;
+_flyable[TILE_ROCKY_SHORE]   = 1;
+_flyable[TILE_KELP_FOREST]   = 1; // water variant
+_flyable[TILE_SALT_MARSH]    = 1;
+_flyable[TILE_SHINGLE]       = 1;
+_flyable[TILE_SEAGRASS]      = 1; // water variant
+_flyable[TILE_MOORLAND]      = 1;
+_flyable[TILE_SCRUBLAND]     = 1;
+_flyable[TILE_BADLANDS]      = 1;
+_flyable[TILE_GRAVEL]        = 1;
+_flyable[TILE_PINE_FOREST]   = 1;
+_flyable[TILE_PALM_FOREST]   = 1;
+_flyable[TILE_MANGROVE]      = 1;
+_flyable[TILE_CORAL_REEF]    = 1; // water variant
 
 // Precomputed opacity per tile type
-const _opaque = new Uint8Array(32);
+const _opaque = new Uint8Array(64);
 _opaque[TILE_WALL]       = 1;
 _opaque[TILE_MOUNTAIN]   = 1;
 _opaque[TILE_MOUNTAIN_B] = 1;
 _opaque[TILE_MOUNTAIN_C] = 1;
 _opaque[TILE_TREE]       = 1;
+_opaque[TILE_PINE_FOREST] = 1;
+_opaque[TILE_PALM_FOREST] = 1;
 
 /** @param {number} cx @param {number} cy */
 function _key(cx, cy) { return `${cx},${cy}`; }
