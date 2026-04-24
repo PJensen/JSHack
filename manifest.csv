@@ -88,3 +88,6 @@ weather_lightning_strike_distant.mp3,10.03,unknown,128
 weather_lightning_strike.mp3,3.34,unknown,128
 weather_rain.mp3,89.33,unknown,128
 chest_opened.mp3,0.53,-16,128
+boar_charge.mp3,2.30,-16,128
+boar_died.mp3,0.86,-16,128
+eat_food.mp3,0.99,-16,128
