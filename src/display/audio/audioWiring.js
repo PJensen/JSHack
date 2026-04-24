@@ -465,4 +465,13 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
   world.on('shop:open', ({ targetId, actor }) => {
     sfx("shop:enter"); // One-time entry chime
   });
+
+  // Generic audio event — play any registered sound by key
+  world.on('audio:play', ({ key, x, y }) => {
+    if (typeof x === 'number' && typeof y === 'number') {
+      sfxAt(key, { x, y }, pp());
+    } else {
+      sfx(key);
+    }
+  });
 }
