@@ -20,6 +20,7 @@ const SOUNDS = {
   "creature:boar:died": { file: "boar_died.mp3",      bus: "combat", maxVoices: 1 },
   "player:death":     { file: "player_death.wav",   bus: "combat", maxVoices: 1 },
   "player:death:heavy": { file: "player_death_2.wav", bus: "combat", maxVoices: 1 },
+  "player:near_death": { file: "player_near_death.mp3", bus: "combat", maxVoices: 1 },
 
   // ── Items (by type) ─────────────────────────────
   "item:pickup:weapon":    { file: "pickup_weapon.wav",   bus: "items" },
@@ -73,7 +74,9 @@ const SOUNDS = {
   "character:select":  { file: "character_select.mp3",      bus: "ui", maxVoices: 1 },
   "enter:world":       { file: "enter_world.mp3",           bus: "ui", maxVoices: 1 },
   "snake:alert":      { file: "snake_alerted.mp3",         bus: "combat", maxVoices: 2, randomPitch: 18 },
-  "spider:alert":     { file: "spider_alerted.mp3",        bus: "combat", maxVoices: 2, randomPitch: 20 },
+  "spider:alert":     { files: ["spider_alerted.mp3", "insect_alerted.mp3"], bus: "combat", maxVoices: 2, randomPitch: 20 },
+  "insect:alert":     { file: "insect_alerted.mp3",        bus: "combat", maxVoices: 3, randomPitch: 24 },
+  "gelatinous_cube:alert": { file: "gelatinous_cube_alerted.mp3", bus: "combat", maxVoices: 1, randomPitch: 8 },
   "cave_bear:alert":  { file: "creature_alerted_large_beast.mp3",     bus: "combat", maxVoices: 2, randomPitch: 15 },
   "rat:alert":        { file: "rat_alerted_1.mp3",         bus: "combat", maxVoices: 3, randomPitch: 25 },
   "creature:alert:large_beast": { file: "creature_alerted_large_beast.mp3", bus: "combat", maxVoices: 2, randomPitch: 15 },
@@ -88,7 +91,8 @@ const SOUNDS = {
   "spell:blizzard":      { file: "spell_blizzard.wav",      bus: "spells" },
   "spell:firestorm":     { file: "spell_firestorm.wav",     bus: "spells" },
   "spell:blastwave":     { file: "spell_blastwave.wav",     bus: "spells" },
-  "spell:flash_heal":    { file: "spell_heal.wav",          bus: "spells" },
+  "spell:heal":          { file: "healing_magic_1.mp3",     bus: "spells", maxVoices: 2 },
+  "spell:flash_heal":    { file: "healing_magic_1.mp3",     bus: "spells", maxVoices: 2 },
   "spell:smite":         { file: "spell_smite_1.mp3",         bus: "spells" },
   "spell:death_volley":  { file: "spell_death_volley.wav",  bus: "spells" },
   "spell:blink":         { file: "spell_blink.wav",         bus: "spells" },
@@ -110,13 +114,15 @@ const SOUNDS = {
   "spell:shadow_veil":   { file: "spell_shadow_veil.wav",   bus: "spells" },
   "spell:smoke_bomb":    { files: ["spell_smoke_bomb.mp3"], bus: "spells" },
   "spell:poison_blade":  { file: "spell_poison_blade.wav",  bus: "spells" },
-  "spell:lifetap":       { file: "spell_lifetap.wav",       bus: "spells" },
+  "spell:lifetap":       { file: "spell_lifetap.mp3",       bus: "spells" },
   "spell:acid_spit":     { files: ["spell_acid_spit.wav", "spell_acid_spit.mp3"], bus: "spells" },
   "spell:web_spit":      { files: ["spider_attack_web_1.mp3", "spider_attack_web_2.mp3"], bus: "spells", randomPitch: 20 },
   "spell:spider_lunge":  { files: ["spider_attack_1.mp3", "spider_attack_2.mp3", "spider_attack_3.mp3"], bus: "spells", randomPitch: 25 },
   "spell:entangle":      { file: "spell_entangle.mp3",      bus: "spells" },
   "cave_bear:attack":   { files: ["cave_bear_attack_1.mp3", "cave_bear_attack_2.mp3"], bus: "combat", randomPitch: 30 },
   "rat:attack":         { file: "rat_attack_1.mp3", bus: "combat", maxVoices: 4, randomPitch: 35 },
+  "insect:attack":      { file: "insect_attack.mp3", bus: "combat", maxVoices: 4, randomPitch: 35 },
+  "spider:attack":      { files: ["spider_attack_1.mp3", "spider_attack_2.mp3", "spider_attack_3.mp3", "insect_attack.mp3"], bus: "combat", maxVoices: 4, randomPitch: 30 },
   "spell:fizzle":        { file: "spell_fizzle.wav",        bus: "spells" },
 
   // ── Spell travel (in-flight projectile) ────────
@@ -154,6 +160,8 @@ const SOUNDS = {
 
   // ── Interactions ────────────────────────────────
   "fountain:sip":     { file: "fountain_sip.mp3",    bus: "items" },
+  "water:magic":      { file: "water_magic_1.mp3",   bus: "spells", maxVoices: 2 },
+  "teleported":       { file: "teleported.mp3",      bus: "spells", maxVoices: 2 },
   "item:consume:food": { file: "action_eat.mp3",     bus: "items" },
   "torch:ignite":     { file: "light_fire.mp3",      bus: "ambient" },
   "shop:enter":       { file: "shop_door_chime.mp3", bus: "ui", maxVoices: 1 },
