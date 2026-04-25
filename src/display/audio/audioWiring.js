@@ -220,6 +220,15 @@ export const SPELL_CAST_SOUND_EVENTS = Object.freeze([
   'spell:entangle',
 ]);
 
+export const CHANNELING_LOOP_SOUND_ID = "spell:channeling";
+export const CHANNELING_LOOP_OPTIONS = Object.freeze({
+  volume: 0.42,
+  fadeIn: 0.12,
+  fadeOut: 0.18,
+  bus: "spells",
+  crossfade: 0.18,
+});
+
 /**
  * Install audio event listeners on the ECS world.
  * Call once during display setup.
@@ -240,6 +249,27 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
 
   // No preload — sounds are fetched on first play. Missing files fail once
   // and are blacklisted so they never retry or flood the network.
+
+  const channelingLoopUrl = resolve(CHANNELING_LOOP_SOUND_ID)?.url;
+  let channelingLoopActive = false;
+
+  function startChannelingLoop(actor) {
+    if (!channelingLoopUrl || !isPlayer(actor) || channelingLoopActive) return;
+    channelingLoopActive = true;
+    startLoop(channelingLoopUrl, {
+      volume: CHANNELING_LOOP_OPTIONS.volume,
+      fadeIn: CHANNELING_LOOP_OPTIONS.fadeIn,
+      bus: CHANNELING_LOOP_OPTIONS.bus,
+      crossfade: CHANNELING_LOOP_OPTIONS.crossfade,
+    });
+  }
+
+  function stopChannelingLoop(actor) {
+    if (!channelingLoopUrl || !channelingLoopActive) return;
+    if (actor != null && !isPlayer(actor)) return;
+    channelingLoopActive = false;
+    stopLoop(channelingLoopUrl, { fadeOut: CHANNELING_LOOP_OPTIONS.fadeOut });
+  }
 
   /** Shorthand — current player pos for spatial calcs. */
   function pp() { return getPlayerPosition(); }
@@ -329,6 +359,7 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
   world.on('died', ({ id, critical, amount }) => {
     const pos = getPosition(id);
     if (isPlayer(id)) {
+      stopChannelingLoop(id);
       const heavyDeath = critical || (Number(amount) >= 15);
       const deathId = heavyDeath ? "player:death:heavy" : "player:death";
       sfx(deathId); // player death is always full volume center
@@ -521,6 +552,18 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
   // separately via the 'damaged' handler above when the spell
   // actually hits after travel time.
 
+  world.on('channeling:start', ({ actor }) => {
+    startChannelingLoop(actor);
+  });
+
+  world.on('channeling:complete', ({ actor }) => {
+    stopChannelingLoop(actor);
+  });
+
+  world.on('channeling:cancelled', ({ actor }) => {
+    stopChannelingLoop(actor);
+  });
+
   for (const ev of SPELL_CAST_SOUND_EVENTS) {
     world.on(ev, (payload) => {
       // Spells carry origin info in various fields
@@ -573,6 +616,8 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
   let dungeonActive = false;
 
   world.on('dungeon:transitioned', () => {
+    stopChannelingLoop(null);
+
     if (rainUrl) stopLoop(rainUrl, { fadeOut: 1.0 });
 
     // Reverb: overworld (depth 0) = dry/open air, dungeon = stone room reverb

@@ -187,6 +187,7 @@ const SOUNDS = {
 
   // ── Additional Spell Variants ───────────────────
   "spell:agony":      { file: "spell_agony.mp3",     bus: "spells", volume: 8 },
+  "spell:channeling": { file: "spell_channeling.mp3", bus: "spells", volume: 0.55 },
 
   // ── UI / Misc ───────────────────────────────────
   "level:up":         { file: "quest_complete.mp3",   bus: "ui", maxVoices: 1 },
