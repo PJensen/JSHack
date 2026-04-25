@@ -357,6 +357,14 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     sfx("deity:omen");
   });
 
+  world.on('hazard:spawned', ({ at }) => {
+    sfx("ambient:omen", { priority: 1 });
+  });
+
+  world.on('plasmaCloud:spawned', ({ at }) => {
+    sfx("ambient:omen", { priority: 1 });
+  });
+
   world.on('bell:rung', ({ targetId }) => {
     const pos = targetId != null ? getPosition(targetId) : null;
     sfxAt("church:bell", pos, pp(), { priority: 1 });
@@ -434,6 +442,9 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
   });
 
   // Floor transitions — stop rain, adjust reverb for environment
+  const dungeonUrl = resolve("ambient:dungeon")?.url;
+  let dungeonActive = false;
+
   world.on('dungeon:transitioned', () => {
     if (rainUrl) stopLoop(rainUrl, { fadeOut: 1.0 });
 
@@ -442,8 +453,16 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     const depth = getDepth();
     if (depth === 0) {
       setReverbMix(0.05);  // outdoors — barely any
+      if (dungeonUrl && dungeonActive) {
+        stopLoop(dungeonUrl, { fadeOut: 1.0 });
+        dungeonActive = false;
+      }
     } else {
       setReverbMix(Math.min(0.45, 0.15 + depth * 0.05));  // 0.20 at d1, 0.45 cap
+      if (dungeonUrl && !dungeonActive) {
+        startLoop(dungeonUrl, { volume: 0.5, fadeIn: 1.5, bus: "ambient" });
+        dungeonActive = true;
+      }
     }
   });
 
