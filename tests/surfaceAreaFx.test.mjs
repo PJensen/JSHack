@@ -35,6 +35,34 @@ function makeTraceCtx() {
   };
 }
 
+function makeDrawCtx() {
+  const ctx = {
+    radii: [],
+    save() {},
+    restore() {},
+    beginPath() {},
+    moveTo() {},
+    quadraticCurveTo() {},
+    closePath() {},
+    clip() {},
+    stroke() {},
+    fill() {},
+    fillRect() {},
+    createLinearGradient() {
+      return { addColorStop() {} };
+    },
+    arc(_x, _y, radius) {
+      this.radii.push(radius);
+      if (radius < 0) throw new Error(`negative arc radius: ${radius}`);
+    },
+    ellipse(_x, _y, rx, ry) {
+      this.radii.push(rx, ry);
+      if (rx < 0 || ry < 0) throw new Error(`negative ellipse radius: ${rx}, ${ry}`);
+    },
+  };
+  return ctx;
+}
+
 Deno.test("surfaceAreaFx extracts one fixed water region for contiguous tiles", () => {
   const worldView = makeWorldView([
     { x: 10, y: 4, tile: 1 },
@@ -131,4 +159,49 @@ Deno.test("surfaceAreaFx reuses regions while turn and tile viewport are unchang
   worldView.turn++;
   fx.tick(1 / 60, worldView, { vx0: 0.3, vy0: 0.3, vx1: 3.1, vy1: 3.1 }, "clear");
   assertEquals(scans, 2);
+});
+
+Deno.test("surfaceAreaFx rain ripples never draw negative arc radii", () => {
+  const originalRandom = Math.random;
+  const sequence = [
+    0, // pick the only water cell
+    0, // x jitter
+    0, // y jitter
+    1, // old code: ttl high
+    0, // old code: max low, making progress negative
+    0, // radius0 low
+    0, // radius1 low
+  ];
+  let idx = 0;
+  Math.random = () => sequence[idx++] ?? 0;
+  try {
+    const worldView = {
+      turn: 1,
+      currentDepth: 0,
+      tileGrid: {
+        forEachTileInRect(x0, y0, x1, y1, fn) {
+          for (let y = y0; y <= y1; y++) {
+            for (let x = x0; x <= x1; x++) {
+              fn(x, y, x === 1 && y === 1 ? 1 : 0);
+            }
+          }
+        },
+      },
+      isVisible() {
+        return true;
+      },
+    };
+    const fx = createSurfaceAreaFxController({
+      getFxTime: () => 0,
+      classifySurfaceTile: (tile) => tile === 1 ? { family: "water", tone: "water" } : null,
+      fx: null,
+      PERF: { quality: "high" },
+    });
+    fx.tick(10, worldView, { vx0: 0, vy0: 0, vx1: 2, vy1: 2 }, "heavy_rain");
+    const ctx = makeDrawCtx();
+    fx.draw(ctx);
+    assert(ctx.radii.every((r) => r >= 0), "all canvas arc radii should be non-negative");
+  } finally {
+    Math.random = originalRandom;
+  }
 });
