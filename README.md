@@ -1,6 +1,6 @@
 ![JSHack logo](https://raw.githubusercontent.com/PJensen/JSHack/refs/heads/master/logo.jpg)
 
-[🎮 Play JSHack](https://pjensen.github.io/JSHack/)
+[🎮 Play JSHack](https://jshack.net/) · [GitHub Pages fallback](https://pjensen.github.io/JSHack/)
 
 **A mobile-first roguelike built to be hacked.**
 
@@ -25,11 +25,13 @@ The game is built for phones first. A run should make sense in your hand: tap to
 
 ### Current game surface
 
-- **Classes**: Warlock, Archaeologist, Cleric, and Druid.
-- **Combat**: D&D-style attack rolls, armor class, crits, damage types, resistances, shields, dual wielding, status procs, gaze attacks, and spell crits.
-- **Magic**: destruction, support, summoning, teleportation, channeling, wands, scrolls, and gear-driven spell interactions.
-- **World simulation**: village jobs, shops, economy chains, farming, seasons, lunar calendar, weather, plant growth, fire spread, and harvestable resources.
-- **Dungeon play**: multi-floor procedural dungeons, biome slices, traps, boulder puzzles, chests, stairs, FOV, exploration memory, and monster spawners.
+- **9 classes**: Warden, Druid, Outlaw, Archeologist, Warlock, Mage, Mireborn, Pilgrim, and Cleric.
+- **58 monsters**: rats and goblins up through dragons, mind flayers, long creatures, mimics, undead, bugs, spellcasters, and stranger dungeon ecology.
+- **338 catalog items**: 215 equipment entries, 105 magic items, food, materials, seeds, tools, gems, wands, scrolls, potions, weapons, and armor.
+- **64 spells**: destruction, support, summoning, teleportation, channeling, class abilities, monster magic, wands, scrolls, and gear-driven spell interactions.
+- **Combat**: D&D-style attack rolls, armor class, crits, damage types, resistances, shields, dual wielding, 34 affixes, status procs, gaze attacks, and spell crits.
+- **World simulation**: 12 townfolk roles, shops, economy chains, farming, seasons, lunar calendar, weather, plant growth, fire spread, and harvestable resources.
+- **Dungeon play**: multi-floor procedural dungeons, biome slices, traps, boulder puzzles, chests, stairs, FOV, exploration memory, monster spawners, and 69 status/effect definitions.
 - **Character pressure**: hunger, encumbrance, cursed equipment, unidentified items, pets with behavior, deity boons and wrath, and a score system.
 
 JSHack is still growing quickly, but it is already a game with enough moving parts to reward player judgment. The technical obsession exists to serve that.
@@ -301,18 +303,18 @@ Events keep the scheduler in control and execution order predictable.
 ### 🎮 Core Features
 
 - **Turn-based roguelike gameplay** — classic dungeon crawling with multi-floor dungeons and an overworld
-- **4 character classes** — Warlock, Archaeologist, Cleric, Druid — each with unique starting gear
+- **9 character classes** — Warden, Druid, Outlaw, Archeologist, Warlock, Mage, Mireborn, Pilgrim, Cleric — each with unique starting gear
 - **Monster AI** — 10-level intelligence tiers driving pack alerting, retreat, ambush, and scurry
-- **28 monsters across 4 tiers** — rats to dragons, with flying creatures and gaze attacks
-- **Item system** — 363+ items: potions, scrolls, weapons, armor, wands, gems, crafting materials
-- **Magic system** — 15 spells across destruction, support, and summoning schools; channeling and INT-based crits
+- **58 monsters across dungeon tiers** — rats to dragons, with flying creatures, mimics, long creatures, spellcasters, death hooks, and gaze attacks
+- **Item system** — 338 catalog items: potions, scrolls, weapons, armor, wands, gems, food, seeds, and crafting materials
+- **Magic system** — 64 spells across destruction, support, summoning, teleportation, class, monster, and item-driven magic; channeling and INT-based crits
 - **Dual-wielding** — equip two one-handed weapons with offhand penalties
 - **Equipment** — canonical gear slots (weapon, offhand, armor, helmet, ring, ammo) with affix modifiers
-- **Status effects** — poison, burn, regen, stun, berserk, curse, confusion, paralysis, and more
+- **Status effects** — 69 effect definitions including poison, burn, regen, stun, berserk, curse, confusion, paralysis, and more
 - **Hunger & survival** — eat food or suffer; carry weight and encumbrance matter
 - **Deity favor** — worship gods, gain boons or invoke wrath; ascetic and dietary tracking
 - **Pet companions** — they follow, fight, and have opinions
-- **Overworld village** — 11 NPC townspeople with scheduled daily routines and a full economy chain
+- **Overworld village** — 12 NPC townfolk roles with scheduled daily routines and a full economy chain
 - **Weather system** — rain and heavy rain with gameplay effects (extinguishes fire, waters crops)
 - **Calendar** — 13 lunar months, 8 moon phases, archaic week, 4 seasons
 - **Plant growth & farming** — crops grow through visual stages, harvestable resources regrow
@@ -343,11 +345,12 @@ Events keep the scheduler in control and execution order predictable.
 - **85 systems** — movement, combat, AI, items, effects, weather, economy, crafting, spawning, cleanup
 - **129 component modules** — Position, Vitality, Inventory, Brain, Equipment, WeatherState, CalendarState, TownfolkJob, and more
 - **16 archetype files** — Player, Creatures, Items, Tiles, Doors, Stairs, Traps, Food, TownGoods, Overworld, etc.
-- **15 spells** — destruction (lightning, meteor, blizzard, firestorm, shadow bolt), support (heal, flash heal), summoning (skeleton), teleportation (blink, homecoming)
-- **28 monsters across 4 dungeon tiers** — rats and goblins up through dragons, mind flayers, and ancient wyrms
-- **363+ items** — weapons, armor, potions, scrolls, gems, crafting materials, food, tools
-- **11 NPC townspeople** — farmer, smith, miner, barkeep, herbalist, and more — with full economy simulation
-- **Deity pantheon** — multiple gods with unique mechanics, dietary tracking, and ascetic hooks
+- **64 spells** — destruction (lightning, meteor, blizzard, firestorm, shadow bolt), support (heal, flash heal), summoning, teleportation, class abilities, and monster magic
+- **58 monsters across dungeon tiers** — rats and goblins up through dragons, mind flayers, mimics, long creatures, and ancient wyrms
+- **338 catalog items** — 215 equipment entries, 105 magic entries, plus food, materials, seeds, tools, gems, crafting materials, weapons, armor, potions, scrolls, and wands
+- **12 NPC townfolk roles** — farmer, smith, miner, barkeep, herbalist, and more — with full economy simulation
+- **4-deity pantheon** — gods with unique mechanics, dietary tracking, and ascetic hooks
+- **34 affixes and 69 effects** — proc gear, resistances, status pressure, and build-defining item behavior
 
 All data-driven. All modifiable. All in plain JavaScript files.
 
