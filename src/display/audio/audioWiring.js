@@ -40,6 +40,18 @@ export const CREATURE_VOCALIZE_SOUNDS = Object.freeze({
   chicken_rooster: "ambient:chicken",
 });
 
+export const STATUS_SOUND_BY_KIND = Object.freeze({
+  deafened: "status:deafened",
+  deaf: "status:deafened",
+  slimed: "status:slimed",
+  slime: "status:slimed",
+  frozen: "status:frozen",
+  frost: "status:frozen",
+  electrocuted: "status:electrocuted",
+  electric: "status:electrocuted",
+  lightning: "status:electrocuted",
+});
+
 // Pet vocalization sound map
 const PET_VOCALIZE_SOUNDS = Object.freeze({
   cat: "creature:pet:meow",
@@ -88,6 +100,21 @@ export function computeZoomAudibilityGain(zoomScale, referenceScale) {
   if (!Number.isFinite(zoom) || !Number.isFinite(reference) || zoom <= 0 || reference <= 0) return 1;
   const gain = Math.sqrt(zoom / reference);
   return Math.max(MIN_ZOOM_GAIN, Math.min(MAX_ZOOM_GAIN, gain));
+}
+
+export function resolveStatusSoundId(payload) {
+  const raw = payload?.sound || payload?.kind || payload?.effect || payload?.status || payload?.type || "";
+  const key = String(raw || "").toLowerCase();
+  return STATUS_SOUND_BY_KIND[key] || null;
+}
+
+export function resolveAudioPlayKey(payload) {
+  return String(payload?.key || payload?.id || payload?.sound || "");
+}
+
+function isSpellLikeDamageCause(cause) {
+  const value = String(cause || "");
+  return value === "spell" || value === "magic" || value.startsWith("spell:") || value.startsWith("familiar:");
 }
 
 // ── Sound playback helpers ──────────────────────────────────
@@ -239,7 +266,7 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     if (cause === 'melee' || cause === 'offhand') {
       sfxAt(critical ? "melee:crit" : "melee:hit", pos, pp(), null, zg());
     }
-    if (cause === 'spell' || cause === 'magic') {
+    if (isSpellLikeDamageCause(cause)) {
       const impactId = SPELL_IMPACT_MAP[type] || "spell:impact:physical";
       sfxAt(impactId, pos, pp(), null, zg());
     }
@@ -434,12 +461,25 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     sfxAt("water:magic", pos, pp(), { priority: 1 }, zg());
   });
 
-  world.on('status', ({ id, kind, at }) => {
-    if (kind !== 'alert' || !(id > 0) || typeof getIdentity !== "function") return;
-    const identity = String(getIdentity(id) || "");
-    const soundId = ALERT_SOUND_BY_IDENTITY[identity];
+  world.on('status', (payload) => {
+    const { id, kind, at } = payload || {};
+    if (kind === 'alert') {
+      if (!(id > 0) || typeof getIdentity !== "function") return;
+      const identity = String(getIdentity(id) || "");
+      const soundId = ALERT_SOUND_BY_IDENTITY[identity];
+      if (!soundId) return;
+      const pos = at || getPosition(id);
+      sfxAt(soundId, pos, pp(), { priority: 1 }, zg());
+      return;
+    }
+
+    const soundId = resolveStatusSoundId(payload);
     if (!soundId) return;
-    const pos = at || getPosition(id);
+    if (isPlayer(id)) {
+      sfx(soundId, { priority: 1 });
+      return;
+    }
+    const pos = at || (id != null ? getPosition(id) : null);
     sfxAt(soundId, pos, pp(), { priority: 1 }, zg());
   });
 
@@ -495,6 +535,10 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
 
   world.on('spell:phase_strike', (payload) => {
     sfxAt("teleported", payload?.to || payload?.at || payload?.from || null, pp(), { priority: 1 }, zg());
+  });
+
+  world.on('familiar:fireball', (payload) => {
+    sfxAt("spell:fireball", payload?.from || payload?.at || null, pp(), { priority: 1 }, zg());
   });
 
   // Meteor should land one impact sound at the resolved strike point,
@@ -569,8 +613,12 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
   });
 
   // Generic audio event — play any registered sound by key
-  world.on('audio:play', ({ key, x, y }) => {
-    if (typeof x === 'number' && typeof y === 'number') {
+  world.on('audio:play', (payload) => {
+    const key = resolveAudioPlayKey(payload);
+    const x = Number(payload?.x ?? payload?.at?.x);
+    const y = Number(payload?.y ?? payload?.at?.y);
+    if (!key) return;
+    if (Number.isFinite(x) && Number.isFinite(y)) {
       sfxAt(key, { x, y }, pp(), null, zg());
     } else {
       sfx(key);
