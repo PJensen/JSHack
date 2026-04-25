@@ -69,6 +69,39 @@ Deno.test("local emitter controller follows nearest cooking fire and torch sourc
   assertEquals(calls[7]?.type, "stop");
 });
 
+Deno.test("local emitter controller prefers explicit audio emitters over identities", () => {
+  const calls = [];
+  const controller = createLocalEmitterAmbientController({
+    resolveFn(id) {
+      return { url: `./assets/audio/${id}.mp3`, bus: "ambient" };
+    },
+    startLoopFn(url, opts) {
+      calls.push({ type: "start", url, opts });
+    },
+    stopLoopFn(url, opts) {
+      calls.push({ type: "stop", url, opts });
+    },
+    setLoopVolumeFn(url, volume, opts) {
+      calls.push({ type: "set", url, volume, opts });
+    },
+  });
+
+  controller.syncWorldView({
+    player: { pos: { x: 10, y: 10 } },
+    audioEmitters: [],
+    entities: [{ kind: "torch", pos: { x: 11, y: 10 } }],
+  });
+  assertEquals(calls.length, 0);
+
+  controller.syncWorldView({
+    player: { pos: { x: 10, y: 10 } },
+    audioEmitters: [{ profile: "torch", pos: { x: 11, y: 10 }, interior: false }],
+    entities: [],
+  });
+  assertEquals(calls[0]?.type, "start");
+  assertEquals(calls[0]?.url, "./assets/audio/ambient:torch_flames.mp3");
+});
+
 Deno.test("local emitter controller keeps church holy-site loop inside shelter and LOS", () => {
   const calls = [];
   const controller = createLocalEmitterAmbientController({

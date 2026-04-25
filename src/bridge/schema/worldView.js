@@ -42,6 +42,7 @@ import { EntranceProfile } from "../../rules/components/EntranceProfile.js";
 import { GroundStackOrder } from "../../rules/components/GroundStackOrder.js";
 import { Facing } from "../../rules/components/Facing.js";
 import { Interactable } from "../../rules/components/Interactable.js";
+import { AudioEmitter } from "../../rules/components/AudioEmitter.js";
 import { canonicalStatusKey } from "../../rules/utils/effectSemantics.js";
 import { listProcPackages } from "../../rules/data/procPackages.js";
 import {
@@ -70,12 +71,13 @@ import {
 /** @typedef {{ id:number, kind:string, pos:{x:number,y:number}, tags:string[], layer:number, hp:number, maxHp:number, isPet:boolean, showHealthBar:boolean, facing:{dx:number,dy:number}|null, weaponVfx:any[]|null, itemScale:number, rotation:number, visualOff:{dx:number,dy:number} }} EntityView */
 /** @typedef {{ id:number, x:number, y:number }} SolidView */
 /** @typedef {{ x:number, y:number, kind:string, alpha:number, burning?:boolean, smoking?:boolean }} RoofTileView */
-/** @typedef {{ turn:number, seed:number, player: { id:number, pos:{x:number,y:number} } | null, entities: EntityView[], solids: SolidView[], emissives: any[], roofs: RoofTileView[], tileGrid: any, isVisible: ((x:number,y:number)=>boolean)|null, isExplored: ((x:number,y:number)=>boolean)|null, currentDepth?: number }} WorldView */
+/** @typedef {{ id:number, profile:string, pos:{x:number,y:number}, interior:boolean }} AudioEmitterView */
+/** @typedef {{ turn:number, seed:number, player: { id:number, pos:{x:number,y:number} } | null, entities: EntityView[], solids: SolidView[], emissives: any[], audioEmitters: AudioEmitterView[], roofs: RoofTileView[], tileGrid: any, isVisible: ((x:number,y:number)=>boolean)|null, isExplored: ((x:number,y:number)=>boolean)|null, currentDepth?: number }} WorldView */
 
 /** @typedef {{ id:number, text:string, profane:boolean, pos:{x:number,y:number} }} EngravingView */
 
 /** @type {WorldView} */
-const _view = { turn: 0, seed: 0, player: null, entities: [], solids: [], emissives: [], roofs: [], engravings: [], tileGrid: null, isVisible: null, isExplored: null, isBlockedVision: null, weather: "clear", playerSheltered: false, nightAlpha: 0, dawnAlpha: 0, duskAlpha: 0, isOverworld: false, currentDepth: 0, turnInDay: 0, moonBrightness: 0, playerVisionRadius: 0, playerFacing: null, playerConeDegrees: 360, perceptionState: null };
+const _view = { turn: 0, seed: 0, player: null, entities: [], solids: [], emissives: [], audioEmitters: [], roofs: [], engravings: [], tileGrid: null, isVisible: null, isExplored: null, isBlockedVision: null, weather: "clear", playerSheltered: false, nightAlpha: 0, dawnAlpha: 0, duskAlpha: 0, isOverworld: false, currentDepth: 0, turnInDay: 0, moonBrightness: 0, playerVisionRadius: 0, playerFacing: null, playerConeDegrees: 360, perceptionState: null };
 let _lastPerceptionWorld = null;
 /** @type {Map<number, EntityView>} */
 const _entityRecs = new Map();   // id -> { id, kind, pos:{x,y}, tags:[] }
@@ -826,6 +828,7 @@ export function buildWorldView(world) {
 	_view.entities.length = 0;
 	_view.solids.length = 0;
 	_view.emissives.length = 0;
+	_view.audioEmitters.length = 0;
 	_view.roofs.length = 0;
 	_view.engravings.length = 0;
 	_view.weather = "clear";
@@ -952,6 +955,21 @@ export function buildWorldView(world) {
 	_view.playerFacing = playerFacingForAwareness;
 	_view.playerConeDegrees = awarenessConeDegrees;
 	_view.perceptionState = perceptionState;
+
+	for (const [id, pos, audio] of world.query(Position, AudioEmitter)) {
+		const emitters = Array.isArray(audio?.emitters) ? audio.emitters : [];
+		for (let i = 0; i < emitters.length; i++) {
+			const spec = emitters[i];
+			const profile = String(spec?.profile || "").trim();
+			if (!profile) continue;
+			_view.audioEmitters.push({
+				id,
+				profile,
+				pos: { x: pos.x | 0, y: pos.y | 0 },
+				interior: spec?.interior === true,
+			});
+		}
+	}
 
 	// Collect entity records near the player (or all if no player).
 	if (_view.player) {

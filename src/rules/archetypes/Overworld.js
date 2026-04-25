@@ -8,6 +8,7 @@ import { Inventory } from "../components/Inventory.js";
 import { HarvestNode } from "../components/HarvestNode.js";
 import { ObjectState } from "../components/ObjectState.js";
 import { GrowthStage } from "../components/GrowthStage.js";
+import { AudioEmitter } from "../components/AudioEmitter.js";
 
 export const HomeBed = defineArchetype(
   "HomeBed",
@@ -200,6 +201,7 @@ export const Anvil = defineArchetype(
     params: { idleState: "idle", activeState: "working", activeDuration: 4 },
   }],
   [ObjectState, { state: "idle" }],
+  [AudioEmitter, { emitters: [{ profile: "smithy", interior: true }] }],
 );
 
 export const Furnace = defineArchetype(
@@ -213,6 +215,10 @@ export const Furnace = defineArchetype(
     params: { idleState: "unlit", activeState: "lit", activeDuration: 5 },
   }],
   [ObjectState, { state: "unlit" }],
+  [AudioEmitter, { emitters: [
+    { profile: "smithy", interior: true },
+    { profile: "cooking_fire", interior: true },
+  ] }],
 );
 
 export const CookingFire = defineArchetype(
@@ -222,6 +228,7 @@ export const CookingFire = defineArchetype(
   [Material, { kind: "wood" }],
   [Collider, { solid: true, blocksSight: false }],
   [Interactable, { action: "cookFood", params: null }],
+  [AudioEmitter, { emitters: [{ profile: "cooking_fire", interior: true }] }],
 );
 
 // ── Farm crops ────────────────────────────────────────────────────
@@ -306,6 +313,7 @@ export const TavernKeg = defineArchetype(
   [NamedIdentity, { name: "Keg", identity: "tavern_keg" }],
   [Material, { kind: "wood" }],
   [Collider, { solid: true, blocksSight: false }],
+  [AudioEmitter, { emitters: [{ profile: "tavern", interior: true }] }],
 );
 
 export const TavernTable = defineArchetype(
@@ -314,6 +322,7 @@ export const TavernTable = defineArchetype(
   [NamedIdentity, { name: "Table", identity: "tavern_table" }],
   [Material, { kind: "wood" }],
   [Collider, { solid: true, blocksSight: false }],
+  [AudioEmitter, { emitters: [{ profile: "tavern", interior: true }] }],
 );
 
 export const TavernBench = defineArchetype(
@@ -322,6 +331,7 @@ export const TavernBench = defineArchetype(
   [NamedIdentity, { name: "Bench", identity: "tavern_bench" }],
   [Material, { kind: "wood" }],
   [Collider, { solid: false, blocksSight: false }],
+  [AudioEmitter, { emitters: [{ profile: "tavern", interior: true }] }],
 );
 
 export const TavernPillar = defineArchetype(
@@ -330,6 +340,7 @@ export const TavernPillar = defineArchetype(
   [NamedIdentity, { name: "Pillar", identity: "tavern_pillar" }],
   [Material, { kind: "wood" }],
   [Collider, { solid: false, blocksSight: false }],
+  [AudioEmitter, { emitters: [{ profile: "tavern", interior: true }] }],
 );
 
 export const TavernSign = defineArchetype(
@@ -338,6 +349,7 @@ export const TavernSign = defineArchetype(
   [NamedIdentity, { name: "Tavern Sign", identity: "tavern_sign" }],
   [Material, { kind: "wood" }],
   [Collider, { solid: false, blocksSight: false }],
+  [AudioEmitter, { emitters: [{ profile: "tavern", interior: false }] }],
 );
 
 export const Millstone = defineArchetype(
@@ -361,6 +373,10 @@ export const ChurchAltar = defineArchetype(
   [Material, { kind: "stone" }],
   [Collider, { solid: true, blocksSight: false }],
   [Interactable, { action: "prayAltar", params: null }],
+  [AudioEmitter, { emitters: [
+    { profile: "church", interior: true },
+    { profile: "holy_site", interior: true },
+  ] }],
 );
 
 export const ChurchPew = defineArchetype(
@@ -386,6 +402,7 @@ export const ChurchFont = defineArchetype(
   [Material, { kind: "stone" }],
   [Collider, { solid: true, blocksSight: false }],
   [Interactable, { action: "fountain", params: null }],
+  [AudioEmitter, { emitters: [{ profile: "church", interior: true }] }],
 );
 
 export const ChurchWindow = defineArchetype(
@@ -549,6 +566,7 @@ export const SmithySign = defineArchetype(
   [Material, { kind: "wood" }],
   [Collider, { solid: false, blocksSight: false }],
   [Interactable, { action: "readText", params: { textId: "smithy_sign" } }],
+  [AudioEmitter, { emitters: [{ profile: "smithy", interior: false }] }],
 );
 
 export const PotionShelf = defineArchetype(

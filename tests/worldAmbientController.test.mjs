@@ -71,6 +71,74 @@ Deno.test("world ambient controller prioritizes tavern over town bed", () => {
   assertEquals(calls[5]?.type, "stop");
 });
 
+Deno.test("world ambient controller prefers explicit audio emitters over identity-derived town noise", () => {
+  const calls = [];
+  const controller = createWorldAmbientController({
+    resolveFn(id) {
+      return { url: `./assets/audio/${id}.mp3`, bus: "ambient" };
+    },
+    startLoopFn(url, opts) {
+      calls.push({ type: "start", url, opts });
+    },
+    stopLoopFn(url, opts) {
+      calls.push({ type: "stop", url, opts });
+    },
+    setLoopVolumeFn(url, volume, opts) {
+      calls.push({ type: "set", url, volume, opts });
+    },
+  });
+
+  controller.syncWorldView({
+    isOverworld: true,
+    player: { pos: { x: 10, y: 10 } },
+    audioEmitters: [],
+    entities: [{ kind: "townfolk_farmer", pos: { x: 11, y: 10 } }],
+  });
+  assertEquals(calls.length, 0);
+
+  controller.syncWorldView({
+    isOverworld: true,
+    player: { pos: { x: 10, y: 10 } },
+    audioEmitters: [{ profile: "town", pos: { x: 11, y: 10 }, interior: false }],
+    entities: [],
+  });
+  assertEquals(calls[0]?.type, "start");
+  assertEquals(calls[0]?.url, "./assets/audio/ambient:town.mp3");
+});
+
+Deno.test("world ambient controller stops explicit town emitters at audible edge", () => {
+  const calls = [];
+  const controller = createWorldAmbientController({
+    resolveFn(id) {
+      return { url: `./assets/audio/${id}.mp3`, bus: "ambient" };
+    },
+    startLoopFn(url, opts) {
+      calls.push({ type: "start", url, opts });
+    },
+    stopLoopFn(url, opts) {
+      calls.push({ type: "stop", url, opts });
+    },
+    setLoopVolumeFn(url, volume, opts) {
+      calls.push({ type: "set", url, volume, opts });
+    },
+  });
+
+  controller.syncWorldView({
+    isOverworld: true,
+    player: { pos: { x: 10, y: 10 } },
+    audioEmitters: [{ profile: "town", pos: { x: 11, y: 10 }, interior: false }],
+  });
+  assertEquals(calls[0]?.type, "start");
+
+  controller.syncWorldView({
+    isOverworld: true,
+    player: { pos: { x: 40, y: 10 } },
+    audioEmitters: [{ profile: "town", pos: { x: 11, y: 10 }, interior: false }],
+  });
+  assertEquals(calls[1]?.type, "stop");
+  assertEquals(calls[1]?.url, "./assets/audio/ambient:town.mp3");
+});
+
 Deno.test("world ambient controller uses tavern interior anchors and mutes town when sheltered", () => {
   const calls = [];
   const controller = createWorldAmbientController({

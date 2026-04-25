@@ -17,6 +17,19 @@ const HOLY_SITE_INTERIOR_IDENTITIES = new Set([
   "church_altar",
 ]);
 
+function sourceAudible(source, playerPos, playerSheltered, isBlockedVision) {
+  if (!source?.interior) return true;
+  if (!playerSheltered) return false;
+  return isBlockedVision
+    ? hasLOS(playerPos.x | 0, playerPos.y | 0, source.pos.x | 0, source.pos.y | 0, isBlockedVision)
+    : true;
+}
+
+function collectExplicitSources(worldView) {
+  if (!Array.isArray(worldView?.audioEmitters)) return null;
+  return worldView.audioEmitters.filter((source) => source?.pos && source.profile);
+}
+
 /**
  * @param {{ x:number, y:number }} a
  * @param {{ x:number, y:number }} b
@@ -105,9 +118,10 @@ export function createLocalEmitterAmbientController({
   function syncWorldView(worldView) {
     const playerPos = worldView?.player?.pos || null;
     const entities = Array.isArray(worldView?.entities) ? worldView.entities : [];
+    const explicitSources = collectExplicitSources(worldView);
     const playerSheltered = worldView?.playerSheltered === true;
     const isBlockedVision = typeof worldView?.isBlockedVision === "function" ? worldView.isBlockedVision : null;
-    if (!playerPos || entities.length === 0) {
+    if (!playerPos || (explicitSources ? explicitSources.length === 0 : entities.length === 0)) {
       stopCooking();
       stopHolySite();
       stopTorch();
@@ -117,7 +131,16 @@ export function createLocalEmitterAmbientController({
     let nearestCooking = Infinity;
     let nearestHolySite = Infinity;
     let nearestTorch = Infinity;
-    for (let i = 0; i < entities.length; i++) {
+    if (explicitSources) {
+      for (let i = 0; i < explicitSources.length; i++) {
+        const source = explicitSources[i];
+        if (!sourceAudible(source, playerPos, playerSheltered, isBlockedVision)) continue;
+        const dist = distance(source.pos, playerPos);
+        if (source.profile === "cooking_fire") nearestCooking = Math.min(nearestCooking, dist);
+        else if (source.profile === "holy_site") nearestHolySite = Math.min(nearestHolySite, dist);
+        else if (source.profile === "torch") nearestTorch = Math.min(nearestTorch, dist);
+      }
+    } else for (let i = 0; i < entities.length; i++) {
       const entity = entities[i];
       if (!entity?.pos) continue;
       const kind = String(entity.kind || "");

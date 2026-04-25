@@ -13,6 +13,7 @@ import { Pushable } from "../components/Pushable.js";
 import { ObjectState } from "../components/ObjectState.js";
 import { HydraulicsLink } from "../components/HydraulicsLink.js";
 import { Vitality } from "../components/Vitality.js";
+import { AudioEmitter } from "../components/AudioEmitter.js";
 
 // --- Interactive features ---
 
@@ -32,6 +33,7 @@ export const Altar = defineArchetype(
   [Material, { kind: "stone" }],
   [Collider, { solid: true, blocksSight: false }],
   [Interactable, { action: "prayAltar", params: null }],
+  [AudioEmitter, { emitters: [{ profile: "holy_site", interior: false }] }],
 );
 
 export const Shrine = defineArchetype(
@@ -41,6 +43,7 @@ export const Shrine = defineArchetype(
   [Material, { kind: "stone" }],
   [Collider, { solid: true, blocksSight: false }],
   [Interactable, { action: "touchShrine", params: null }],
+  [AudioEmitter, { emitters: [{ profile: "holy_site", interior: false }] }],
 );
 
 // --- Decorative features ---
@@ -108,6 +111,7 @@ export const Torch = defineArchetype(
   [Position, (p) => ({ x: p.x, y: p.y })],
   [NamedIdentity, { name: "Torch", identity: "torch" }],
   [Material, { kind: "wood" }],
+  [AudioEmitter, { emitters: [{ profile: "torch", interior: false }] }],
 );
 
 export const Urn = defineArchetype(
