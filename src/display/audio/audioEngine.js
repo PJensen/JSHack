@@ -392,14 +392,14 @@ function _playTrackedBuffer(buf, opts) {
   }
 }
 
-/** Map<string, { src, gain }> — currently playing loops keyed by URL. */
+/** Map<string, { src?: AudioBufferSourceNode, gain?: GainNode, srcs?: Set<AudioBufferSourceNode>, gains?: Set<GainNode>, timers?: Set<number>, stopped?: boolean }> — currently playing loops keyed by URL. */
 const _loops = new Map();
 const _cancelledLoops = new Set();
 
 /**
  * Start a looping sound. If already looping, does nothing.
  * @param {string} url
- * @param {{ volume?: number, fadeIn?: number, bus?: string }} [opts]
+ * @param {{ volume?: number, fadeIn?: number, bus?: string, crossfade?: number }} [opts]
  */
 export function startLoop(url, opts) {
   _cancelledLoops.delete(url);
@@ -416,6 +416,12 @@ export function startLoop(url, opts) {
 
 function _startLoopBuffer(url, buf, opts) {
   try {
+    const crossfade = Math.max(0, Number(opts?.crossfade || 0));
+    if (crossfade > 0 && Number(buf.duration || 0) > crossfade * 2) {
+      _startCrossfadeLoopBuffer(url, buf, opts, crossfade);
+      return;
+    }
+
     const ac = ctx();
     const src = ac.createBufferSource();
     src.buffer = buf;
@@ -442,6 +448,44 @@ function _startLoopBuffer(url, buf, opts) {
   }
 }
 
+function _startCrossfadeLoopBuffer(url, buf, opts, crossfade) {
+  const ac = ctx();
+  const dest = bus(opts?.bus || "ambient");
+  const vol = Number(opts?.volume ?? 1);
+  const fadeIn = Number(opts?.fadeIn || 0);
+  const intervalMs = Math.max(50, (buf.duration - crossfade) * 1000);
+  const entry = { srcs: new Set(), gains: new Set(), timers: new Set(), stopped: false };
+
+  function startVoice(isFirst = false) {
+    if (entry.stopped || _cancelledLoops.has(url)) return;
+    const src = ac.createBufferSource();
+    const gain = ac.createGain();
+    src.buffer = buf;
+    gain.gain.setValueAtTime(0, ac.currentTime);
+    const ramp = isFirst ? Math.max(fadeIn, 0.01) : Math.max(crossfade, 0.01);
+    gain.gain.linearRampToValueAtTime(vol, ac.currentTime + ramp);
+    src.connect(gain);
+    gain.connect(dest);
+    src.onended = () => {
+      entry.srcs.delete(src);
+      entry.gains.delete(gain);
+    };
+    entry.srcs.add(src);
+    entry.gains.add(gain);
+    src.start();
+    try { src.stop(ac.currentTime + buf.duration + 0.05); } catch (_) { /* ignore */ }
+
+    const timer = setTimeout(() => {
+      entry.timers.delete(timer);
+      startVoice(false);
+    }, intervalMs);
+    entry.timers.add(timer);
+  }
+
+  _loops.set(url, entry);
+  startVoice(true);
+}
+
 /**
  * Stop a looping sound.
  * @param {string} url
@@ -458,6 +502,29 @@ export function stopLoop(url, opts) {
 
   const fadeOut = Number(opts?.fadeOut || 0);
   try {
+    if (entry.srcs || entry.gains || entry.timers) {
+      const ac = ctx();
+      for (const timer of entry.timers || []) clearTimeout(timer);
+      entry.timers?.clear();
+      entry.stopped = true;
+      for (const gain of entry.gains || []) {
+        if (fadeOut > 0) {
+          gain.gain.cancelScheduledValues(ac.currentTime);
+          gain.gain.setValueAtTime(gain.gain.value, ac.currentTime);
+          gain.gain.linearRampToValueAtTime(0, ac.currentTime + fadeOut);
+        } else {
+          gain.gain.value = 0;
+        }
+      }
+      for (const src of entry.srcs || []) {
+        try {
+          if (fadeOut > 0) src.stop(ac.currentTime + fadeOut + 0.05);
+          else src.stop();
+        } catch (_) { /* ignore */ }
+      }
+      return;
+    }
+
     if (fadeOut > 0) {
       const ac = ctx();
       entry.gain.gain.setValueAtTime(entry.gain.gain.value, ac.currentTime);
@@ -483,6 +550,20 @@ export function setLoopVolume(url, volume, opts) {
   const next = Math.max(0, Math.min(1, Number(volume ?? 1)));
   const ramp = Math.max(0, Number(opts?.ramp || 0));
   try {
+    if (entry.gains) {
+      const ac = ctx();
+      for (const gain of entry.gains) {
+        if (ramp > 0) {
+          gain.gain.cancelScheduledValues(ac.currentTime);
+          gain.gain.setValueAtTime(gain.gain.value, ac.currentTime);
+          gain.gain.linearRampToValueAtTime(next, ac.currentTime + ramp);
+        } else {
+          gain.gain.value = next;
+        }
+      }
+      return;
+    }
+
     if (ramp > 0) {
       const ac = ctx();
       entry.gain.gain.cancelScheduledValues(ac.currentTime);
