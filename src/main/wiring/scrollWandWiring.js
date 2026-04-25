@@ -215,6 +215,7 @@ export function installScrollWandWiring({ world, targeting, playerEntity }) {
     const to = candidates[Math.floor(world.rand() * candidates.length)];
     world.set(actor, Position, { x: to.x, y: to.y });
     emitSafe(world, 'moved', { id: actor, from, to });
+    emitSafe(world, 'teleported', { id: actor, from, to, source: 'scroll:teleportation' });
   });
 
   // ── Scroll of Summoning ─────────────────────────────────────────────────

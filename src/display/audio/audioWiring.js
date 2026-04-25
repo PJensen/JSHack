@@ -14,6 +14,9 @@ export const ALERT_SOUND_BY_IDENTITY = Object.freeze({
   spider: "spider:alert",
   cave_spider: "spider:alert",
   phase_spider: "spider:alert",
+  grid_bug: "insect:alert",
+  killer_bee: "insect:alert",
+  gelatinous_cube: "gelatinous_cube:alert",
   cave_bear: "creature:alert:large_beast",
   boar: "creature:alert:large_beast",
   dragon: "creature:alert:large_beast",
@@ -24,6 +27,11 @@ export const ALERT_SOUND_BY_IDENTITY = Object.freeze({
 export const CREATURE_ATTACK_SOUNDS = Object.freeze({
   cave_bear: "cave_bear:attack",
   rat: "rat:attack",
+  grid_bug: "insect:attack",
+  killer_bee: "insect:attack",
+  spider: "spider:attack",
+  cave_spider: "spider:attack",
+  phase_spider: "spider:attack",
 });
 
 export const CREATURE_VOCALIZE_SOUNDS = Object.freeze({
@@ -48,6 +56,7 @@ const _petVocalizationCooldowns = new Map();
 const MAX_HEAR_DIST = 16;
 const MIN_ZOOM_GAIN = 0.65;
 const MAX_ZOOM_GAIN = 1.35;
+const PLAYER_NEAR_DEATH_RATIO = 0.25;
 
 /**
  * Compute pan (-1…+1) and volume (0…1) from source position relative to player.
@@ -154,6 +163,7 @@ export const SPELL_CAST_SOUND_EVENTS = Object.freeze([
   'spell:blizzard',
   'spell:firestorm',
   'spell:blastwave',
+  'spell:heal',
   'spell:flash_heal',
   'spell:smite',
   'spell:death_volley',
@@ -236,6 +246,18 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     // Electrocution sound for electric/lightning damage
     if ((type === 'electric' || type === 'lightning') && cause === 'spell') {
       sfxAt("status:electrocuted", pos, pp(), { priority: 1 }, zg());
+    }
+  });
+
+  world.on('damaged', ({ target, hpBefore, hpAfter, maxHp }) => {
+    if (!isPlayer(target)) return;
+    const cap = Number(maxHp || 0);
+    if (!(cap > 0)) return;
+    const beforeRatio = Number(hpBefore || 0) / cap;
+    const after = Number(hpAfter || 0);
+    const afterRatio = after / cap;
+    if (after > 0 && beforeRatio > PLAYER_NEAR_DEATH_RATIO && afterRatio <= PLAYER_NEAR_DEATH_RATIO) {
+      sfx("player:near_death", { priority: 1 });
     }
   });
 
@@ -397,11 +419,19 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
   world.on('fountain:drink', ({ targetId, effect }) => {
     const pos = targetId != null ? getPosition(targetId) : null;
     sfxAt("fountain:sip", pos, pp(), null, zg());
+    if (effect === "gush") sfxAt("water:magic", pos, pp(), { priority: 1 }, zg());
+    if (effect === "teleport") sfx("teleported", { priority: 1 });
   });
 
   world.on('fountain:dip', ({ targetId, effect }) => {
     const pos = targetId != null ? getPosition(targetId) : null;
     sfxAt("fountain:sip", pos, pp(), null, zg());
+  });
+
+  world.on('hydraulics:floodgate', ({ targetId, active, tilesChanged }) => {
+    if (!active || !(Number(tilesChanged || 0) > 0)) return;
+    const pos = targetId != null ? getPosition(targetId) : null;
+    sfxAt("water:magic", pos, pp(), { priority: 1 }, zg());
   });
 
   world.on('status', ({ id, kind, at }) => {
@@ -430,6 +460,22 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     sfxAt("status:frozen", pos, pp(), null, zg());
   });
 
+  world.on('teleported', ({ id, from, to }) => {
+    const pos = to || from || (id != null ? getPosition(id) : null);
+    sfxAt("teleported", pos, pp(), { priority: 1 }, zg());
+  });
+
+  world.on('pet:teleported', ({ petId, id, from, to }) => {
+    const entityId = petId || id;
+    const pos = to || from || (entityId != null ? getPosition(entityId) : null);
+    sfxAt("teleported", pos, pp(), { priority: 1 }, zg());
+  });
+
+  world.on('summon:teleported', ({ id, from, to }) => {
+    const pos = to || from || (id != null ? getPosition(id) : null);
+    sfxAt("teleported", pos, pp(), { priority: 1 }, zg());
+  });
+
   // ── Spells (cast / launch sounds) ─────────────────────────
   // Each spell gets its own sound on cast. Impact sounds fire
   // separately via the 'damaged' handler above when the spell
@@ -442,6 +488,14 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
       sfxAt(ev, pos, pp(), null, zg());
     });
   }
+
+  world.on('spell:blink', (payload) => {
+    sfxAt("teleported", payload?.to || payload?.at || payload?.from || null, pp(), { priority: 1 }, zg());
+  });
+
+  world.on('spell:phase_strike', (payload) => {
+    sfxAt("teleported", payload?.to || payload?.at || payload?.from || null, pp(), { priority: 1 }, zg());
+  });
 
   // Meteor should land one impact sound at the resolved strike point,
   // not a cast sound and not one sound per damaged target.

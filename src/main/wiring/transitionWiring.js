@@ -60,6 +60,7 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
       fragActorsAtTarget: opts?.fragActorsAtTarget === true,
       returnTicket,
       homecomingLanding: opts?.homecomingLanding === true,
+      source: typeof opts?.source === "string" ? opts.source : "",
     };
   }
 
@@ -217,6 +218,17 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
       }
 
       onTransitioned();
+      if (pending.source) {
+        const pe = playerEntity();
+        try {
+          world.emit?.('teleported', {
+            id: pe?.id || 0,
+            to: pe?.pos || null,
+            source: pending.source,
+            depth: newDepth,
+          });
+        } catch (e) { console.debug('[transition] emit teleported failed:', e); }
+      }
     } finally {
       _inFlight = false;
       armCooldown();
@@ -241,6 +253,7 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
     world.on('dungeon:teleport-depth', ({ targetDepth, source, returnTicket }) => {
       const isHomecoming = String(source || '') === 'scroll_homecoming' || String(source || '') === 'hearthstone';
       queueDepth(targetDepth, {
+        source: String(source || 'dungeon:teleport-depth'),
         returnTicket: isHomecoming ? returnTicket : null,
         homecomingLanding: isHomecoming,
       });
@@ -258,7 +271,7 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
       if (!Number.isFinite(targetDepth) || !Number.isFinite(targetX) || !Number.isFinite(targetY)) return;
       try { world.destroy(pid); } catch {}
       untrackFloorEntity(pid);
-      queueDepth(targetDepth, { targetPos: { x: targetX, y: targetY }, fragActorsAtTarget: true });
+      queueDepth(targetDepth, { targetPos: { x: targetX, y: targetY }, fragActorsAtTarget: true, source: 'portal:return' });
     });
 
     world.on('trap:pit:fall', ({ targetId, x, y }) => {
