@@ -7,7 +7,7 @@
 const BASE = "./assets/audio/";
 
 /**
- * Each entry:  id → { file|files, bus, maxVoices?, volume?, rate?, detune?, randomPitch? }
+ * Each entry:  id → { file|files, bus, maxVoices?, volume?, rate?, detune?, randomPitch?, stopAfter?, fadeOut? }
  */
 const SOUNDS = {
   // ── Combat ──────────────────────────────────────
@@ -155,7 +155,7 @@ const SOUNDS = {
   // ── Status Effects ──────────────────────────────
   "status:electrocuted": { file: "status_electrocuted.mp3", bus: "combat", maxVoices: 1 },
   "status:slimed":       { file: "status_slimed.mp3",       bus: "combat", maxVoices: 1 },
-  "status:deafened":     { files: ["status_deafened.mp3", "status_deafened_2.mp3"], bus: "ui", maxVoices: 1 },
+  "status:deafened":     { file: "status_deafened_2.mp3", bus: "ui", maxVoices: 1, stopAfter: 2.0, fadeOut: 0.55 },
   "status:frozen":       { files: ["status_frozen_1.mp3", "status_frozen_2.mp3", "status_frozen_3.mp3", "status_frozen_4.mp3", "status_frozen_5.mp3"], bus: "combat", maxVoices: 1 },
 
   // ── Interactions ────────────────────────────────
@@ -196,7 +196,7 @@ const SOUNDS = {
 /**
  * Resolve a sound ID to its full URL and default options.
  * @param {string} id
- * @returns {{ url: string, file: string, files?: string[], bus?: string, maxVoices?: number, randomPitch?: number, volume?: number, rate?: number, detune?: number } | null}
+ * @returns {{ url: string, file: string, files?: string[], bus?: string, maxVoices?: number, randomPitch?: number, volume?: number, rate?: number, detune?: number, stopAfter?: number, fadeOut?: number } | null}
  */
 export function resolve(id) {
   const entry = SOUNDS[id];

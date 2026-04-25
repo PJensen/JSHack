@@ -304,6 +304,8 @@ export function preload(urls) {
  *   maxVoices?: number,    // max concurrent plays of this URL (default 3)
  *   pan?: number,          // stereo pan -1 (left) to +1 (right), default 0 (center)
  *   reverb?: boolean,      // send this sound through reverb (default true)
+ *   stopAfter?: number,    // seconds after start to begin stopping a one-shot
+ *   fadeOut?: number,      // seconds to fade before stopping when stopAfter is set
  * }} [opts]
  */
 export function play(url, opts) {
@@ -595,16 +597,20 @@ function _playBuffer(url, buf, opts) {
     const dest = bus(opts?.bus || "ui");
     const vol = Number(opts?.volume ?? 1);
     const pan = Number(opts?.pan || 0);
+    const stopAfter = Number(opts?.stopAfter || 0);
+    const fadeOut = Math.max(0, Number(opts?.fadeOut || 0));
 
     // Build chain:  src → [gain] → [panner] → bus  (dry path)
     //                                        ↘ reverb send  (wet path)
     let tail = src;
+    let gainNode = null;
 
-    if (vol !== 1) {
+    if (vol !== 1 || stopAfter > 0) {
       const g = ac.createGain();
       g.gain.value = vol;
       tail.connect(g);
       tail = g;
+      gainNode = g;
     }
 
     if (pan !== 0 && typeof ac.createStereoPanner === "function") {
@@ -628,6 +634,7 @@ function _playBuffer(url, buf, opts) {
     trackVoice(url, src, maxV, priority, vol);
 
     const when = opts?.delay ? ac.currentTime + opts.delay : 0;
+    const startAt = when || ac.currentTime;
     const segment = Number(opts?.segment || 0);
     if (segment > 0 && buf.duration > segment) {
       // Pick random start position for segment playback
@@ -636,6 +643,14 @@ function _playBuffer(url, buf, opts) {
       src.start(when, offset, segment);
     } else {
       src.start(when);
+    }
+    if (stopAfter > 0) {
+      if (gainNode && fadeOut > 0) {
+        const fadeStart = startAt + stopAfter;
+        gainNode.gain.setValueAtTime(vol, fadeStart);
+        gainNode.gain.linearRampToValueAtTime(0, fadeStart + fadeOut);
+      }
+      src.stop(startAt + stopAfter + fadeOut + 0.05);
     }
   } catch (_) {
     // Web Audio not available — silent fail

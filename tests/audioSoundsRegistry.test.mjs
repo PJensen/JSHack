@@ -126,6 +126,16 @@ Deno.test("sounds registry wires quiet spell assets with usable defaults", () =>
   assertEquals(channeling.bus, "spells");
 });
 
+Deno.test("sounds registry caps deafened playback with a short fade", () => {
+  const deafened = resolve("status:deafened");
+
+  assertExists(deafened);
+  assertEquals(deafened.file, "status_deafened_2.mp3");
+  assertEquals(deafened.bus, "ui");
+  assert(deafened.stopAfter <= 2.5, "deafened should not linger past a couple seconds before fading");
+  assert(deafened.fadeOut > 0, "deafened should fade instead of cutting hard");
+});
+
 Deno.test("sounds registry does not reference missing cleave wav", () => {
   const urls = allUrls();
 
