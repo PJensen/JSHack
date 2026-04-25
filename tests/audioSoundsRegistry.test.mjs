@@ -1,5 +1,5 @@
 import { assert, assertEquals, assertExists } from "jsr:@std/assert";
-import { allUrls, resolve } from "../src/display/audio/sounds.js";
+import { allUrls, resolve, resolveUrls } from "../src/display/audio/sounds.js";
 
 Deno.test("sounds registry exposes thrown potion impact sound", () => {
   const sound = resolve("item:impact:potion");
@@ -13,6 +13,18 @@ Deno.test("sounds registry exposes fountain ambient loop as mp3", () => {
   assertExists(sound);
   assertEquals(sound.file, "ambient_fountain.mp3");
   assertEquals(sound.bus, "ambient");
+});
+
+Deno.test("sounds registry exposes both dungeon loop beds and keeps omen separate", () => {
+  const dungeonUrls = resolveUrls("ambient:dungeon");
+  const omen = resolve("ambient:omen");
+
+  assertEquals(dungeonUrls, [
+    "./assets/audio/ambient_dungeon_1.mp3",
+    "./assets/audio/ambient_dungeon_2.mp3",
+  ]);
+  assertExists(omen);
+  assertEquals(omen.file, "ambient_dungeon_omen.mp3");
 });
 
 Deno.test("sounds registry adopts descriptive weather filenames", () => {
@@ -134,6 +146,10 @@ Deno.test("sounds registry caps deafened playback with a short fade", () => {
   assertEquals(deafened.bus, "ui");
   assert(deafened.stopAfter <= 2.5, "deafened should not linger past a couple seconds before fading");
   assert(deafened.fadeOut > 0, "deafened should fade instead of cutting hard");
+});
+
+Deno.test("sounds registry leaves consecrate silent until a better file exists", () => {
+  assertEquals(resolve("spell:consecrate"), null);
 });
 
 Deno.test("sounds registry does not reference missing cleave wav", () => {

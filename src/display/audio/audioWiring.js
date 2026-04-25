@@ -4,8 +4,8 @@
 // Spatial audio: sounds with a known {x,y} source are panned L/R and
 // attenuated by distance from the player. Sounds through walls are muffled.
 
-import { play, preload, startLoop, stopLoop, setReverbMix } from "./audioEngine.js";
-import { resolve, allUrls } from "./sounds.js";
+import { play, preload, startLoop, stopLoop, startLoopSequence, stopLoopSequence, setReverbMix } from "./audioEngine.js";
+import { resolve, resolveUrls, allUrls } from "./sounds.js";
 
 export const ALERT_SOUND_BY_IDENTITY = Object.freeze({
   snake: "snake:alert",
@@ -276,6 +276,15 @@ export const CHANNELING_LOOP_OPTIONS = Object.freeze({
   fadeOut: 0.18,
   bus: "spells",
   crossfade: 0.18,
+});
+
+export const DUNGEON_LOOP_SOUND_ID = "ambient:dungeon";
+export const DUNGEON_LOOP_OPTIONS = Object.freeze({
+  volume: 0.22,
+  fadeIn: 1.5,
+  fadeOut: 1.0,
+  bus: "ambient:loop",
+  crossfade: 2.0,
 });
 
 /**
@@ -675,7 +684,7 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
   });
 
   // Floor transitions — stop rain, adjust reverb for environment
-  const dungeonUrl = resolve("ambient:dungeon")?.url;
+  const dungeonLoopUrls = resolveUrls(DUNGEON_LOOP_SOUND_ID);
   let dungeonActive = false;
 
   world.on('dungeon:transitioned', () => {
@@ -688,14 +697,19 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     const depth = getDepth();
     if (depth === 0) {
       setReverbMix(0.05);  // outdoors — barely any
-      if (dungeonUrl && dungeonActive) {
-        stopLoop(dungeonUrl, { fadeOut: 1.0 });
+      if (dungeonActive) {
+        stopLoopSequence(DUNGEON_LOOP_SOUND_ID, { fadeOut: DUNGEON_LOOP_OPTIONS.fadeOut });
         dungeonActive = false;
       }
     } else {
       setReverbMix(Math.min(0.45, 0.15 + depth * 0.05));  // 0.20 at d1, 0.45 cap
-      if (dungeonUrl && !dungeonActive) {
-        startLoop(dungeonUrl, { volume: 0.22, fadeIn: 1.5, bus: "ambient:loop", crossfade: 1.25 });
+      if (dungeonLoopUrls.length > 0 && !dungeonActive) {
+        startLoopSequence(DUNGEON_LOOP_SOUND_ID, dungeonLoopUrls, {
+          volume: DUNGEON_LOOP_OPTIONS.volume,
+          fadeIn: DUNGEON_LOOP_OPTIONS.fadeIn,
+          bus: DUNGEON_LOOP_OPTIONS.bus,
+          crossfade: DUNGEON_LOOP_OPTIONS.crossfade,
+        });
         dungeonActive = true;
       }
     }

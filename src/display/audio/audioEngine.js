@@ -396,6 +396,7 @@ function _playTrackedBuffer(buf, opts) {
 
 /** Map<string, { src?: AudioBufferSourceNode, gain?: GainNode, srcs?: Set<AudioBufferSourceNode>, gains?: Set<GainNode>, timers?: Set<number>, stopped?: boolean }> — currently playing loops keyed by URL. */
 const _loops = new Map();
+const _loopSequences = new Map();
 const _cancelledLoops = new Set();
 
 /**
@@ -414,6 +415,115 @@ export function startLoop(url, opts) {
   loadBuffer(url).then(b => {
     if (b && !_loops.has(url) && !_cancelledLoops.has(url)) _startLoopBuffer(url, b, opts);
   });
+}
+
+/**
+ * Start a persistent loop that alternates across several files.
+ * @param {string} key
+ * @param {string[]} urls
+ * @param {{ volume?: number, fadeIn?: number, bus?: string, crossfade?: number }} [opts]
+ */
+export function startLoopSequence(key, urls, opts) {
+  const id = String(key || "");
+  const list = Array.isArray(urls) ? urls.filter((url) => typeof url === "string" && url.length > 0) : [];
+  if (!id || list.length <= 0) return;
+  _cancelledLoops.delete(id);
+  if (_loopSequences.has(id)) return;
+
+  const entry = { srcs: new Set(), gains: new Set(), timers: new Set(), stopped: false };
+  _loopSequences.set(id, entry);
+
+  Promise.all(list.map(loadBuffer)).then((buffers) => {
+    if (entry.stopped || _cancelledLoops.has(id) || !_loopSequences.has(id)) return;
+    const playable = buffers.filter(Boolean);
+    if (playable.length <= 0) {
+      _loopSequences.delete(id);
+      return;
+    }
+    _startLoopSequenceBuffers(id, playable, entry, opts);
+  });
+}
+
+function _startLoopSequenceBuffers(key, buffers, entry, opts) {
+  const ac = ctx();
+  const dest = bus(opts?.bus || "ambient");
+  const vol = Number(opts?.volume ?? 1);
+  const fadeIn = Math.max(0, Number(opts?.fadeIn || 0));
+  const crossfade = Math.max(0.05, Number(opts?.crossfade || 1.0));
+  let index = 0;
+
+  function startVoice(isFirst = false) {
+    if (entry.stopped || _cancelledLoops.has(key)) return;
+    const buf = buffers[index % buffers.length];
+    index++;
+
+    const src = ac.createBufferSource();
+    const gain = ac.createGain();
+    src.buffer = buf;
+    gain.gain.setValueAtTime(0, ac.currentTime);
+    gain.gain.linearRampToValueAtTime(vol, ac.currentTime + (isFirst ? Math.max(fadeIn, 0.01) : crossfade));
+    src.connect(gain);
+    gain.connect(dest);
+    src.onended = () => {
+      entry.srcs.delete(src);
+      entry.gains.delete(gain);
+    };
+    entry.srcs.add(src);
+    entry.gains.add(gain);
+    src.start();
+
+    const duration = Math.max(0.1, Number(buf.duration || 0.1));
+    const nextMs = Math.max(50, (duration - crossfade) * 1000);
+    const timer = setTimeout(() => {
+      entry.timers.delete(timer);
+      startVoice(false);
+    }, nextMs);
+    entry.timers.add(timer);
+    try { src.stop(ac.currentTime + duration + 0.05); } catch (_) { /* ignore */ }
+  }
+
+  startVoice(true);
+}
+
+/**
+ * Stop a loop started by startLoopSequence.
+ * @param {string} key
+ * @param {{ fadeOut?: number }} [opts]
+ */
+export function stopLoopSequence(key, opts) {
+  const id = String(key || "");
+  const entry = _loopSequences.get(id);
+  if (!entry) {
+    if (id) _cancelledLoops.add(id);
+    return;
+  }
+  _cancelledLoops.add(id);
+  _loopSequences.delete(id);
+
+  const fadeOut = Number(opts?.fadeOut || 0);
+  try {
+    const ac = ctx();
+    for (const timer of entry.timers || []) clearTimeout(timer);
+    entry.timers?.clear();
+    entry.stopped = true;
+    for (const gain of entry.gains || []) {
+      if (fadeOut > 0) {
+        gain.gain.cancelScheduledValues(ac.currentTime);
+        gain.gain.setValueAtTime(gain.gain.value, ac.currentTime);
+        gain.gain.linearRampToValueAtTime(0, ac.currentTime + fadeOut);
+      } else {
+        gain.gain.value = 0;
+      }
+    }
+    for (const src of entry.srcs || []) {
+      try {
+        if (fadeOut > 0) src.stop(ac.currentTime + fadeOut + 0.05);
+        else src.stop();
+      } catch (_) { /* ignore */ }
+    }
+  } catch (_) {
+    // already stopped
+  }
 }
 
 function _startLoopBuffer(url, buf, opts) {
@@ -582,6 +692,7 @@ export function setLoopVolume(url, volume, opts) {
 /** Stop all active loops. */
 export function stopAllLoops() {
   for (const url of [..._loops.keys()]) stopLoop(url);
+  for (const key of [..._loopSequences.keys()]) stopLoopSequence(key);
 }
 
 // ── Internal playback ───────────────────────────────────────
