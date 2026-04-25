@@ -8,6 +8,79 @@ Pure JavaScript. Zero dependencies. No build step. Serve the folder, open the pa
 
 ---
 
+## Gameplay
+
+JSHack is a turn-based roguelike about surviving a strange, reactive world one tile at a time. You are not piloting a camera through a tech demo. You are choosing when to fight, when to run, when to drink the questionable potion, when to sell the loot, when to pray, and when to head back underground.
+
+The game is built for phones first. A run should make sense in your hand: tap to move, swipe into inventory, double-tap to grab what is underfoot, pinch the map when you need a better read. Keyboard controls are there because roguelike players deserve them, but touch is the primary interface.
+
+### What you do
+
+- Explore procedural dungeons and an overworld village.
+- Fight monsters with melee weapons, thrown items, spells, pets, traps, and whatever else you can bend into a tactic.
+- Loot, identify, equip, curse, bless, buy, sell, eat, drink, apply, throw, and craft items.
+- Manage hunger, carrying weight, mana, status effects, weather, fire, faction trouble, deity favor, and town economy consequences.
+- Learn the map through field of view, fog of war, memory, messages, and risk.
+- Survive long enough for your build to become a story.
+
+### Current game surface
+
+- **Classes**: Warlock, Archaeologist, Cleric, and Druid.
+- **Combat**: D&D-style attack rolls, armor class, crits, damage types, resistances, shields, dual wielding, status procs, gaze attacks, and spell crits.
+- **Magic**: destruction, support, summoning, teleportation, channeling, wands, scrolls, and gear-driven spell interactions.
+- **World simulation**: village jobs, shops, economy chains, farming, seasons, lunar calendar, weather, plant growth, fire spread, and harvestable resources.
+- **Dungeon play**: multi-floor procedural dungeons, biome slices, traps, boulder puzzles, chests, stairs, FOV, exploration memory, and monster spawners.
+- **Character pressure**: hunger, encumbrance, cursed equipment, unidentified items, pets with behavior, deity boons and wrath, and a score system.
+
+JSHack is still growing quickly, but it is already a game with enough moving parts to reward player judgment. The technical obsession exists to serve that.
+
+---
+
+## Getting Started
+
+### Play it in 30 seconds
+
+```bash
+git clone https://github.com/PJensen/JSHack.git
+cd JSHack
+python3 -m http.server 8000
+# Open http://localhost:8000
+```
+
+Any static HTTP server works because ES modules need to be served over HTTP, not opened as `file://` URLs. No `npm install`. No `npm run build`. Just serve and play.
+
+### Controls
+
+**Touch / Mobile (primary):**
+- **Tap screen sides**: Move in that direction
+- **Double-tap**: Pick up items at your feet
+- **Pinch**: Zoom in/out
+- **Swipe right**: Open inventory
+- **Swipe down**: Open message log
+
+**Keyboard (also works):**
+- **Arrow keys / WASD / HJKL**: Move
+- **. (period)**: Wait a turn
+- **, (comma)**: Pick up items
+- **Q**: Drink a potion
+- **+/- (or numpad)**: Zoom in/out
+- **0**: Reset zoom
+- **X**: Camera shake demo
+
+### Performance tuning
+
+On older phones or just want better framerates? Add URL params:
+
+```
+index.html?quality=low    # Fast mode: no glow, fewer particles
+index.html?quality=high   # Full eye candy
+index.html?dprCap=1       # Force 1x pixel density (speed boost)
+```
+
+These only affect visuals. The deterministic simulation stays identical.
+
+---
+
 ## What makes this different?
 
 ### 🚀 Zero build step, zero dependencies
@@ -71,51 +144,6 @@ Every decision prioritizes hackability:
 - No abstractions (everything is transparent)
 
 If you can `console.log` it, you can understand it.
-
----
-
-## Getting Started
-
-### Play it in 30 seconds
-
-```bash
-git clone https://github.com/PJensen/JSHack.git
-cd JSHack
-python3 -m http.server 8000
-# Open http://localhost:8000
-```
-
-Any static HTTP server works — ES modules need to be served over HTTP, not opened as `file://` URLs. No `npm install`. No `npm run build`. Just serve and play.
-
-### Controls
-
-**Touch / Mobile (primary):**
-- **Tap screen sides**: Move in that direction
-- **Double-tap**: Pick up items at your feet
-- **Pinch**: Zoom in/out
-- **Swipe right**: Open inventory
-- **Swipe down**: Open message log
-
-**Keyboard (also works):**
-- **Arrow keys / WASD / HJKL**: Move (pick your poison)
-- **. (period)**: Wait a turn
-- **, (comma)**: Pick up items
-- **Q**: Drink a potion
-- **+/- (or numpad)**: Zoom in/out
-- **0**: Reset zoom
-- **X**: Camera shake demo (because why not)
-
-### Performance tuning
-
-On older phones or just want better framerates? Add URL params:
-
-```
-index.html?quality=low    # Fast mode: no glow, fewer particles
-index.html?quality=high   # Full eye candy
-index.html?dprCap=1       # Force 1x pixel density (speed boost)
-```
-
-These only affect visuals — the deterministic simulation stays identical.
 
 ---
 
@@ -272,7 +300,7 @@ Events keep the scheduler in control and execution order predictable.
 
 ### 🎮 Core Features
 
-- **Turn-based roguelike gameplay** — classic dungeon crawling with multi-floor dungeons
+- **Turn-based roguelike gameplay** — classic dungeon crawling with multi-floor dungeons and an overworld
 - **4 character classes** — Warlock, Archaeologist, Cleric, Druid — each with unique starting gear
 - **Monster AI** — 10-level intelligence tiers driving pack alerting, retreat, ambush, and scurry
 - **28 monsters across 4 tiers** — rats to dragons, with flying creatures and gaze attacks
@@ -306,14 +334,14 @@ Events keep the scheduler in control and execution order predictable.
 - **Spatial indexing** — fast radius queries for AI and effects
 - **Script system** — attach behavior to entities without hardcoding
 - **Hot reload** — edit JS, refresh browser, see changes instantly
-- **1,086 tests** across 209 test files — Deno-powered, deterministic, no flakes
+- **2,003 tests** across 344 test files — Deno-powered, deterministic, no flakes
 - **PWA** — installable on mobile, no app store required
 - **Debug console** — spawn monsters, inspect state, remembers prior commands
 
 ### 📚 Content
 
-- **72 systems** — movement, combat, AI, items, effects, weather, economy, crafting, spawning, cleanup
-- **105 components** — Position, Vitality, Inventory, Brain, Equipment, WeatherState, CalendarState, TownfolkJob, and more
+- **85 systems** — movement, combat, AI, items, effects, weather, economy, crafting, spawning, cleanup
+- **129 component modules** — Position, Vitality, Inventory, Brain, Equipment, WeatherState, CalendarState, TownfolkJob, and more
 - **16 archetype files** — Player, Creatures, Items, Tiles, Doors, Stairs, Traps, Food, TownGoods, Overworld, etc.
 - **15 spells** — destruction (lightning, meteor, blizzard, firestorm, shadow bolt), support (heal, flash heal), summoning (skeleton), teleportation (blink, homecoming)
 - **28 monsters across 4 dungeon tiers** — rats and goblins up through dragons, mind flayers, and ancient wyrms
@@ -332,8 +360,8 @@ JSHack/
 ├── index.html              # Entry point (serve over HTTP)
 ├── src/
 │   ├── rules/              # Pure deterministic simulation
-│   │   ├── systems/        # 72 game logic systems
-│   │   ├── components/     # 105 data containers
+│   │   ├── systems/        # 85 game logic systems
+│   │   ├── components/     # 129 component modules
 │   │   ├── archetypes/     # Entity templates
 │   │   ├── scripts/        # Behavior hooks (spells, items, traps)
 │   │   ├── data/           # Spells, monsters, items, loot tables, calendar
@@ -354,7 +382,7 @@ JSHack/
 │   │   └── input/          # Input → Intent conversion
 │   ├── shared/             # Pure utilities (math, grid algorithms)
 │   └── lib/                # Vendored libraries (ecs-js, deity-js)
-├── tests/                  # 209 test files, 1,086 tests (Deno)
+├── tests/                  # 344 test files, 2,003 tests (Deno)
 ├── reference/              # Demos and examples
 └── AGENTS.md               # Guide for AI/autonomous agents
 ```
