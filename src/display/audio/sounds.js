@@ -66,7 +66,7 @@ const SOUNDS = {
   "ambient:swamp":    { files: ["biome_swamp_loop.mp3", "ambient_swamp.mp3"], bus: "ambient" },
   "ambient:forest":   { files: ["ambient_forest_1.mp3", "ambient_forest_2.mp3"], bus: "ambient" },
   "ambient:meadow":   { file: "ambient_meadow_1.mp3",      bus: "ambient" },
-  "ambient:dungeon":  { file: "ambient_dungeon_1.mp3",     bus: "ambient" },
+  "ambient:dungeon":  { files: ["ambient_dungeon_1.mp3", "ambient_dungeon_2.mp3"], bus: "ambient" },
   "ambient:omen":     { file: "ambient_dungeon_omen.mp3",  bus: "ambient", maxVoices: 1 },
   "ambient:chick":    { file: "chick.mp3",                 bus: "ambient", maxVoices: 4, volume: 0.35 },
   "ambient:chicken":  { file: "chicken.mp3",               bus: "ambient", maxVoices: 4, volume: 0.35 },
