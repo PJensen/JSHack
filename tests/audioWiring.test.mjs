@@ -3,6 +3,8 @@ import { assertAlmostEquals } from "jsr:@std/assert";
 import {
   CHANNELING_LOOP_OPTIONS,
   CHANNELING_LOOP_SOUND_ID,
+  DUNGEON_LOOP_OPTIONS,
+  DUNGEON_LOOP_SOUND_ID,
   SPELL_CAST_SOUND_EVENTS,
   computeZoomAudibilityGain,
   resolveAudioPlayKey,
@@ -20,6 +22,14 @@ Deno.test("audio wiring exposes a clean channeling loop contract", () => {
   assert(CHANNELING_LOOP_OPTIONS.bus === "spells");
   assert(CHANNELING_LOOP_OPTIONS.crossfade > 0);
   assert(CHANNELING_LOOP_OPTIONS.fadeOut > 0);
+});
+
+Deno.test("audio wiring exposes a persistent dungeon loop contract", () => {
+  assert(DUNGEON_LOOP_SOUND_ID === "ambient:dungeon");
+  assert(DUNGEON_LOOP_OPTIONS.bus === "ambient:loop");
+  assert(DUNGEON_LOOP_OPTIONS.volume > 0);
+  assert(DUNGEON_LOOP_OPTIONS.crossfade > 0);
+  assert(DUNGEON_LOOP_OPTIONS.fadeOut > 0);
 });
 
 Deno.test("audio wiring zoom gain follows camera scale with clamps", () => {

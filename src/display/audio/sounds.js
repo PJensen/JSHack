@@ -105,7 +105,7 @@ const SOUNDS = {
   "spell:shield_bash":   { file: "melee_shield_hit_1.mp3",  bus: "spells" },
   "spell:wolf_howl":     { file: "spell_wolf_howl.mp3",     bus: "spells" },
   "spell:boar_charge":   { file: "boar_charge.mp3",         bus: "spells" },
-  "spell:consecrate":    { file: "harp_reverb.wav",         bus: "spells" },
+  "spell:consecrate":    { file: null,                      bus: "spells" },
   "spell:divine_shield": { file: "spell_buff.mp3",          bus: "spells" },
   "spell:purify":        { file: "water_magic_1.mp3",       bus: "spells" },
   "spell:bloodthirst":   { file: "spell_lifetap.mp3",       bus: "spells" },
@@ -209,6 +209,17 @@ export function resolve(id) {
     : entry.file;
   if (typeof file !== "string" || file.length <= 0) return null;
   return { ...entry, file, files: files.length > 0 ? files : undefined, url: BASE + file };
+}
+
+export function resolveUrls(id) {
+  const entry = SOUNDS[id];
+  if (!entry) return [];
+  if (Array.isArray(entry.files) && entry.files.length > 0) {
+    return entry.files
+      .filter((file) => typeof file === "string" && file.length > 0)
+      .map((file) => BASE + file);
+  }
+  return typeof entry.file === "string" && entry.file.length > 0 ? [BASE + entry.file] : [];
 }
 
 /** All registered file URLs — for preloading. */
