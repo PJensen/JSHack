@@ -2,7 +2,8 @@ import { startLoop, stopLoop, setLoopVolume } from "./audioEngine.js";
 import { resolve } from "./sounds.js";
 
 const FOUNTAIN_AUDIBLE_RADIUS_TILES = 7;
-const FOUNTAIN_LOOP_GAIN = 0.72;
+const FOUNTAIN_LOOP_GAIN = 0.24;
+const AMBIENT_LOOP_BUS = "ambient:loop";
 
 /**
  * @param {{ x:number, y:number }} a
@@ -113,7 +114,7 @@ export function createFountainAmbientController({
 
     if (!loopActive) {
       startLoopFn(fountainUrl, {
-        bus: fountainSound?.bus || "ambient",
+        bus: AMBIENT_LOOP_BUS,
         volume: targetVolume,
         fadeIn: 0.45,
       });

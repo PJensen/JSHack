@@ -2,9 +2,9 @@ import { assert, assertAlmostEquals, assertEquals } from "jsr:@std/assert";
 import { createLocalEmitterAmbientController, computeCookingFireLoopVolume, computeHolySiteLoopVolume, computeTorchLoopVolume } from "../src/display/audio/localEmitterAmbientController.js";
 
 Deno.test("local emitter loop curves fall off by radius", () => {
-  assertAlmostEquals(computeCookingFireLoopVolume(1), 0.3, 1e-10);
-  assertAlmostEquals(computeHolySiteLoopVolume(1), 0.26, 1e-10);
-  assertAlmostEquals(computeTorchLoopVolume(1), 0.35, 1e-10);
+  assertAlmostEquals(computeCookingFireLoopVolume(1), 0.14, 1e-10);
+  assertAlmostEquals(computeHolySiteLoopVolume(1), 0.1, 1e-10);
+  assertAlmostEquals(computeTorchLoopVolume(1), 0.12, 1e-10);
   assertEquals(computeCookingFireLoopVolume(8), 0);
   assertEquals(computeHolySiteLoopVolume(7), 0);
   assertEquals(computeTorchLoopVolume(6), 0);
@@ -40,10 +40,13 @@ Deno.test("local emitter controller follows nearest cooking fire and torch sourc
   });
   assertEquals(calls[0]?.type, "start");
   assertEquals(calls[0]?.url, "./assets/audio/ambient:cooking_fire.mp3");
+  assertEquals(calls[0]?.opts?.bus, "ambient:loop");
   assertEquals(calls[1]?.type, "start");
   assertEquals(calls[1]?.url, "./assets/audio/ambient:holy_site.mp3");
+  assertEquals(calls[1]?.opts?.bus, "ambient:loop");
   assertEquals(calls[2]?.type, "start");
   assertEquals(calls[2]?.url, "./assets/audio/ambient:torch_flames.mp3");
+  assertEquals(calls[2]?.opts?.bus, "ambient:loop");
 
   controller.syncWorldView({
     player: { pos: { x: 10, y: 10 } },

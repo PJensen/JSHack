@@ -439,8 +439,8 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
 
   world.on('weather:changed', ({ weather }) => {
     if ((weather === 'rain' || weather === 'heavy_rain') && rainUrl) {
-      const vol = weather === 'heavy_rain' ? 0.7 : 0.4;
-      startLoop(rainUrl, { volume: vol, fadeIn: 2.0, bus: "ambient" });
+      const vol = weather === 'heavy_rain' ? 0.34 : 0.2;
+      startLoop(rainUrl, { volume: vol, fadeIn: 2.0, bus: "ambient:loop" });
     } else {
       if (rainUrl) stopLoop(rainUrl, { fadeOut: 3.0 });
     }
@@ -472,7 +472,7 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     } else {
       setReverbMix(Math.min(0.45, 0.15 + depth * 0.05));  // 0.20 at d1, 0.45 cap
       if (dungeonUrl && !dungeonActive) {
-        startLoop(dungeonUrl, { volume: 0.5, fadeIn: 1.5, bus: "ambient" });
+        startLoop(dungeonUrl, { volume: 0.22, fadeIn: 1.5, bus: "ambient:loop" });
         dungeonActive = true;
       }
     }

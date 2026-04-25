@@ -5,9 +5,10 @@ import { hasLOS } from "../../shared/math/gridLOS.js";
 const COOKING_FIRE_AUDIBLE_RADIUS_TILES = 8;
 const HOLY_SITE_AUDIBLE_RADIUS_TILES = 7;
 const TORCH_AUDIBLE_RADIUS_TILES = 6;
-const COOKING_FIRE_LOOP_GAIN = 0.3;
-const HOLY_SITE_LOOP_GAIN = 0.26;
-const TORCH_LOOP_GAIN = 0.35;
+const AMBIENT_LOOP_BUS = "ambient:loop";
+const COOKING_FIRE_LOOP_GAIN = 0.14;
+const HOLY_SITE_LOOP_GAIN = 0.1;
+const TORCH_LOOP_GAIN = 0.12;
 const HOLY_SITE_IDENTITIES = new Set([
   "altar",
   "shrine",
@@ -170,7 +171,7 @@ export function createLocalEmitterAmbientController({
 
     if (cookingVolume > 0.001 && cookingUrl) {
       if (!cookingActive) {
-        startLoopFn(cookingUrl, { bus: cookingSound?.bus || "ambient", volume: cookingVolume, fadeIn: 0.25 });
+        startLoopFn(cookingUrl, { bus: AMBIENT_LOOP_BUS, volume: cookingVolume, fadeIn: 0.25 });
         cookingActive = true;
       } else {
         setLoopVolumeFn(cookingUrl, cookingVolume, { ramp: 0.12 });
@@ -181,7 +182,7 @@ export function createLocalEmitterAmbientController({
 
     if (holySiteVolume > 0.001 && holySiteUrl) {
       if (!holySiteActive) {
-        startLoopFn(holySiteUrl, { bus: holySiteSound?.bus || "ambient", volume: holySiteVolume, fadeIn: 0.28 });
+        startLoopFn(holySiteUrl, { bus: AMBIENT_LOOP_BUS, volume: holySiteVolume, fadeIn: 0.28 });
         holySiteActive = true;
       } else {
         setLoopVolumeFn(holySiteUrl, holySiteVolume, { ramp: 0.1 });
@@ -192,7 +193,7 @@ export function createLocalEmitterAmbientController({
 
     if (torchVolume > 0.001 && torchUrl) {
       if (!torchActive) {
-        startLoopFn(torchUrl, { bus: torchSound?.bus || "ambient", volume: torchVolume, fadeIn: 0.2 });
+        startLoopFn(torchUrl, { bus: AMBIENT_LOOP_BUS, volume: torchVolume, fadeIn: 0.2 });
         torchActive = true;
       } else {
         setLoopVolumeFn(torchUrl, torchVolume, { ramp: 0.08 });

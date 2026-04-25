@@ -70,6 +70,7 @@ const BUS_DEFAULTS = {
   spells:  1.0,
   items:   0.8,
   ambient: 0.9,
+  "ambient:loop": 0.45,
   ui:      1.0,
 };
 

@@ -25,10 +25,11 @@ const FOREST_TILES = new Set([
 const MEADOW_TILES = new Set([
   TILE_GRASS, TILE_GRASS_A, TILE_GRASS_C, TILE_GRASS_D,
 ]);
-const OCEAN_PEAK_GAIN = 0.45;
-const SWAMP_PEAK_GAIN = 0.38;
-const FOREST_PEAK_GAIN = 0.40;
-const MEADOW_PEAK_GAIN = 0.35;
+const AMBIENT_LOOP_BUS = "ambient:loop";
+const OCEAN_PEAK_GAIN = 0.2;
+const SWAMP_PEAK_GAIN = 0.16;
+const FOREST_PEAK_GAIN = 0.17;
+const MEADOW_PEAK_GAIN = 0.14;
 
 /**
  * Compute volume from tile count in scan area.
@@ -152,7 +153,7 @@ export function createBiomeAmbientController({
 
     if (oceanVolume > 0.001 && oceanUrl) {
       if (!oceanActive) {
-        startLoopFn(oceanUrl, { bus: oceanSound?.bus || "ambient", volume: oceanVolume, fadeIn: 0.4 });
+        startLoopFn(oceanUrl, { bus: AMBIENT_LOOP_BUS, volume: oceanVolume, fadeIn: 0.4 });
         oceanActive = true;
       } else {
         setLoopVolumeFn(oceanUrl, oceanVolume, { ramp: 0.15 });
@@ -163,7 +164,7 @@ export function createBiomeAmbientController({
 
     if (swampVolume > 0.001 && swampUrl) {
       if (!swampActive) {
-        startLoopFn(swampUrl, { bus: swampSound?.bus || "ambient", volume: swampVolume, fadeIn: 0.4 });
+        startLoopFn(swampUrl, { bus: AMBIENT_LOOP_BUS, volume: swampVolume, fadeIn: 0.4 });
         swampActive = true;
       } else {
         setLoopVolumeFn(swampUrl, swampVolume, { ramp: 0.15 });
@@ -174,7 +175,7 @@ export function createBiomeAmbientController({
 
     if (forestVolume > 0.001 && forestUrl) {
       if (!forestActive) {
-        startLoopFn(forestUrl, { bus: forestSound?.bus || "ambient", volume: forestVolume, fadeIn: 0.4 });
+        startLoopFn(forestUrl, { bus: AMBIENT_LOOP_BUS, volume: forestVolume, fadeIn: 0.4 });
         forestActive = true;
       } else {
         setLoopVolumeFn(forestUrl, forestVolume, { ramp: 0.15 });
@@ -185,7 +186,7 @@ export function createBiomeAmbientController({
 
     if (meadowVolume > 0.001 && meadowUrl) {
       if (!meadowActive) {
-        startLoopFn(meadowUrl, { bus: meadowSound?.bus || "ambient", volume: meadowVolume, fadeIn: 0.4 });
+        startLoopFn(meadowUrl, { bus: AMBIENT_LOOP_BUS, volume: meadowVolume, fadeIn: 0.4 });
         meadowActive = true;
       } else {
         setLoopVolumeFn(meadowUrl, meadowVolume, { ramp: 0.15 });
