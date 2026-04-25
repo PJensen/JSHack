@@ -46,6 +46,8 @@ const _petVocalizationCooldowns = new Map();
 
 /** Max tile distance at which a sound is still audible. Beyond this → silent. */
 const MAX_HEAR_DIST = 16;
+const MIN_ZOOM_GAIN = 0.65;
+const MAX_ZOOM_GAIN = 1.35;
 
 /**
  * Compute pan (-1…+1) and volume (0…1) from source position relative to player.
@@ -71,6 +73,14 @@ function spatialize(sourcePos, playerPos) {
   return { pan, volume };
 }
 
+export function computeZoomAudibilityGain(zoomScale, referenceScale) {
+  const zoom = Number(zoomScale);
+  const reference = Number(referenceScale);
+  if (!Number.isFinite(zoom) || !Number.isFinite(reference) || zoom <= 0 || reference <= 0) return 1;
+  const gain = Math.sqrt(zoom / reference);
+  return Math.max(MIN_ZOOM_GAIN, Math.min(MAX_ZOOM_GAIN, gain));
+}
+
 // ── Sound playback helpers ──────────────────────────────────
 
 /** Play a registered sound with optional spatial + overrides. */
@@ -88,7 +98,7 @@ function sfx(id, opts) {
 }
 
 /** Play a registered sound positioned in world space. */
-function sfxAt(id, sourcePos, playerPos, extraOpts) {
+function sfxAt(id, sourcePos, playerPos, extraOpts, zoomGain = 1) {
   const spatial = spatialize(sourcePos, playerPos);
   if (spatial.volume <= 0) return; // too far, don't play
   const sound = resolve(id);
@@ -98,7 +108,7 @@ function sfxAt(id, sourcePos, playerPos, extraOpts) {
   // Sounds at/adjacent to player (volume >= 0.95) keep priority 1.
   // Everything else is priority 0 and evictable when player acts.
   const priority = spatial.volume >= 0.95 ? 1 : 0;
-  sfx(id, { pan: spatial.pan, volume: spatial.volume * gain, priority, ...restOpts });
+  sfx(id, { pan: spatial.pan, volume: spatial.volume * gain * zoomGain, priority, ...restOpts });
 }
 
 /**
@@ -185,15 +195,22 @@ export const SPELL_CAST_SOUND_EVENTS = Object.freeze([
  *   getPosition: (id: number) => { x: number, y: number } | null,
  *   getIdentity?: (id: number) => string | null,
  *   getDepth: () => number,
+ *   getZoomScale?: () => number,
+ *   getReferenceZoomScale?: () => number,
  * }} deps
  */
-export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosition, getPosition, getIdentity, getDepth }) {
+export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosition, getPosition, getIdentity, getDepth, getZoomScale, getReferenceZoomScale }) {
 
   // No preload — sounds are fetched on first play. Missing files fail once
   // and are blacklisted so they never retry or flood the network.
 
   /** Shorthand — current player pos for spatial calcs. */
   function pp() { return getPlayerPosition(); }
+  function zg() {
+    if (typeof getZoomScale !== "function") return 1;
+    const reference = typeof getReferenceZoomScale === "function" ? getReferenceZoomScale() : getZoomScale();
+    return computeZoomAudibilityGain(getZoomScale(), reference);
+  }
 
   // ── Combat ────────────────────────────────────────────────
 
@@ -205,39 +222,39 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
       const creatureAttackId = CREATURE_ATTACK_SOUNDS[srcIdentity];
       if (creatureAttackId) {
         const srcPos = source != null ? getPosition(source) : null;
-        sfxAt(creatureAttackId, srcPos, pp(), { priority: 1 });
+        sfxAt(creatureAttackId, srcPos, pp(), { priority: 1 }, zg());
       }
     }
     // Impact sounds on hit
     if (cause === 'melee' || cause === 'offhand') {
-      sfxAt(critical ? "melee:crit" : "melee:hit", pos, pp());
+      sfxAt(critical ? "melee:crit" : "melee:hit", pos, pp(), null, zg());
     }
     if (cause === 'spell' || cause === 'magic') {
       const impactId = SPELL_IMPACT_MAP[type] || "spell:impact:physical";
-      sfxAt(impactId, pos, pp());
+      sfxAt(impactId, pos, pp(), null, zg());
     }
     // Electrocution sound for electric/lightning damage
     if ((type === 'electric' || type === 'lightning') && cause === 'spell') {
-      sfxAt("status:electrocuted", pos, pp(), { priority: 1 });
+      sfxAt("status:electrocuted", pos, pp(), { priority: 1 }, zg());
     }
   });
 
   world.on('hit', (ctx) => {
     if (ctx.missed) {
       const pos = ctx.at || (ctx.target != null ? getPosition(ctx.target) : null);
-      sfxAt("melee:miss", pos, pp());
+      sfxAt("melee:miss", pos, pp(), null, zg());
     }
   });
 
   world.on('shield:guarded', ({ id, at }) => {
     const pos = at || (id != null ? getPosition(id) : null);
-    sfxAt("shield:blocked", pos, pp(), { priority: 1 });
+    sfxAt("shield:blocked", pos, pp(), { priority: 1 }, zg());
   });
 
   world.on('creature:vocalize', ({ identity, at }) => {
     const soundId = CREATURE_VOCALIZE_SOUNDS[identity];
     if (soundId) {
-      sfxAt(soundId, at, pp());
+      sfxAt(soundId, at, pp(), null, zg());
     }
   });
 
@@ -251,13 +268,13 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     }
 
     const soundId = PET_VOCALIZE_SOUNDS[identity] || "creature:pet:meow";
-    sfxAt(soundId, at, pp());
+    sfxAt(soundId, at, pp(), null, zg());
     _petVocalizationCooldowns.set(petId, 60); // 60-turn cooldown between vocalizations
   });
 
   world.on('ranged:shot', ({ attacker, target }) => {
     const pos = attacker != null ? getPosition(attacker) : null;
-    sfxAt("ranged:shot", pos, pp());
+    sfxAt("ranged:shot", pos, pp(), null, zg());
   });
 
   world.on('died', ({ id, critical, amount }) => {
@@ -269,7 +286,7 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     } else {
       const creatureId = typeof getIdentity === "function" ? String(getIdentity(id) || "") : "";
       const deathSoundId = creatureId === "boar" ? "creature:boar:died" : "death";
-      sfxAt(deathSoundId, pos, pp());
+      sfxAt(deathSoundId, pos, pp(), null, zg());
     }
   });
 
@@ -278,7 +295,7 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
   world.on('item:pickup', ({ itemId, itemX, itemY }) => {
     const cat = itemCategory(getItemInfo, itemId);
     const pos = (itemX != null && itemY != null) ? { x: itemX, y: itemY } : null;
-    sfxAt(`item:pickup:${cat}`, pos, pp());
+    sfxAt(`item:pickup:${cat}`, pos, pp(), null, zg());
   });
 
   world.on('item:dropped', ({ itemId, at }) => {
@@ -302,27 +319,27 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     } else {
       dropId = "item:drop:generic";
     }
-    sfxAt(dropId, at, pp());
+    sfxAt(dropId, at, pp(), null, zg());
   });
 
   world.on('interaction', ({ action, result, targetId }) => {
     if (action === 'toggleDoor') {
       const doorSoundId = result === 'opened' ? 'door:open' : 'door:close';
       const pos = targetId != null ? getPosition(targetId) : null;
-      sfxAt(doorSoundId, pos, pp(), { priority: 0, volume: 0.6 });
+      sfxAt(doorSoundId, pos, pp(), { priority: 1, volume: 1.25 }, zg());
     }
   });
 
   world.on('potion:splash', ({ at }) => {
-    sfxAt("item:impact:potion", at, pp());
+    sfxAt("item:impact:potion", at, pp(), null, zg());
   });
 
   world.on('potion:splash:dud', ({ at }) => {
-    sfxAt("item:impact:potion", at, pp());
+    sfxAt("item:impact:potion", at, pp(), null, zg());
   });
 
   world.on('potion:oil_splash', ({ at }) => {
-    sfxAt("item:impact:potion", at, pp());
+    sfxAt("item:impact:potion", at, pp(), null, zg());
   });
 
   world.on('item:equipped', ({ itemId }) => {
@@ -335,7 +352,7 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
 
   world.on('chest:open', ({ targetId }) => {
     const pos = targetId != null ? getPosition(targetId) : null;
-    sfxAt("chest:open", pos, pp());
+    sfxAt("chest:open", pos, pp(), null, zg());
   });
 
   world.on('harvest:picked', ({ itemId, targetId }) => {
@@ -347,7 +364,7 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     const pos = targetId != null ? getPosition(targetId) : null;
     let dropId = mat && mat !== "gemstone" ? `item:drop:gem:${mat}` : "item:drop:gem";
     if (!resolve(dropId)) dropId = "item:drop:gem";
-    sfxAt(dropId, pos, pp());
+    sfxAt(dropId, pos, pp(), null, zg());
   });
 
   // ── Environment ───────────────────────────────────────────
@@ -374,17 +391,17 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
 
   world.on('bell:rung', ({ targetId }) => {
     const pos = targetId != null ? getPosition(targetId) : null;
-    sfxAt("church:bell", pos, pp(), { priority: 1 });
+    sfxAt("church:bell", pos, pp(), { priority: 1 }, zg());
   });
 
   world.on('fountain:drink', ({ targetId, effect }) => {
     const pos = targetId != null ? getPosition(targetId) : null;
-    sfxAt("fountain:sip", pos, pp());
+    sfxAt("fountain:sip", pos, pp(), null, zg());
   });
 
   world.on('fountain:dip', ({ targetId, effect }) => {
     const pos = targetId != null ? getPosition(targetId) : null;
-    sfxAt("fountain:sip", pos, pp());
+    sfxAt("fountain:sip", pos, pp(), null, zg());
   });
 
   world.on('status', ({ id, kind, at }) => {
@@ -393,7 +410,7 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     const soundId = ALERT_SOUND_BY_IDENTITY[identity];
     if (!soundId) return;
     const pos = at || getPosition(id);
-    sfxAt(soundId, pos, pp(), { priority: 1 });
+    sfxAt(soundId, pos, pp(), { priority: 1 }, zg());
   });
 
   world.on('status:deafened', ({ target, severity }) => {
@@ -410,7 +427,7 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
 
   world.on('status:frozen', ({ target, at }) => {
     const pos = at || (target != null ? getPosition(target) : null);
-    sfxAt("status:frozen", pos, pp());
+    sfxAt("status:frozen", pos, pp(), null, zg());
   });
 
   // ── Spells (cast / launch sounds) ─────────────────────────
@@ -422,7 +439,7 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     world.on(ev, (payload) => {
       // Spells carry origin info in various fields
       const pos = payload?.at || payload?.origin || payload?.from || null;
-      sfxAt(ev, pos, pp());
+      sfxAt(ev, pos, pp(), null, zg());
     });
   }
 
@@ -430,7 +447,7 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
   // not a cast sound and not one sound per damaged target.
   world.on('spell:meteor', (payload) => {
     const pos = payload?.origin || payload?.at || null;
-    sfxAt("spell:impact:meteor", pos, pp(), { priority: 1 });
+    sfxAt("spell:impact:meteor", pos, pp(), { priority: 1 }, zg());
   });
 
   // ── Weather ───────────────────────────────────────────────
@@ -450,7 +467,7 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     const playerPos = pp();
     const spatial = spatialize({ x, y }, playerPos);
     const thunderId = spatial.volume <= 0.45 ? "thunder:distant" : "thunder";
-    sfxAt(thunderId, { x, y }, playerPos);
+    sfxAt(thunderId, { x, y }, playerPos, null, zg());
   });
 
   // Floor transitions — stop rain, adjust reverb for environment
@@ -490,7 +507,7 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
 
   world.on('hazard:ignited', ({ at }) => {
     const pos = at || null;
-    sfxAt("torch:ignite", pos, pp());
+    sfxAt("torch:ignite", pos, pp(), null, zg());
   });
 
   world.on('shop:open', ({ targetId, actor }) => {
@@ -500,7 +517,7 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
   // Generic audio event — play any registered sound by key
   world.on('audio:play', ({ key, x, y }) => {
     if (typeof x === 'number' && typeof y === 'number') {
-      sfxAt(key, { x, y }, pp());
+      sfxAt(key, { x, y }, pp(), null, zg());
     } else {
       sfx(key);
     }

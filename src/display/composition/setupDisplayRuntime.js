@@ -136,6 +136,7 @@ export function setupDisplayRuntime({
     dispatchRulesAction,
   });
 
+  const audioReferenceZoomScale = cam?.targetScale || cam?.scale || 1;
   installAudioWiring({
     world,
     isPlayer,
@@ -152,6 +153,8 @@ export function setupDisplayRuntime({
       return pe ? getPosition(pe.id ?? pe) : null;
     },
     getDepth: getDepth || (() => 0),
+    getZoomScale: () => cam?.scale || cam?.targetScale || 1,
+    getReferenceZoomScale: () => audioReferenceZoomScale,
   });
 
   const fountainAmbientFx = createFountainAmbientController({ world });
