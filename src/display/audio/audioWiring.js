@@ -489,7 +489,7 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     } else {
       setReverbMix(Math.min(0.45, 0.15 + depth * 0.05));  // 0.20 at d1, 0.45 cap
       if (dungeonUrl && !dungeonActive) {
-        startLoop(dungeonUrl, { volume: 0.22, fadeIn: 1.5, bus: "ambient:loop" });
+        startLoop(dungeonUrl, { volume: 0.22, fadeIn: 1.5, bus: "ambient:loop", crossfade: 1.25 });
         dungeonActive = true;
       }
     }
