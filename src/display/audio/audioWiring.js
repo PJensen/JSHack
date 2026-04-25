@@ -391,7 +391,7 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
 
   world.on('status:deafened', ({ target, severity }) => {
     if (isPlayer(target) && severity >= 1) {
-      sfx("ears:ringing", { volume: 0.8 });
+      sfx("status:deafened", { volume: 0.8 });
     }
   });
 

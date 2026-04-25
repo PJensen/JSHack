@@ -70,7 +70,6 @@ const SOUNDS = {
   "ambient:omen":     { file: "ambient_dungeon_omen.mp3",  bus: "ambient", maxVoices: 1 },
   "ambient:chick":    { file: "chick.mp3",                 bus: "ambient", maxVoices: 4, volume: 0.35 },
   "ambient:chicken":  { file: "chicken.mp3",               bus: "ambient", maxVoices: 4, volume: 0.35 },
-  "ears:ringing":     { files: ["ears_ringing.mp3", "ears_ringing_2.mp3"], bus: "ui", maxVoices: 1 },
   "character:select":  { file: "character_select.mp3",      bus: "ui", maxVoices: 1 },
   "enter:world":       { file: "enter_world.mp3",           bus: "ui", maxVoices: 1 },
   "snake:alert":      { file: "snake_alerted.mp3",         bus: "combat", maxVoices: 2, randomPitch: 18 },
@@ -147,8 +146,9 @@ const SOUNDS = {
   "smithy:anvil:hit": { files: ["anvil_hit_1.mp3", "anvil_hit_2.mp3"], bus: "ambient", maxVoices: 3, randomPitch: 40 },
 
   // ── Status Effects ──────────────────────────────
-  "status:electrocuted": { file: "electrocuted.mp3", bus: "combat", maxVoices: 1 },
-  "status:slimed":       { file: "slimed.mp3",       bus: "combat", maxVoices: 1 },
+  "status:electrocuted": { file: "status_electrocuted.mp3", bus: "combat", maxVoices: 1 },
+  "status:slimed":       { file: "status_slimed.mp3",       bus: "combat", maxVoices: 1 },
+  "status:deafened":     { files: ["status_deafened.mp3", "status_deafened_2.mp3"], bus: "ui", maxVoices: 1 },
 
   // ── Interactions ────────────────────────────────
   "fountain:sip":     { file: "fountain_sip.mp3",    bus: "items" },
