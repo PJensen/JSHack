@@ -401,6 +401,11 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     }
   });
 
+  world.on('status:frozen', ({ target, at }) => {
+    const pos = at || (target != null ? getPosition(target) : null);
+    sfxAt("status:frozen", pos, pp());
+  });
+
   // ── Spells (cast / launch sounds) ─────────────────────────
   // Each spell gets its own sound on cast. Impact sounds fire
   // separately via the 'damaged' handler above when the spell

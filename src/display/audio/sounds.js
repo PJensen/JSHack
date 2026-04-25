@@ -149,6 +149,7 @@ const SOUNDS = {
   "status:electrocuted": { file: "status_electrocuted.mp3", bus: "combat", maxVoices: 1 },
   "status:slimed":       { file: "status_slimed.mp3",       bus: "combat", maxVoices: 1 },
   "status:deafened":     { files: ["status_deafened.mp3", "status_deafened_2.mp3"], bus: "ui", maxVoices: 1 },
+  "status:frozen":       { files: ["status_frozen_1.mp3", "status_frozen_2.mp3", "status_frozen_3.mp3", "status_frozen_4.mp3", "status_frozen_5.mp3"], bus: "combat", maxVoices: 1 },
 
   // ── Interactions ────────────────────────────────
   "fountain:sip":     { file: "fountain_sip.mp3",    bus: "items" },
