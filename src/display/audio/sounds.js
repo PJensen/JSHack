@@ -95,7 +95,7 @@ const SOUNDS = {
   "spell:plague_swarm":  { file: "spell_plague_swarm.mp3",  bus: "spells" },
   "spell:earthshatter":  { file: "spell_earthshatter.wav",  bus: "spells" },
   "spell:war_cry":       { file: "spell_war_cry.wav",       bus: "spells" },
-  "spell:cleave":        { files: ["spell_cleave.wav", "spell_cleave.mp3"], bus: "spells" },
+  "spell:cleave":        { file: "spell_cleave.mp3",        bus: "spells" },
   "spell:rampage":       { file: "spell_rampage.wav",       bus: "spells" },
   "spell:phase_strike":  { file: "spell_phase_strike.wav",  bus: "spells" },
   "spell:shield_bash":   { file: "spell_shield_bash.wav",   bus: "spells" },
@@ -168,7 +168,7 @@ const SOUNDS = {
   "ambient:jump_scare": { file: "ambient_jump_scare.mp3", bus: "ambient", maxVoices: 1 },
 
   // ── Additional Spell Variants ───────────────────
-  "spell:agony":      { file: "spell_agony.mp3",     bus: "spells" },
+  "spell:agony":      { file: "spell_agony.mp3",     bus: "spells", volume: 8 },
 
   // ── UI / Misc ───────────────────────────────────
   "level:up":         { file: "level_up.wav",   bus: "ui", maxVoices: 1 },
