@@ -126,3 +126,103 @@ export const HINTS = [
   "Seeds can be entered as hex (0xC0FFEE) or plain numbers.",
   "On PC, you can use ~ to open the console and enter debug commands. Try 'god' for fun.",
 ];
+
+export const ORACULAR_MESSAGES = HINTS;
+
+const ORACULAR_TERMS = Object.freeze([
+  // Items
+  "Potion of Poison",
+  "Potion of Weakness",
+  "Stoneskin potion",
+  "Anti-Venom",
+  "Hearthstone",
+  "Touchstone",
+  "Holy water",
+  "Unholy water",
+  "Polymorph scroll",
+  "Voidmind Athame",
+  "Items",
+  "weapons",
+  "equipment",
+
+  // Spells and abilities
+  "Lightning",
+  "Blink",
+  "Homecoming",
+  "Phase Strike",
+  "Rampage",
+  "Flash Heal",
+  "Frost",
+  "Agony",
+  "Polymorph Control",
+
+  // Monsters and creatures
+  "Rat",
+  "Snake",
+  "Floating Eye",
+  "Cave Spiders",
+  "Devourer",
+  "Grid bugs",
+  "Liches",
+  "Wraiths",
+  "Dragons",
+  "Golems",
+  "Gargoyles",
+  "Vampires",
+  "Cats",
+  "monsters",
+  "wolves",
+  "centipedes",
+
+  // Statuses, traps, and named mechanics
+  "Stun",
+  "Burning",
+  "Blind",
+  "Frost",
+  "Shock traps",
+  "Snake traps",
+  "spike trap",
+  "disease",
+  "poison",
+  "electricity",
+]);
+
+const ORACULAR_TERM_SET = new Set(ORACULAR_TERMS.map((term) => term.toLowerCase()));
+const ORACULAR_TERM_PATTERN = new RegExp(
+  `\\b(${ORACULAR_TERMS
+    .slice()
+    .sort((a, b) => b.length - a.length)
+    .map(escapeRegExp)
+    .join("|")})\\b`,
+  "gi",
+);
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (ch) => {
+    switch (ch) {
+      case "&": return "&amp;";
+      case "<": return "&lt;";
+      case ">": return "&gt;";
+      case '"': return "&quot;";
+      case "'": return "&#39;";
+      default: return ch;
+    }
+  });
+}
+
+function bracketLabel(label) {
+  const text = String(label || "").trim();
+  if (!text) return "";
+  return text.startsWith("[") && text.endsWith("]") ? text : `[${text}]`;
+}
+
+export function formatOracularMessageHtml(message) {
+  return escapeHtml(message).replace(ORACULAR_TERM_PATTERN, (match) => {
+    if (!ORACULAR_TERM_SET.has(String(match).toLowerCase())) return match;
+    return `<b class="oracle-term">${bracketLabel(match)}</b>`;
+  });
+}

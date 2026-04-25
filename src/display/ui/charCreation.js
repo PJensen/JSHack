@@ -4,6 +4,7 @@
 import { versionLoaded, getVersionState } from '../../shared/version.js';
 import { pickRandomCharacterName } from '../../shared/utils/characterNames.js';
 import { getHighscoreVersionLabel, getHighscores } from '../../shared/tombstoneApi.js';
+import { ORACULAR_MESSAGES, formatOracularMessageHtml } from '../../shared/data/hints.js';
 import { play, preload, startLoop, stopLoop } from '../audio/audioEngine.js';
 
 /**
@@ -55,6 +56,7 @@ const CLASS_ICONS = {
 
 export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm }) {
   let classIndex = Math.floor(Math.random() * classes.length);
+  let oracleTimer = null;
   const savedName = readSavedName();
   const fallbackName = savedName || pickRandomCharacterName();
   preload([
@@ -1290,6 +1292,40 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
   box.appendChild(hsToggle);
   box.appendChild(hsWrap);
 
+  // ---- oracular gameplay messages ----
+  const oracleHint = document.createElement('div');
+  Object.assign(oracleHint.style, {
+    margin: '12px auto 0',
+    maxWidth: 'min(420px, 82vw)',
+    minHeight: '2.8em',
+    color: '#8fb8ca',
+    fontSize: '11px',
+    lineHeight: '1.4',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    opacity: '0',
+    transition: 'opacity 360ms ease',
+  });
+  function renderOracleHint() {
+    if (!Array.isArray(ORACULAR_MESSAGES) || !ORACULAR_MESSAGES.length) return;
+    const idx = Math.floor(Math.random() * ORACULAR_MESSAGES.length);
+    oracleHint.style.opacity = '0';
+    setTimeout(() => {
+      oracleHint.innerHTML = formatOracularMessageHtml(ORACULAR_MESSAGES[idx]);
+      for (const el of oracleHint.querySelectorAll('.oracle-term')) {
+        Object.assign(el.style, {
+          color: '#d8f2ff',
+          fontStyle: 'normal',
+          fontWeight: '800',
+        });
+      }
+      oracleHint.style.opacity = '1';
+    }, 360);
+  }
+  renderOracleHint();
+  oracleTimer = setInterval(renderOracleHint, 5200);
+  box.appendChild(oracleHint);
+
   // ---- footer: subscribe + music nudge ----
   const footerRow = document.createElement('div');
   Object.assign(footerRow.style, {
@@ -1420,6 +1456,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
     // Stop character creation soundscape
     stopLoop('./assets/audio/soundscape.mp3', { fadeOut: 1.0 });
     if (bgRafId !== null) cancelAnimationFrame(bgRafId);
+    if (oracleTimer !== null) clearInterval(oracleTimer);
     if (ctaPulseAnim) { try { ctaPulseAnim.cancel(); } catch {} ctaPulseAnim = null; }
     window.removeEventListener('resize', resizeBgCanvas);
     panel.removeEventListener('pointermove', onPointerEntropy);

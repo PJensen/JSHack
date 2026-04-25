@@ -209,6 +209,13 @@
 				#boot-file-line[data-status="loaded"] { color: #8bd4a8; }
 				#boot-file-line[data-status="error"] { color: #ff9b9b; }
 
+				#boot-hint .oracle-term {
+					font-weight: 800;
+					color: #d8f2ff;
+					font-style: normal;
+					text-shadow: 0 0 8px rgba(122, 175, 207, 0.28);
+				}
+
 				#boot-install {
 					display: none;
 					margin-top: 16px;
@@ -413,35 +420,40 @@
 			if (hasSavegame() && !hasValidFloorOverride()) bootLabel.textContent = 'Loading from Save';
 			renderBoot();
 
-			// ---- feature hints during load ----
+			// ---- canonical oracular messages during load ----
 			{
-				const hints = [
-					'A spirit wisp orbits you \u2014 it senses danger and flares on miracles',
-					'Sub-tile lighting with flickering torches, candles, and magical pulses',
-					'Rain sweeps across the overworld with wind-driven particle streaks',
-					'Burning enemies bleed embers \u2014 poison drips, frost crystallizes',
-					'Lightning bolts fork across the screen with deity-colored strokes',
-					'Spells erupt in radial blasts, meteor impacts, and blink particle bursts',
-					'Shield wards pulse with rotating sigils and lighter-blend auras',
-					'Dragon breath radiates hot yellow-to-red glow with heat shimmer',
-					'Electric shock arcs strobe with discrete blue-white sparks',
-					'Camera shakes on heavy impacts \u2014 sways when intoxicated',
-					'Fire clouds churn with plasma pulses and burn plumes',
-					'Crops sprout from seedlings through visual growth stages',
-					'Floating damage numbers punch upward in combat text',
+				let hints = [
+					'The seed determines the entire dungeon layout. Share it to give someone your exact world.',
+					'Rat corpse: disease. Snake corpse: poison. Floating eye corpse: you forget who you are. There is a pattern.',
+					'Items can be thrown. Some are more useful in flight than in hand.',
 				];
+				let formatHintHtml = null;
 				const hintEl = document.getElementById('boot-hint');
 				let hintIdx = Math.floor(Math.random() * hints.length);
 				function showNextHint() {
 					hintEl.style.opacity = '0';
 					setTimeout(() => {
-						hintEl.textContent = hints[hintIdx];
+						const hint = hints[hintIdx];
+						if (typeof formatHintHtml === 'function') hintEl.innerHTML = formatHintHtml(hint);
+						else hintEl.textContent = hint;
 						hintEl.style.opacity = '1';
 						hintIdx = (hintIdx + 1) % hints.length;
 					}, 400);
 				}
 				showNextHint();
 				_bootHintTimer = setInterval(showNextHint, 3500);
+				import('./src/shared/data/hints.js')
+					.then((mod) => {
+						if (Array.isArray(mod.ORACULAR_MESSAGES) && mod.ORACULAR_MESSAGES.length) {
+							hints = mod.ORACULAR_MESSAGES;
+							hintIdx = Math.floor(Math.random() * hints.length);
+						}
+						if (typeof mod.formatOracularMessageHtml === 'function') {
+							formatHintHtml = mod.formatOracularMessageHtml;
+						}
+						showNextHint();
+					})
+					.catch(() => {});
 			}
 
 			async function loadAppVersion() {
