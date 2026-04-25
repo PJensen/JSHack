@@ -554,6 +554,7 @@
 				const script = document.createElement('script');
 				script.type = 'module';
 				script.src = `./src/main.js?v=${encodeURIComponent(version)}`;
+				applyBootProgress({ label: 'Starting game runtime...', done: 0, total: 1 });
 				addBootFile(script.src, 'requested');
 				script.addEventListener('load', () => addBootFile(script.src, 'loaded'), { once: true });
 				script.addEventListener('error', () => addBootFile(script.src, 'error'), { once: true });

@@ -280,6 +280,29 @@ function finishBoot() {
   maybeShowFirstRunDevNotice();
 }
 
+/**
+ * Give the browser one frame to paint the bootloader before the next
+ * synchronous startup phase takes over the main thread.
+ *
+ * @param {string} label
+ * @param {number} [done]
+ * @returns {Promise<void>}
+ */
+function bootPaint(label, done = _bootDoneUnits) {
+  updateBootProgress(label, done);
+  if (typeof requestAnimationFrame !== "function") return Promise.resolve();
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    requestAnimationFrame(finish);
+    setTimeout(finish, 48);
+  });
+}
+
 updateBootProgress((!_hasFloorOverride && hasSavegame()) ? "Loading from Save" : "Loading...");
 installPluralizationExtensions();
 
@@ -326,6 +349,7 @@ bootAdvance("Installed run listeners");
 // Warm data registries with per-dataset progress callbacks.
 let _bootDataUnits = 0;
 const _bootDataBase = _bootDoneUnits;
+await bootPaint("Preparing game data...", _bootDataBase);
 loadGameData({
   onProgress: (progress) => {
     if (!progress || progress.phase !== 'data') return;
@@ -342,6 +366,7 @@ loadGameData({
 });
 _bootDoneUnits = _bootDataBase + _bootDataUnits;
 updateBootProgress("Game data loaded", _bootDoneUnits);
+await bootPaint("Game data loaded", _bootDoneUnits);
 
 // Only app/scenes step the sim (deterministic). We'll keep it paused here.
 function stepSim(dtTurns = 0) {
@@ -658,7 +683,7 @@ const _bootChunkTotal = Math.max(
 let _bootChunkUnits = _bootChunkTotal;
 _bootTotalUnits += _bootChunkUnits;
 const _bootDungeonBase = _bootDoneUnits;
-updateBootProgress(`Generating dungeon 0/${_bootChunkTotal} chunks`, _bootDungeonBase);
+await bootPaint(`Generating dungeon 0/${_bootChunkTotal} chunks`, _bootDungeonBase);
 
 // Initialize the procedural dungeon (entire floor generated up front)
 let spawnPos = initDungeon(world, {
@@ -678,6 +703,7 @@ let spawnPos = initDungeon(world, {
 });
 _bootDoneUnits = _bootDungeonBase + _bootChunkUnits;
 updateBootProgress(`Dungeon ready (${_bootChunkUnits} chunks)`, _bootDoneUnits);
+await bootPaint(`Dungeon ready (${_bootChunkUnits} chunks)`, _bootDoneUnits);
 
 let _savegameLoaded = false;
 let _tutorialDisabledThisSession = false;
@@ -5188,13 +5214,16 @@ function frame(now) {
 // ---- Character creation gate -------------------------------------------------
 // Savegames bypass char creation; new games show the selection screen first.
 if (_savegameLoaded) {
+  await bootPaint("Finalizing saved run...", _bootDoneUnits);
   _finalizeNewGame(null);
 } else if (runtimeConfig.params.get('test') === '1') {
   // ?test=1 — skip char creation, auto-start as Outlaw "Debug Agent"
+  await bootPaint("Finalizing debug run...", _bootDoneUnits);
   finishBoot();
   _finalizeNewGame({ name: 'Debug Agent', classId: 'outlaw', seed: 0xC0FFEE, difficulty: 'easy' });
 } else {
   // Fade out the boot loader so the char creation panel is visible
+  await bootPaint("Opening character creation...", _bootDoneUnits);
   finishBoot();
 
   const displayOrder = listClassIds();
