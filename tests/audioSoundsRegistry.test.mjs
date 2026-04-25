@@ -83,7 +83,7 @@ Deno.test("sounds registry adopts descriptive weather filenames", () => {
   assertEquals(town.file, "ambient_town.mp3");
   assertEquals(tavern.file, "ambient_tavern.mp3");
   assertEquals(snakeAlert.file, "snake_alerted.mp3");
-  assertEquals(spiderAlert.file, "spider_alerted.mp3");
+  assertEquals(spiderAlert.file, "insect_alerted.mp3");
   assertEquals(caveBearAlert.file, "cave_bear_alerted.mp3");
   assertEquals(ratAlert.file, "rat_alerted_1.mp3");
   assertEquals(boneDrop.file, "bone_dropped.mp3");
@@ -151,7 +151,7 @@ Deno.test("sounds registry preloads every spider variant url", () => {
   assert(urls.includes("./assets/audio/spider_attack_web_1.mp3"));
   assert(urls.includes("./assets/audio/spider_attack_web_2.mp3"));
   assert(urls.includes("./assets/audio/snake_alerted.mp3"));
-  assert(urls.includes("./assets/audio/spider_alerted.mp3"));
+  assert(urls.includes("./assets/audio/insect_alerted.mp3"));
   assert(urls.includes("./assets/audio/cave_bear_alerted.mp3"));
   assert(urls.includes("./assets/audio/cave_bear_attack_1.mp3"));
   assert(urls.includes("./assets/audio/cave_bear_attack_2.mp3"));
@@ -173,5 +173,37 @@ Deno.test("sounds registry wires every spell mp3 asset", () => {
   assert(spellMp3s.length > 0, "expected spell mp3 assets");
   for (const url of spellMp3s) {
     assert(urls.has(url), `missing sound registry entry for ${url}`);
+  }
+});
+
+Deno.test("sounds registry only references audio files present on disk", () => {
+  const filenames = new Set(
+    Array.from(Deno.readDirSync("assets/audio"))
+      .filter((entry) => entry.isFile)
+      .map((entry) => entry.name),
+  );
+
+  for (const url of allUrls()) {
+    const file = String(url).replace("./assets/audio/", "");
+    assert(filenames.has(file), `missing audio file referenced by registry: ${url}`);
+  }
+});
+
+Deno.test("sounds registry covers content-authored sound aliases", () => {
+  const authored = [
+    "blade_ignite",
+    "frost_explosion",
+    "frost_surge",
+    "glass_crack",
+    "glass_shatter",
+    "holy_beam",
+    "holy_chime",
+    "holy_sear",
+    "poison_bloom",
+    "wight_shriek",
+  ];
+
+  for (const id of authored) {
+    assertExists(resolve(id), `missing content-authored sound alias: ${id}`);
   }
 });
