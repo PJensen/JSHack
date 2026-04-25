@@ -7,6 +7,7 @@ import {
   computeZoomAudibilityGain,
   resolveAudioPlayKey,
   resolveStatusSoundId,
+  shouldPlayDungeonOmen,
 } from "../src/display/audio/audioWiring.js";
 
 Deno.test("audio wiring includes spider spell cast events", () => {
@@ -39,4 +40,26 @@ Deno.test("audio wiring maps semantic status events to status sounds", () => {
   assert(resolveStatusSoundId({ effect: "slimed" }) === "status:slimed");
   assert(resolveStatusSoundId({ status: "deafened" }) === "status:deafened");
   assert(resolveStatusSoundId({ type: "electrocuted" }) === "status:electrocuted");
+});
+
+Deno.test("audio wiring gates dungeon omens to rare real dungeon events", () => {
+  assert(!shouldPlayDungeonOmen({ kind: "fire", at: { x: 1, y: 2 } }, {}, 0));
+  assert(!shouldPlayDungeonOmen({ kind: "fire" }, {}, 1));
+
+  const state = {};
+  let played = 0;
+  for (let i = 0; i < 240; i++) {
+    if (shouldPlayDungeonOmen({
+      kind: "fire",
+      medium: "floor",
+      cause: "spell:fireball",
+      sourceKind: "player",
+      at: { x: i, y: 7 },
+    }, state, 1)) {
+      played++;
+    }
+  }
+
+  assert(played > 0, "real dungeon events should occasionally produce an omen");
+  assert(played < 20, "omens should stay rare even during many hazard events");
 });

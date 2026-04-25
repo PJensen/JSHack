@@ -69,6 +69,8 @@ const MAX_HEAR_DIST = 16;
 const MIN_ZOOM_GAIN = 0.65;
 const MAX_ZOOM_GAIN = 1.35;
 const PLAYER_NEAR_DEATH_RATIO = 0.25;
+const DUNGEON_OMEN_EVENT_GAP = 18;
+const DUNGEON_OMEN_CHANCE = 12;
 
 /**
  * Compute pan (-1…+1) and volume (0…1) from source position relative to player.
@@ -117,6 +119,52 @@ function isSpellLikeDamageCause(cause) {
   return value === "spell" || value === "magic" || value.startsWith("spell:") || value.startsWith("familiar:");
 }
 
+function hashOmenPayload(payload, depth, eventIndex) {
+  const at = payload?.at || {};
+  const text = [
+    payload?.kind,
+    payload?.medium,
+    payload?.cause,
+    payload?.sourceKind,
+    payload?.identity,
+    depth,
+    Number(at.x) | 0,
+    Number(at.y) | 0,
+    eventIndex,
+  ].join(":");
+  let hash = 2166136261;
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+export function shouldPlayDungeonOmen(payload, state, depth) {
+  if (!payload || typeof payload !== "object") return false;
+  const currentDepth = Number(depth || 0) | 0;
+  if (currentDepth <= 0) return false;
+
+  const at = payload.at || null;
+  const x = Number(at?.x);
+  const y = Number(at?.y);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+
+  const kind = String(payload.kind || payload.identity || payload.sourceKind || "").toLowerCase();
+  const cause = String(payload.cause || payload.sourceKind || "").toLowerCase();
+  if (!kind && !cause) return false;
+
+  state.eventIndex = (Number(state.eventIndex || 0) | 0) + 1;
+  const last = Number(state.lastPlayedEventIndex || -Infinity);
+  if (state.eventIndex - last < DUNGEON_OMEN_EVENT_GAP) return false;
+
+  const hash = hashOmenPayload(payload, currentDepth, state.eventIndex);
+  if ((hash % DUNGEON_OMEN_CHANCE) !== 0) return false;
+
+  state.lastPlayedEventIndex = state.eventIndex;
+  return true;
+}
+
 // ── Sound playback helpers ──────────────────────────────────
 
 /** Play a registered sound with optional spatial + overrides. */
@@ -128,6 +176,7 @@ function sfx(id, opts) {
   play(s.url, {
     bus: s.bus, maxVoices: s.maxVoices, randomPitch: s.randomPitch,
     volume: s.volume, rate: s.rate, detune: s.detune,
+    stopAfter: s.stopAfter, fadeOut: s.fadeOut,
     priority: 1,
     ...opts,
   });
@@ -252,6 +301,8 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
 
   const channelingLoopUrl = resolve(CHANNELING_LOOP_SOUND_ID)?.url;
   let channelingLoopActive = false;
+  const dungeonOmenState = { eventIndex: 0, lastPlayedEventIndex: -Infinity };
+  const dungeonOmenEntityIds = new Set();
 
   function startChannelingLoop(actor) {
     if (!channelingLoopUrl || !isPlayer(actor) || channelingLoopActive) return;
@@ -277,6 +328,18 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     if (typeof getZoomScale !== "function") return 1;
     const reference = typeof getReferenceZoomScale === "function" ? getReferenceZoomScale() : getZoomScale();
     return computeZoomAudibilityGain(getZoomScale(), reference);
+  }
+
+  function maybePlayDungeonOmen(payload) {
+    const eventEntityId = Number(payload?.hazardId || payload?.cloudId || 0) | 0;
+    if (eventEntityId > 0) {
+      if (dungeonOmenEntityIds.has(eventEntityId)) return;
+      dungeonOmenEntityIds.add(eventEntityId);
+      if (dungeonOmenEntityIds.size > 128) dungeonOmenEntityIds.clear();
+    }
+    if (shouldPlayDungeonOmen(payload, dungeonOmenState, getDepth())) {
+      sfxAt("ambient:omen", payload.at, pp(), { priority: 0, volume: 0.55 }, zg());
+    }
   }
 
   // ── Combat ────────────────────────────────────────────────
@@ -461,12 +524,12 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     sfx("deity:omen");
   });
 
-  world.on('hazard:spawned', ({ at }) => {
-    sfx("ambient:omen", { priority: 1 });
+  world.on('hazard:spawned', (payload) => {
+    maybePlayDungeonOmen(payload);
   });
 
-  world.on('plasmaCloud:spawned', ({ at }) => {
-    sfx("ambient:omen", { priority: 1 });
+  world.on('plasmaCloud:spawned', (payload) => {
+    maybePlayDungeonOmen({ kind: "plasma", medium: "air", ...(payload || {}) });
   });
 
   world.on('bell:rung', ({ targetId }) => {
