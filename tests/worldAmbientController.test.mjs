@@ -2,10 +2,10 @@ import { assert, assertAlmostEquals, assertEquals } from "jsr:@std/assert";
 import { createWorldAmbientController, computeChurchLoopVolume, computeSmithyLoopVolume, computeTavernLoopVolume, computeTownLoopVolume } from "../src/display/audio/worldAmbientController.js";
 
 Deno.test("world ambient loop curves fall to silence at their edge", () => {
-  assertAlmostEquals(computeTownLoopVolume(1), 0.34, 1e-10);
-  assertAlmostEquals(computeTavernLoopVolume(1), 0.46, 1e-10);
-  assertAlmostEquals(computeChurchLoopVolume(1), 0.28, 1e-10);
-  assertAlmostEquals(computeSmithyLoopVolume(1), 0.33, 1e-10);
+  assertAlmostEquals(computeTownLoopVolume(1), 0.16, 1e-10);
+  assertAlmostEquals(computeTavernLoopVolume(1), 0.22, 1e-10);
+  assertAlmostEquals(computeChurchLoopVolume(1), 0.14, 1e-10);
+  assertAlmostEquals(computeSmithyLoopVolume(1), 0.17, 1e-10);
   assertEquals(computeTownLoopVolume(14), 0);
   assertEquals(computeTavernLoopVolume(10), 0);
   assertEquals(computeChurchLoopVolume(12), 0);
@@ -43,8 +43,10 @@ Deno.test("world ambient controller prioritizes tavern over town bed", () => {
   });
   assertEquals(calls[0]?.type, "start");
   assertEquals(calls[0]?.url, "./assets/audio/ambient:tavern.mp3");
+  assertEquals(calls[0]?.opts?.bus, "ambient:loop");
   assertEquals(calls[1]?.type, "start");
   assertEquals(calls[1]?.url, "./assets/audio/ambient:town.mp3");
+  assertEquals(calls[1]?.opts?.bus, "ambient:loop");
   assert(calls[1]?.opts?.volume < 0.34);
 
   controller.syncWorldView({
@@ -60,7 +62,7 @@ Deno.test("world ambient controller prioritizes tavern over town bed", () => {
   assertEquals(calls[3]?.type, "set");
   assertEquals(calls[3]?.url, "./assets/audio/ambient:town.mp3");
   assert(calls[2]?.volume > calls[0]?.opts?.volume);
-  assert(calls[3]?.volume <= 0.34 * 0.28);
+  assert(calls[3]?.volume <= 0.16 * 0.28);
 
   controller.syncWorldView({
     isOverworld: false,

@@ -6,10 +6,11 @@ const TOWN_AUDIBLE_RADIUS_TILES = 14;
 const TAVERN_AUDIBLE_RADIUS_TILES = 10;
 const CHURCH_AUDIBLE_RADIUS_TILES = 12;
 const SMITHY_AUDIBLE_RADIUS_TILES = 11;
-const TOWN_LOOP_GAIN = 0.34;
-const TAVERN_LOOP_GAIN = 0.46;
-const CHURCH_LOOP_GAIN = 0.28;
-const SMITHY_LOOP_GAIN = 0.33;
+const AMBIENT_LOOP_BUS = "ambient:loop";
+const TOWN_LOOP_GAIN = 0.16;
+const TAVERN_LOOP_GAIN = 0.22;
+const CHURCH_LOOP_GAIN = 0.14;
+const SMITHY_LOOP_GAIN = 0.17;
 const TAVERN_IDENTITIES = new Set([
   "tavern_sign",
   "tavern_keg",
@@ -235,7 +236,7 @@ export function createWorldAmbientController({
 
     if (tavernVolume > 0.001 && tavernUrl) {
       if (!tavernActive) {
-        startLoopFn(tavernUrl, { bus: tavernSound?.bus || "ambient", volume: tavernVolume, fadeIn: 0.45 });
+        startLoopFn(tavernUrl, { bus: AMBIENT_LOOP_BUS, volume: tavernVolume, fadeIn: 0.45 });
         tavernActive = true;
       } else {
         setLoopVolumeFn(tavernUrl, tavernVolume, { ramp: 0.14 });
@@ -246,7 +247,7 @@ export function createWorldAmbientController({
 
     if (townVolume > 0.001 && townUrl) {
       if (!townActive) {
-        startLoopFn(townUrl, { bus: townSound?.bus || "ambient", volume: townVolume, fadeIn: 0.7 });
+        startLoopFn(townUrl, { bus: AMBIENT_LOOP_BUS, volume: townVolume, fadeIn: 0.7 });
         townActive = true;
       } else {
         setLoopVolumeFn(townUrl, townVolume, { ramp: 0.2 });
@@ -257,7 +258,7 @@ export function createWorldAmbientController({
 
     if (churchVolume > 0.001 && churchUrl) {
       if (!churchActive) {
-        startLoopFn(churchUrl, { bus: churchSound?.bus || "ambient", volume: churchVolume, fadeIn: 0.35 });
+        startLoopFn(churchUrl, { bus: AMBIENT_LOOP_BUS, volume: churchVolume, fadeIn: 0.35 });
         churchActive = true;
       } else {
         setLoopVolumeFn(churchUrl, churchVolume, { ramp: 0.12 });
@@ -268,7 +269,7 @@ export function createWorldAmbientController({
 
     if (smithyVolume > 0.001 && smithyUrl) {
       if (!smithyActive) {
-        startLoopFn(smithyUrl, { bus: smithySound?.bus || "ambient", volume: smithyVolume, fadeIn: 0.4 });
+        startLoopFn(smithyUrl, { bus: AMBIENT_LOOP_BUS, volume: smithyVolume, fadeIn: 0.4 });
         smithyActive = true;
       } else {
         setLoopVolumeFn(smithyUrl, smithyVolume, { ramp: 0.14 });
