@@ -30,6 +30,7 @@ import { aiFarmAnimalSystem } from "../rules/systems/aiFarmAnimalSystem.js";
 import { aiWeaponPickupSystem } from "../rules/systems/aiWeaponPickupSystem.js";
 import { aiCorpseEatSystem } from "../rules/systems/aiCorpseEatSystem.js";
 import { aiFlyingSystem } from "../rules/systems/aiFlyingSystem.js";
+import { jumpScareSystem } from "../rules/systems/jumpScareSystem.js";
 import { lifespanSystem } from "../rules/systems/lifespanSystem.js";
 import { knockbackSystem } from "../rules/systems/knockbackSystem.js";
 import { soundPropagationSystem } from "../rules/systems/soundPropagationSystem.js";
@@ -163,6 +164,8 @@ export function configureWorld(world) {
   // Phase: ai (intent producers — added intents are visible to later phases
   // in the same tick because ecs-js add() is intratick-immediate)
 
+  // Jump scare triggers on first proximity to dangerous creatures (dragons, lich, etc.)
+  registerSystem(jumpScareSystem, 'ai');
   // Flying AI claims the action with FlyIntent before scurry/chase.
   registerSystem(aiFlyingSystem, 'ai');
   // Scurry before chase: dumb idle creatures set a random MoveIntent which
