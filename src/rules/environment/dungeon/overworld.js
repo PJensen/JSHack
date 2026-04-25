@@ -645,16 +645,65 @@ const BIOME = {
   MOUNTAIN: new Set([TILE_MOUNTAIN, TILE_MOUNTAIN_B, TILE_MOUNTAIN_C, TILE_BADLANDS, TILE_GRAVEL]),
   FOREST: new Set([TILE_TREE, TILE_PINE_FOREST, TILE_PALM_FOREST, TILE_MANGROVE]),
   WETLAND: new Set([TILE_MARSH, TILE_SWAMP, TILE_BOG, TILE_MUD, TILE_TIDAL_FLAT, TILE_SALT_MARSH]),
-  COASTAL: new Set([TILE_BEACH, TILE_SHINGLE, TILE_ROCKY_SHORE]),
+  COASTAL: new Set([TILE_BEACH, TILE_SHINGLE, TILE_ROCKY_SHORE, TILE_SAND_DUNES]),
   GRASSLAND: new Set([TILE_GRASS, TILE_GRASS_A, TILE_GRASS_C, TILE_GRASS_D, TILE_MOORLAND, TILE_SCRUBLAND]),
   WATER: new Set([TILE_WATER, TILE_WATER_DEEP, TILE_SHALLOW_WATER, TILE_KELP_FOREST, TILE_SEAGRASS, TILE_CORAL_REEF]),
 };
+
+const WALKABLE_OVERWORLD_SPAWN_TILES = new Set([
+  TILE_FLOOR,
+  TILE_DOOR,
+  TILE_STAIR_DOWN,
+  TILE_GRASS,
+  TILE_GRASS_A,
+  TILE_GRASS_C,
+  TILE_GRASS_D,
+  TILE_SHALLOW_WATER,
+  TILE_FARMLAND,
+  TILE_COBBLESTONE,
+  TILE_BEACH,
+  TILE_MARSH,
+  TILE_SWAMP,
+  TILE_BOG,
+  TILE_SAND_DUNES,
+  TILE_MUD,
+  TILE_TIDAL_FLAT,
+  TILE_ROCKY_SHORE,
+  TILE_SALT_MARSH,
+  TILE_SHINGLE,
+  TILE_MOORLAND,
+  TILE_SCRUBLAND,
+  TILE_BADLANDS,
+  TILE_GRAVEL,
+  TILE_PINE_FOREST,
+  TILE_PALM_FOREST,
+  TILE_MANGROVE,
+]);
 
 function getTileBiomeId(tile) {
   for (const [biomeId, tiles] of Object.entries(BIOME)) {
     if (tiles.has(tile)) return biomeId;
   }
   return null;
+}
+
+function isOverworldSpawnTile(tile) {
+  return WALKABLE_OVERWORLD_SPAWN_TILES.has(tile);
+}
+
+function hasSpawnAt(chunks, x, y) {
+  const cx = Math.floor(x / CHUNK_SIZE);
+  const cy = Math.floor(y / CHUNK_SIZE);
+  const chunk = chunks.get(chunkKey(cx, cy));
+  if (!chunk || !Array.isArray(chunk.spawns)) return false;
+  return chunk.spawns.some((spawn) => (spawn.x | 0) === (x | 0) && (spawn.y | 0) === (y | 0));
+}
+
+function addSpawnIfOpen(chunks, x, y, kind, params = {}) {
+  if (hasSpawnAt(chunks, x, y)) return false;
+  if (!isOverworldSpawnTile(getWorldTile(chunks, x, y))) return false;
+  addSpawn(chunks, x, y, kind, params);
+  return true;
 }
 
 function spawnOverworldCreatures(chunks, townCenter, bounds, worldSeed) {
@@ -670,6 +719,7 @@ function spawnOverworldCreatures(chunks, townCenter, bounds, worldSeed) {
     { id: 'mountain_goat', biomes: ['MOUNTAIN'], count: 3, clusterR: 6 },
     { id: 'stag_beetle', biomes: ['FOREST'], count: 5, clusterR: 4 },
     { id: 'heron', biomes: ['COASTAL', 'WETLAND'], count: 2, clusterR: 8 },
+    { id: 'sand_crab', biomes: ['COASTAL'], count: 5, clusterR: 4 },
     { id: 'marsh_witch', biomes: ['WETLAND'], count: 1, clusterR: 3 },
   ];
 
@@ -695,6 +745,7 @@ function spawnOverworldCreatures(chunks, townCenter, bounds, worldSeed) {
       if (dx * dx + dy * dy < TOWN_EXCLUSION_RADIUS_SQ) continue;
 
       const tile = getWorldTile(chunks, x, y);
+      if (!isOverworldSpawnTile(tile)) continue;
       const biomeId = getTileBiomeId(tile);
       if (biomeId) {
         biomePositions[biomeId].push({ x, y });
@@ -738,9 +789,12 @@ function spawnOverworldCreatures(chunks, townCenter, bounds, worldSeed) {
           const y = Math.round(anchor.y + Math.sin(angle) * dist);
 
           const tile = getWorldTile(chunks, x, y);
+          if (!isOverworldSpawnTile(tile)) {
+            attempts++;
+            continue;
+          }
           const biomeId = getTileBiomeId(tile);
-          if (creatureType.biomes.includes(biomeId)) {
-            addSpawn(chunks, x, y, 'monster', monsterParams);
+          if (creatureType.biomes.includes(biomeId) && addSpawnIfOpen(chunks, x, y, 'monster', monsterParams)) {
             placed++;
             break;
           }
@@ -788,6 +842,7 @@ function spawnOverworldResources(chunks, townCenter, bounds, worldSeed) {
       if (dx * dx + dy * dy < TOWN_EXCLUSION_RADIUS_SQ) continue;
 
       const tile = getWorldTile(chunks, x, y);
+      if (!isOverworldSpawnTile(tile)) continue;
       const biomeId = getTileBiomeId(tile);
       if (biomeId) {
         biomePositions[biomeId].push({ x, y });
@@ -836,8 +891,7 @@ function spawnOverworldResources(chunks, townCenter, bounds, worldSeed) {
                   const ny = y + dy;
                   const nt = getWorldTile(chunks, nx, ny);
                   const nb = getTileBiomeId(nt);
-                  if (nb && nb !== 'WATER' && nb !== 'MOUNTAIN') {
-                    addSpawn(chunks, nx, ny, resourceType.kind);
+                  if (nb && nb !== 'WATER' && nb !== 'MOUNTAIN' && addSpawnIfOpen(chunks, nx, ny, resourceType.kind)) {
                     placed++;
                     break;
                   }
@@ -846,8 +900,7 @@ function spawnOverworldResources(chunks, townCenter, bounds, worldSeed) {
               break; // anchor attempt done
             }
           } else {
-            if (resourceType.biomes.includes(biomeId)) {
-              addSpawn(chunks, x, y, resourceType.kind);
+            if (resourceType.biomes.includes(biomeId) && addSpawnIfOpen(chunks, x, y, resourceType.kind)) {
               placed++;
               break;
             }
@@ -914,8 +967,8 @@ export function generateOverworldChunks(worldSeed) {
   // Spawn creatures in hinterlands (far from town)
   spawnOverworldCreatures(chunks, townPlan?.center || { x: spawnX, y: spawnY }, { minX, maxX, minY, maxY }, worldSeed >>> 0);
 
-  // TODO: Spawn resources (ore, plants) biome-aware — currently disabled to avoid conflicting with townPlacement harvesters
-  // spawnOverworldResources(chunks, townPlan?.center || { x: spawnX, y: spawnY }, { minX, maxX, minY, maxY }, worldSeed >>> 0);
+  // Spawn resources in the hinterlands; townPlacement owns the town-adjacent work sites.
+  spawnOverworldResources(chunks, townPlan?.center || { x: spawnX, y: spawnY }, { minX, maxX, minY, maxY }, worldSeed >>> 0);
 
   const outChunks = [];
   for (const rec of chunks.values()) {

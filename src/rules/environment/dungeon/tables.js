@@ -5,6 +5,10 @@ import { getMonster, getMonstersByTier, isGenocided } from '../../data/monsters.
 import { resolveLootTable } from '../../data/lootResolver.js';
 import { toMonsterSpawnParams } from '../../utils/monsterSpawnParams.js';
 
+function isOverworldOnlyMonster(def) {
+  return Array.isArray(def?.tags) && def.tags.includes('overworld');
+}
+
 /**
  * Pick monster parameters based on depth.
  * @param {Object} rng - createRng() instance
@@ -12,7 +16,10 @@ import { toMonsterSpawnParams } from '../../utils/monsterSpawnParams.js';
  */
 export function pickMonster(rng, depth, monsterFilter = null) {
   const tier = Math.min(Math.floor((depth - 1) / 5), 3);
-  let pool = getMonstersByTier(tier).filter(m => !m.minDepth || depth >= m.minDepth);
+  let pool = getMonstersByTier(tier).filter(m =>
+    (!m.minDepth || depth >= m.minDepth)
+    && !(depth > 0 && isOverworldOnlyMonster(m))
+  );
   if (pool.length === 0) pool = getMonstersByTier(tier); // fallback
   if (monsterFilter) {
     const filtered = pool.filter(monsterFilter);
@@ -29,7 +36,7 @@ export function pickMonster(rng, depth, monsterFilter = null) {
   // Rare upgrade: rat has a 3% chance to become a cave bear
   if (def.id === 'rat' && rng.next() < 0.03) {
     const rare = getMonster('cave_bear');
-    if (rare && !isGenocided('cave_bear')) def = rare;
+    if (rare && !isOverworldOnlyMonster(rare) && !isGenocided('cave_bear')) def = rare;
   }
 
   // Rare upgrade: bat has a 2% chance to be an early dragon sighting.

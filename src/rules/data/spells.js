@@ -447,6 +447,22 @@ export const SPELL_DEFS = {
       { kind: 'status', status: 'weakened', duration: '2 turns on hit' },
     ],
   },
+  poison_spit: {
+    id: 'poison_spit',
+    name: 'Poison Spit',
+    symbol: '\u223F', // ∿
+    schools: ['bestial', 'poison'],
+    manaCost: 0,
+    minIntelligence: 0,
+    range: 5,
+    script: 'poison_spit',
+    targeting: 'enemy',
+    description: 'A venom glob that sickens prey and leaves noxious residue.',
+    effects: [
+      { kind: 'damage', element: 'poison', amount: 'Ranged poison impact damage' },
+      { kind: 'status', status: 'poison', duration: '4 turns on hit' },
+    ],
+  },
   death_volley: {
     id: 'death_volley',
     name: 'Death Volley',
@@ -508,6 +524,22 @@ export const SPELL_DEFS = {
     effects: [
       { kind: 'damage', element: 'shadow', amount: 'Shadow DOT; cast-time damage scales with INT and each tick can crit' },
       { kind: 'status', status: 'agony', duration: '6-10 turns, snapshotted from cast-time INT' },
+    ],
+  },
+  bog_curse: {
+    id: 'bog_curse',
+    name: 'Bog Curse',
+    symbol: '\u2620',       // ☠
+    schools: ['darkness', 'nature', 'curse'],
+    manaCost: 0,
+    minIntelligence: 6,
+    range: 6,
+    script: 'bog_curse',
+    targeting: 'auto',
+    description: 'A marsh hex that drags luck, defense, and footing into the mud.',
+    effects: [
+      { kind: 'status', status: 'cursed', duration: '6 turns' },
+      { kind: 'status', status: 'slowed', duration: '2 turns' },
     ],
   },
   lifetap: {
