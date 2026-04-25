@@ -7,10 +7,21 @@
 Pure JavaScript. Zero dependencies. No build step. Serve the folder, open the page, and start playing. Edit a file, hit refresh, see your changes instantly. This is JavaScript the way it was meant to be: hackable, transparent, and fun.
 
 ---
+ 
+## Design promise
+
+JSHack is built around readable chaos. The world should feel systemic, but not opaque. Items should interact. Monsters should behave strangely. Town choices should echo later. A good run should leave behind a story that feels discovered, not scripted.
+
+The goal is not nostalgia for old roguelikes as they were. The goal is to recover what made them dangerous and alive, then rebuild that feeling for modern play: fast to enter, hard to master, and dense enough that the dungeon still has secrets after the hundredth run.
 
 ## Gameplay
 
-JSHack is a turn-based roguelike about surviving a strange, reactive world one tile at a time. It started with old roguelike DNA, but it is not trying to be a clone. You are choosing when to fight, when to run, when to drink the questionable potion, when to sell the loot, when to pray, and when to head back underground.
+JSHack is a turn-based roguelike about surviving a strange, reactive world one tile at a time. It chases the lost spirit of older games: consequence, improvisation, mystery, and systems that surprise you back.
+
+The difference is that JSHack is built for now: phone-first, browser-native, and designed for quick sessions without sanding off the danger, weirdness, or depth.
+
+
+You are choosing when to fight, when to run, when to drink the questionable potion, when to sell the loot, when to pray, and when to head back underground.
 
 The game is built for phones first. A run should make sense in your hand: tap to move, swipe into inventory, double-tap to grab what is underfoot, pinch the map when you need a better read. Keyboard controls are there because roguelike players deserve them, but touch is the primary interface.
 
@@ -34,8 +45,7 @@ The game is built for phones first. A run should make sense in your hand: tap to
 - **Dungeon play**: multi-floor procedural dungeons, biome slices, traps, boulder puzzles, chests, stairs, FOV, exploration memory, monster spawners, and 69 status/effect definitions.
 - **Character pressure**: hunger, encumbrance, cursed equipment, unidentified items, pets with behavior, deity boons and wrath, and a score system.
 
-JSHack is still growing quickly, but it is already a game with enough moving parts to reward player judgment. The technical obsession exists to serve that.
-
+JSHack is still growing quickly, but it is already a game with enough moving parts to reward player judgment. The technical obsession exists to serve one thing: a world that keeps reacting after the first obvious answer fails.
 ---
 
 ## Getting Started
