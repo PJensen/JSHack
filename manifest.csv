@@ -90,6 +90,7 @@ weather_rain.mp3,89.33,unknown,128
 chest_opened.mp3,0.53,-16,128
 boar_charge.mp3,2.30,-16,128
 boar_died.mp3,0.86,-16,128
+action_eat.mp3,0.86,-16,128
 eat_food.mp3,0.99,-16,128
 pet_feline_eating.mp3,8.28,-16,128
 biome_ocean_loop.mp3,132.08,-16,128
