@@ -33,9 +33,11 @@ Deno.test("new audio assets are registered", async () => {
 Deno.test("new audio hooks map gameplay identities and spell events", () => {
   assert(ALERT_SOUND_BY_IDENTITY.gelatinous_cube === "gelatinous_cube:alert", "cube alert should use cube sound");
   assert(ALERT_SOUND_BY_IDENTITY.grid_bug === "insect:alert", "grid bug should use insect alert");
-  assert(ALERT_SOUND_BY_IDENTITY.killer_bee === "insect:alert", "killer bee should use insect alert");
+  assert(ALERT_SOUND_BY_IDENTITY.centipede === "insect:alert", "centipede should use insect alert");
+  assert(!ALERT_SOUND_BY_IDENTITY.killer_bee, "killer bee should not use insect alert");
   assert(CREATURE_ATTACK_SOUNDS.grid_bug === "insect:attack", "grid bug attacks should use insect attack");
-  assert(CREATURE_ATTACK_SOUNDS.killer_bee === "insect:attack", "killer bee attacks should use insect attack");
+  assert(CREATURE_ATTACK_SOUNDS.centipede === "insect:attack", "centipede attacks should use insect attack");
+  assert(!CREATURE_ATTACK_SOUNDS.killer_bee, "killer bee attacks should not use insect attack");
   assert(SPELL_CAST_SOUND_EVENTS.includes("spell:heal"), "heal spell should have a cast sound hook");
   assert(SPELL_CAST_SOUND_EVENTS.includes("spell:lifetap"), "lifetap spell should keep its cast sound hook");
 });
