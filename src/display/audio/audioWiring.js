@@ -14,7 +14,10 @@ export const ALERT_SOUND_BY_IDENTITY = Object.freeze({
   spider: "spider:alert",
   cave_spider: "spider:alert",
   phase_spider: "spider:alert",
-  cave_bear: "cave_bear:alert",
+  cave_bear: "creature:alert:large_beast",
+  boar: "creature:alert:large_beast",
+  dragon: "creature:alert:large_beast",
+  dragon_whelp: "creature:alert:large_beast",
   rat: "rat:alert",
 });
 
