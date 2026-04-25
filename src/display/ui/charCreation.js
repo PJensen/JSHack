@@ -1312,13 +1312,6 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
     oracleHint.style.opacity = '0';
     setTimeout(() => {
       oracleHint.innerHTML = formatOracularMessageHtml(ORACULAR_MESSAGES[idx]);
-      for (const el of oracleHint.querySelectorAll('.oracle-term')) {
-        Object.assign(el.style, {
-          color: '#d8f2ff',
-          fontStyle: 'normal',
-          fontWeight: '800',
-        });
-      }
       oracleHint.style.opacity = '1';
     }, 360);
   }

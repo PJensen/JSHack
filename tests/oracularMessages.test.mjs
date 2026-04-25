@@ -10,22 +10,22 @@ Deno.test("boot and character creation use the same canonical oracular messages"
   assert(ORACULAR_MESSAGES.length > 20, "expected a substantial canonical message set");
 });
 
-Deno.test("oracular message formatter bracketizes and bolds known game terms", () => {
+Deno.test("oracular message formatter leaves prose unbracketized", () => {
   const html = formatOracularMessageHtml(
     "Rat corpse: disease. Snake corpse: poison. Floating eye corpse: you forget who you are.",
   );
 
-  assert(html.includes('<b class="oracle-term">[Rat]</b>'));
-  assert(html.includes('<b class="oracle-term">[disease]</b>'));
-  assert(html.includes('<b class="oracle-term">[Snake]</b>'));
-  assert(html.includes('<b class="oracle-term">[poison]</b>'));
-  assert(html.includes('<b class="oracle-term">[Floating eye]</b>'));
-  assert(formatOracularMessageHtml("Items can be thrown.").includes('<b class="oracle-term">[Items]</b>'));
+  assertEquals(
+    html,
+    "Rat corpse: disease. Snake corpse: poison. Floating eye corpse: you forget who you are.",
+  );
+  assert(!html.includes("[Rat]"));
+  assert(!html.includes("oracle-term"));
 });
 
-Deno.test("oracular message formatter escapes html before applying trusted term markup", () => {
+Deno.test("oracular message formatter escapes html", () => {
   const html = formatOracularMessageHtml("<img src=x onerror=alert(1)> Rat");
 
   assert(html.includes("&lt;img src=x onerror=alert(1)&gt;"));
-  assert(html.includes('<b class="oracle-term">[Rat]</b>'));
+  assert(html.endsWith(" Rat"));
 });
