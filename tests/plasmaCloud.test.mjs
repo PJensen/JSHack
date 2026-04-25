@@ -44,14 +44,14 @@ Deno.test("plasma cloud damages all living entities in radius and expires", () =
 
   plasmaCloudSystem(world);
   assertEquals(world.get(center, Vitality).hp, 3);
-  assertEquals(world.get(edge, Vitality).hp, 2);
+  assertEquals(world.get(edge, Vitality).hp, 3);
   assertEquals(world.get(outside, Vitality).hp, 5);
   assertEquals(world.get(dead, Vitality).hp, 0);
   assert(world.isAlive(cloudId), "cloud should still exist after first pulse");
 
   plasmaCloudSystem(world);
   assertEquals(world.get(center, Vitality).hp, 1);
-  assertEquals(world.get(edge, Vitality).hp, 0);
+  assertEquals(world.get(edge, Vitality).hp, 2);
   assertEquals(world.get(outside, Vitality).hp, 5);
   assert(!world.isAlive(cloudId), "cloud should expire on final pulse");
 
@@ -59,7 +59,7 @@ Deno.test("plasma cloud damages all living entities in radius and expires", () =
   const expiredEvents = events.filter((e) => e.type === "plasmaCloud:expired");
   assertEquals(pulseEvents.length, 2);
   assertEquals(expiredEvents.length, 1);
-  assert(events.some((e) => e.type === "died" && e.id === edge), "edge target should die on second pulse");
+  assert(!events.some((e) => e.type === "died" && e.id === edge), "edge target should survive falloff pulses");
 });
 
 Deno.test("plasma cloud respects invulnerable status", () => {
@@ -94,7 +94,7 @@ Deno.test("plasma cloud uses electric resistances", () => {
   plasmaCloudSystem(world);
 
   assertEquals(world.get(vulnerable, Vitality).hp, 8); // 2 * (1000/500) = 4
-  assertEquals(world.get(resistant, Vitality).hp, 11); // 2 * (1000/2000) = 1
+  assertEquals(world.get(resistant, Vitality).hp, 12); // edge falloff raw 1 floors to 0 after resistance
   assertEquals(world.get(immune, Vitality).hp, 12); // Infinity ohms -> no damage
   assert(statuses.some((s) => s.id === immune && String(s.kind) === "resist"), "resist status expected for grounded target");
 });

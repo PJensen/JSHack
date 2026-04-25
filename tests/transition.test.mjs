@@ -1,4 +1,5 @@
 import { assert } from "jsr:@std/assert";
+import "./helpers/installContentCatalog.mjs";
 import { World } from '../src/lib/ecs-js/index.js';
 import { Position } from '../src/rules/components/Position.js';
 import { Player } from '../src/rules/components/Player.js';

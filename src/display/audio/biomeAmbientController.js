@@ -4,7 +4,7 @@ import {
   TILE_WATER_DEEP, TILE_WATER, TILE_SHALLOW_WATER,
   TILE_KELP_FOREST, TILE_SEAGRASS, TILE_CORAL_REEF,
   TILE_SWAMP, TILE_BOG, TILE_MARSH, TILE_MANGROVE, TILE_MUD, TILE_SALT_MARSH,
-} from "../../rules/environment/dungeon/constants.js";
+} from "../../shared/terrainTiles.js";
 
 const OCEAN_SCAN_RADIUS = 6;
 const SWAMP_SCAN_RADIUS = 8;

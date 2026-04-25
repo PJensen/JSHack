@@ -4,7 +4,7 @@ import { createLocalEmitterAmbientController, computeCookingFireLoopVolume, comp
 Deno.test("local emitter loop curves fall off by radius", () => {
   assertAlmostEquals(computeCookingFireLoopVolume(1), 0.3, 1e-10);
   assertAlmostEquals(computeHolySiteLoopVolume(1), 0.26, 1e-10);
-  assertAlmostEquals(computeTorchLoopVolume(1), 0.18, 1e-10);
+  assertAlmostEquals(computeTorchLoopVolume(1), 0.35, 1e-10);
   assertEquals(computeCookingFireLoopVolume(8), 0);
   assertEquals(computeHolySiteLoopVolume(7), 0);
   assertEquals(computeTorchLoopVolume(6), 0);

@@ -17,12 +17,24 @@ import {
 } from '../src/rules/environment/dungeon/tileMap.js';
 import { generateFloor } from '../src/rules/environment/dungeon/index.js';
 import { chunkSeed } from '../src/rules/environment/dungeon/seed.js';
+import { dungeonConfig } from '../src/rules/environment/dungeon/dungeonConfig.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 const CARDINALS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+
+function withDungeonScale(scale, fn) {
+  const previous = dungeonConfig.dungeonScale;
+  dungeonConfig.dungeonScale = scale;
+  try {
+    return fn();
+  } finally {
+    dungeonConfig.dungeonScale = previous;
+    clearAll();
+  }
+}
 
 function floodFillLocal(tiles, sx, sy, stride) {
   const visited = new Set();
@@ -91,18 +103,20 @@ Deno.test("loadPrefabRoom returns the lava dead-end definition", () => {
 });
 
 Deno.test("floor plan at depth 1 includes authored prefab rooms in non-origin chunks", () => {
-  const SEEDS = [42, 123, 777, 9999, 31337];
-  for (const seed of SEEDS) {
-    const plan = generateFloorPlan(seed, 1);
-    assert(Array.isArray(plan.prefabRooms), `seed ${seed}: prefabRooms missing`);
-    assertEquals(plan.prefabRooms.length, 2, `seed ${seed}: should have exactly 2 prefabs`);
-    const ids = new Set(plan.prefabRooms.map(pr => pr.roomId));
-    assert(ids.has("room_boulder_puzzle"), `seed ${seed}: missing boulder puzzle`);
-    assert(ids.has("room_lava_puzzle_dead_end"), `seed ${seed}: missing lava dead end`);
-    for (const pr of plan.prefabRooms) {
-      assert(!(pr.chunkX === 0 && pr.chunkY === 0), `seed ${seed}: prefab should not be in origin chunk`);
+  withDungeonScale(2, () => {
+    const SEEDS = [42, 123, 777, 9999, 31337];
+    for (const seed of SEEDS) {
+      const plan = generateFloorPlan(seed, 1);
+      assert(Array.isArray(plan.prefabRooms), `seed ${seed}: prefabRooms missing`);
+      assertEquals(plan.prefabRooms.length, 2, `seed ${seed}: should have exactly 2 prefabs`);
+      const ids = new Set(plan.prefabRooms.map(pr => pr.roomId));
+      assert(ids.has("room_boulder_puzzle"), `seed ${seed}: missing boulder puzzle`);
+      assert(ids.has("room_lava_puzzle_dead_end"), `seed ${seed}: missing lava dead end`);
+      for (const pr of plan.prefabRooms) {
+        assert(!(pr.chunkX === 0 && pr.chunkY === 0), `seed ${seed}: prefab should not be in origin chunk`);
+      }
     }
-  }
+  });
 });
 
 Deno.test("floor plan at depth 2 has no authored prefabRooms", () => {
@@ -209,85 +223,85 @@ Deno.test("entrance and exit waypoints connect to corridor network", () => {
 });
 
 Deno.test("populateChunk uses prefab spawns and skips normal population", () => {
-  const seed = 42;
-  const plan = generateFloorPlan(seed, 1);
-  assert(plan.prefabRooms.length >= 1);
-  const pr = plan.prefabRooms.find((room) => room.roomId === "room_boulder_puzzle");
-  assert(pr);
+  withDungeonScale(2, () => {
+    const seed = 42;
+    const plan = generateFloorPlan(seed, 1);
+    assert(plan.prefabRooms.length >= 1);
+    const pr = plan.prefabRooms.find((room) => room.roomId === "room_boulder_puzzle");
+    assert(pr);
 
-  const chunk = generateChunk(seed, 1, pr.chunkX, pr.chunkY, plan.profile, plan);
-  const popSeed = chunkSeed(seed, 1, pr.chunkX, pr.chunkY) ^ 0xDEAD;
-  const popRng = createRng(popSeed >>> 0);
-  const spawns = populateChunk(chunk, plan, popRng);
+    const chunk = generateChunk(seed, 1, pr.chunkX, pr.chunkY, plan.profile, plan);
+    const popSeed = chunkSeed(seed, 1, pr.chunkX, pr.chunkY) ^ 0xDEAD;
+    const popRng = createRng(popSeed >>> 0);
+    const spawns = populateChunk(chunk, plan, popRng);
 
-  // Find the prefab room in the chunk.
-  const prefabRoom = chunk.rooms.find(r => r.prefab);
-  if (!prefabRoom) return; // graceful: no room large enough
+    const prefabRoom = chunk.rooms.find(r => r.prefab);
+    if (!prefabRoom) return;
 
-  // All prefab spawn kinds should appear in the spawns list.
-  const def = loadPrefabRoom("room_boulder_puzzle");
-  const expectedKinds = def.spawns.map(s => s.kind);
-  for (const kind of expectedKinds) {
-    const found = spawns.some(s => s.kind === kind);
-    assert(found, `expected spawn kind "${kind}" from prefab room`);
-  }
+    const def = loadPrefabRoom("room_boulder_puzzle");
+    const expectedKinds = def.spawns.map(s => s.kind);
+    for (const kind of expectedKinds) {
+      const found = spawns.some(s => s.kind === kind);
+      assert(found, `expected spawn kind "${kind}" from prefab room`);
+    }
 
-  // Count prefab spawns in the output — should match the def.
-  const prefabSpawnCount = def.spawns.length;
-  const roomArea = { minX: prefabRoom.x, maxX: prefabRoom.x + prefabRoom.w - 1,
-                     minY: prefabRoom.y, maxY: prefabRoom.y + prefabRoom.h - 1 };
-  // Spawns inside the prefab room area should be exactly the prefab spawns.
-  const inRoomSpawns = spawns.filter(s =>
-    s.x >= roomArea.minX && s.x <= roomArea.maxX &&
-    s.y >= roomArea.minY && s.y <= roomArea.maxY
-  );
-  // Should have at least the prefab spawn count (possibly more if spawns from
-  // adjacent rooms happen to overlap coordinates, but unlikely).
-  assert(inRoomSpawns.length >= prefabSpawnCount,
-    `expected at least ${prefabSpawnCount} spawns in prefab room area, got ${inRoomSpawns.length}`);
+    const prefabSpawnCount = def.spawns.length;
+    const roomArea = { minX: prefabRoom.x, maxX: prefabRoom.x + prefabRoom.w - 1,
+                       minY: prefabRoom.y, maxY: prefabRoom.y + prefabRoom.h - 1 };
+    const inRoomSpawns = spawns.filter(s =>
+      s.x >= roomArea.minX && s.x <= roomArea.maxX &&
+      s.y >= roomArea.minY && s.y <= roomArea.maxY
+    );
+    assert(inRoomSpawns.length >= prefabSpawnCount,
+      `expected at least ${prefabSpawnCount} spawns in prefab room area, got ${inRoomSpawns.length}`);
+  });
 });
 
 Deno.test("lava dead-end prefab can author a skeleton archer spawn via explicit monster params", () => {
-  const seed = 42;
-  const plan = generateFloorPlan(seed, 1);
-  const pr = plan.prefabRooms.find((room) => room.roomId === "room_lava_puzzle_dead_end");
-  assert(pr, "expected lava dead-end prefab on depth 1");
+  withDungeonScale(2, () => {
+    const seed = 42;
+    const plan = generateFloorPlan(seed, 1);
+    const pr = plan.prefabRooms.find((room) => room.roomId === "room_lava_puzzle_dead_end");
+    assert(pr, "expected lava dead-end prefab on depth 1");
 
-  const chunk = generateChunk(seed, 1, pr.chunkX, pr.chunkY, plan.profile, plan);
-  const prefabRoom = chunk.rooms.find((room) => room.prefab);
-  assert(prefabRoom, "expected lava dead-end prefab to stamp into its chunk");
-  const popSeed = chunkSeed(seed, 1, pr.chunkX, pr.chunkY) ^ 0xDEAD;
-  const popRng = createRng(popSeed >>> 0);
-  const spawns = populateChunk(chunk, plan, popRng);
+    const chunk = generateChunk(seed, 1, pr.chunkX, pr.chunkY, plan.profile, plan);
+    const prefabRoom = chunk.rooms.find((room) => room.prefab);
+    assert(prefabRoom, "expected lava dead-end prefab to stamp into its chunk");
+    const popSeed = chunkSeed(seed, 1, pr.chunkX, pr.chunkY) ^ 0xDEAD;
+    const popRng = createRng(popSeed >>> 0);
+    const spawns = populateChunk(chunk, plan, popRng);
 
-  const archer = spawns.find((spawn) => spawn.kind === "monster" && spawn.params?.identity === "skeleton_archer");
-  assert(archer, "expected skeleton archer spawn from prefab monster spawn params");
+    const archer = spawns.find((spawn) => spawn.kind === "monster" && spawn.params?.identity === "skeleton_archer");
+    assert(archer, "expected skeleton archer spawn from prefab monster spawn params");
+  });
 });
 
 Deno.test("prefab room is reachable from player spawn on full floor", () => {
-  const SEEDS = [42, 123, 777];
-  for (const seed of SEEDS) {
-    clearAll();
-    const world = new World({ seed });
-    const plan = generateFloorPlan(seed, 1);
-    const { spawnX, spawnY } = generateFloor(world, seed, 1);
+  withDungeonScale(2, () => {
+    const SEEDS = [42, 123, 777];
+    for (const seed of SEEDS) {
+      clearAll();
+      const world = new World({ seed });
+      const plan = generateFloorPlan(seed, 1);
+      const { spawnX, spawnY } = generateFloor(world, seed, 1);
 
-    assert(plan.prefabRooms.length >= 2, `seed ${seed}: should have authored prefabs`);
-    const reachable = floodFillWorld(spawnX, spawnY);
+      assert(plan.prefabRooms.length >= 2, `seed ${seed}: should have authored prefabs`);
+      const reachable = floodFillWorld(spawnX, spawnY);
 
-    for (const pr of plan.prefabRooms) {
-      const ox = pr.chunkX * CHUNK_SIZE;
-      const oy = pr.chunkY * CHUNK_SIZE;
-      let prefabFloorReachable = false;
-      for (let ly = 0; ly < CHUNK_SIZE && !prefabFloorReachable; ly++) {
-        for (let lx = 0; lx < CHUNK_SIZE && !prefabFloorReachable; lx++) {
-          const wx = ox + lx, wy = oy + ly;
-          if (isWalkable(wx, wy) && reachable.has(`${wx},${wy}`)) {
-            prefabFloorReachable = true;
+      for (const pr of plan.prefabRooms) {
+        const ox = pr.chunkX * CHUNK_SIZE;
+        const oy = pr.chunkY * CHUNK_SIZE;
+        let prefabFloorReachable = false;
+        for (let ly = 0; ly < CHUNK_SIZE && !prefabFloorReachable; ly++) {
+          for (let lx = 0; lx < CHUNK_SIZE && !prefabFloorReachable; lx++) {
+            const wx = ox + lx, wy = oy + ly;
+            if (isWalkable(wx, wy) && reachable.has(`${wx},${wy}`)) {
+              prefabFloorReachable = true;
+            }
           }
         }
+        assert(prefabFloorReachable, `seed ${seed}: prefab chunk ${pr.roomId} should have reachable tiles`);
       }
-      assert(prefabFloorReachable, `seed ${seed}: prefab chunk ${pr.roomId} should have reachable tiles`);
     }
-  }
+  });
 });

@@ -75,9 +75,11 @@ Deno.test("sounds registry adopts descriptive weather filenames", () => {
   assertEquals(holySite.file, "ambient_holy_site.mp3");
   assertEquals(smithy.file, "ambient_smithy.mp3");
   assertEquals(torchFlames.file, "ambient_torch_flames.mp3");
-  assertEquals(ringing.file, "ears_ringing.mp3");
+  assert(ringing.files?.includes("ears_ringing.mp3"));
+  assert(ringing.files?.includes("ears_ringing_2.mp3"));
   assertEquals(metalDrop.file, "drop_weapon_metal.mp3");
-  assertEquals(meteorImpact.file, "spell_meteor_impact.mp3");
+  assert(meteorImpact.files?.includes("spell_meteor_impact.mp3"));
+  assert(meteorImpact.files?.includes("spell_meteor_impact_2.mp3"));
   assertEquals(town.file, "ambient_town.mp3");
   assertEquals(tavern.file, "ambient_tavern.mp3");
   assertEquals(snakeAlert.file, "snake_alerted.mp3");
