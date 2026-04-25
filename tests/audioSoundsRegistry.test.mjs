@@ -112,14 +112,18 @@ Deno.test("sounds registry exposes spider spell variant pools", () => {
 Deno.test("sounds registry wires quiet spell assets with usable defaults", () => {
   const agony = resolve("spell:agony");
   const cleave = resolve("spell:cleave");
+  const channeling = resolve("spell:channeling");
 
   assertExists(agony);
   assertExists(cleave);
+  assertExists(channeling);
   assertEquals(agony.file, "spell_agony.mp3");
   assertEquals(agony.bus, "spells");
   assert(agony.volume > 1, "quiet agony source should be boosted by registry volume");
   assertEquals(cleave.file, "spell_cleave.mp3");
   assertEquals(cleave.bus, "spells");
+  assertEquals(channeling.file, "spell_channeling.mp3");
+  assertEquals(channeling.bus, "spells");
 });
 
 Deno.test("sounds registry does not reference missing cleave wav", () => {

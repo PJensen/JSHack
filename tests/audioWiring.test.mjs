@@ -1,6 +1,8 @@
 import { assert } from "jsr:@std/assert";
 import { assertAlmostEquals } from "jsr:@std/assert";
 import {
+  CHANNELING_LOOP_OPTIONS,
+  CHANNELING_LOOP_SOUND_ID,
   SPELL_CAST_SOUND_EVENTS,
   computeZoomAudibilityGain,
   resolveAudioPlayKey,
@@ -10,6 +12,13 @@ import {
 Deno.test("audio wiring includes spider spell cast events", () => {
   assert(SPELL_CAST_SOUND_EVENTS.includes("spell:web_spit"));
   assert(SPELL_CAST_SOUND_EVENTS.includes("spell:spider_lunge"));
+});
+
+Deno.test("audio wiring exposes a clean channeling loop contract", () => {
+  assert(CHANNELING_LOOP_SOUND_ID === "spell:channeling");
+  assert(CHANNELING_LOOP_OPTIONS.bus === "spells");
+  assert(CHANNELING_LOOP_OPTIONS.crossfade > 0);
+  assert(CHANNELING_LOOP_OPTIONS.fadeOut > 0);
 });
 
 Deno.test("audio wiring zoom gain follows camera scale with clamps", () => {
