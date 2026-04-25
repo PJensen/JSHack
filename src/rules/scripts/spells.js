@@ -1984,6 +1984,95 @@ REGISTRY["acid_spit"] = function acidSpitScript(world, actor, spell, intent) {
   });
 };
 
+// Poison Spit - ranged poison hit + poison DOT + short poison hazard patch.
+REGISTRY["poison_spit"] = function poisonSpitScript(world, actor, spell, intent) {
+  const apos = /** @type any */ (world.get(actor, Position));
+  if (!apos) return;
+  const actorFaction = String(world.get(actor, Faction)?.key || "").trim();
+  const targetId = Number(intent?.targetId || 0) | 0;
+  const targetPos = targetId > 0 ? world.get(targetId, Position) : null;
+  const tx = targetPos ? (targetPos.x | 0) : (Number.isFinite(intent?.x) ? (Number(intent.x) | 0) : NaN);
+  const ty = targetPos ? (targetPos.y | 0) : (Number.isFinite(intent?.y) ? (Number(intent.y) | 0) : NaN);
+  const range = Math.max(1, Number(spell?.range || 5) | 0);
+  if (!Number.isInteger(tx) || !Number.isInteger(ty)) {
+    emitSafe(world, "spell:poison_spit:failed", { actor, reason: "no_target", range });
+    return;
+  }
+  const dist = Math.max(Math.abs((apos.x | 0) - tx), Math.abs((apos.y | 0) - ty));
+  if (dist > range) {
+    emitSafe(world, "spell:poison_spit:failed", { actor, reason: "out_of_range", range });
+    return;
+  }
+
+  let struckId = 0;
+  let amount = 0;
+  const tryStrike = (id) => {
+    const fac = world.get(id, Faction);
+    const vit = world.get(id, Vitality);
+    if (!fac || !vit || (vit.hp | 0) <= 0) return false;
+    if (!areFactionsHostile(actorFaction, String(fac.key || ""))) return false;
+    const result = dealDamage(world, buildSpellDamageSpec(world, actor, id, {
+      spell,
+      baseAmount: 2,
+      type: "poison",
+      cause: "spell:poison_spit",
+      at: { x: tx | 0, y: ty | 0 },
+      salt: id ^ 0x70150,
+    }));
+    if (!result.applied) return false;
+    struckId = id | 0;
+    amount = result.amount | 0;
+    return true;
+  };
+
+  if (targetId > 0 && world.isAlive(targetId)) tryStrike(targetId);
+  if (!(struckId > 0)) {
+    for (const [id, pos] of world.query(Position)) {
+      if ((pos.x | 0) !== tx || (pos.y | 0) !== ty) continue;
+      if (tryStrike(id)) break;
+    }
+  }
+
+  if (struckId > 0) {
+    const ae = ensureActiveEffects(world, struckId);
+    if (ae?.effects) {
+      upsertTimedEffect(ae.effects, {
+        key: "poison",
+        turnsLeft: 4,
+        potency: 1,
+        stacks: 1,
+        startedAtTurn: world.step,
+        sourceId: actor,
+      });
+    }
+  }
+
+  const hazardId = spawnHazard(world, {
+    x: tx | 0,
+    y: ty | 0,
+    kind: "poison",
+    medium: "floor",
+    turnsLeft: 2,
+    radius: 0,
+    tickDamage: 1,
+    damageType: "poison",
+    cause: "spell:poison_spit",
+    sourceId: actor,
+    sourceKind: "giant_frog",
+    identity: "poison_spit_pool",
+    name: "Poison Slime",
+  });
+
+  emitSafe(world, "spell:poison_spit", {
+    actor,
+    targetId: struckId || targetId || 0,
+    at: { x: tx | 0, y: ty | 0 },
+    amount: amount | 0,
+    hazardId: hazardId | 0,
+    hit: struckId > 0,
+  });
+};
+
 // Death Volley — elite archer cone replacement: target tile + orthogonal neighbors.
 REGISTRY["death_volley"] = function deathVolleyScript(world, actor, spell, intent) {
   const apos = /** @type any */ (world.get(actor, Position));
@@ -2278,6 +2367,96 @@ REGISTRY['agony'] = function agonyScript(world, actor, spell, _intent) {
     actor, targetId,
     from: { x: apos.x, y: apos.y }, at: tpos,
     potency: basePotency, duration: baseDuration,
+  });
+};
+
+// Bog Curse - auto-targeting marsh hex used by overworld witches.
+REGISTRY['bog_curse'] = function bogCurseScript(world, actor, spell, _intent) {
+  const apos = /** @type any */ (world.get(actor, Position));
+  if (!apos) return;
+  const actorFaction = String(world.get(actor, Faction)?.key || 'player');
+  const range = Math.max(1, Number(spell?.range || 6) | 0);
+  const isBlocked = createLOSBlocker(world);
+  const d2 = (x0, y0, x1, y1) => {
+    const dx = x1 - x0;
+    const dy = y1 - y0;
+    return dx * dx + dy * dy;
+  };
+
+  let best = null;
+  for (const [id, pos] of world.query(Position)) {
+    if (id === actor) continue;
+    const fac = /** @type any */ (world.get(id, Faction));
+    if (!fac || !areFactionsHostile(actorFaction, fac.key)) continue;
+    const vit = /** @type any */ (world.get(id, Vitality));
+    if (!vit || (vit.hp | 0) <= 0) continue;
+    const dist2v = d2(apos.x, apos.y, pos.x, pos.y);
+    if (dist2v > range * range) continue;
+    if (!hasSpellLineOfSight(world, {
+      sourceId: actor,
+      targetId: id,
+      sourcePos: apos,
+      targetPos: pos,
+      range,
+      isBlocked,
+    })) continue;
+    if (!best || dist2v < best.dist2) best = { id, pos: { x: pos.x | 0, y: pos.y | 0 }, dist2: dist2v };
+  }
+
+  if (!best) {
+    emitSafe(world, 'spell:bog_curse', { actor, targetId: actor, fizzle: true });
+    return;
+  }
+
+  const targetId = best.id;
+  const hitChancePct = getSpellHitChancePct(world, actor, targetId);
+  if (!rollSpellHit(world, actor, targetId, spell)) {
+    emitSpellMiss(world, actor, targetId, spell, {
+      cause: 'spell:bog_curse',
+      hitChancePct,
+      at: best.pos,
+    });
+    emitSafe(world, 'spell:bog_curse', {
+      actor,
+      targetId,
+      from: { x: apos.x, y: apos.y },
+      at: best.pos,
+      missed: true,
+      hitChancePct,
+    });
+    return;
+  }
+
+  const intBonus = getSpellIntelligenceBonus(world, actor);
+  const curseTurns = Math.min(10, 6 + Math.floor(intBonus / 5));
+  const cursePotency = 1 + Math.floor(intBonus / 10);
+  const ae = ensureActiveEffects(world, targetId);
+  if (ae?.effects) {
+    upsertTimedEffect(ae.effects, {
+      key: 'cursed',
+      turnsLeft: curseTurns,
+      potency: cursePotency,
+      stacks: 1,
+      startedAtTurn: world.step,
+      sourceId: actor,
+    });
+    upsertTimedEffect(ae.effects, {
+      key: 'slowed',
+      turnsLeft: 2,
+      potency: 1,
+      stacks: 1,
+      startedAtTurn: world.step,
+      sourceId: actor,
+    });
+  }
+
+  emitSafe(world, 'spell:bog_curse', {
+    actor,
+    targetId,
+    from: { x: apos.x, y: apos.y },
+    at: best.pos,
+    potency: cursePotency,
+    duration: curseTurns,
   });
 };
 

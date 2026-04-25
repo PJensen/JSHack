@@ -377,6 +377,25 @@ export function phaseOutOnDamaged(chancePct, seedSalt, emitEvent = "proc:phased"
 }
 
 /**
+ * Sand crab shelling: roll -> claw into the ground, recover part of the hit,
+ * and gain a short defensive/rooted state. Unlike phaseOutOnDamaged, this
+ * does not cancel later callbacks or grant invulnerability.
+ * @param {number} chancePct
+ * @param {number} seedSalt
+ * @param {string} [emitEvent]
+ */
+export function sandBurrowOnDamaged(chancePct, seedSalt, emitEvent = "proc:sand_burrow") {
+  return (ctx) => {
+    if (!ctx.roll(chancePct, seedSalt)) return;
+    const healAmount = Math.max(1, Math.floor(Number(ctx.damage || 0) / 2));
+    ctx.heal(ctx.defender, healAmount);
+    ctx.pushEffect(ctx.defender, { key: "stoneskin", turnsLeft: 2, potency: 2, stacks: 1 });
+    ctx.pushEffect(ctx.defender, { key: "rooted", turnsLeft: 1, potency: 1, stacks: 1 });
+    if (emitEvent) ctx.emit(emitEvent, { actor: ctx.defender, attacker: ctx.attacker, amount: healAmount });
+  };
+}
+
+/**
  * Mindflayer blast: roll → clear spells, degrade map memory, push mindwipe.
  * Unique to floating eye / mindflayer.
  */
