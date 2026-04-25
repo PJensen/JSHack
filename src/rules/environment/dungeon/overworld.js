@@ -3,6 +3,7 @@
 
 import { perlin2, buildPermutation, fbm01 } from "./generators/noise.js";
 import { applyTownPlacement } from "./townPlacement.js";
+import { pickSpecificMonster } from "./tables.js";
 import {
   CHUNK_SIZE,
   TILE_FLOOR,
@@ -640,16 +641,38 @@ function addOutdoorSpawn(chunks, pos, kind, predicate = null) {
   addSpawn(chunks, target.x, target.y, kind);
 }
 
-function spawnOverworldCreatures(chunks, townCenter, bounds, worldSeed) {
-  const WET = new Set([TILE_WATER, TILE_WATER_DEEP, TILE_SHALLOW_WATER, TILE_KELP_FOREST, TILE_SEAGRASS, TILE_CORAL_REEF]);
-  const MOUNTAIN = new Set([TILE_MOUNTAIN, TILE_MOUNTAIN_B, TILE_MOUNTAIN_C, TILE_ROCKY_SHORE, TILE_BADLANDS]);
+const BIOME = {
+  MOUNTAIN: new Set([TILE_MOUNTAIN, TILE_MOUNTAIN_B, TILE_MOUNTAIN_C, TILE_BADLANDS, TILE_GRAVEL]),
+  FOREST: new Set([TILE_TREE, TILE_PINE_FOREST, TILE_PALM_FOREST, TILE_MANGROVE]),
+  WETLAND: new Set([TILE_MARSH, TILE_SWAMP, TILE_BOG, TILE_MUD, TILE_TIDAL_FLAT, TILE_SALT_MARSH]),
+  COASTAL: new Set([TILE_BEACH, TILE_SHINGLE, TILE_ROCKY_SHORE]),
+  GRASSLAND: new Set([TILE_GRASS, TILE_GRASS_A, TILE_GRASS_C, TILE_GRASS_D, TILE_MOORLAND, TILE_SCRUBLAND]),
+  WATER: new Set([TILE_WATER, TILE_WATER_DEEP, TILE_SHALLOW_WATER, TILE_KELP_FOREST, TILE_SEAGRASS, TILE_CORAL_REEF]),
+};
 
-  const creatures = [
-    { kind: "rat", minDist: 30, maxDist: 80, count: 8 },
-    { kind: "cave_bear", minDist: 40, maxDist: 100, count: 4 },
-    { kind: "snake", minDist: 35, maxDist: 90, count: 6 },
-    { kind: "boar", minDist: 40, maxDist: 100, count: 5 },
+function getTileBiomeId(tile) {
+  for (const [biomeId, tiles] of Object.entries(BIOME)) {
+    if (tiles.has(tile)) return biomeId;
+  }
+  return null;
+}
+
+function spawnOverworldCreatures(chunks, townCenter, bounds, worldSeed) {
+  const TOWN_EXCLUSION_RADIUS_SQ = 45 * 45; // covers districts up to r=36 + footprint
+
+  const OVERWORLD_CREATURES = [
+    { id: 'rat', biomes: ['GRASSLAND', 'WETLAND'], count: 8, clusterR: 6 },
+    { id: 'cave_bear', biomes: ['MOUNTAIN', 'FOREST'], count: 4, clusterR: 8 },
+    { id: 'snake', biomes: ['WETLAND', 'COASTAL', 'GRASSLAND'], count: 6, clusterR: 5 },
+    { id: 'boar', biomes: ['FOREST', 'GRASSLAND'], count: 5, clusterR: 6 },
+    { id: 'wild_elk', biomes: ['GRASSLAND', 'FOREST'], count: 4, clusterR: 7 },
+    { id: 'giant_frog', biomes: ['WETLAND'], count: 6, clusterR: 5 },
+    { id: 'mountain_goat', biomes: ['MOUNTAIN'], count: 3, clusterR: 6 },
+    { id: 'stag_beetle', biomes: ['FOREST'], count: 5, clusterR: 4 },
+    { id: 'heron', biomes: ['COASTAL', 'WETLAND'], count: 2, clusterR: 8 },
+    { id: 'marsh_witch', biomes: ['WETLAND'], count: 1, clusterR: 3 },
   ];
+
   const rng = new (function(seed) {
     this.seed = seed >>> 0;
     this.next = function() {
@@ -658,20 +681,178 @@ function spawnOverworldCreatures(chunks, townCenter, bounds, worldSeed) {
     };
   })(worldSeed);
 
-  for (const creatureType of creatures) {
+  // Collect candidate tiles per biome
+  const biomePositions = {};
+  for (const [biomeId, _] of Object.entries(BIOME)) {
+    biomePositions[biomeId] = [];
+  }
+
+  for (let x = bounds.minX + 5; x <= bounds.maxX - 5; x++) {
+    for (let y = bounds.minY + 5; y <= bounds.maxY - 5; y++) {
+      // Skip town exclusion zone
+      const dx = x - townCenter.x;
+      const dy = y - townCenter.y;
+      if (dx * dx + dy * dy < TOWN_EXCLUSION_RADIUS_SQ) continue;
+
+      const tile = getWorldTile(chunks, x, y);
+      const biomeId = getTileBiomeId(tile);
+      if (biomeId) {
+        biomePositions[biomeId].push({ x, y });
+      }
+    }
+  }
+
+  // Spawn each creature type
+  for (const creatureType of OVERWORLD_CREATURES) {
     let placed = 0;
-    for (let r = creatureType.minDist; r <= creatureType.maxDist && placed < creatureType.count; r += 5) {
-      for (let dx = -r; dx <= r && placed < creatureType.count; dx += 3) {
-        for (let dy = -r; dy <= r && placed < creatureType.count; dy += 3) {
-          if (Math.abs(dx) + Math.abs(dy) < r) continue;
-          if (rng.next() > 0.3) continue;
-          const x = townCenter.x + dx;
-          const y = townCenter.y + dy;
-          if (x < bounds.minX + 5 || x > bounds.maxX - 5 || y < bounds.minY + 5 || y > bounds.maxY - 5) continue;
+
+    // Collect all candidate positions for this creature's biomes
+    const candidates = [];
+    for (const biomeId of creatureType.biomes) {
+      candidates.push(...biomePositions[biomeId]);
+    }
+
+    if (candidates.length === 0) continue;
+
+    // Pick ~2-3 anchor clusters per creature type
+    const numClusters = Math.max(1, Math.floor(creatureType.count / 2));
+    const anchors = [];
+    for (let i = 0; i < numClusters && anchors.length < numClusters; i++) {
+      const idx = Math.floor(rng.next() * candidates.length);
+      anchors.push(candidates[idx]);
+    }
+
+    // Compute monster params once for all placements
+    const monsterParams = pickSpecificMonster(creatureType.id, 0);
+    if (!monsterParams) continue; // creature ID doesn't exist
+
+    // Spawn creatures around each anchor
+    for (const anchor of anchors) {
+      const perCluster = Math.ceil(creatureType.count / numClusters);
+      for (let s = 0; s < perCluster && placed < creatureType.count; s++) {
+        let attempts = 0;
+        while (attempts < 10) {
+          const angle = rng.next() * Math.PI * 2;
+          const dist = rng.next() * creatureType.clusterR;
+          const x = Math.round(anchor.x + Math.cos(angle) * dist);
+          const y = Math.round(anchor.y + Math.sin(angle) * dist);
+
           const tile = getWorldTile(chunks, x, y);
-          if (WET.has(tile) || MOUNTAIN.has(tile)) continue;
-          addSpawn(chunks, x, y, "creature_" + creatureType.kind);
-          placed++;
+          const biomeId = getTileBiomeId(tile);
+          if (creatureType.biomes.includes(biomeId)) {
+            addSpawn(chunks, x, y, 'monster', monsterParams);
+            placed++;
+            break;
+          }
+          attempts++;
+        }
+      }
+    }
+  }
+}
+
+function spawnOverworldResources(chunks, townCenter, bounds, worldSeed) {
+  const TOWN_EXCLUSION_RADIUS_SQ = 45 * 45;
+
+  const OVERWORLD_RESOURCES = [
+    // Mining
+    { kind: 'harvest_iron_ore', biomes: ['MOUNTAIN'], count: 12, clusterR: 5, nearMountain: true },
+    { kind: 'harvest_coal_ore', biomes: ['MOUNTAIN'], count: 8, clusterR: 4, nearMountain: true },
+    { kind: 'harvest_stone', biomes: ['MOUNTAIN', 'COASTAL'], count: 10, clusterR: 6, nearMountain: false },
+    // Plants
+    { kind: 'harvest_herbs', biomes: ['FOREST', 'WETLAND'], count: 10, clusterR: 5, nearMountain: false },
+    { kind: 'harvest_berries', biomes: ['FOREST', 'GRASSLAND'], count: 8, clusterR: 4, nearMountain: false },
+    { kind: 'harvest_moonleaf', biomes: ['WETLAND'], count: 4, clusterR: 3, nearMountain: false },
+    { kind: 'harvest_ember_root', biomes: ['MOUNTAIN'], count: 3, clusterR: 2, nearMountain: true },
+    { kind: 'harvest_venom_fern', biomes: ['WETLAND', 'FOREST'], count: 5, clusterR: 4, nearMountain: false },
+  ];
+
+  const rng = new (function(seed) {
+    this.seed = (seed ^ 0xDEADBEEF) >>> 0;
+    this.next = function() {
+      this.seed = (this.seed * 1103515245 + 12345) >>> 0;
+      return this.seed / 4294967296;
+    };
+  })(worldSeed);
+
+  // Collect candidate tiles per biome
+  const biomePositions = {};
+  for (const [biomeId, _] of Object.entries(BIOME)) {
+    biomePositions[biomeId] = [];
+  }
+
+  for (let x = bounds.minX + 5; x <= bounds.maxX - 5; x++) {
+    for (let y = bounds.minY + 5; y <= bounds.maxY - 5; y++) {
+      const dx = x - townCenter.x;
+      const dy = y - townCenter.y;
+      if (dx * dx + dy * dy < TOWN_EXCLUSION_RADIUS_SQ) continue;
+
+      const tile = getWorldTile(chunks, x, y);
+      const biomeId = getTileBiomeId(tile);
+      if (biomeId) {
+        biomePositions[biomeId].push({ x, y });
+      }
+    }
+  }
+
+  // Spawn each resource type
+  for (const resourceType of OVERWORLD_RESOURCES) {
+    let placed = 0;
+
+    const candidates = [];
+    for (const biomeId of resourceType.biomes) {
+      candidates.push(...biomePositions[biomeId]);
+    }
+
+    if (candidates.length === 0) continue;
+
+    const numClusters = Math.max(1, Math.floor(resourceType.count / 3));
+    const anchors = [];
+    for (let i = 0; i < numClusters && anchors.length < numClusters; i++) {
+      const idx = Math.floor(rng.next() * candidates.length);
+      anchors.push(candidates[idx]);
+    }
+
+    for (const anchor of anchors) {
+      const perCluster = Math.ceil(resourceType.count / numClusters);
+      for (let s = 0; s < perCluster && placed < resourceType.count; s++) {
+        let attempts = 0;
+        while (attempts < 10 && placed < resourceType.count) {
+          const angle = rng.next() * Math.PI * 2;
+          const dist = rng.next() * resourceType.clusterR;
+          const x = Math.round(anchor.x + Math.cos(angle) * dist);
+          const y = Math.round(anchor.y + Math.sin(angle) * dist);
+
+          const tile = getWorldTile(chunks, x, y);
+          const biomeId = getTileBiomeId(tile);
+
+          if (resourceType.nearMountain) {
+            // Ore must be on adjacent tile to mountain, not on mountain itself
+            if (biomeId === 'MOUNTAIN') {
+              for (let dx = -1; dx <= 1 && placed < resourceType.count; dx++) {
+                for (let dy = -1; dy <= 1 && placed < resourceType.count; dy++) {
+                  if (dx === 0 && dy === 0) continue;
+                  const nx = x + dx;
+                  const ny = y + dy;
+                  const nt = getWorldTile(chunks, nx, ny);
+                  const nb = getTileBiomeId(nt);
+                  if (nb && nb !== 'WATER' && nb !== 'MOUNTAIN') {
+                    addSpawn(chunks, nx, ny, resourceType.kind);
+                    placed++;
+                    break;
+                  }
+                }
+              }
+              break; // anchor attempt done
+            }
+          } else {
+            if (resourceType.biomes.includes(biomeId)) {
+              addSpawn(chunks, x, y, resourceType.kind);
+              placed++;
+              break;
+            }
+          }
+          attempts++;
         }
       }
     }
@@ -732,6 +913,9 @@ export function generateOverworldChunks(worldSeed) {
 
   // Spawn creatures in hinterlands (far from town)
   spawnOverworldCreatures(chunks, townPlan?.center || { x: spawnX, y: spawnY }, { minX, maxX, minY, maxY }, worldSeed >>> 0);
+
+  // TODO: Spawn resources (ore, plants) biome-aware — currently disabled to avoid conflicting with townPlacement harvesters
+  // spawnOverworldResources(chunks, townPlan?.center || { x: spawnX, y: spawnY }, { minX, maxX, minY, maxY }, worldSeed >>> 0);
 
   const outChunks = [];
   for (const rec of chunks.values()) {
