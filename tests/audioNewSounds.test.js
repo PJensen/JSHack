@@ -18,6 +18,7 @@ Deno.test("new audio assets are registered", async () => {
     "insect:attack",
     "player:near_death",
     "spell:lifetap",
+    "spell:channeling",
     "teleported",
     "water:magic",
   ];
