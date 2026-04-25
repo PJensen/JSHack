@@ -393,6 +393,7 @@ function _playTrackedBuffer(buf, opts) {
 
 /** Map<string, { src, gain }> — currently playing loops keyed by URL. */
 const _loops = new Map();
+const _cancelledLoops = new Set();
 
 /**
  * Start a looping sound. If already looping, does nothing.
@@ -400,6 +401,7 @@ const _loops = new Map();
  * @param {{ volume?: number, fadeIn?: number, bus?: string }} [opts]
  */
 export function startLoop(url, opts) {
+  _cancelledLoops.delete(url);
   if (_loops.has(url)) return;
   const buf = _cache.get(url);
   if (buf) {
@@ -407,7 +409,7 @@ export function startLoop(url, opts) {
     return;
   }
   loadBuffer(url).then(b => {
-    if (b && !_loops.has(url)) _startLoopBuffer(url, b, opts);
+    if (b && !_loops.has(url) && !_cancelledLoops.has(url)) _startLoopBuffer(url, b, opts);
   });
 }
 
@@ -446,7 +448,11 @@ function _startLoopBuffer(url, buf, opts) {
  */
 export function stopLoop(url, opts) {
   const entry = _loops.get(url);
-  if (!entry) return;
+  if (!entry) {
+    _cancelledLoops.add(url);
+    return;
+  }
+  _cancelledLoops.add(url);
   _loops.delete(url);
 
   const fadeOut = Number(opts?.fadeOut || 0);

@@ -795,7 +795,12 @@ function _finalizeNewGame(classData) {
       // Re-init gem pricing with the new seed
       reseedRunGemPricing(world);
       // Regenerate the dungeon
-      spawnPos = initDungeon(world, { startDepth: _startDepth, tombstoneRepo });
+      spawnPos = initDungeon(world, {
+        startDepth: _startDepth,
+        tombstoneRepo,
+        dungeonType: runtimeConfig.dungeonType,
+        onProgress: typeof classData?.onProgress === "function" ? classData.onProgress : undefined,
+      });
     }
   }
 

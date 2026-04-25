@@ -4,13 +4,13 @@
 import { versionLoaded, getVersionState } from '../../shared/version.js';
 import { pickRandomCharacterName } from '../../shared/utils/characterNames.js';
 import { getHighscoreVersionLabel, getHighscores } from '../../shared/tombstoneApi.js';
-import { play, startLoop, stopLoop } from '../audio/audioEngine.js';
+import { play, preload, startLoop, stopLoop } from '../audio/audioEngine.js';
 
 /**
  * @param {{
  *   classes: Array<{ id: string, name: string, description: string, deityName: string, deityAlignment: string }>,
  *   defaultSeed?: number,
- *   onConfirm: (result: { name: string, classId: string, seed: number, difficulty: string }) => void,
+ *   onConfirm: (result: { name: string, classId: string, seed: number, difficulty: string, onProgress?: (progress: any) => void }) => void,
  * }} opts
  * @returns {{ dispose: () => void }}
  */
@@ -57,6 +57,11 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
   let classIndex = Math.floor(Math.random() * classes.length);
   const savedName = readSavedName();
   const fallbackName = savedName || pickRandomCharacterName();
+  preload([
+    './assets/audio/soundscape.mp3',
+    './assets/audio/enter_world.mp3',
+    './assets/audio/character_select.mp3',
+  ]).catch(() => {});
 
   // ---- full-viewport container ----
   const panel = document.createElement('div');
@@ -736,7 +741,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
   }
   box.appendChild(dotsRow);
 
-  function scrollTo(idx) {
+  function scrollTo(idx, opts = {}) {
     classIndex = idx;
     scrollTrack.style.transform = `translateX(-${classIndex * 100}%)`;
     refreshConfirmCta();
@@ -745,7 +750,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
       dots[i].style.background = i === classIndex ? UI.accent : UI.low;
       dots[i].style.transform = i === classIndex ? 'scale(1.3)' : 'scale(1)';
     }
-    play('./assets/audio/character_select.mp3', { bus: 'ui', volume: 0.7, priority: 1 });
+    if (!opts?.silent) play('./assets/audio/character_select.mp3', { bus: 'ui', volume: 0.7, priority: 1 });
   }
 
   prevBtn.addEventListener('pointerdown', () => {
@@ -993,6 +998,11 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
   });
 
   let confirming = false;
+  function nextPaint() {
+    if (typeof requestAnimationFrame !== 'function') return Promise.resolve();
+    return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+  }
+
   function showGenerationPanel() {
     box.replaceChildren();
     Object.assign(box.style, {
@@ -1096,7 +1106,21 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
       }, i * 140));
     }
     return {
-      readyDelayMs: rows.length * 140 + 80,
+      readyDelayMs: 140,
+      progress(progress = {}) {
+        if (progress?.phase !== 'chunks') return;
+        const total = Math.max(1, Number(progress.total) || 1);
+        const processed = Math.max(0, Math.min(total, Number(progress.processed) || 0));
+        const p = processed / total;
+        active = Math.min(rows.length - 1, Math.floor(p * rows.length));
+        footer.textContent = `Generating floor ${processed}/${total}`;
+        render();
+      },
+      complete() {
+        active = rows.length;
+        render();
+        footer.textContent = 'Entering world...';
+      },
       dispose() {
         for (const timer of timers) clearTimeout(timer);
       },
@@ -1120,11 +1144,22 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
 
     const generationPanel = showGenerationPanel();
 
-    setTimeout(() => {
-      onConfirm({ name, classId: classes[classIndex].id, seed: seedVal, difficulty, tutorial, disableGore });
+    nextPaint().then(() => {
+      return new Promise((resolve) => setTimeout(resolve, generationPanel.readyDelayMs));
+    }).then(() => {
+      onConfirm({
+        name,
+        classId: classes[classIndex].id,
+        seed: seedVal,
+        difficulty,
+        tutorial,
+        disableGore,
+        onProgress: generationPanel.progress,
+      });
+      generationPanel.complete();
       generationPanel.dispose();
-      dispose();
-    }, generationPanel.readyDelayMs);
+      dispose({ fade: true });
+    });
   }
 
   confirmBtn.addEventListener('pointerdown', (e) => {
@@ -1133,7 +1168,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
     doConfirm();
   });
   box.appendChild(confirmBtn);
-  scrollTo(classIndex);
+  scrollTo(classIndex, { silent: true });
 
   // ---- seed (hidden, revealable) ----
   const seedToggle = document.createElement('div');
@@ -1381,7 +1416,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
     }
   }, { passive: true });
 
-  function dispose() {
+  function dispose(opts = {}) {
     // Stop character creation soundscape
     stopLoop('./assets/audio/soundscape.mp3', { fadeOut: 1.0 });
     if (bgRafId !== null) cancelAnimationFrame(bgRafId);
@@ -1393,7 +1428,17 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
     panel.removeEventListener('wheel', onWheelEntropy);
     panel.removeEventListener('touchmove', onTouchEntropy);
     if (accelCleanup) accelCleanup();
-    if (panel.parentNode) panel.parentNode.removeChild(panel);
+    if (!panel.parentNode) return;
+    if (opts?.fade) {
+      panel.style.pointerEvents = 'none';
+      panel.style.transition = 'opacity 360ms ease';
+      panel.style.opacity = '0';
+      setTimeout(() => {
+        if (panel.parentNode) panel.parentNode.removeChild(panel);
+      }, 380);
+      return;
+    }
+    panel.parentNode.removeChild(panel);
   }
 
   return { dispose };
