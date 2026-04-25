@@ -45,6 +45,19 @@ const SMITHY_INTERIOR_IDENTITIES = new Set([
   "furnace_unlit",
 ]);
 
+function sourceVisibleFromPlayer(source, playerPos, playerSheltered, isBlockedVision) {
+  if (!source?.interior) return !playerSheltered;
+  if (!playerSheltered) return false;
+  return isBlockedVision
+    ? hasLOS(playerPos.x | 0, playerPos.y | 0, source.pos.x | 0, source.pos.y | 0, isBlockedVision)
+    : true;
+}
+
+function collectExplicitSources(worldView) {
+  if (!Array.isArray(worldView?.audioEmitters)) return null;
+  return worldView.audioEmitters.filter((source) => source?.pos && source.profile);
+}
+
 /**
  * @param {{ x:number, y:number }} a
  * @param {{ x:number, y:number }} b
@@ -147,10 +160,11 @@ export function createWorldAmbientController({
   function syncWorldView(worldView) {
     const playerPos = worldView?.player?.pos || null;
     const entities = Array.isArray(worldView?.entities) ? worldView.entities : [];
+    const explicitSources = collectExplicitSources(worldView);
     const isOverworld = worldView?.isOverworld === true;
     const playerSheltered = worldView?.playerSheltered === true;
     const isBlockedVision = typeof worldView?.isBlockedVision === "function" ? worldView.isBlockedVision : null;
-    if (!playerPos || !isOverworld || entities.length === 0) {
+    if (!playerPos || !isOverworld || (explicitSources ? explicitSources.length === 0 : entities.length === 0)) {
       stopTown();
       stopTavern();
       stopChurch();
@@ -162,7 +176,17 @@ export function createWorldAmbientController({
     let nearestTavern = Infinity;
     let nearestChurch = Infinity;
     let nearestSmithy = Infinity;
-    for (let i = 0; i < entities.length; i++) {
+    if (explicitSources) {
+      for (let i = 0; i < explicitSources.length; i++) {
+        const source = explicitSources[i];
+        if (!sourceVisibleFromPlayer(source, playerPos, playerSheltered, isBlockedVision)) continue;
+        const dist = distance(source.pos, playerPos);
+        if (source.profile === "town") nearestTown = Math.min(nearestTown, dist);
+        else if (source.profile === "tavern") nearestTavern = Math.min(nearestTavern, dist);
+        else if (source.profile === "church") nearestChurch = Math.min(nearestChurch, dist);
+        else if (source.profile === "smithy") nearestSmithy = Math.min(nearestSmithy, dist);
+      }
+    } else for (let i = 0; i < entities.length; i++) {
       const entity = entities[i];
       if (!entity?.pos) continue;
       const kind = String(entity.kind || "");

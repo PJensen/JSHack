@@ -91,10 +91,14 @@ function sfx(id, opts) {
 function sfxAt(id, sourcePos, playerPos, extraOpts) {
   const spatial = spatialize(sourcePos, playerPos);
   if (spatial.volume <= 0) return; // too far, don't play
+  const sound = resolve(id);
+  const baseVolume = Number.isFinite(Number(sound?.volume)) ? Number(sound.volume) : 1;
+  const { volume: volumeOverride, ...restOpts } = extraOpts || {};
+  const gain = Number.isFinite(Number(volumeOverride)) ? Number(volumeOverride) : baseVolume;
   // Sounds at/adjacent to player (volume >= 0.95) keep priority 1.
   // Everything else is priority 0 and evictable when player acts.
   const priority = spatial.volume >= 0.95 ? 1 : 0;
-  sfx(id, { pan: spatial.pan, volume: spatial.volume, priority, ...extraOpts });
+  sfx(id, { pan: spatial.pan, volume: spatial.volume * gain, priority, ...restOpts });
 }
 
 /**

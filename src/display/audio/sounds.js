@@ -15,7 +15,7 @@ const SOUNDS = {
   "shield:blocked":   { files: ["melee_shield_hit_1.mp3", "melee_shield_hit_2.mp3", "melee_shield_hit_3.mp3", "melee_shield_hit_4.mp3", "melee_shield_hit_5.mp3", "melee_shield_hit_6.mp3"], bus: "combat", randomPitch: 45 },
   "melee:crit":       { file: "melee_crit.wav",    bus: "combat", randomPitch: 40 },
   "melee:miss":       { file: "melee_miss.wav",    bus: "combat" },
-  "ranged:shot":      { file: "ranged_shot.wav",   bus: "combat", randomPitch: 35 },
+  "ranged:shot":      { file: "ranged_shot.wav",   bus: "combat", randomPitch: 35, volume: 1.35 },
   "death":            { file: "death.wav",          bus: "combat", maxVoices: 3 },
   "creature:boar:died": { file: "boar_died.mp3",      bus: "combat", maxVoices: 1 },
   "player:death":     { file: "player_death.wav",   bus: "combat", maxVoices: 1 },

@@ -14,6 +14,7 @@ import { Polymorph } from '../../components/Polymorph.js';
 import { DoorKey } from '../../components/DoorKey.js';
 import { DoorLock } from '../../components/DoorLock.js';
 import { DoorState } from '../../components/DoorState.js';
+import { AudioEmitter } from '../../components/AudioEmitter.js';
 import { Shopkeeper, Human, Other } from '../../archetypes/Creatures.js';
 import { Equipment } from '../../components/Equipment.js';
 import { ShopInventory } from '../../components/ShopInventory.js';
@@ -2393,6 +2394,7 @@ export function materializeSpawn(world, spawn) {
         capacity: 6,
         intelligence: 10,
       });
+      world.add(id, AudioEmitter, { emitters: [{ profile: "town", interior: false }] });
       world.add(id, TownfolkJob, {
         role: def.role,
         state: "idle",
