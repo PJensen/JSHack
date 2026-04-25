@@ -19,6 +19,10 @@ function clamp01(v) {
   return Math.max(0, Math.min(1, Number(v) || 0));
 }
 
+function rippleProgress(ripple) {
+  return ripple?.max > 0 ? clamp01(1 - (ripple.ttl / ripple.max)) : 1;
+}
+
 function hash32(a, b = 0, c = 0, d = 0) {
   let h = 2166136261 >>> 0;
   h ^= a | 0; h = Math.imul(h, 16777619);
@@ -335,10 +339,10 @@ function drawWaterRegion(ctx, region, fxTime, ripples, quality) {
     ctx.globalCompositeOperation = "source-over";
     for (let i = 0; i < ripples.length; i++) {
       const ripple = ripples[i];
-      const p = ripple.max > 0 ? 1 - (ripple.ttl / ripple.max) : 1;
+      const p = rippleProgress(ripple);
       const alpha = Math.max(0, (1 - p) * ripple.alpha);
       if (alpha <= 0.003) continue;
-      const radius = ripple.radius0 + (ripple.radius1 - ripple.radius0) * p;
+      const radius = Math.max(0, ripple.radius0 + (ripple.radius1 - ripple.radius0) * p);
       ctx.strokeStyle = `rgba(220,246,255,${alpha.toFixed(3)})`;
       ctx.lineWidth = 0.035 + (1 - p) * 0.015;
       ctx.beginPath();
@@ -735,11 +739,12 @@ export function createSurfaceAreaFxController({ getFxTime, classifySurfaceTile, 
       _rainAccum -= 1;
       const cell = waterCells[(Math.random() * waterCells.length) | 0];
       if (!cell) break;
+      const life = 0.34 + Math.random() * 0.20;
       _waterRipples.push({
         x: cell.x + 0.2 + Math.random() * 0.6,
         y: cell.y + 0.18 + Math.random() * 0.64,
-        ttl: 0.34 + Math.random() * 0.20,
-        max: 0.34 + Math.random() * 0.20,
+        ttl: life,
+        max: life,
         radius0: 0.02 + Math.random() * 0.04,
         radius1: 0.14 + Math.random() * 0.22,
         alpha: weather === "heavy_rain" ? 0.28 : 0.20,
@@ -768,10 +773,10 @@ export function createSurfaceAreaFxController({ getFxTime, classifySurfaceTile, 
         for (let j = 0; j < _waterRipples.length; j++) {
           const ripple = _waterRipples[j];
           if (!region.cellKeys.has(ripple.cellKey)) continue;
-          const p = ripple.max > 0 ? 1 - (ripple.ttl / ripple.max) : 1;
+          const p = rippleProgress(ripple);
           const alpha = Math.max(0, (1 - p) * ripple.alpha);
           if (alpha <= 0.003) continue;
-          const radius = ripple.radius0 + (ripple.radius1 - ripple.radius0) * p;
+          const radius = Math.max(0, ripple.radius0 + (ripple.radius1 - ripple.radius0) * p);
           ctx.strokeStyle = `rgba(220,246,255,${alpha.toFixed(3)})`;
           ctx.lineWidth = 0.035 + (1 - p) * 0.015;
           ctx.beginPath();
