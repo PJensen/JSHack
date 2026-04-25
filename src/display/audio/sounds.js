@@ -165,6 +165,7 @@ const SOUNDS = {
 
   // ── Soundscapes ─────────────────────────────────
   "soundscape":       { file: "soundscape.mp3",      bus: "ambient" },
+  "ambient:jump_scare": { file: "ambient_jump_scare.mp3", bus: "ambient", maxVoices: 1 },
 
   // ── Additional Spell Variants ───────────────────
   "spell:agony":      { file: "spell_agony.mp3",     bus: "spells" },
