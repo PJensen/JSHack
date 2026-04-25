@@ -28,7 +28,7 @@ drop_weapon_metal.mp3,1.49,unknown,128
 drop_weapon.wav,0.80,unknown,6144
 ears_ringing_2.mp3,6.60,unknown,128
 ears_ringing.mp3,34.51,unknown,128
-electrocuted.mp3,0.79,unknown,128
+status_electrocuted.mp3,0.79,unknown,128
 enter_world.mp3,1.80,unknown,128
 fountain_sip.mp3,1.70,unknown,128
 harp_reverb.wav,9.10,unknown,6144
