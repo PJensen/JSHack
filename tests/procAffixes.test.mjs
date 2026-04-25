@@ -256,6 +256,7 @@ Deno.test("shieldWall1 affix applies stoneskin on damaged event", () => {
     const defender = makeActor(world, { x: 1, y: 1, hp: 50, faction: 'player' });
     const attacker = makeActor(world, { x: 1, y: 2, hp: 50, faction: 'enemy' });
     world.get(defender, Equipment).offhand = shield;
+    equipmentSystem(world);
 
     dealDamage(world, { target: defender, amount: 5, source: attacker });
 
@@ -280,6 +281,7 @@ Deno.test("secondWind1 affix applies regen and restores stamina on damaged", () 
     const defender = makeActor(world, { x: 1, y: 1, hp: 50, faction: 'player', stamina: 80, maxStamina: 100 });
     const attacker = makeActor(world, { x: 1, y: 2, hp: 50, faction: 'enemy' });
     world.get(defender, Equipment).armor = armor;
+    equipmentSystem(world);
 
     dealDamage(world, { target: defender, amount: 5, source: attacker });
 

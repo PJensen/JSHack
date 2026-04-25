@@ -13,7 +13,7 @@ Deno.test("custom affix heals defender after canonical damage application", asyn
 
   registerScript('affix:test_shield', {
     [ScriptVerb.ProcEvaluate]: (_world, ctx) => {
-      ctx.proc.heal(ctx.source, 1);
+      ctx.proc.heal(ctx.target, 1);
     }
   });
 
@@ -56,8 +56,8 @@ Deno.test("custom affix retaliates on damaged event", async () => {
 
   registerScript('affix:test_thorns', {
     [ScriptVerb.ProcEvaluate]: (_world, ctx) => {
-      ctx.proc.dealDamage(ctx.target, 3, 'physical', {
-        source: ctx.source,
+      ctx.proc.dealDamage(ctx.source, 3, 'physical', {
+        source: ctx.target,
         cause: 'retaliation',
         bypassResist: true,
         noTrigger: true,

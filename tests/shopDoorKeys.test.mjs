@@ -437,7 +437,20 @@ Deno.test("overworld bookseller blocks leaving with unpaid stock", () => {
   world.set(playerId, Position, { x: doorPos.x, y: doorPos.y });
 
   const insideDoorPos = world.get(playerId, Position);
-  world.add(playerId, MoveIntent, { dx: 0, dy: 1 });
+  let exitDx = 0;
+  let exitDy = 0;
+  for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+    const nx = insideDoorPos.x + dx;
+    const ny = insideDoorPos.y + dy;
+    const stillInside = nx >= shopRoom.x && nx < shopRoom.x + shopRoom.w && ny >= shopRoom.y && ny < shopRoom.y + shopRoom.h;
+    if (!stillInside) {
+      exitDx = dx;
+      exitDy = dy;
+      break;
+    }
+  }
+  assert(exitDx !== 0 || exitDy !== 0, "expected shop door to border an exterior tile");
+  world.add(playerId, MoveIntent, { dx: exitDx, dy: exitDy });
   world.tick(1);
 
   assertEquals(blocked.length, 1, "bookseller should block leaving with unpaid stock");

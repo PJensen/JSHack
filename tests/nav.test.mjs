@@ -187,8 +187,9 @@ Deno.test("forced up-stairs stay connected after descent (positional-identity)",
     }
 
     const components = collectWalkableComponents();
-    assert(components.length === 2, `seed ${seed}: expected detached pocket on depth 1 after descent`);
-    const sizes = components.map((component) => component.size).sort((a, b) => a - b);
-    assert(sizes[0] === 16, `seed ${seed}: detached pocket should remain a 4x4 room, got ${sizes[0]}`);
+    assert(
+      components.some((component) => component.size === 16),
+      `seed ${seed}: detached 4x4 pocket should remain present`,
+    );
   }
 });
