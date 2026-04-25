@@ -10,7 +10,7 @@ Pure JavaScript. Zero dependencies. No build step. Serve the folder, open the pa
 
 ## Gameplay
 
-JSHack is a turn-based roguelike about surviving a strange, reactive world one tile at a time. You are not piloting a camera through a tech demo. You are choosing when to fight, when to run, when to drink the questionable potion, when to sell the loot, when to pray, and when to head back underground.
+JSHack is a turn-based roguelike about surviving a strange, reactive world one tile at a time. It started with old roguelike DNA, but it is not trying to be a clone. You are choosing when to fight, when to run, when to drink the questionable potion, when to sell the loot, when to pray, and when to head back underground.
 
 The game is built for phones first. A run should make sense in your hand: tap to move, swipe into inventory, double-tap to grab what is underfoot, pinch the map when you need a better read. Keyboard controls are there because roguelike players deserve them, but touch is the primary interface.
 
@@ -302,7 +302,7 @@ Events keep the scheduler in control and execution order predictable.
 
 ### 🎮 Core Features
 
-- **Turn-based roguelike gameplay** — classic dungeon crawling with multi-floor dungeons and an overworld
+- **Turn-based roguelike gameplay** — dungeon survival, overworld trouble, and systems that collide in useful ways
 - **9 character classes** — Warden, Druid, Outlaw, Archeologist, Warlock, Mage, Mireborn, Pilgrim, Cleric — each with unique starting gear
 - **Monster AI** — 10-level intelligence tiers driving pack alerting, retreat, ambush, and scurry
 - **58 monsters across dungeon tiers** — rats to dragons, with flying creatures, mimics, long creatures, spellcasters, death hooks, and gaze attacks
@@ -568,7 +568,7 @@ Key rules:
 
 - [Roguelike Development Guide](http://www.roguebasin.com/)
 - [ECS Architecture](https://en.wikipedia.org/wiki/Entity_component_system)
-- Classic roguelikes: NetHack, DCSS, Brogue
+- Classic roguelikes, especially the parts that make player choice, consequence, and improvisation matter
 
 ---
 
