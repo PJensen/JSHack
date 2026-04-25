@@ -109,6 +109,26 @@ Deno.test("sounds registry exposes spider spell variant pools", () => {
   assertEquals(seenWeb, new Set(["spider_attack_web_1.mp3", "spider_attack_web_2.mp3"]));
 });
 
+Deno.test("sounds registry wires quiet spell assets with usable defaults", () => {
+  const agony = resolve("spell:agony");
+  const cleave = resolve("spell:cleave");
+
+  assertExists(agony);
+  assertExists(cleave);
+  assertEquals(agony.file, "spell_agony.mp3");
+  assertEquals(agony.bus, "spells");
+  assert(agony.volume > 1, "quiet agony source should be boosted by registry volume");
+  assertEquals(cleave.file, "spell_cleave.mp3");
+  assertEquals(cleave.bus, "spells");
+});
+
+Deno.test("sounds registry does not reference missing cleave wav", () => {
+  const urls = allUrls();
+
+  assert(urls.includes("./assets/audio/spell_cleave.mp3"));
+  assert(!urls.includes("./assets/audio/spell_cleave.wav"));
+});
+
 Deno.test("sounds registry exposes shield block variant pools", () => {
   const seenShieldBlock = new Set();
 

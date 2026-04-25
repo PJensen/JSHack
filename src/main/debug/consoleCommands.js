@@ -711,7 +711,14 @@ export function registerBuiltinCommands(console, { world, messageLog, lightingEn
     const s = await sounds();
     const resolved = s.resolve(id);
     if (!resolved) return `Unknown sound ID: "${id}"\nUse "sfx list" to see all IDs.`;
-    const opts = { bus: resolved.bus, maxVoices: resolved.maxVoices };
+    const opts = {
+      bus: resolved.bus,
+      maxVoices: resolved.maxVoices,
+      volume: resolved.volume,
+      rate: resolved.rate,
+      detune: resolved.detune,
+      randomPitch: resolved.randomPitch,
+    };
     if (volStr) opts.volume = Math.max(0, Math.min(1, parseFloat(volStr)));
     if (pitchStr) opts.randomPitch = Math.abs(parseInt(pitchStr, 10));
     a.play(resolved.url, opts);
@@ -767,7 +774,15 @@ export function registerBuiltinCommands(console, { world, messageLog, lightingEn
       if (!r) continue;
       if (filterBus && r.bus !== filterBus) continue;
       if (r.file === 'weather_rain.mp3') continue; // skip loops
-      a.play(r.url, { bus: r.bus, delay });
+      a.play(r.url, {
+        bus: r.bus,
+        maxVoices: r.maxVoices,
+        volume: r.volume,
+        rate: r.rate,
+        detune: r.detune,
+        randomPitch: r.randomPitch,
+        delay,
+      });
       delay += 0.6;
       count++;
     }

@@ -600,7 +600,7 @@ function _playBuffer(url, buf, opts) {
     //                                        ↘ reverb send  (wet path)
     let tail = src;
 
-    if (vol < 1) {
+    if (vol !== 1) {
       const g = ac.createGain();
       g.gain.value = vol;
       tail.connect(g);
