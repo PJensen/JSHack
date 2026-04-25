@@ -142,3 +142,16 @@ Deno.test("sounds registry preloads every spider variant url", () => {
   assert(urls.includes("./assets/audio/melee_shield_hit_3.mp3"));
   assert(urls.includes("./assets/audio/bone_dropped.mp3"));
 });
+
+Deno.test("sounds registry wires every spell mp3 asset", () => {
+  const urls = new Set(allUrls());
+  const spellMp3s = Array.from(Deno.readDirSync("assets/audio"))
+    .filter((entry) => entry.isFile && /^spell.*\.mp3$/i.test(entry.name))
+    .map((entry) => `./assets/audio/${entry.name}`)
+    .sort();
+
+  assert(spellMp3s.length > 0, "expected spell mp3 assets");
+  for (const url of spellMp3s) {
+    assert(urls.has(url), `missing sound registry entry for ${url}`);
+  }
+});

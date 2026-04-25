@@ -95,7 +95,7 @@ const SOUNDS = {
   "spell:plague_swarm":  { file: "spell_plague_swarm.mp3",  bus: "spells" },
   "spell:earthshatter":  { file: "spell_earthshatter.wav",  bus: "spells" },
   "spell:war_cry":       { file: "spell_war_cry.wav",       bus: "spells" },
-  "spell:cleave":        { file: "spell_cleave.wav",        bus: "spells" },
+  "spell:cleave":        { files: ["spell_cleave.wav", "spell_cleave.mp3"], bus: "spells" },
   "spell:rampage":       { file: "spell_rampage.wav",       bus: "spells" },
   "spell:phase_strike":  { file: "spell_phase_strike.wav",  bus: "spells" },
   "spell:shield_bash":   { file: "spell_shield_bash.wav",   bus: "spells" },
