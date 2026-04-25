@@ -74,8 +74,9 @@ const SOUNDS = {
   "enter:world":       { file: "enter_world.mp3",           bus: "ui", maxVoices: 1 },
   "snake:alert":      { file: "snake_alerted.mp3",         bus: "combat", maxVoices: 2, randomPitch: 18 },
   "spider:alert":     { file: "spider_alerted.mp3",        bus: "combat", maxVoices: 2, randomPitch: 20 },
-  "cave_bear:alert":  { file: "cave_bear_alerted.mp3",     bus: "combat", maxVoices: 2, randomPitch: 15 },
+  "cave_bear:alert":  { file: "creature_alerted_large_beast.mp3",     bus: "combat", maxVoices: 2, randomPitch: 15 },
   "rat:alert":        { file: "rat_alerted_1.mp3",         bus: "combat", maxVoices: 3, randomPitch: 25 },
+  "creature:alert:large_beast": { file: "creature_alerted_large_beast.mp3", bus: "combat", maxVoices: 2, randomPitch: 15 },
   "deity:omen":       { file: "harp_reverb.wav",   bus: "ambient", maxVoices: 2 },
 
   // ── Spells (cast / launch) ─────────────────────
