@@ -67,3 +67,5 @@ export const ROOM_MARGIN     = 1;   // gap between room edge and leaf edge (>=1 
 export const SPLIT_RATIO_MIN = 0.40;
 export const SPLIT_RATIO_MAX = 0.60;
 export const BSP_MAX_DEPTH   = 5;
+
+export const AVG_ROOM_SIZE = (MIN_ROOM_SIZE + MAX_ROOM_SIZE) / 2;
