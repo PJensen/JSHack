@@ -154,7 +154,7 @@ const SOUNDS = {
 
   // ── Interactions ────────────────────────────────
   "fountain:sip":     { file: "fountain_sip.mp3",    bus: "items" },
-  "item:consume:food": { file: "eat_food.mp3",       bus: "items" },
+  "item:consume:food": { file: "action_eat.mp3",     bus: "items" },
   "torch:ignite":     { file: "light_fire.mp3",      bus: "ambient" },
   "shop:enter":       { file: "shop_door_chime.mp3", bus: "ui", maxVoices: 1 },
   "quest:completed":  { file: "quest_complete.mp3",  bus: "ui", maxVoices: 1 },
