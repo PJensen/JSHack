@@ -41,6 +41,7 @@ import { petCommandSystem } from "../rules/systems/petCommandSystem.js";
 import { petBehaviorSystem } from "../rules/systems/petBehaviorSystem.js";
 import { summonedBehaviorSystem } from "../rules/systems/summonedBehaviorSystem.js";
 import { shopkeeperSystem } from "../rules/systems/shopkeeperSystem.js";
+import { shopAmbientSoundSystem } from "../rules/systems/shopAmbientSoundSystem.js";
 import { movementSystem, installMoveAutoPickupListener } from "../rules/systems/movementSystem.js";
 import { intentValidationSystem } from "../rules/systems/intentValidationSystem.js";
 import { combatSystem, installBumpAttackListener } from "../rules/systems/combatSystem.js";
@@ -258,6 +259,7 @@ export function configureWorld(world) {
   registerSystem(weatherSystem, 'effects');
   registerSystem(townSimulationSystem, 'effects');
   registerSystem(townfolkAmbientDialogueSystem, 'effects');
+  registerSystem(shopAmbientSoundSystem, 'effects');
   registerSystem(entrancePressureSystem, 'effects');
   registerSystem(districtConditionSystem, 'effects');
   registerSystem(workstationStateSystem, 'effects');
