@@ -8,10 +8,11 @@ import { Player } from "../components/Player.js";
 import { DungeonState } from "../components/DungeonState.js";
 import { forEachInRadius } from "../utils/spatialIndex.js";
 import { playerEntity } from "../utils/queries.js";
+import { AVG_ROOM_SIZE } from "../environment/dungeon/constants.js";
 
 const DANGEROUS_INTEL = 8;
-const DANGEROUS_TAGS = new Set(['draconic']);
-const SCARE_RANGE = 3;
+const DANGEROUS_TAGS = new Set(['draconic', 'demon']);
+const SCARE_RANGE = Math.round(AVG_ROOM_SIZE * 2);
 
 export function jumpScareSystem(world) {
   const player = playerEntity(world);
