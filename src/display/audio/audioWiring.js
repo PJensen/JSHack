@@ -415,7 +415,9 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     if (cause === 'melee' || cause === 'offhand') {
       sfxAt(critical ? "melee:crit" : "melee:hit", pos, pp(), null, zg());
     }
-    if (isSpellLikeDamageCause(cause)) {
+    // Skip impact sounds for DOT ticks (only play on initial spell cast impact)
+    const dotKeys = new Set(['agony', 'poison', 'bleed', 'burn', 'shock', 'swarm', 'frost']);
+    if (isSpellLikeDamageCause(cause) && !dotKeys.has(cause)) {
       const impactId = SPELL_IMPACT_MAP[type] || "spell:impact:physical";
       sfxAt(impactId, pos, pp(), null, zg());
     }

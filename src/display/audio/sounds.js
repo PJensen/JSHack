@@ -95,7 +95,7 @@ const SOUNDS = {
   "spell:blastwave":     { file: "spell_earthshatter_1.mp3", bus: "spells" },
   "spell:heal":          { file: "healing_magic_1.mp3",     bus: "spells", maxVoices: 2 },
   "spell:flash_heal":    { file: "healing_magic_1.mp3",     bus: "spells", maxVoices: 2 },
-  "spell:smite":         { file: "spell_smite_1.mp3",         bus: "spells" },
+  "spell:smite":         { file: "spell_smite_1.mp3",         bus: "spells", maxVoices: 1 },
   "spell:death_volley":  { file: "spell_agony.mp3",         bus: "spells" },
   "spell:blink":         { file: "teleported.mp3",          bus: "spells" },
   "spell:plague_swarm":  { file: "spell_plague_swarm.mp3",  bus: "spells" },
@@ -192,7 +192,7 @@ const SOUNDS = {
   "ambient:jump_scare": { file: "ambient_jump_scare.mp3", bus: "ambient", maxVoices: 1 },
 
   // ── Additional Spell Variants ───────────────────
-  "spell:agony":      { file: "spell_agony.mp3",     bus: "spells" },
+  "c":      { file: "spell_agony.mp3",     bus: "spells" },
   "spell:channeling": { file: "spell_channeling.mp3", bus: "spells" },
 
   // ── UI / Misc ───────────────────────────────────
