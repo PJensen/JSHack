@@ -7,6 +7,8 @@ import {
   DUNGEON_LOOP_SOUND_ID,
   FAMILIAR_FIRE_CAST_SOUND_ID,
   FAMILIAR_FIRE_READY_SOUND_ID,
+  FOOD_EAT_SOUND_ID,
+  PUSH_STONE_SOUND_ID,
   SPELL_CAST_SOUND_EVENTS,
   computeZoomAudibilityGain,
   resolveAudioPlayKey,
@@ -39,6 +41,11 @@ Deno.test("audio wiring exposes a persistent dungeon loop contract", () => {
 Deno.test("audio wiring exposes familiar fire ready and cast sound aliases", () => {
   assert(FAMILIAR_FIRE_READY_SOUND_ID === "torch:ignite");
   assert(FAMILIAR_FIRE_CAST_SOUND_ID === "spell:fireball");
+});
+
+Deno.test("audio wiring exposes food and stone push sound aliases", () => {
+  assert(FOOD_EAT_SOUND_ID === "item:consume:food");
+  assert(PUSH_STONE_SOUND_ID === "action:move_boulder");
 });
 
 Deno.test("audio wiring zoom gain follows camera scale with clamps", () => {

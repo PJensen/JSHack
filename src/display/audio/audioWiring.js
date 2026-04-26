@@ -308,6 +308,8 @@ export const DUNGEON_LOOP_OPTIONS = Object.freeze({
 
 export const FAMILIAR_FIRE_READY_SOUND_ID = "torch:ignite";
 export const FAMILIAR_FIRE_CAST_SOUND_ID = "spell:fireball";
+export const FOOD_EAT_SOUND_ID = "item:consume:food";
+export const PUSH_STONE_SOUND_ID = "action:move_boulder";
 
 /**
  * Install audio event listeners on the ECS world.
@@ -540,6 +542,12 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     sfx(equipId); // equip is always the player — center, full vol
   });
 
+  world.on('hunger:ate', ({ actor }) => {
+    if (!isPlayer(actor)) return;
+    const pos = actor != null ? getPosition(actor) : null;
+    sfxAt(FOOD_EAT_SOUND_ID, pos, pp(), { priority: 1 }, zg());
+  });
+
   world.on('chest:open', ({ targetId }) => {
     const pos = targetId != null ? getPosition(targetId) : null;
     sfxAt("chest:open", pos, pp(), null, zg());
@@ -600,6 +608,11 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     if (!active || !(Number(tilesChanged || 0) > 0)) return;
     const pos = targetId != null ? getPosition(targetId) : null;
     sfxAt("water:magic", pos, pp(), { priority: 1 }, zg());
+  });
+
+  world.on('entity:pushed', ({ target, to }) => {
+    const pos = to || (target != null ? getPosition(target) : null);
+    sfxAt(PUSH_STONE_SOUND_ID, pos, pp(), { priority: 1 }, zg());
   });
 
   world.on('status', (payload) => {

@@ -189,7 +189,6 @@ function runCorpseEatHooks(ctx, state) {
       newHunger: projected.hunger,
       satiation: projected.satiation,
     });
-    ctx.io.emit("audio:play", { key: "item:consume:food" });
   }
 
   return {

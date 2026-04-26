@@ -9,6 +9,7 @@ import { HarvestNode } from "../components/HarvestNode.js";
 import { ObjectState } from "../components/ObjectState.js";
 import { GrowthStage } from "../components/GrowthStage.js";
 import { AudioEmitter } from "../components/AudioEmitter.js";
+import { Pushable } from "../components/Pushable.js";
 
 export const HomeBed = defineArchetype(
   "HomeBed",
@@ -746,6 +747,7 @@ export const Boulder = defineArchetype(
   [NamedIdentity, { name: "Boulder", identity: "boulder" }],
   [Material, { kind: "stone" }],
   [Collider, { solid: true, blocksSight: false }],
+  [Pushable],
 );
 
 export const FallenLog = defineArchetype(
