@@ -306,6 +306,9 @@ export const DUNGEON_LOOP_OPTIONS = Object.freeze({
   crossfade: 2.0,
 });
 
+export const FAMILIAR_FIRE_READY_SOUND_ID = "torch:ignite";
+export const FAMILIAR_FIRE_CAST_SOUND_ID = "spell:fireball";
+
 /**
  * Install audio event listeners on the ECS world.
  * Call once during display setup.
@@ -690,8 +693,13 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     sfxAt("teleported", payload?.to || payload?.at || payload?.from || null, pp(), { priority: 1 }, zg());
   });
 
+  world.on('familiar:ready', ({ id }) => {
+    const pos = id != null ? getPosition(id) : null;
+    sfxAt(FAMILIAR_FIRE_READY_SOUND_ID, pos, pp(), { priority: 1, volume: 0.65 }, zg());
+  });
+
   world.on('familiar:fireball', (payload) => {
-    sfxAt("spell:fireball", payload?.from || payload?.at || null, pp(), { priority: 1 }, zg());
+    sfxAt(FAMILIAR_FIRE_CAST_SOUND_ID, payload?.from || payload?.at || null, pp(), { priority: 1 }, zg());
   });
 
   // Meteor should land one impact sound at the resolved strike point,
