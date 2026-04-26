@@ -5,6 +5,8 @@ import {
   CHANNELING_LOOP_SOUND_ID,
   DUNGEON_LOOP_OPTIONS,
   DUNGEON_LOOP_SOUND_ID,
+  FAMILIAR_FIRE_CAST_SOUND_ID,
+  FAMILIAR_FIRE_READY_SOUND_ID,
   SPELL_CAST_SOUND_EVENTS,
   computeZoomAudibilityGain,
   resolveAudioPlayKey,
@@ -32,6 +34,11 @@ Deno.test("audio wiring exposes a persistent dungeon loop contract", () => {
   assert(DUNGEON_LOOP_OPTIONS.volume > 0);
   assert(DUNGEON_LOOP_OPTIONS.crossfade > 0);
   assert(DUNGEON_LOOP_OPTIONS.fadeOut > 0);
+});
+
+Deno.test("audio wiring exposes familiar fire ready and cast sound aliases", () => {
+  assert(FAMILIAR_FIRE_READY_SOUND_ID === "torch:ignite");
+  assert(FAMILIAR_FIRE_CAST_SOUND_ID === "spell:fireball");
 });
 
 Deno.test("audio wiring zoom gain follows camera scale with clamps", () => {
