@@ -63,6 +63,7 @@ const SOUNDS = {
   "ambient:smithy":   { file: "ambient_smithy.mp3",        bus: "ambient" },
   "ambient:torch_flames": { file: "ambient_torch_flames.mp3", bus: "ambient" },
   "ambient:town":     { file: "ambient_town.mp3",          bus: "ambient", volume: 0.7 },
+  "ambient:town:night": { file: "ambient_nighttime_owl.mp3", bus: "ambient", volume: 0.7 },
   "ambient:tavern":   { file: "ambient_tavern.mp3",        bus: "ambient" },
   "ambient:ocean":    { file: "biome_ocean_loop.mp3",      bus: "ambient" },
   "ambient:swamp":    { files: ["biome_swamp_loop.mp3", "ambient_swamp.mp3"], bus: "ambient" },

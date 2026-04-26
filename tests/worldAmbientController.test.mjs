@@ -108,6 +108,44 @@ Deno.test("world ambient controller prefers explicit audio emitters over identit
   assertEquals(calls[0]?.url, "./assets/audio/ambient:town.mp3");
 });
 
+Deno.test("world ambient controller replaces town loop with owl ambience at night", () => {
+  const calls = [];
+  const controller = createWorldAmbientController({
+    resolveFn(id) {
+      return { url: `./assets/audio/${id}.mp3`, bus: "ambient" };
+    },
+    startLoopFn(url, opts) {
+      calls.push({ type: "start", url, opts });
+    },
+    stopLoopFn(url, opts) {
+      calls.push({ type: "stop", url, opts });
+    },
+    setLoopVolumeFn(url, volume, opts) {
+      calls.push({ type: "set", url, volume, opts });
+    },
+  });
+
+  controller.syncWorldView({
+    isOverworld: true,
+    nightAlpha: 0,
+    player: { pos: { x: 10, y: 10 } },
+    audioEmitters: [{ profile: "town", pos: { x: 11, y: 10 }, interior: false }],
+  });
+  assertEquals(calls[0]?.type, "start");
+  assertEquals(calls[0]?.url, "./assets/audio/ambient:town.mp3");
+
+  controller.syncWorldView({
+    isOverworld: true,
+    nightAlpha: 1,
+    player: { pos: { x: 10, y: 10 } },
+    audioEmitters: [{ profile: "town", pos: { x: 11, y: 10 }, interior: false }],
+  });
+  assertEquals(calls[1]?.type, "stop");
+  assertEquals(calls[1]?.url, "./assets/audio/ambient:town.mp3");
+  assertEquals(calls[2]?.type, "start");
+  assertEquals(calls[2]?.url, "./assets/audio/ambient:town:night.mp3");
+});
+
 Deno.test("world ambient controller stops explicit town emitters at audible edge", () => {
   const calls = [];
   const controller = createWorldAmbientController({

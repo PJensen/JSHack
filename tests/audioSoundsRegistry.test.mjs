@@ -184,6 +184,14 @@ Deno.test("sounds registry exposes trap, skeleton, and weapon rack sounds", () =
   assertEquals(rackDrop.bus, "items");
 });
 
+Deno.test("sounds registry exposes nighttime town owl ambience", () => {
+  const owl = resolve("ambient:town:night");
+
+  assertExists(owl);
+  assertEquals(owl.file, "ambient_nighttime_owl.mp3");
+  assertEquals(owl.bus, "ambient");
+});
+
 Deno.test("sounds registry does not reference missing cleave wav", () => {
   const urls = allUrls();
 
