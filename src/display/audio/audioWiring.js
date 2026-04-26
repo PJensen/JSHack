@@ -40,6 +40,13 @@ export const CREATURE_VOCALIZE_SOUNDS = Object.freeze({
   chicken_rooster: "ambient:chicken",
 });
 
+export const DEATH_SOUND_BY_IDENTITY = Object.freeze({
+  boar: "creature:boar:died",
+  skeleton: "creature:skeleton:died",
+  skeleton_archer: "creature:skeleton:died",
+  skeleton_sharpshooter: "creature:skeleton:died",
+});
+
 export const STATUS_SOUND_BY_KIND = Object.freeze({
   deafened: "status:deafened",
   deaf: "status:deafened",
@@ -310,6 +317,11 @@ export const FAMILIAR_FIRE_READY_SOUND_ID = "torch:ignite";
 export const FAMILIAR_FIRE_CAST_SOUND_ID = "spell:fireball";
 export const FOOD_EAT_SOUND_ID = "item:consume:food";
 export const PUSH_STONE_SOUND_ID = "action:move_boulder";
+export const TRAP_SOUND_BY_TYPE = Object.freeze({
+  snake: "trap:snake",
+  spike: "trap:spike",
+});
+export const WEAPON_RACK_DROPPED_SOUND_ID = "rack:weapon:dropped";
 
 /**
  * Install audio event listeners on the ECS world.
@@ -477,7 +489,7 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
       sfx(deathId); // player death is always full volume center
     } else {
       const creatureId = typeof getIdentity === "function" ? String(getIdentity(id) || "") : "";
-      const deathSoundId = creatureId === "boar" ? "creature:boar:died" : "death";
+      const deathSoundId = DEATH_SOUND_BY_IDENTITY[creatureId] || "death";
       sfxAt(deathSoundId, pos, pp(), null, zg());
     }
   });
@@ -565,6 +577,11 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     sfxAt(dropId, pos, pp(), null, zg());
   });
 
+  world.on('rack:looted', ({ targetId }) => {
+    const pos = targetId != null ? getPosition(targetId) : null;
+    sfxAt(WEAPON_RACK_DROPPED_SOUND_ID, pos, pp(), { priority: 1 }, zg());
+  });
+
   // ── Environment ───────────────────────────────────────────
 
   world.on('stair:traverse', ({ direction }) => {
@@ -608,6 +625,13 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     if (!active || !(Number(tilesChanged || 0) > 0)) return;
     const pos = targetId != null ? getPosition(targetId) : null;
     sfxAt("water:magic", pos, pp(), { priority: 1 }, zg());
+  });
+
+  world.on('trap:triggered', ({ trapId, type }) => {
+    const soundId = TRAP_SOUND_BY_TYPE[String(type || "").toLowerCase()];
+    if (!soundId) return;
+    const pos = trapId != null ? getPosition(trapId) : null;
+    sfxAt(soundId, pos, pp(), { priority: 1 }, zg());
   });
 
   world.on('entity:pushed', ({ target, to }) => {

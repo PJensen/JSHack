@@ -124,3 +124,7 @@ spell_earthshatter_1.mp3,8.04,-16,128
 spell_smite_1.mp3,8.04,-16,128
 action_move_boulder.mp3,8.04,-16,128
 spell_channeling.mp3,1.39,-16,128
+skeleton_died.mp3,1.70,-16,128
+trap_snake.mp3,60.86,-16,128
+trap_spike.mp3,2.12,-16,128
+weapon_rack_dropped.mp3,1.70,-16,128
