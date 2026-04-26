@@ -1,5 +1,6 @@
 import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";
+import { createFrom } from "../src/lib/ecs-js/archetype.js";
 import { Position } from "../src/rules/components/Position.js";
 import { Player } from "../src/rules/components/Player.js";
 import { Faction } from "../src/rules/components/Faction.js";
@@ -9,6 +10,7 @@ import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { Material } from "../src/rules/components/Material.js";
 import { Pushable } from "../src/rules/components/Pushable.js";
 import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
+import { Boulder } from "../src/rules/archetypes/Overworld.js";
 import { resolveBump, BUMP_RESOLVERS } from "../src/rules/data/bumpResolvers.js";
 import { loadChunk, clearAll, setTile } from "../src/rules/environment/dungeon/tileMap.js";
 import {
@@ -203,6 +205,13 @@ Deno.test("pushStatue: emits entity:pushed and moved events", () => {
     assert(movedEvent, "should emit moved for pushed entity");
     assertEquals(movedEvent.id, statue);
   } finally { clearAll(); }
+});
+
+Deno.test("pushStatue: boulder archetype uses existing push resolver path", () => {
+  const world = new World({ seed: 42 });
+  const boulder = createFrom(world, Boulder, { x: 4, y: 3 });
+
+  assert(world.has(boulder, Pushable), "boulders should be pushable like statues");
 });
 
 // ── entity without Pushable cannot be pushed ────────────────────────

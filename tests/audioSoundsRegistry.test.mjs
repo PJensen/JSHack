@@ -152,6 +152,18 @@ Deno.test("sounds registry leaves consecrate silent until a better file exists",
   assertEquals(resolve("spell:consecrate"), null);
 });
 
+Deno.test("sounds registry exposes eating and boulder move sounds", () => {
+  const eating = resolve("item:consume:food");
+  const pushStone = resolve("action:move_boulder");
+
+  assertExists(eating);
+  assertExists(pushStone);
+  assertEquals(eating.file, "action_eat.mp3");
+  assertEquals(eating.bus, "items");
+  assertEquals(pushStone.file, "action_move_boulder.mp3");
+  assertEquals(pushStone.bus, "ambient");
+});
+
 Deno.test("sounds registry does not reference missing cleave wav", () => {
   const urls = allUrls();
 

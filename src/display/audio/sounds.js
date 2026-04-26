@@ -163,6 +163,7 @@ const SOUNDS = {
   "water:magic":      { file: "water_magic_1.mp3",   bus: "spells", maxVoices: 2 },
   "teleported":       { file: "teleported.mp3",      bus: "spells", maxVoices: 2 },
   "item:consume:food": { file: "action_eat.mp3",     bus: "items" },
+  "action:move_boulder": { file: "action_move_boulder.mp3", bus: "ambient", maxVoices: 2, randomPitch: 18, volume: 0.9 },
   "torch:ignite":     { file: "light_fire.mp3",      bus: "ambient" },
   "shop:enter":       { file: "shop_door_chime.mp3", bus: "ui", maxVoices: 1 },
   "quest:completed":  { file: "quest_complete.mp3",  bus: "ui", maxVoices: 1 },
