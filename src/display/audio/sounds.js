@@ -192,8 +192,8 @@ const SOUNDS = {
   "ambient:jump_scare": { file: "ambient_jump_scare.mp3", bus: "ambient", maxVoices: 1 },
 
   // ── Additional Spell Variants ───────────────────
-  "spell:agony":      { file: "spell_agony.mp3",     bus: "spells", volume: 8 },
-  "spell:channeling": { file: "spell_channeling.mp3", bus: "spells", volume: 0.55 },
+  "spell:agony":      { file: "spell_agony.mp3",     bus: "spells" },
+  "spell:channeling": { file: "spell_channeling.mp3", bus: "spells" },
 
   // ── UI / Misc ───────────────────────────────────
   "level:up":         { file: "quest_complete.mp3",   bus: "ui", maxVoices: 1 },
