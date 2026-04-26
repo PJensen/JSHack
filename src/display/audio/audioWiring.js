@@ -71,6 +71,7 @@ const MAX_ZOOM_GAIN = 1.35;
 const PLAYER_NEAR_DEATH_RATIO = 0.25;
 const DUNGEON_OMEN_EVENT_GAP = 18;
 const DUNGEON_OMEN_CHANCE = 12;
+const DEAFENED_SOUND_COOLDOWN_MS = 2500;
 
 /**
  * Compute pan (-1…+1) and volume (0…1) from source position relative to player.
@@ -117,6 +118,24 @@ export function resolveAudioPlayKey(payload) {
 function isSpellLikeDamageCause(cause) {
   const value = String(cause || "");
   return value === "spell" || value === "magic" || value.startsWith("spell:") || value.startsWith("familiar:");
+}
+
+export function shouldPlayElectrocutionSound(payload) {
+  const type = String(payload?.type || "").toLowerCase();
+  return type === "electric" || type === "lightning";
+}
+
+export function shouldPlayTeleportSound(payload, isPlayerFn) {
+  const id = Number(payload?.id || 0) | 0;
+  if (!(id > 0) || typeof isPlayerFn !== "function" || !isPlayerFn(id)) return false;
+  const src = String(payload?.source || "");
+  return src !== "dungeon:teleport-depth";
+}
+
+function audioNowMs() {
+  return typeof performance !== "undefined" && typeof performance.now === "function"
+    ? performance.now()
+    : Date.now();
 }
 
 function hashOmenPayload(payload, depth, eventIndex) {
@@ -312,6 +331,7 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
   let channelingLoopActive = false;
   const dungeonOmenState = { eventIndex: 0, lastPlayedEventIndex: -Infinity };
   const dungeonOmenEntityIds = new Set();
+  const deafenedSoundAt = new Map();
 
   function startChannelingLoop(actor) {
     if (!channelingLoopUrl || !isPlayer(actor) || channelingLoopActive) return;
@@ -351,6 +371,16 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     }
   }
 
+  function playDeafenedForTarget(target, opts = null) {
+    const id = Number(target || 0) | 0;
+    if (!isPlayer(id)) return;
+    const now = audioNowMs();
+    const last = deafenedSoundAt.get(id) || -Infinity;
+    if (now - last < DEAFENED_SOUND_COOLDOWN_MS) return;
+    deafenedSoundAt.set(id, now);
+    sfx("status:deafened", { priority: 1, ...(opts || {}) });
+  }
+
   // ── Combat ────────────────────────────────────────────────
 
   world.on('damaged', ({ cause, critical, type, at, target, source }) => {
@@ -372,8 +402,8 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
       const impactId = SPELL_IMPACT_MAP[type] || "spell:impact:physical";
       sfxAt(impactId, pos, pp(), null, zg());
     }
-    // Electrocution sound for electric/lightning damage
-    if ((type === 'electric' || type === 'lightning') && cause === 'spell') {
+    // Electrocution sound for any electric/lightning hit, including grid bugs.
+    if (shouldPlayElectrocutionSound({ type })) {
       sfxAt("status:electrocuted", pos, pp(), { priority: 1 }, zg());
     }
   });
@@ -400,6 +430,11 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
   world.on('shield:guarded', ({ id, at }) => {
     const pos = at || (id != null ? getPosition(id) : null);
     sfxAt("shield:blocked", pos, pp(), { priority: 1 }, zg());
+  });
+
+  world.on('proc:shocked', ({ target, at }) => {
+    const pos = at || (target != null ? getPosition(target) : null);
+    sfxAt("status:electrocuted", pos, pp(), { priority: 1 }, zg());
   });
 
   world.on('creature:vocalize', ({ identity, at }) => {
@@ -578,6 +613,10 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
 
     const soundId = resolveStatusSoundId(payload);
     if (!soundId) return;
+    if (soundId === "status:deafened") {
+      playDeafenedForTarget(id);
+      return;
+    }
     if (isPlayer(id)) {
       sfx(soundId, { priority: 1 });
       return;
@@ -588,7 +627,7 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
 
   world.on('status:deafened', ({ target, severity }) => {
     if (isPlayer(target) && severity >= 1) {
-      sfx("status:deafened", { volume: 0.8 });
+      playDeafenedForTarget(target, { volume: 0.8 });
     }
   });
 
@@ -603,20 +642,19 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     sfxAt("status:frozen", pos, pp(), null, zg());
   });
 
-  world.on('teleported', ({ id, from, to }) => {
+  world.on('teleported', (payload) => {
+    const { id, from, to } = payload || {};
+    if (!shouldPlayTeleportSound(payload, isPlayer)) return;
     const pos = to || from || (id != null ? getPosition(id) : null);
     sfxAt("teleported", pos, pp(), { priority: 1 }, zg());
   });
 
   world.on('pet:teleported', ({ petId, id, from, to }) => {
-    const entityId = petId || id;
-    const pos = to || from || (entityId != null ? getPosition(entityId) : null);
-    sfxAt("teleported", pos, pp(), { priority: 1 }, zg());
+    // Pet catch-up teleports are housekeeping, not a player-facing teleport cast.
   });
 
   world.on('summon:teleported', ({ id, from, to }) => {
-    const pos = to || from || (id != null ? getPosition(id) : null);
-    sfxAt("teleported", pos, pp(), { priority: 1 }, zg());
+    // Summon catch-up/materialization teleports are intentionally silent.
   });
 
   // ── Spells (cast / launch sounds) ─────────────────────────

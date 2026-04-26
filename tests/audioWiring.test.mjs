@@ -9,7 +9,9 @@ import {
   computeZoomAudibilityGain,
   resolveAudioPlayKey,
   resolveStatusSoundId,
+  shouldPlayElectrocutionSound,
   shouldPlayDungeonOmen,
+  shouldPlayTeleportSound,
 } from "../src/display/audio/audioWiring.js";
 
 Deno.test("audio wiring includes spider spell cast events", () => {
@@ -50,6 +52,20 @@ Deno.test("audio wiring maps semantic status events to status sounds", () => {
   assert(resolveStatusSoundId({ effect: "slimed" }) === "status:slimed");
   assert(resolveStatusSoundId({ status: "deafened" }) === "status:deafened");
   assert(resolveStatusSoundId({ type: "electrocuted" }) === "status:electrocuted");
+});
+
+Deno.test("audio wiring plays electrocution for non-spell electric damage", () => {
+  assert(shouldPlayElectrocutionSound({ type: "electric", cause: "grid_bug" }));
+  assert(shouldPlayElectrocutionSound({ type: "lightning", cause: "trap" }));
+  assert(!shouldPlayElectrocutionSound({ type: "fire", cause: "spell" }));
+});
+
+Deno.test("audio wiring keeps housekeeping teleports silent", () => {
+  const isPlayer = (id) => id === 7;
+
+  assert(shouldPlayTeleportSound({ id: 7, source: "scroll:teleportation" }, isPlayer));
+  assert(!shouldPlayTeleportSound({ id: 7, source: "dungeon:teleport-depth" }, isPlayer));
+  assert(!shouldPlayTeleportSound({ id: 8, source: "scroll:teleportation" }, isPlayer));
 });
 
 Deno.test("audio wiring gates dungeon omens to rare real dungeon events", () => {

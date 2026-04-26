@@ -694,7 +694,7 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
         if (s) {
           const handle = _playTracked(s.url, {
             bus: s.bus,
-            loop: true,
+            loop: false,
             volume: 0.6,
             randomPitch: s.randomPitch,
           });
