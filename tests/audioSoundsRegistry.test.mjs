@@ -164,6 +164,26 @@ Deno.test("sounds registry exposes eating and boulder move sounds", () => {
   assertEquals(pushStone.bus, "ambient");
 });
 
+Deno.test("sounds registry exposes trap, skeleton, and weapon rack sounds", () => {
+  const skeletonDied = resolve("creature:skeleton:died");
+  const snakeTrap = resolve("trap:snake");
+  const spikeTrap = resolve("trap:spike");
+  const rackDrop = resolve("rack:weapon:dropped");
+
+  assertExists(skeletonDied);
+  assertExists(snakeTrap);
+  assertExists(spikeTrap);
+  assertExists(rackDrop);
+  assertEquals(skeletonDied.file, "skeleton_died.mp3");
+  assertEquals(skeletonDied.bus, "combat");
+  assertEquals(snakeTrap.file, "trap_snake.mp3");
+  assertEquals(snakeTrap.bus, "ambient");
+  assertEquals(spikeTrap.file, "trap_spike.mp3");
+  assertEquals(spikeTrap.bus, "combat");
+  assertEquals(rackDrop.file, "weapon_rack_dropped.mp3");
+  assertEquals(rackDrop.bus, "items");
+});
+
 Deno.test("sounds registry does not reference missing cleave wav", () => {
   const urls = allUrls();
 

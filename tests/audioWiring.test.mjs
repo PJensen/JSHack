@@ -5,11 +5,14 @@ import {
   CHANNELING_LOOP_SOUND_ID,
   DUNGEON_LOOP_OPTIONS,
   DUNGEON_LOOP_SOUND_ID,
+  DEATH_SOUND_BY_IDENTITY,
   FAMILIAR_FIRE_CAST_SOUND_ID,
   FAMILIAR_FIRE_READY_SOUND_ID,
   FOOD_EAT_SOUND_ID,
   PUSH_STONE_SOUND_ID,
   SPELL_CAST_SOUND_EVENTS,
+  TRAP_SOUND_BY_TYPE,
+  WEAPON_RACK_DROPPED_SOUND_ID,
   computeZoomAudibilityGain,
   resolveAudioPlayKey,
   resolveStatusSoundId,
@@ -46,6 +49,15 @@ Deno.test("audio wiring exposes familiar fire ready and cast sound aliases", () 
 Deno.test("audio wiring exposes food and stone push sound aliases", () => {
   assert(FOOD_EAT_SOUND_ID === "item:consume:food");
   assert(PUSH_STONE_SOUND_ID === "action:move_boulder");
+});
+
+Deno.test("audio wiring maps new authored event sounds", () => {
+  assert(DEATH_SOUND_BY_IDENTITY.skeleton === "creature:skeleton:died");
+  assert(DEATH_SOUND_BY_IDENTITY.skeleton_archer === "creature:skeleton:died");
+  assert(DEATH_SOUND_BY_IDENTITY.skeleton_sharpshooter === "creature:skeleton:died");
+  assert(TRAP_SOUND_BY_TYPE.snake === "trap:snake");
+  assert(TRAP_SOUND_BY_TYPE.spike === "trap:spike");
+  assert(WEAPON_RACK_DROPPED_SOUND_ID === "rack:weapon:dropped");
 });
 
 Deno.test("audio wiring zoom gain follows camera scale with clamps", () => {
