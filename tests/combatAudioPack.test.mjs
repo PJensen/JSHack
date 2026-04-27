@@ -124,7 +124,7 @@ Deno.test("combat sound resolver supports every purchased weapon and shield fami
     assertExists(resolveCombatSoundPlan({ itemInfo: info, action: "whoosh" })?.id, `${family} should resolve whoosh audio`);
     assertExists(resolveCombatSoundPlan({ itemInfo: info, action: "impact_soft" })?.id, `${family} should resolve impact audio`);
     assert(planWeaponReady({ itemInfo: info, action: "equip" }).some((x) => x.id === `combat:weapon:${family}:equip`), `${family} should resolve equip audio`);
-    assertEquals(planWeaponDrop({ itemInfo: info }).map((x) => x.id), [`combat:weapon:${family}:impact_soft`], `${family} drops should use soft impact audio only`);
+    assertEquals(planWeaponDrop({ itemInfo: info }).map((x) => x.id), [`combat:weapon:${family}:impact_soft`], `${family} pickup/drop should use soft impact audio only`);
   }
 });
 
