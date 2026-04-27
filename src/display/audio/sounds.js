@@ -4,19 +4,31 @@
 // maxVoices:   how many of this sound can play at once (default 3)
 // randomPitch: cents of random detune jitter per play — opt-in, set after hearing the files
 
+import { COMBAT_PACK, COMBAT_SOUNDS } from "./combatPack.js";
+
 const BASE = "./assets/audio/";
+
+function combatAlias(files, opts = {}) {
+  return {
+    files,
+    bus: "combat",
+    maxVoices: 5,
+    randomPitch: 35,
+    ...opts,
+  };
+}
 
 /**
  * Each entry:  id → { file|files, bus, maxVoices?, volume?, rate?, detune?, randomPitch?, stopAfter?, fadeOut? }
  */
 const SOUNDS = {
   // ── Combat ──────────────────────────────────────
-  "melee:hit":        { file: "melee_hit.wav",     bus: "combat", randomPitch: 55 },
-  "shield:blocked":   { files: ["melee_shield_hit_1.mp3", "melee_shield_hit_2.mp3", "melee_shield_hit_3.mp3", "melee_shield_hit_4.mp3", "melee_shield_hit_5.mp3", "melee_shield_hit_6.mp3"], bus: "combat", randomPitch: 45 },
-  "melee:crit":       { file: "melee_crit.wav",    bus: "combat", randomPitch: 40 },
-  "melee:miss":       { file: "melee_miss.wav",    bus: "combat" },
+  "melee:hit":        combatAlias([...COMBAT_PACK.sword_small.impact_soft, ...COMBAT_PACK.mace.impact_soft], { volume: 0.92 }),
+  "shield:blocked":   combatAlias([...COMBAT_PACK.shield_metal.deflect, ...COMBAT_PACK.shield_wood.deflect], { volume: 0.95 }),
+  "melee:crit":       combatAlias([...COMBAT_PACK.sword_large.impact_hard, ...COMBAT_PACK.axe_large.impact_hard, ...COMBAT_PACK.hammer_large.impact_hard], { volume: 1.05 }),
+  "melee:miss":       combatAlias([...COMBAT_PACK.dagger.whoosh_short, ...COMBAT_PACK.sword_small.whoosh_short], { volume: 0.74 }),
   "ranged:shot":      { file: "ranged_shot.wav",   bus: "combat", randomPitch: 35, volume: 1.35 },
-  "death":            { file: "death.wav",          bus: "combat", maxVoices: 3 },
+  "death":            combatAlias([...COMBAT_PACK.gore.impact_medium, ...COMBAT_PACK.gore.slice_medium, ...COMBAT_PACK.gore.stab_medium], { maxVoices: 3, volume: 0.85 }),
   "creature:boar:died": { file: "boar_died.mp3",      bus: "combat", maxVoices: 1 },
   "creature:skeleton:died": { file: "skeleton_died.mp3", bus: "combat", maxVoices: 2, randomPitch: 18 },
   "player:death":     { file: "player_death.wav",   bus: "combat", maxVoices: 1 },
@@ -43,9 +55,9 @@ const SOUNDS = {
   "item:drop:gem:glass":   { file: "drop_gem_lesser.wav", bus: "items" },
   "item:drop:generic":     { file: "drop_generic.wav",    bus: "items" },
 
-  "item:equip:weapon":     { file: "equip_weapon.wav",    bus: "items" },
-  "item:equip:armor":      { file: "equip_weapon.wav",    bus: "items" },
-  "item:equip:generic":    { file: "equip_weapon.wav",    bus: "items" },
+  "item:equip:weapon":     { files: [...COMBAT_PACK.sword_small.equip, ...COMBAT_PACK.dagger.equip, ...COMBAT_PACK.mace.equip], bus: "items", maxVoices: 3, randomPitch: 24, volume: 1.15 },
+  "item:equip:armor":      { files: [...COMBAT_PACK.shield_metal.equip, ...COMBAT_PACK.shield_wood.equip], bus: "items", maxVoices: 3, randomPitch: 18, volume: 1.15 },
+  "item:equip:generic":    { files: COMBAT_PACK.dagger.equip, bus: "items", maxVoices: 3, randomPitch: 18, volume: 0.9 },
 
   "chest:open":            { file: "chest_opened.mp3",    bus: "items" },
   "item:chest:opened":     { file: "chest_opened.mp3",    bus: "items" },
@@ -79,13 +91,14 @@ const SOUNDS = {
   "spider:alert":     { file: "insect_alerted.mp3",       bus: "combat", maxVoices: 2, randomPitch: 20 },
   "insect:alert":     { file: "insect_alerted.mp3",        bus: "combat", maxVoices: 3, randomPitch: 24 },
   "gelatinous_cube:alert": { file: "gelatinous_cube_alerted.mp3", bus: "combat", maxVoices: 1, randomPitch: 8 },
-  "cave_bear:alert":  { file: "creature_alerted_large_beast.mp3",     bus: "combat", maxVoices: 2, randomPitch: 15 },
+  "cave_bear:alert":  { file: "cave_bear_alerted.mp3",     bus: "combat", maxVoices: 2, randomPitch: 15 },
   "rat:alert":        { file: "rat_alerted_1.mp3",         bus: "combat", maxVoices: 3, randomPitch: 25 },
   "creature:alert:large_beast": { file: "creature_alerted_large_beast.mp3", bus: "combat", maxVoices: 2, randomPitch: 15 },
   "deity:omen":       { file: "harp_reverb.wav",   bus: "ambient", maxVoices: 2 },
 
   // ── Spells (cast / launch) ─────────────────────
   "spell:bolt":          { file: "spell_buff.mp3",          bus: "spells" },
+  "spell:agony":         { file: "spell_agony.mp3",         bus: "spells", volume: 1.25 },
   "spell:frost":         { file: "spell_frost.wav",         bus: "spells" },
   "spell:shadow_bolt":   { file: "spell_agony.mp3",         bus: "spells" },
   "spell:fireball":      { files: ["spell_fire.mp3", "spell_fireball.mp3"], bus: "spells" },
@@ -104,7 +117,7 @@ const SOUNDS = {
   "spell:cleave":        { file: "spell_cleave.mp3",        bus: "spells" },
   "spell:rampage":       { file: "spell_lifetap.mp3",       bus: "spells" },
   "spell:phase_strike":  { file: "teleported.mp3",          bus: "spells" },
-  "spell:shield_bash":   { file: "melee_shield_hit_1.mp3",  bus: "spells" },
+  "spell:shield_bash":   { files: COMBAT_PACK.shield_metal.impact_hard,  bus: "spells", randomPitch: 24 },
   "spell:wolf_howl":     { file: "spell_wolf_howl.mp3",     bus: "spells" },
   "spell:boar_charge":   { file: "boar_charge.mp3",         bus: "spells" },
   "spell:consecrate":    { file: null,                      bus: "spells" },
@@ -144,7 +157,7 @@ const SOUNDS = {
   "spell:impact:shadow":    { file: "spell_agony.mp3",     bus: "spells", maxVoices: 4 },
   "spell:impact:holy":      { file: "harp_reverb.wav",     bus: "spells", maxVoices: 4 },
   "spell:impact:poison":    { file: "status_slimed.mp3",   bus: "spells", maxVoices: 4 },
-  "spell:impact:physical":  { file: "melee_hit.wav",       bus: "spells", maxVoices: 4 },
+  "spell:impact:physical":  { files: [...COMBAT_PACK.sword_small.impact_soft, ...COMBAT_PACK.mace.impact_soft], bus: "spells", maxVoices: 4, randomPitch: 28 },
 
   // ── Weather ─────────────────────────────────────
   "thunder":          { file: "weather_lightning_strike.mp3",          bus: "ambient", maxVoices: 2 },
@@ -158,6 +171,7 @@ const SOUNDS = {
   "status:electrocuted": { file: "status_electrocuted.mp3", bus: "combat", maxVoices: 1 },
   "status:slimed":       { file: "status_slimed.mp3",       bus: "combat", maxVoices: 1 },
   "status:deafened":     { file: "status_deafened_2.mp3", bus: "ui", maxVoices: 1, stopAfter: 2.0, fadeOut: 0.55 },
+  "ears:ringing":         { files: ["status_deafened.mp3", "status_deafened_2.mp3"], bus: "ui", maxVoices: 1, stopAfter: 2.0, fadeOut: 0.55 },
   "status:frozen":       { files: ["status_frozen_1.mp3", "status_frozen_2.mp3", "status_frozen_3.mp3", "status_frozen_4.mp3", "status_frozen_5.mp3"], bus: "combat", maxVoices: 1 },
 
   // ── Interactions ────────────────────────────────
@@ -197,6 +211,9 @@ const SOUNDS = {
 
   // ── UI / Misc ───────────────────────────────────
   "level:up":         { file: "quest_complete.mp3",   bus: "ui", maxVoices: 1 },
+
+  // ── Purchased Medieval Combat Pack ──────────────
+  ...COMBAT_SOUNDS,
 };
 
 /**
