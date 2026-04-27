@@ -1,6 +1,6 @@
 import { assert, assertEquals, assertExists } from "jsr:@std/assert";
 import { allUrls, resolve, resolveUrls } from "../src/display/audio/sounds.js";
-import { allAdapterCombatSoundIds, planMeleeDeath, planWeaponDeflect, planWeaponImpact, planWeaponReady, planWeaponWhoosh } from "../src/display/audio/combatAudioAdapter.js";
+import { allAdapterCombatSoundIds, planMeleeDeath, planWeaponDeflect, planWeaponDrop, planWeaponImpact, planWeaponReady, planWeaponWhoosh } from "../src/display/audio/combatAudioAdapter.js";
 import { allCombatPackFiles, COMBAT_PACK, COMBAT_SOUNDS, combatSoundId } from "../src/display/audio/combatPack.js";
 import { buildAudioItemInfo } from "../src/display/composition/setupDisplayRuntime.js";
 import { World } from "../src/lib/ecs-js/index.js";
@@ -124,6 +124,7 @@ Deno.test("combat sound resolver supports every purchased weapon and shield fami
     assertExists(resolveCombatSoundPlan({ itemInfo: info, action: "whoosh" })?.id, `${family} should resolve whoosh audio`);
     assertExists(resolveCombatSoundPlan({ itemInfo: info, action: "impact_soft" })?.id, `${family} should resolve impact audio`);
     assert(planWeaponReady({ itemInfo: info, action: "equip" }).some((x) => x.id === `combat:weapon:${family}:equip`), `${family} should resolve equip audio`);
+    assertEquals(planWeaponDrop({ itemInfo: info }).map((x) => x.id), [`combat:weapon:${family}:impact_soft`], `${family} drops should use soft impact audio only`);
   }
 });
 

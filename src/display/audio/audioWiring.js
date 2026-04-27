@@ -10,6 +10,7 @@ import {
   planMeleeDeath,
   planShieldBlock,
   planWeaponDeflect,
+  planWeaponDrop,
   planWeaponImpact,
   planWeaponReady,
   planWeaponWhoosh,
@@ -479,8 +480,9 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
 
   function playDroppedCombatSoft(itemId, at) {
     const info = combatInfoFor(getItemInfo, itemId);
-    if (!resolveCombatFamily(info)) return false;
-    playCombatLayers(planWeaponImpact({ itemInfo: info, amount: 0 }), at);
+    const layers = planWeaponDrop({ itemInfo: info });
+    if (layers.length <= 0) return false;
+    playCombatLayers(layers, at);
     return true;
   }
 
