@@ -478,7 +478,7 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     playCombatLayers(planWeaponWhoosh({ itemInfo, fallbackFamily: null }), pos);
   }
 
-  function playDroppedCombatSoft(itemId, at) {
+  function playCombatSoftHandling(itemId, at) {
     const info = combatInfoFor(getItemInfo, itemId);
     const layers = planWeaponDrop({ itemInfo: info });
     if (layers.length <= 0) return false;
@@ -680,13 +680,14 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
   // ── Items (sound varies by item type) ─────────────────────
 
   world.on('item:pickup', ({ itemId, itemX, itemY }) => {
-    const cat = itemCategory(getItemInfo, itemId);
     const pos = (itemX != null && itemY != null) ? { x: itemX, y: itemY } : null;
+    if (playCombatSoftHandling(itemId, pos)) return;
+    const cat = itemCategory(getItemInfo, itemId);
     sfxAt(`item:pickup:${cat}`, pos, pp(), null, zg());
   });
 
   world.on('item:dropped', ({ itemId, at }) => {
-    if (playDroppedCombatSoft(itemId, at)) return;
+    if (playCombatSoftHandling(itemId, at)) return;
     const cat = itemCategory(getItemInfo, itemId);
     let dropId;
     if (cat === "weapon") {
