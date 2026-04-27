@@ -82,6 +82,32 @@ Deno.test("combat sound resolver maps current melee equipment into pack families
   }
 });
 
+Deno.test("combat sound resolver supports every purchased weapon and shield family", () => {
+  const supported = Object.freeze({
+    axe_large: { id: "execution_axe", name: "Execution Axe", slot: "weapon", damageDice: "1d10", damageType: "slash", twoHanded: true, weight: 4.2 },
+    axe_small: { id: "hand_axe", name: "Hand Axe", slot: "weapon", damageDice: "1d6", damageType: "slash", weight: 1.4 },
+    dagger: { id: "dagger_quick", name: "Dagger", slot: "weapon", damageDice: "1d4", damageType: "pierce", weight: 0.5 },
+    flail: { id: "flail", name: "Flail", slot: "weapon", damageDice: "1d8", damageType: "blunt", weight: 3.2 },
+    hammer_large: { id: "warhammer", name: "Warhammer", slot: "weapon", damageDice: "1d8", damageType: "blunt", weight: 3.4 },
+    mace: { id: "iron_mace", name: "Iron Mace", slot: "weapon", damageDice: "1d8", damageType: "blunt", weight: 3.0 },
+    shield_metal: { id: "shield_iron", name: "Iron Shield", slot: "offhand", material: "iron" },
+    shield_wood: { id: "shield_wood", name: "Wooden Shield", slot: "offhand", material: "wood" },
+    spear: { id: "training_spear", name: "Training Spear", slot: "weapon", damageDice: "1d8", damageType: "pierce", weight: 2.2 },
+    sword_large: { id: "greatsword", name: "Greatsword", slot: "weapon", damageDice: "1d10", damageType: "slash", twoHanded: true, weight: 3.4 },
+    sword_small: { id: "sword_plain", name: "Short Sword", slot: "weapon", damageDice: "1d6", damageType: "slash", weight: 1.2 },
+    wooden_staff: { id: "staff_oak", name: "Oak Staff", slot: "weapon", damageDice: "1d6", damageType: "blunt", material: "wood", twoHanded: true, weight: 2.5 },
+  });
+
+  assertEquals(new Set(Object.keys(supported)), new Set(Object.keys(COMBAT_PACK).filter((family) => family !== "gore")));
+
+  for (const [family, info] of Object.entries(supported)) {
+    assertEquals(resolveCombatFamily(info), family, family);
+    assertExists(resolveCombatSoundPlan({ itemInfo: info, action: "whoosh" })?.id, `${family} should resolve whoosh audio`);
+    assertExists(resolveCombatSoundPlan({ itemInfo: info, action: "impact_soft" })?.id, `${family} should resolve impact audio`);
+    assertEquals(planWeaponReady({ itemInfo: info, action: "equip" }).map((x) => x.id), [`combat:weapon:${family}:equip`], `${family} should resolve equip audio`);
+  }
+});
+
 Deno.test("combat sound resolver covers every authored melee weapon, including all staffs", () => {
   const expectedStaffs = new Set(["staff_oak", "resonant_quarterstaff"]);
   const seenStaffs = new Set();
@@ -101,6 +127,28 @@ Deno.test("combat sound resolver covers every authored melee weapon, including a
   }
 
   assertEquals(seenStaffs, expectedStaffs);
+});
+
+Deno.test("authored equipment currently represents every purchased combat family", () => {
+  const seen = new Set();
+  for (const [id, rec] of Object.entries(ITEM_CATALOG)) {
+    if (rec?.catalogKind !== "equipment") continue;
+    const slot = String(rec.slot || "");
+    if (slot !== "weapon" && slot !== "offhand" && slot !== "shield") continue;
+    const family = resolveCombatFamily({ id, identity: id, ...rec });
+    if (family) seen.add(family);
+  }
+
+  assertEquals(seen, new Set(Object.keys(COMBAT_PACK).filter((family) => family !== "gore")));
+});
+
+Deno.test("combat sound resolver does not route non-equipment shield text into shield audio", () => {
+  assertEquals(resolveCombatFamily({
+    id: "book_divine_shield",
+    name: "Spellbook of Divine Shield",
+    type: "book",
+    slot: "bag",
+  }), null);
 });
 
 Deno.test("display audio bridge preserves item identity/name/material for weapon family routing", () => {
