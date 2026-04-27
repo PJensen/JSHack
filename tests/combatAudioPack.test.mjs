@@ -1,6 +1,6 @@
 import { assert, assertEquals, assertExists } from "jsr:@std/assert";
 import { allUrls, resolve, resolveUrls } from "../src/display/audio/sounds.js";
-import { allAdapterCombatSoundIds } from "../src/display/audio/combatAudioAdapter.js";
+import { allAdapterCombatSoundIds, planMeleeDeath, planWeaponImpact, planWeaponReady } from "../src/display/audio/combatAudioAdapter.js";
 import { allCombatPackFiles, COMBAT_PACK, COMBAT_SOUNDS, combatSoundId } from "../src/display/audio/combatPack.js";
 import { buildAudioItemInfo } from "../src/display/composition/setupDisplayRuntime.js";
 import {
@@ -99,6 +99,26 @@ Deno.test("display audio bridge preserves item identity/name/material for weapon
 
   assertEquals(resolveCombatFamily(mace), "mace");
   assertEquals(resolveCombatFamily(staff), "wooden_staff");
+});
+
+Deno.test("combat audio plans mace and staff equip/unequip through purchased pack ids", () => {
+  const mace = { id: "mace", identity: "mace", name: "Iron Mace", type: "equip", slot: "weapon", damageDice: "1d6", damageType: "blunt" };
+  const staff = { id: "staff_oak", identity: "staff_oak", name: "Oak Staff", type: "equip", slot: "weapon", damageDice: "1d6", damageType: "blunt", material: "wood" };
+
+  assertEquals(planWeaponReady({ itemInfo: mace, action: "equip" }).map((x) => x.id), ["combat:weapon:mace:equip"]);
+  assertEquals(planWeaponReady({ itemInfo: mace, action: "unequip" }).map((x) => x.id), ["combat:weapon:mace:unequip"]);
+  assertEquals(planWeaponReady({ itemInfo: staff, action: "equip" }).map((x) => x.id), ["combat:weapon:wooden_staff:equip"]);
+  assertEquals(planWeaponReady({ itemInfo: staff, action: "unequip" }).map((x) => x.id), ["combat:weapon:wooden_staff:unequip"]);
+});
+
+Deno.test("combat audio plans gore layers for blunt slash and pierce hits/deaths", () => {
+  const bluntHit = planWeaponImpact({ itemInfo: { name: "Iron Mace", slot: "weapon", damageDice: "1d6" }, type: "blunt", amount: 6 });
+  const slashHit = planWeaponImpact({ itemInfo: { name: "Short Sword", slot: "weapon", damageDice: "1d6" }, type: "slash", amount: 3 });
+  const pierceDeath = planMeleeDeath({ itemInfo: { name: "Spear", slot: "weapon", damageDice: "1d8" }, damageType: "pierce", amount: 12, critical: true });
+
+  assert(bluntHit.some((x) => x.id === "combat:gore:impact_medium"));
+  assert(slashHit.some((x) => x.id === "combat:gore:slice_small"));
+  assert(pierceDeath.some((x) => x.id === "combat:gore:stab_large"));
 });
 
 Deno.test("combat sound resolver produces action-specific sound plans", () => {

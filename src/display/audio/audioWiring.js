@@ -463,8 +463,6 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     const layers = planWeaponReady({ itemInfo: info, action });
     if (layers.length > 0) {
       playCombatLayers(layers, null, { centered: true, bus: "items" });
-    } else {
-      sfx("item:equip:weapon", { priority: 1 });
     }
   }
 
