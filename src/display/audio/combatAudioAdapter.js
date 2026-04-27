@@ -57,6 +57,11 @@ export function planWeaponWhoosh({ itemInfo, offhand = false, fallbackFamily = "
   ]);
 }
 
+export function planWeaponDrop({ itemInfo } = {}) {
+  const family = familyForCombatItem(itemInfo);
+  return family ? compact([layer(combatSoundId(family, "impact_soft"), { volume: 0.84 })]) : [];
+}
+
 export function planWeaponDeflect({ itemInfo, fallbackFamily = "sword_small", hard = true, volume = 0.9 } = {}) {
   const family = familyForCombatItem(itemInfo, fallbackFamily);
   return compact([
