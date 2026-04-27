@@ -6,6 +6,7 @@ import { Player } from "../components/Player.js";
 import { KnockbackPending } from "../components/KnockbackPending.js";
 import { Equipment } from "../components/Equipment.js";
 import { Material } from "../components/Material.js";
+import { ItemInfo } from "../components/ItemInfo.js";
 import { ActiveEffects } from "../components/ActiveEffects.js";
 import { isEntityInvulnerable } from "./effectGuards.js";
 import { MATERIAL_CATALOG } from "../data/materials.js";
@@ -23,6 +24,13 @@ import { statusStrength } from "./statusFacade.js";
 import { Physiology } from "../components/Physiology.js";
 import { getMonster } from "../data/monsters.js";
 import { emitSafe } from "./emitSafe.js";
+import { resolveWeaponFamily } from "../data/weaponFamilies.js";
+
+function resolveEventWeaponFamily(world, weaponId) {
+  if (!(weaponId > 0) || !world.isAlive(weaponId)) return "";
+  const info = world.get(weaponId, ItemInfo);
+  return String(info?.weaponFamily || resolveWeaponFamily(info || {}) || "");
+}
 
 // ── Electric tuning constants (moved from typedDamage.js) ───────────
 const BASE_ELECTRIC_OHMS = Number(ELECTRIC_DAMAGE_TUNING.baseOhms);
@@ -370,6 +378,7 @@ export function dealDamage(world, spec) {
 
   // Step 5: Emit 'damaged'
   const _phys = world.get(target, Physiology);
+  const eventWeaponFamily = resolveEventWeaponFamily(world, Number(spec.weaponId || 0) | 0);
   emitSafe(world, 'damaged', {
     target,
     amount: finalAmount,
@@ -380,6 +389,7 @@ export function dealDamage(world, spec) {
     type,
     source,
     weaponId: Number(spec.weaponId || 0) | 0,
+    weaponFamily: eventWeaponFamily,
     cause,
     critical,
     at: spec.at || undefined,
@@ -456,6 +466,7 @@ export function dealDamage(world, spec) {
     emitSafe(world, 'died', {
       id: target, killer: source, cause,
       weaponId: Number(spec.weaponId || 0) | 0,
+      weaponFamily: eventWeaponFamily,
       damageType: type,
       critical,
       amount: finalAmount,

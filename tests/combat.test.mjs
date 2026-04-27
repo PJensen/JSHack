@@ -14,6 +14,7 @@ import { installAffixTriggers } from '../src/rules/systems/affixTriggerSystem.js
 import { applyWeaponCoatingOnHit } from '../src/rules/data/weaponCoatings.js';
 import { Position } from '../src/rules/components/Position.js';
 import { Facing } from '../src/rules/components/Facing.js';
+import { WEAPON_FAMILIES } from '../src/rules/data/weaponFamilies.js';
 
 function makeActor(world, name, eq, hp = 10, resistances = null) {
   const id = world.create();
@@ -45,6 +46,7 @@ function makeEquip(world, { id, name, slot, bonuses, affixes = [], damageType = 
     rarityName: 'common',
     affixes,
     damageType,
+    weaponFamily: '',
   });
   return eid;
 }
@@ -136,6 +138,40 @@ Deno.test("combatSystem: melee emits blended impact profiles by weapon signature
   const vec = morningstarHit?.impactVector;
   const mag = Math.hypot(Number(vec?.dx || 0), Number(vec?.dy || 0));
   assert(mag > 0.99 && mag < 1.01, `impact vector should be normalized (mag=${mag})`);
+});
+
+Deno.test("combatSystem: flail melee events carry weaponFamily through attack and damage", () => {
+  const world = new World({ seed: 7 });
+  const flail = makeEquip(world, {
+    id: 'flail',
+    name: 'Flail',
+    slot: 'weapon',
+    bonuses: { accuracy: 40, damagePower: 4, bluntPenetration: 3 },
+    damageType: 'blunt',
+  });
+  const flailInfo = world.get(flail, ItemInfo);
+  world.set(flail, ItemInfo, { ...flailInfo, subtype: 'flail', weaponFamily: WEAPON_FAMILIES.flail, damageDice: '1d8' });
+
+  const attacker = makeActor(world, 'Attacker', { weapon: flail }, 20);
+  const defender = makeActor(world, 'Defender', {}, 30);
+  world.add(attacker, Position, { x: 1, y: 1 });
+  world.add(defender, Position, { x: 1, y: 2 });
+  equipmentSystem(world);
+
+  const attacks = [];
+  const damaged = [];
+  world.on('combat:melee:attack', (ev) => attacks.push(ev));
+  world.on('damaged', (ev) => damaged.push(ev));
+
+  world.add(attacker, AttackIntent, { targetId: defender });
+  combatSystem(world);
+
+  assertEquals(attacks.length, 1);
+  assertEquals(attacks[0].weaponId, flail);
+  assertEquals(attacks[0].weaponFamily, WEAPON_FAMILIES.flail);
+  assert(damaged.length > 0, 'expected flail hit to land');
+  assertEquals(damaged[0].weaponId, flail);
+  assertEquals(damaged[0].weaponFamily, WEAPON_FAMILIES.flail);
 });
 
 Deno.test("d20 combat with affix triggers: fierce, vamp, thorns", () => {
