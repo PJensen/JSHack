@@ -5,6 +5,7 @@
 import { EQUIPMENT_ITEMS } from "./itemCatalogEquipment.js";
 import { MAGIC_ITEMS } from "./itemCatalogMagic.js";
 import { isWeaponCatalogItem, resolveWeaponVisualMeta } from "./weaponVisuals.js";
+import { resolveWeaponFamily } from "./weaponFamilies.js";
 import {
   canGemSocketDipTarget,
   createGemSocketDipHook,
@@ -17,16 +18,21 @@ function buildItemCatalog() {
   };
   const out = {};
   for (const [id, rec] of Object.entries(merged)) {
-    if (!isWeaponCatalogItem(rec)) {
-      out[id] = rec;
+    if (isWeaponCatalogItem(rec)) {
+      const meta = resolveWeaponVisualMeta(rec);
+      const withVisuals = {
+        ...rec,
+        weaponLengthCm: meta.weaponLengthCm,
+        weaponVfxProfile: meta.weaponVfxProfile,
+      };
+      out[id] = {
+        ...withVisuals,
+        weaponFamily: rec.weaponFamily || resolveWeaponFamily(withVisuals) || "",
+      };
       continue;
     }
-    const meta = resolveWeaponVisualMeta(rec);
-    out[id] = {
-      ...rec,
-      weaponLengthCm: meta.weaponLengthCm,
-      weaponVfxProfile: meta.weaponVfxProfile,
-    };
+    const weaponFamily = resolveWeaponFamily(rec);
+    out[id] = weaponFamily ? { ...rec, weaponFamily } : rec;
   }
   return out;
 }

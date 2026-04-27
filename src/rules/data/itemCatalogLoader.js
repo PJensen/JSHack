@@ -64,6 +64,7 @@ export function buildCatalogItem(world, itemId, opts = {}) {
     range: def.range || null,
     weaponLengthCm: Number(def.weaponLengthCm || 0) > 0 ? (Number(def.weaponLengthCm) | 0) : null,
     weaponVfxProfile: cloneWeaponVfxProfile(def.weaponVfxProfile),
+    weaponFamily: typeof def.weaponFamily === "string" ? def.weaponFamily : "",
     identified: def.identified === true,
     noQuickChip: def.noQuickChip === true,
     tags: Array.isArray(def.tags) ? def.tags.slice() : [],
