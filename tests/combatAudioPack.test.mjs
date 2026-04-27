@@ -1,12 +1,13 @@
 import { assert, assertEquals, assertExists } from "jsr:@std/assert";
 import { allUrls, resolve, resolveUrls } from "../src/display/audio/sounds.js";
-import { allAdapterCombatSoundIds, planMeleeDeath, planWeaponImpact, planWeaponReady } from "../src/display/audio/combatAudioAdapter.js";
+import { allAdapterCombatSoundIds, planMeleeDeath, planWeaponDeflect, planWeaponImpact, planWeaponReady, planWeaponWhoosh } from "../src/display/audio/combatAudioAdapter.js";
 import { allCombatPackFiles, COMBAT_PACK, COMBAT_SOUNDS, combatSoundId } from "../src/display/audio/combatPack.js";
 import { buildAudioItemInfo } from "../src/display/composition/setupDisplayRuntime.js";
 import { World } from "../src/lib/ecs-js/index.js";
 import { ITEM_CATALOG } from "../src/rules/data/itemCatalog.js";
 import { buildCatalogItem } from "../src/rules/data/itemCatalogLoader.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
+import { WEAPON_FAMILIES } from "../src/rules/data/weaponFamilies.js";
 import {
   resolveCombatFamily,
   resolveCombatSoundPlan,
@@ -115,28 +116,66 @@ Deno.test("materialized flail keeps flail audio even from raw ItemInfo", () => {
   const world = new World({ seed: 0xC0FFEE });
   const itemId = buildCatalogItem(world, "flail");
   const info = world.get(itemId, ItemInfo);
+  const actions = [
+    "deflect",
+    "deflect_body",
+    "deflect_tail",
+    "equip",
+    "finisher",
+    "impact_hard",
+    "impact_hard_body",
+    "impact_hard_tail",
+    "impact_soft",
+    "unequip",
+    "whoosh_long",
+    "whoosh_short",
+  ];
 
   assertEquals(info?.subtype, "flail");
+  assertEquals(info?.weaponFamily, "flail");
   assertEquals(resolveCombatFamily(info), "flail");
-  assertEquals(planWeaponReady({ itemInfo: info, action: "equip" }).map((x) => x.id), ["combat:weapon:flail:equip"]);
+  for (const action of actions) {
+    assertEquals(resolveCombatSoundPlan({ itemInfo: info, action })?.id, `combat:weapon:flail:${action}`);
+  }
   assertEquals(resolveCombatSoundPlan({ itemInfo: info, action: "whoosh" })?.id, "combat:weapon:flail:whoosh_short");
 });
 
-Deno.test("combat sound resolver covers every authored melee weapon, including all staffs", () => {
+Deno.test("combat audio adapter plans every flail playback path through flail assets", () => {
+  const world = new World({ seed: 0xC0FFEE });
+  const itemId = buildCatalogItem(world, "flail");
+  const info = world.get(itemId, ItemInfo);
+
+  assertEquals(planWeaponReady({ itemInfo: info, action: "equip" }).map((x) => x.id), ["combat:weapon:flail:equip"]);
+  assertEquals(planWeaponReady({ itemInfo: info, action: "unequip" }).map((x) => x.id), ["combat:weapon:flail:unequip"]);
+  assertEquals(planWeaponWhoosh({ itemInfo: info }).map((x) => x.id), ["combat:weapon:flail:whoosh_short"]);
+  assert(planWeaponDeflect({ itemInfo: info }).every((x) => x.id.startsWith("combat:weapon:flail:deflect")));
+  assert(planWeaponImpact({ itemInfo: info, type: "blunt", amount: 2 }).some((x) => x.id === "combat:weapon:flail:impact_soft"));
+  assert(planWeaponImpact({ itemInfo: info, type: "blunt", amount: 12, critical: true }).some((x) => x.id === "combat:weapon:flail:impact_hard"));
+  assert(planMeleeDeath({ itemInfo: info, damageType: "blunt", amount: 12, critical: true }).some((x) => x.id === "combat:weapon:flail:finisher"));
+});
+
+Deno.test("materialized melee weapons carry raw ItemInfo weapon families, including all staffs", () => {
   const expectedStaffs = new Set(["staff_oak", "resonant_quarterstaff"]);
   const seenStaffs = new Set();
+  const supported = new Set(Object.values(WEAPON_FAMILIES));
 
   for (const [id, rec] of Object.entries(ITEM_CATALOG)) {
     if (rec?.catalogKind !== "equipment" || rec?.slot !== "weapon") continue;
 
-    const family = resolveCombatFamily({ id, identity: id, ...rec });
+    const world = new World({ seed: 0xA77A77 });
+    const itemId = buildCatalogItem(world, id);
+    const info = world.get(itemId, ItemInfo);
+    const family = resolveCombatFamily(info);
+
+    assert(supported.has(String(info?.weaponFamily || "")), `${id} (${rec.name}) should carry a supported weaponFamily on ItemInfo`);
     assert(family, `${id} (${rec.name}) should resolve to a combat audio family`);
+    assertEquals(family, info?.weaponFamily, `${id} (${rec.name}) should resolve from raw ItemInfo weaponFamily`);
 
     if (id.includes("staff") || String(rec.name || "").toLowerCase().includes("staff")) {
       seenStaffs.add(id);
       assertEquals(family, "wooden_staff", `${id} should use WOODEN STAFF combat audio`);
-      assertEquals(planWeaponReady({ itemInfo: { id, identity: id, ...rec }, action: "equip" }).map((x) => x.id), ["combat:weapon:wooden_staff:equip"]);
-      assertEquals(resolveCombatSoundPlan({ itemInfo: { id, identity: id, ...rec }, action: "whoosh" })?.id, "combat:weapon:wooden_staff:whoosh_long");
+      assertEquals(planWeaponReady({ itemInfo: info, action: "equip" }).map((x) => x.id), ["combat:weapon:wooden_staff:equip"]);
+      assertEquals(resolveCombatSoundPlan({ itemInfo: info, action: "whoosh" })?.id, "combat:weapon:wooden_staff:whoosh_long");
     }
   }
 

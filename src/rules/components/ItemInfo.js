@@ -22,6 +22,7 @@ export const ItemInfo = defineComponent(
     maxSockets: 0, // maximum number of gem sockets this item can hold
     weaponLengthCm: null, // physical weapon length in centimeters (rules -> display)
     weaponVfxProfile: null, // density profile key (grip->tip) for weapon VFX
+    weaponFamily: "", // semantic weapon family for combat/audio affordances
     noQuickChip: false, // suppress pickup quick-chip UI for this item
     tags: [], // behavioral flags: "conflict", "sunlight", "levitate", etc.
   },
@@ -59,6 +60,8 @@ export const ItemInfo = defineComponent(
         throw new Error("ItemInfo.validate(): weaponLengthCm must be null or a positive number");
       if (rec.weaponVfxProfile != null && typeof rec.weaponVfxProfile !== "string" && typeof rec.weaponVfxProfile !== "object")
         throw new Error("ItemInfo.validate(): weaponVfxProfile must be null, string, or object");
+      if (typeof rec.weaponFamily !== "string")
+        throw new Error("ItemInfo.validate(): weaponFamily must be a string");
       return true;
     },
   }

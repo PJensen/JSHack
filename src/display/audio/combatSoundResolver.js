@@ -28,6 +28,8 @@ function familyFromProfile(profile, info = {}) {
 
 export function resolveCombatFamily(info) {
   if (!info) return null;
+  const explicitFamily = String(info.weaponFamily || "").trim().toLowerCase();
+  if (combatSoundId(explicitFamily, "equip")) return explicitFamily;
   const slot = String(info.slot || "").toLowerCase();
   const type = String(info.type || "").toLowerCase();
   const material = String(info.material || "").toLowerCase();
