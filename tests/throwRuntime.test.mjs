@@ -54,6 +54,34 @@ Deno.test("throw runtime default path drops item to landing tile with weighted r
   assertEquals(thrownEvents[0].range, throwMeta.range);
 });
 
+Deno.test("throw runtime carries weapon family for thrown weapons and shields", () => {
+  const expected = {
+    dagger_quick: "dagger",
+    shield_iron: "shield_metal",
+    shield_wood: "shield_wood",
+  };
+
+  for (const [catalogId, family] of Object.entries(expected)) {
+    const world = new World({ seed: 7108 });
+    const actor = world.create();
+    world.add(actor, Inventory, { items: [], maxWeight: 999 });
+    world.add(actor, Position, { x: 10, y: 10 });
+
+    const item = buildCatalogItem(world, catalogId);
+    addToInventory(world, actor, item);
+
+    const thrownEvents = [];
+    world.on("item:thrown", (ev) => thrownEvents.push(ev));
+
+    world.add(actor, ThrowIntent, { itemId: item, x: 12, y: 10 });
+    throwSystem(world);
+
+    assertEquals(thrownEvents.length, 1, `${catalogId} should emit item:thrown`);
+    assertEquals(thrownEvents[0].itemId, item);
+    assertEquals(thrownEvents[0].weaponFamily, family, `${catalogId} should carry weaponFamily`);
+  }
+});
+
 Deno.test("throw runtime preserves selected off-axis tile when target is in range", () => {
   const world = new World({ seed: 7105 });
   const actor = world.create();

@@ -402,6 +402,8 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
       combatSoundId(family, "equip"),
       combatSoundId(family, "unequip"),
       combatSoundId(family, "deflect"),
+      combatSoundId(family, "whoosh_short"),
+      combatSoundId(family, "whoosh_long"),
     ]),
   ];
   preload([...new Set(warmupIds.filter(Boolean).flatMap(resolveUrls))]).catch?.(() => {});
@@ -463,6 +465,23 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
   function playWeaponWhoosh({ weaponId, attacker, at, offhand }) {
     const info = combatInfoFor(getItemInfo, weaponId);
     playCombatLayers(planWeaponWhoosh({ itemInfo: info, offhand }), at || (attacker != null ? getPosition(attacker) : null));
+  }
+
+  function playThrownWhoosh(payload = {}) {
+    const baseInfo = combatInfoFor(getItemInfo, payload?.itemId);
+    const itemInfo = payload?.weaponFamily
+      ? { ...(baseInfo || {}), weaponFamily: payload.weaponFamily }
+      : baseInfo;
+    if (!resolveCombatFamily(itemInfo)) return;
+    const pos = payload?.from || (payload?.actor != null ? getPosition(payload.actor) : null);
+    playCombatLayers(planWeaponWhoosh({ itemInfo, fallbackFamily: null }), pos);
+  }
+
+  function playDroppedCombatSoft(itemId, at) {
+    const info = combatInfoFor(getItemInfo, itemId);
+    if (!resolveCombatFamily(info)) return false;
+    playCombatLayers(planWeaponImpact({ itemInfo: info, amount: 0 }), at);
+    return true;
   }
 
   function playWeaponImpact(payload) {
@@ -665,6 +684,7 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
   });
 
   world.on('item:dropped', ({ itemId, at }) => {
+    if (playDroppedCombatSoft(itemId, at)) return;
     const cat = itemCategory(getItemInfo, itemId);
     let dropId;
     if (cat === "weapon") {
@@ -686,6 +706,10 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
       dropId = "item:drop:generic";
     }
     sfxAt(dropId, at, pp(), null, zg());
+  });
+
+  world.on('item:thrown', (payload) => {
+    playThrownWhoosh(payload);
   });
 
   world.on('interaction', ({ action, result, targetId }) => {

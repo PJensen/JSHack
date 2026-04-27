@@ -221,6 +221,7 @@ Deno.test("materialized shields equip and unequip through shield combat pack ids
     assertEquals(resolveCombatFamily(info), family, `${id} should resolve to ${family}`);
     assertEquals(planWeaponReady({ itemInfo: info, action: "equip" }).map((x) => x.id), [`combat:weapon:${family}:equip`], `${id} equip`);
     assertEquals(planWeaponReady({ itemInfo: info, action: "unequip" }).map((x) => x.id), [`combat:weapon:${family}:unequip`], `${id} unequip`);
+    assertEquals(planWeaponWhoosh({ itemInfo: info, fallbackFamily: null }).map((x) => x.id), [`combat:weapon:${family}:whoosh_short`], `${id} thrown whoosh`);
   }
 });
 
