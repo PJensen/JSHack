@@ -71,7 +71,17 @@ export function setCombatPosture(world, entityId, stance, options = {}) {
 export function markMovedThisTurn(world, entityId) {
   const id = Number(entityId || 0) | 0;
   if (!(id > 0) || !world?.isAlive?.(id)) return;
-  const rec = setCombatPosture(world, id, COMBAT_POSTURES.balanced, { reason: "move" });
+  let rec = world.get(id, CombatPosture);
+  if (!rec) {
+    try {
+      world.add(id, CombatPosture, {
+        stance: COMBAT_POSTURES.balanced,
+        lastChangedStep: Number(world.step || 0) | 0,
+        lastMoveStep: -1,
+      });
+    } catch {}
+    rec = world.get(id, CombatPosture);
+  }
   if (!rec) return;
   rec.lastMoveStep = Number(world.step || 0) | 0;
 }

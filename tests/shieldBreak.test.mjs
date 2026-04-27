@@ -12,6 +12,7 @@ import { CombatPosture, COMBAT_POSTURES } from "../src/rules/components/CombatPo
 import { Stamina } from "../src/rules/components/Stamina.js";
 import { shieldGuardSystem } from "../src/rules/systems/shieldGuardSystem.js";
 import { dealDamage } from "../src/rules/utils/dealDamage.js";
+import { getPostureState, markMovedThisTurn } from "../src/rules/utils/posture.js";
 import { buildWorldView } from "../src/bridge/schema/worldView.js";
 
 function makeShield(world) {
@@ -151,6 +152,23 @@ Deno.test("switching from guarded to balanced removes shield_guard", () => {
   world.get(actor, CombatPosture).stance = COMBAT_POSTURES.balanced;
   shieldGuardSystem(world);
   assert(!hasEffect(world, actor, "shield_guard"), "balanced posture = no guard");
+});
+
+Deno.test("moving while guarded keeps shield raised", () => {
+  const world = new World({ seed: 0x5601 });
+  const actor = makeActor(world, { x: 3, y: 3 });
+  const shield = makeShield(world);
+  world.get(actor, Equipment).offhand = shield;
+  world.add(actor, CombatPosture, { stance: COMBAT_POSTURES.guarded, lastChangedStep: 0, lastMoveStep: -1 });
+  shieldGuardSystem(world);
+
+  for (let step = 1; step <= 5; step++) {
+    world.step = step;
+    markMovedThisTurn(world, actor);
+    shieldGuardSystem(world);
+    assertEquals(getPostureState(world, actor)?.stance, COMBAT_POSTURES.guarded);
+    assert(hasEffect(world, actor, "shield_guard"), "moving should not lower an explicitly guarded shield");
+  }
 });
 
 Deno.test("shield block drains stamina scaled to damage", () => {
