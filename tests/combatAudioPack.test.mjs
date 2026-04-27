@@ -3,6 +3,7 @@ import { allUrls, resolve, resolveUrls } from "../src/display/audio/sounds.js";
 import { allAdapterCombatSoundIds, planMeleeDeath, planWeaponImpact, planWeaponReady } from "../src/display/audio/combatAudioAdapter.js";
 import { allCombatPackFiles, COMBAT_PACK, COMBAT_SOUNDS, combatSoundId } from "../src/display/audio/combatPack.js";
 import { buildAudioItemInfo } from "../src/display/composition/setupDisplayRuntime.js";
+import { ITEM_CATALOG } from "../src/rules/data/itemCatalog.js";
 import {
   resolveCombatFamily,
   resolveCombatSoundPlan,
@@ -79,6 +80,27 @@ Deno.test("combat sound resolver maps current melee equipment into pack families
   for (const [id, [info, family]] of Object.entries(expected)) {
     assertEquals(resolveCombatFamily({ id, ...info }), family, id);
   }
+});
+
+Deno.test("combat sound resolver covers every authored melee weapon, including all staffs", () => {
+  const expectedStaffs = new Set(["staff_oak", "resonant_quarterstaff"]);
+  const seenStaffs = new Set();
+
+  for (const [id, rec] of Object.entries(ITEM_CATALOG)) {
+    if (rec?.catalogKind !== "equipment" || rec?.slot !== "weapon") continue;
+
+    const family = resolveCombatFamily({ id, identity: id, ...rec });
+    assert(family, `${id} (${rec.name}) should resolve to a combat audio family`);
+
+    if (id.includes("staff") || String(rec.name || "").toLowerCase().includes("staff")) {
+      seenStaffs.add(id);
+      assertEquals(family, "wooden_staff", `${id} should use WOODEN STAFF combat audio`);
+      assertEquals(planWeaponReady({ itemInfo: { id, identity: id, ...rec }, action: "equip" }).map((x) => x.id), ["combat:weapon:wooden_staff:equip"]);
+      assertEquals(resolveCombatSoundPlan({ itemInfo: { id, identity: id, ...rec }, action: "whoosh" })?.id, "combat:weapon:wooden_staff:whoosh_long");
+    }
+  }
+
+  assertEquals(seenStaffs, expectedStaffs);
 });
 
 Deno.test("display audio bridge preserves item identity/name/material for weapon family routing", () => {

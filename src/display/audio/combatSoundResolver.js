@@ -14,6 +14,18 @@ function textOf(info) {
   return `${info?.id || ""} ${info?.identity || ""} ${info?.name || ""} ${info?.subtype || ""}`.toLowerCase();
 }
 
+function familyFromProfile(profile) {
+  if (typeof profile !== "string") return null;
+  const key = profile.trim().toLowerCase();
+  if (key === "staff") return "wooden_staff";
+  if (key === "dagger") return "dagger";
+  if (key === "spear") return "spear";
+  if (key === "axe") return "axe_large";
+  if (key === "mace" || key === "morningstar") return "mace";
+  if (key === "sword") return "sword_small";
+  return null;
+}
+
 export function resolveCombatFamily(info) {
   if (!info) return null;
   const slot = String(info.slot || "").toLowerCase();
@@ -28,14 +40,16 @@ export function resolveCombatFamily(info) {
   }
 
   if (slot !== "weapon" && !info.damageDice) return null;
+  const profileFamily = familyFromProfile(info.weaponVfxProfile);
+  if (profileFamily) return profileFamily;
   if (text.includes("staff") || text.includes("quarterstaff")) return "wooden_staff";
-  if (text.includes("dagger") || text.includes("shiv") || text.includes("stiletto") || text.includes("kris") || text.includes("athame") || text.includes("knife")) return "dagger";
-  if (text.includes("spear") || text.includes("pike") || text.includes("lance")) return "spear";
+  if (text.includes("dagger") || text.includes("shiv") || text.includes("stiletto") || text.includes("kris") || text.includes("athame") || text.includes("knife") || text.includes("fang")) return "dagger";
+  if (text.includes("spear") || text.includes("pike") || text.includes("lance") || text.includes("scythe")) return "spear";
   if (text.includes("flail")) return "flail";
   if (text.includes("hammer") || text.includes("maul")) return "hammer_large";
-  if (text.includes("mace") || text.includes("morningstar")) return "mace";
+  if (text.includes("mace") || text.includes("morningstar") || text.includes("debtbringer")) return "mace";
   if (text.includes("axe") || text.includes("cleaver")) return info.twoHanded || Number(info.weight || 0) >= 3 ? "axe_large" : "axe_small";
-  if (text.includes("greatsword") || text.includes("longsword") || text.includes("reaver") || text.includes("warblade") || text.includes("blade") || text.includes("sword")) {
+  if (text.includes("greatsword") || text.includes("longsword") || text.includes("reaver") || text.includes("warblade") || text.includes("blade") || text.includes("sword") || text.includes("edge") || text.includes("flametongue")) {
     return info.twoHanded || Number(info.weight || 0) >= 2.4 || text.includes("great") || text.includes("long")
       ? "sword_large"
       : "sword_small";
