@@ -15,6 +15,7 @@ import {
   planWeaponWhoosh,
 } from "./combatAudioAdapter.js";
 import { combatSoundId } from "./combatPack.js";
+import { resolveCombatFamily } from "./combatSoundResolver.js";
 
 export const ALERT_SOUND_BY_IDENTITY = Object.freeze({
   snake: "snake:alert",
@@ -279,6 +280,10 @@ function combatInfoFor(getItemInfo, itemId) {
   return { ...info, id: info.id || info.identity || "" };
 }
 
+function isShieldCombatFamily(info) {
+  return String(resolveCombatFamily(info) || "").startsWith("shield_");
+}
+
 /**
  * Map a spell damage type to an impact sound category.
  */
@@ -488,7 +493,9 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     const layers = planWeaponReady({ itemInfo: info, action });
     if (layers.length > 0) {
       playCombatLayers(layers, null, { centered: true, bus: "items" });
+      return true;
     }
+    return false;
   }
 
   function playCombatLayers(layers, pos, defaults = null) {
@@ -702,6 +709,8 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
   });
 
   world.on('item:equipped', ({ itemId }) => {
+    const info = combatInfoFor(getItemInfo, itemId);
+    if (isShieldCombatFamily(info) && playWeaponEquip(itemId, "equip")) return;
     const cat = itemCategory(getItemInfo, itemId);
     if (cat === "weapon" || cat === "armor") {
       playWeaponEquip(itemId, "equip");
@@ -714,6 +723,8 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
   });
 
   world.on('item:unequipped', ({ itemId }) => {
+    const info = combatInfoFor(getItemInfo, itemId);
+    if (isShieldCombatFamily(info) && playWeaponEquip(itemId, "unequip")) return;
     const cat = itemCategory(getItemInfo, itemId);
     if (cat === "weapon" || cat === "armor") {
       playWeaponEquip(itemId, "unequip");

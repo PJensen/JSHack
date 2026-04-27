@@ -204,6 +204,26 @@ Deno.test("materialized melee weapons carry raw ItemInfo weapon families, includ
   assertEquals(seenStaffs, expectedStaffs);
 });
 
+Deno.test("materialized shields equip and unequip through shield combat pack ids", () => {
+  const expected = {
+    shield_fireward: "shield_metal",
+    shield_wood: "shield_wood",
+    shield_iron: "shield_metal",
+    shield_spiked_pavise: "shield_metal",
+    shield_steel: "shield_metal",
+  };
+
+  for (const [id, family] of Object.entries(expected)) {
+    const world = new World({ seed: 0xA77A77 });
+    const itemId = buildCatalogItem(world, id);
+    const info = world.get(itemId, ItemInfo);
+
+    assertEquals(resolveCombatFamily(info), family, `${id} should resolve to ${family}`);
+    assertEquals(planWeaponReady({ itemInfo: info, action: "equip" }).map((x) => x.id), [`combat:weapon:${family}:equip`], `${id} equip`);
+    assertEquals(planWeaponReady({ itemInfo: info, action: "unequip" }).map((x) => x.id), [`combat:weapon:${family}:unequip`], `${id} unequip`);
+  }
+});
+
 Deno.test("ambiguous authored combat items declare weaponFamily explicitly", () => {
   const source = Deno.readTextFileSync("src/rules/data/itemCatalogEquipment.js");
   const explicitIds = [
