@@ -468,11 +468,13 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     playCombatLayers(planWeaponWhoosh({ itemInfo: info, offhand }), at || (attacker != null ? getPosition(attacker) : null));
   }
 
+  function combatInfoForEvent(itemId, weaponFamily = "") {
+    const info = combatInfoFor(getItemInfo, itemId);
+    return weaponFamily ? { ...(info || {}), weaponFamily } : info;
+  }
+
   function playThrownWhoosh(payload = {}) {
-    const baseInfo = combatInfoFor(getItemInfo, payload?.itemId);
-    const itemInfo = payload?.weaponFamily
-      ? { ...(baseInfo || {}), weaponFamily: payload.weaponFamily }
-      : baseInfo;
+    const itemInfo = combatInfoForEvent(payload?.itemId, payload?.weaponFamily);
     if (!resolveCombatFamily(itemInfo)) return;
     const pos = payload?.from || (payload?.actor != null ? getPosition(payload.actor) : null);
     playCombatLayers(planWeaponWhoosh({ itemInfo, fallbackFamily: null }), pos);
@@ -487,7 +489,7 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
   }
 
   function playWeaponImpact(payload) {
-    const info = combatInfoFor(getItemInfo, payload?.weaponId);
+    const info = combatInfoForEvent(payload?.weaponId, payload?.weaponFamily);
     const pos = payload?.at || (payload?.target != null ? getPosition(payload.target) : null);
     playCombatLayers(planWeaponImpact({
       itemInfo: info,
@@ -537,23 +539,26 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
 
   // ── Combat ────────────────────────────────────────────────
 
-  world.on('combat:melee:attack', ({ attacker, weaponId, at, offhand }) => {
-    playWeaponWhoosh({ weaponId, attacker, at, offhand });
+  world.on('combat:melee:attack', ({ attacker, weaponId, weaponFamily, at, offhand }) => {
+    const info = combatInfoForEvent(weaponId, weaponFamily);
+    playCombatLayers(planWeaponWhoosh({ itemInfo: info, offhand, fallbackFamily: null }), at || (attacker != null ? getPosition(attacker) : null));
   });
 
-  world.on('combat:melee:miss', ({ attacker, weaponId, at, offhand }) => {
-    playWeaponWhoosh({ weaponId, attacker, at, offhand });
+  world.on('combat:melee:miss', ({ attacker, weaponId, weaponFamily, at, offhand }) => {
+    const info = combatInfoForEvent(weaponId, weaponFamily);
+    playCombatLayers(planWeaponWhoosh({ itemInfo: info, offhand, fallbackFamily: null }), at || (attacker != null ? getPosition(attacker) : null));
   });
 
   world.on('combat:fumble', ({ attacker, weaponId, at }) => {
     playWeaponDeflect({ weaponId, at, entityId: attacker, hard: false, volume: 0.72 });
   });
 
-  world.on('combat:dodge', ({ attacker, weaponId, at, offhand }) => {
-    playWeaponWhoosh({ weaponId, attacker, at, offhand });
+  world.on('combat:dodge', ({ attacker, weaponId, weaponFamily, at, offhand }) => {
+    const info = combatInfoForEvent(weaponId, weaponFamily);
+    playCombatLayers(planWeaponWhoosh({ itemInfo: info, offhand, fallbackFamily: null }), at || (attacker != null ? getPosition(attacker) : null));
   });
 
-  world.on('damaged', ({ cause, critical, type, at, target, source, weaponId, amount, targetKind, sizeClass }) => {
+  world.on('damaged', ({ cause, critical, type, at, target, source, weaponId, weaponFamily, amount, targetKind, sizeClass }) => {
     const pos = at || (target != null ? getPosition(target) : null);
     // Creature attack vocalizations (roars, squeaks, etc.)
     if ((cause === 'melee' || cause === 'offhand') && source > 0 && typeof getIdentity === "function") {
@@ -566,7 +571,7 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     }
     // Impact sounds on hit
     if (cause === 'melee' || cause === 'offhand') {
-      playWeaponImpact({ cause, critical, type, at: pos, target, source, weaponId, amount, targetKind, sizeClass });
+      playWeaponImpact({ cause, critical, type, at: pos, target, source, weaponId, weaponFamily, amount, targetKind, sizeClass });
     }
     // Skip impact sounds for DOT ticks and direct spell casts (no separate impact phase)
     const noImpactKeys = new Set(['agony', 'spell:agony', 'poison', 'bleed', 'burn', 'shock', 'swarm', 'frost', 'spell:smite']);

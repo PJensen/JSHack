@@ -48,8 +48,15 @@ import { EFFECT_DEFS } from '../data/effectDefs.js';
 import { resolveWeaponVisualMeta } from '../data/weaponVisuals.js';
 import { resolvePlayerActiveDeity, scoreDeityStanding } from './deitySystem.js';
 import { forEachInRadius } from '../utils/spatialIndex.js';
+import { resolveWeaponFamily } from '../data/weaponFamilies.js';
 
 const BUMP_ATTACK_INSTALLED = Symbol.for('jshack:combat:bumpAttack:installed');
+
+function resolveEventWeaponFamily(world, weaponId) {
+    if (!(weaponId > 0) || !world.isAlive(weaponId)) return '';
+    const info = world.get(weaponId, ItemInfo);
+    return String(info?.weaponFamily || resolveWeaponFamily(info || {}) || '');
+}
 
 function resolveWeaponClass(world, weaponId, damageType) {
     if (!(weaponId > 0) || !world.isAlive(weaponId)) return 'unarmed';
@@ -318,10 +325,12 @@ function resolveHitRoll(world, {
     const positional = getPositionalAttackBonus(world, source, target);
     const actionTags = Array.isArray(tags) ? [...tags, `relation:${positional.relation}`] : [`relation:${positional.relation}`];
     const attackPos = world.get(source, Position);
+    const weaponFamily = resolveEventWeaponFamily(world, weaponId);
     emitSafe(world, 'combat:melee:attack', {
         attacker: source,
         defender: target,
         weaponId: weaponId || 0,
+        weaponFamily,
         offhand: !!offhand,
         at: attackPos ? { x: attackPos.x, y: attackPos.y } : undefined,
     });
@@ -355,6 +364,7 @@ function resolveHitRoll(world, {
                 defender: target,
                 attacker: source,
                 weaponId: weaponId || 0,
+                weaponFamily,
                 offhand: !!offhand,
                 at: dpos ? { x: dpos.x, y: dpos.y } : undefined,
             });
