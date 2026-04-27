@@ -3,7 +3,10 @@ import { allUrls, resolve, resolveUrls } from "../src/display/audio/sounds.js";
 import { allAdapterCombatSoundIds, planMeleeDeath, planWeaponImpact, planWeaponReady } from "../src/display/audio/combatAudioAdapter.js";
 import { allCombatPackFiles, COMBAT_PACK, COMBAT_SOUNDS, combatSoundId } from "../src/display/audio/combatPack.js";
 import { buildAudioItemInfo } from "../src/display/composition/setupDisplayRuntime.js";
+import { World } from "../src/lib/ecs-js/index.js";
 import { ITEM_CATALOG } from "../src/rules/data/itemCatalog.js";
+import { buildCatalogItem } from "../src/rules/data/itemCatalogLoader.js";
+import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 import {
   resolveCombatFamily,
   resolveCombatSoundPlan,
@@ -106,6 +109,17 @@ Deno.test("combat sound resolver supports every purchased weapon and shield fami
     assertExists(resolveCombatSoundPlan({ itemInfo: info, action: "impact_soft" })?.id, `${family} should resolve impact audio`);
     assertEquals(planWeaponReady({ itemInfo: info, action: "equip" }).map((x) => x.id), [`combat:weapon:${family}:equip`], `${family} should resolve equip audio`);
   }
+});
+
+Deno.test("materialized flail keeps flail audio even from raw ItemInfo", () => {
+  const world = new World({ seed: 0xC0FFEE });
+  const itemId = buildCatalogItem(world, "flail");
+  const info = world.get(itemId, ItemInfo);
+
+  assertEquals(info?.subtype, "flail");
+  assertEquals(resolveCombatFamily(info), "flail");
+  assertEquals(planWeaponReady({ itemInfo: info, action: "equip" }).map((x) => x.id), ["combat:weapon:flail:equip"]);
+  assertEquals(resolveCombatSoundPlan({ itemInfo: info, action: "whoosh" })?.id, "combat:weapon:flail:whoosh_short");
 });
 
 Deno.test("combat sound resolver covers every authored melee weapon, including all staffs", () => {
