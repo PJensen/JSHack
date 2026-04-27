@@ -1231,6 +1231,7 @@ export const EQUIPMENT_ITEMS = {
     name: "Flail",
     type: "equip",
     slot: "weapon",
+    subtype: "flail",
     material: "iron",
     rarity: 2,
     rarityName: "magic",
