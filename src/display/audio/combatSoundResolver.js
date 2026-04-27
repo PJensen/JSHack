@@ -14,15 +14,15 @@ function textOf(info) {
   return `${info?.id || ""} ${info?.identity || ""} ${info?.name || ""} ${info?.subtype || ""}`.toLowerCase();
 }
 
-function familyFromProfile(profile) {
+function familyFromProfile(profile, info = {}) {
   if (typeof profile !== "string") return null;
   const key = profile.trim().toLowerCase();
   if (key === "staff") return "wooden_staff";
   if (key === "dagger") return "dagger";
   if (key === "spear") return "spear";
-  if (key === "axe") return "axe_large";
+  if (key === "axe") return info.twoHanded || Number(info.weight || 0) >= 3 ? "axe_large" : "axe_small";
   if (key === "mace" || key === "morningstar") return "mace";
-  if (key === "sword") return "sword_small";
+  if (key === "sword") return info.twoHanded || Number(info.weight || 0) >= 2.4 ? "sword_large" : "sword_small";
   return null;
 }
 
@@ -33,15 +33,15 @@ export function resolveCombatFamily(info) {
   const material = String(info.material || "").toLowerCase();
   const text = textOf(info);
 
-  if (slot === "shield" || type === "shield" || text.includes("shield") || text.includes("buckler") || text.includes("pavise") || text.includes("aegis")) {
+  const shieldLikeText = text.includes("shield") || text.includes("buckler") || text.includes("pavise") || text.includes("aegis");
+  const shieldLikeSlot = slot === "shield" || slot === "offhand";
+  if (type === "shield" || (shieldLikeSlot && shieldLikeText) || (type === "equip" && shieldLikeText)) {
     return WOOD_MATERIALS.has(material) || text.includes("wood")
       ? "shield_wood"
       : "shield_metal";
   }
 
   if (slot !== "weapon" && !info.damageDice) return null;
-  const profileFamily = familyFromProfile(info.weaponVfxProfile);
-  if (profileFamily) return profileFamily;
   if (text.includes("staff") || text.includes("quarterstaff")) return "wooden_staff";
   if (text.includes("dagger") || text.includes("shiv") || text.includes("stiletto") || text.includes("kris") || text.includes("athame") || text.includes("knife") || text.includes("fang")) return "dagger";
   if (text.includes("spear") || text.includes("pike") || text.includes("lance") || text.includes("scythe")) return "spear";
@@ -54,6 +54,9 @@ export function resolveCombatFamily(info) {
       ? "sword_large"
       : "sword_small";
   }
+
+  const profileFamily = familyFromProfile(info.weaponVfxProfile, info);
+  if (profileFamily) return profileFamily;
 
   const damageType = String(info.damageType || "").toLowerCase();
   if (damageType === "pierce") return "spear";
