@@ -297,6 +297,7 @@ export function throwPipeline(ctx) {
       range: throwSpec.range,
       maxRange: throwSpec.maxRange,
       weight: throwSpec.weight,
+      weaponFamily: String(info?.weaponFamily || ""),
       path: metrics.path,
       consumed: true,
     });
@@ -364,6 +365,7 @@ export function throwPipeline(ctx) {
       range: throwSpec.range,
       maxRange: throwSpec.maxRange,
       weight: throwSpec.weight,
+      weaponFamily: String(info?.weaponFamily || ""),
       path: metrics.path,
       impact,
     });
