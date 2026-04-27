@@ -2,6 +2,7 @@ import { assert, assertEquals, assertExists } from "jsr:@std/assert";
 import { allUrls, resolve, resolveUrls } from "../src/display/audio/sounds.js";
 import { allAdapterCombatSoundIds } from "../src/display/audio/combatAudioAdapter.js";
 import { allCombatPackFiles, COMBAT_PACK, COMBAT_SOUNDS, combatSoundId } from "../src/display/audio/combatPack.js";
+import { buildAudioItemInfo } from "../src/display/composition/setupDisplayRuntime.js";
 import {
   resolveCombatFamily,
   resolveCombatSoundPlan,
@@ -78,6 +79,26 @@ Deno.test("combat sound resolver maps current melee equipment into pack families
   for (const [id, [info, family]] of Object.entries(expected)) {
     assertEquals(resolveCombatFamily({ id, ...info }), family, id);
   }
+});
+
+Deno.test("display audio bridge preserves item identity/name/material for weapon family routing", () => {
+  const mace = buildAudioItemInfo({
+    id: 10,
+    info: { type: "equip", slot: "weapon", damageDice: "1d6", damageType: "blunt" },
+    getItemMaterial: () => ({ kind: "iron" }),
+    getEntityIdentity: () => "mace",
+    resolveItemDisplayName: () => "Iron Mace",
+  });
+  const staff = buildAudioItemInfo({
+    id: 11,
+    info: { type: "equip", slot: "weapon", damageDice: "1d6", damageType: "blunt" },
+    getItemMaterial: () => ({ kind: "wood" }),
+    getEntityIdentity: () => "staff_oak",
+    resolveItemDisplayName: () => "Oak Staff",
+  });
+
+  assertEquals(resolveCombatFamily(mace), "mace");
+  assertEquals(resolveCombatFamily(staff), "wooden_staff");
 });
 
 Deno.test("combat sound resolver produces action-specific sound plans", () => {

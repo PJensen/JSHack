@@ -25,6 +25,21 @@ import { createWorldAmbientController } from "../audio/worldAmbientController.js
 import { createBiomeAmbientController } from "../audio/biomeAmbientController.js";
 import { installContentVfxWiring } from "../../content/vfxWiring.js";
 
+export function buildAudioItemInfo({ id, info, getItemMaterial, getEntityIdentity, resolveItemDisplayName }) {
+  if (!info) return null;
+  const material = typeof getItemMaterial === "function" ? getItemMaterial(id) : null;
+  const materialKind = typeof material === "string" ? material : material?.kind;
+  const identity = typeof getEntityIdentity === "function" ? getEntityIdentity(id) : null;
+  const name = typeof resolveItemDisplayName === "function" ? resolveItemDisplayName(id) : null;
+  return {
+    ...info,
+    id: info.id || info.identity || identity || "",
+    identity: info.identity || identity || "",
+    name: info.name || name || "",
+    material: materialKind || info.material || "",
+  };
+}
+
 /**
  * Configure display-owned runtime controllers and event wiring.
  * Returns live controller instances used by the frame loop and render pass.
@@ -142,9 +157,7 @@ export function setupDisplayRuntime({
     isPlayer,
     getItemInfo: (id) => {
       const info = getItemInfo(id);
-      if (!info) return null;
-      const material = getItemMaterial ? getItemMaterial(id) : null;
-      return material ? { ...info, material } : info;
+      return buildAudioItemInfo({ id, info, getItemMaterial, getEntityIdentity, resolveItemDisplayName });
     },
     getPosition,
     getIdentity: getEntityIdentity,
