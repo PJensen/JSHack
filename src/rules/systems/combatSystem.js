@@ -279,9 +279,11 @@ function resolveHitRoll(world, {
             const fumbleSeed = combatSeed(world.seed, world.step, source, target, fumbleSalt);
             const fumbleRng = mulberry32(fumbleSeed);
             if (pct(fumbleRng, 20)) {
+                const pos = world.get(source, Position);
                 world.emit?.('combat:fumble', {
                     attacker: source, defender: target, weaponId,
                     name: world.get(weaponId, NamedIdentity)?.name || 'weapon',
+                    at: pos ? { x: pos.x, y: pos.y } : undefined,
                 });
                 return true;
             }
@@ -300,10 +302,12 @@ function resolveHitRoll(world, {
             const bfSeed = combatSeed(world.seed, world.step, source, target, fumbleSalt ^ 0xB11D);
             const bfRng = mulberry32(bfSeed);
             if (pct(bfRng, blindFumblePct)) {
+                const pos = world.get(source, Position);
                 world.emit?.('combat:fumble', {
                     attacker: source, defender: target, weaponId,
                     name: world.get(weaponId, NamedIdentity)?.name || 'weapon',
                     reason: 'blinded',
+                    at: pos ? { x: pos.x, y: pos.y } : undefined,
                 });
                 return true;
             }
@@ -313,6 +317,14 @@ function resolveHitRoll(world, {
     breakStealthOnOffense(world, source, { reason: 'attack', mode: 'melee', targetId: target });
     const positional = getPositionalAttackBonus(world, source, target);
     const actionTags = Array.isArray(tags) ? [...tags, `relation:${positional.relation}`] : [`relation:${positional.relation}`];
+    const attackPos = world.get(source, Position);
+    emitSafe(world, 'combat:melee:attack', {
+        attacker: source,
+        defender: target,
+        weaponId: weaponId || 0,
+        offhand: !!offhand,
+        at: attackPos ? { x: attackPos.x, y: attackPos.y } : undefined,
+    });
     let attackBonus = atkSnapshot.attackBonus + hitPenalty + positional.attackBonus;
     const armorClass = defSnapshot.armorClass;
 
@@ -342,6 +354,8 @@ function resolveHitRoll(world, {
             emitSafe(world, 'combat:dodge', {
                 defender: target,
                 attacker: source,
+                weaponId: weaponId || 0,
+                offhand: !!offhand,
                 at: dpos ? { x: dpos.x, y: dpos.y } : undefined,
             });
             applyPendingDamageProcPhase(world, source, buildProcContext('onMiss', {
@@ -375,6 +389,7 @@ function resolveHitRoll(world, {
                         defender: target,
                         attacker: source,
                         weaponId: defWeaponId,
+                        attackerWeaponId: weaponId || 0,
                         weaponName: world.get(defWeaponId, NamedIdentity)?.name || 'weapon',
                         at: dpos ? { x: dpos.x, y: dpos.y } : undefined,
                         dualWield: dualWieldBonus > 0,
@@ -514,6 +529,7 @@ function resolveHitRoll(world, {
             target, amount: finalDmg, source,
             type: damageType, cause: 'melee',
             critical: isCrit,
+            weaponId,
             armorPenetration,
             impactVector: computeImpactVector(srcPos, dstPos),
             impactProfile: buildMeleeImpactProfile(

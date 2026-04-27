@@ -331,9 +331,12 @@ export function dealDamage(world, spec) {
       });
       if (guard.guarded) {
         finalAmount = Math.max(1, Math.floor(finalAmount * shieldArcMult));
+        const targetEquipment = world.get(target, Equipment);
+        const shieldId = Number(targetEquipment?.offhand || 0) | 0;
         emitSafe(world, "shield:guarded", {
           id: target,
           source,
+          shieldId,
           stacks: Number(guard.stacks || 0) | 0,
           at: spec.at || undefined,
           broken: !!guard.broken,
@@ -376,6 +379,7 @@ export function dealDamage(world, spec) {
     rawAmount,
     type,
     source,
+    weaponId: Number(spec.weaponId || 0) | 0,
     cause,
     critical,
     at: spec.at || undefined,
@@ -451,6 +455,7 @@ export function dealDamage(world, spec) {
   if (killed) {
     emitSafe(world, 'died', {
       id: target, killer: source, cause,
+      weaponId: Number(spec.weaponId || 0) | 0,
       damageType: type,
       critical,
       amount: finalAmount,

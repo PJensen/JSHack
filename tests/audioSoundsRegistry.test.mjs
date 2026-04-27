@@ -1,6 +1,24 @@
 import { assert, assertEquals, assertExists } from "jsr:@std/assert";
 import { allUrls, resolve, resolveUrls } from "../src/display/audio/sounds.js";
 
+Deno.test("sounds registry only references audio files present on disk", () => {
+  const filenames = new Set();
+  function collect(dir, prefix = "") {
+    for (const entry of Deno.readDirSync(dir)) {
+      const path = `${dir}/${entry.name}`;
+      const name = prefix ? `${prefix}/${entry.name}` : entry.name;
+      if (entry.isDirectory) collect(path, name);
+      else if (entry.isFile) filenames.add(name);
+    }
+  }
+  collect("assets/audio");
+
+  for (const url of allUrls()) {
+    const file = String(url).replace("./assets/audio/", "");
+    assert(filenames.has(file), `missing audio file referenced by registry: ${url}`);
+  }
+});
+
 Deno.test("sounds registry exposes thrown potion impact sound", () => {
   const sound = resolve("item:impact:potion");
   assertExists(sound);
@@ -87,8 +105,8 @@ Deno.test("sounds registry adopts descriptive weather filenames", () => {
   assertEquals(holySite.file, "ambient_holy_site.mp3");
   assertEquals(smithy.file, "ambient_smithy.mp3");
   assertEquals(torchFlames.file, "ambient_torch_flames.mp3");
-  assert(ringing.files?.includes("ears_ringing.mp3"));
-  assert(ringing.files?.includes("ears_ringing_2.mp3"));
+  assert(ringing.files?.includes("status_deafened.mp3"));
+  assert(ringing.files?.includes("status_deafened_2.mp3"));
   assertEquals(metalDrop.file, "drop_weapon_metal.mp3");
   assert(meteorImpact.files?.includes("spell_meteor_impact.mp3"));
   assert(meteorImpact.files?.includes("spell_meteor_impact_2.mp3"));
@@ -99,7 +117,9 @@ Deno.test("sounds registry adopts descriptive weather filenames", () => {
   assertEquals(caveBearAlert.file, "cave_bear_alerted.mp3");
   assertEquals(ratAlert.file, "rat_alerted_1.mp3");
   assertEquals(boneDrop.file, "bone_dropped.mp3");
-  assert(shieldBlocked.files && shieldBlocked.files.length === 6);
+  assert(shieldBlocked.files && shieldBlocked.files.length === 12);
+  assert(shieldBlocked.files.includes("combat/SHIELD METAL/SHIELD METAL-Deflect-01.mp3"));
+  assert(shieldBlocked.files.includes("combat/SHIELD WOOD/SHIELD WOOD-Deflect-01.mp3"));
 });
 
 Deno.test("sounds registry exposes spider spell variant pools", () => {
@@ -209,7 +229,10 @@ Deno.test("sounds registry exposes shield block variant pools", () => {
     assertEquals(blocked.bus, "combat");
   }
 
-  assertEquals(seenShieldBlock, new Set(["melee_shield_hit_1.mp3", "melee_shield_hit_2.mp3", "melee_shield_hit_3.mp3", "melee_shield_hit_4.mp3", "melee_shield_hit_5.mp3", "melee_shield_hit_6.mp3"]));
+  for (const file of seenShieldBlock) {
+    assert(String(file).startsWith("combat/SHIELD "), `shield block should use combat pack file, got ${file}`);
+  }
+  assert(seenShieldBlock.size >= 6, "shield block should expose multiple combat-pack variants");
 });
 
 Deno.test("sounds registry preloads every spider variant url", () => {
@@ -227,9 +250,9 @@ Deno.test("sounds registry preloads every spider variant url", () => {
   assert(urls.includes("./assets/audio/cave_bear_attack_2.mp3"));
   assert(urls.includes("./assets/audio/rat_alerted_1.mp3"));
   assert(urls.includes("./assets/audio/rat_attack_1.mp3"));
-  assert(urls.includes("./assets/audio/melee_shield_hit_1.mp3"));
-  assert(urls.includes("./assets/audio/melee_shield_hit_2.mp3"));
-  assert(urls.includes("./assets/audio/melee_shield_hit_3.mp3"));
+  assert(urls.includes("./assets/audio/insect_attack.mp3"));
+  assert(urls.includes("./assets/audio/combat/SHIELD METAL/SHIELD METAL-Deflect-01.mp3"));
+  assert(urls.includes("./assets/audio/combat/SHIELD WOOD/SHIELD WOOD-Deflect-01.mp3"));
   assert(urls.includes("./assets/audio/bone_dropped.mp3"));
 });
 
@@ -243,19 +266,6 @@ Deno.test("sounds registry wires every spell mp3 asset", () => {
   assert(spellMp3s.length > 0, "expected spell mp3 assets");
   for (const url of spellMp3s) {
     assert(urls.has(url), `missing sound registry entry for ${url}`);
-  }
-});
-
-Deno.test("sounds registry only references audio files present on disk", () => {
-  const filenames = new Set(
-    Array.from(Deno.readDirSync("assets/audio"))
-      .filter((entry) => entry.isFile)
-      .map((entry) => entry.name),
-  );
-
-  for (const url of allUrls()) {
-    const file = String(url).replace("./assets/audio/", "");
-    assert(filenames.has(file), `missing audio file referenced by registry: ${url}`);
   }
 });
 

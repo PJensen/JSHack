@@ -1,0 +1,134 @@
+import { assert, assertEquals, assertExists } from "jsr:@std/assert";
+import { allUrls, resolve, resolveUrls } from "../src/display/audio/sounds.js";
+import { allAdapterCombatSoundIds } from "../src/display/audio/combatAudioAdapter.js";
+import { allCombatPackFiles, COMBAT_PACK, COMBAT_SOUNDS, combatSoundId } from "../src/display/audio/combatPack.js";
+import {
+  resolveCombatFamily,
+  resolveCombatSoundPlan,
+  resolveGoreAction,
+  resolveImpactAction,
+  resolveWhooshAction,
+} from "../src/display/audio/combatSoundResolver.js";
+
+function collectCombatFiles() {
+  const files = [];
+  function walk(dir, prefix) {
+    for (const entry of Deno.readDirSync(dir)) {
+      const path = `${dir}/${entry.name}`;
+      const name = prefix ? `${prefix}/${entry.name}` : entry.name;
+      if (entry.isDirectory) walk(path, name);
+      else if (entry.isFile && entry.name.endsWith(".mp3")) files.push(`combat/${name}`);
+    }
+  }
+  walk("assets/audio/combat", "");
+  return files.sort();
+}
+
+Deno.test("combat audio pack manifest covers every normalized purchased clip", () => {
+  const actual = collectCombatFiles();
+  const generated = allCombatPackFiles().slice().sort();
+  assertEquals(generated, actual);
+});
+
+Deno.test("combat audio pack exposes expected family pools", () => {
+  for (const family of ["axe_large", "axe_small", "dagger", "flail", "hammer_large", "mace", "spear", "sword_large", "sword_small", "wooden_staff"]) {
+    assertExists(COMBAT_PACK[family], `missing combat family ${family}`);
+    for (const action of ["whoosh_short", "whoosh_long", "impact_hard", "impact_soft", "deflect", "equip", "unequip", "finisher"]) {
+      assert(COMBAT_PACK[family][action]?.length > 0, `missing ${family}.${action}`);
+      assertExists(resolve(combatSoundId(family, action)), `missing sound registry id for ${family}.${action}`);
+    }
+  }
+
+  for (const family of ["shield_metal", "shield_wood"]) {
+    assert(COMBAT_PACK[family].deflect.length > 0, `missing ${family}.deflect`);
+    assert(COMBAT_PACK[family].equip.length > 0, `missing ${family}.equip`);
+  }
+
+  for (const action of ["impact_small", "impact_medium", "impact_large", "slice_small", "slice_medium", "slice_large", "stab_small", "stab_medium", "stab_large"]) {
+    assert(COMBAT_PACK.gore[action]?.length > 0, `missing gore.${action}`);
+    assertExists(resolve(combatSoundId("gore", action)), `missing gore sound id ${action}`);
+  }
+});
+
+Deno.test("sounds registry preloads nested combat pack urls", () => {
+  const urls = new Set(allUrls());
+  assert(urls.has("./assets/audio/combat/AXE LARGE/AXE LARGE-Whoosh Long-01.mp3"));
+  assert(urls.has("./assets/audio/combat/DAGGER/DAGGER-Whoosh Long-07.mp3"));
+  assert(urls.has("./assets/audio/combat/WOODEN STAFF/WOODEN STAFF-Equip-07.mp3"));
+  assert(urls.has("./assets/audio/combat/GORE/GORE-Impact Small-05.mp3"));
+});
+
+Deno.test("combat sound resolver maps current melee equipment into pack families", () => {
+  const expected = {
+    staff_oak: [{ name: "Oak Staff", slot: "weapon", damageDice: "1d6", damageType: "blunt", material: "wood" }, "wooden_staff"],
+    longsword: [{ name: "Longsword", slot: "weapon", damageDice: "1d8", damageType: "slash", twoHanded: true, weight: 2.8 }, "sword_large"],
+    sword_plain: [{ name: "Short Sword", slot: "weapon", damageDice: "1d6", damageType: "slash", weight: 1.2 }, "sword_small"],
+    dagger_quick: [{ name: "Dagger", slot: "weapon", damageDice: "1d4", damageType: "pierce", weight: 0.5 }, "dagger"],
+    axe_heavy: [{ name: "Axe", slot: "weapon", damageDice: "1d8", damageType: "slash", weight: 3.0 }, "axe_large"],
+    iron_mace: [{ name: "Iron Mace", slot: "weapon", damageDice: "1d8", damageType: "blunt", weight: 3.2 }, "mace"],
+    morningstar: [{ name: "Morningstar", slot: "weapon", damageDice: "1d8", damageType: "blunt", weight: 3.0 }, "mace"],
+    warhammer: [{ name: "Warhammer", slot: "weapon", damageDice: "1d8", damageType: "blunt", weight: 3.4 }, "hammer_large"],
+    flail: [{ name: "Flail", slot: "weapon", damageDice: "1d8", damageType: "blunt", weight: 3.2 }, "flail"],
+    cataclysm_warspear: [{ name: "Cataclysm Warspear", slot: "weapon", damageDice: "1d10", damageType: "pierce", weight: 4.0 }, "spear"],
+    shield_wood: [{ name: "Wooden Shield", slot: "offhand", material: "wood" }, "shield_wood"],
+    shield_iron: [{ name: "Iron Shield", slot: "offhand", material: "iron" }, "shield_metal"],
+    shield_steel: [{ name: "Steel Shield", slot: "offhand", material: "steel" }, "shield_metal"],
+  };
+
+  for (const [id, [info, family]] of Object.entries(expected)) {
+    assertEquals(resolveCombatFamily({ id, ...info }), family, id);
+  }
+});
+
+Deno.test("combat sound resolver produces action-specific sound plans", () => {
+  const longsword = { id: "longsword", name: "Longsword", slot: "weapon", damageDice: "1d8", damageType: "slash", twoHanded: true };
+  const dagger = { id: "dagger_quick", name: "Dagger", slot: "weapon", damageDice: "1d4", damageType: "pierce" };
+  assertEquals(resolveWhooshAction("sword_large"), "whoosh_long");
+  assertEquals(resolveWhooshAction("sword_large", true), "whoosh_short");
+  assertEquals(resolveCombatSoundPlan({ itemInfo: longsword, action: "whoosh" })?.id, "combat:weapon:sword_large:whoosh_long");
+  assertEquals(resolveCombatSoundPlan({ itemInfo: dagger, action: "whoosh" })?.id, "combat:weapon:dagger:whoosh_short");
+  assertEquals(resolveImpactAction({ family: "sword_large", amount: 10 }), "impact_hard");
+  assertEquals(resolveImpactAction({ family: "sword_large", amount: 2 }), "impact_soft");
+  assertEquals(resolveGoreAction({ damageType: "slash", amount: 3, sizeClass: "S" }), "slice_small");
+  assertEquals(resolveGoreAction({ damageType: "pierce", amount: 6 }), "stab_medium");
+  assertEquals(resolveGoreAction({ damageType: "blunt", critical: true }), "impact_large");
+});
+
+Deno.test("combat sound resolver keeps normal melee on pack ids instead of legacy generic ids", () => {
+  const sword = { id: "sword_plain", name: "Short Sword", slot: "weapon", damageDice: "1d6", damageType: "slash" };
+  const mace = { id: "iron_mace", name: "Iron Mace", slot: "weapon", damageDice: "1d8", damageType: "blunt", weight: 3.2 };
+  const shield = { id: "shield_iron", name: "Iron Shield", slot: "offhand", material: "iron" };
+
+  const swordWhoosh = resolveCombatSoundPlan({ itemInfo: sword, action: "whoosh" })?.id;
+  const maceImpact = resolveCombatSoundPlan({ itemInfo: mace, action: "impact_hard" })?.id;
+  const shieldDeflect = resolveCombatSoundPlan({ itemInfo: shield, action: "deflect" })?.id;
+
+  assertEquals(swordWhoosh, "combat:weapon:sword_small:whoosh_short");
+  assertEquals(maceImpact, "combat:weapon:mace:impact_hard");
+  assertEquals(shieldDeflect, "combat:weapon:shield_metal:deflect");
+  assert(swordWhoosh !== "melee:miss");
+  assert(maceImpact !== "melee:hit");
+  assert(maceImpact !== "melee:crit");
+  assert(shieldDeflect !== "shield:blocked");
+});
+
+Deno.test("combat audio adapter covers every purchased pack sound id", () => {
+  const adapterIds = allAdapterCombatSoundIds();
+  const packIds = new Set(Object.keys(COMBAT_SOUNDS));
+  assertEquals(adapterIds, packIds);
+});
+
+Deno.test("combat audio adapter resolves every normalized purchased clip through engine sound ids", () => {
+  const actualFiles = new Set(collectCombatFiles());
+  const adapterFiles = new Set();
+  for (const id of allAdapterCombatSoundIds()) {
+    for (const url of resolveUrls(id)) adapterFiles.add(url.replace("./assets/audio/", ""));
+    assertExists(resolve(id), `adapter sound id must resolve: ${id}`);
+  }
+  assertEquals(adapterFiles, actualFiles);
+});
+
+Deno.test("ranged audio stays on ranged assets instead of weapon pack aliases", () => {
+  assertEquals(resolve("ranged:shot")?.file, "ranged_shot.wav");
+  assertEquals(resolve("travel:arrow")?.file, "ranged_shot.wav");
+});

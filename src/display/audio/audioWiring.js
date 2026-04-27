@@ -6,6 +6,14 @@
 
 import { play, preload, startLoop, stopLoop, startLoopSequence, stopLoopSequence, setReverbMix } from "./audioEngine.js";
 import { resolve, resolveUrls, allUrls } from "./sounds.js";
+import {
+  planMeleeDeath,
+  planShieldBlock,
+  planWeaponDeflect,
+  planWeaponImpact,
+  planWeaponReady,
+  planWeaponWhoosh,
+} from "./combatAudioAdapter.js";
 
 export const ALERT_SOUND_BY_IDENTITY = Object.freeze({
   snake: "snake:alert",
@@ -222,6 +230,15 @@ function sfxAt(id, sourcePos, playerPos, extraOpts, zoomGain = 1) {
   sfx(id, { pan: spatial.pan, volume: spatial.volume * gain * zoomGain, priority, ...restOpts });
 }
 
+function sfxAtDelay(id, sourcePos, playerPos, extraOpts, zoomGain, delayMs) {
+  const delay = Math.max(0, Number(delayMs || 0) | 0);
+  if (delay <= 0 || typeof globalThis.setTimeout !== "function") {
+    sfxAt(id, sourcePos, playerPos, extraOpts, zoomGain);
+    return;
+  }
+  globalThis.setTimeout(() => sfxAt(id, sourcePos, playerPos, extraOpts, zoomGain), delay);
+}
+
 /**
  * Resolve an item entity's type to a sound category.
  */
@@ -229,14 +246,23 @@ function itemCategory(getItemInfo, itemId) {
   const info = getItemInfo(itemId);
   if (!info) return "generic";
   const t = info.type;
+  const slot = String(info.slot || "").toLowerCase();
+  const name = String(info.name || info.id || "").toLowerCase();
   if (t === "weapon") return "weapon";
-  if (t === "armor" || t === "shield" || t === "helmet" || t === "boots" || t === "gloves") return "armor";
+  if (slot === "weapon" || info.damageDice) return "weapon";
+  if (t === "armor" || t === "shield" || t === "helmet" || t === "boots" || t === "gloves" || slot === "offhand" && name.includes("shield")) return "armor";
   if (t === "potion") return "potion";
   if (t === "scroll") return "scroll";
   if (t === "gold" || t === "coin") return "gold";
   if (t === "food" || t === "corpse") return "food";
   if (t === "gem") return "gem";
   return "generic";
+}
+
+function combatInfoFor(getItemInfo, itemId) {
+  const info = getItemInfo(itemId);
+  if (!info) return null;
+  return { ...info, id: info.id || info.identity || "" };
 }
 
 /**
@@ -341,8 +367,14 @@ export const WEAPON_RACK_DROPPED_SOUND_ID = "rack:weapon:dropped";
  */
 export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosition, getPosition, getIdentity, getDepth, getZoomScale, getReferenceZoomScale }) {
 
-  // No preload — sounds are fetched on first play. Missing files fail once
-  // and are blacklisted so they never retry or flood the network.
+  const warmupIds = [
+    "item:equip:weapon",
+    "item:equip:armor",
+    "melee:miss",
+    "melee:hit",
+    "shield:blocked",
+  ];
+  preload([...new Set(warmupIds.flatMap(resolveUrls))]).catch?.(() => {});
 
   const channelingLoopUrl = resolve(CHANNELING_LOOP_SOUND_ID)?.url;
   let channelingLoopActive = false;
@@ -398,9 +430,79 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     sfx("status:deafened", { priority: 1, ...(opts || {}) });
   }
 
+  function playWeaponWhoosh({ weaponId, attacker, at, offhand }) {
+    const info = combatInfoFor(getItemInfo, weaponId);
+    playCombatLayers(planWeaponWhoosh({ itemInfo: info, offhand }), at || (attacker != null ? getPosition(attacker) : null));
+  }
+
+  function playWeaponImpact(payload) {
+    const info = combatInfoFor(getItemInfo, payload?.weaponId);
+    const pos = payload?.at || (payload?.target != null ? getPosition(payload.target) : null);
+    playCombatLayers(planWeaponImpact({
+      itemInfo: info,
+      type: payload?.type,
+      amount: payload?.amount,
+      critical: payload?.critical,
+      targetKind: payload?.targetKind,
+      sizeClass: payload?.sizeClass,
+    }), pos);
+  }
+
+  function playWeaponDeflect({ weaponId, at, entityId, hard = true, volume = 0.9 }) {
+    const info = combatInfoFor(getItemInfo, weaponId);
+    playCombatLayers(planWeaponDeflect({ itemInfo: info, hard, volume }), at || (entityId != null ? getPosition(entityId) : null));
+  }
+
+  function playShieldBlock({ shieldId, id, at, broken }) {
+    const info = combatInfoFor(getItemInfo, shieldId);
+    playCombatLayers(planShieldBlock({ shieldInfo: info, broken }), at || (id != null ? getPosition(id) : null));
+  }
+
+  function playWeaponEquip(itemId, action) {
+    const info = combatInfoFor(getItemInfo, itemId);
+    const layers = planWeaponReady({ itemInfo: info, action });
+    if (layers.length > 0) {
+      playCombatLayers(layers, null, { centered: true, bus: "items" });
+    } else {
+      sfx("item:equip:weapon", { priority: 1 });
+    }
+  }
+
+  function playCombatLayers(layers, pos, defaults = null) {
+    for (const part of layers || []) {
+      const opts = {
+        priority: part.priority ?? 1,
+        volume: part.volume,
+        rate: part.rate,
+        bus: defaults?.bus,
+      };
+      if (defaults?.centered) {
+        sfxAtDelay(part.id, null, null, opts, 1, part.delayMs || 0);
+      } else {
+        sfxAtDelay(part.id, pos, pp(), opts, zg(), part.delayMs || 0);
+      }
+    }
+  }
+
   // ── Combat ────────────────────────────────────────────────
 
-  world.on('damaged', ({ cause, critical, type, at, target, source }) => {
+  world.on('combat:melee:attack', ({ attacker, weaponId, at, offhand }) => {
+    playWeaponWhoosh({ weaponId, attacker, at, offhand });
+  });
+
+  world.on('combat:melee:miss', ({ attacker, weaponId, at, offhand }) => {
+    playWeaponWhoosh({ weaponId, attacker, at, offhand });
+  });
+
+  world.on('combat:fumble', ({ attacker, weaponId, at }) => {
+    playWeaponDeflect({ weaponId, at, entityId: attacker, hard: false, volume: 0.72 });
+  });
+
+  world.on('combat:dodge', ({ attacker, weaponId, at, offhand }) => {
+    playWeaponWhoosh({ weaponId, attacker, at, offhand });
+  });
+
+  world.on('damaged', ({ cause, critical, type, at, target, source, weaponId, amount, targetKind, sizeClass }) => {
     const pos = at || (target != null ? getPosition(target) : null);
     // Creature attack vocalizations (roars, squeaks, etc.)
     if ((cause === 'melee' || cause === 'offhand') && source > 0 && typeof getIdentity === "function") {
@@ -413,10 +515,10 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     }
     // Impact sounds on hit
     if (cause === 'melee' || cause === 'offhand') {
-      sfxAt(critical ? "melee:crit" : "melee:hit", pos, pp(), null, zg());
+      playWeaponImpact({ cause, critical, type, at: pos, target, source, weaponId, amount, targetKind, sizeClass });
     }
     // Skip impact sounds for DOT ticks and direct spell casts (no separate impact phase)
-    const noImpactKeys = new Set(['agony', 'poison', 'bleed', 'burn', 'shock', 'swarm', 'frost', 'spell:smite']);
+    const noImpactKeys = new Set(['agony', 'spell:agony', 'poison', 'bleed', 'burn', 'shock', 'swarm', 'frost', 'spell:smite']);
     if (isSpellLikeDamageCause(cause) && !noImpactKeys.has(cause)) {
       const impactId = SPELL_IMPACT_MAP[type] || "spell:impact:physical";
       sfxAt(impactId, pos, pp(), null, zg());
@@ -442,13 +544,31 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
   world.on('hit', (ctx) => {
     if (ctx.missed) {
       const pos = ctx.at || (ctx.target != null ? getPosition(ctx.target) : null);
-      sfxAt("melee:miss", pos, pp(), null, zg());
+      playWeaponWhoosh({
+        weaponId: ctx.weaponId || 0,
+        attacker: ctx.attacker,
+        at: pos,
+        offhand: !!ctx.offhand,
+      });
     }
   });
 
-  world.on('shield:guarded', ({ id, at }) => {
-    const pos = at || (id != null ? getPosition(id) : null);
-    sfxAt("shield:blocked", pos, pp(), { priority: 1 }, zg());
+  world.on('combat:parry', ({ weaponId, attackerWeaponId, at, defender, attacker }) => {
+    playWeaponDeflect({ weaponId, at, entityId: defender, hard: true, volume: 0.95 });
+    if (attackerWeaponId) {
+      sfxAtDelay(
+        combatSoundId(resolveCombatFamily(combatInfoFor(getItemInfo, attackerWeaponId)) || "sword_small", "deflect"),
+        at || (attacker != null ? getPosition(attacker) : null),
+        pp(),
+        { priority: 0, volume: 0.42 },
+        zg(),
+        24,
+      );
+    }
+  });
+
+  world.on('shield:guarded', ({ id, at, shieldId, broken }) => {
+    playShieldBlock({ shieldId, id, at, broken });
   });
 
   world.on('proc:shocked', ({ target, at }) => {
@@ -482,7 +602,7 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     sfxAt("ranged:shot", pos, pp(), null, zg());
   });
 
-  world.on('died', ({ id, critical, amount }) => {
+  world.on('died', ({ id, critical, amount, weaponId, cause, damageType, sizeClass }) => {
     const pos = getPosition(id);
     if (isPlayer(id)) {
       stopChannelingLoop(id);
@@ -493,6 +613,16 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
       const creatureId = typeof getIdentity === "function" ? String(getIdentity(id) || "") : "";
       const deathSoundId = DEATH_SOUND_BY_IDENTITY[creatureId] || "death";
       sfxAt(deathSoundId, pos, pp(), null, zg());
+      if (cause === "melee" || cause === "offhand") {
+        const info = combatInfoFor(getItemInfo, weaponId);
+        playCombatLayers(planMeleeDeath({
+          itemInfo: info,
+          damageType,
+          amount,
+          critical,
+          sizeClass,
+        }), pos);
+      }
     }
   });
 
@@ -550,10 +680,23 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
 
   world.on('item:equipped', ({ itemId }) => {
     const cat = itemCategory(getItemInfo, itemId);
+    if (cat === "weapon" || cat === "armor") {
+      playWeaponEquip(itemId, "equip");
+      return;
+    }
     const equipId = (cat === "weapon" || cat === "armor")
       ? `item:equip:${cat}`
       : "item:equip:generic";
     sfx(equipId); // equip is always the player — center, full vol
+  });
+
+  world.on('item:unequipped', ({ itemId }) => {
+    const cat = itemCategory(getItemInfo, itemId);
+    if (cat === "weapon" || cat === "armor") {
+      playWeaponEquip(itemId, "unequip");
+      return;
+    }
+    sfx("item:equip:generic", { priority: 1, volume: 0.75 });
   });
 
   world.on('hunger:ate', ({ actor }) => {
