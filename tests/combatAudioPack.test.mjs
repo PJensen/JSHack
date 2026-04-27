@@ -123,7 +123,7 @@ Deno.test("combat sound resolver supports every purchased weapon and shield fami
     assertEquals(resolveCombatFamily(info), family, family);
     assertExists(resolveCombatSoundPlan({ itemInfo: info, action: "whoosh" })?.id, `${family} should resolve whoosh audio`);
     assertExists(resolveCombatSoundPlan({ itemInfo: info, action: "impact_soft" })?.id, `${family} should resolve impact audio`);
-    assertEquals(planWeaponReady({ itemInfo: info, action: "equip" }).map((x) => x.id), [`combat:weapon:${family}:equip`], `${family} should resolve equip audio`);
+    assert(planWeaponReady({ itemInfo: info, action: "equip" }).some((x) => x.id === `combat:weapon:${family}:equip`), `${family} should resolve equip audio`);
   }
 });
 
@@ -160,8 +160,15 @@ Deno.test("combat audio adapter plans every flail playback path through flail as
   const itemId = buildCatalogItem(world, "flail");
   const info = world.get(itemId, ItemInfo);
 
-  assertEquals(planWeaponReady({ itemInfo: info, action: "equip" }).map((x) => x.id), ["combat:weapon:flail:equip"]);
-  assertEquals(planWeaponReady({ itemInfo: info, action: "unequip" }).map((x) => x.id), ["combat:weapon:flail:unequip"]);
+  assertEquals(planWeaponReady({ itemInfo: info, action: "equip" }).map((x) => x.id), [
+    "combat:weapon:flail:equip",
+    "combat:weapon:flail:whoosh_short",
+    "combat:weapon:flail:deflect_tail",
+  ]);
+  assertEquals(planWeaponReady({ itemInfo: info, action: "unequip" }).map((x) => x.id), [
+    "combat:weapon:flail:unequip",
+    "combat:weapon:flail:deflect_tail",
+  ]);
   assertEquals(planWeaponWhoosh({ itemInfo: info }).map((x) => x.id), ["combat:weapon:flail:whoosh_short"]);
   assert(planWeaponDeflect({ itemInfo: info }).every((x) => x.id.startsWith("combat:weapon:flail:deflect")));
   assert(planWeaponImpact({ itemInfo: info, type: "blunt", amount: 2 }).some((x) => x.id === "combat:weapon:flail:impact_soft"));

@@ -43,6 +43,18 @@ export function familyForCombatItem(info, fallback = null) {
 
 export function planWeaponReady({ itemInfo, action = "equip" } = {}) {
   const family = familyForCombatItem(itemInfo);
+  if (family === "flail") {
+    return compact(action === "equip"
+      ? [
+        layer(combatSoundId("flail", "equip"), { volume: 1.18 }),
+        layer(combatSoundId("flail", "whoosh_short"), { delayMs: 18, volume: 0.48, rate: 0.92 }),
+        layer(combatSoundId("flail", "deflect_tail"), { delayMs: 44, volume: 0.38, priority: 0 }),
+      ]
+      : [
+        layer(combatSoundId("flail", "unequip"), { volume: 1.0 }),
+        layer(combatSoundId("flail", "deflect_tail"), { delayMs: 24, volume: 0.34, priority: 0 }),
+      ]);
+  }
   return family ? compact([layer(combatSoundId(family, action), { volume: 1.12 })]) : [];
 }
 
@@ -148,4 +160,3 @@ export function allAdapterCombatSoundIds() {
   }
   return ids;
 }
-

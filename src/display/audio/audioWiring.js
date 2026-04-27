@@ -14,6 +14,7 @@ import {
   planWeaponReady,
   planWeaponWhoosh,
 } from "./combatAudioAdapter.js";
+import { combatSoundId } from "./combatPack.js";
 
 export const ALERT_SOUND_BY_IDENTITY = Object.freeze({
   snake: "snake:alert",
@@ -87,6 +88,19 @@ const PLAYER_NEAR_DEATH_RATIO = 0.25;
 const DUNGEON_OMEN_EVENT_GAP = 18;
 const DUNGEON_OMEN_CHANCE = 12;
 const DEAFENED_SOUND_COOLDOWN_MS = 2500;
+const WARMUP_WEAPON_FAMILIES = Object.freeze([
+  "axe_large",
+  "axe_small",
+  "dagger",
+  "flail",
+  "hammer_large",
+  "mace",
+  "spear",
+  "sword_large",
+  "sword_small",
+  "wooden_staff",
+]);
+const WARMUP_SHIELD_FAMILIES = Object.freeze(["shield_metal", "shield_wood"]);
 
 /**
  * Compute pan (-1…+1) and volume (0…1) from source position relative to player.
@@ -373,8 +387,19 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     "melee:miss",
     "melee:hit",
     "shield:blocked",
+    ...WARMUP_WEAPON_FAMILIES.flatMap((family) => [
+      combatSoundId(family, "equip"),
+      combatSoundId(family, "unequip"),
+      combatSoundId(family, "whoosh_short"),
+      combatSoundId(family, "whoosh_long"),
+    ]),
+    ...WARMUP_SHIELD_FAMILIES.flatMap((family) => [
+      combatSoundId(family, "equip"),
+      combatSoundId(family, "unequip"),
+      combatSoundId(family, "deflect"),
+    ]),
   ];
-  preload([...new Set(warmupIds.flatMap(resolveUrls))]).catch?.(() => {});
+  preload([...new Set(warmupIds.filter(Boolean).flatMap(resolveUrls))]).catch?.(() => {});
 
   const channelingLoopUrl = resolve(CHANNELING_LOOP_SOUND_ID)?.url;
   let channelingLoopActive = false;
