@@ -99,6 +99,7 @@ export function bracketizeName(s) {
  *   range: number,
  *   requiresLOS: boolean,
  *   requiresVisible?: boolean,
+ *   validateTarget?: (x:number, y:number, ctx:{ player:{id:number,pos:{x:number,y:number}} }) => string | null | undefined | false,
  * }} SpellTargeting
  *
  * @typedef {{
@@ -370,6 +371,13 @@ export function createTargetingController({ world, messageLog, playerEntity, dis
           log(`${pending.spellName} target must be visible.`);
           return true;
         }
+        if (typeof pending.validateTarget === 'function') {
+          const message = pending.validateTarget(finalTx, finalTy, { player: pe });
+          if (message) {
+            log(String(message));
+            return true;
+          }
+        }
         _spell = null;
         _cursor = null;
         dispatchRules({ type: 'rules.castActiveSpell', payload: { spellId: pending.spellId, targetId: pe.id, x: finalTx, y: finalTy } });
@@ -479,6 +487,13 @@ export function createTargetingController({ world, messageLog, playerEntity, dis
       if (pending.requiresVisible && !isVisibleAt(tx, ty)) {
         log(`${pending.spellName} target must be visible.`);
         return true;
+      }
+      if (typeof pending.validateTarget === 'function') {
+        const message = pending.validateTarget(tx, ty, { player: pe });
+        if (message) {
+          log(String(message));
+          return true;
+        }
       }
       _spell = null;
       _cursor = null;

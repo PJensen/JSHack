@@ -93,10 +93,11 @@ export function isCatalogMagic(def) { return !!def && String(def.catalogKind) ==
  * Register a content-DSL item into the unified catalog at runtime.
  * @param {string} id
  * @param {object} def - catalog-compatible item definition
+ * @param {{ override?: boolean }} [opts]
  */
-export function registerCatalogItem(id, def) {
+export function registerCatalogItem(id, def, opts = {}) {
   const key = String(id || "").trim().toLowerCase();
   if (!key) return;
-  if (ITEM_CATALOG[key]) return; // already present, skip
+  if (ITEM_CATALOG[key] && opts.override !== true) return;
   ITEM_CATALOG[key] = def;
 }

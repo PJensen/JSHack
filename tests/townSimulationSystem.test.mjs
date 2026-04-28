@@ -128,6 +128,36 @@ Deno.test("townSimulationSystem keeps a visible tavern meal reserve instead of d
   assertEquals(countInventory(world, tavern, "food_stew"), 1, "town should keep at least one prepared meal on hand");
 });
 
+Deno.test("townSimulationSystem cooks fish into tavern stew", () => {
+  const world = new World({ seed: 105 });
+  world.step = 24;
+
+  const ds = world.create();
+  world.add(ds, DungeonState, {
+    worldSeed: 105,
+    currentDepth: 0,
+    profileType: "overworld",
+    floorEntityIds: [],
+    downStairPositions: [],
+  });
+
+  const ws = world.create();
+  world.add(ws, WeatherState, { current: "clear", turnsRemaining: 20, transitionCooldown: 0 });
+
+  const tavern = addStorage(world, "Tavern Chest", "tavern_chest", 9, 8);
+  seedInventory(world, tavern, "food_raw_fish", 1);
+  seedInventory(world, tavern, "fuel_firewood", 1);
+  seedInventory(world, tavern, "tool_kitchen_knife", 1);
+
+  const stateId = world.create();
+  world.add(stateId, TownState, { nextPulseStep: 0 });
+
+  townSimulationSystem(world);
+
+  assertEquals(countInventory(world, tavern, "food_raw_fish"), 0);
+  assertEquals(countInventory(world, tavern, "food_stew"), 1);
+});
+
 Deno.test("townSimulationSystem counts the herbalist stash instead of the apothecary chest", () => {
   const world = new World({ seed: 104 });
   world.step = 24;

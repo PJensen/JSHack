@@ -43,6 +43,7 @@ import { ItemInfo } from "../components/ItemInfo.js";
 import { appraiseItemValue } from "../utils/shopAppraisal.js";
 import {
   TILE_TREE, TILE_GRASS, TILE_STAIR_DOWN, TILE_STAIR_UP,
+  TILE_WATER, TILE_WATER_DEEP, TILE_SHALLOW_WATER, TILE_KELP_FOREST, TILE_SEAGRASS, TILE_CORAL_REEF,
 } from "../environment/dungeon/constants.js";
 import { getTownPhase } from "../data/calendar.js";
 import { actorHasDoorKey, setDoorState } from "../utils/doorAccess.js";
@@ -91,6 +92,7 @@ const CARRYING_ITEM_IDS = Object.freeze({
   wood: ["material_lumber", "fuel_firewood"],
   herbs: ["food_wild_herbs", "reagent_thorn_pod", "reagent_venom_frond", "reagent_moonleaf", "reagent_ember_root"],
   water: ["water_bucket"],
+  fish: ["food_raw_fish"],
   flour: ["food_flour"],
   firewood: ["fuel_firewood"],
   lumber: ["material_lumber"],
@@ -149,6 +151,38 @@ function findTownFeature(world, identity) {
     if (String(ni.identity || "") === identity) return { id, x: pos.x, y: pos.y };
   }
   return null;
+}
+
+function isFishableTile(tile) {
+  return tile === TILE_WATER
+    || tile === TILE_WATER_DEEP
+    || tile === TILE_SHALLOW_WATER
+    || tile === TILE_KELP_FOREST
+    || tile === TILE_SEAGRASS
+    || tile === TILE_CORAL_REEF;
+}
+
+function findFishableShoreSpot(cx, cy, radius = 12) {
+  let best = null;
+  let bestDist = Infinity;
+  for (let y = cy - radius; y <= cy + radius; y++) {
+    for (let x = cx - radius; x <= cx + radius; x++) {
+      const d = manhattanScalar(x, y, cx, cy);
+      if (d > radius || d >= bestDist) continue;
+      if (!isWalkable(x, y)) continue;
+      let touchesWater = false;
+      for (const dir of CARDINAL_DIRS) {
+        if (isFishableTile(getTile(x + dir.dx, y + dir.dy))) {
+          touchesWater = true;
+          break;
+        }
+      }
+      if (!touchesWater) continue;
+      best = { x, y };
+      bestDist = d;
+    }
+  }
+  return best;
 }
 
 function activateWorkstation(world, identity, fallbackState, duration = 4) {
@@ -334,6 +368,7 @@ function isStormShelterRole(role) {
   return role === TOWNFOLK_ROLES.farmer
     || role === TOWNFOLK_ROLES.woodcutter
     || role === TOWNFOLK_ROLES.herbalist
+    || role === TOWNFOLK_ROLES.fisher
     || role === TOWNFOLK_ROLES.villager
     || role === TOWNFOLK_ROLES.miner;
 }
@@ -620,6 +655,17 @@ function handleIdle(world, id, pos, job) {
       job.workSiteKind = "brew";
       break;
     }
+    case TOWNFOLK_ROLES.fisher: {
+      const spot = findFishableShoreSpot(job.workX, job.workY, WORK_RANGE);
+      if (!spot) {
+        job.idleTurns = 8;
+        return;
+      }
+      job.targetX = spot.x;
+      job.targetY = spot.y;
+      job.workSiteKind = "fish";
+      break;
+    }
     case TOWNFOLK_ROLES.gem_vendor:
     case TOWNFOLK_ROLES.book_vendor: {
       job.targetX = job.workX;
@@ -900,6 +946,14 @@ function handleWorking(world, id, pos, job) {
       carryCreated(world, id, "water_bucket");
       setCarry(job, "water");
       emitSafe(world, "townfolk:carrying", { actor: id, resource: "water" });
+      setReturning(job);
+      return;
+    }
+    case "fish": {
+      carryCreated(world, id, "food_raw_fish");
+      setCarry(job, "fish");
+      emitSafe(world, "townfolk:fished", { actor: id, x: pos.x, y: pos.y, itemId: "food_raw_fish" });
+      emitSafe(world, "townfolk:carrying", { actor: id, resource: "fish" });
       setReturning(job);
       return;
     }
@@ -1188,6 +1242,24 @@ function getRoleWorkTarget(world, job) {
       }
       return { x: job.workAuxX, y: job.workAuxY, kind: "stock_shelves", state: TOWNFOLK_STATES.working, radius: 1 };
     }
+    case TOWNFOLK_ROLES.fisher: {
+      const storage = _cachedStorage;
+      const tavernPos = getEntityPosition(world, storage.tavern);
+      const tavernDrop = deliverNear(tavernPos);
+      const spot = findFishableShoreSpot(job.workX, job.workY, WORK_RANGE);
+      if (spot && tavernDrop) {
+        return {
+          x: spot.x,
+          y: spot.y,
+          kind: "fish",
+          state: TOWNFOLK_STATES.working,
+          radius: 0,
+          deliverX: tavernDrop.x,
+          deliverY: tavernDrop.y,
+        };
+      }
+      return { x: job.workX, y: job.workY, kind: "fish", state: TOWNFOLK_STATES.working, radius: 1 };
+    }
     case TOWNFOLK_ROLES.gem_vendor:
     case TOWNFOLK_ROLES.book_vendor:
       return { x: job.workX, y: job.workY, kind: "tend_stall", state: TOWNFOLK_STATES.working, radius: 0 };
@@ -1281,6 +1353,7 @@ function emitRoleWork(world, id, pos, job, target) {
     || target.kind === "forge_tools"
     || target.kind === "cook"
     || target.kind === "fetch_water"
+    || target.kind === "fish"
     || target.kind === "haul_flour"
     || target.kind === "haul_firewood"
     || target.kind === "haul_lumber"

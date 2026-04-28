@@ -116,3 +116,21 @@ export const TownStew = defineArchetype(
   [NamedIdentity, (p) => ({ name: (p && p.name) ?? "Town Stew", identity: "food_stew" })],
   [Material, { kind: "organic" }],
 );
+
+export const RawFish = defineArchetype(
+  "RawFish",
+  [Consumable, {
+    effectParams: { nutrition: 120, special: null },
+    remainingUses: 1,
+    potency: 0,
+  }],
+  [ItemInfo, {
+    type: "food",
+    description: "A clean silver fish, fresh from nearby water.",
+    weight: 0.7,
+    value: 8,
+    count: 1,
+  }],
+  [NamedIdentity, (p) => ({ name: (p && p.name) ?? "Raw Fish", identity: "food_raw_fish" })],
+  [Material, { kind: "organic" }],
+);

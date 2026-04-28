@@ -92,6 +92,7 @@ const BUILDING_PLANS = Object.freeze([
   Object.freeze({ key: "graveyard", district: "churchyard", coreDx: 4, coreDy: 11, wants: ["quiet", "flat"], roles: [] }),
   Object.freeze({ key: "farm", district: "market_green", resource: "waterFlat", wants: ["flat", "water"], roles: ["farmer"] }),
   Object.freeze({ key: "windmill", district: "market_green", resource: "waterFlat", wants: ["flat"], roles: [] }),
+  Object.freeze({ key: "fishery", defKey: "cottage", district: "market_green", resource: "waterFlat", wants: ["water", "flat"], roles: ["fisher"], supplies: "tavern" }),
   Object.freeze({ key: "herbalist_hut", district: "workshop_row", resource: "herbs", wants: ["forest", "water"], roles: ["herbalist"], supplies: "apothecary" }),
   Object.freeze({ key: "mine_camp", defKey: "cottage", district: "workshop_row", resource: "mine", wants: ["mountain", "flat"], roles: ["miner"], supplies: "smithy" }),
   Object.freeze({ key: "woodcutter_camp", defKey: "cottage", district: "workshop_row", resource: "forest", wants: ["forest", "flat"], roles: ["woodcutter"], supplies: "general_store" }),

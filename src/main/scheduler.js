@@ -77,7 +77,7 @@ import { districtConditionSystem } from "../rules/systems/districtConditionSyste
 import { installTileStepEffectListener } from "../rules/systems/tileStepEffectSystem.js";
 import { installPolymorphListener } from "../rules/systems/polymorphSystem.js";
 import { installCurseHooks } from "../rules/systems/curseHooks.js";
-import { channelingSystem, installDrainLifeDamageInterruptListener } from "../rules/systems/channelingSystem.js";
+import { channelingSystem, installDrainLifeDamageInterruptListener, installFishingCastRequestListener } from "../rules/systems/channelingSystem.js";
 import { installGenocideListener } from "../rules/systems/genocideSystem.js";
 import { installTamingListener } from "../rules/systems/tamingSystem.js";
 import { workstationStateSystem } from "../rules/systems/workstationStateSystem.js";
@@ -158,6 +158,7 @@ export function configureWorld(world) {
   installElectrocuteOnDamage(world);
   // Drain Life is uniquely interrupted by incoming damage.
   installDrainLifeDamageInterruptListener(world);
+  installFishingCastRequestListener(world);
   // Centipede body segments cascade position when the head moves.
   installCentipedeBodyCascade(world);
   installPerceptionMemoryListeners(world);

@@ -19,7 +19,7 @@ function combatAlias(files, opts = {}) {
 }
 
 /**
- * Each entry:  id → { file|files, bus, maxVoices?, volume?, rate?, detune?, randomPitch?, stopAfter?, fadeOut? }
+ * Each entry:  id → { file|files, bus, maxVoices?, volume?, rate?, detune?, randomPitch?, stopAfter?, fadeOut?, segment? }
  */
 const SOUNDS = {
   // ── Combat ──────────────────────────────────────
@@ -39,6 +39,7 @@ const SOUNDS = {
   "item:pickup:weapon":    { file: "pickup_weapon.wav",   bus: "items" },
   "item:pickup:armor":     { file: "pickup_armor.wav",    bus: "items" },
   "item:pickup:potion":    { file: "pickup_potion.wav",   bus: "items" },
+  "item:pickup:paper":     { files: ["paper_collect_1.mp3", "paper_collect_2.mp3"], bus: "items", randomPitch: 12 },
   "item:pickup:scroll":    { file: "pickup_scroll.wav",   bus: "items" },
   "item:pickup:gold":      { file: "pickup_gold.wav",     bus: "items" },
   "item:pickup:food":      { file: "pickup_food.wav",     bus: "items" },
@@ -56,11 +57,13 @@ const SOUNDS = {
   "item:drop:generic":     { file: "drop_generic.wav",    bus: "items" },
 
   "item:equip:weapon":     { files: [...COMBAT_PACK.sword_small.equip, ...COMBAT_PACK.dagger.equip, ...COMBAT_PACK.mace.equip], bus: "items", maxVoices: 3, randomPitch: 24, volume: 1.15 },
-  "item:equip:armor":      { files: [...COMBAT_PACK.shield_metal.equip, ...COMBAT_PACK.shield_wood.equip], bus: "items", maxVoices: 3, randomPitch: 18, volume: 1.15 },
-  "item:equip:generic":    { files: COMBAT_PACK.dagger.equip, bus: "items", maxVoices: 3, randomPitch: 18, volume: 0.9 },
+  "item:equip:ranged":     { file: "equip_ranged.mp3", bus: "items", randomPitch: 18 },
+  "item:equip:armor":      { file: "equip_armor.wav", bus: "items", randomPitch: 18 },
+  "item:equip:generic":    { file: "equip_generic.wav", bus: "items", randomPitch: 18 },
 
-  "chest:open":            { file: "chest_opened.mp3",    bus: "items" },
-  "item:chest:opened":     { file: "chest_opened.mp3",    bus: "items" },
+  "chest:open":            { file: "chest_open.wav",      bus: "items", randomPitch: 12 },
+  "item:chest:opened":     { file: "chest_open.wav",      bus: "items", randomPitch: 12 },
+  "urn:broken":            { file: "break_pottery.wav",   bus: "items", randomPitch: 30 },
 
   // ── Environment ─────────────────────────────────
   "stair:descend":    { file: "transition_coating.mp3", bus: "ambient" },
@@ -70,6 +73,7 @@ const SOUNDS = {
   "fountain":         { file: "ambient_fountain.mp3",      bus: "ambient" },
   "church:bell":      { file: "ambient_church_bells.mp3",  bus: "ambient", maxVoices: 1 },
   "ambient:church":   { file: "ambient_church_inside.mp3", bus: "ambient" },
+  "ambient:bubbles":  { file: "ambient_bubbles.mp3",       bus: "ambient" },
   "ambient:cooking_fire": { file: "ambient_cooking_fire.mp3", bus: "ambient" },
   "ambient:holy_site": { file: "ambient_holy_site.mp3",    bus: "ambient" },
   "ambient:smithy":   { file: "ambient_smithy.mp3",        bus: "ambient" },
@@ -180,7 +184,7 @@ const SOUNDS = {
   "teleported":       { file: "teleported.mp3",      bus: "spells", maxVoices: 2 },
   "item:consume:food": { file: "action_eat.mp3",     bus: "items" },
   "action:move_boulder": { file: "action_move_boulder.mp3", bus: "ambient", maxVoices: 2, randomPitch: 18, volume: 0.9 },
-  "trap:snake":       { file: "trap_snake.mp3",      bus: "ambient", maxVoices: 1 },
+  "trap:snake":       { file: "trap_snake.mp3",      bus: "ambient", maxVoices: 1, segment: 2 },
   "trap:spike":       { file: "trap_spike.mp3",      bus: "combat", maxVoices: 3, randomPitch: 12 },
   "rack:weapon:dropped": { file: "weapon_rack_dropped.mp3", bus: "items", maxVoices: 2, randomPitch: 16 },
   "torch:ignite":     { file: "light_fire.mp3",      bus: "ambient" },
@@ -219,7 +223,7 @@ const SOUNDS = {
 /**
  * Resolve a sound ID to its full URL and default options.
  * @param {string} id
- * @returns {{ url: string, file: string, files?: string[], bus?: string, maxVoices?: number, randomPitch?: number, volume?: number, rate?: number, detune?: number, stopAfter?: number, fadeOut?: number } | null}
+ * @returns {{ url: string, file: string, files?: string[], bus?: string, maxVoices?: number, randomPitch?: number, volume?: number, rate?: number, detune?: number, stopAfter?: number, fadeOut?: number, segment?: number } | null}
  */
 export function resolve(id) {
   const entry = SOUNDS[id];

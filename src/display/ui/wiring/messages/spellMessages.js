@@ -116,6 +116,7 @@ export function installSpellMessages(ctx) {
   // === Channeling events ===
   world.on('channeling:start', ({ actor, spellId }) => {
     if (nameOfEntity(actor) !== 'You') return;
+    if (String(spellId || '').toLowerCase() === 'fishing') return;
     const sp = _spell(spellId);
     if (_playerHas('confused')) { _log(`You sway on your feet and fumble into ${sp.text}... was this the right spell?`, `You sway on your feet and fumble into ${sp.html}... was this the right spell?`, 'system'); return; }
     if (_playerHas('stunned')) { _log(`Your head throbs. Through the ringing, you force ${sp.text} to take shape...`, `Your head throbs. Through the ringing, you force ${sp.html} to take shape...`, 'system'); return; }
@@ -128,6 +129,13 @@ export function installSpellMessages(ctx) {
   world.on('channeling:tick', ({ actor, spellId, mode, turnsRemaining, turnsTotal }) => {
     if (nameOfEntity(actor) !== 'You') return;
     if (mode === 'sustain') return;
+    if (String(spellId || '').toLowerCase() === 'fishing') {
+      const elapsed = Math.max(0, (turnsTotal || 0) - (turnsRemaining || 0));
+      if (elapsed <= 1) log(`The bobber drifts... (${elapsed}/${turnsTotal || '?'})`, 'system');
+      else if (turnsRemaining > 1) log(`The line twitches in the water. (${elapsed}/${turnsTotal || '?'})`, 'system');
+      else log(`Something bites. Hold steady. (${elapsed}/${turnsTotal || '?'})`, 'system');
+      return;
+    }
     const elapsed = Math.max(0, (turnsTotal || 0) - (turnsRemaining || 0));
     const pct = turnsTotal ? Math.round((elapsed / turnsTotal) * 100) : 0;
     const confused = _playerHas('confused');
@@ -138,6 +146,11 @@ export function installSpellMessages(ctx) {
 
   world.on('channeling:cancelled', ({ actor, spellId, reason }) => {
     if (nameOfEntity(actor) !== 'You') return;
+    if (String(spellId || '').toLowerCase() === 'fishing') {
+      if (reason === 'caster_moved') log('You move and the line goes slack.', 'system');
+      else log('You stop fishing.', 'system');
+      return;
+    }
     if (reason === 'dead') { log('The channel dies with you.', 'combat'); }
     else if (reason === 'oom') { log('Your mana runs dry \u2014 the channel collapses in a shower of sparks.', 'system'); }
     else if (reason === 'silenced') { log('Silence falls over you. The channel shatters.', 'system'); }

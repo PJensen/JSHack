@@ -16,7 +16,9 @@ import { addToInventory } from "../src/rules/utils/inventoryFacade.js";
 import { clearAll, loadChunk } from "../src/rules/environment/dungeon/tileMap.js";
 import { CHUNK_SIZE, TILE_FLOOR } from "../src/rules/environment/dungeon/constants.js";
 import { buildCatalogItem } from "../src/rules/data/itemCatalogLoader.js";
+import { createItemById } from "../src/rules/utils/itemFactory.js";
 import "../src/content/items/sunsword.js";
+import "../src/content/items/fishingRod.js";
 import { installContent } from "../src/content/install.js";
 installContent();
 
@@ -218,6 +220,46 @@ Deno.test("inventory data provider marks hook-backed equipment as usable", () =>
   const sword = bagItems.find((it) => String(it?.identity || "") === "sunsword") || null;
   assert(sword, "expected sunsword in bag payload");
   assertEquals(!!sword.canUse, true);
+});
+
+Deno.test("inventory data provider marks fishing_rod from debug give path as usable", () => {
+  const world = new World({ seed: 2469 });
+  const player = world.create();
+  world.add(player, Player, {});
+  world.add(player, Position, { x: 0, y: 0 });
+  world.add(player, Inventory, { items: [], capacity: 20 });
+  world.add(player, Equipment, {});
+  world.add(player, Brain, { learnedSpellIds: [], itemKnowledgeIdentities: [], seenTiles: new Uint8Array(), intelligence: 10, visionRange: 8 });
+
+  const rod = createItemById(world, "fishing_rod");
+  assert(rod > 0, "expected fishing_rod to be creatable");
+  addToInventory(world, player, rod);
+  world.set(player, Equipment, { ...world.get(player, Equipment), weapon: rod });
+
+  installInventoryDataProvider({
+    world,
+    getActiveSpellId: () => null,
+    isSimUiBlocked: () => false,
+    getMessageLog: () => ({ getEntries: () => [] }),
+    tombstoneRepo: { getAll: () => [] },
+  });
+
+  /** @type {any[]} */
+  const payloads = [];
+  const onInventoryData = (ev) => {
+    payloads.push(ev?.detail || null);
+  };
+  addEventListener("ui:inventoryData", onInventoryData);
+  dispatchEvent(new CustomEvent("ui:requestInventoryData"));
+  removeEventListener("ui:inventoryData", onInventoryData);
+
+  const payload = payloads.find((detail) => {
+    const equipped = detail?.equippedBySlot?.weapon?.item;
+    return String(equipped?.identity || "") === "fishing_rod";
+  }) || null;
+  assert(payload, "expected ui:inventoryData payload with equipped fishing_rod");
+  const equippedRod = payload.equippedBySlot.weapon.item;
+  assertEquals(!!equippedRod.canUse, true);
 });
 
 Deno.test("character data dedupes effect/status aliases into one active effect row", () => {

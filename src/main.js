@@ -99,7 +99,7 @@ import {
 import { loadGameData } from "./main/bootstrap/loadGameData.js";
 import { PHASE_TURNS } from "./rules/data/calendar.js";
 import { Inventory } from "./rules/components/Inventory.js";
-import { Equipment, GEAR_SLOTS } from "./rules/components/Equipment.js";
+import { Equipment, GEAR_SLOTS, getEquippedSlot } from "./rules/components/Equipment.js";
 import { ItemInfo } from "./rules/components/ItemInfo.js";
 import { ItemCooldown } from "./rules/components/ItemCooldown.js";
 import { NamedIdentity } from "./rules/components/NamedIdentity.js";
@@ -321,6 +321,7 @@ import './content/items/potionOfRadiance.js';
 import './content/items/sunVessel.js';
 import './content/items/dawnbreaker.js';
 import './content/items/sunsword.js';
+import './content/items/fishingRod.js';
 import './content/items/lodbrokSerpentBoundBreeches.js';
 import './content/monsters/barrowWight.js';
 import { installContent } from './content/install.js';
@@ -414,7 +415,27 @@ world.on("died", ({ id }) => {
 // --- Active spell selection (app-side state) ---------------------------------
 /** @type {string|null} */
 let _activeSpellId = null;
+function isFishableTile(tile) {
+  return tile === TILE_WATER
+    || tile === TILE_WATER_DEEP
+    || tile === TILE_SHALLOW_WATER
+    || tile === TILE_KELP_FOREST
+    || tile === TILE_SEAGRASS
+    || tile === TILE_CORAL_REEF;
+}
+
 const TARGETED_SPELL_CONFIG = Object.freeze({
+  fishing: Object.freeze({
+    fallbackRange: 6,
+    requiresLOS: true,
+    requiresVisible: false,
+    validateTarget(x, y) {
+      return isFishableTile(getTile(x | 0, y | 0)) ? null : 'Fishing must target a water tile.';
+    },
+    describePrompt(range) {
+      return `Choose water for Fishing (range ${range}). Tap a water tile or use arrow keys + Enter. Esc to cancel.`;
+    },
+  }),
   blink: Object.freeze({
     fallbackRange: 10,
     requiresLOS: false,
@@ -1436,6 +1457,35 @@ function buildQuickItemPinDetailFromWorld(itemId) {
   };
 }
 
+function tryOpenFishingTargeterFromRod(itemId) {
+  const id = Number(itemId || 0) | 0;
+  if (!(id > 0)) return false;
+  const identity = String(world.get(id, NamedIdentity)?.identity || '');
+  if (identity !== 'fishing_rod') return false;
+
+  const pe = playerEntity(world);
+  if (!pe?.id) return true;
+  const eq = world.get(pe.id, Equipment);
+  if (!getEquippedSlot(eq, id)) {
+    try { messageLog.log({ text: 'Equip the fishing rod before casting.', type: 'warning' }); } catch {}
+    return true;
+  }
+
+  const spell = getSpell('fishing');
+  const cfg = getTargetedSpellConfig('fishing');
+  const range = Math.max(1, Number(spell?.range || cfg?.fallbackRange || 6) | 0);
+  targeting.cancelAll();
+  targeting.openSpellTargeting({
+    spellId: 'fishing',
+    spellName: 'Fishing',
+    range,
+    requiresLOS: cfg?.requiresLOS === true,
+    requiresVisible: cfg?.requiresVisible === true,
+    validateTarget: cfg?.validateTarget,
+  }, cfg?.describePrompt ? cfg.describePrompt(range) : `Choose water for Fishing (range ${range}).`);
+  return true;
+}
+
 // Keep quick-slot and pinned chips in sync when items are consumed.
 world.on('item:used', ({ itemId }) => {
   const detail = buildQuickItemPinDetailFromWorld(itemId);
@@ -2124,6 +2174,7 @@ addEventListener('ui:requestUse', (ev) => {
   const e = ev;
   const itemId = e?.detail?.itemId;
   if (!Number.isInteger(itemId)) return;
+  if (tryOpenFishingTargeterFromRod(itemId)) return;
   const action = { type: 'rules.useItem', payload: { itemId } };
   const rulesHandler = makeRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
   rulesHandler(action);
@@ -2396,6 +2447,49 @@ world.on('dungeon:transitioned', () => {
   if (lightingEngine) lightingEngine.invalidateAll();
 });
 const getPosition = (id) => world.get(Number(id || 0), Position) || null;
+world.on('fishing:cast', ({ actor, x, y }) => {
+  const from = world.get(Number(actor || 0), Position);
+  const tx = Number(x);
+  const ty = Number(y);
+  if (!from || !Number.isFinite(tx) || !Number.isFinite(ty)) return;
+  const ax = (from.x | 0);
+  const ay = (from.y | 0);
+  const dx = (tx | 0) - ax;
+  const dy = (ty | 0) - ay;
+  const steps = Math.max(2, Math.max(Math.abs(dx), Math.abs(dy)) * 2);
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const sag = Math.sin(t * Math.PI) * 0.12;
+    fx.pool.spawn(new Particle({
+      x: ax + dx * t,
+      y: ay + dy * t + sag,
+      vx: 0,
+      vy: 0,
+      life: 1.25,
+      size0: 0.035,
+      size1: 0.018,
+      r: 166,
+      g: 218,
+      b: 226,
+      a0: 0.82,
+      a1: 0.08,
+    }));
+  }
+  fx.pool.spawn(new Particle({
+    x: (tx | 0),
+    y: (ty | 0),
+    vx: 0,
+    vy: -0.02,
+    life: 1.9,
+    size0: 0.22,
+    size1: 0.08,
+    r: 246,
+    g: 82,
+    b: 72,
+    a0: 0.95,
+    a1: 0.12,
+  }));
+});
 const isPetEntity = (id) => world.has(Number(id || 0), Pet);
 const isPlayerEntity = (id) => world.has(Number(id || 0), Player);
 const getPlayerEntity = () => playerEntity(world);

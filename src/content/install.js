@@ -15,7 +15,7 @@ import { registerPaletteEntries } from '../display/palette/base.js';
 export function installContent() {
   // ── Items → unified catalog ───────────────────────────────────
   for (const [id, def] of allContentItems()) {
-    registerCatalogItem(id, def);
+    registerCatalogItem(id, def, { override: true });
   }
 
   // ── Monsters → monster registry ───────────────────────────────

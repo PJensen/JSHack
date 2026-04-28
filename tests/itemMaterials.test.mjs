@@ -3,9 +3,13 @@ import { World } from "../src/lib/ecs-js/index.js";
 import { Position } from "../src/rules/components/Position.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 import { Material } from "../src/rules/components/Material.js";
+import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { buildCatalogItem } from "../src/rules/data/itemCatalogLoader.js";
 import { materializeDrop } from "../src/rules/data/lootResolver.js";
 import { createItemById } from "../src/rules/utils/itemFactory.js";
+import "../src/content/items/fishingRod.js";
+import { installContent } from "../src/content/install.js";
+installContent();
 
 Deno.test("buildCatalogItem applies material and charges from item defs", () => {
   const world = new World({ seed: 11 });
@@ -65,6 +69,16 @@ Deno.test("createItemById propagates noQuickChip from catalog", () => {
   const info = world.get(id, ItemInfo);
   assert(info, "scroll should have item info");
   assertEquals(info.noQuickChip, true);
+});
+
+Deno.test("createItemById creates fishing_rod for debug give", () => {
+  const world = new World({ seed: 704 });
+  const id = createItemById(world, "fishing_rod");
+  assert(id > 0, "expected fishing_rod to be creatable");
+  const ni = world.get(id, NamedIdentity);
+  const info = world.get(id, ItemInfo);
+  assertEquals(ni?.identity, "fishing_rod");
+  assertEquals(info?.type, "equip");
 });
 
 Deno.test("simple archetype items carry baseline materials", () => {

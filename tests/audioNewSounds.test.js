@@ -3,6 +3,7 @@ import {
   ALERT_SOUND_BY_IDENTITY,
   CREATURE_ATTACK_SOUNDS,
   SPELL_CAST_SOUND_EVENTS,
+  itemCategory,
 } from "../src/display/audio/audioWiring.js";
 
 function assert(condition, message) {
@@ -21,6 +22,7 @@ Deno.test("new audio assets are registered", async () => {
     "spell:channeling",
     "teleported",
     "water:magic",
+    "item:pickup:paper",
   ];
 
   for (const id of ids) {
@@ -41,4 +43,20 @@ Deno.test("new audio hooks map gameplay identities and spell events", () => {
   assert(!CREATURE_ATTACK_SOUNDS.killer_bee, "killer bee attacks should not use insect attack");
   assert(SPELL_CAST_SOUND_EVENTS.includes("spell:heal"), "heal spell should have a cast sound hook");
   assert(SPELL_CAST_SOUND_EVENTS.includes("spell:lifetap"), "lifetap spell should keep its cast sound hook");
+});
+
+Deno.test("paper pickup audio covers scrolls, spellbooks, and paper material", () => {
+  const cases = [
+    [{ type: "scroll" }, "paper"],
+    [{ type: "learn" }, "paper"],
+    [{ type: "book" }, "paper"],
+    [{ type: "tool", material: "paper" }, "paper"],
+    [{ type: "item", tags: ["paper"] }, "paper"],
+    [{ type: "item", identity: "book_dead" }, "paper"],
+    [{ type: "weapon", material: "paper", damageDice: "1d4" }, "weapon"],
+  ];
+
+  for (const [info, expected] of cases) {
+    assert(itemCategory(() => info, 1) === expected, `${JSON.stringify(info)} should resolve to ${expected}`);
+  }
 });

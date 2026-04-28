@@ -191,6 +191,9 @@ export function installEconomyMessages(ctx) {
   world.on('townfolk:gathered_herbs', ({ x, y }) => {
     if (canSeeAt(x, y)) log('An herbalist gathers wild herbs.', 'ambient');
   });
+  world.on('townfolk:fished', ({ x, y }) => {
+    if (canSeeAt(x, y)) log('A fisher works the water and lands a catch.', 'ambient');
+  });
   world.on('townfolk:brewed', ({ x, y }) => {
     if (canSeeAt(x, y)) log('An alchemist brews a potion.', 'ambient');
   });
@@ -208,6 +211,7 @@ export function installEconomyMessages(ctx) {
     if (chain === 'mill') log('The mill turns stored grain into fresh flour.', 'ambient');
     else if (chain === 'furnace') log('The forge roars as ore melts down into iron.', 'ambient');
     else if (chain === 'smithy') log('Hammering rings out as the smith turns iron into tools.', 'ambient');
+    else if (chain === 'tavern_fish') log('The tavern turns the fresh catch into hot stew.', 'ambient');
   });
 
   world.on('town:shortage', ({ food, materials, medicine }) => {
@@ -220,4 +224,3 @@ export function installEconomyMessages(ctx) {
     if (threatLevel > 0) log('The town stirs uneasily at a nearby threat.', 'system');
   });
 }
-
