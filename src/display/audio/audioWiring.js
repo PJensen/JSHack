@@ -226,7 +226,7 @@ function sfx(id, opts) {
   play(s.url, {
     bus: s.bus, maxVoices: s.maxVoices, randomPitch: s.randomPitch,
     volume: s.volume, rate: s.rate, detune: s.detune,
-    stopAfter: s.stopAfter, fadeOut: s.fadeOut,
+    stopAfter: s.stopAfter, fadeOut: s.fadeOut, segment: s.segment,
     priority: 1,
     ...opts,
   });
@@ -258,17 +258,21 @@ function sfxAtDelay(id, sourcePos, playerPos, extraOpts, zoomGain, delayMs) {
 /**
  * Resolve an item entity's type to a sound category.
  */
-function itemCategory(getItemInfo, itemId) {
+export function itemCategory(getItemInfo, itemId) {
   const info = getItemInfo(itemId);
   if (!info) return "generic";
-  const t = info.type;
+  const t = String(info.type || "").toLowerCase();
   const slot = String(info.slot || "").toLowerCase();
-  const name = String(info.name || info.id || "").toLowerCase();
+  const material = String(info.material || "").toLowerCase();
+  const tags = Array.isArray(info.tags) ? info.tags.map((tag) => String(tag || "").toLowerCase()) : [];
+  const name = String(info.name || info.id || info.identity || "").toLowerCase();
   if (t === "weapon") return "weapon";
   if (slot === "weapon" || info.damageDice) return "weapon";
   if (t === "armor" || t === "shield" || t === "helmet" || t === "boots" || t === "gloves" || slot === "offhand" && name.includes("shield")) return "armor";
   if (t === "potion") return "potion";
-  if (t === "scroll") return "scroll";
+  if (t === "scroll" || t === "book" || t === "learn") return "paper";
+  if (material === "paper" || tags.includes("paper")) return "paper";
+  if (name.startsWith("scroll_") || name.startsWith("book_")) return "paper";
   if (t === "gold" || t === "coin") return "gold";
   if (t === "food" || t === "corpse") return "food";
   if (t === "gem") return "gem";
@@ -283,6 +287,13 @@ function combatInfoFor(getItemInfo, itemId) {
 
 function isShieldCombatFamily(info) {
   return String(resolveCombatFamily(info) || "").startsWith("shield_");
+}
+
+function isRangedEquipInfo(info) {
+  const slot = String(info?.slot || "").toLowerCase();
+  const subtype = String(info?.subtype || "").toLowerCase();
+  const text = `${info?.id || ""} ${info?.identity || ""} ${info?.name || ""}`.toLowerCase();
+  return slot === "ranged" || subtype === "bow" || subtype === "crossbow" || text.includes("bow");
 }
 
 /**
@@ -359,15 +370,44 @@ export const DUNGEON_LOOP_OPTIONS = Object.freeze({
   crossfade: 2.0,
 });
 
+export const CRAFTING_MENU_LOOP_OPTIONS = Object.freeze({
+  volume: 0.26,
+  fadeIn: 0.28,
+  fadeOut: 0.35,
+  bus: "ambient:loop",
+  crossfade: 0.6,
+});
+
+export const CRAFTING_MENU_LOOP_BY_KIND = Object.freeze({
+  cooking: "ambient:cooking_fire",
+  alchemy: "ambient:bubbles",
+  smithing: "ambient:smithy",
+});
+
+export const CRAFTING_RESULT_SOUND_BY_KIND = Object.freeze({
+  cooking: "item:pickup:generic",
+  alchemy: "item:pickup:potion",
+  smithing: "item:pickup:weapon",
+});
+
 export const FAMILIAR_FIRE_READY_SOUND_ID = "torch:ignite";
 export const FAMILIAR_FIRE_CAST_SOUND_ID = "spell:fireball";
 export const FOOD_EAT_SOUND_ID = "item:consume:food";
 export const PUSH_STONE_SOUND_ID = "action:move_boulder";
+export const URN_BROKEN_SOUND_ID = "urn:broken";
 export const TRAP_SOUND_BY_TYPE = Object.freeze({
   snake: "trap:snake",
   spike: "trap:spike",
 });
 export const WEAPON_RACK_DROPPED_SOUND_ID = "rack:weapon:dropped";
+
+export function craftingMenuLoopKey(kind) {
+  return `ui:crafting:${String(kind || "")}`;
+}
+
+export function resolveCraftingResultSoundId(kind) {
+  return CRAFTING_RESULT_SOUND_BY_KIND[String(kind || "")] || "item:pickup:generic";
+}
 
 /**
  * Install audio event listeners on the ECS world.
@@ -411,6 +451,9 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
 
   const channelingLoopUrl = resolve(CHANNELING_LOOP_SOUND_ID)?.url;
   let channelingLoopActive = false;
+  const craftingLoopUrlsByKind = new Map(Object.entries(CRAFTING_MENU_LOOP_BY_KIND)
+    .map(([kind, soundId]) => [kind, resolveUrls(soundId)]));
+  let activeCraftingLoopKind = "";
   const dungeonOmenState = { eventIndex: 0, lastPlayedEventIndex: -Infinity };
   const dungeonOmenEntityIds = new Set();
   const deafenedSoundAt = new Map();
@@ -433,6 +476,39 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     stopLoop(channelingLoopUrl, { fadeOut: CHANNELING_LOOP_OPTIONS.fadeOut });
   }
 
+  function stopCraftingMenuLoop(kind = "") {
+    const key = String(kind || activeCraftingLoopKind || "");
+    if (!key) return;
+    stopLoopSequence(craftingMenuLoopKey(key), { fadeOut: CRAFTING_MENU_LOOP_OPTIONS.fadeOut });
+    if (activeCraftingLoopKind === key) activeCraftingLoopKind = "";
+  }
+
+  function stopAllCraftingMenuLoops() {
+    for (const key of Object.keys(CRAFTING_MENU_LOOP_BY_KIND)) {
+      stopLoopSequence(craftingMenuLoopKey(key), { fadeOut: CRAFTING_MENU_LOOP_OPTIONS.fadeOut });
+    }
+    activeCraftingLoopKind = "";
+  }
+
+  function startCraftingMenuLoop(kind) {
+    const key = String(kind || "");
+    const urls = craftingLoopUrlsByKind.get(key) || [];
+    if (urls.length <= 0) return;
+    if (activeCraftingLoopKind && activeCraftingLoopKind !== key) stopAllCraftingMenuLoops();
+    if (activeCraftingLoopKind === key) return;
+    activeCraftingLoopKind = key;
+    startLoopSequence(craftingMenuLoopKey(key), urls, {
+      volume: CRAFTING_MENU_LOOP_OPTIONS.volume,
+      fadeIn: CRAFTING_MENU_LOOP_OPTIONS.fadeIn,
+      bus: CRAFTING_MENU_LOOP_OPTIONS.bus,
+      crossfade: CRAFTING_MENU_LOOP_OPTIONS.crossfade,
+    });
+  }
+
+  function playCraftingResult(kind, itemId, pos) {
+    sfxAt(resolveCraftingResultSoundId(kind), pos || null, pp(), { priority: 1 }, zg());
+  }
+
   /** Shorthand — current player pos for spatial calcs. */
   function pp() { return getPlayerPosition(); }
   function zg() {
@@ -451,6 +527,15 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     if (shouldPlayDungeonOmen(payload, dungeonOmenState, getDepth())) {
       sfxAt("ambient:omen", payload.at, pp(), { priority: 0, volume: 0.55 }, zg());
     }
+  }
+
+  if (typeof globalThis.addEventListener === "function") {
+    globalThis.addEventListener("ui:openCookingFire", () => startCraftingMenuLoop("cooking"));
+    globalThis.addEventListener("ui:closeCookingFire", () => stopCraftingMenuLoop("cooking"));
+    globalThis.addEventListener("ui:openAlchemyBench", () => startCraftingMenuLoop("alchemy"));
+    globalThis.addEventListener("ui:closeAlchemyBench", () => stopCraftingMenuLoop("alchemy"));
+    globalThis.addEventListener("ui:openAnvil", () => startCraftingMenuLoop("smithing"));
+    globalThis.addEventListener("ui:closeAnvil", () => stopCraftingMenuLoop("smithing"));
   }
 
   function playDeafenedForTarget(target, opts = null) {
@@ -742,16 +827,18 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
 
   world.on('item:equipped', ({ itemId }) => {
     const info = combatInfoFor(getItemInfo, itemId);
+    if (isRangedEquipInfo(info)) {
+      sfx("item:equip:ranged");
+      return;
+    }
     if (isShieldCombatFamily(info) && playWeaponEquip(itemId, "equip")) return;
     const cat = itemCategory(getItemInfo, itemId);
     if (cat === "weapon" || cat === "armor") {
-      playWeaponEquip(itemId, "equip");
+      if (playWeaponEquip(itemId, "equip")) return;
+      sfx(`item:equip:${cat}`);
       return;
     }
-    const equipId = (cat === "weapon" || cat === "armor")
-      ? `item:equip:${cat}`
-      : "item:equip:generic";
-    sfx(equipId); // equip is always the player — center, full vol
+    sfx("item:equip:generic"); // equip is always the player — center, full vol
   });
 
   world.on('item:unequipped', ({ itemId }) => {
@@ -771,9 +858,43 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     sfxAt(FOOD_EAT_SOUND_ID, pos, pp(), { priority: 1 }, zg());
   });
 
+  world.on('cooking:cooked', ({ actor, targetId, itemId }) => {
+    if (!isPlayer(actor)) return;
+    const pos = targetId != null ? getPosition(targetId) : null;
+    playCraftingResult("cooking", itemId, pos);
+  });
+
+  world.on('alchemy:crafted', ({ actor, targetId, itemIds }) => {
+    if (!isPlayer(actor)) return;
+    const firstItemId = Array.isArray(itemIds) ? itemIds[0] : 0;
+    const pos = targetId != null ? getPosition(targetId) : null;
+    playCraftingResult("alchemy", firstItemId, pos);
+  });
+
+  world.on('smithy:forged', ({ actor, targetId, itemId }) => {
+    if (!isPlayer(actor)) return;
+    const pos = targetId != null ? getPosition(targetId) : null;
+    playCraftingResult("smithing", itemId, pos);
+  });
+
   world.on('chest:open', ({ targetId }) => {
     const pos = targetId != null ? getPosition(targetId) : null;
     sfxAt("chest:open", pos, pp(), null, zg());
+  });
+
+  world.on('chest:burst', ({ targetId, origin }) => {
+    const pos = origin || (targetId != null ? getPosition(targetId) : null);
+    sfxAt("chest:open", pos, pp(), { priority: 1 }, zg());
+  });
+
+  world.on('chest:empty', ({ targetId }) => {
+    const pos = targetId != null ? getPosition(targetId) : null;
+    sfxAt("chest:open", pos, pp(), { priority: 1 }, zg());
+  });
+
+  world.on('urn:broken', ({ targetId }) => {
+    const pos = targetId != null ? getPosition(targetId) : null;
+    sfxAt(URN_BROKEN_SOUND_ID, pos, pp(), { priority: 1 }, zg());
   });
 
   world.on('harvest:picked', ({ itemId, targetId }) => {

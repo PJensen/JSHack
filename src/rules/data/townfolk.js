@@ -82,6 +82,14 @@ export const TOWNFOLK = Object.freeze({
     maxHp: 30,
     dialogue: "A pinch of this, a drop of that... perfection takes patience.",
   },
+  fisher: {
+    name: "Fisher",
+    identity: "townfolk_fisher",
+    role: "fisher",
+    speed: 3,
+    maxHp: 30,
+    dialogue: "Water tells you where the town's next meal is hiding.",
+  },
   gem_vendor: {
     name: "Gem Merchant",
     identity: "townfolk_gem_vendor",

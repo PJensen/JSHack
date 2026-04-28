@@ -121,6 +121,12 @@ function pulseIndustry(world, state, storage, weather) {
       createInventoryItem(world, storage.tavern, "food_stew");
       produced = true;
       world.emit?.("town:produced", { chain: "tavern", itemId: "food_stew" });
+    } else if ((tavern.food_raw_fish || 0) >= 1 && (tavern.fuel_firewood || 0) >= 1 && (tavern.tool_kitchen_knife || 0) >= 1) {
+      consumeInventoryIdentity(world, storage.tavern, "food_raw_fish", 1);
+      consumeInventoryIdentity(world, storage.tavern, "fuel_firewood", 1);
+      createInventoryItem(world, storage.tavern, "food_stew");
+      produced = true;
+      world.emit?.("town:produced", { chain: "tavern_fish", itemId: "food_stew" });
     }
     const preparedMeals = Number(tavern.food_stew || 0) + Number(tavern.food_ration || 0);
     if ((tavern.food_stew || 0) >= 1 && preparedMeals > 1) {
@@ -160,6 +166,7 @@ export function townSimulationSystem(world) {
   const foodStores = (mill.food_wheat || 0)
     + (mill.food_flour || 0)
     + (tavern.food_flour || 0)
+    + (tavern.food_raw_fish || 0)
     + (tavern.food_stew || 0)
     + (tavern.food_ration || 0);
   const materialStores = (smith.ore_iron || 0)

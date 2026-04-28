@@ -3,6 +3,9 @@ import { assertAlmostEquals } from "jsr:@std/assert";
 import {
   CHANNELING_LOOP_OPTIONS,
   CHANNELING_LOOP_SOUND_ID,
+  CRAFTING_MENU_LOOP_BY_KIND,
+  CRAFTING_MENU_LOOP_OPTIONS,
+  CRAFTING_RESULT_SOUND_BY_KIND,
   DUNGEON_LOOP_OPTIONS,
   DUNGEON_LOOP_SOUND_ID,
   DEATH_SOUND_BY_IDENTITY,
@@ -12,8 +15,11 @@ import {
   PUSH_STONE_SOUND_ID,
   SPELL_CAST_SOUND_EVENTS,
   TRAP_SOUND_BY_TYPE,
+  URN_BROKEN_SOUND_ID,
   WEAPON_RACK_DROPPED_SOUND_ID,
+  craftingMenuLoopKey,
   computeZoomAudibilityGain,
+  resolveCraftingResultSoundId,
   resolveAudioPlayKey,
   resolveStatusSoundId,
   shouldPlayElectrocutionSound,
@@ -41,6 +47,20 @@ Deno.test("audio wiring exposes a persistent dungeon loop contract", () => {
   assert(DUNGEON_LOOP_OPTIONS.fadeOut > 0);
 });
 
+Deno.test("audio wiring exposes crafting menu ambience and result sound contracts", () => {
+  assert(CRAFTING_MENU_LOOP_BY_KIND.cooking === "ambient:cooking_fire");
+  assert(CRAFTING_MENU_LOOP_BY_KIND.alchemy === "ambient:bubbles");
+  assert(CRAFTING_MENU_LOOP_BY_KIND.smithing === "ambient:smithy");
+  assert(CRAFTING_MENU_LOOP_OPTIONS.bus === "ambient:loop");
+  assert(CRAFTING_MENU_LOOP_OPTIONS.crossfade > 0);
+  assert(CRAFTING_MENU_LOOP_OPTIONS.fadeOut > 0);
+  assert(CRAFTING_RESULT_SOUND_BY_KIND.cooking === "item:pickup:generic");
+  assert(CRAFTING_RESULT_SOUND_BY_KIND.alchemy === "item:pickup:potion");
+  assert(CRAFTING_RESULT_SOUND_BY_KIND.smithing === "item:pickup:weapon");
+  assert(craftingMenuLoopKey("alchemy") === "ui:crafting:alchemy");
+  assert(resolveCraftingResultSoundId("unknown") === "item:pickup:generic");
+});
+
 Deno.test("audio wiring exposes familiar fire ready and cast sound aliases", () => {
   assert(FAMILIAR_FIRE_READY_SOUND_ID === "torch:ignite");
   assert(FAMILIAR_FIRE_CAST_SOUND_ID === "spell:fireball");
@@ -57,6 +77,7 @@ Deno.test("audio wiring maps new authored event sounds", () => {
   assert(DEATH_SOUND_BY_IDENTITY.skeleton_sharpshooter === "creature:skeleton:died");
   assert(TRAP_SOUND_BY_TYPE.snake === "trap:snake");
   assert(TRAP_SOUND_BY_TYPE.spike === "trap:spike");
+  assert(URN_BROKEN_SOUND_ID === "urn:broken");
   assert(WEAPON_RACK_DROPPED_SOUND_ID === "rack:weapon:dropped");
 });
 

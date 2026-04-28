@@ -1,4 +1,5 @@
 import { Consumable } from "../../components/Consumable.js";
+import { Equipment, getEquippedSlot } from "../../components/Equipment.js";
 import { MaterialState } from "../../components/MaterialState.js";
 import { findUsePayload } from "../../content/items/usePayloads.js";
 import { interceptUseForWaterDamage } from "../../utils/waterExposure.js";
@@ -74,7 +75,8 @@ export function usePipeline(ctx) {
     ctx.cancel({ code: "USE_GATE_NO_ITEM", message: "Item no longer exists." });
     return { metrics };
   }
-  if (!ctx.rules.hasItemInInventory(actor, itemId)) {
+  const equippedSlot = getEquippedSlot(ctx.query.get(actor, Equipment), itemId);
+  if (!ctx.rules.hasItemInInventory(actor, itemId) && !equippedSlot) {
     ctx.cancel({ code: "USE_GATE_NOT_OWNED", message: "Item is not in inventory." });
     return { metrics };
   }

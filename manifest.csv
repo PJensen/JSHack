@@ -129,3 +129,13 @@ trap_spike.mp3,2.12,-16,128
 weapon_rack_dropped.mp3,1.70,-16,128
 ambient_nighttime_owl.mp3,131.30,-16,128
 spell_agony.mp3,8.04,-16,128
+break_pottery.wav,1.24,-16,PCM
+chest_open.wav,2.78,-16,PCM
+equip_armor.wav,1.03,-16,PCM
+equip_generic.wav,0.43,-16,PCM
+move_boulder_alt.wav,1.89,-16,PCM
+move_boulder.wav,2.49,-16,PCM
+equip_ranged.mp3,1.03,-16,128
+paper_collect_1.mp3,0.46,-16,128
+paper_collect_2.mp3,0.41,-16,128
+ambient_bubbles.mp3,7.56,-16,128

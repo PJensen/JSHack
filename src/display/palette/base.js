@@ -280,6 +280,7 @@ export const basePalette = {
   townfolk_mason:      { glyph: "@", fg: "#bcaaa4", glow: "#795548" },
   townfolk_herbalist:  { glyph: "@", fg: "#81c784", glow: "#2e7d32" },
   townfolk_alchemist:  { glyph: "@", fg: "#80deea", glow: "#00838f" },
+  townfolk_fisher:     { glyph: "@", fg: "#64b5f6", glow: "#1565c0" },
   townfolk_gem_vendor: { glyph: "@", fg: "#8fdcff", glow: "#3ea0d4" },
   townfolk_book_vendor: { glyph: "@", fg: "#d4a76a", glow: "#8b6914" },
 

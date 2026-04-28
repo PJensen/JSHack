@@ -736,16 +736,22 @@ export function initOverlays() {
     ingredients: { berries: 0, herbs: 0, thornPods: 0, venomFronds: 0, moonleaf: 0, emberRoot: 0 },
     recipes: [],
   };
+  let _craftPanelMode = '';
   window.addEventListener('ui:openAlchemyBench', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
     const d = e?.detail || {};
+    _craftPanelMode = 'alchemy';
     _alchemyState.benchId = Number(d.benchId || 0) | 0;
     show(alchemy);
     renderAlchemyBench(alchemy, _alchemyState);
     const escKey = (/** @type {KeyboardEvent} */ ke) => {
       if (alchemy.style.display !== 'block') return;
-      if (ke.key === 'Escape') { hide(alchemy); ke.preventDefault(); }
+      if (_craftPanelMode !== 'alchemy') return;
+      if (ke.key === 'Escape') {
+        window.dispatchEvent(new CustomEvent('ui:closeAlchemyBench'));
+        ke.preventDefault();
+      }
     };
     window.addEventListener('keydown', escKey);
     const obs = new MutationObserver(() => {
@@ -758,7 +764,10 @@ export function initOverlays() {
   });
   window.addEventListener('ui:closeAlchemyBench', () => {
     _alchemyState.benchId = 0;
-    hide(alchemy);
+    if (_craftPanelMode === 'alchemy') {
+      _craftPanelMode = '';
+      hide(alchemy);
+    }
   });
   window.addEventListener('ui:alchemyBenchData', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
@@ -784,12 +793,17 @@ export function initOverlays() {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
     const d = e?.detail || {};
+    _craftPanelMode = 'anvil';
     _anvilState.anvilId = Number(d.anvilId || 0) | 0;
     show(alchemy);
     renderAnvil(alchemy, _anvilState);
     const escKey = (/** @type {KeyboardEvent} */ ke) => {
       if (alchemy.style.display !== 'block') return;
-      if (ke.key === 'Escape') { hide(alchemy); ke.preventDefault(); }
+      if (_craftPanelMode !== 'anvil') return;
+      if (ke.key === 'Escape') {
+        window.dispatchEvent(new CustomEvent('ui:closeAnvil'));
+        ke.preventDefault();
+      }
     };
     window.addEventListener('keydown', escKey);
     const obs = new MutationObserver(() => {
@@ -802,7 +816,10 @@ export function initOverlays() {
   });
   window.addEventListener('ui:closeAnvil', () => {
     _anvilState.anvilId = 0;
-    hide(alchemy);
+    if (_craftPanelMode === 'anvil') {
+      _craftPanelMode = '';
+      hide(alchemy);
+    }
   });
   window.addEventListener('ui:anvilData', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
@@ -833,7 +850,10 @@ export function initOverlays() {
     renderCookingFire(cooking, _cookingState);
     const escKey = (/** @type {KeyboardEvent} */ ke) => {
       if (cooking.style.display !== 'block') return;
-      if (ke.key === 'Escape') { hide(cooking); ke.preventDefault(); }
+      if (ke.key === 'Escape') {
+        window.dispatchEvent(new CustomEvent('ui:closeCookingFire'));
+        ke.preventDefault();
+      }
     };
     window.addEventListener('keydown', escKey);
     const obs = new MutationObserver(() => {

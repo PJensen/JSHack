@@ -53,6 +53,7 @@ Deno.test("sounds registry adopts descriptive weather filenames", () => {
   const rain = resolve("rain:loop");
   const church = resolve("ambient:church");
   const churchBell = resolve("church:bell");
+  const bubbles = resolve("ambient:bubbles");
   const cookingFire = resolve("ambient:cooking_fire");
   const holySite = resolve("ambient:holy_site");
   const smithy = resolve("ambient:smithy");
@@ -77,6 +78,7 @@ Deno.test("sounds registry adopts descriptive weather filenames", () => {
   assertExists(rain);
   assertExists(church);
   assertExists(churchBell);
+  assertExists(bubbles);
   assertExists(cookingFire);
   assertExists(holySite);
   assertExists(smithy);
@@ -101,6 +103,7 @@ Deno.test("sounds registry adopts descriptive weather filenames", () => {
   assertEquals(rain.file, "weather_rain.mp3");
   assertEquals(church.file, "ambient_church_inside.mp3");
   assertEquals(churchBell.file, "ambient_church_bells.mp3");
+  assertEquals(bubbles.file, "ambient_bubbles.mp3");
   assertEquals(cookingFire.file, "ambient_cooking_fire.mp3");
   assertEquals(holySite.file, "ambient_holy_site.mp3");
   assertEquals(smithy.file, "ambient_smithy.mp3");
@@ -198,10 +201,35 @@ Deno.test("sounds registry exposes trap, skeleton, and weapon rack sounds", () =
   assertEquals(skeletonDied.bus, "combat");
   assertEquals(snakeTrap.file, "trap_snake.mp3");
   assertEquals(snakeTrap.bus, "ambient");
+  assertEquals(snakeTrap.segment, 2);
   assertEquals(spikeTrap.file, "trap_spike.mp3");
   assertEquals(spikeTrap.bus, "combat");
   assertEquals(rackDrop.file, "weapon_rack_dropped.mp3");
   assertEquals(rackDrop.bus, "items");
+});
+
+Deno.test("sounds registry exposes authored pottery, chest, and equip sounds", () => {
+  const urnBreak = resolve("urn:broken");
+  const chestOpen = resolve("chest:open");
+  const rangedEquip = resolve("item:equip:ranged");
+  const armorEquip = resolve("item:equip:armor");
+  const genericEquip = resolve("item:equip:generic");
+
+  assertExists(urnBreak);
+  assertExists(chestOpen);
+  assertExists(rangedEquip);
+  assertExists(armorEquip);
+  assertExists(genericEquip);
+  assertEquals(urnBreak.file, "break_pottery.wav");
+  assertEquals(urnBreak.bus, "items");
+  assertEquals(chestOpen.file, "chest_open.wav");
+  assertEquals(chestOpen.bus, "items");
+  assertEquals(rangedEquip.file, "equip_ranged.mp3");
+  assertEquals(rangedEquip.bus, "items");
+  assertEquals(armorEquip.file, "equip_armor.wav");
+  assertEquals(armorEquip.bus, "items");
+  assertEquals(genericEquip.file, "equip_generic.wav");
+  assertEquals(genericEquip.bus, "items");
 });
 
 Deno.test("sounds registry exposes nighttime town owl ambience", () => {

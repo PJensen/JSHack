@@ -38,6 +38,43 @@ export function installItemMessages(ctx) {
     log(`${pickerName} picks up ${it}.`, 'system');
   }
 
+  world.on('fishing:cast', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('You cast your line and watch the water.', 'system');
+  });
+  world.on('fishing:caught', ({ actor, caughtId }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    if (!(Number(caughtId || 0) > 0)) {
+      log('The bobber settles. Nothing bites.', 'system');
+      return;
+    }
+    const itemName = caughtId ? bracketizeName(nameOfItem(caughtId)) : 'something';
+    log(`You reel in ${itemName}.`, 'system');
+  });
+
+  world.on('item:use-cancelled', ({ actor, code, message }) => {
+    const pe = playerEntity(world);
+    if (!pe || Number(actor || 0) !== Number(pe.id || 0)) return;
+    const reason = String(code || "");
+    if (reason === "FISHING_NO_WATER" || reason === "FISHING_NO_WATER_TARGET") {
+      log("There is no fishable water in casting range.", "warning");
+      return;
+    }
+    if (reason === "FISHING_OUT_OF_RANGE") {
+      log("That water is out of casting range.", "warning");
+      return;
+    }
+    if (reason === "FISHING_ROD_NOT_EQUIPPED") {
+      log("Equip the fishing rod before casting.", "warning");
+      return;
+    }
+    if (reason === "FISHING_ALREADY_CHANNELING") {
+      log("You are already channeling.", "warning");
+      return;
+    }
+    if (message) log(String(message), "warning");
+  });
+
   // === Item events ===
   world.on('drank', ({ actor, itemId, target, feel, identified }) => {
     const who = nameOfEntity(actor);

@@ -22,7 +22,7 @@ import { aiTownfolkSystem, installTownfolkDoorListener } from "../src/rules/syst
 import { aiChaseSystem }    from "../src/rules/systems/aiChaseSystem.js";
 import { clearAll, loadChunk, getTile, setTile } from "../src/rules/environment/dungeon/tileMap.js";
 import {
-  CHUNK_SIZE, TILE_FLOOR, TILE_TREE, TILE_GRASS, TILE_STAIR_DOWN, TILE_WALL, TILE_DOOR,
+  CHUNK_SIZE, TILE_FLOOR, TILE_TREE, TILE_GRASS, TILE_STAIR_DOWN, TILE_WALL, TILE_DOOR, TILE_WATER,
 } from "../src/rules/environment/dungeon/constants.js";
 import { markDestroyedTile } from "../src/rules/utils/destroyedTiles.js";
 import { addToInventory, inventoryItems } from "../src/rules/utils/inventoryFacade.js";
@@ -797,6 +797,41 @@ Deno.test("villager hauls flour from the mill chest into the tavern chest", () =
   assertEquals(countInventory(world, npc, "food_flour"), 0, "villager inventory should be empty after delivery");
   job = world.get(npc, TownfolkJob);
   assertEquals(job.state, TOWNFOLK_STATES.returning, "villager should head home after delivery");
+});
+
+Deno.test("fisher delivers raw fish into the tavern chest", () => {
+  const world = makeWorld(120);
+  setTile(8, 5, TILE_FLOOR);
+  setTile(9, 5, TILE_WATER);
+
+  const tavernChest = world.create();
+  world.add(tavernChest, Position, { x: 12, y: 5 });
+  world.add(tavernChest, Inventory, { capacity: 30 });
+  world.add(tavernChest, ItemNamedIdentity, { name: "Tavern Chest", identity: "tavern_chest" });
+
+  const fisher = addTownfolk(world, 8, 5, "fisher", {
+    state: TOWNFOLK_STATES.working,
+    workTurns: 0,
+    workSiteKind: "fish",
+    deliverX: 12,
+    deliverY: 5,
+    homeX: 6,
+    homeY: 5,
+  });
+
+  aiTownfolkSystem(world);
+
+  assertEquals(countInventory(world, fisher, "food_raw_fish"), 1, "fisher should carry a catch");
+  let job = world.get(fisher, TownfolkJob);
+  assertEquals(job.state, TOWNFOLK_STATES.delivering);
+
+  world.set(fisher, Position, { x: 12, y: 5 });
+  aiTownfolkSystem(world);
+
+  assertEquals(countInventory(world, tavernChest, "food_raw_fish"), 1, "tavern chest should receive fish");
+  assertEquals(countInventory(world, fisher, "food_raw_fish"), 0, "fisher should empty carried fish");
+  job = world.get(fisher, TownfolkJob);
+  assertEquals(job.state, TOWNFOLK_STATES.returning);
 });
 
 Deno.test("barkeep cooks stew from tavern chest ingredients", () => {

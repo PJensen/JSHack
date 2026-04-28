@@ -8,7 +8,9 @@ import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 import { ItemCooldown } from "../src/rules/components/ItemCooldown.js";
 import { Stamina } from "../src/rules/components/Stamina.js";
+import { createItemById } from "../src/rules/utils/itemFactory.js";
 import "../src/content/items/sunsword.js";
+import "../src/content/items/fishingRod.js";
 import "../src/content/items/lodbrokSerpentBoundBreeches.js";
 import { installContent } from "../src/content/install.js";
 installContent();
@@ -210,6 +212,55 @@ Deno.test("hudFeeds prepends equipped leg-slot content abilities into the spell 
     assertEquals(Number(slots[0]?.cdRemaining || 0), 9);
     assertEquals(String(slots[1]?.id || ""), "heal");
     assert(!slots.some((entry) => String(entry?.id || "") === "smite"), "expected last action bar spell to be spliced out when breeches occupy the dock");
+  } finally {
+    restoreWindow();
+  }
+});
+
+Deno.test("hudFeeds prepends equipped fishing_rod content ability into the spell dock", () => {
+  const restoreWindow = installTestWindow();
+
+  try {
+    const world = new World({ seed: 15 });
+    const player = world.create();
+    world.add(player, Player, {});
+    world.add(player, Position, { x: 0, y: 0 });
+    world.add(player, Equipment, {});
+    world.add(player, Stamina, { stamina: 10, maxStamina: 10, staminaRegen: 1, regenCooldown: 0 });
+
+    const rod = createItemById(world, "fishing_rod");
+    assert(rod > 0, "expected fishing_rod to be creatable");
+    world.get(player, Equipment).weapon = rod;
+
+    const actionBarSlots = ["heal", "fireball", "arcane_bolt", "shadow_bolt", "lightning", "smite"];
+    const hudFeeds = createHudFeeds(world, {
+      getPlayerMana: () => ({ mana: 10, maxMana: 10 }),
+      ensureActiveSpell: () => "heal",
+      updateActiveSpellLabel: () => {},
+      knownSpellIds: () => actionBarSlots.slice(),
+      getActionBarSlots: () => actionBarSlots.slice(),
+      getPinnedSpellSlots: () => [],
+      autoAssignSlot: () => -1,
+      autoAssignPinnedSlot: () => -1,
+    });
+
+    /** @type {any[]} */
+    const payloads = [];
+    const onUpdate = (ev) => payloads.push(ev?.detail || null);
+    window.addEventListener("ui:updateSpellBar", onUpdate);
+    hudFeeds.updateActiveSpellHUD();
+    window.removeEventListener("ui:updateSpellBar", onUpdate);
+
+    assert(payloads.length > 0, "expected desktop spell dock payload");
+    const detail = payloads[payloads.length - 1];
+    const slots = Array.isArray(detail?.slots) ? detail.slots : [];
+    assertEquals(slots.length, 6);
+    assertEquals(slots[0]?.kind, "item-use");
+    assertEquals(slots[0]?.identity, "fishing_rod");
+    assertEquals(String(slots[0]?.abilityId || ""), "cast_line");
+    assertEquals(Number(slots[0]?.itemId || 0), rod);
+    assertEquals(String(slots[1]?.id || ""), "heal");
+    assert(!slots.some((entry) => String(entry?.id || "") === "smite"), "expected last action bar spell to be spliced out when fishing rod occupies the dock");
   } finally {
     restoreWindow();
   }
