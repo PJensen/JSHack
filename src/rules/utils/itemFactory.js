@@ -10,16 +10,6 @@ import { ItemInfo } from '../components/ItemInfo.js';
 // Archetypes
 import { GoldStack, HealthPotion, ArrowsStack, FireArrowsStack, PiercingArrowsStack, BodkinArrowsStack, BluntHeadArrowsStack, ScrollOfMapping, GemItem, Bone } from '../archetypes/Items.js';
 import {
-  FlourSack,
-  IronIngot,
-  WaterBucket,
-  FirewoodBundle,
-  LumberBundle,
-  WorkHatchet,
-  KitchenKnife,
-  TownStew,
-} from '../archetypes/TownGoods.js';
-import {
   Ration, IronRation, WildBerries, WildHerbs,
   DungeonMushrooms, Wheat, Carrot, Corn,
 } from '../archetypes/Food.js';
@@ -42,14 +32,6 @@ function simpleItemArchetypes() {
     'ammo_piercing_arrows': PiercingArrowsStack,
     'ammo_bodkin_arrows': BodkinArrowsStack,
     'ammo_blunt_arrows': BluntHeadArrowsStack,
-    'food_flour': FlourSack,
-    'food_stew': TownStew,
-    'water_bucket': WaterBucket,
-    'fuel_firewood': FirewoodBundle,
-    'material_iron': IronIngot,
-    'material_lumber': LumberBundle,
-    'tool_hatchet': WorkHatchet,
-    'tool_kitchen_knife': KitchenKnife,
     'scroll_mapping': ScrollOfMapping,
     'bone': Bone,
     'food_ration': Ration,
