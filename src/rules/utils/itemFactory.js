@@ -18,7 +18,6 @@ import {
   WorkHatchet,
   KitchenKnife,
   TownStew,
-  RawFish,
 } from '../archetypes/TownGoods.js';
 import {
   Ration, IronRation, WildBerries, WildHerbs,
@@ -45,7 +44,6 @@ function simpleItemArchetypes() {
     'ammo_blunt_arrows': BluntHeadArrowsStack,
     'food_flour': FlourSack,
     'food_stew': TownStew,
-    'food_raw_fish': RawFish,
     'water_bucket': WaterBucket,
     'fuel_firewood': FirewoodBundle,
     'material_iron': IronIngot,

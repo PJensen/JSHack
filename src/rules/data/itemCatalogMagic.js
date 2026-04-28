@@ -1944,6 +1944,33 @@ export const MAGIC_ITEMS = {
       on_use: EAT_ON_USE,
     },
   },
+  food_raw_fish: {
+    id: "food_raw_fish",
+    catalogKind: "food",
+    name: "Raw Fish",
+    type: "food",
+    slot: "bag",
+    material: "organic",
+    rarity: 1,
+    rarityName: "common",
+    weight: 0.7,
+    value: 8,
+    description: "A clean silver fish, fresh from nearby water.",
+    hooks: {
+      on_use: EAT_ON_USE,
+    },
+    _contentFood: {
+      consumable: {
+        effectParams: { nutrition: 120, special: null },
+        remainingUses: 1,
+        potency: 0,
+      },
+      decay: {
+        shelfLife: 120,
+        turnsHeld: 0,
+      },
+    },
+  },
   food_wheat: {
     id: "food_wheat",
     catalogKind: "food",
