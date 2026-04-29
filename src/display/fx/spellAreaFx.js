@@ -446,7 +446,7 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
         continue;
       }
       if (!fx?.pool || ch.rippleClock > 0) continue;
-      ch.rippleClock = 0.12 + Math.random() * 0.08;
+      ch.rippleClock = 0.07 + Math.random() * 0.05;
       const a = Math.random() * Math.PI * 2;
       const r = 0.10 + Math.random() * 0.28;
       fx.pool.spawn(new Particle({
@@ -454,13 +454,13 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
         y: Number(ch.y) + Math.sin(a) * r,
         vx: Math.cos(a) * (0.08 + Math.random() * 0.10),
         vy: Math.sin(a) * (0.08 + Math.random() * 0.10),
-        life: 0.35 + Math.random() * 0.22,
-        size0: 0.05 + Math.random() * 0.04,
+        life: 0.45 + Math.random() * 0.28,
+        size0: 0.07 + Math.random() * 0.05,
         size1: 0.01,
         r: 100,
         g: 210,
         b: 255,
-        a0: 0.52,
+        a0: 0.72,
       }));
     }
     for (const [actorId, channel] of _drainLifeChannels) {
@@ -697,8 +697,8 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
       if (actorPos) {
         const ax = Number(actorPos.x) + 0.5;
         const ay = Number(actorPos.y) + 0.48;
-        ctx.strokeStyle = `rgba(205,235,255,${(0.42 * alphaBase).toFixed(3)})`;
-        ctx.lineWidth = 0.035;
+        ctx.strokeStyle = `rgba(220,245,255,${(0.72 * alphaBase).toFixed(3)})`;
+        ctx.lineWidth = 0.06;
         ctx.beginPath();
         ctx.moveTo(ax, ay);
         const mx = (ax + bx) * 0.5;
@@ -708,24 +708,24 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
       }
 
       const pulse = 0.5 + 0.5 * Math.sin(fxTime * 6.4 + Number(ch.phase || 0));
-      ctx.strokeStyle = `rgba(90,210,255,${(0.34 * alphaBase).toFixed(3)})`;
-      ctx.lineWidth = 0.035;
+      ctx.strokeStyle = `rgba(90,220,255,${(0.58 * alphaBase).toFixed(3)})`;
+      ctx.lineWidth = 0.055;
       ctx.beginPath();
-      ctx.ellipse(bx, by + 0.03, 0.24 + pulse * 0.05, 0.10 + pulse * 0.02, 0, 0, TAU);
+      ctx.ellipse(bx, by + 0.03, 0.32 + pulse * 0.07, 0.13 + pulse * 0.03, 0, 0, TAU);
       ctx.stroke();
 
       ctx.fillStyle = `rgba(245,70,62,${(0.92 * alphaBase).toFixed(3)})`;
       ctx.beginPath();
-      ctx.arc(bx, by, 0.095, Math.PI, TAU);
+      ctx.arc(bx, by, 0.14, Math.PI, TAU);
       ctx.fill();
       ctx.fillStyle = `rgba(250,250,235,${(0.94 * alphaBase).toFixed(3)})`;
       ctx.beginPath();
-      ctx.arc(bx, by, 0.095, 0, Math.PI);
+      ctx.arc(bx, by, 0.14, 0, Math.PI);
       ctx.fill();
       ctx.strokeStyle = `rgba(30,60,75,${(0.72 * alphaBase).toFixed(3)})`;
-      ctx.lineWidth = 0.018;
+      ctx.lineWidth = 0.025;
       ctx.beginPath();
-      ctx.arc(bx, by, 0.097, 0, TAU);
+      ctx.arc(bx, by, 0.142, 0, TAU);
       ctx.stroke();
     }
     ctx.restore();
@@ -2638,7 +2638,7 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
       current.endFlash = Math.max(Number(current.endFlash || 0), 0.16);
     });
 
-    world.on("fishing:cast", ({ actor, x, y, turns }) => {
+    function startFishingChannelFx({ actor, x, y, turns }) {
       const a = Number(actor || 0) | 0;
       const tx = Number(x);
       const ty = Number(y);
@@ -2655,6 +2655,15 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
         fadeMax: 0,
         rippleClock: 0,
       });
+    }
+
+    world.on("fishing:cast", (ev) => {
+      startFishingChannelFx(ev || {});
+    });
+
+    world.on("channeling:start", ({ actor, spellId, x, y, castTime }) => {
+      if (String(spellId || "") !== "fishing") return;
+      startFishingChannelFx({ actor, x, y, turns: castTime });
     });
 
     function fadeFishing(actor) {

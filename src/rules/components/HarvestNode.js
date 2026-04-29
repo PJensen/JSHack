@@ -17,6 +17,7 @@ import { defineComponent } from "../../lib/ecs-js/index.js";
  *   requiresTool  — equipment bonus key required to harvest (e.g. 'dig'), or null
  *   danger        — optional melee-style damage on harvest: { type, dmgMin, dmgMax, cause }
  *   hazard        — optional floor hazard on harvest: { kind, turnsLeft, tickDamage, identity, name }
+ *   fishingPressure — optional fishing depletion pressure for fishing_spot nodes
  */
 export const HarvestNode = defineComponent("HarvestNode", {
   kind: "berries",
@@ -31,6 +32,7 @@ export const HarvestNode = defineComponent("HarvestNode", {
   hazard: null,
   replantable: false,
   needsPlanting: false,
+  fishingPressure: 0,
 }, {
   validate(rec) {
     if (typeof rec.kind !== "string" || !rec.kind) throw new Error("HarvestNode.kind must be a non-empty string");

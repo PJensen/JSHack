@@ -1083,6 +1083,12 @@ export function buildWorldView(world) {
 			if (kind === 'epic_chest') rec.tags.push('epic_glowing');
 			if (harvestNode && String(harvestNode.kind || "") === "fishing_spot") {
 				rec.tags.push(harvestNode.ready === true ? "fishing_spot_ready" : "fishing_spot_depleted");
+				const pressure = Math.max(0, Number(harvestNode.fishingPressure || 0) | 0);
+				if (harvestNode.ready === true) {
+					if (pressure >= 4 || harvestNode.overfished === true) rec.tags.push("fishing_pressure_overfished");
+					else if (pressure >= 2) rec.tags.push("fishing_pressure_medium");
+					else rec.tags.push("fishing_pressure_low");
+				}
 			}
 
 			_allEntities.push(rec);
@@ -1189,6 +1195,12 @@ export function buildWorldView(world) {
 			if (kind === 'epic_chest') rec.tags.push('epic_glowing');
 			if (harvestNode2 && String(harvestNode2.kind || "") === "fishing_spot") {
 				rec.tags.push(harvestNode2.ready === true ? "fishing_spot_ready" : "fishing_spot_depleted");
+				const pressure = Math.max(0, Number(harvestNode2.fishingPressure || 0) | 0);
+				if (harvestNode2.ready === true) {
+					if (pressure >= 4 || harvestNode2.overfished === true) rec.tags.push("fishing_pressure_overfished");
+					else if (pressure >= 2) rec.tags.push("fishing_pressure_medium");
+					else rec.tags.push("fishing_pressure_low");
+				}
 			}
 
 			_allEntities.push(rec);

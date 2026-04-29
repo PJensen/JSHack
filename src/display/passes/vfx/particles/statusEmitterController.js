@@ -75,7 +75,6 @@ export function createStatusEmitterController({ world, fx }) {
     blinded: { tracker: blindedEmitters, prefix: "blind", cfg: { rate: 10, angle: -Math.PI / 2, spread: Math.PI * 2, speed: 0.25, speedJitter: 0.15, ax: 0, ay: -0.08, life: 1.4, lifeJitter: 0.5, size: 0.14, sizeEnd: 0.03, color: "#6633aa", alpha0: 0.7, alpha1: 0.0 } },
     confused: { tracker: confusedEmitters, prefix: "confused", cfg: { rate: 8, angle: 0, spread: Math.PI * 2, speed: 0.35, speedJitter: 0.25, ax: 0, ay: -0.12, life: 1.2, lifeJitter: 0.4, size: 0.18, sizeEnd: 0.06, color: "#f0c030", alpha0: 0.85, alpha1: 0.0 } },
     torch: { tracker: torchEmitters, prefix: "torch", cfg: { continuous: true, rate: 10, angle: -Math.PI / 2, spread: Math.PI / 6, speed: 0.5, speedJitter: 0.4, ax: 0, ay: -0.9, life: 0.6, lifeJitter: 0.3, size: 0.22, sizeEnd: 0.03, color: "#ffaa33", alpha0: 0.85, alpha1: 0.0, offsetX: 0, offsetY: -0.2 } },
-    fishing_spot: { tracker: fishingSpotEmitters, prefix: "fishspot", cfg: { continuous: true, rate: 18, angle: 0, spread: Math.PI * 2, speed: 0.22, speedJitter: 0.16, ax: 0, ay: 0, life: 1.4, lifeJitter: 0.4, size: 0.16, sizeEnd: 0.04, color: "#69d7ff", alpha0: 0.58, alpha1: 0.0, offsetX: 0, offsetY: 0 } },
   };
   /** @type {Record<string, {tracker: Set<number>, prefix: string, cfg: Record<string, any>}>} */
   const KIND_EMITTER_CFG = {
@@ -83,6 +82,7 @@ export function createStatusEmitterController({ world, fx }) {
     furnace: { tracker: furnaceEmitters, prefix: "furnace", cfg: { continuous: true, rate: 22, angle: -Math.PI / 2, spread: Math.PI / 5, speed: 0.9, speedJitter: 0.3, ax: 0, ay: -0.1, life: 0.65, lifeJitter: 0.2, size: 0.42, sizeEnd: 0.04, color: "#ff6600", alpha0: 0.88, alpha1: 0.0, offsetX: 0, offsetY: -0.3 } },
     cooking_fire: { tracker: cookFireEmitters, prefix: "cfire", cfg: { continuous: true, rate: 14, angle: -Math.PI / 2, spread: Math.PI / 3, speed: 0.65, speedJitter: 0.3, ax: 0, ay: -0.05, life: 0.9, lifeJitter: 0.3, size: 0.35, sizeEnd: 0.04, color: "#ff8800", alpha0: 0.75, alpha1: 0.0, offsetX: 0, offsetY: 0 } },
     torch: { tracker: torchEmitters, prefix: "torch", cfg: { continuous: true, rate: 10, angle: -Math.PI / 2, spread: Math.PI / 6, speed: 0.5, speedJitter: 0.4, ax: 0, ay: -0.9, life: 0.6, lifeJitter: 0.3, size: 0.22, sizeEnd: 0.03, color: "#ffaa33", alpha0: 0.85, alpha1: 0.0, offsetX: 0, offsetY: -0.2 } },
+    fishing_spot: { tracker: fishingSpotEmitters, prefix: "fishspot", cfg: { continuous: true, rate: 26, angle: 0, spread: Math.PI * 2, speed: 0.34, speedJitter: 0.16, ax: 0, ay: 0, life: 1.25, lifeJitter: 0.36, size: 0.13, sizeEnd: 0.025, color: "#69d7ff", alpha0: 0.72, alpha1: 0.0, offsetX: 0.5, offsetY: 0.5 } },
     familiar: { tracker: familiarEmitters, prefix: "fam", cfg: { continuous: true, rate: 8, angle: -Math.PI / 2, spread: Math.PI / 3, speed: 0.45, speedJitter: 0.25, ax: 0, ay: -0.15, life: 0.55, lifeJitter: 0.2, size: 0.18, sizeEnd: 0.03, color: "#ff6600", alpha0: 0.7, alpha1: 0.0, offsetX: -0.2, offsetY: -0.1 } },
   };
 
@@ -205,6 +205,7 @@ export function createStatusEmitterController({ world, fx }) {
       if (kc) {
         if (e.kind === "fountain" && dryFountains.has(e.id)) continue;
         if (e.kind === "familiar" && familiarCooldowns.has(e.id)) continue;
+        if (e.kind === "fishing_spot" && (!Array.isArray(e.tags) || !e.tags.includes("fishing_spot_ready") || e.tags.includes("fishing_pressure_overfished"))) continue;
         const key = `${kc.prefix}:${e.id}`;
         seenEmitterKeys.add(key);
         const emitter = fx.ensureEmitter(key, kc.cfg);
@@ -217,8 +218,28 @@ export function createStatusEmitterController({ world, fx }) {
           emitter.alphaMultiplier = pattern.intensity;
           emitter.rateMultiplier = pattern.intensity;
           emitter.sizeMultiplier = pattern.intensity;
+        } else if (e.kind === "fishing_spot" && emitter) {
+          const pressureMedium = Array.isArray(e.tags) && e.tags.includes("fishing_pressure_medium");
+          const phase = Number(fxTime || 0) * 2.8 + (e.id * 0.31);
+          const pulse = 0.88 + 0.12 * Math.sin(phase);
+          const pressureScale = pressureMedium ? 0.45 : 1.0;
+          emitter.alphaMultiplier = pulse * pressureScale;
+          emitter.rateMultiplier = pressureMedium ? 0.45 : 1.0;
+          emitter.sizeMultiplier = pressureMedium ? 0.72 : 1.0;
         }
-        origins.push({ key, x: e.pos.x, y: e.pos.y });
+        if (e.kind === "fishing_spot") {
+          const pressureMedium = Array.isArray(e.tags) && e.tags.includes("fishing_pressure_medium");
+          const phase = Number(fxTime || 0) * (pressureMedium ? 1.6 : 2.7) + (e.id * 0.37);
+          const rx = pressureMedium ? 0.24 : 0.36;
+          const ry = pressureMedium ? 0.10 : 0.16;
+          origins.push({
+            key,
+            x: e.pos.x + Math.cos(phase) * rx,
+            y: e.pos.y + Math.sin(phase) * ry,
+          });
+        } else {
+          origins.push({ key, x: e.pos.x, y: e.pos.y });
+        }
         if (e.kind === "familiar") {
           lightProbes.push({ kind: "familiar_ready", id: e.id, x: e.pos.x, y: e.pos.y });
         }

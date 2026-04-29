@@ -47,6 +47,7 @@ const FISHING_CAST_REQUEST_INSTALLED = Symbol.for("jshack:fishing:castRequest:in
 const FISHING_SPOT_REGROW_TURNS = 180;
 const FISHING_PRESSURE_KEY = Symbol.for("jshack:fishing:tilePressure");
 const FISHING_PRESSURE_DECAY_TURNS = 80;
+const FISHING_SPOT_OVERFISHED_PRESSURE = 4;
 
 function isFishableTile(tile) {
   return tile === TILE_WATER
@@ -289,7 +290,10 @@ function resolveFishingChannel(world, actor, ch) {
   const tile = getTile(Number(ch.x || 0) | 0, Number(ch.y || 0) | 0);
   const tileProfile = fishingTileProfile(tile);
   const raining = isFishingRain(world);
-  const pressureBefore = readFishingPressure(world, ch.x, ch.y);
+  const pressureBefore = Math.max(
+    readFishingPressure(world, ch.x, ch.y),
+    useSpot ? (Number(node.fishingPressure || 0) | 0) : 0,
+  );
   const seed = ((Number(world.seed || 0) >>> 0) ^ Math.imul(Number(world.step || 0) | 0, 0x9e3779b1) ^ Math.imul(actor | 0, 0x85ebca6b)) >>> 0;
   const rng = createRng(seed);
   const drops = resolveFishingDrops(tableId, rng, { tileProfile, raining, pressure: pressureBefore });
@@ -313,6 +317,8 @@ function resolveFishingChannel(world, actor, ch) {
       n.ready = false;
       n.regrowTurns = Math.max(1, Number(n.regrowTurns || FISHING_SPOT_REGROW_TURNS) | 0);
       n.regrowCountdown = n.regrowTurns;
+      n.fishingPressure = Math.min(8, Math.max(Number(n.fishingPressure || 0) | 0, pressureBefore) + 1);
+      n.overfished = n.fishingPressure >= FISHING_SPOT_OVERFISHED_PRESSURE;
     });
     emitSafe(world, "fishing:spot:exhausted", {
       actor,
@@ -320,6 +326,7 @@ function resolveFishingChannel(world, actor, ch) {
       x: ch.x,
       y: ch.y,
       regrowTurns: Number(node.regrowTurns || FISHING_SPOT_REGROW_TURNS) | 0,
+      fishingPressure: Math.min(8, Math.max(Number(node.fishingPressure || 0) | 0, pressureBefore) + 1),
     });
   }
   const pressureAfter = addFishingPressure(world, ch.x, ch.y);
