@@ -380,7 +380,11 @@ export function createTargetingController({ world, messageLog, playerEntity, dis
         }
         _spell = null;
         _cursor = null;
-        dispatchRules({ type: 'rules.castActiveSpell', payload: { spellId: pending.spellId, targetId: pe.id, x: finalTx, y: finalTy } });
+        if (typeof pending.onConfirm === 'function') {
+          pending.onConfirm(finalTx, finalTy);
+        } else {
+          dispatchRules({ type: 'rules.castActiveSpell', payload: { spellId: pending.spellId, targetId: pe.id, x: finalTx, y: finalTy } });
+        }
         return true;
       }
 
@@ -460,11 +464,11 @@ export function createTargetingController({ world, messageLog, playerEntity, dis
    * @returns {boolean} true if event was consumed
    */
   function handleTilePointer(rawTx, rawTy) {
-    if (!_spell?.spellId && !_throw?.itemId) return false;
+    if (!_spell && !_throw?.itemId) return false;
     const pe = playerEntity();
     if (!pe) { cancelAll(); return true; }
 
-    if (_spell?.spellId) {
+    if (_spell) {
       const pending = _spell;
       const px = pe.pos.x | 0;
       const py = pe.pos.y | 0;
@@ -497,10 +501,14 @@ export function createTargetingController({ world, messageLog, playerEntity, dis
       }
       _spell = null;
       _cursor = null;
-      dispatchRules({
-        type: 'rules.castActiveSpell',
-        payload: { spellId: pending.spellId, targetId: pe.id, x: tx, y: ty },
-      });
+      if (typeof pending.onConfirm === 'function') {
+        pending.onConfirm(tx, ty);
+      } else {
+        dispatchRules({
+          type: 'rules.castActiveSpell',
+          payload: { spellId: pending.spellId, targetId: pe.id, x: tx, y: ty },
+        });
+      }
       return true;
     }
 

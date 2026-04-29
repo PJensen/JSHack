@@ -24,18 +24,6 @@ import { getDeityInstance } from "./deitySystem.js";
 import { Stamina } from "../components/Stamina.js";
 import { STAMINA_REGEN_COOLDOWN } from "../data/regenConstants.js";
 import { spellCost, spellCostPerTick, spellCostResource } from "../data/spells.js";
-import { Equipment, GEAR_SLOTS } from "../components/Equipment.js";
-import { NamedIdentity } from "../components/NamedIdentity.js";
-import { HarvestNode } from "../components/HarvestNode.js";
-import { getTile } from "../environment/dungeon/tileMap.js";
-import {
-  TILE_CORAL_REEF,
-  TILE_KELP_FOREST,
-  TILE_SEAGRASS,
-  TILE_SHALLOW_WATER,
-  TILE_WATER,
-  TILE_WATER_DEEP,
-} from "../environment/dungeon/constants.js";
 /** @typedef {import('../../lib/ecs-js/index.js').World} World */
 
 // ── Spirit wisp spell boost ───────────────────────────────────────
@@ -75,39 +63,6 @@ function normalizedLearnedSpellIds(brain) {
     out.push(id);
   }
   return out;
-}
-
-function isFishableTile(tile) {
-  return tile === TILE_WATER
-    || tile === TILE_WATER_DEEP
-    || tile === TILE_SHALLOW_WATER
-    || tile === TILE_KELP_FOREST
-    || tile === TILE_SEAGRASS
-    || tile === TILE_CORAL_REEF;
-}
-
-function equippedFishingRodId(world, actor) {
-  const eq = world.get(actor, Equipment);
-  if (!eq) return 0;
-  for (let i = 0; i < GEAR_SLOTS.length; i++) {
-    const itemId = Number(eq[GEAR_SLOTS[i]] || 0) | 0;
-    if (!(itemId > 0)) continue;
-    const identity = String(world.get(itemId, NamedIdentity)?.identity || "");
-    if (identity === "fishing_rod") return itemId;
-  }
-  return 0;
-}
-
-function findReadyFishingSpotAt(world, x, y) {
-  const tx = Number(x) | 0;
-  const ty = Number(y) | 0;
-  for (const [id, pos, node] of world.query(Position, HarvestNode)) {
-    if ((pos.x | 0) !== tx || (pos.y | 0) !== ty) continue;
-    if (String(node?.kind || "") !== "fishing_spot") continue;
-    if (node.ready !== true) continue;
-    return id | 0;
-  }
-  return 0;
 }
 
 function readEchoGrimoireState(world, actorId) {
@@ -228,47 +183,6 @@ export function castSpellSystem(world) {
     }
 
     const targetId = Number(intent?.targetId || 0) | 0;
-    const isFishingSpell = String(spell.id || "") === "fishing";
-    const fishingRodId = isFishingSpell ? equippedFishingRodId(world, actor) : 0;
-    if (isFishingSpell) {
-      if (!(fishingRodId > 0)) {
-        emitSafe(world, "item:use-cancelled", {
-          actor,
-          itemId: 0,
-          code: "FISHING_ROD_NOT_EQUIPPED",
-          message: "Equip the fishing rod before casting.",
-          consumesTurn: false,
-        });
-        world.remove(actor, CastSpellIntent);
-        continue;
-      }
-      const tx = Number(intent?.x);
-      const ty = Number(intent?.y);
-      if (!Number.isFinite(tx) || !Number.isFinite(ty) || !isFishableTile(getTile(tx | 0, ty | 0))) {
-        emitSafe(world, "item:use-cancelled", {
-          actor,
-          itemId: fishingRodId,
-          code: "FISHING_NO_WATER_TARGET",
-          message: "Cast at a water tile.",
-          consumesTurn: false,
-        });
-        world.remove(actor, CastSpellIntent);
-        continue;
-      }
-      const pos = world.get(actor, Position);
-      const range = Math.max(1, Number(spell.range || 6) | 0);
-      if (pos && Math.max(Math.abs((tx | 0) - (pos.x | 0)), Math.abs((ty | 0) - (pos.y | 0))) > range) {
-        emitSafe(world, "item:use-cancelled", {
-          actor,
-          itemId: fishingRodId,
-          code: "FISHING_OUT_OF_RANGE",
-          message: "That water is out of casting range.",
-          consumesTurn: false,
-        });
-        world.remove(actor, CastSpellIntent);
-        continue;
-      }
-    }
     if (targetId > 0 && targetId !== actor) {
       const sourcePos = world.get(actor, Position);
       const targetPos = world.get(targetId, Position);
@@ -295,7 +209,7 @@ export function castSpellSystem(world) {
     const brain = /** @type any */ (world.get(actor, Brain));
     const learned = normalizedLearnedSpellIds(brain);
     const fromChanneling = !!intent._fromChanneling;
-    if (!fromChanneling && !isFishingSpell && (!brain || !learned.includes(spell.id))) {
+    if (!fromChanneling && (!brain || !learned.includes(spell.id))) {
       emitSafe(world, 'spell:not-known', { actor, spellId: spell.id });
       world.remove(actor, CastSpellIntent);
       continue;
@@ -413,9 +327,7 @@ export function castSpellSystem(world) {
     const castTime = Number(resolvedSpell.castTime || 0) | 0;
     if (castTime > 0 && !fromChanneling) {
       const casterPos = world.get(actor, Position);
-      const channelTargetId = String(resolvedSpell.id || "") === "fishing"
-        ? (findReadyFishingSpotAt(world, intent.x, intent.y) || actor)
-        : (intent.targetId || actor);
+      const channelTargetId = intent.targetId || actor;
       try {
         world.add(actor, Channeling, {
           mode: "cast",
@@ -440,16 +352,6 @@ export function castSpellSystem(world) {
         x: intent.x ?? null,
         y: intent.y ?? null,
       });
-      if (String(resolvedSpell.id || "") === "fishing") {
-        emitSafe(world, "fishing:cast", {
-          actor,
-          itemId: fishingRodId,
-          x: intent.x ?? null,
-          y: intent.y ?? null,
-          turns: castTime,
-          spotId: channelTargetId !== actor ? channelTargetId : 0,
-        });
-      }
       world.remove(actor, CastSpellIntent);
       continue;
     }

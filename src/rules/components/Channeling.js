@@ -24,6 +24,7 @@ export const Channeling = defineComponent("Channeling", {
   staminaPerTick: 0,
   lifePerTick: 0,
   spellId: "",
+  itemActionId: "",
   targetId: 0,
   x: null,
   y: null,
