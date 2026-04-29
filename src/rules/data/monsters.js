@@ -432,6 +432,7 @@ export const MONSTERS = [
     },
     specials: ["Throws web (25%)", "Web spit", "Lunge (stagger)"],
     description: 'A skittish arachnid. It spins webs but lacks venom.',
+    lootTable: 'drop:spider',
   },
 
   {
@@ -1057,6 +1058,7 @@ export const MONSTERS = [
     },
     specials: ["Phase teleport (50%)", "Poison 30%", "Phase out 20%"],
     description: 'A shimmering spider that blinks in and out of existence, striking from impossible angles.',
+    lootTable: 'drop:spider',
   },
   {
     id: 'wight',
@@ -1133,6 +1135,7 @@ export const MONSTERS = [
     },
     specials: ["Web spit", "Poison 15%"],
     description: 'A dog-sized arachnid with venomous fangs.',
+    lootTable: 'drop:spider',
   },
 
   {
@@ -1836,6 +1839,7 @@ export const MONSTERS = [
     hooks: null,
     specials: [],
     description: 'A crusty growth clinging to the dungeon stone. Edible, if desperate.',
+    lootTable: 'drop:plant',
   },
   // ── Nymph (tier 0, minDepth 3) — item thief ───────────────────────
   {

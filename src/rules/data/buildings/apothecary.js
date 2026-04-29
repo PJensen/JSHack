@@ -70,6 +70,7 @@ export default {
   ],
   "spawns": [
     { "dx": -3, "dy": -3, "kind": "alchemy_bench" },
+    { "dx": 2, "dy": -3, "kind": "enchanting_bench" },
     { "dx": -3, "dy": -1, "kind": "herb_chest" },
     { "dx": -1, "dy": -4, "kind": "potion_shelf" },
     { "dx": 1, "dy": -4, "kind": "potion_shelf" },
@@ -82,7 +83,8 @@ export default {
   ],
   "waypoints": [
     { "dx": 0, "dy": 0, "name": "shop_door" },
-    { "dx": -3, "dy": -3, "name": "vendor_work" }
+    { "dx": -3, "dy": -3, "name": "vendor_work" },
+    { "dx": 1, "dy": -3, "name": "enchantress_work" }
   ],
   "rooms": [
     { "name": "shop", "roomType": "shop", "dx": -5, "dy": -5, "w": 10, "h": 6 }

@@ -157,6 +157,12 @@ export function generateAlchemyShopItem(world, rng) {
         { id: "potion_speed", weight: 5 },
         { id: "potion_acid", weight: 4 },
         { id: "potion_oil", weight: 4 },
+        { id: "reagent_resin", weight: 10 },
+        { id: "reagent_venom_gland", weight: 8 },
+        { id: "reagent_bone_dust", weight: 7 },
+        { id: "reagent_rune_fragment", weight: 7 },
+        { id: "reagent_frost_core", weight: 6 },
+        { id: "reagent_cursed_thread", weight: 6 },
     ]);
     if (!pick?.id) return stripPosition(world, createFrom(world, HealthPotion, {}));
     const itemId = createItemById(world, pick.id);
