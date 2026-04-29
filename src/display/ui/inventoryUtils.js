@@ -28,13 +28,23 @@ export function isInventoryItemUsable(it) {
 
 /**
  * @param {any} it
+ * @returns {boolean}
+ */
+export function shouldInventoryItemPreferApply(it) {
+  if (!it) return false;
+  if (!(it.canApply && Number(it.applyTargetCount || 0) > 0)) return false;
+  return it.type === 'scroll' || it.type === 'tool' || it.type === 'utility';
+}
+
+/**
+ * @param {any} it
  * @returns {"none"|"apply"|"equip"|"use"|"set-spell"}
  */
 export function getInventoryDefaultAction(it) {
   if (!it) return 'none';
   const canApply = !!it.canApply && Number(it.applyTargetCount || 0) > 0;
   if (isInventoryItemEquippable(it)) return 'equip';
-  if (canApply && (it.type === 'scroll' || it.type === 'tool' || it.type === 'utility')) return 'apply';
+  if (shouldInventoryItemPreferApply(it)) return 'apply';
   if (isInventoryItemUsable(it)) return 'use';
   if (canApply) return 'apply';
   if (it.type === 'spell') return 'set-spell';

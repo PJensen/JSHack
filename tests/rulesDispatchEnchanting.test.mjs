@@ -12,7 +12,7 @@ Deno.test("rulesDispatch: craftEnchant queues InteractIntent in enchant mode", (
   };
 
   const dispatch = makeRulesDispatcher(world, () => 77);
-  dispatch({ type: "rules.craftEnchant", payload: { benchId: 15, recipe: "Firestorm_Script" } });
+  dispatch({ type: "rules.craftEnchant", payload: { benchId: 15, recipe: "firestorm_script" } });
 
   assertEquals(addCalls.length, 1);
   assertEquals(addCalls[0]?.[0], 77);

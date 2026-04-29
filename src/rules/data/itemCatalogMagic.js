@@ -71,7 +71,7 @@ function createGearEnchantDipHook({ affixId, enchantType, enchantLabel, detail }
   const resolvedLabel = String(enchantLabel || resolvedType || "enchant");
   const resolvedDetail = String(detail || "");
   return (ctx, state) => {
-    const targetId = Number(state?.targetId || ctx.target || 0) | 0;
+    const targetId = Number(state?.targetId || 0) | 0;
     if (!(targetId > 0)) {
       ctx.cancel({
         code: "ENCHANT_INVALID_TARGET",
