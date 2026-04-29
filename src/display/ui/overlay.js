@@ -787,8 +787,10 @@ export function initOverlays() {
   // Enchanting bench overlay
   let _enchantingState = {
     benchId: 0,
-    ingredients: { emberRoot: 0, moonleaf: 0, thornPods: 0, venomFronds: 0, oil: 0, water: 0, gold: 0 },
+    ingredients: { emberRoot: 0, moonleaf: 0, thornPods: 0, venomFronds: 0, spiderLeg: 0, venomGland: 0, resin: 0, boneDust: 0, ectoplasm: 0, runeFragment: 0, frostCore: 0, beastClaw: 0, cursedThread: 0, oil: 0, water: 0, ashes: 0, gold: 0 },
     recipes: [],
+    title: "✧ Enchanting Bench",
+    subtitle: "Bind reagents and gold into a scroll, then apply it to your gear.",
   };
   window.addEventListener('ui:openEnchantingBench', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
@@ -830,8 +832,10 @@ export function initOverlays() {
       benchId: Number(d.benchId || _enchantingState.benchId || 0) | 0,
       ingredients: d.ingredients && typeof d.ingredients === 'object'
         ? d.ingredients
-        : { emberRoot: 0, moonleaf: 0, thornPods: 0, venomFronds: 0, oil: 0, water: 0, gold: 0 },
+        : { emberRoot: 0, moonleaf: 0, thornPods: 0, venomFronds: 0, spiderLeg: 0, venomGland: 0, resin: 0, boneDust: 0, ectoplasm: 0, runeFragment: 0, frostCore: 0, beastClaw: 0, cursedThread: 0, oil: 0, water: 0, ashes: 0, gold: 0 },
       recipes: Array.isArray(d.recipes) ? d.recipes : [],
+      title: String(d.title || _enchantingState.title || "✧ Enchanting Bench"),
+      subtitle: String(d.subtitle || _enchantingState.subtitle || "Bind reagents and gold into a scroll, then apply it to your gear."),
     };
     renderEnchantingBench(alchemy, _enchantingState);
   });

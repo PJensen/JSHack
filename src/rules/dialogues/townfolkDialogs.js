@@ -309,7 +309,7 @@ function barkeepQuest(world, actorId) {
 }
 
 for (const def of Object.values(TOWNFOLK)) {
-  if (def.role === "priest" || def.role === "barkeep") continue;
+  if (def.role === "priest" || def.role === "barkeep" || def.role === "enchantress") continue;
   registerDialog({
     id: `townfolk:${def.role}`,
     start: "root",
@@ -323,6 +323,68 @@ for (const def of Object.values(TOWNFOLK)) {
     },
   });
 }
+
+registerDialog({
+  id: "townfolk:enchantress",
+  start: "root",
+  presentation: "overlay",
+  nodes: {
+    root: {
+      text: (ctx) => ambientTownfolkText(TOWNFOLK.enchantress, ctx),
+      choices: [
+        {
+          id: "open_services",
+          label: "Show me your enchanting services.",
+          emits: [{
+            name: "enchanting:openRequest",
+            payload: (ctx) => ({
+              actorId: ctx.actorId,
+              targetId: ctx.targetId,
+              title: "✧ Enchantress",
+              subtitle: "Bring themed reagents, gold, and the gear you want changed forever.",
+            }),
+          }],
+          close: true,
+        },
+        { id: "ask_reagents", label: "What reagents are you after?", to: "reagents" },
+        { id: "ask_work", label: "What bindings can you make?", to: "services" },
+        { id: "leave", label: "Goodbye.", close: true },
+      ],
+    },
+    reagents: {
+      text: "Spider legs and venom glands for poisons. Ash, runes, and ember root for fire. Moonleaf, water, and frost cores for cold. Bone dust, resin, and cursed thread keep wards from slipping loose.",
+      choices: [
+        { id: "services", label: "And the bindings?", to: "services" },
+        { id: "open_services", label: "Let's start enchanting.", emits: [{
+          name: "enchanting:openRequest",
+          payload: (ctx) => ({
+            actorId: ctx.actorId,
+            targetId: ctx.targetId,
+            title: "✧ Enchantress",
+            subtitle: "Pick a binding, pay the gold, and I'll give you a scroll worth using.",
+          }),
+        }], close: true },
+        { id: "leave", label: "Later.", close: true },
+      ],
+    },
+    services: {
+      text: "Venom for blades. Fire and frost for killing edges. Wards for armor, shields, rings, and amulets. I bind the scroll; you decide what piece earns it.",
+      choices: [
+        { id: "open_services", label: "Make me a scroll.", emits: [{
+          name: "enchanting:openRequest",
+          payload: (ctx) => ({
+            actorId: ctx.actorId,
+            targetId: ctx.targetId,
+            title: "✧ Enchantress",
+            subtitle: "Choose the binding you want and I'll scribe the scroll if you've brought the price.",
+          }),
+        }], close: true },
+        { id: "reagents", label: "Remind me of the materials.", to: "reagents" },
+        { id: "leave", label: "That's enough for now.", close: true },
+      ],
+    },
+  },
+});
 
 registerDialog({
   id: "townfolk:barkeep",

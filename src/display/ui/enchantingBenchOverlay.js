@@ -3,8 +3,18 @@ const INGREDIENT_LABELS = Object.freeze({
   moonleaf: "Moonleaf",
   thornPods: "Thorn Pods",
   venomFronds: "Venom Fronds",
+  spiderLeg: "Spider Leg",
+  venomGland: "Venom Gland",
+  resin: "Binding Resin",
+  boneDust: "Bone Dust",
+  ectoplasm: "Ectoplasm",
+  runeFragment: "Rune Fragment",
+  frostCore: "Frost Core",
+  beastClaw: "Beast Claw",
+  cursedThread: "Cursed Thread",
   oil: "Flask of Oil",
   water: "Water Flask",
+  ashes: "Ashes",
   gold: "Gold",
 });
 
@@ -45,7 +55,7 @@ export function renderEnchantingBench(panel, state) {
   el.innerHTML = "";
 
   const title = document.createElement("div");
-  title.textContent = "✧ Enchanting Bench";
+  title.textContent = String(state?.title || "✧ Enchanting Bench");
   Object.assign(title.style, {
     fontWeight: "bold",
     marginBottom: "8px",
@@ -55,7 +65,7 @@ export function renderEnchantingBench(panel, state) {
   el.appendChild(title);
 
   const subtitle = document.createElement("div");
-  subtitle.textContent = "Bind reagents and gold into a scroll, then apply it to your gear.";
+  subtitle.textContent = String(state?.subtitle || "Bind reagents and gold into a scroll, then apply it to your gear.");
   Object.assign(subtitle.style, {
     opacity: "0.86",
     marginBottom: "10px",
