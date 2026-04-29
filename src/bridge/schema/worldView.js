@@ -73,12 +73,12 @@ import {
 /** @typedef {{ id:number, x:number, y:number }} SolidView */
 /** @typedef {{ x:number, y:number, kind:string, alpha:number, burning?:boolean, smoking?:boolean }} RoofTileView */
 /** @typedef {{ id:number, profile:string, pos:{x:number,y:number}, interior:boolean }} AudioEmitterView */
-/** @typedef {{ turn:number, seed:number, player: { id:number, pos:{x:number,y:number} } | null, entities: EntityView[], solids: SolidView[], emissives: any[], audioEmitters: AudioEmitterView[], roofs: RoofTileView[], tileGrid: any, isVisible: ((x:number,y:number)=>boolean)|null, isExplored: ((x:number,y:number)=>boolean)|null, currentDepth?: number }} WorldView */
+/** @typedef {{ turn:number, seed:number, player: { id:number, pos:{x:number,y:number} } | null, entities: EntityView[], solids: SolidView[], emissives: any[], audioEmitters: AudioEmitterView[], roofs: RoofTileView[], fisheries: any[], tileGrid: any, isVisible: ((x:number,y:number)=>boolean)|null, isExplored: ((x:number,y:number)=>boolean)|null, currentDepth?: number }} WorldView */
 
 /** @typedef {{ id:number, text:string, profane:boolean, pos:{x:number,y:number} }} EngravingView */
 
 /** @type {WorldView} */
-const _view = { turn: 0, seed: 0, player: null, entities: [], solids: [], emissives: [], audioEmitters: [], roofs: [], engravings: [], tileGrid: null, isVisible: null, isExplored: null, isBlockedVision: null, weather: "clear", playerSheltered: false, nightAlpha: 0, dawnAlpha: 0, duskAlpha: 0, isOverworld: false, currentDepth: 0, turnInDay: 0, moonBrightness: 0, playerVisionRadius: 0, playerFacing: null, playerConeDegrees: 360, perceptionState: null };
+const _view = { turn: 0, seed: 0, player: null, entities: [], solids: [], emissives: [], audioEmitters: [], roofs: [], fisheries: [], engravings: [], tileGrid: null, isVisible: null, isExplored: null, isBlockedVision: null, weather: "clear", playerSheltered: false, nightAlpha: 0, dawnAlpha: 0, duskAlpha: 0, isOverworld: false, currentDepth: 0, turnInDay: 0, moonBrightness: 0, playerVisionRadius: 0, playerFacing: null, playerConeDegrees: 360, perceptionState: null };
 let _lastPerceptionWorld = null;
 /** @type {Map<number, EntityView>} */
 const _entityRecs = new Map();   // id -> { id, kind, pos:{x,y}, tags:[] }
@@ -831,6 +831,7 @@ export function buildWorldView(world) {
 	_view.emissives.length = 0;
 	_view.audioEmitters.length = 0;
 	_view.roofs.length = 0;
+	_view.fisheries.length = 0;
 	_view.engravings.length = 0;
 	_view.weather = "clear";
 	_view.playerSheltered = false;
@@ -935,6 +936,19 @@ export function buildWorldView(world) {
 
 	_view.isVisible = isVisible;
 	_view.isExplored = isExplored;
+	for (const [id, pos, node] of world.query(Position, HarvestNode)) {
+		if (String(node?.kind || "") !== "fishing_spot") continue;
+		if (typeof isVisible === "function" && !isVisible(pos.x, pos.y)) continue;
+		const pressure = Math.max(0, Number(node.fishingPressure || 0) | 0);
+		_view.fisheries.push({
+			id,
+			x: pos.x | 0,
+			y: pos.y | 0,
+			ready: node.ready === true,
+			overfished: node.overfished === true || pressure >= 4,
+			pressure,
+		});
+	}
 	const playerFactionKey = _view.player ? String(world.get(_view.player.id, Faction)?.key || "player").trim().toLowerCase() : "";
 	const perceptionState = _view.player
 		? readPlayerPerceptionState(world, _view.player.id)
