@@ -5,10 +5,9 @@ import { createCorpse } from "../src/rules/archetypes/Food.js";
 import { buildCatalogItem } from "../src/rules/data/itemCatalogLoader.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 import { UseIntent } from "../src/rules/components/Intents/UseIntent.js";
-import { CastSpellIntent } from "../src/rules/components/Intents/CastSpellIntent.js";
 import { useItemSystem } from "../src/rules/systems/useItemSystem.js";
-import { castSpellSystem } from "../src/rules/systems/castSpellSystem.js";
-import { channelingSystem, installFishingCastRequestListener } from "../src/rules/systems/channelingSystem.js";
+import { channelingSystem } from "../src/rules/systems/channelingSystem.js";
+import { installFishingAction } from "../src/rules/content/useActions/fishingAction.js";
 import { harvestRegrowthSystem } from "../src/rules/systems/harvestRegrowthSystem.js";
 import { addToInventory } from "../src/rules/utils/inventoryFacade.js";
 import { Equipment } from "../src/rules/components/Equipment.js";
@@ -27,7 +26,7 @@ import { installContent } from "../src/content/install.js";
 installContent();
 
 function installFishingAbilityRuntime(world, actor) {
-  installFishingCastRequestListener(world);
+  installFishingAction(world);
   installContentAbilityHandler({
     world,
     targeting: { openEnemyTargeting() {} },
@@ -137,13 +136,13 @@ Deno.test("fishing is a targeted channeled spell that requires water", () => {
   addToInventory(world, actor, rod);
   world.set(actor, Equipment, { ...world.get(actor, Equipment), weapon: rod });
 
+  installFishingAction(world);
   const casts = [];
   const caught = [];
   world.on("fishing:cast", (ev) => casts.push(ev));
   world.on("fishing:caught", (ev) => caught.push(ev));
 
-  world.add(actor, CastSpellIntent, { spellId: "fishing", targetId: actor, x: 2, y: 0 });
-  castSpellSystem(world);
+  world.emit("fishing:cast:request", { actor, itemId: rod, turns: 12, x: 2, y: 0 });
 
   assert(world.has(actor, Channeling), "fishing spell should start a channel");
   assertEquals(casts[0]?.x, 2);
@@ -192,12 +191,12 @@ Deno.test("fishing spots use special loot, exhaust, and replenish on cooldown", 
   const casts = [];
   const caught = [];
   const exhausted = [];
+  installFishingAction(world);
   world.on("fishing:cast", (ev) => casts.push(ev));
   world.on("fishing:caught", (ev) => caught.push(ev));
   world.on("fishing:spot:exhausted", (ev) => exhausted.push(ev));
 
-  world.add(actor, CastSpellIntent, { spellId: "fishing", targetId: actor, x: 2, y: 0 });
-  castSpellSystem(world);
+  world.emit("fishing:cast:request", { actor, itemId: rod, turns: 12, x: 2, y: 0 });
 
   assertEquals(casts[0]?.spotId, spot);
   assertEquals(world.get(actor, Channeling)?.targetId, spot);
@@ -240,11 +239,11 @@ Deno.test("fishing loot context records rain, tile profile, and repeat pressure"
   addToInventory(world, actor, rod);
   world.set(actor, Equipment, { ...world.get(actor, Equipment), weapon: rod });
 
+  installFishingAction(world);
   const caught = [];
   world.on("fishing:caught", (ev) => caught.push(ev));
 
-  world.add(actor, CastSpellIntent, { spellId: "fishing", targetId: actor, x: 2, y: 0 });
-  castSpellSystem(world);
+  world.emit("fishing:cast:request", { actor, itemId: rod, turns: 12, x: 2, y: 0 });
   for (let i = 0; i < 12; i++) channelingSystem(world);
 
   assertEquals(caught[0]?.raining, true);
@@ -252,15 +251,13 @@ Deno.test("fishing loot context records rain, tile profile, and repeat pressure"
   assertEquals(caught[0]?.pressureBefore, 0);
   assertEquals(caught[0]?.pressureAfter, 1);
 
-  world.add(actor, CastSpellIntent, { spellId: "fishing", targetId: actor, x: 2, y: 0 });
-  castSpellSystem(world);
+  world.emit("fishing:cast:request", { actor, itemId: rod, turns: 12, x: 2, y: 0 });
   for (let i = 0; i < 12; i++) channelingSystem(world);
 
   assertEquals(caught[1]?.pressureBefore, 1);
   assertEquals(caught[1]?.pressureAfter, 2);
 
-  world.add(actor, CastSpellIntent, { spellId: "fishing", targetId: actor, x: 3, y: 0 });
-  castSpellSystem(world);
+  world.emit("fishing:cast:request", { actor, itemId: rod, turns: 12, x: 3, y: 0 });
   for (let i = 0; i < 12; i++) channelingSystem(world);
 
   assertEquals(caught[2]?.tileProfile, "marsh");
@@ -282,14 +279,14 @@ Deno.test("fishing spell refuses non-water tiles", () => {
   addToInventory(world, actor, rod);
   world.set(actor, Equipment, { ...world.get(actor, Equipment), weapon: rod });
 
+  installFishingAction(world);
   const cancelled = [];
   world.on("item:use-cancelled", (ev) => cancelled.push(ev));
 
-  world.add(actor, CastSpellIntent, { spellId: "fishing", targetId: actor, x: 1, y: 0 });
-  castSpellSystem(world);
+  world.emit("fishing:cast:request", { actor, itemId: rod, turns: 12, x: 1, y: 0 });
 
   assertEquals(world.has(actor, Channeling), false);
-  assertEquals(cancelled[0]?.code, "FISHING_NO_WATER_TARGET");
+  assertEquals(cancelled[0]?.code, "FISHING_NO_WATER");
 });
 
 Deno.test("fishing rod use requires the rod to be equipped", () => {

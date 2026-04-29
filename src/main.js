@@ -326,6 +326,7 @@ import './content/items/fishingRod.js';
 import './content/items/lodbrokSerpentBoundBreeches.js';
 import './content/monsters/barrowWight.js';
 import { installContent } from './content/install.js';
+import { getChannelAction } from './rules/content/useActions/useActionRegistry.js';
 installContent();
 
 // Initialize identification & gem pricing for this game run
@@ -416,27 +417,7 @@ world.on("died", ({ id }) => {
 // --- Active spell selection (app-side state) ---------------------------------
 /** @type {string|null} */
 let _activeSpellId = null;
-function isFishableTile(tile) {
-  return tile === TILE_WATER
-    || tile === TILE_WATER_DEEP
-    || tile === TILE_SHALLOW_WATER
-    || tile === TILE_KELP_FOREST
-    || tile === TILE_SEAGRASS
-    || tile === TILE_CORAL_REEF;
-}
-
 const TARGETED_SPELL_CONFIG = Object.freeze({
-  fishing: Object.freeze({
-    fallbackRange: 6,
-    requiresLOS: true,
-    requiresVisible: false,
-    validateTarget(x, y) {
-      return isFishableTile(getTile(x | 0, y | 0)) ? null : 'Fishing must target a water tile.';
-    },
-    describePrompt(range) {
-      return `Choose water for Fishing (range ${range}). Tap a water tile or use arrow keys + Enter. Esc to cancel.`;
-    },
-  }),
   blink: Object.freeze({
     fallbackRange: 10,
     requiresLOS: false,
@@ -1461,32 +1442,28 @@ function buildQuickItemPinDetailFromWorld(itemId) {
   };
 }
 
-function tryOpenFishingTargeterFromRod(itemId) {
+function tryOpenItemChannelTargeter(itemId) {
   const id = Number(itemId || 0) | 0;
   if (!(id > 0)) return false;
   const identity = String(world.get(id, NamedIdentity)?.identity || '');
-  if (identity !== 'fishing_rod') return false;
+  const action = getChannelAction(identity);
+  if (!action?.targeting) return false;
 
   const pe = playerEntity(world);
   if (!pe?.id) return true;
-  const eq = world.get(pe.id, Equipment);
-  if (!getEquippedSlot(eq, id)) {
-    try { messageLog.log({ text: 'Equip the fishing rod before casting.', type: 'warning' }); } catch {}
-    return true;
-  }
-
-  const spell = getSpell('fishing');
-  const cfg = getTargetedSpellConfig('fishing');
-  const range = Math.max(1, Number(spell?.range || cfg?.fallbackRange || 6) | 0);
+  const cfg = action.targeting;
+  const range = Math.max(1, Number(cfg.fallbackRange || 6) | 0);
   targeting.cancelAll();
   targeting.openSpellTargeting({
-    spellId: 'fishing',
-    spellName: 'Fishing',
+    spellName: cfg.name || identity,
     range,
-    requiresLOS: cfg?.requiresLOS === true,
-    requiresVisible: cfg?.requiresVisible === true,
-    validateTarget: cfg?.validateTarget,
-  }, cfg?.describePrompt ? cfg.describePrompt(range) : `Choose water for Fishing (range ${range}).`);
+    requiresLOS: cfg.requiresLOS === true,
+    requiresVisible: cfg.requiresVisible === true,
+    validateTarget: cfg.validateTarget,
+    onConfirm(x, y) {
+      if (typeof cfg.onConfirm === 'function') cfg.onConfirm(world, pe.id, id, x, y);
+    },
+  }, cfg.describePrompt ? cfg.describePrompt(range) : `Use ${cfg.name || identity} (range ${range}).`);
   return true;
 }
 
@@ -2187,7 +2164,7 @@ addEventListener('ui:requestUse', (ev) => {
   const e = ev;
   const itemId = e?.detail?.itemId;
   if (!Number.isInteger(itemId)) return;
-  if (tryOpenFishingTargeterFromRod(itemId)) return;
+  if (tryOpenItemChannelTargeter(itemId)) return;
   const action = { type: 'rules.useItem', payload: { itemId } };
   const rulesHandler = makeRulesDispatcher(world, () => (playerEntity(world)?.id || 0));
   rulesHandler(action);
