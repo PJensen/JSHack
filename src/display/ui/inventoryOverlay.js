@@ -4,7 +4,7 @@ import {
   hide, hideItemTooltip, rarityStyle, renderItemDetails,
   installDetachableKeyHandler, pulseRow,
 } from './overlayUtils.js';
-import { getInventoryDefaultAction, isInventoryItemEquippable, isInventoryItemUsable, shouldInventoryItemPreferApply } from './inventoryUtils.js';
+import { getInventoryDefaultAction, isInventoryItemEquippable, isInventoryItemUsable } from './inventoryUtils.js';
 
 /** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Array<any>} items @param {any} [ground] @param {string} [slotFilter] */
 export function renderInventory(panel, items, ground, slotFilter = '', scrollOfIdentifyId = 0, encumbrance = null, pinnedKeys = []) {
@@ -431,7 +431,7 @@ export function renderInventory(panel, items, ground, slotFilter = '', scrollOfI
       return;
     }
     if (actionKey === 'use') {
-      if (shouldInventoryItemPreferApply(it)) {
+      if (getInventoryDefaultAction(it) === 'apply') {
         triggerApplyForTool(it);
         return;
       }
