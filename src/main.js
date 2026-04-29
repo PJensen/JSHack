@@ -672,6 +672,9 @@ function classifySurfaceTile(tile) {
     case TILE_SHALLOW_WATER: return SURFACE_TILE_KINDS.waterShallow;
     case TILE_WATER: return SURFACE_TILE_KINDS.water;
     case TILE_WATER_DEEP: return SURFACE_TILE_KINDS.waterDeep;
+    case TILE_KELP_FOREST: return SURFACE_TILE_KINDS.waterDeep;
+    case TILE_SEAGRASS: return SURFACE_TILE_KINDS.waterShallow;
+    case TILE_CORAL_REEF: return SURFACE_TILE_KINDS.waterShallow;
     case TILE_LAVA: return SURFACE_TILE_KINDS.lava;
     default: return null;
   }

@@ -540,22 +540,20 @@ export function createSurfaceAreaFxController({ getFxTime, classifySurfaceTile, 
     _waterRipples = nextRipples;
 
     const seenFisheryIds = new Set();
-    const entities = Array.isArray(worldView?.entities) ? worldView.entities : [];
-    for (let i = 0; i < entities.length; i++) {
-      const entity = entities[i];
-      if (String(entity?.kind || "") !== "fishing_spot") continue;
-      const tags = Array.isArray(entity.tags) ? entity.tags : [];
-      const id = Number(entity.id || 0) | 0;
-      const x = Number(entity?.pos?.x || 0) | 0;
-      const y = Number(entity?.pos?.y || 0) | 0;
+    const fisheries = Array.isArray(worldView?.fisheries) ? worldView.fisheries : [];
+    for (let i = 0; i < fisheries.length; i++) {
+      const fishery = fisheries[i];
+      const id = Number(fishery.id || 0) | 0;
+      const x = Number(fishery.x || 0) | 0;
+      const y = Number(fishery.y || 0) | 0;
       const key = cellKey(x, y);
       seenFisheryIds.add(id);
       const cell = waterCellByKey.get(key);
-      if (!cell || tags.includes("fishing_spot_depleted") || tags.includes("fishing_pressure_overfished")) {
+      if (!cell || fishery.ready !== true || fishery.overfished === true) {
         _fisheryRippleAccum.delete(id);
         continue;
       }
-      const pressureMedium = tags.includes("fishing_pressure_medium");
+      const pressureMedium = Number(fishery.pressure || 0) >= 2;
       const rate = pressureMedium ? 1.8 : 4.5;
       let acc = (_fisheryRippleAccum.has(id) ? Number(_fisheryRippleAccum.get(id) || 0) : 1)
         + Math.max(0, Number(dtSec) || 0) * rate;
