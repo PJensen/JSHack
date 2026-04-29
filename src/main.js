@@ -5108,8 +5108,8 @@ function render(worldView) {
   _rpStage("weather_roofs");
   weatherFx.tick(_dtSec, effectiveWeather, { vx0, vx1, vy0, vy1 }, cam);
   weatherFx.draw(bctx, cam);
-  if (typeof statusEmitterFx.drawFishingDroplets === "function") {
-    statusEmitterFx.drawFishingDroplets(bctx);
+  if (typeof statusEmitterFx.drawFishingRipples === "function") {
+    statusEmitterFx.drawFishingRipples(bctx);
   }
 
   _roofCoverKeys.clear();
