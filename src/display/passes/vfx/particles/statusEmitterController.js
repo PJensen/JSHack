@@ -23,7 +23,6 @@ export function createStatusEmitterController({ world, fx }) {
   const furnaceEmitters = new Set();
   const cookFireEmitters = new Set();
   const torchEmitters = new Set();
-  const fishingSpotEmitters = new Set();
   const familiarEmitters = new Set();
   const weaponProfileEmitterKeys = new Set();
   const familiarCooldowns = new Set();
@@ -31,8 +30,6 @@ export function createStatusEmitterController({ world, fx }) {
   const seenEmitterKeys = new Set();
   const origins = [];
   const lightProbes = [];
-  const fishingRipples = [];
-  const fishingRippleAccumulators = new Map();
   let _fxTime = 0;
 
   function computeCarryOrigin(entity, slot, carryAnchor) {
@@ -84,7 +81,6 @@ export function createStatusEmitterController({ world, fx }) {
     furnace: { tracker: furnaceEmitters, prefix: "furnace", cfg: { continuous: true, rate: 22, angle: -Math.PI / 2, spread: Math.PI / 5, speed: 0.9, speedJitter: 0.3, ax: 0, ay: -0.1, life: 0.65, lifeJitter: 0.2, size: 0.42, sizeEnd: 0.04, color: "#ff6600", alpha0: 0.88, alpha1: 0.0, offsetX: 0, offsetY: -0.3 } },
     cooking_fire: { tracker: cookFireEmitters, prefix: "cfire", cfg: { continuous: true, rate: 14, angle: -Math.PI / 2, spread: Math.PI / 3, speed: 0.65, speedJitter: 0.3, ax: 0, ay: -0.05, life: 0.9, lifeJitter: 0.3, size: 0.35, sizeEnd: 0.04, color: "#ff8800", alpha0: 0.75, alpha1: 0.0, offsetX: 0, offsetY: 0 } },
     torch: { tracker: torchEmitters, prefix: "torch", cfg: { continuous: true, rate: 10, angle: -Math.PI / 2, spread: Math.PI / 6, speed: 0.5, speedJitter: 0.4, ax: 0, ay: -0.9, life: 0.6, lifeJitter: 0.3, size: 0.22, sizeEnd: 0.03, color: "#ffaa33", alpha0: 0.85, alpha1: 0.0, offsetX: 0, offsetY: -0.2 } },
-    fishing_spot: { tracker: fishingSpotEmitters, prefix: "fishspot", cfg: {} },
     familiar: { tracker: familiarEmitters, prefix: "fam", cfg: { continuous: true, rate: 8, angle: -Math.PI / 2, spread: Math.PI / 3, speed: 0.45, speedJitter: 0.25, ax: 0, ay: -0.15, life: 0.55, lifeJitter: 0.2, size: 0.18, sizeEnd: 0.03, color: "#ff6600", alpha0: 0.7, alpha1: 0.0, offsetX: -0.2, offsetY: -0.1 } },
   };
 
@@ -122,54 +118,11 @@ export function createStatusEmitterController({ world, fx }) {
     });
   }
 
-  function pressureRippleRate(entity) {
-    if (!Array.isArray(entity?.tags)) return 0;
-    if (!entity.tags.includes("fishing_spot_ready")) return 0;
-    if (entity.tags.includes("fishing_pressure_overfished")) return 0;
-    if (entity.tags.includes("fishing_pressure_medium")) return 0.9;
-    return 2.3;
-  }
-
-  function spawnFishingRipples(dtSec, entity, fxTime) {
-    const rate = pressureRippleRate(entity);
-    const id = Number(entity?.id || 0) | 0;
-    if (!(id > 0) || rate <= 0) {
-      fishingRippleAccumulators.delete(id);
-      return;
-    }
-    const phase = Number(fxTime || 0) * 1.7 + id * 0.41;
-    const key = id;
-    let acc = Number(fishingRippleAccumulators.get(key) || 0);
-    acc += dtSec * rate;
-    while (acc >= 1) {
-      acc -= 1;
-      const pressureMedium = Array.isArray(entity.tags) && entity.tags.includes("fishing_pressure_medium");
-      const life = 0.42 + Math.random() * 0.22;
-      const ox = (Math.random() - 0.5) * 0.62;
-      const oy = (Math.random() - 0.5) * 0.46;
-      fishingRipples.push({
-        x: Number(entity.pos.x || 0) + ox,
-        y: Number(entity.pos.y || 0) + oy + Math.sin(phase) * 0.04,
-        ttl: life,
-        max: life,
-        radius0: 0.025 + Math.random() * 0.035,
-        radius1: pressureMedium ? (0.12 + Math.random() * 0.10) : (0.18 + Math.random() * 0.18),
-        alpha: pressureMedium ? 0.15 : 0.26,
-      });
-      if (fishingRipples.length > 48) fishingRipples.splice(0, fishingRipples.length - 48);
-    }
-    fishingRippleAccumulators.set(key, acc);
-  }
-
   function step(dtSec, view, fxTime) {
     _fxTime = Number(fxTime || 0);
     origins.length = 0;
     lightProbes.length = 0;
     seenEmitterKeys.clear();
-    for (let i = fishingRipples.length - 1; i >= 0; i--) {
-      fishingRipples[i].ttl -= dtSec;
-      if (fishingRipples[i].ttl <= 0) fishingRipples.splice(i, 1);
-    }
     const isVisibleAt = (typeof view?.isVisible === "function") ? view.isVisible : null;
     for (let i = 0; i < view.entities.length; i++) {
       const e = view.entities[i];
@@ -250,13 +203,6 @@ export function createStatusEmitterController({ world, fx }) {
       if (kc) {
         if (e.kind === "fountain" && dryFountains.has(e.id)) continue;
         if (e.kind === "familiar" && familiarCooldowns.has(e.id)) continue;
-        if (e.kind === "fishing_spot" && (!Array.isArray(e.tags) || !e.tags.includes("fishing_spot_ready") || e.tags.includes("fishing_pressure_overfished"))) continue;
-        if (e.kind === "fishing_spot") {
-          spawnFishingRipples(dtSec, e, fxTime);
-          seenEmitterKeys.add(`${kc.prefix}:${e.id}`);
-          if (!kc.tracker.has(e.id)) kc.tracker.add(e.id);
-          continue;
-        }
         const key = `${kc.prefix}:${e.id}`;
         seenEmitterKeys.add(key);
         const emitter = fx.ensureEmitter(key, kc.cfg);
@@ -305,30 +251,6 @@ export function createStatusEmitterController({ world, fx }) {
     fx.step(dtSec, origins);
   }
 
-  function drawFishingRipples(ctx) {
-    if (!ctx || fishingRipples.length === 0) return;
-    ctx.save();
-    ctx.globalCompositeOperation = "source-over";
-    for (let i = 0; i < fishingRipples.length; i++) {
-      const ripple = fishingRipples[i];
-      const p = Math.max(0, Math.min(1, 1 - (ripple.ttl / ripple.max)));
-      const alpha = Math.max(0, (1 - p) * ripple.alpha);
-      if (alpha <= 0.003) continue;
-      const radius = Math.max(0, ripple.radius0 + (ripple.radius1 - ripple.radius0) * p);
-      ctx.strokeStyle = `rgba(220,246,255,${alpha.toFixed(3)})`;
-      ctx.lineWidth = 0.035 + (1 - p) * 0.015;
-      ctx.beginPath();
-      ctx.arc(ripple.x, ripple.y, radius, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.strokeStyle = `rgba(120,190,255,${(alpha * 0.55).toFixed(3)})`;
-      ctx.lineWidth = 0.022;
-      ctx.beginPath();
-      ctx.arc(ripple.x, ripple.y, Math.max(0.02, radius * 0.62), 0, Math.PI * 2);
-      ctx.stroke();
-    }
-    ctx.restore();
-  }
-
   function getActiveLights() {
     const out = [];
     for (let i = 0; i < lightProbes.length; i++) {
@@ -358,5 +280,5 @@ export function createStatusEmitterController({ world, fx }) {
     return out;
   }
 
-  return { installListeners, step, drawFishingRipples, getActiveLights };
+  return { installListeners, step, getActiveLights };
 }

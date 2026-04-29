@@ -23,6 +23,37 @@ function rippleProgress(ripple) {
   return ripple?.max > 0 ? clamp01(1 - (ripple.ttl / ripple.max)) : 1;
 }
 
+function drawWaterRipple(ctx, ripple, alphaScale = 1) {
+  const p = rippleProgress(ripple);
+  const alpha = Math.max(0, (1 - p) * Number(ripple.alpha || 0) * alphaScale);
+  if (alpha <= 0.003) return;
+  const radius = Math.max(0, Number(ripple.radius0 || 0) + (Number(ripple.radius1 || 0) - Number(ripple.radius0 || 0)) * p);
+  const rings = Math.max(2, Number(ripple.rings || 2) | 0);
+  ctx.strokeStyle = rings >= 3
+    ? `rgba(235,252,255,${alpha.toFixed(3)})`
+    : `rgba(220,246,255,${alpha.toFixed(3)})`;
+  ctx.lineWidth = rings >= 3 ? 0.050 + (1 - p) * 0.020 : 0.035 + (1 - p) * 0.015;
+  ctx.beginPath();
+  ctx.arc(ripple.x, ripple.y, radius, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.strokeStyle = rings >= 3
+    ? `rgba(135,210,255,${(alpha * 0.70).toFixed(3)})`
+    : `rgba(120,190,255,${(alpha * 0.55).toFixed(3)})`;
+  ctx.lineWidth = rings >= 3 ? 0.034 : 0.022;
+  ctx.beginPath();
+  ctx.arc(ripple.x, ripple.y, Math.max(0.02, radius * 0.62), 0, Math.PI * 2);
+  ctx.stroke();
+
+  if (rings >= 3) {
+    ctx.strokeStyle = `rgba(255,255,255,${(alpha * 0.42).toFixed(3)})`;
+    ctx.lineWidth = 0.020;
+    ctx.beginPath();
+    ctx.arc(ripple.x, ripple.y, Math.max(0.015, radius * 0.34), 0, Math.PI * 2);
+    ctx.stroke();
+  }
+}
+
 function hash32(a, b = 0, c = 0, d = 0) {
   let h = 2166136261 >>> 0;
   h ^= a | 0; h = Math.imul(h, 16777619);
@@ -339,20 +370,7 @@ function drawWaterRegion(ctx, region, fxTime, ripples, quality) {
     ctx.globalCompositeOperation = "source-over";
     for (let i = 0; i < ripples.length; i++) {
       const ripple = ripples[i];
-      const p = rippleProgress(ripple);
-      const alpha = Math.max(0, (1 - p) * ripple.alpha);
-      if (alpha <= 0.003) continue;
-      const radius = Math.max(0, ripple.radius0 + (ripple.radius1 - ripple.radius0) * p);
-      ctx.strokeStyle = `rgba(220,246,255,${alpha.toFixed(3)})`;
-      ctx.lineWidth = 0.035 + (1 - p) * 0.015;
-      ctx.beginPath();
-      ctx.arc(ripple.x, ripple.y, radius, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.strokeStyle = `rgba(120,190,255,${(alpha * 0.55).toFixed(3)})`;
-      ctx.lineWidth = 0.022;
-      ctx.beginPath();
-      ctx.arc(ripple.x, ripple.y, Math.max(0.02, radius * 0.62), 0, Math.PI * 2);
-      ctx.stroke();
+      drawWaterRipple(ctx, ripple, ripple.rings >= 3 ? 1 : 0.55);
     }
   }
 
@@ -446,9 +464,10 @@ export function createSurfaceAreaFxController({ getFxTime, classifySurfaceTile, 
   /** @type {ReturnType<typeof extractSurfaceRegions>} */
   let _regions = [];
   let _regionCacheKey = "";
-  /** @type {Array<{ x:number, y:number, ttl:number, max:number, radius0:number, radius1:number, alpha:number, cellKey:string }>} */
+  /** @type {Array<{ x:number, y:number, ttl:number, max:number, radius0:number, radius1:number, alpha:number, cellKey:string, rings?:number }>} */
   let _waterRipples = [];
   let _rainAccum = 0;
+  const _fisheryRippleAccum = new Map();
 
   // Lava particles
   /** @type {Array<{ x:number, y:number, r:number, ttl:number, max:number, cellKey:string }>} */
@@ -500,6 +519,47 @@ export function createSurfaceAreaFxController({ getFxTime, classifySurfaceTile, 
       nextRipples.push(ripple);
     }
     _waterRipples = nextRipples;
+
+    const seenFisheryIds = new Set();
+    const entities = Array.isArray(worldView?.entities) ? worldView.entities : [];
+    for (let i = 0; i < entities.length; i++) {
+      const entity = entities[i];
+      if (String(entity?.kind || "") !== "fishing_spot") continue;
+      const tags = Array.isArray(entity.tags) ? entity.tags : [];
+      const id = Number(entity.id || 0) | 0;
+      const x = Number(entity?.pos?.x || 0) | 0;
+      const y = Number(entity?.pos?.y || 0) | 0;
+      const key = cellKey(x, y);
+      seenFisheryIds.add(id);
+      if (!tags.includes("fishing_spot_ready") || tags.includes("fishing_pressure_overfished") || !waterKeys.has(key)) {
+        _fisheryRippleAccum.delete(id);
+        continue;
+      }
+      const pressureMedium = tags.includes("fishing_pressure_medium");
+      const rate = pressureMedium ? 1.8 : 4.5;
+      let acc = Number(_fisheryRippleAccum.get(id) || 0) + Math.max(0, Number(dtSec) || 0) * rate;
+      const phase = Number(getFxTime?.() || 0) * 1.7 + id * 0.41;
+      while (acc >= 1) {
+        acc -= 1;
+        const life = 0.62 + Math.random() * 0.22;
+        _waterRipples.push({
+          x: x + (Math.random() - 0.5) * 0.58,
+          y: y + (Math.random() - 0.5) * 0.42 + Math.sin(phase) * 0.04,
+          ttl: life,
+          max: life,
+          radius0: 0.035 + Math.random() * 0.045,
+          radius1: pressureMedium ? (0.24 + Math.random() * 0.12) : (0.34 + Math.random() * 0.20),
+          alpha: pressureMedium ? 0.34 : 0.58,
+          cellKey: key,
+          rings: 3,
+        });
+        if (_waterRipples.length > 128) _waterRipples.splice(0, _waterRipples.length - 128);
+      }
+      _fisheryRippleAccum.set(id, acc);
+    }
+    for (const id of _fisheryRippleAccum.keys()) {
+      if (!seenFisheryIds.has(id)) _fisheryRippleAccum.delete(id);
+    }
 
     // ---- Lava bubbles + fireballs ----
     /** @type {Array<{ key:string, x:number, y:number }>} */
@@ -773,20 +833,7 @@ export function createSurfaceAreaFxController({ getFxTime, classifySurfaceTile, 
         for (let j = 0; j < _waterRipples.length; j++) {
           const ripple = _waterRipples[j];
           if (!region.cellKeys.has(ripple.cellKey)) continue;
-          const p = rippleProgress(ripple);
-          const alpha = Math.max(0, (1 - p) * ripple.alpha);
-          if (alpha <= 0.003) continue;
-          const radius = Math.max(0, ripple.radius0 + (ripple.radius1 - ripple.radius0) * p);
-          ctx.strokeStyle = `rgba(220,246,255,${alpha.toFixed(3)})`;
-          ctx.lineWidth = 0.035 + (1 - p) * 0.015;
-          ctx.beginPath();
-          ctx.arc(ripple.x, ripple.y, radius, 0, Math.PI * 2);
-          ctx.stroke();
-          ctx.strokeStyle = `rgba(120,190,255,${(alpha * 0.55).toFixed(3)})`;
-          ctx.lineWidth = 0.022;
-          ctx.beginPath();
-          ctx.arc(ripple.x, ripple.y, Math.max(0.02, radius * 0.62), 0, Math.PI * 2);
-          ctx.stroke();
+          drawWaterRipple(ctx, ripple);
         }
         ctx.restore();
       }
