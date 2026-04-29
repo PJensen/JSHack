@@ -582,6 +582,8 @@ function addBuildingResourceSpawns(chunks, building, buildingPlan, bounds) {
     spawns.push(["harvest_herbs", (t) => FOREST_TILES.has(t) || WATER_EDGE_TILES.has(t), 4]);
     spawns.push(["harvest_moonleaf", (t) => FOREST_TILES.has(t) || WATER_EDGE_TILES.has(t), 2]);
     spawns.push(["harvest_ember_root", (t) => FOREST_TILES.has(t) || WATER_EDGE_TILES.has(t), 2]);
+  } else if (kind === "fishery") {
+    spawns.push(["fishing_spot", (t) => WET_TILES.has(t), 8]);
   }
 
   for (const [spawnKind, predicate, count] of spawns) {

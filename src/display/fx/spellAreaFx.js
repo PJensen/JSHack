@@ -234,6 +234,8 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
    * }>}
    */
   const _evocationChannels = new Map();
+  /** @type {Map<number, { actor:number, x:number, y:number, turns:number, startedAtStep:number, phase:number, fading:boolean, fadeLeft:number, fadeMax:number, rippleClock:number }>} */
+  const _fishingChannels = new Map();
 
   const STORM_VOLLEY_SWAY_MAX_RAD = Math.PI / 36; // +/- 5deg
   const STORM_LOCAL_SWAY_MAX_RAD = Math.PI / 60; // +/- 3deg
@@ -435,6 +437,31 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
     }
     if (_impactFlameLights.length > 180) {
       _impactFlameLights.splice(0, _impactFlameLights.length - 180);
+    }
+    for (const [actorId, ch] of _fishingChannels) {
+      ch.rippleClock = Math.max(0, Number(ch.rippleClock || 0) - dt);
+      if (ch.fading) {
+        ch.fadeLeft = Math.max(0, Number(ch.fadeLeft || 0) - dt);
+        if (ch.fadeLeft <= 0) _fishingChannels.delete(actorId);
+        continue;
+      }
+      if (!fx?.pool || ch.rippleClock > 0) continue;
+      ch.rippleClock = 0.12 + Math.random() * 0.08;
+      const a = Math.random() * Math.PI * 2;
+      const r = 0.10 + Math.random() * 0.28;
+      fx.pool.spawn(new Particle({
+        x: Number(ch.x) + Math.cos(a) * r,
+        y: Number(ch.y) + Math.sin(a) * r,
+        vx: Math.cos(a) * (0.08 + Math.random() * 0.10),
+        vy: Math.sin(a) * (0.08 + Math.random() * 0.10),
+        life: 0.35 + Math.random() * 0.22,
+        size0: 0.05 + Math.random() * 0.04,
+        size1: 0.01,
+        r: 100,
+        g: 210,
+        b: 255,
+        a0: 0.52,
+      }));
     }
     for (const [actorId, channel] of _drainLifeChannels) {
       channel.tickFlash = Math.max(0, Number(channel.tickFlash || 0) - dt);
@@ -647,6 +674,59 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
         ctx.arc(cx, cy, flashR, 0, TAU);
         ctx.fill();
       }
+    }
+    ctx.restore();
+  }
+
+  function drawFishing(ctx) {
+    if (!_fishingChannels.size) return;
+    const TAU = Math.PI * 2;
+    const fxTime = Number(getFxTime?.() || 0);
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    for (const [actorId, ch] of _fishingChannels) {
+      const actorPos = typeof getPosition === "function" ? getPosition(actorId) : null;
+      const alphaBase = ch.fading
+        ? Math.max(0, Math.min(1, Number(ch.fadeLeft || 0) / Math.max(0.001, Number(ch.fadeMax || 1))))
+        : 1;
+      const bob = Math.sin(fxTime * 5.2 + Number(ch.phase || 0)) * 0.045;
+      const bx = Number(ch.x) + 0.5;
+      const by = Number(ch.y) + 0.42 + bob;
+      if (actorPos) {
+        const ax = Number(actorPos.x) + 0.5;
+        const ay = Number(actorPos.y) + 0.48;
+        ctx.strokeStyle = `rgba(205,235,255,${(0.42 * alphaBase).toFixed(3)})`;
+        ctx.lineWidth = 0.035;
+        ctx.beginPath();
+        ctx.moveTo(ax, ay);
+        const mx = (ax + bx) * 0.5;
+        const my = (ay + by) * 0.5 - 0.22;
+        ctx.quadraticCurveTo(mx, my, bx, by);
+        ctx.stroke();
+      }
+
+      const pulse = 0.5 + 0.5 * Math.sin(fxTime * 6.4 + Number(ch.phase || 0));
+      ctx.strokeStyle = `rgba(90,210,255,${(0.34 * alphaBase).toFixed(3)})`;
+      ctx.lineWidth = 0.035;
+      ctx.beginPath();
+      ctx.ellipse(bx, by + 0.03, 0.24 + pulse * 0.05, 0.10 + pulse * 0.02, 0, 0, TAU);
+      ctx.stroke();
+
+      ctx.fillStyle = `rgba(245,70,62,${(0.92 * alphaBase).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(bx, by, 0.095, Math.PI, TAU);
+      ctx.fill();
+      ctx.fillStyle = `rgba(250,250,235,${(0.94 * alphaBase).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(bx, by, 0.095, 0, Math.PI);
+      ctx.fill();
+      ctx.strokeStyle = `rgba(30,60,75,${(0.72 * alphaBase).toFixed(3)})`;
+      ctx.lineWidth = 0.018;
+      ctx.beginPath();
+      ctx.arc(bx, by, 0.097, 0, TAU);
+      ctx.stroke();
     }
     ctx.restore();
   }
@@ -2558,6 +2638,44 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
       current.endFlash = Math.max(Number(current.endFlash || 0), 0.16);
     });
 
+    world.on("fishing:cast", ({ actor, x, y, turns }) => {
+      const a = Number(actor || 0) | 0;
+      const tx = Number(x);
+      const ty = Number(y);
+      if (!(a > 0) || !Number.isFinite(tx) || !Number.isFinite(ty)) return;
+      _fishingChannels.set(a, {
+        actor: a,
+        x: Math.floor(tx),
+        y: Math.floor(ty),
+        turns: Math.max(1, Number(turns || 12) | 0),
+        startedAtStep: currentStep(),
+        phase: Math.random() * Math.PI * 2,
+        fading: false,
+        fadeLeft: 0,
+        fadeMax: 0,
+        rippleClock: 0,
+      });
+    });
+
+    function fadeFishing(actor) {
+      const a = Number(actor || 0) | 0;
+      const current = _fishingChannels.get(a);
+      if (!current) return;
+      current.fading = true;
+      current.fadeMax = 0.35;
+      current.fadeLeft = Math.max(Number(current.fadeLeft || 0), current.fadeMax);
+    }
+
+    world.on("channeling:complete", ({ actor, spellId }) => {
+      if (String(spellId || "") !== "fishing") return;
+      fadeFishing(actor);
+    });
+
+    world.on("channeling:cancelled", ({ actor, spellId }) => {
+      if (String(spellId || "") !== "fishing") return;
+      fadeFishing(actor);
+    });
+
     // ── Evocation channel VFX ──────────────────────────────────────────
 
     world.on("channeling:start", ({ actor, spellId }) => {
@@ -3041,5 +3159,5 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
     return out;
   }
 
-  return { tick, drawBlink, drawMeteor, drawBlastwave, drawFlashHeal, drawSmite, drawPhaseStrike, drawRampage, drawSearchPulse, drawDrainLife, drawEvocation, drawCleave, drawWarCry, drawDivineShield, drawConsecrate, drawSmokeBomb, getActiveLights, installListeners };
+  return { tick, drawBlink, drawMeteor, drawBlastwave, drawFlashHeal, drawSmite, drawPhaseStrike, drawRampage, drawSearchPulse, drawDrainLife, drawEvocation, drawFishing, drawCleave, drawWarCry, drawDivineShield, drawConsecrate, drawSmokeBomb, getActiveLights, installListeners };
 }
