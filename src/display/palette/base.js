@@ -304,6 +304,7 @@ export const basePalette = {
   house_sign:  { glyph: "!", fg: "#d8c08a", glow: "#8b6f3f" },
   audio_sign:  { glyph: "!", fg: "#ffe066", glow: "#ccaa00" },
   alchemy_bench: { glyph: "⚗", fg: "#93def6", glow: "#4f7fa1" },
+  enchanting_bench: { glyph: "✧", fg: "#d8b8ff", glow: "#7f5ac8" },
   potion_shelf:  { glyph: "=", fg: "#7986cb", glow: "#3949ab" },
   herb_chest:    { glyph: "]", fg: "#66bb6a", glow: "#2e7d32" },
   tavern_chest:   { glyph: "]", fg: "#d7a15d", glow: "#8f5225" },

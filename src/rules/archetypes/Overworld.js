@@ -203,6 +203,15 @@ export const AlchemyBench = defineArchetype(
   [Interactable, { action: "brewAlchemy", params: null }],
 );
 
+export const EnchantingBench = defineArchetype(
+  "EnchantingBench",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Enchanting Bench", identity: "enchanting_bench" }],
+  [Material, { kind: "wood" }],
+  [Collider, { solid: true, blocksSight: false }],
+  [Interactable, { action: "craftEnchants", params: null }],
+);
+
 export const Anvil = defineArchetype(
   "Anvil",
   [Position, (p) => ({ x: p.x, y: p.y })],

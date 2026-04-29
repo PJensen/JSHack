@@ -431,6 +431,13 @@ export function renderInventory(panel, items, ground, slotFilter = '', scrollOfI
       return;
     }
     if (actionKey === 'use') {
+      const redirectsToApply = !!it?.canApply
+        && Number(it?.applyTargetCount || 0) > 0
+        && (it?.type === 'scroll' || it?.type === 'tool' || it?.type === 'utility');
+      if (redirectsToApply) {
+        triggerApplyForTool(it);
+        return;
+      }
       if (!isInventoryItemUsable(it) || !Number.isInteger(it.id) || it.id <= 0) return;
       signalPulse(); pulseRow(row, 'use', restoreBg);
       if (it.type === 'potion') {

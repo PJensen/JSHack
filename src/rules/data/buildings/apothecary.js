@@ -70,6 +70,7 @@ export default {
   ],
   "spawns": [
     { "dx": -3, "dy": -3, "kind": "alchemy_bench" },
+    { "dx": 2, "dy": -3, "kind": "enchanting_bench" },
     { "dx": -3, "dy": -1, "kind": "herb_chest" },
     { "dx": -1, "dy": -4, "kind": "potion_shelf" },
     { "dx": 1, "dy": -4, "kind": "potion_shelf" },
