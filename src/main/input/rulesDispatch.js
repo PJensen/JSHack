@@ -431,6 +431,15 @@ export function makeRulesDispatcher(world, getActorId, opts = {}) {
         world?.tick?.(1);
         break;
       }
+      case "rules.craftEnchant": {
+        const { benchId = 0, recipe = "" } = action.payload || {};
+        if (!Number.isInteger(benchId) || benchId <= 0) break;
+        const recipeKey = String(recipe || "").trim().toLowerCase();
+        if (!recipeKey) break;
+        world?.add?.(actorId, InteractIntent, { targetId: benchId, mode: "enchant", recipe: recipeKey });
+        world?.tick?.(1);
+        break;
+      }
       case "rules.cookFood": {
         const { fireId = 0, itemId: cookItemId = 0 } = action.payload || {};
         if (!Number.isInteger(fireId) || fireId <= 0) break;

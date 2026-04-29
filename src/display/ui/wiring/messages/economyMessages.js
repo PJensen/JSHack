@@ -7,6 +7,24 @@ export function installEconomyMessages(ctx) {
           compGet, canSeeAt, formatBulletinDistrictLine, formatBulletinRumors,
           formatIngredientBag, harvestYieldLabel, harvestNodeLabel, isOreKind,
           BULLETIN_SECTOR_LABELS, Position } = ctx;
+  const formatEnchantingBag = (bag, { includeZero = false } = {}) => {
+    const labels = {
+      emberRoot: 'ember root',
+      moonleaf: 'moonleaf',
+      thornPods: 'thorn pods',
+      venomFronds: 'venom fronds',
+      oil: 'oil',
+      water: 'water',
+      gold: 'gold',
+    };
+    const parts = [];
+    for (const [key, label] of Object.entries(labels)) {
+      const count = Math.max(0, Number(bag?.[key] || 0) | 0);
+      if (!includeZero && count <= 0) continue;
+      parts.push(`${count} ${label}`);
+    }
+    return parts.join(', ');
+  };
 
   world.on('town:bulletinBoard', ({ actor, districts, opportunityView, questBoard }) => {
     if (nameOfEntity(actor) !== 'You') return;
@@ -131,6 +149,28 @@ export function installEconomyMessages(ctx) {
     if (result === 'unknown_recipe') { log('That alchemy recipe is unknown.', 'system'); return; }
     if (result === 'no_inventory') { log('You need an inventory to carry brewed vials.', 'system'); return; }
     if (result === 'brew_failed') log('The brew collapses into sludge.', 'system');
+  });
+
+  // === Enchanting events ===
+  world.on('enchanting:open', ({ actor, ingredients }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log(`You open the enchanting bench. (${formatEnchantingBag(ingredients, { includeZero: true }) || "no stock"})`, 'system');
+  });
+
+  world.on('enchanting:crafted', ({ actor, recipeLabel, outputName }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log(`You scribe ${bracketizeName(String(recipeLabel || 'an enchantment'))} and receive ${bracketizeName(String(outputName || 'a scroll'))}.`, 'system');
+  });
+
+  world.on('enchanting:result', ({ actor, result, missing, recipeKey }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    if (result === 'missing_requirements') {
+      log(`Missing materials for ${recipeKey || 'that enchant'}: ${formatEnchantingBag(missing) || "requirements not met"}.`, 'system');
+      return;
+    }
+    if (result === 'unknown_recipe') { log('That enchantment recipe is unknown.', 'system'); return; }
+    if (result === 'no_inventory') { log('You need an inventory to carry the finished scroll.', 'system'); return; }
+    if (result === 'craft_failed') log('The glyph buckles and the enchantment fails to take hold.', 'system');
   });
 
   // === Mill events ===

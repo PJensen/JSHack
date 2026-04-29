@@ -72,6 +72,10 @@ import {
   brewAtAlchemyBench,
   emitAlchemyBenchOpen,
 } from "../alchemy/benchGame.js";
+import {
+  craftAtEnchantingBench,
+  emitEnchantingBenchOpen,
+} from "../enchanting/benchGame.js";
 import { cookAtFire, emitCookingFireOpen } from "../cooking/cookingGame.js";
 import { emitAnvilOpen, forgeAtAnvil } from "../smithing/anvilGame.js";
 import { createItemById } from "../../utils/itemFactory.js";
@@ -881,6 +885,19 @@ export const INTERACT_PAYLOADS = {
         return;
       }
       brewAtAlchemyBench(world, actor, targetId, requestedRecipe);
+    },
+  },
+
+  craftEnchants: {
+    onInteract(ctx) {
+      const { world, actor, targetId, intent } = ctx;
+      const interactionMode = String(intent?.mode || "").toLowerCase();
+      const requestedRecipe = String(intent?.recipe || "").toLowerCase();
+      if (interactionMode !== "enchant" || !requestedRecipe) {
+        emitEnchantingBenchOpen(world, actor, targetId);
+        return;
+      }
+      craftAtEnchantingBench(world, actor, targetId, requestedRecipe);
     },
   },
 

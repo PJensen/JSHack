@@ -36,6 +36,17 @@ Deno.test("inventory default action: usable non-slot items prioritize use over a
   assertEquals(getInventoryDefaultAction(potion), "use");
 });
 
+Deno.test("inventory default action: apply-capable scrolls prioritize apply", () => {
+  const scroll = {
+    id: 250,
+    type: "scroll",
+    canApply: true,
+    applyTargetCount: 2,
+  };
+  assertEquals(getInventoryDefaultAction(scroll), "apply");
+  assertEquals(getQuickChipPrimaryAction(scroll), "use");
+});
+
 Deno.test("inventory default action: apply tools default to apply only with valid targets", () => {
   const tool = {
     id: 303,

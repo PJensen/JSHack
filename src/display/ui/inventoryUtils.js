@@ -32,9 +32,11 @@ export function isInventoryItemUsable(it) {
  */
 export function getInventoryDefaultAction(it) {
   if (!it) return 'none';
+  const canApply = !!it.canApply && Number(it.applyTargetCount || 0) > 0;
   if (isInventoryItemEquippable(it)) return 'equip';
+  if (canApply && (it.type === 'scroll' || it.type === 'tool' || it.type === 'utility')) return 'apply';
   if (isInventoryItemUsable(it)) return 'use';
-  if (it.canApply && Number(it.applyTargetCount || 0) > 0) return 'apply';
+  if (canApply) return 'apply';
   if (it.type === 'spell') return 'set-spell';
   return 'none';
 }

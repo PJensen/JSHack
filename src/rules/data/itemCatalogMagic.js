@@ -48,6 +48,73 @@ function cleanupPriorExprEntity(ctx, targetId, effectKey) {
   }
 }
 
+function canEnchantScrollTarget(state) {
+  const targetInfo = state?.targetInfo;
+  if (!targetInfo || String(targetInfo.type || "") !== "equip") return false;
+  return String(targetInfo.slot || "").toLowerCase() !== "ammo";
+}
+
+function createEnchantScrollUseHint(message) {
+  const text = String(message || "Choose a piece of gear to enchant.");
+  return () => ({
+    consumed: false,
+    cancelled: true,
+    code: "USE_ENCHANT_SCROLL_TARGET",
+    message: text,
+    consumesTurn: false,
+  });
+}
+
+function createGearEnchantDipHook({ affixId, enchantType, enchantLabel, detail }) {
+  const resolvedAffixId = String(affixId || "").trim();
+  const resolvedType = String(enchantType || "").trim().toLowerCase();
+  const resolvedLabel = String(enchantLabel || resolvedType || "enchant");
+  const resolvedDetail = String(detail || "");
+  return (ctx, state) => {
+    const targetId = Number(state?.targetId || ctx.target || 0) | 0;
+    if (!(targetId > 0)) {
+      ctx.cancel({
+        code: "ENCHANT_INVALID_TARGET",
+        message: "That scroll needs a piece of gear to bind to.",
+        consumesTurn: false,
+      });
+      return { applied: false, consumedTool: false, resultType: "nothing" };
+    }
+    const info = ctx.query.itemInfo(targetId);
+    if (!info || String(info.type || "") !== "equip") {
+      ctx.cancel({
+        code: "ENCHANT_INVALID_TARGET",
+        message: "Only gear can hold that enchantment.",
+        consumesTurn: false,
+      });
+      return { applied: false, consumedTool: false, resultType: "nothing" };
+    }
+    const currentAffixes = Array.isArray(info.affixes) ? info.affixes.slice() : [];
+    const targetName = resolveApplyTargetName(ctx, state, "gear");
+    if (currentAffixes.includes(resolvedAffixId)) {
+      ctx.cancel({
+        code: "ENCHANT_ALREADY_PRESENT",
+        message: `${targetName} already bears ${resolvedLabel}.`,
+        consumesTurn: false,
+      });
+      return { applied: false, consumedTool: false, resultType: "nothing" };
+    }
+    ctx.helpers.patchItemInfo(targetId, { affixes: [...currentAffixes, resolvedAffixId] });
+    ctx.io.emit("item:applied", {
+      actor: state.actor,
+      toolId: state.toolId,
+      targetId,
+      result: {
+        type: "gear_enchant",
+        enchantType: resolvedType,
+        affixId: resolvedAffixId,
+        message: `You bind ${resolvedLabel} into ${targetName}.${resolvedDetail ? ` ${resolvedDetail}` : ""}`,
+      },
+    });
+    return { applied: true, consumedTool: true, resultType: `${resolvedType}_gear_enchant` };
+  };
+}
+
 export const MAGIC_ITEMS = {
   // Magic / Usable
   stone_touchstone: {
@@ -2354,6 +2421,75 @@ export const MAGIC_ITEMS = {
     weight: 0.2,
     value: 8,
     description: "A hot, peppery root that keeps its heat long after harvest.",
+  },
+  scroll_enchant_poison: {
+    id: "scroll_enchant_poison",
+    catalogKind: "magic",
+    name: "Scroll of Venom Binding",
+    type: "scroll",
+    slot: "bag",
+    material: "paper",
+    rarity: 2,
+    rarityName: "magic",
+    value: 120,
+    weight: 0.1,
+    description: "Apply to a piece of gear to bind a persistent venomous enchantment.",
+    hooks: {
+      can_dip_target: canEnchantScrollTarget,
+      on_dip: createGearEnchantDipHook({
+        affixId: "venomous1",
+        enchantType: "poison",
+        enchantLabel: "Venomous",
+        detail: "Strikes from the enchanted gear can poison your enemies.",
+      }),
+      on_use: createEnchantScrollUseHint("Choose a piece of gear to bind the venom script into."),
+    },
+  },
+  scroll_enchant_fire: {
+    id: "scroll_enchant_fire",
+    catalogKind: "magic",
+    name: "Scroll of Firestorm Binding",
+    type: "scroll",
+    slot: "bag",
+    material: "paper",
+    rarity: 2,
+    rarityName: "magic",
+    value: 125,
+    weight: 0.1,
+    description: "Apply to a piece of gear to bind a persistent firestorm enchantment.",
+    hooks: {
+      can_dip_target: canEnchantScrollTarget,
+      on_dip: createGearEnchantDipHook({
+        affixId: "firestorm1",
+        enchantType: "fire",
+        enchantLabel: "Firestorm",
+        detail: "Strikes from the enchanted gear can ignite lingering fire.",
+      }),
+      on_use: createEnchantScrollUseHint("Choose a piece of gear to bind the fire script into."),
+    },
+  },
+  scroll_enchant_frost: {
+    id: "scroll_enchant_frost",
+    catalogKind: "magic",
+    name: "Scroll of Frost Binding",
+    type: "scroll",
+    slot: "bag",
+    material: "paper",
+    rarity: 2,
+    rarityName: "magic",
+    value: 125,
+    weight: 0.1,
+    description: "Apply to a piece of gear to bind a persistent frostbite enchantment.",
+    hooks: {
+      can_dip_target: canEnchantScrollTarget,
+      on_dip: createGearEnchantDipHook({
+        affixId: "frostbite1",
+        enchantType: "frost",
+        enchantLabel: "Frostbite",
+        detail: "Strikes from the enchanted gear can chill foes with frost.",
+      }),
+      on_use: createEnchantScrollUseHint("Choose a piece of gear to bind the frost script into."),
+    },
   },
   // ── Scroll of Identify ─────────────────────────────────────────────
   scroll_identify: {

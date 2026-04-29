@@ -14,7 +14,7 @@ const _CORPSE_SKIP_PREFIXES = [
 const _CORPSE_SKIP_KEYS = new Set([
   'gold', 'monster', 'bone', 'engraving', 'spawner', 'tombstone',
   'chest', 'mill_chest', 'smithy_chest', 'lumber_chest', 'herb_chest', 'tavern_chest',
-  'bed_home', 'house_sign', 'alchemy_bench',
+  'bed_home', 'house_sign', 'alchemy_bench', 'enchanting_bench',
   'berry_bush', 'herb_patch', 'thorn_bramble', 'venom_fern', 'moonleaf_cluster', 'ember_root_patch', 'venom_spores',
   'anvil', 'anvil_active', 'furnace', 'furnace_unlit', 'cooking_fire',
   'crop_wheat', 'crop_carrot', 'crop_corn',
