@@ -349,7 +349,7 @@ export function createTargetingController({ world, messageLog, playerEntity, dis
       const px = pe.pos.x | 0;
       const py = pe.pos.y | 0;
 
-      if (_spell?.spellId) {
+      if (_spell) {
         const pending = _spell;
         const clamped = clampTargetToRange(px, py, tx, ty, pending.range);
         const finalTx = clamped.x | 0;
