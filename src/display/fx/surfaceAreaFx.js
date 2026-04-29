@@ -54,6 +54,22 @@ function drawWaterRipple(ctx, ripple, alphaScale = 1) {
   }
 }
 
+function spawnWaterImpactRipple(out, cell, { alpha = 0.20, rings = 2 } = {}) {
+  if (!out || !cell) return;
+  const life = 0.34 + Math.random() * 0.20;
+  out.push({
+    x: cell.x + 0.2 + Math.random() * 0.6,
+    y: cell.y + 0.18 + Math.random() * 0.64,
+    ttl: life,
+    max: life,
+    radius0: 0.02 + Math.random() * 0.04,
+    radius1: 0.14 + Math.random() * 0.22,
+    alpha,
+    cellKey: cell.key,
+    rings,
+  });
+}
+
 function hash32(a, b = 0, c = 0, d = 0) {
   let h = 2166136261 >>> 0;
   h ^= a | 0; h = Math.imul(h, 16777619);
@@ -498,6 +514,8 @@ export function createSurfaceAreaFxController({ getFxTime, classifySurfaceTile, 
 
     /** @type {Set<string>} */
     const waterKeys = new Set();
+    /** @type {Map<string, { key:string, x:number, y:number, family:string, tone:string }>} */
+    const waterCellByKey = new Map();
     /** @type {Array<{ key:string, x:number, y:number, family:string, tone:string }>} */
     const waterCells = [];
     for (let i = 0; i < _regions.length; i++) {
@@ -506,6 +524,7 @@ export function createSurfaceAreaFxController({ getFxTime, classifySurfaceTile, 
       for (let j = 0; j < region.cells.length; j++) {
         const cell = region.cells[j];
         waterKeys.add(cell.key);
+        waterCellByKey.set(cell.key, cell);
         waterCells.push(cell);
       }
     }
@@ -531,26 +550,19 @@ export function createSurfaceAreaFxController({ getFxTime, classifySurfaceTile, 
       const y = Number(entity?.pos?.y || 0) | 0;
       const key = cellKey(x, y);
       seenFisheryIds.add(id);
-      if (!tags.includes("fishing_spot_ready") || tags.includes("fishing_pressure_overfished") || !waterKeys.has(key)) {
+      const cell = waterCellByKey.get(key);
+      if (!cell || tags.includes("fishing_spot_depleted") || tags.includes("fishing_pressure_overfished")) {
         _fisheryRippleAccum.delete(id);
         continue;
       }
       const pressureMedium = tags.includes("fishing_pressure_medium");
       const rate = pressureMedium ? 1.8 : 4.5;
-      let acc = Number(_fisheryRippleAccum.get(id) || 0) + Math.max(0, Number(dtSec) || 0) * rate;
-      const phase = Number(getFxTime?.() || 0) * 1.7 + id * 0.41;
+      let acc = (_fisheryRippleAccum.has(id) ? Number(_fisheryRippleAccum.get(id) || 0) : 1)
+        + Math.max(0, Number(dtSec) || 0) * rate;
       while (acc >= 1) {
         acc -= 1;
-        const life = 0.62 + Math.random() * 0.22;
-        _waterRipples.push({
-          x: x + (Math.random() - 0.5) * 0.58,
-          y: y + (Math.random() - 0.5) * 0.42 + Math.sin(phase) * 0.04,
-          ttl: life,
-          max: life,
-          radius0: 0.035 + Math.random() * 0.045,
-          radius1: pressureMedium ? (0.24 + Math.random() * 0.12) : (0.34 + Math.random() * 0.20),
-          alpha: pressureMedium ? 0.34 : 0.58,
-          cellKey: key,
+        spawnWaterImpactRipple(_waterRipples, cell, {
+          alpha: pressureMedium ? 0.36 : 0.62,
           rings: 3,
         });
         if (_waterRipples.length > 128) _waterRipples.splice(0, _waterRipples.length - 128);
@@ -799,16 +811,8 @@ export function createSurfaceAreaFxController({ getFxTime, classifySurfaceTile, 
       _rainAccum -= 1;
       const cell = waterCells[(Math.random() * waterCells.length) | 0];
       if (!cell) break;
-      const life = 0.34 + Math.random() * 0.20;
-      _waterRipples.push({
-        x: cell.x + 0.2 + Math.random() * 0.6,
-        y: cell.y + 0.18 + Math.random() * 0.64,
-        ttl: life,
-        max: life,
-        radius0: 0.02 + Math.random() * 0.04,
-        radius1: 0.14 + Math.random() * 0.22,
+      spawnWaterImpactRipple(_waterRipples, cell, {
         alpha: weather === "heavy_rain" ? 0.28 : 0.20,
-        cellKey: cell.key,
       });
       if (_waterRipples.length > rippleBudget) {
         _waterRipples.splice(0, _waterRipples.length - rippleBudget);
