@@ -55,6 +55,11 @@ Deno.test("enchanting bench crafts a poison enchant scroll from reagents and gol
 
   assertEquals(crafted.length, 1);
   assertEquals(crafted[0]?.outputIdentity, "scroll_enchant_poison");
+  assertEquals(crafted[0]?.magnitude, 2);
+  assertEquals(crafted[0]?.proc, "on hit");
+  assertEquals(crafted[0]?.duration, 4);
+  assertEquals(crafted[0]?.runtime?.affixId, "venomous1");
+  assertEquals(crafted[0]?.metadata?.rarity, "magic");
   assertEquals(getStackCount(world, actor, "gold"), 0);
   assertEquals(getStackCount(world, actor, "reagent_spider_leg"), 0);
   assertEquals(getStackCount(world, actor, "reagent_venom_gland"), 0);
@@ -152,10 +157,9 @@ Deno.test("enchant paths cover every non-ammo gear slot", () => {
     assert(slotFixtures[slot], `missing enchant coverage fixture for ${slot}`);
   }
 
-  const world = new World({ seed: 1204 });
-  const actor = makeActor(world);
-
   for (const slot of NON_AMMO_GEAR_SLOTS) {
+    const world = new World({ seed: 1204 });
+    const actor = makeActor(world);
     const fixture = slotFixtures[slot];
     const target = createItemById(world, fixture.itemId);
     const scroll = createItemById(world, fixture.scrollId);
