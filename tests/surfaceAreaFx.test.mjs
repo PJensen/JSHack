@@ -38,6 +38,7 @@ function makeTraceCtx() {
 function makeDrawCtx() {
   const ctx = {
     radii: [],
+    arcs: [],
     save() {},
     restore() {},
     beginPath() {},
@@ -51,7 +52,8 @@ function makeDrawCtx() {
     createLinearGradient() {
       return { addColorStop() {} };
     },
-    arc(_x, _y, radius) {
+    arc(x, y, radius) {
+      this.arcs.push({ x, y, radius });
       this.radii.push(radius);
       if (radius < 0) throw new Error(`negative arc radius: ${radius}`);
     },
@@ -201,6 +203,84 @@ Deno.test("surfaceAreaFx rain ripples never draw negative arc radii", () => {
     const ctx = makeDrawCtx();
     fx.draw(ctx);
     assert(ctx.radii.every((r) => r >= 0), "all canvas arc radii should be non-negative");
+  } finally {
+    Math.random = originalRandom;
+  }
+});
+
+Deno.test("surfaceAreaFx suppresses fishery ripples from clipped viewport edge cells", () => {
+  const originalRandom = Math.random;
+  Math.random = () => 0;
+  try {
+    const worldView = {
+      turn: 1,
+      currentDepth: 0,
+      fisheries: [
+        { id: 10, x: 3, y: 3, ready: true, overfished: false, pressure: 0 },
+      ],
+      tileGrid: {
+        forEachTileInRect(x0, y0, x1, y1, fn) {
+          for (let y = y0; y <= y1; y++) {
+            for (let x = x0; x <= x1; x++) {
+              fn(x, y, x === 3 && y === 3 ? 1 : 0);
+            }
+          }
+        },
+      },
+      isVisible() {
+        return true;
+      },
+    };
+    const fx = createSurfaceAreaFxController({
+      getFxTime: () => 0,
+      classifySurfaceTile: (tile) => tile === 1 ? { family: "water", tone: "water" } : null,
+      fx: null,
+      PERF: { quality: "high" },
+    });
+    fx.tick(1 / 60, worldView, { vx0: 0, vy0: 0, vx1: 3.2, vy1: 3.2 }, "clear");
+    const ctx = makeDrawCtx();
+    fx.draw(ctx);
+    assertEquals(ctx.radii.length, 0, "fishery ripples should not bleed in from a clipped bottom-right cell");
+  } finally {
+    Math.random = originalRandom;
+  }
+});
+
+Deno.test("surfaceAreaFx fishery ripples are centered within their water tile", () => {
+  const originalRandom = Math.random;
+  Math.random = () => 0;
+  try {
+    const worldView = {
+      turn: 1,
+      currentDepth: 0,
+      fisheries: [
+        { id: 10, x: 3, y: 3, ready: true, overfished: false, pressure: 0 },
+      ],
+      tileGrid: {
+        forEachTileInRect(x0, y0, x1, y1, fn) {
+          for (let y = y0; y <= y1; y++) {
+            for (let x = x0; x <= x1; x++) {
+              fn(x, y, x === 3 && y === 3 ? 1 : 0);
+            }
+          }
+        },
+      },
+      isVisible() {
+        return true;
+      },
+    };
+    const fx = createSurfaceAreaFxController({
+      getFxTime: () => 0,
+      classifySurfaceTile: (tile) => tile === 1 ? { family: "water", tone: "water" } : null,
+      fx: null,
+      PERF: { quality: "high" },
+    });
+    fx.tick(1 / 60, worldView, { vx0: 0, vy0: 0, vx1: 4, vy1: 4 }, "clear");
+    const ctx = makeDrawCtx();
+    fx.draw(ctx);
+    assert(ctx.arcs.length > 0, "fishery should draw ripple rings");
+    assertEquals(ctx.arcs[0].x, 2.7);
+    assertEquals(ctx.arcs[0].y, 2.7);
   } finally {
     Math.random = originalRandom;
   }
