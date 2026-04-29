@@ -43,6 +43,7 @@ import { GroundStackOrder } from "../../rules/components/GroundStackOrder.js";
 import { Facing } from "../../rules/components/Facing.js";
 import { Interactable } from "../../rules/components/Interactable.js";
 import { AudioEmitter } from "../../rules/components/AudioEmitter.js";
+import { HarvestNode } from "../../rules/components/HarvestNode.js";
 import { canonicalStatusKey } from "../../rules/utils/effectSemantics.js";
 import { listProcPackages } from "../../rules/data/procPackages.js";
 import {
@@ -1021,11 +1022,16 @@ export function buildWorldView(world) {
 			} else {
 				kind = ident?.identity || ident?.name || "default";
 			}
+			const harvestNode = /** @type {any} */ (world.get(id, HarvestNode));
+			if (harvestNode && String(harvestNode.kind || "") === "fishing_spot" && harvestNode.ready !== true) {
+				kind = "fishing_spot_depleted";
+			}
 
 			let layer = 300; // actors
 			if (itemInfo) layer = 250; // items/ground (above doors/stairs, below actors)
 			else if (door) layer = 200; // doors/walls-like entities
 			else if (isPlayer) layer = 400; // player on top
+			else if (harvestNode && String(harvestNode.kind || "") === "fishing_spot") layer = 210; // water harvest marker
 
 			/** @type {EntityView|null} */
 			const stackSeq = Number(world.get(id, GroundStackOrder)?.seq || 0) | 0;
@@ -1075,6 +1081,9 @@ export function buildWorldView(world) {
 			if (_questGiverIds.has(id) && !rec.tags.includes('quest_giver')) rec.tags.push('quest_giver');
 			if (kind === 'legendary_chest') rec.tags.push('legendary_glowing');
 			if (kind === 'epic_chest') rec.tags.push('epic_glowing');
+			if (harvestNode && String(harvestNode.kind || "") === "fishing_spot") {
+				rec.tags.push(harvestNode.ready === true ? "fishing_spot_ready" : "fishing_spot_depleted");
+			}
 
 			_allEntities.push(rec);
 			collectedIds.add(id);
@@ -1123,11 +1132,16 @@ export function buildWorldView(world) {
 			} else {
 				kind = ident?.identity || ident?.name || "default";
 			}
+			const harvestNode2 = /** @type {any} */ (world.get(id, HarvestNode));
+			if (harvestNode2 && String(harvestNode2.kind || "") === "fishing_spot" && harvestNode2.ready !== true) {
+				kind = "fishing_spot_depleted";
+			}
 
 			let layer = 300; // actors
 			if (itemInfo) layer = 250; // items/ground (above doors/stairs, below actors)
 			else if (door) layer = 200; // doors/walls-like entities
 			else if (isPlayer) layer = 400; // player on top
+			else if (harvestNode2 && String(harvestNode2.kind || "") === "fishing_spot") layer = 210; // water harvest marker
 
 			const stackSeq2 = Number(world.get(id, GroundStackOrder)?.seq || 0) | 0;
 			const physSizeClass2 = /** @type {string} */ (world.get(id, Physiology)?.sizeClass || '');
@@ -1173,6 +1187,9 @@ export function buildWorldView(world) {
 			if (_questGiverIds.has(id) && !rec.tags.includes('quest_giver')) rec.tags.push('quest_giver');
 			if (kind === 'legendary_chest') rec.tags.push('legendary_glowing');
 			if (kind === 'epic_chest') rec.tags.push('epic_glowing');
+			if (harvestNode2 && String(harvestNode2.kind || "") === "fishing_spot") {
+				rec.tags.push(harvestNode2.ready === true ? "fishing_spot_ready" : "fishing_spot_depleted");
+			}
 
 			_allEntities.push(rec);
 			collectedIds.add(id);

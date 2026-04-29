@@ -59,13 +59,13 @@ export function harvestRegrowthSystem(world) {
   seedActiveSet(world);
   syncFromChanged(world);
 
-  // Only grow during rain.
+  // Most plants only grow during rain. Fishing spots are water-bound and
+  // replenish on their own cooldown.
   let raining = false;
   for (const [, ws] of world.query(WeatherState)) {
     raining = ws.current === "rain" || ws.current === "heavy_rain";
     break;
   }
-  if (!raining) return;
 
   const active = activeSet(world);
   for (const id of active) {
@@ -78,6 +78,7 @@ export function harvestRegrowthSystem(world) {
       active.delete(id);
       continue;
     }
+    if (!raining && String(node.kind || "") !== "fishing_spot") continue;
     const left = Number(node.regrowCountdown || 0);
     if (left > 1) {
       world.mutate(id, HarvestNode, (r) => { r.regrowCountdown = left - 1; });

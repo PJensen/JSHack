@@ -8,7 +8,7 @@ function fishingRodUseHook(ctx, state) {
   ctx.io.emit("fishing:cast:request", {
     actor,
     itemId,
-    turns: 4,
+    turns: 12,
   });
   return { consumed: false };
 }

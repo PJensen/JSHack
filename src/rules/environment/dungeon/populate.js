@@ -32,6 +32,7 @@ import {
   HomeBed,
   HomeChest,
   HomeSign,
+  FishingSpot,
   BerryBush,
   HerbPatch,
   ThornBramble,
@@ -131,6 +132,7 @@ import {
 // Simple spawn kinds: just `createFrom(world, Archetype, { x, y })` with no extra logic.
 const SIMPLE_SPAWN_TABLE = {
   home_bed: HomeBed, home_chest: HomeChest, home_sign: HomeSign,
+  fishing_spot: FishingSpot,
   harvest_berries: BerryBush, harvest_herbs: HerbPatch,
   harvest_thorn_bramble: ThornBramble, harvest_venom_fern: VenomFern,
   harvest_moonleaf: MoonleafCluster, harvest_ember_root: EmberRootPatch,

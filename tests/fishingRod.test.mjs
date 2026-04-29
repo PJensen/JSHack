@@ -33,5 +33,5 @@ Deno.test("fishing_rod on_use requests a fishing cast", () => {
   assertEquals(emits.length, 1);
   assertEquals(emits[0].name, "fishing:cast:request");
   assertEquals(emits[0].payload.itemId, 42);
-  assertEquals(emits[0].payload.turns, 4);
+  assertEquals(emits[0].payload.turns, 12);
 });

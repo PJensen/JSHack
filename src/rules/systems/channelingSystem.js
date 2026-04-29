@@ -11,6 +11,8 @@ import { Stamina } from "../components/Stamina.js";
 import { Position } from "../components/Position.js";
 import { Vitality } from "../components/Vitality.js";
 import { Equipment, getEquippedSlot } from "../components/Equipment.js";
+import { HarvestNode } from "../components/HarvestNode.js";
+import { NamedIdentity } from "../components/NamedIdentity.js";
 import { getSpell } from "../data/spells.js";
 import { MANA_REGEN_COOLDOWN, STAMINA_REGEN_COOLDOWN } from "../data/regenConstants.js";
 import { runSpellScript } from "../scripts/spells.js";
@@ -20,8 +22,9 @@ import { emitSafe } from "../utils/emitSafe.js";
 import { hasLOS } from "../../shared/math/gridLOS.js";
 import { buildBlocksVisionMap, blockedCallback } from "../utils/vision.js";
 import { spellCostPerTick, spellCostResource } from "../data/spells.js";
-import { createItemById } from "../utils/itemFactory.js";
 import { addToInventory } from "../utils/inventoryFacade.js";
+import { resolveLootTable, materializeDrop } from "../data/lootResolver.js";
+import { createRng } from "../../lib/ecs-js/rng.js";
 import { getTile } from "../environment/dungeon/tileMap.js";
 import {
   TILE_CORAL_REEF,
@@ -34,6 +37,7 @@ import {
 
 const DRAIN_LIFE_DAMAGE_INTERRUPT_INSTALLED = Symbol.for("jshack:channeling:drainLifeDamageInterrupt:installed");
 const FISHING_CAST_REQUEST_INSTALLED = Symbol.for("jshack:fishing:castRequest:installed");
+const FISHING_SPOT_REGROW_TURNS = 180;
 
 function isFishableTile(tile) {
   return tile === TILE_WATER
@@ -67,8 +71,20 @@ function findFishingWater(world, actor, intent) {
   return best;
 }
 
+function findReadyFishingSpotAt(world, x, y) {
+  const tx = Number(x) | 0;
+  const ty = Number(y) | 0;
+  for (const [id, pos, node] of world.query(Position, HarvestNode)) {
+    if ((pos.x | 0) !== tx || (pos.y | 0) !== ty) continue;
+    if (String(node?.kind || "") !== "fishing_spot") continue;
+    if (node.ready !== true) continue;
+    return id | 0;
+  }
+  return 0;
+}
+
 export function requestFishingCast(world, actor, itemId, opts = {}) {
-  const turns = Math.max(1, Number(opts?.turns || 4) | 0);
+  const turns = Math.max(1, Number(opts?.turns || 12) | 0);
   const eq = world.get(actor, Equipment);
   if (!getEquippedSlot(eq, itemId)) {
     emitSafe(world, "item:use-cancelled", {
@@ -104,13 +120,14 @@ export function requestFishingCast(world, actor, itemId, opts = {}) {
   }
 
   const pos = world.get(actor, Position);
+  const spotId = findReadyFishingSpotAt(world, water.x, water.y);
   try {
     world.add(actor, Channeling, {
       mode: "cast",
       turnsRemaining: turns,
       turnsTotal: turns,
       spellId: "fishing",
-      targetId: itemId,
+      targetId: spotId || itemId,
       x: water.x,
       y: water.y,
       breakOnMove: true,
@@ -119,7 +136,7 @@ export function requestFishingCast(world, actor, itemId, opts = {}) {
     });
   } catch {}
   emitSafe(world, "channeling:start", { actor, spellId: "fishing", castTime: turns, mode: "fish", itemId, x: water.x, y: water.y });
-  emitSafe(world, "fishing:cast", { actor, itemId, x: water.x, y: water.y, turns });
+  emitSafe(world, "fishing:cast", { actor, itemId, x: water.x, y: water.y, turns, spotId });
   return true;
 }
 
@@ -133,16 +150,42 @@ export function installFishingCastRequestListener(world) {
 }
 
 function resolveFishingChannel(world, actor, ch) {
-  const roll = typeof world.rand === "function" ? world.rand() : 0.42;
-  const itemId = roll < 0.70 ? "food_raw_fish" : roll < 0.82 ? "food_wild_herbs" : roll < 0.90 ? "bone" : "";
-  const caught = itemId ? createItemById(world, itemId) : 0;
   const pos = world.get(actor, Position);
+  const targetId = Number(ch?.targetId || 0) | 0;
+  const node = targetId > 0 ? world.get(targetId, HarvestNode) : null;
+  const useSpot = !!node && String(node.kind || "") === "fishing_spot" && node.ready === true;
+  const tableId = useSpot ? "fishing:spot" : "fishing:normal_water";
+  const seed = ((Number(world.seed || 0) >>> 0) ^ Math.imul(Number(world.step || 0) | 0, 0x9e3779b1) ^ Math.imul(actor | 0, 0x85ebca6b)) >>> 0;
+  const rng = createRng(seed);
+  const drops = resolveLootTable(tableId, rng, 0);
+  let caught = 0;
+  let itemId = "";
+  if (drops.length > 0 && pos) {
+    caught = materializeDrop(world, drops[0], { x: pos.x | 0, y: pos.y | 0 }) || 0;
+    if (caught > 0) {
+      itemId = String(world.get(caught, NamedIdentity)?.identity || "");
+    }
+  }
   let stored = false;
   if (caught > 0) {
     stored = addToInventory(world, actor, caught);
     if (!stored && pos) {
       try { world.add(caught, Position, { x: pos.x | 0, y: pos.y | 0 }); } catch {}
     }
+  }
+  if (useSpot) {
+    world.mutate(targetId, HarvestNode, (n) => {
+      n.ready = false;
+      n.regrowTurns = Math.max(1, Number(n.regrowTurns || FISHING_SPOT_REGROW_TURNS) | 0);
+      n.regrowCountdown = n.regrowTurns;
+    });
+    emitSafe(world, "fishing:spot:exhausted", {
+      actor,
+      targetId,
+      x: ch.x,
+      y: ch.y,
+      regrowTurns: Number(node.regrowTurns || FISHING_SPOT_REGROW_TURNS) | 0,
+    });
   }
   emitSafe(world, "fishing:caught", {
     actor,
@@ -151,6 +194,8 @@ function resolveFishingChannel(world, actor, ch) {
     stored,
     x: ch.x,
     y: ch.y,
+    spotId: useSpot ? targetId : 0,
+    tableId,
   });
 }
 

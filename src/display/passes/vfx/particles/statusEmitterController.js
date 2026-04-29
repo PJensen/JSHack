@@ -23,6 +23,7 @@ export function createStatusEmitterController({ world, fx }) {
   const furnaceEmitters = new Set();
   const cookFireEmitters = new Set();
   const torchEmitters = new Set();
+  const fishingSpotEmitters = new Set();
   const familiarEmitters = new Set();
   const weaponProfileEmitterKeys = new Set();
   const familiarCooldowns = new Set();
@@ -74,6 +75,7 @@ export function createStatusEmitterController({ world, fx }) {
     blinded: { tracker: blindedEmitters, prefix: "blind", cfg: { rate: 10, angle: -Math.PI / 2, spread: Math.PI * 2, speed: 0.25, speedJitter: 0.15, ax: 0, ay: -0.08, life: 1.4, lifeJitter: 0.5, size: 0.14, sizeEnd: 0.03, color: "#6633aa", alpha0: 0.7, alpha1: 0.0 } },
     confused: { tracker: confusedEmitters, prefix: "confused", cfg: { rate: 8, angle: 0, spread: Math.PI * 2, speed: 0.35, speedJitter: 0.25, ax: 0, ay: -0.12, life: 1.2, lifeJitter: 0.4, size: 0.18, sizeEnd: 0.06, color: "#f0c030", alpha0: 0.85, alpha1: 0.0 } },
     torch: { tracker: torchEmitters, prefix: "torch", cfg: { continuous: true, rate: 10, angle: -Math.PI / 2, spread: Math.PI / 6, speed: 0.5, speedJitter: 0.4, ax: 0, ay: -0.9, life: 0.6, lifeJitter: 0.3, size: 0.22, sizeEnd: 0.03, color: "#ffaa33", alpha0: 0.85, alpha1: 0.0, offsetX: 0, offsetY: -0.2 } },
+    fishing_spot: { tracker: fishingSpotEmitters, prefix: "fishspot", cfg: { continuous: true, rate: 18, angle: 0, spread: Math.PI * 2, speed: 0.22, speedJitter: 0.16, ax: 0, ay: 0, life: 1.4, lifeJitter: 0.4, size: 0.16, sizeEnd: 0.04, color: "#69d7ff", alpha0: 0.58, alpha1: 0.0, offsetX: 0, offsetY: 0 } },
   };
   /** @type {Record<string, {tracker: Set<number>, prefix: string, cfg: Record<string, any>}>} */
   const KIND_EMITTER_CFG = {
