@@ -17,8 +17,9 @@ import { Inventory } from "../src/rules/components/Inventory.js";
 import { Position } from "../src/rules/components/Position.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { HarvestNode } from "../src/rules/components/HarvestNode.js";
+import { WeatherState } from "../src/rules/components/WeatherState.js";
 import { clearAll, loadChunk, setTile } from "../src/rules/environment/dungeon/tileMap.js";
-import { CHUNK_SIZE, TILE_FLOOR, TILE_WATER } from "../src/rules/environment/dungeon/constants.js";
+import { CHUNK_SIZE, TILE_FLOOR, TILE_MARSH, TILE_WATER, TILE_WATER_DEEP } from "../src/rules/environment/dungeon/constants.js";
 import { inventoryItems } from "../src/rules/utils/inventoryFacade.js";
 import { installContentAbilityHandler } from "../src/content/abilityHandler.js";
 import "../src/content/items/fishingRod.js";
@@ -206,6 +207,7 @@ Deno.test("fishing spots use special loot, exhaust, and replenish on cooldown", 
   assertEquals(caught.length, 1);
   assertEquals(caught[0]?.tableId, "fishing:spot");
   assertEquals(caught[0]?.spotId, spot);
+  assertEquals(caught[0]?.tileProfile, "normal");
   assertEquals(exhausted.length, 1);
   assertEquals(world.get(spot, HarvestNode)?.ready, false);
   assertEquals(world.get(spot, HarvestNode)?.regrowCountdown, 2);
@@ -217,6 +219,52 @@ Deno.test("fishing spots use special loot, exhaust, and replenish on cooldown", 
   harvestRegrowthSystem(world);
   assertEquals(world.get(spot, HarvestNode)?.ready, true);
   assertEquals(world.get(spot, HarvestNode)?.regrowCountdown, 0);
+});
+
+Deno.test("fishing loot context records rain, tile profile, and repeat pressure", () => {
+  clearAll();
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
+  tiles.fill(TILE_FLOOR);
+  loadChunk(0, 0, tiles);
+  setTile(2, 0, TILE_WATER_DEEP);
+  setTile(3, 0, TILE_MARSH);
+
+  const world = new World({ seed: 3315 });
+  const weather = world.create();
+  world.add(weather, WeatherState, { current: "rain", turnsRemaining: 20, transitionCooldown: 0 });
+  const actor = createPlayer(world, { x: 0, y: 0, name: "Angler" });
+  if (!world.has(actor, Inventory)) world.add(actor, Inventory, { capacity: 20 });
+  if (!world.has(actor, Equipment)) world.add(actor, Equipment, {});
+
+  const rod = buildCatalogItem(world, "fishing_rod");
+  addToInventory(world, actor, rod);
+  world.set(actor, Equipment, { ...world.get(actor, Equipment), weapon: rod });
+
+  const caught = [];
+  world.on("fishing:caught", (ev) => caught.push(ev));
+
+  world.add(actor, CastSpellIntent, { spellId: "fishing", targetId: actor, x: 2, y: 0 });
+  castSpellSystem(world);
+  for (let i = 0; i < 12; i++) channelingSystem(world);
+
+  assertEquals(caught[0]?.raining, true);
+  assertEquals(caught[0]?.tileProfile, "deep");
+  assertEquals(caught[0]?.pressureBefore, 0);
+  assertEquals(caught[0]?.pressureAfter, 1);
+
+  world.add(actor, CastSpellIntent, { spellId: "fishing", targetId: actor, x: 2, y: 0 });
+  castSpellSystem(world);
+  for (let i = 0; i < 12; i++) channelingSystem(world);
+
+  assertEquals(caught[1]?.pressureBefore, 1);
+  assertEquals(caught[1]?.pressureAfter, 2);
+
+  world.add(actor, CastSpellIntent, { spellId: "fishing", targetId: actor, x: 3, y: 0 });
+  castSpellSystem(world);
+  for (let i = 0; i < 12; i++) channelingSystem(world);
+
+  assertEquals(caught[2]?.tileProfile, "marsh");
+  assertEquals(caught[2]?.pressureBefore, 0);
 });
 
 Deno.test("fishing spell refuses non-water tiles", () => {

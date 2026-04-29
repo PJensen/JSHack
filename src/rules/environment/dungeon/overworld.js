@@ -706,6 +706,14 @@ function addSpawnIfOpen(chunks, x, y, kind, params = {}) {
   return true;
 }
 
+function addWaterSpawnIfOpen(chunks, x, y, kind, params = {}) {
+  if (hasSpawnAt(chunks, x, y)) return false;
+  const biomeId = getTileBiomeId(getWorldTile(chunks, x, y));
+  if (biomeId !== 'WATER') return false;
+  addSpawn(chunks, x, y, kind, params);
+  return true;
+}
+
 function spawnOverworldCreatures(chunks, townCenter, bounds, worldSeed) {
   const TOWN_EXCLUSION_RADIUS_SQ = 45 * 45; // covers districts up to r=36 + footprint
 
@@ -809,6 +817,8 @@ function spawnOverworldResources(chunks, townCenter, bounds, worldSeed) {
   const TOWN_EXCLUSION_RADIUS_SQ = 45 * 45;
 
   const OVERWORLD_RESOURCES = [
+    // Water harvest nodes
+    { kind: 'fishing_spot', biomes: ['WATER'], count: 18, clusterR: 7, nearMountain: false, waterSpawn: true },
     // Mining
     { kind: 'harvest_iron_ore', biomes: ['MOUNTAIN'], count: 12, clusterR: 5, nearMountain: true },
     { kind: 'harvest_coal_ore', biomes: ['MOUNTAIN'], count: 8, clusterR: 4, nearMountain: true },
@@ -842,7 +852,6 @@ function spawnOverworldResources(chunks, townCenter, bounds, worldSeed) {
       if (dx * dx + dy * dy < TOWN_EXCLUSION_RADIUS_SQ) continue;
 
       const tile = getWorldTile(chunks, x, y);
-      if (!isOverworldSpawnTile(tile)) continue;
       const biomeId = getTileBiomeId(tile);
       if (biomeId) {
         biomePositions[biomeId].push({ x, y });
@@ -900,7 +909,14 @@ function spawnOverworldResources(chunks, townCenter, bounds, worldSeed) {
               break; // anchor attempt done
             }
           } else {
-            if (resourceType.biomes.includes(biomeId) && addSpawnIfOpen(chunks, x, y, resourceType.kind)) {
+            if (!resourceType.biomes.includes(biomeId)) {
+              attempts++;
+              continue;
+            }
+            const placedHere = resourceType.waterSpawn
+              ? addWaterSpawnIfOpen(chunks, x, y, resourceType.kind)
+              : addSpawnIfOpen(chunks, x, y, resourceType.kind);
+            if (placedHere) {
               placed++;
               break;
             }

@@ -13,6 +13,7 @@ import { Vitality } from "../components/Vitality.js";
 import { Equipment, getEquippedSlot } from "../components/Equipment.js";
 import { HarvestNode } from "../components/HarvestNode.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
+import { WeatherState } from "../components/WeatherState.js";
 import { getSpell } from "../data/spells.js";
 import { MANA_REGEN_COOLDOWN, STAMINA_REGEN_COOLDOWN } from "../data/regenConstants.js";
 import { runSpellScript } from "../scripts/spells.js";
@@ -24,13 +25,19 @@ import { buildBlocksVisionMap, blockedCallback } from "../utils/vision.js";
 import { spellCostPerTick, spellCostResource } from "../data/spells.js";
 import { addToInventory } from "../utils/inventoryFacade.js";
 import { resolveLootTable, materializeDrop } from "../data/lootResolver.js";
+import { LOOT_TABLES } from "../data/lootTables.js";
 import { createRng } from "../../lib/ecs-js/rng.js";
 import { getTile } from "../environment/dungeon/tileMap.js";
 import {
   TILE_CORAL_REEF,
+  TILE_BOG,
   TILE_KELP_FOREST,
+  TILE_MANGROVE,
+  TILE_MARSH,
+  TILE_SALT_MARSH,
   TILE_SEAGRASS,
   TILE_SHALLOW_WATER,
+  TILE_SWAMP,
   TILE_WATER,
   TILE_WATER_DEEP,
 } from "../environment/dungeon/constants.js";
@@ -38,6 +45,8 @@ import {
 const DRAIN_LIFE_DAMAGE_INTERRUPT_INSTALLED = Symbol.for("jshack:channeling:drainLifeDamageInterrupt:installed");
 const FISHING_CAST_REQUEST_INSTALLED = Symbol.for("jshack:fishing:castRequest:installed");
 const FISHING_SPOT_REGROW_TURNS = 180;
+const FISHING_PRESSURE_KEY = Symbol.for("jshack:fishing:tilePressure");
+const FISHING_PRESSURE_DECAY_TURNS = 80;
 
 function isFishableTile(tile) {
   return tile === TILE_WATER
@@ -45,7 +54,12 @@ function isFishableTile(tile) {
     || tile === TILE_SHALLOW_WATER
     || tile === TILE_KELP_FOREST
     || tile === TILE_SEAGRASS
-    || tile === TILE_CORAL_REEF;
+    || tile === TILE_CORAL_REEF
+    || tile === TILE_MARSH
+    || tile === TILE_SWAMP
+    || tile === TILE_BOG
+    || tile === TILE_SALT_MARSH
+    || tile === TILE_MANGROVE;
 }
 
 function findFishingWater(world, actor, intent) {
@@ -81,6 +95,123 @@ function findReadyFishingSpotAt(world, x, y) {
     return id | 0;
   }
   return 0;
+}
+
+function fishingTileProfile(tile) {
+  switch (tile) {
+    case TILE_WATER_DEEP:
+      return "deep";
+    case TILE_SHALLOW_WATER:
+    case TILE_SEAGRASS:
+    case TILE_CORAL_REEF:
+      return "shallow";
+    case TILE_KELP_FOREST:
+      return "kelp";
+    case TILE_MARSH:
+    case TILE_SWAMP:
+    case TILE_BOG:
+    case TILE_SALT_MARSH:
+    case TILE_MANGROVE:
+      return "marsh";
+    default:
+      return "normal";
+  }
+}
+
+function isFishingRain(world) {
+  for (const [, ws] of world.query(WeatherState)) {
+    const current = String(ws?.current || "");
+    return current === "rain" || current === "heavy_rain";
+  }
+  return false;
+}
+
+function fishingPressureMap(world) {
+  if (!world[FISHING_PRESSURE_KEY]) world[FISHING_PRESSURE_KEY] = new Map();
+  return world[FISHING_PRESSURE_KEY];
+}
+
+function readFishingPressure(world, x, y) {
+  const key = `${Number(x) | 0},${Number(y) | 0}`;
+  const rec = fishingPressureMap(world).get(key);
+  if (!rec) return 0;
+  const elapsed = Math.max(0, (Number(world.step || 0) | 0) - (Number(rec.lastStep || 0) | 0));
+  const decayed = Math.max(0, (Number(rec.pressure || 0) | 0) - Math.floor(elapsed / FISHING_PRESSURE_DECAY_TURNS));
+  if (decayed <= 0) {
+    fishingPressureMap(world).delete(key);
+    return 0;
+  }
+  rec.pressure = decayed;
+  return decayed;
+}
+
+function addFishingPressure(world, x, y) {
+  const key = `${Number(x) | 0},${Number(y) | 0}`;
+  const pressure = Math.min(8, readFishingPressure(world, x, y) + 1);
+  fishingPressureMap(world).set(key, {
+    pressure,
+    lastStep: Number(world.step || 0) | 0,
+  });
+  return pressure;
+}
+
+function adjustedFishingEntry(entry, ctx) {
+  const next = { ...(entry || {}) };
+  next.weight = Number(next.weight || 0);
+  if (next.type === "item") {
+    const itemId = String(next.itemId || "");
+    if (ctx.raining && itemId === "food_raw_fish") next.weight += 8;
+    if (ctx.raining && (itemId === "food_golden_carp" || itemId === "food_moonfin")) next.weight += 5;
+    if (ctx.tileProfile === "deep" && itemId === "food_moonfin") next.weight += 8;
+    if (ctx.tileProfile === "deep" && itemId === "food_golden_carp") next.weight += 3;
+    if (ctx.tileProfile === "shallow" && itemId === "food_golden_carp") next.weight += 5;
+    if (ctx.tileProfile === "kelp" && itemId === "fishing_kelp") next.weight += 18;
+    if (ctx.tileProfile === "marsh" && itemId === "fishing_kelp") next.weight += 10;
+    if (ctx.tileProfile === "marsh" && itemId === "junk_soggy_boot") next.weight += 7;
+  }
+  if (next.type === "table" && ctx.tileProfile === "deep") next.weight += 1;
+  if (next.type === "nothing") {
+    if (ctx.raining) next.weight = Math.max(1, next.weight - 3);
+    next.weight += Math.max(0, ctx.pressure || 0) * 8;
+  }
+  return next;
+}
+
+function fishingEntryToDrop(entry, rng) {
+  switch (String(entry?.type || "")) {
+    case "nothing":
+      return null;
+    case "archetype":
+      return { kind: "archetype", params: { archetype: entry.archetype } };
+    case "item":
+      return { kind: "item", params: { itemId: entry.itemId } };
+    case "equip": {
+      const pool = Array.isArray(entry.pool) ? entry.pool : [];
+      const equipId = rng.choice(pool);
+      return equipId ? { kind: "equip", params: { equipId, affixes: [] } } : null;
+    }
+    case "table": {
+      const nested = resolveLootTable(String(entry.tableId || ""), rng, 0);
+      return nested[0] || null;
+    }
+    default:
+      return null;
+  }
+}
+
+function resolveFishingDrops(tableId, rng, ctx) {
+  const table = LOOT_TABLES[tableId];
+  const entries = Array.isArray(table?.entries) ? table.entries.map((entry) => adjustedFishingEntry(entry, ctx)) : [];
+  const total = entries.reduce((sum, entry) => sum + Math.max(0, Number(entry.weight || 0)), 0);
+  if (total <= 0) return [];
+  let roll = rng.float(0, total);
+  for (let i = 0; i < entries.length; i++) {
+    roll -= Math.max(0, Number(entries[i].weight || 0));
+    if (roll > 0) continue;
+    const drop = fishingEntryToDrop(entries[i], rng);
+    return drop ? [drop] : [];
+  }
+  return [];
 }
 
 export function requestFishingCast(world, actor, itemId, opts = {}) {
@@ -155,9 +286,13 @@ function resolveFishingChannel(world, actor, ch) {
   const node = targetId > 0 ? world.get(targetId, HarvestNode) : null;
   const useSpot = !!node && String(node.kind || "") === "fishing_spot" && node.ready === true;
   const tableId = useSpot ? "fishing:spot" : "fishing:normal_water";
+  const tile = getTile(Number(ch.x || 0) | 0, Number(ch.y || 0) | 0);
+  const tileProfile = fishingTileProfile(tile);
+  const raining = isFishingRain(world);
+  const pressureBefore = readFishingPressure(world, ch.x, ch.y);
   const seed = ((Number(world.seed || 0) >>> 0) ^ Math.imul(Number(world.step || 0) | 0, 0x9e3779b1) ^ Math.imul(actor | 0, 0x85ebca6b)) >>> 0;
   const rng = createRng(seed);
-  const drops = resolveLootTable(tableId, rng, 0);
+  const drops = resolveFishingDrops(tableId, rng, { tileProfile, raining, pressure: pressureBefore });
   let caught = 0;
   let itemId = "";
   if (drops.length > 0 && pos) {
@@ -187,6 +322,7 @@ function resolveFishingChannel(world, actor, ch) {
       regrowTurns: Number(node.regrowTurns || FISHING_SPOT_REGROW_TURNS) | 0,
     });
   }
+  const pressureAfter = addFishingPressure(world, ch.x, ch.y);
   emitSafe(world, "fishing:caught", {
     actor,
     itemId,
@@ -196,6 +332,11 @@ function resolveFishingChannel(world, actor, ch) {
     y: ch.y,
     spotId: useSpot ? targetId : 0,
     tableId,
+    tile,
+    tileProfile,
+    raining,
+    pressureBefore,
+    pressureAfter,
   });
 }
 

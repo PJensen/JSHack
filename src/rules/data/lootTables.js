@@ -835,6 +835,7 @@ export const LOOT_TABLES = {
   "shop:equipment": {
     rolls: { min: 2, max: 4 },
     entries: [
+      { type: "item",   weight: 60, itemId: "fishing_rod" },
       { type: "table",  weight: 40, tableId: "sub:equip_common" },
       { type: "table",  weight: 30, tableId: "sub:equip_magic" },
       { type: "table",  weight: 8,  tableId: "sub:equip_catalog_backfill" },
