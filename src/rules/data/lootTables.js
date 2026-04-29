@@ -732,8 +732,8 @@ export const LOOT_TABLES = {
       { type: "table",     weight: 10, tableId: "sub:scrolls" },
       { type: "table",     weight: 8,  tableId: "sub:potions" },
       { type: "item",      weight: 8,  itemId: "scroll_remove_curse" },
-      { type: "item",      weight: 6,  itemId: "scroll_enchant_venom_ward" },
-      { type: "item",      weight: 6,  itemId: "scroll_enchant_frost" },
+      { type: "item",      weight: 6,  itemId: "reagent_cursed_thread" },
+      { type: "item",      weight: 6,  itemId: "reagent_frost_core" },
     ],
   },
 

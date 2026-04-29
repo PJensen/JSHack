@@ -4,6 +4,7 @@ import { EnchantingBench } from "../src/rules/archetypes/Overworld.js";
 import { GoldStack } from "../src/rules/archetypes/Items.js";
 import { Inventory } from "../src/rules/components/Inventory.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
+import { NON_AMMO_GEAR_SLOTS } from "../src/rules/components/Equipment.js";
 import { InteractIntent } from "../src/rules/components/Intents/InteractIntent.js";
 import { ApplyIntent } from "../src/rules/components/Intents/ApplyIntent.js";
 import { interactionSystem } from "../src/rules/systems/interactionSystem.js";
@@ -14,7 +15,7 @@ import "../src/rules/data/affixes.js";
 
 function makeActor(world) {
   const actor = world.create();
-  world.add(actor, Inventory, { items: [], capacity: 20, weightLimit: null });
+  world.add(actor, Inventory, { items: [], capacity: 50, weightLimit: null });
   return actor;
 }
 
@@ -129,4 +130,63 @@ Deno.test("fire weapon scroll rejects incompatible accessory targets", () => {
   assertEquals(results[0]?.metrics?.payloadMatched, false);
   assertEquals((world.get(amulet, ItemInfo)?.affixes || []).includes("firestorm1"), false);
   assert(world.isAlive(fireScroll), "invalid target should not consume the scroll");
+});
+
+Deno.test("enchant paths cover every non-ammo gear slot", () => {
+  const slotFixtures = {
+    weapon: { itemId: "dagger_quick", scrollId: "scroll_enchant_fire", affixId: "firestorm1" },
+    armor: { itemId: "leather_armor", scrollId: "scroll_enchant_fortified", affixId: "kineticWard1" },
+    head: { itemId: "helm_iron", scrollId: "scroll_enchant_fortified", affixId: "kineticWard1" },
+    neck: { itemId: "amulet_guarded", scrollId: "scroll_enchant_fortified", affixId: "kineticWard1" },
+    belt: { itemId: "belt_leather", scrollId: "scroll_enchant_fortified", affixId: "kineticWard1" },
+    gloves: { itemId: "gloves_leather", scrollId: "scroll_enchant_fortified", affixId: "kineticWard1" },
+    offhand: { itemId: "shield_wood", scrollId: "scroll_enchant_fortified", affixId: "kineticWard1" },
+    ring1: { itemId: "ring_copper", scrollId: "scroll_enchant_fortified", affixId: "kineticWard1", forceSlot: "ring1" },
+    ring2: { itemId: "ring_copper", scrollId: "scroll_enchant_fortified", affixId: "kineticWard1", forceSlot: "ring2" },
+    legs: { itemId: "leggings_leather", scrollId: "scroll_enchant_fortified", affixId: "kineticWard1" },
+    feet: { itemId: "boots_leather", scrollId: "scroll_enchant_fortified", affixId: "kineticWard1" },
+    ranged: { itemId: "bow_short", scrollId: "scroll_enchant_fortified", affixId: "kineticWard1" },
+  };
+
+  for (const slot of NON_AMMO_GEAR_SLOTS) {
+    assert(slotFixtures[slot], `missing enchant coverage fixture for ${slot}`);
+  }
+
+  const world = new World({ seed: 1204 });
+  const actor = makeActor(world);
+
+  for (const slot of NON_AMMO_GEAR_SLOTS) {
+    const fixture = slotFixtures[slot];
+    const target = createItemById(world, fixture.itemId);
+    const scroll = createItemById(world, fixture.scrollId);
+    assert(target > 0 && scroll > 0, `required test items should be creatable for ${slot}`);
+    if (fixture.forceSlot) {
+      world.get(target, ItemInfo).slot = fixture.forceSlot;
+    }
+    addToInventory(world, actor, target);
+    addToInventory(world, actor, scroll);
+
+    world.add(actor, ApplyIntent, { itemId: scroll, targetItemId: target });
+    applySystem(world);
+
+    assert((world.get(target, ItemInfo)?.affixes || []).includes(fixture.affixId), `${slot} should accept ${fixture.scrollId}`);
+    assert(!world.isAlive(scroll), `${slot} enchant should consume the scroll`);
+  }
+});
+
+Deno.test("slot normalization lets shield-labeled gear accept offhand enchants", () => {
+  const world = new World({ seed: 1205 });
+  const actor = makeActor(world);
+  const shield = createItemById(world, "shield_wood");
+  const scroll = createItemById(world, "scroll_enchant_fortified");
+  assert(shield > 0 && scroll > 0);
+  world.get(shield, ItemInfo).slot = "shield";
+  addToInventory(world, actor, shield);
+  addToInventory(world, actor, scroll);
+
+  world.add(actor, ApplyIntent, { itemId: scroll, targetItemId: shield });
+  applySystem(world);
+
+  assert((world.get(shield, ItemInfo)?.affixes || []).includes("kineticWard1"));
+  assert(!world.isAlive(scroll));
 });
