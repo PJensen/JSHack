@@ -44,6 +44,7 @@ import {
   OreVeinStone,
   TreeNode,
   AlchemyBench,
+  EnchantingBench,
   Anvil,
   Furnace,
   CookingFire,
@@ -138,7 +139,7 @@ const SIMPLE_SPAWN_TABLE = {
   harvest_moonleaf: MoonleafCluster, harvest_ember_root: EmberRootPatch,
   harvest_iron_ore: OreVeinIron, harvest_coal_ore: OreVeinCoal,
   harvest_stone: OreVeinStone, tree_node: TreeNode,
-  alchemy_bench: AlchemyBench, anvil: Anvil, furnace: Furnace,
+  alchemy_bench: AlchemyBench, enchanting_bench: EnchantingBench, anvil: Anvil, furnace: Furnace,
   cooking_fire: CookingFire,
   crop_wheat: CropWheat, crop_carrot: CropCarrot, crop_corn: CropCorn,
   well: Well, scarecrow: Scarecrow,
@@ -2443,6 +2444,18 @@ export function materializeSpawn(world, spawn) {
             h: spawn.params.shopRoom.h,
             shopkeeperId: id,
           });
+        }
+      } else if (def.role === "enchantress") {
+        world.add(id, Interactable, {
+          action: "openEnchantressServices",
+          params: {
+            dialogue: def.dialogue,
+            townfolkId: spawn.params.townfolkId,
+            dialogId: "townfolk:enchantress",
+          },
+        });
+        if (spawn.params.shopDoor) {
+          assignShopDoorKey(world, id, spawn.params.shopDoorRole || def.role, spawn.params.shopDoor);
         }
       } else if (def.role === "gem_vendor") {
         world.add(id, Interactable, {

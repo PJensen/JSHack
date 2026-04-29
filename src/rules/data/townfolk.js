@@ -82,6 +82,14 @@ export const TOWNFOLK = Object.freeze({
     maxHp: 30,
     dialogue: "A pinch of this, a drop of that... perfection takes patience.",
   },
+  enchantress: {
+    name: "Enchantress",
+    identity: "townfolk_enchantress",
+    role: "enchantress",
+    speed: 2,
+    maxHp: 28,
+    dialogue: "Bring me reagents, gold, and a piece worth keeping. I'll give it a second life.",
+  },
   fisher: {
     name: "Fisher",
     identity: "townfolk_fisher",

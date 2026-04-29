@@ -431,6 +431,10 @@ export function renderInventory(panel, items, ground, slotFilter = '', scrollOfI
       return;
     }
     if (actionKey === 'use') {
+      if (getInventoryDefaultAction(it) === 'apply') {
+        triggerApplyForTool(it);
+        return;
+      }
       if (!isInventoryItemUsable(it) || !Number.isInteger(it.id) || it.id <= 0) return;
       signalPulse(); pulseRow(row, 'use', restoreBg);
       if (it.type === 'potion') {

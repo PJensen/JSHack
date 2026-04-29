@@ -6,6 +6,7 @@ import { createDebugGraph } from './debugGraph.js';
 import { createTileInspector } from './tileInspector.js';
 import { renderAlchemyBench } from './alchemyBenchOverlay.js';
 import { renderAnvil } from './anvilOverlay.js';
+import { renderEnchantingBench } from './enchantingBenchOverlay.js';
 import { renderCookingFire } from './cookingFireOverlay.js';
 import { renderDialog } from './dialogOverlay.js';
 import { playDeathJingle } from '../fx/deathJingle.js';
@@ -781,6 +782,62 @@ export function initOverlays() {
       recipes: Array.isArray(d.recipes) ? d.recipes : [],
     };
     renderAlchemyBench(alchemy, _alchemyState);
+  });
+
+  // Enchanting bench overlay
+  let _enchantingState = {
+    benchId: 0,
+    ingredients: { emberRoot: 0, moonleaf: 0, thornPods: 0, venomFronds: 0, spiderLeg: 0, venomGland: 0, resin: 0, boneDust: 0, ectoplasm: 0, runeFragment: 0, frostCore: 0, beastClaw: 0, cursedThread: 0, oil: 0, water: 0, ashes: 0, gold: 0 },
+    recipes: [],
+    title: "✧ Enchanting Bench",
+    subtitle: "Bind reagents and gold into a scroll, then apply it to your gear.",
+  };
+  window.addEventListener('ui:openEnchantingBench', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const d = e?.detail || {};
+    _craftPanelMode = 'enchanting';
+    _enchantingState.benchId = Number(d.benchId || 0) | 0;
+    show(alchemy);
+    renderEnchantingBench(alchemy, _enchantingState);
+    const escKey = (/** @type {KeyboardEvent} */ ke) => {
+      if (alchemy.style.display !== 'block') return;
+      if (_craftPanelMode !== 'enchanting') return;
+      if (ke.key === 'Escape') {
+        window.dispatchEvent(new CustomEvent('ui:closeEnchantingBench'));
+        ke.preventDefault();
+      }
+    };
+    window.addEventListener('keydown', escKey);
+    const obs = new MutationObserver(() => {
+      if (alchemy.style.display === 'none') {
+        window.removeEventListener('keydown', escKey);
+        obs.disconnect();
+      }
+    });
+    obs.observe(alchemy, { attributes: true, attributeFilter: ['style'] });
+  });
+  window.addEventListener('ui:closeEnchantingBench', () => {
+    _enchantingState.benchId = 0;
+    if (_craftPanelMode === 'enchanting') {
+      _craftPanelMode = '';
+      hide(alchemy);
+    }
+  });
+  window.addEventListener('ui:enchantingBenchData', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const d = e?.detail || {};
+    _enchantingState = {
+      benchId: Number(d.benchId || _enchantingState.benchId || 0) | 0,
+      ingredients: d.ingredients && typeof d.ingredients === 'object'
+        ? d.ingredients
+        : { emberRoot: 0, moonleaf: 0, thornPods: 0, venomFronds: 0, spiderLeg: 0, venomGland: 0, resin: 0, boneDust: 0, ectoplasm: 0, runeFragment: 0, frostCore: 0, beastClaw: 0, cursedThread: 0, oil: 0, water: 0, ashes: 0, gold: 0 },
+      recipes: Array.isArray(d.recipes) ? d.recipes : [],
+      title: String(d.title || _enchantingState.title || "✧ Enchanting Bench"),
+      subtitle: String(d.subtitle || _enchantingState.subtitle || "Bind reagents and gold into a scroll, then apply it to your gear."),
+    };
+    renderEnchantingBench(alchemy, _enchantingState);
   });
 
   // Anvil overlay

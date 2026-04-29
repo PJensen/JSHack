@@ -397,6 +397,58 @@ export const LOOT_TABLES = {
     ],
   },
 
+  "sub:reagents_beast": {
+    rolls: { min: 1, max: 1 },
+    entries: [
+      { type: "item", weight: 22, itemId: "reagent_beast_claw" },
+      { type: "item", weight: 10, itemId: "reagent_resin" },
+      { type: "item", weight: 8, itemId: "reagent_venom_gland" },
+      { type: "nothing", weight: 20 },
+    ],
+  },
+
+  "sub:reagents_spider": {
+    rolls: { min: 1, max: 2 },
+    entries: [
+      { type: "item", weight: 30, itemId: "reagent_spider_leg" },
+      { type: "item", weight: 18, itemId: "reagent_venom_gland" },
+      { type: "item", weight: 10, itemId: "reagent_resin" },
+      { type: "nothing", weight: 12 },
+    ],
+  },
+
+  "sub:reagents_undead": {
+    rolls: { min: 1, max: 1 },
+    entries: [
+      { type: "item", weight: 24, itemId: "reagent_bone_dust" },
+      { type: "item", weight: 16, itemId: "reagent_ectoplasm" },
+      { type: "archetype", weight: 12, archetype: "Ashes" },
+      { type: "nothing", weight: 20 },
+    ],
+  },
+
+  "sub:reagents_occult": {
+    rolls: { min: 1, max: 1 },
+    entries: [
+      { type: "item", weight: 20, itemId: "reagent_rune_fragment" },
+      { type: "item", weight: 16, itemId: "reagent_cursed_thread" },
+      { type: "item", weight: 10, itemId: "reagent_ectoplasm" },
+      { type: "item", weight: 10, itemId: "reagent_frost_core" },
+      { type: "nothing", weight: 18 },
+    ],
+  },
+
+  "sub:reagents_plant": {
+    rolls: { min: 1, max: 1 },
+    entries: [
+      { type: "item", weight: 16, itemId: "reagent_resin" },
+      { type: "item", weight: 14, itemId: "reagent_moonleaf" },
+      { type: "item", weight: 14, itemId: "reagent_ember_root" },
+      { type: "item", weight: 12, itemId: "reagent_thorn_pod" },
+      { type: "nothing", weight: 18 },
+    ],
+  },
+
   // ── Monster tier defaults (fallback for untagged monsters) ────────
   // Most monsters route through tag-based tables (drop:beast, drop:humanoid,
   // drop:undead, drop:caster). These tier tables serve aberrations, giants,
@@ -504,6 +556,8 @@ export const LOOT_TABLES = {
     entries: [
       { type: "nothing",   weight: 50 },
       { type: "gold",      weight: 30, count: { base: 16, perDepth: 6 } },
+      { type: "table",     weight: 12, tableId: "sub:reagents_occult" },
+      { type: "table",     weight: 10, tableId: "sub:reagents_plant" },
       { type: "table",     weight: 10, tableId: "sub:potions" },
       { type: "table",     weight: 8, tableId: "sub:jewelry" },
       { type: "table",     weight: 5, tableId: "sub:scrolls" },
@@ -519,6 +573,7 @@ export const LOOT_TABLES = {
     entries: [
       { type: "nothing",   weight: 50 },
       { type: "gold",      weight: 28, count: { base: 5, perDepth: 3 } },
+      { type: "table",     weight: 18, tableId: "sub:reagents_beast" },
       { type: "archetype", weight: 15, archetype: "Ration" },
       { type: "archetype", weight: 10, archetype: "HealthPotion" },
       { type: "table",     weight: 8,  tableId: "sub:equip_early_proc" },
@@ -532,12 +587,24 @@ export const LOOT_TABLES = {
     entries: [
       { type: "nothing",   weight: 45 },
       { type: "gold",      weight: 30, count: { base: 8, perDepth: 5 } },
+      { type: "table",     weight: 18, tableId: "sub:reagents_spider" },
       { type: "item",      weight: 9, itemId: "potion_resist_poison" },
       { type: "item",      weight: 6, itemId: "potion_anti_venom" },
       { type: "table",     weight: 8, tableId: "sub:potions" },
       { type: "table",     weight: 8,  tableId: "sub:equip_early_proc" },
       { type: "archetype", weight: 10, archetype: "HealthPotion" },
       { type: "archetype", weight: 8,  archetype: "Ration" },
+    ],
+  },
+
+  "drop:plant": {
+    rolls: { min: 1, max: 1 },
+    entries: [
+      { type: "nothing",   weight: 42 },
+      { type: "table",     weight: 24, tableId: "sub:reagents_plant" },
+      { type: "archetype", weight: 14, archetype: "WildHerbs" },
+      { type: "archetype", weight: 10, archetype: "WildBerries" },
+      { type: "table",     weight: 6,  tableId: "sub:potions" },
     ],
   },
 
@@ -569,6 +636,7 @@ export const LOOT_TABLES = {
     entries: [
       { type: "nothing",   weight: 40 },
       { type: "gold",      weight: 35, count: { base: 14, perDepth: 6 } },
+      { type: "table",     weight: 18, tableId: "sub:reagents_undead" },
       { type: "item",      weight: 6, itemId: "potion_holy_water" },
       { type: "table",     weight: 11, tableId: "sub:scrolls" },
       { type: "table",     weight: 8, tableId: "sub:potions" },
@@ -592,6 +660,7 @@ export const LOOT_TABLES = {
     entries: [
       { type: "nothing",   weight: 40 },
       { type: "gold",      weight: 25, count: { base: 16, perDepth: 6 } },
+      { type: "table",     weight: 16, tableId: "sub:reagents_occult" },
       { type: "table",     weight: 17, tableId: "sub:scrolls" },
       { type: "table",     weight: 14, tableId: "sub:spellbooks" },
       { type: "table",     weight: 10, tableId: "sub:wands" },
@@ -624,6 +693,19 @@ export const LOOT_TABLES = {
     ],
   },
 
+  "drop:spider": {
+    rolls: { min: 1, max: 1 },
+    entries: [
+      { type: "nothing",   weight: 40 },
+      { type: "gold",      weight: 14, count: { base: 4, perDepth: 2 } },
+      { type: "table",     weight: 26, tableId: "sub:reagents_spider" },
+      { type: "item",      weight: 6,  itemId: "potion_anti_venom" },
+      { type: "item",      weight: 6,  itemId: "potion_resist_poison" },
+      { type: "table",     weight: 8,  tableId: "sub:equip_early_proc" },
+      { type: "table",     weight: 6,  tableId: "sub:potions" },
+    ],
+  },
+
   "drop:wight": {
     rolls: { min: 1, max: 1 },
     entries: [
@@ -632,11 +714,26 @@ export const LOOT_TABLES = {
       { type: "item",      weight: 9, itemId: "potion_holy_water" },
       { type: "item",      weight: 7, itemId: "scroll_remove_curse" },
       { type: "item",      weight: 5, itemId: "potion_anti_venom" },
+      { type: "table",     weight: 16, tableId: "sub:reagents_undead" },
       { type: "table",     weight: 8, tableId: "sub:potions" },
       { type: "table",     weight: 7, tableId: "sub:scrolls" },
       { type: "table",     weight: 6, tableId: "sub:equip_magic" },
       { type: "archetype", weight: 8,  archetype: "HealthPotion" },
       { type: "archetype", weight: 6,  archetype: "ArrowsStack" },
+    ],
+  },
+
+  "drop:witch": {
+    rolls: { min: 1, max: 1 },
+    entries: [
+      { type: "nothing",   weight: 34 },
+      { type: "gold",      weight: 20, count: { base: 18, perDepth: 6 } },
+      { type: "table",     weight: 20, tableId: "sub:reagents_occult" },
+      { type: "table",     weight: 10, tableId: "sub:scrolls" },
+      { type: "table",     weight: 8,  tableId: "sub:potions" },
+      { type: "item",      weight: 8,  itemId: "scroll_remove_curse" },
+      { type: "item",      weight: 6,  itemId: "reagent_cursed_thread" },
+      { type: "item",      weight: 6,  itemId: "reagent_frost_core" },
     ],
   },
 
@@ -697,6 +794,8 @@ export const LOOT_TABLES = {
     entries: [
       { type: "nothing",   weight: 40 },
       { type: "gold",      weight: 30, count: { base: 35, perDepth: 7 } },
+      { type: "item",      weight: 14, itemId: "reagent_rune_fragment" },
+      { type: "archetype", weight: 12, archetype: "Ashes" },
       { type: "equip",     weight: 14, pool: ["ember_knife", "smoldering_club", "ring_fire_resist"], affixChance: 0 },
       { type: "equip",     weight: 8, pool: ["shield_fireward"], affixChance: 0.15, affixCountMax: 1 },
       { type: "table",     weight: 9, tableId: "sub:potions" },
@@ -710,6 +809,8 @@ export const LOOT_TABLES = {
     entries: [
       { type: "nothing",   weight: 25 },
       { type: "gold",      weight: 30, count: { base: 85, perDepth: 15 } },
+      { type: "item",      weight: 18, itemId: "reagent_rune_fragment" },
+      { type: "archetype", weight: 14, archetype: "Ashes" },
       { type: "equip",     weight: 18, pool: ["axe_heavy", "chain_armor", "amulet_vigor", "belt_girded", "gauntlets_iron", "greaves_steel", "helm_steel", "shield_iron", "ring_health", "ring_precision", "ring_arcana", "ring_fire_resist", "ring_poison_resist", "ring_cold_resist", "ring_shock_resist", "shield_fireward", "leadweave_mantle", "ring_endurance", "shield_spiked_pavise"],
         affixChance: 0.80, affixCountMax: 2 },
       { type: "equip",     weight: 1,  pool: ["warhammer"], affixChance: 0, affixCountMax: 0 },
@@ -728,6 +829,8 @@ export const LOOT_TABLES = {
     rolls: { min: 1, max: 1 },
     entries: [
       { type: "nothing",   weight: 35 },
+      { type: "table",     weight: 18, tableId: "sub:reagents_undead" },
+      { type: "table",     weight: 16, tableId: "sub:reagents_occult" },
       { type: "table",     weight: 20, tableId: "sub:spellbooks" },
       { type: "gold",      weight: 22, count: { base: 35, perDepth: 8 } },
       { type: "table",     weight: 10, tableId: "sub:scrolls" },

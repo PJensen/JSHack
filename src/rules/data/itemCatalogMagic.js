@@ -31,6 +31,13 @@ import { createStatusEvent } from "../../shared/events/statusEvent.js";
 import { getPassiveBonuses } from "../utils/passiveBonuses.js";
 import { attachDerivedExpression, exprAddConst } from "../utils/statProcAuthoring.js";
 import { resolveItemCooldownRemaining } from "../utils/itemCooldowns.js";
+import { affixSupportsSlot } from "./affixes.js";
+import {
+  enchantDefSupportsSlot,
+  ENCHANT_SCROLL_DEFS,
+  getEnchantScrollDef,
+  normalizeEnchantSlot,
+} from "../content/enchanting/enchantCatalog.js";
 
 /**
  * Destroy any existing DerivedExpression entity owned by an active effect
@@ -47,6 +54,123 @@ function cleanupPriorExprEntity(ctx, targetId, effectKey) {
     }
   }
 }
+
+function canEnchantScrollTarget(state) {
+  const targetInfo = state?.targetInfo;
+  if (!targetInfo || String(targetInfo.type || "") !== "equip") return false;
+  const slot = normalizeEnchantSlot(targetInfo.slot);
+  if (!slot || slot === "ammo") return false;
+  const scrollDef = getEnchantScrollDef(state?.toolIdentity || state?.toolId || "");
+  const runtimeAffixId = scrollDef?.runtime?.affixId || scrollDef?.affixId;
+  if (!runtimeAffixId) return false;
+  return enchantDefSupportsSlot(scrollDef, slot) && affixSupportsSlot(runtimeAffixId, slot);
+}
+
+function createEnchantScrollUseHint(message) {
+  const text = String(message || "Choose a piece of gear to enchant.");
+  return () => ({
+    consumed: false,
+    cancelled: true,
+    code: "USE_ENCHANT_SCROLL_TARGET",
+    message: text,
+    consumesTurn: false,
+  });
+}
+
+function createGearEnchantDipHook({ affixId, enchantType, enchantLabel, detail, allowedSlots, magnitude, proc, duration, metadata }) {
+  const resolvedAffixId = String(affixId || "").trim();
+  const resolvedType = String(enchantType || "").trim().toLowerCase();
+  const resolvedLabel = String(enchantLabel || resolvedType || "enchant");
+  const resolvedDetail = String(detail || "");
+  const scrollDef = { affixId: resolvedAffixId, allowedSlots: Array.isArray(allowedSlots) ? allowedSlots.slice() : [] };
+  return (ctx, state) => {
+    const targetId = Number(state?.targetId || 0) | 0;
+    if (!(targetId > 0)) {
+      ctx.cancel({
+        code: "ENCHANT_INVALID_TARGET",
+        message: "That scroll needs a piece of gear to bind to.",
+        consumesTurn: false,
+      });
+      return { applied: false, consumedTool: false, resultType: "nothing" };
+    }
+    const info = ctx.query.itemInfo(targetId);
+    if (!info || String(info.type || "") !== "equip") {
+      ctx.cancel({
+        code: "ENCHANT_INVALID_TARGET",
+        message: "Only gear can hold that enchantment.",
+        consumesTurn: false,
+      });
+      return { applied: false, consumedTool: false, resultType: "nothing" };
+    }
+    const targetName = resolveApplyTargetName(ctx, state, "gear");
+    const slot = normalizeEnchantSlot(info.slot);
+    if (!enchantDefSupportsSlot(scrollDef, slot) || !affixSupportsSlot(resolvedAffixId, slot)) {
+      ctx.cancel({
+        code: "ENCHANT_INVALID_SLOT",
+        message: `${targetName} cannot hold ${resolvedLabel}.`,
+        consumesTurn: false,
+      });
+      return { applied: false, consumedTool: false, resultType: "nothing" };
+    }
+    const currentAffixes = Array.isArray(info.affixes) ? info.affixes.slice() : [];
+    if (currentAffixes.includes(resolvedAffixId)) {
+      ctx.cancel({
+        code: "ENCHANT_ALREADY_PRESENT",
+        message: `${targetName} already bears ${resolvedLabel}.`,
+        consumesTurn: false,
+      });
+      return { applied: false, consumedTool: false, resultType: "nothing" };
+    }
+    ctx.helpers.patchItemInfo(targetId, { affixes: [...currentAffixes, resolvedAffixId] });
+    ctx.io.emit("item:applied", {
+      actor: state.actor,
+      toolId: state.toolId,
+      targetId,
+      result: {
+        type: "gear_enchant",
+        enchantType: resolvedType,
+        affixId: resolvedAffixId,
+        magnitude,
+        proc,
+        duration,
+        metadata: { ...(metadata || {}) },
+        message: `You bind ${resolvedLabel} into ${targetName}.${resolvedDetail ? ` ${resolvedDetail}` : ""}`,
+      },
+    });
+    return { applied: true, consumedTool: true, resultType: `${resolvedType}_gear_enchant` };
+  };
+}
+
+const ENCHANT_SCROLL_ITEMS = Object.fromEntries(
+  ENCHANT_SCROLL_DEFS.map((def) => [def.itemId, {
+    id: def.itemId,
+    catalogKind: "magic",
+    name: def.name,
+    type: "scroll",
+    slot: "bag",
+    material: "paper",
+    rarity: 2,
+    rarityName: "magic",
+    value: 120,
+    weight: 0.1,
+    description: def.description,
+    hooks: {
+      can_dip_target: canEnchantScrollTarget,
+      on_dip: createGearEnchantDipHook({
+        affixId: def.runtime?.affixId || def.affixId,
+        enchantType: def.enchantType,
+        enchantLabel: def.name.replace(/^Scroll of /, "").replace(/ Binding$/, ""),
+        detail: def.detail,
+        allowedSlots: def.allowedSlots,
+        magnitude: def.magnitude,
+        proc: def.proc,
+        duration: def.duration,
+        metadata: def.metadata,
+      }),
+      on_use: createEnchantScrollUseHint(`Choose a piece of gear for ${def.name.toLowerCase()}.`),
+    },
+  }]),
+);
 
 export const MAGIC_ITEMS = {
   // Magic / Usable
@@ -2355,6 +2479,124 @@ export const MAGIC_ITEMS = {
     value: 8,
     description: "A hot, peppery root that keeps its heat long after harvest.",
   },
+  reagent_spider_leg: {
+    id: "reagent_spider_leg",
+    catalogKind: "material",
+    name: "Spider Leg",
+    type: "ingredient",
+    slot: "bag",
+    material: "organic",
+    rarity: 1,
+    rarityName: "common",
+    weight: 0.15,
+    value: 7,
+    description: "A hooked spider leg, dried stiff for poison work and binding sigils.",
+  },
+  reagent_venom_gland: {
+    id: "reagent_venom_gland",
+    catalogKind: "material",
+    name: "Venom Gland",
+    type: "ingredient",
+    slot: "bag",
+    material: "organic",
+    rarity: 2,
+    rarityName: "uncommon",
+    weight: 0.2,
+    value: 12,
+    description: "A sealed venom sac prized by poisoners and enchanters alike.",
+  },
+  reagent_resin: {
+    id: "reagent_resin",
+    catalogKind: "material",
+    name: "Binding Resin",
+    type: "ingredient",
+    slot: "bag",
+    material: "resin",
+    rarity: 1,
+    rarityName: "common",
+    weight: 0.2,
+    value: 8,
+    description: "Sticky amber resin used to seal enchantments into gear.",
+  },
+  reagent_bone_dust: {
+    id: "reagent_bone_dust",
+    catalogKind: "material",
+    name: "Bone Dust",
+    type: "ingredient",
+    slot: "bag",
+    material: "bone",
+    rarity: 1,
+    rarityName: "common",
+    weight: 0.15,
+    value: 8,
+    description: "Pale dust from shattered bone, useful for warding work.",
+  },
+  reagent_ectoplasm: {
+    id: "reagent_ectoplasm",
+    catalogKind: "material",
+    name: "Ectoplasm",
+    type: "ingredient",
+    slot: "bag",
+    material: "organic",
+    rarity: 2,
+    rarityName: "uncommon",
+    weight: 0.15,
+    value: 13,
+    description: "Cold spectral residue that clings to glass and cloth.",
+  },
+  reagent_rune_fragment: {
+    id: "reagent_rune_fragment",
+    catalogKind: "material",
+    name: "Rune Fragment",
+    type: "ingredient",
+    slot: "bag",
+    material: "stone",
+    rarity: 2,
+    rarityName: "uncommon",
+    weight: 0.1,
+    value: 14,
+    description: "A splinter of worked sigil-stone, still holding a charge.",
+  },
+  reagent_frost_core: {
+    id: "reagent_frost_core",
+    catalogKind: "material",
+    name: "Frost Core",
+    type: "ingredient",
+    slot: "bag",
+    material: "ice",
+    rarity: 2,
+    rarityName: "uncommon",
+    weight: 0.25,
+    value: 15,
+    description: "A crystal heart of trapped cold lifted from winter-touched foes.",
+  },
+  reagent_beast_claw: {
+    id: "reagent_beast_claw",
+    catalogKind: "material",
+    name: "Beast Claw",
+    type: "ingredient",
+    slot: "bag",
+    material: "bone",
+    rarity: 1,
+    rarityName: "common",
+    weight: 0.2,
+    value: 9,
+    description: "A heavy claw with enough bite left in it to anchor tougher wards.",
+  },
+  reagent_cursed_thread: {
+    id: "reagent_cursed_thread",
+    catalogKind: "material",
+    name: "Cursed Thread",
+    type: "ingredient",
+    slot: "bag",
+    material: "cloth",
+    rarity: 2,
+    rarityName: "uncommon",
+    weight: 0.05,
+    value: 16,
+    description: "Black thread knotted with a whisper of malice.",
+  },
+  ...ENCHANT_SCROLL_ITEMS,
   // ── Scroll of Identify ─────────────────────────────────────────────
   scroll_identify: {
     id: "scroll_identify",

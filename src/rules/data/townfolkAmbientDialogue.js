@@ -135,6 +135,11 @@ const ROLE_GOSSIP = Object.freeze({
     "the priest's asked for items I've never heard of before",
     "something's stirring the potions in their bottles at night",
   ]),
+  enchantress: Object.freeze([
+    "the enchantress keeps asking after spider glands and grave dust",
+    "the apothecary's got a second lamp burning late into the night",
+    "folk say she can make a trinket remember fire",
+  ]),
   gem_vendor: Object.freeze([
     "heard the adventurer's carrying something that glows",
     "the book vendor says there's demand for strange knowledge",
@@ -316,6 +321,23 @@ const ROLE_LEXICON = Object.freeze({
       "half the town thinks a bottle is faster than caution",
       "someone is storing corks like they grow on trees",
       "volatile stock goes bad exactly when people get desperate",
+    ]),
+  }),
+  enchantress: Object.freeze({
+    title: "enchantress",
+    goods: Object.freeze(["binding scrolls", "warding vellum", "sealed charms", "enchanted gear"]),
+    worksites: Object.freeze(["the enchanting bench", "the reagent tray", "the binding table", "the warding lamp"]),
+    boasts: Object.freeze([
+      "a good binding makes gear remember what it wants to be",
+      "reagents matter more than symbols; symbols just persuade them",
+      "I don't sell miracles, only durable agreements",
+      "if a ward slips, it wasn't bound honestly to begin with",
+    ]),
+    worries: Object.freeze([
+      "grave dust is getting harder to find clean",
+      "too many hunters bring me venom that's already gone flat",
+      "cheap vellum ruins more work than dull knives ever could",
+      "one missing binder and the whole script peels off by morning",
     ]),
   }),
   gem_vendor: Object.freeze({
