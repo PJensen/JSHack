@@ -87,6 +87,10 @@ export function harvestRegrowthSystem(world) {
     world.mutate(id, HarvestNode, (r) => {
       r.ready = true;
       r.regrowCountdown = 0;
+      if (String(r.kind || "") === "fishing_spot") {
+        r.fishingPressure = Math.max(0, (Number(r.fishingPressure || 0) | 0) - 1);
+        r.overfished = r.fishingPressure >= 4;
+      }
     });
     active.delete(id);
     // Regrown trees and mushrooms become solid again.

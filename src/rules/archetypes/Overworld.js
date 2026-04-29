@@ -73,6 +73,7 @@ export const FishingSpot = defineArchetype(
   [HarvestNode, {
     kind: "fishing_spot", ready: true, regrowTurns: 180, regrowCountdown: 0,
     yield: "food_raw_fish", yieldMin: 1, yieldMax: 1,
+    fishingPressure: 0,
   }],
 );
 
