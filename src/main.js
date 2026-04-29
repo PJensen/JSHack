@@ -5242,10 +5242,17 @@ function render(worldView) {
 // ---- Frame loop (FXClock) --------------------------------------------------
 let last = performance.now();
 let _fpsEMA = 0; // FX FPS (EMA)
+const MAX_FRAME_DT_SEC = 0.10;
+if (typeof document !== "undefined") {
+  document.addEventListener("visibilitychange", () => {
+    last = performance.now();
+    _dtSec = 0;
+  });
+}
 function frame(now) {
     /** @type {DOMHighResTimeStamp} */
     // @ts-ignore - annotate for JS type checking
-  const dtSec = Math.max(0, (now - last) / 1000);
+  const dtSec = Math.min(MAX_FRAME_DT_SEC, Math.max(0, (now - last) / 1000));
   last = now;
 
   // Update FX FPS (exponential moving average for stability)

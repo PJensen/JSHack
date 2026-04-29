@@ -58,8 +58,8 @@ function spawnWaterImpactRipple(out, cell, { alpha = 0.20, rings = 2 } = {}) {
   if (!out || !cell) return;
   const life = 0.34 + Math.random() * 0.20;
   out.push({
-    x: cell.x + 0.2 + Math.random() * 0.6,
-    y: cell.y + 0.18 + Math.random() * 0.64,
+    x: cell.x - 0.30 + Math.random() * 0.60,
+    y: cell.y - 0.30 + Math.random() * 0.60,
     ttl: life,
     max: life,
     radius0: 0.02 + Math.random() * 0.04,
@@ -68,6 +68,19 @@ function spawnWaterImpactRipple(out, cell, { alpha = 0.20, rings = 2 } = {}) {
     cellKey: cell.key,
     rings,
   });
+}
+
+function cellFullyInsideViewport(cell, viewport) {
+  if (!cell || !viewport) return false;
+  const vx0 = Number(viewport.vx0);
+  const vy0 = Number(viewport.vy0);
+  const vx1 = Number(viewport.vx1);
+  const vy1 = Number(viewport.vy1);
+  if (!Number.isFinite(vx0) || !Number.isFinite(vy0) || !Number.isFinite(vx1) || !Number.isFinite(vy1)) return false;
+  return cell.x - 0.5 >= vx0
+    && cell.y - 0.5 >= vy0
+    && cell.x + 0.5 <= vx1
+    && cell.y + 0.5 <= vy1;
 }
 
 function hash32(a, b = 0, c = 0, d = 0) {
@@ -549,7 +562,7 @@ export function createSurfaceAreaFxController({ getFxTime, classifySurfaceTile, 
       const key = cellKey(x, y);
       seenFisheryIds.add(id);
       const cell = waterCellByKey.get(key);
-      if (!cell || fishery.ready !== true || fishery.overfished === true) {
+      if (!cell || !cellFullyInsideViewport(cell, viewport) || fishery.ready !== true || fishery.overfished === true) {
         _fisheryRippleAccum.delete(id);
         continue;
       }
