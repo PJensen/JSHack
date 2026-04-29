@@ -32,7 +32,12 @@ import { getPassiveBonuses } from "../utils/passiveBonuses.js";
 import { attachDerivedExpression, exprAddConst } from "../utils/statProcAuthoring.js";
 import { resolveItemCooldownRemaining } from "../utils/itemCooldowns.js";
 import { affixSupportsSlot } from "./affixes.js";
-import { ENCHANT_SCROLL_DEFS, getEnchantScrollDef } from "../content/enchanting/enchantCatalog.js";
+import {
+  enchantDefSupportsSlot,
+  ENCHANT_SCROLL_DEFS,
+  getEnchantScrollDef,
+  normalizeEnchantSlot,
+} from "../content/enchanting/enchantCatalog.js";
 
 /**
  * Destroy any existing DerivedExpression entity owned by an active effect
@@ -53,11 +58,12 @@ function cleanupPriorExprEntity(ctx, targetId, effectKey) {
 function canEnchantScrollTarget(state) {
   const targetInfo = state?.targetInfo;
   if (!targetInfo || String(targetInfo.type || "") !== "equip") return false;
-  const slot = String(targetInfo.slot || "").toLowerCase();
+  const slot = normalizeEnchantSlot(targetInfo.slot);
   if (!slot || slot === "ammo") return false;
   const scrollDef = getEnchantScrollDef(state?.toolIdentity || state?.toolId || "");
-  if (!scrollDef?.affixId) return false;
-  return affixSupportsSlot(scrollDef.affixId, slot);
+  const runtimeAffixId = scrollDef?.runtime?.affixId || scrollDef?.affixId;
+  if (!runtimeAffixId) return false;
+  return enchantDefSupportsSlot(scrollDef, slot) && affixSupportsSlot(runtimeAffixId, slot);
 }
 
 function createEnchantScrollUseHint(message) {
@@ -71,11 +77,12 @@ function createEnchantScrollUseHint(message) {
   });
 }
 
-function createGearEnchantDipHook({ affixId, enchantType, enchantLabel, detail }) {
+function createGearEnchantDipHook({ affixId, enchantType, enchantLabel, detail, allowedSlots, magnitude, proc, duration, metadata }) {
   const resolvedAffixId = String(affixId || "").trim();
   const resolvedType = String(enchantType || "").trim().toLowerCase();
   const resolvedLabel = String(enchantLabel || resolvedType || "enchant");
   const resolvedDetail = String(detail || "");
+  const scrollDef = { affixId: resolvedAffixId, allowedSlots: Array.isArray(allowedSlots) ? allowedSlots.slice() : [] };
   return (ctx, state) => {
     const targetId = Number(state?.targetId || 0) | 0;
     if (!(targetId > 0)) {
@@ -96,8 +103,8 @@ function createGearEnchantDipHook({ affixId, enchantType, enchantLabel, detail }
       return { applied: false, consumedTool: false, resultType: "nothing" };
     }
     const targetName = resolveApplyTargetName(ctx, state, "gear");
-    const slot = String(info.slot || "").toLowerCase();
-    if (!affixSupportsSlot(resolvedAffixId, slot)) {
+    const slot = normalizeEnchantSlot(info.slot);
+    if (!enchantDefSupportsSlot(scrollDef, slot) || !affixSupportsSlot(resolvedAffixId, slot)) {
       ctx.cancel({
         code: "ENCHANT_INVALID_SLOT",
         message: `${targetName} cannot hold ${resolvedLabel}.`,
@@ -123,6 +130,10 @@ function createGearEnchantDipHook({ affixId, enchantType, enchantLabel, detail }
         type: "gear_enchant",
         enchantType: resolvedType,
         affixId: resolvedAffixId,
+        magnitude,
+        proc,
+        duration,
+        metadata: { ...(metadata || {}) },
         message: `You bind ${resolvedLabel} into ${targetName}.${resolvedDetail ? ` ${resolvedDetail}` : ""}`,
       },
     });
@@ -146,10 +157,15 @@ const ENCHANT_SCROLL_ITEMS = Object.fromEntries(
     hooks: {
       can_dip_target: canEnchantScrollTarget,
       on_dip: createGearEnchantDipHook({
-        affixId: def.affixId,
+        affixId: def.runtime?.affixId || def.affixId,
         enchantType: def.enchantType,
         enchantLabel: def.name.replace(/^Scroll of /, "").replace(/ Binding$/, ""),
         detail: def.detail,
+        allowedSlots: def.allowedSlots,
+        magnitude: def.magnitude,
+        proc: def.proc,
+        duration: def.duration,
+        metadata: def.metadata,
       }),
       on_use: createEnchantScrollUseHint(`Choose a piece of gear for ${def.name.toLowerCase()}.`),
     },

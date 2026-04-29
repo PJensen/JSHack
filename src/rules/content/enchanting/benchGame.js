@@ -1,6 +1,6 @@
 import { Inventory } from "../../components/Inventory.js";
 import { Position } from "../../components/Position.js";
-import { createItemById } from "../../utils/itemFactory.js";
+import { createItemById, isValidItemId } from "../../utils/itemFactory.js";
 import { addToInventory, consumeFromStack, getStackCount } from "../../utils/inventoryFacade.js";
 import { ENCHANTING_INGREDIENTS, getEnchantScrollDef, listEnchantRecipeDefs } from "./enchantCatalog.js";
 
@@ -72,7 +72,7 @@ export function emitEnchantingBenchOpen(world, actor, targetId, options = {}) {
   const ingredients = countEnchantingIngredients(world, actor);
   const recipes = listEnchantRecipeDefs().map((recipe) => ({
     ...recipe,
-    metadata: { tier: 1, rarity: "magic" },
+    metadata: { ...(recipe.metadata || { tier: 1, rarity: "magic" }) },
     canCraft: hasEnoughIngredients(ingredients, recipe.requirements || {}),
   }));
   world.emit?.("enchanting:open", {
@@ -104,6 +104,16 @@ export function craftAtEnchantingBench(world, actor, targetId, recipeKey, option
       targetId,
       result: "unknown_recipe",
       recipeKey: String(recipeKey || ""),
+    });
+    return false;
+  }
+
+  if (!isValidItemId(recipe.outputIdentity)) {
+    world.emit?.("enchanting:result", {
+      actor,
+      targetId,
+      result: "craft_failed",
+      recipeKey: recipe.key,
     });
     return false;
   }
@@ -159,7 +169,12 @@ export function craftAtEnchantingBench(world, actor, targetId, recipeKey, option
     outputName: recipe.outputName,
     enchantType: recipe.enchantType,
     affixId: recipe.affixId,
-    metadata: { tier: 1, rarity: "magic" },
+    magnitude: recipe.magnitude,
+    proc: recipe.proc,
+    duration: recipe.duration,
+    allowedSlots: Array.isArray(recipe.allowedSlots) ? recipe.allowedSlots.slice() : [],
+    runtime: { ...(recipe.runtime || {}) },
+    metadata: { ...(recipe.metadata || { tier: 1, rarity: "magic" }) },
     requirements: { ...(recipe.requirements || {}) },
   });
   emitEnchantingBenchOpen(world, actor, targetId, options);

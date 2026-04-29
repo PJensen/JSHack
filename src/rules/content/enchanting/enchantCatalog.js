@@ -18,6 +18,51 @@ export const ENCHANTING_INGREDIENTS = Object.freeze({
   gold: Object.freeze({ identity: "gold", label: "Gold" }),
 });
 
+export const ENCHANTABLE_GEAR_SLOTS = Object.freeze([
+  "weapon",
+  "armor",
+  "head",
+  "neck",
+  "belt",
+  "gloves",
+  "offhand",
+  "ring",
+  "ring1",
+  "ring2",
+  "legs",
+  "feet",
+  "ranged",
+]);
+
+export const DEFENSIVE_ENCHANT_SLOTS = Object.freeze([
+  "armor",
+  "head",
+  "neck",
+  "belt",
+  "gloves",
+  "offhand",
+  "ring",
+  "ring1",
+  "ring2",
+  "legs",
+  "feet",
+  "ranged",
+]);
+
+export function normalizeEnchantSlot(slot) {
+  const key = String(slot || "").trim().toLowerCase();
+  if (key === "ring1" || key === "ring2") return "ring";
+  if (key === "shield") return "offhand";
+  return key;
+}
+
+export function enchantDefSupportsSlot(def, slot) {
+  const normalized = normalizeEnchantSlot(slot);
+  if (!normalized || normalized === "ammo") return false;
+  const allowed = Array.isArray(def?.allowedSlots) ? def.allowedSlots : [];
+  return allowed.map(normalizeEnchantSlot).includes(normalized);
+}
+
 export const ENCHANT_SCROLL_DEFS = Object.freeze([
   Object.freeze({
     itemId: "scroll_enchant_poison",
@@ -25,6 +70,12 @@ export const ENCHANT_SCROLL_DEFS = Object.freeze([
     name: "Scroll of Venom Binding",
     enchantType: "poison",
     affixId: "venomous1",
+    magnitude: 2,
+    proc: "on hit",
+    duration: 4,
+    allowedSlots: Object.freeze(["weapon"]),
+    runtime: Object.freeze({ affixId: "venomous1", procPackageId: null }),
+    metadata: Object.freeze({ tier: 1, rarity: "magic", role: "source:poison/carrier:weapon/binder:resin" }),
     description: "Apply to a weapon to bind a persistent venomous enchantment.",
     effectSummary: "On hit, weapon strikes can poison enemies.",
     detail: "Strikes from the enchanted gear can poison your enemies.",
@@ -38,6 +89,12 @@ export const ENCHANT_SCROLL_DEFS = Object.freeze([
     name: "Scroll of Firestorm Binding",
     enchantType: "fire",
     affixId: "firestorm1",
+    magnitude: 2,
+    proc: "on hit",
+    duration: 3,
+    allowedSlots: Object.freeze(["weapon"]),
+    runtime: Object.freeze({ affixId: "firestorm1", procPackageId: null }),
+    metadata: Object.freeze({ tier: 1, rarity: "magic", role: "source:fire/carrier:oil/binder:rune" }),
     description: "Apply to a weapon to bind a persistent firestorm enchantment.",
     effectSummary: "On hit, weapon strikes can kindle lingering fire damage.",
     detail: "Strikes from the enchanted gear can ignite lingering fire.",
@@ -51,6 +108,12 @@ export const ENCHANT_SCROLL_DEFS = Object.freeze([
     name: "Scroll of Frost Binding",
     enchantType: "frost",
     affixId: "frostbite1",
+    magnitude: 1,
+    proc: "on hit",
+    duration: 2,
+    allowedSlots: Object.freeze(["weapon"]),
+    runtime: Object.freeze({ affixId: "frostbite1", procPackageId: null }),
+    metadata: Object.freeze({ tier: 1, rarity: "magic", role: "source:frost/carrier:water/binder:rune" }),
     description: "Apply to a weapon to bind a persistent frostbite enchantment.",
     effectSummary: "On hit, weapon strikes can chill enemies with frost.",
     detail: "Strikes from the enchanted gear can chill foes with frost.",
@@ -64,7 +127,13 @@ export const ENCHANT_SCROLL_DEFS = Object.freeze([
     name: "Scroll of Flame Ward Binding",
     enchantType: "fire ward",
     affixId: "fireWard1",
-    description: "Apply to armor, offhand gear, or an amulet to bind a persistent flame ward.",
+    magnitude: 0.15,
+    proc: "passive",
+    duration: 0,
+    allowedSlots: DEFENSIVE_ENCHANT_SLOTS,
+    runtime: Object.freeze({ affixId: "fireWard1", procPackageId: null }),
+    metadata: Object.freeze({ tier: 1, rarity: "magic", role: "source:fire/carrier:ash/binder:resin" }),
+    description: "Apply to armor, accessories, offhand gear, or ranged gear to bind a persistent flame ward.",
     effectSummary: "Adds enduring fire resistance to defensive gear.",
     detail: "The binding settles into the gear as a steady ward against flame.",
     stationTitle: "✧ Enchantress's Satchel",
@@ -77,7 +146,13 @@ export const ENCHANT_SCROLL_DEFS = Object.freeze([
     name: "Scroll of Venom Ward Binding",
     enchantType: "venom ward",
     affixId: "poisonWard1",
-    description: "Apply to armor, rings, or an amulet to bind a persistent venom ward.",
+    magnitude: 0.15,
+    proc: "passive",
+    duration: 0,
+    allowedSlots: DEFENSIVE_ENCHANT_SLOTS,
+    runtime: Object.freeze({ affixId: "poisonWard1", procPackageId: null }),
+    metadata: Object.freeze({ tier: 1, rarity: "magic", role: "source:poison/carrier:thread/binder:gland" }),
+    description: "Apply to armor, accessories, offhand gear, or ranged gear to bind a persistent venom ward.",
     effectSummary: "Adds enduring poison resistance to defensive gear.",
     detail: "The script stiffens into a bitter ward against poison.",
     stationTitle: "✧ Enchantress's Satchel",
@@ -90,7 +165,13 @@ export const ENCHANT_SCROLL_DEFS = Object.freeze([
     name: "Scroll of Fortified Binding",
     enchantType: "fortified",
     affixId: "kineticWard1",
-    description: "Apply to armor, offhand gear, or an amulet to bind a persistent fortified ward.",
+    magnitude: 2,
+    proc: "passive",
+    duration: 0,
+    allowedSlots: DEFENSIVE_ENCHANT_SLOTS,
+    runtime: Object.freeze({ affixId: "kineticWard1", procPackageId: null }),
+    metadata: Object.freeze({ tier: 1, rarity: "magic", role: "source:impact/carrier:claw/binder:bone" }),
+    description: "Apply to armor, accessories, offhand gear, or ranged gear to bind a persistent fortified ward.",
     effectSummary: "Adds enduring impact resistance to heavy gear.",
     detail: "The page hardens the gear into a patient, stubborn bulwark.",
     stationTitle: "✧ Enchantress's Satchel",
@@ -117,6 +198,12 @@ export function listEnchantRecipeDefs() {
     outputName: def.name,
     enchantType: def.enchantType,
     affixId: def.affixId,
+    magnitude: def.magnitude,
+    proc: def.proc,
+    duration: def.duration,
+    allowedSlots: Array.isArray(def.allowedSlots) ? def.allowedSlots.slice() : [],
+    runtime: { ...(def.runtime || {}) },
+    metadata: { ...(def.metadata || { tier: 1, rarity: "magic" }) },
     effectSummary: def.effectSummary,
     flavor: def.flavor,
     requirements: { ...(def.requirements || {}) },
