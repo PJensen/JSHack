@@ -85,7 +85,7 @@ const BUILDING_PLANS = Object.freeze([
   Object.freeze({ key: "tavern", district: "market_green", coreDx: -8, coreDy: -3, wants: ["flat"], roles: ["barkeep"] }),
   Object.freeze({ key: "general_store", district: "market_green", coreDx: -3, coreDy: 9, wants: ["flat"], roles: [] }),
   Object.freeze({ key: "smithy", district: "workshop_row", coreDx: 12, coreDy: -4, wants: ["mountain", "flat"], roles: ["smith"], rotations: FIXED_ROTATION }),
-  Object.freeze({ key: "apothecary", district: "workshop_row", coreDx: 4, coreDy: 13, wants: ["forest", "water"], roles: ["alchemist"] }),
+  Object.freeze({ key: "apothecary", district: "workshop_row", coreDx: 4, coreDy: 13, wants: ["forest", "water"], roles: ["alchemist", "enchantress"] }),
   Object.freeze({ key: "gem_store", district: "workshop_row", coreDx: -1, coreDy: 12, wants: ["flat"], roles: ["gem_vendor"] }),
   Object.freeze({ key: "book_shop", district: "civic_core", coreDx: 7, coreDy: -10, wants: ["flat"], roles: ["book_vendor"] }),
   Object.freeze({ key: "church", district: "churchyard", coreDx: -12, coreDy: 8, wants: ["quiet", "flat"], roles: ["priest"] }),
@@ -423,16 +423,18 @@ function hashKey(key) {
 }
 
 function addTownfolkForBuilding(chunks, building, roles, tavernDoor) {
-  const home = building.waypoints.resident_home
-    || building.waypoints.vendor_work
-    || building.waypoints.farmer_work
-    || building.door;
-  const work = building.waypoints.vendor_work
-    || building.waypoints.farmer_work
-    || building.waypoints.shop_door
-    || building.waypoints.front_door
-    || building.door;
   for (const role of roles) {
+    const home = (role === "enchantress" ? (building.waypoints.enchantress_work || building.waypoints.vendor_work) : null)
+      || building.waypoints.resident_home
+      || building.waypoints.vendor_work
+      || building.waypoints.farmer_work
+      || building.door;
+    const work = (role === "enchantress" ? (building.waypoints.enchantress_work || building.waypoints.vendor_work) : null)
+      || building.waypoints.vendor_work
+      || building.waypoints.farmer_work
+      || building.waypoints.shop_door
+      || building.waypoints.front_door
+      || building.door;
     addChunkSpawn(chunks, work.x, work.y, "townfolk", {
       townfolkId: role,
       homeX: home.x,

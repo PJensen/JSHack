@@ -120,11 +120,16 @@ const CATALOG_ARCHETYPES = {
 
 const HARVEST_SEED_SALT = 0x48415256;
 const SEED_DROP_SALT = 0x5345ED01;
+const HARVEST_BONUS_DROP_SALT = 0x48B0A5D1;
 
 const SEED_ITEM_IDS = Object.freeze({
   wheat: "seed_wheat",
   carrot: "seed_carrot",
   corn: "seed_corn",
+});
+const HARVEST_BONUS_DROPS = Object.freeze({
+  tree: Object.freeze({ itemId: "reagent_resin", chance: 0.65, count: 1 }),
+  thorn_bramble: Object.freeze({ itemId: "reagent_resin", chance: 0.55, count: 1 }),
 });
 const FOUNTAIN_MIN_CHARGES = 2;
 const FOUNTAIN_MAX_CHARGES = 4;
@@ -898,6 +903,34 @@ export const INTERACT_PAYLOADS = {
         return;
       }
       craftAtEnchantingBench(world, actor, targetId, requestedRecipe);
+    },
+  },
+
+  openEnchantressServices: {
+    onInteract(ctx) {
+      const { world, actor, targetId, intent, params } = ctx;
+      const interactionMode = String(intent?.mode || "").toLowerCase();
+      const requestedRecipe = String(intent?.recipe || "").toLowerCase();
+      if (interactionMode === "enchant" && requestedRecipe) {
+        craftAtEnchantingBench(world, actor, targetId, requestedRecipe, {
+          title: "✧ Enchantress",
+          subtitle: "Choose the binding you want and I'll scribe the scroll if you've brought the price.",
+        });
+        return;
+      }
+      const dialogId = String(params?.dialogId || "").trim();
+      if (dialogId) {
+        world.emit?.("dialog:openRequest", {
+          actorId: actor,
+          targetId,
+          dialogId,
+        });
+        return;
+      }
+      emitEnchantingBenchOpen(world, actor, targetId, {
+        title: "✧ Enchantress",
+        subtitle: "Bring themed reagents, gold, and the gear you want changed forever.",
+      });
     },
   },
 
@@ -1875,6 +1908,26 @@ export const INTERACT_PAYLOADS = {
               targetId,
               kind: node.kind,
               seedItemId: seedCatalogId,
+            });
+          }
+        }
+      }
+
+      const bonusDrop = HARVEST_BONUS_DROPS[node.kind];
+      if (bonusDrop?.itemId) {
+        const seed = (((world.seed >>> 0) ^ Math.imul((targetId | 0), HARVEST_BONUS_DROP_SALT) ^ Math.imul((world.step | 0), 0x9e3779b9)) >>> 0);
+        const rng = createRng(seed);
+        if (rng.next() < Number(bonusDrop.chance || 0)) {
+          const bonusItemId = createItemById(world, bonusDrop.itemId);
+          if (bonusItemId) {
+            addToInventory(world, actor, bonusItemId);
+            world.emit?.("harvest:bonus_drop", {
+              actor,
+              targetId,
+              kind: node.kind,
+              itemId: bonusItemId,
+              identity: bonusDrop.itemId,
+              count: Math.max(1, Number(bonusDrop.count || 1) | 0),
             });
           }
         }

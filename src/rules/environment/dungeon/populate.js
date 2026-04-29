@@ -2445,6 +2445,18 @@ export function materializeSpawn(world, spawn) {
             shopkeeperId: id,
           });
         }
+      } else if (def.role === "enchantress") {
+        world.add(id, Interactable, {
+          action: "openEnchantressServices",
+          params: {
+            dialogue: def.dialogue,
+            townfolkId: spawn.params.townfolkId,
+            dialogId: "townfolk:enchantress",
+          },
+        });
+        if (spawn.params.shopDoor) {
+          assignShopDoorKey(world, id, spawn.params.shopDoorRole || def.role, spawn.params.shopDoor);
+        }
       } else if (def.role === "gem_vendor") {
         world.add(id, Interactable, {
           action: "openGemVendor",

@@ -2,79 +2,28 @@ import { Inventory } from "../../components/Inventory.js";
 import { Position } from "../../components/Position.js";
 import { createItemById } from "../../utils/itemFactory.js";
 import { addToInventory, consumeFromStack, getStackCount } from "../../utils/inventoryFacade.js";
+import { ENCHANTING_INGREDIENTS, getEnchantScrollDef, listEnchantRecipeDefs } from "./enchantCatalog.js";
 
-export const ENCHANTING_INGREDIENTS = Object.freeze({
-  emberRoot: Object.freeze({ identity: "reagent_ember_root", label: "Ember Root" }),
-  moonleaf: Object.freeze({ identity: "reagent_moonleaf", label: "Moonleaf" }),
-  thornPods: Object.freeze({ identity: "reagent_thorn_pod", label: "Thorn Pods" }),
-  venomFronds: Object.freeze({ identity: "reagent_venom_frond", label: "Venom Fronds" }),
-  oil: Object.freeze({ identity: "potion_oil", label: "Flask of Oil" }),
-  water: Object.freeze({ identity: "potion_water", label: "Water Flask" }),
-  gold: Object.freeze({ identity: "gold", label: "Gold" }),
-});
-
-export const ENCHANTING_RECIPES = Object.freeze([
-  Object.freeze({
-    key: "venomous_script",
-    label: "Venomous Script",
-    outputIdentity: "scroll_enchant_poison",
-    outputName: "Scroll of Venom Binding",
-    enchantType: "poison",
-    affixId: "venomous1",
-    metadata: Object.freeze({ tier: 1, rarity: "magic" }),
-    requirements: Object.freeze({ venomFronds: 2, thornPods: 1, oil: 1, gold: 55 }),
-    effectSummary: "On hit, your gear can lace enemies with poison.",
-    flavor: "Fronds, resin, and oil are worked into a bitter green script.",
-  }),
-  Object.freeze({
-    key: "firestorm_script",
-    label: "Firestorm Script",
-    outputIdentity: "scroll_enchant_fire",
-    outputName: "Scroll of Firestorm Binding",
-    enchantType: "fire",
-    affixId: "firestorm1",
-    metadata: Object.freeze({ tier: 1, rarity: "magic" }),
-    requirements: Object.freeze({ emberRoot: 2, thornPods: 1, oil: 1, gold: 60 }),
-    effectSummary: "On hit, your gear can kindle burning fire damage.",
-    flavor: "The scroll drinks heat from ember root and flashes with sparks.",
-  }),
-  Object.freeze({
-    key: "frostbite_script",
-    label: "Frostbite Script",
-    outputIdentity: "scroll_enchant_frost",
-    outputName: "Scroll of Frost Binding",
-    enchantType: "frost",
-    affixId: "frostbite1",
-    metadata: Object.freeze({ tier: 1, rarity: "magic" }),
-    requirements: Object.freeze({ moonleaf: 2, water: 1, thornPods: 1, gold: 60 }),
-    effectSummary: "On hit, your gear can chill enemies with frost.",
-    flavor: "Cold silver leaf and clean water dry into a pale blue sigil.",
-  }),
-]);
-
-function findRecipe(recipeKey) {
-  const key = String(recipeKey || "").trim().toLowerCase();
-  if (!key) return null;
-  for (const recipe of ENCHANTING_RECIPES) {
-    if (recipe.key === key) return recipe;
-  }
-  return null;
-}
+const INSTALLED_KEY = Symbol.for("jshack:enchanting:openRequest:installed");
 
 function safeCountIngredient(world, actor, identity) {
   return Math.max(0, Number(getStackCount(world, actor, identity) || 0) | 0);
 }
 
-function countEnchantingIngredients(world, actor) {
-  return {
-    emberRoot: safeCountIngredient(world, actor, ENCHANTING_INGREDIENTS.emberRoot.identity),
-    moonleaf: safeCountIngredient(world, actor, ENCHANTING_INGREDIENTS.moonleaf.identity),
-    thornPods: safeCountIngredient(world, actor, ENCHANTING_INGREDIENTS.thornPods.identity),
-    venomFronds: safeCountIngredient(world, actor, ENCHANTING_INGREDIENTS.venomFronds.identity),
-    oil: safeCountIngredient(world, actor, ENCHANTING_INGREDIENTS.oil.identity),
-    water: safeCountIngredient(world, actor, ENCHANTING_INGREDIENTS.water.identity),
-    gold: safeCountIngredient(world, actor, ENCHANTING_INGREDIENTS.gold.identity),
-  };
+export function countEnchantingIngredients(world, actor) {
+  return Object.fromEntries(
+    Object.entries(ENCHANTING_INGREDIENTS).map(([key, def]) => [key, safeCountIngredient(world, actor, def.identity)]),
+  );
+}
+
+function findRecipe(recipeKey) {
+  const key = String(recipeKey || "").trim().toLowerCase();
+  if (!key) return null;
+  const recipes = listEnchantRecipeDefs();
+  for (let i = 0; i < recipes.length; i++) {
+    if (recipes[i].key === key) return recipes[i];
+  }
+  return null;
 }
 
 function hasEnoughIngredients(counts, requirements) {
@@ -119,25 +68,24 @@ function giveCraftedItem(world, actor, itemId) {
   return createdId;
 }
 
-export function emitEnchantingBenchOpen(world, actor, targetId) {
+export function emitEnchantingBenchOpen(world, actor, targetId, options = {}) {
   const ingredients = countEnchantingIngredients(world, actor);
-  const recipes = ENCHANTING_RECIPES.map((recipe) => ({
-    key: recipe.key,
-    label: recipe.label,
-    outputIdentity: recipe.outputIdentity,
-    outputName: recipe.outputName,
-    enchantType: recipe.enchantType,
-    affixId: recipe.affixId,
-    metadata: { ...(recipe.metadata || {}) },
-    requirements: { ...(recipe.requirements || {}) },
+  const recipes = listEnchantRecipeDefs().map((recipe) => ({
+    ...recipe,
+    metadata: { tier: 1, rarity: "magic" },
     canCraft: hasEnoughIngredients(ingredients, recipe.requirements || {}),
-    effectSummary: recipe.effectSummary,
-    flavor: recipe.flavor,
   }));
-  world.emit?.("enchanting:open", { actor, targetId, ingredients, recipes });
+  world.emit?.("enchanting:open", {
+    actor,
+    targetId,
+    ingredients,
+    recipes,
+    title: String(options.title || "✧ Enchanting Bench"),
+    subtitle: String(options.subtitle || "Bind reagents and gold into a scroll, then apply it to your gear."),
+  });
 }
 
-export function craftAtEnchantingBench(world, actor, targetId, recipeKey) {
+export function craftAtEnchantingBench(world, actor, targetId, recipeKey, options = {}) {
   if (!world.has(actor, Inventory)) {
     world.emit?.("enchanting:result", {
       actor,
@@ -150,7 +98,7 @@ export function craftAtEnchantingBench(world, actor, targetId, recipeKey) {
 
   const recipe = findRecipe(recipeKey);
   if (!recipe) {
-    emitEnchantingBenchOpen(world, actor, targetId);
+    emitEnchantingBenchOpen(world, actor, targetId, options);
     world.emit?.("enchanting:result", {
       actor,
       targetId,
@@ -167,7 +115,7 @@ export function craftAtEnchantingBench(world, actor, targetId, recipeKey) {
       const required = Math.max(0, Number(recipe.requirements?.[key] || 0) | 0);
       missing[key] = Math.max(0, required - Math.max(0, Number(ingredients[key] || 0) | 0));
     }
-    emitEnchantingBenchOpen(world, actor, targetId);
+    emitEnchantingBenchOpen(world, actor, targetId, options);
     world.emit?.("enchanting:result", {
       actor,
       targetId,
@@ -211,9 +159,24 @@ export function craftAtEnchantingBench(world, actor, targetId, recipeKey) {
     outputName: recipe.outputName,
     enchantType: recipe.enchantType,
     affixId: recipe.affixId,
-    metadata: { ...(recipe.metadata || {}) },
+    metadata: { tier: 1, rarity: "magic" },
     requirements: { ...(recipe.requirements || {}) },
   });
-  emitEnchantingBenchOpen(world, actor, targetId);
+  emitEnchantingBenchOpen(world, actor, targetId, options);
   return true;
+}
+
+export function installEnchantingOpenRequestListener(world) {
+  if (!world || world[INSTALLED_KEY]) return;
+  world[INSTALLED_KEY] = true;
+  world.on("enchanting:openRequest", ({ actorId, targetId, title, subtitle }) => {
+    const actor = Number(actorId || 0) | 0;
+    const target = Number(targetId || 0) | 0;
+    if (!(actor > 0) || !(target > 0)) return;
+    emitEnchantingBenchOpen(world, actor, target, { title, subtitle });
+  });
+}
+
+export function getEnchantScrollRecipe(itemId) {
+  return getEnchantScrollDef(itemId);
 }

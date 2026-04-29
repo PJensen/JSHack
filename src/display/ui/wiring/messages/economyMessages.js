@@ -13,8 +13,18 @@ export function installEconomyMessages(ctx) {
       moonleaf: 'moonleaf',
       thornPods: 'thorn pods',
       venomFronds: 'venom fronds',
+      spiderLeg: 'spider legs',
+      venomGland: 'venom glands',
+      resin: 'binding resin',
+      boneDust: 'bone dust',
+      ectoplasm: 'ectoplasm',
+      runeFragment: 'rune fragments',
+      frostCore: 'frost cores',
+      beastClaw: 'beast claws',
+      cursedThread: 'cursed thread',
       oil: 'oil',
       water: 'water',
+      ashes: 'ashes',
       gold: 'gold',
     };
     const parts = [];
@@ -124,6 +134,12 @@ export function installEconomyMessages(ctx) {
     log(`You find some ${label} seeds!`, 'system');
   });
 
+  world.on('harvest:bonus_drop', ({ actor, kind, identity }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    const label = String(identity || 'a reagent').replace(/^reagent_/, '').replace(/_/g, ' ');
+    log(`You salvage ${label} from the ${harvestNodeLabel(kind)}.`, 'system');
+  });
+
   world.on('seed:planted', ({ actor, kind }) => {
     if (nameOfEntity(actor) !== 'You') return;
     const label = kind === 'wheat' ? 'wheat' : kind === 'carrot' ? 'carrot' : kind === 'corn' ? 'corn' : kind;
@@ -152,9 +168,10 @@ export function installEconomyMessages(ctx) {
   });
 
   // === Enchanting events ===
-  world.on('enchanting:open', ({ actor, ingredients }) => {
+  world.on('enchanting:open', ({ actor, ingredients, title }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    log(`You open the enchanting bench. (${formatEnchantingBag(ingredients, { includeZero: true }) || "no stock"})`, 'system');
+    const label = String(title || 'Enchanting Bench').replace(/^✧\s*/, '');
+    log(`You consult the ${label.toLowerCase()}. (${formatEnchantingBag(ingredients, { includeZero: true }) || "no stock"})`, 'system');
   });
 
   world.on('enchanting:crafted', ({ actor, recipeLabel, outputName }) => {

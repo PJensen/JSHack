@@ -100,6 +100,7 @@ import { installGemSocketListener } from "../rules/data/gemSocketAffixes.js";
 import { installElectrocuteOnDamage } from "../rules/utils/electrocute.js";
 import { installCentipedeBodyCascade } from "../rules/utils/centipedeMovement.js";
 import { installPerceptionMemoryListeners, perceptionMemorySystem } from "../rules/systems/perceptionMemorySystem.js";
+import { installEnchantingOpenRequestListener } from "../rules/content/enchanting/benchGame.js";
 
 /**
  * @param {World} world
@@ -162,6 +163,7 @@ export function configureWorld(world) {
   // Centipede body segments cascade position when the head moves.
   installCentipedeBodyCascade(world);
   installPerceptionMemoryListeners(world);
+  installEnchantingOpenRequestListener(world);
 
   // Phase: ai (intent producers — added intents are visible to later phases
   // in the same tick because ecs-js add() is intratick-immediate)
