@@ -61,15 +61,19 @@ function findRecipe(recipeKey) {
   return null;
 }
 
+function safeCountIngredient(world, actor, identity) {
+  return Math.max(0, Number(getStackCount(world, actor, identity) || 0) | 0);
+}
+
 function countEnchantingIngredients(world, actor) {
   return {
-    emberRoot: Math.max(0, Number(getStackCount(world, actor, ENCHANTING_INGREDIENTS.emberRoot.identity) || 0) | 0),
-    moonleaf: Math.max(0, Number(getStackCount(world, actor, ENCHANTING_INGREDIENTS.moonleaf.identity) || 0) | 0),
-    thornPods: Math.max(0, Number(getStackCount(world, actor, ENCHANTING_INGREDIENTS.thornPods.identity) || 0) | 0),
-    venomFronds: Math.max(0, Number(getStackCount(world, actor, ENCHANTING_INGREDIENTS.venomFronds.identity) || 0) | 0),
-    oil: Math.max(0, Number(getStackCount(world, actor, ENCHANTING_INGREDIENTS.oil.identity) || 0) | 0),
-    water: Math.max(0, Number(getStackCount(world, actor, ENCHANTING_INGREDIENTS.water.identity) || 0) | 0),
-    gold: Math.max(0, Number(getStackCount(world, actor, ENCHANTING_INGREDIENTS.gold.identity) || 0) | 0),
+    emberRoot: safeCountIngredient(world, actor, ENCHANTING_INGREDIENTS.emberRoot.identity),
+    moonleaf: safeCountIngredient(world, actor, ENCHANTING_INGREDIENTS.moonleaf.identity),
+    thornPods: safeCountIngredient(world, actor, ENCHANTING_INGREDIENTS.thornPods.identity),
+    venomFronds: safeCountIngredient(world, actor, ENCHANTING_INGREDIENTS.venomFronds.identity),
+    oil: safeCountIngredient(world, actor, ENCHANTING_INGREDIENTS.oil.identity),
+    water: safeCountIngredient(world, actor, ENCHANTING_INGREDIENTS.water.identity),
+    gold: safeCountIngredient(world, actor, ENCHANTING_INGREDIENTS.gold.identity),
   };
 }
 
