@@ -1,25 +1,13 @@
 import { FoodDecay } from "../../components/FoodDecay.js";
 import { Hunger } from "../../components/Hunger.js";
-
-const DECAY_STAGES = Object.freeze([
-  Object.freeze({ name: "fresh", maxFrac: 0.33, nutritionMult: 1.0, sicknessChance: 0 }),
-  Object.freeze({ name: "off", maxFrac: 0.66, nutritionMult: 0.75, sicknessChance: 0 }),
-  Object.freeze({ name: "rancid", maxFrac: 0.99, nutritionMult: 0.5, sicknessChance: 0.2 }),
-  Object.freeze({ name: "putrid", maxFrac: Infinity, nutritionMult: 0.25, sicknessChance: 0.8 }),
-]);
+import { getDecayStage as readDecayStage } from "../../data/food.js";
 
 /**
  * @param {any} decay
  */
 function getDecayStage(decay) {
   if (!decay || typeof decay !== "object") return null;
-  const turnsHeld = Number(decay.turnsHeld || 0);
-  const shelfLife = Number(decay.shelfLife || 0);
-  const frac = shelfLife > 0 ? turnsHeld / shelfLife : 1;
-  for (let i = 0; i < DECAY_STAGES.length; i++) {
-    if (frac <= DECAY_STAGES[i].maxFrac) return DECAY_STAGES[i];
-  }
-  return DECAY_STAGES[DECAY_STAGES.length - 1];
+  return readDecayStage(Number(decay.turnsHeld || 0), decay.shelfLife);
 }
 
 /**

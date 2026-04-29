@@ -8,7 +8,7 @@ import { Inventory } from '../components/Inventory.js';
 import { ItemInfo } from '../components/ItemInfo.js';
 import { FoodDecay } from '../components/FoodDecay.js';
 import { NamedIdentity } from '../components/NamedIdentity.js';
-import { getDecayStage } from '../data/food.js';
+import { getDecayStage, resolveFoodShelfLife } from '../data/food.js';
 import { inventoryItems } from '../utils/inventoryFacade.js';
 
 /** Corpse identities that never decay. */
@@ -30,15 +30,17 @@ export function foodDecaySystem(world) {
       // Some corpses never rot (e.g. lichen)
       const ni = world.get(itemId, NamedIdentity);
       if (ni && NEVER_DECAY_CORPSES.has(ni.identity)) continue;
+      const shelfLife = resolveFoodShelfLife(decay.shelfLife);
+      if (shelfLife <= 0) continue;
 
       // Snapshot previous stage before incrementing
-      const prevStage = getDecayStage(decay.turnsHeld, decay.shelfLife).stage;
+      const prevStage = getDecayStage(decay.turnsHeld, shelfLife).stage;
 
       // Advance decay
       decay.turnsHeld += 1;
 
       // Check for stage transition
-      const next = getDecayStage(decay.turnsHeld, decay.shelfLife);
+      const next = getDecayStage(decay.turnsHeld, shelfLife);
       if (next.stage !== prevStage) {
         const ni = world.get(itemId, NamedIdentity);
         const itemName = ni?.name || info.description || 'food';

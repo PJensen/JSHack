@@ -521,8 +521,8 @@ function _wrapMonsterHook(identity, hookName, dslFn) {
 // ═══════════════════════════════════════════════════════════════════
 
 function _resolveShelfLife(input) {
-  if (typeof input === 'number') return Math.max(1, input | 0);
-  if (typeof input === 'string') return SHELF_LIFE[input] || SHELF_LIFE.ration;
+  if (typeof input === 'number') return Math.max(0, input | 0);
+  if (typeof input === 'string') return SHELF_LIFE[input] || input;
   return SHELF_LIFE.ration;
 }
 

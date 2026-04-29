@@ -692,11 +692,11 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
         ? Math.max(0, Math.min(1, Number(ch.fadeLeft || 0) / Math.max(0.001, Number(ch.fadeMax || 1))))
         : 1;
       const bob = Math.sin(fxTime * 5.2 + Number(ch.phase || 0)) * 0.045;
-      const bx = Number(ch.x) + 0.5;
-      const by = Number(ch.y) + 0.42 + bob;
+      const bx = Number(ch.x);
+      const by = Number(ch.y) - 0.08 + bob;
       if (actorPos) {
-        const ax = Number(actorPos.x) + 0.5;
-        const ay = Number(actorPos.y) + 0.48;
+        const ax = Number(actorPos.x);
+        const ay = Number(actorPos.y);
         ctx.strokeStyle = `rgba(220,245,255,${(0.72 * alphaBase).toFixed(3)})`;
         ctx.lineWidth = 0.06;
         ctx.beginPath();

@@ -1966,7 +1966,7 @@ export const MAGIC_ITEMS = {
         potency: 0,
       },
       decay: {
-        shelfLife: 120,
+        shelfLife: "TURNS_PER_DAY * 1.5",
         turnsHeld: 0,
       },
     },
@@ -1993,7 +1993,7 @@ export const MAGIC_ITEMS = {
         potency: 0,
       },
       decay: {
-        shelfLife: 160,
+        shelfLife: "TURNS_PER_DAY * 2",
         turnsHeld: 0,
       },
     },
@@ -2020,7 +2020,7 @@ export const MAGIC_ITEMS = {
         potency: 0,
       },
       decay: {
-        shelfLife: 200,
+        shelfLife: "TURNS_PER_DAY * 3",
         turnsHeld: 0,
       },
     },
@@ -2086,7 +2086,7 @@ export const MAGIC_ITEMS = {
         potency: 0,
       },
       decay: {
-        shelfLife: 160,
+        shelfLife: "TURNS_PER_DAY * 2",
         turnsHeld: 0,
       },
     },
