@@ -26,6 +26,7 @@ import { STAMINA_REGEN_COOLDOWN } from "../data/regenConstants.js";
 import { spellCost, spellCostPerTick, spellCostResource } from "../data/spells.js";
 import { Equipment, GEAR_SLOTS } from "../components/Equipment.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
+import { HarvestNode } from "../components/HarvestNode.js";
 import { getTile } from "../environment/dungeon/tileMap.js";
 import {
   TILE_CORAL_REEF,
@@ -93,6 +94,18 @@ function equippedFishingRodId(world, actor) {
     if (!(itemId > 0)) continue;
     const identity = String(world.get(itemId, NamedIdentity)?.identity || "");
     if (identity === "fishing_rod") return itemId;
+  }
+  return 0;
+}
+
+function findReadyFishingSpotAt(world, x, y) {
+  const tx = Number(x) | 0;
+  const ty = Number(y) | 0;
+  for (const [id, pos, node] of world.query(Position, HarvestNode)) {
+    if ((pos.x | 0) !== tx || (pos.y | 0) !== ty) continue;
+    if (String(node?.kind || "") !== "fishing_spot") continue;
+    if (node.ready !== true) continue;
+    return id | 0;
   }
   return 0;
 }
@@ -400,6 +413,9 @@ export function castSpellSystem(world) {
     const castTime = Number(resolvedSpell.castTime || 0) | 0;
     if (castTime > 0 && !fromChanneling) {
       const casterPos = world.get(actor, Position);
+      const channelTargetId = String(resolvedSpell.id || "") === "fishing"
+        ? (findReadyFishingSpotAt(world, intent.x, intent.y) || actor)
+        : (intent.targetId || actor);
       try {
         world.add(actor, Channeling, {
           mode: "cast",
@@ -407,7 +423,7 @@ export function castSpellSystem(world) {
           turnsTotal: castTime,
           manaPerTick: 0,
           spellId: resolvedSpell.id,
-          targetId: intent.targetId || actor,
+          targetId: channelTargetId,
           x: intent.x ?? null,
           y: intent.y ?? null,
           breakOnNoLos: !!resolvedSpell.breakOnNoLos,
@@ -420,7 +436,7 @@ export function castSpellSystem(world) {
         actor,
         spellId: resolvedSpell.id,
         castTime,
-        targetId: intent.targetId || actor,
+        targetId: channelTargetId,
         x: intent.x ?? null,
         y: intent.y ?? null,
       });
@@ -431,6 +447,7 @@ export function castSpellSystem(world) {
           x: intent.x ?? null,
           y: intent.y ?? null,
           turns: castTime,
+          spotId: channelTargetId !== actor ? channelTargetId : 0,
         });
       }
       world.remove(actor, CastSpellIntent);

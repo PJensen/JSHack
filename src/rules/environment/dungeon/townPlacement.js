@@ -606,6 +606,7 @@ function addBuildingResourceSpawns(chunks, building, buildingPlan, bounds) {
 
 function addResourceSpawns(chunks, center, bounds) {
   const kinds = [
+    ["fishing_spot", (t) => WET_TILES.has(t)],
     ["harvest_berries", (t) => FOREST_TILES.has(t) || FLAT_TILES.has(t)],
     ["harvest_herbs", (t) => FOREST_TILES.has(t) || WATER_EDGE_TILES.has(t)],
     ["harvest_thorn_bramble", (t) => FOREST_TILES.has(t) || t === TILE_SWAMP || t === TILE_BOG],
@@ -613,9 +614,10 @@ function addResourceSpawns(chunks, center, bounds) {
   ];
   for (const [kind, predicate] of kinds) {
     let placed = 0;
-    for (let r = 20; r <= 54 && placed < 3; r++) {
-      for (let dx = -r; dx <= r && placed < 3; dx++) {
-        for (let dy = -r; dy <= r && placed < 3; dy++) {
+    const targetCount = kind === "fishing_spot" ? 6 : 3;
+    for (let r = 20; r <= 54 && placed < targetCount; r++) {
+      for (let dx = -r; dx <= r && placed < targetCount; dx++) {
+        for (let dy = -r; dy <= r && placed < targetCount; dy++) {
           if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
           const x = center.x + dx;
           const y = center.y + dy;

@@ -25,7 +25,7 @@ defineItem('fishing_rod', {
   abilities: {
     cast_line: {
       name:        'Cast Line',
-      icon:        'F',
+      icon:        '🎣',
       targeting:   'none',
       cooldown:    0,
       description: 'Cast into nearby water and wait for a bite.',
@@ -34,7 +34,7 @@ defineItem('fishing_rod', {
         ctx.emit('fishing:cast:request', {
           actor: ctx.user,
           itemId: ctx.item,
-          turns: 4,
+          turns: 12,
         });
       },
     },
@@ -44,7 +44,7 @@ defineItem('fishing_rod', {
     ctx.emit('fishing:cast:request', {
       actor: ctx.user,
       itemId: ctx.item,
-      turns: 4,
+      turns: 12,
     });
   },
 });

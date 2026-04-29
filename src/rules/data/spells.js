@@ -149,7 +149,7 @@ export const SPELL_DEFS = {
     minIntelligence: 0,
     clearMindedCasting: true,
     range: 6,
-    castTime: 4,
+    castTime: 12,
     breakOnMove: true,
     script: 'fishing',
     targeting: 'target',

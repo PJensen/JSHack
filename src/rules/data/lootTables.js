@@ -147,6 +147,56 @@ export const LOOT_TABLES = {
     ],
   },
 
+  "sub:fishing_epic_weapon": {
+    rolls: { min: 1, max: 1 },
+    entries: [
+      { type: "equip", weight: 18, pool: ["pyreheart_mace"], affixChance: 0 },
+      { type: "equip", weight: 16, pool: ["ashen_reaver"], affixChance: 0 },
+      { type: "equip", weight: 16, pool: ["glacial_edge"], affixChance: 0 },
+      { type: "equip", weight: 14, pool: ["witchfire_sword"], affixChance: 0 },
+      { type: "equip", weight: 14, pool: ["howling_maul"], affixChance: 0 },
+      { type: "equip", weight: 10, pool: ["sunsword"], affixChance: 0 },
+      { type: "equip", weight: 8,  pool: ["bow_composite"], affixChance: 0 },
+    ],
+  },
+
+  "sub:fishing_legendary_weapon": {
+    rolls: { min: 1, max: 1 },
+    entries: [
+      { type: "equip", weight: 35, pool: ["stormcaller_blade"], affixChance: 0 },
+      { type: "equip", weight: 35, pool: ["soulreaver_axe"], affixChance: 0 },
+      { type: "equip", weight: 25, pool: ["bow_shadow"], affixChance: 0 },
+    ],
+  },
+
+  "fishing:normal_water": {
+    rolls: { min: 1, max: 1 },
+    entries: [
+      { type: "item",    weight: 68, itemId: "food_raw_fish" },
+      { type: "item",    weight: 2,  itemId: "food_golden_carp" },
+      { type: "item",    weight: 1,  itemId: "food_moonfin" },
+      { type: "item",    weight: 8,  itemId: "fishing_kelp" },
+      { type: "item",    weight: 6,  itemId: "junk_soggy_boot" },
+      { type: "archetype", weight: 7, archetype: "Bone" },
+      { type: "nothing", weight: 8 },
+    ],
+  },
+
+  "fishing:spot": {
+    rolls: { min: 1, max: 1 },
+    entries: [
+      { type: "item",    weight: 42, itemId: "food_raw_fish" },
+      { type: "item",    weight: 18, itemId: "food_golden_carp" },
+      { type: "item",    weight: 7,  itemId: "food_moonfin" },
+      { type: "item",    weight: 12, itemId: "fishing_kelp" },
+      { type: "item",    weight: 8,  itemId: "junk_soggy_boot" },
+      { type: "archetype", weight: 5, archetype: "Bone" },
+      { type: "table",   weight: 3,  tableId: "sub:fishing_epic_weapon" },
+      { type: "table",   weight: 1,  tableId: "sub:fishing_legendary_weapon" },
+      { type: "nothing", weight: 4 },
+    ],
+  },
+
   // Catalog backfill so new/thematic gear can still enter the drop economy.
   "sub:equip_catalog_backfill": {
     rolls: { min: 1, max: 1 },

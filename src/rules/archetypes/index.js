@@ -37,6 +37,7 @@ export {
   HomeBed,
   HomeChest,
   HomeSign,
+  FishingSpot,
   BerryBush,
   HerbPatch,
   ThornBramble,
