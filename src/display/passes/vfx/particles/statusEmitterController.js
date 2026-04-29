@@ -1,7 +1,12 @@
 import { isGoreDisabled } from "../../../ui/wiring/goreEngine.js";
 import { evaluatePattern } from "../../../lighting/sources/temporalPatterns.js";
+import { ParticlePool } from "./particlePool.js";
 
 const INSTALLED_KEY = Symbol.for("jshack:display:statusEmitters:installed");
+const FISHING_DROP_STREAK_LEN = 0.42;
+const FISHING_DROP_R = 100;
+const FISHING_DROP_G = 170;
+const FISHING_DROP_B = 230;
 
 /**
  * Display-only controller for continuous status/kind particle emitters.
@@ -31,6 +36,8 @@ export function createStatusEmitterController({ world, fx }) {
   const seenEmitterKeys = new Set();
   const origins = [];
   const lightProbes = [];
+  const fishingDropPool = new ParticlePool(384);
+  const fishingDropAccumulators = new Map();
   let _fxTime = 0;
 
   function computeCarryOrigin(entity, slot, carryAnchor) {
@@ -120,11 +127,59 @@ export function createStatusEmitterController({ world, fx }) {
     });
   }
 
+  function pressureDropRate(entity) {
+    if (!Array.isArray(entity?.tags)) return 0;
+    if (!entity.tags.includes("fishing_spot_ready")) return 0;
+    if (entity.tags.includes("fishing_pressure_overfished")) return 0;
+    if (entity.tags.includes("fishing_pressure_medium")) return 5;
+    return 13;
+  }
+
+  function spawnFishingDroplets(dtSec, entity, fxTime) {
+    const rate = pressureDropRate(entity);
+    const id = Number(entity?.id || 0) | 0;
+    if (!(id > 0) || rate <= 0) {
+      fishingDropAccumulators.delete(id);
+      return;
+    }
+    const phase = Number(fxTime || 0) * 1.7 + id * 0.41;
+    const key = id;
+    let acc = Number(fishingDropAccumulators.get(key) || 0);
+    acc += dtSec * rate;
+    while (acc >= 1) {
+      acc -= 1;
+      const ox = (Math.random() - 0.5) * 0.62;
+      const oy = (Math.random() - 0.5) * 0.46;
+      const speedJitter = 0.85 + Math.random() * 0.30;
+      const pressureMedium = Array.isArray(entity.tags) && entity.tags.includes("fishing_pressure_medium");
+      fishingDropPool.spawn({
+        x: Number(entity.pos.x || 0) + ox,
+        y: Number(entity.pos.y || 0) + oy + Math.sin(phase) * 0.04,
+        vx: -0.60 * speedJitter,
+        vy: 2.30 * speedJitter,
+        ax: 0,
+        ay: 0.35,
+        life: 0.22 + Math.random() * 0.16,
+        size0: pressureMedium ? 0.045 : 0.06,
+        size1: 0.025,
+        r: FISHING_DROP_R + Math.floor(Math.random() * 24 - 12),
+        g: FISHING_DROP_G + Math.floor(Math.random() * 18 - 9),
+        b: FISHING_DROP_B + Math.floor(Math.random() * 18 - 9),
+        a0: pressureMedium ? 0.42 : 0.68,
+        a1: 0,
+        rot: 0,
+        rotVel: 0,
+      });
+    }
+    fishingDropAccumulators.set(key, acc);
+  }
+
   function step(dtSec, view, fxTime) {
     _fxTime = Number(fxTime || 0);
     origins.length = 0;
     lightProbes.length = 0;
     seenEmitterKeys.clear();
+    fishingDropPool.step(dtSec);
     const isVisibleAt = (typeof view?.isVisible === "function") ? view.isVisible : null;
     for (let i = 0; i < view.entities.length; i++) {
       const e = view.entities[i];
@@ -206,6 +261,12 @@ export function createStatusEmitterController({ world, fx }) {
         if (e.kind === "fountain" && dryFountains.has(e.id)) continue;
         if (e.kind === "familiar" && familiarCooldowns.has(e.id)) continue;
         if (e.kind === "fishing_spot" && (!Array.isArray(e.tags) || !e.tags.includes("fishing_spot_ready") || e.tags.includes("fishing_pressure_overfished"))) continue;
+        if (e.kind === "fishing_spot") {
+          spawnFishingDroplets(dtSec, e, fxTime);
+          seenEmitterKeys.add(`${kc.prefix}:${e.id}`);
+          if (!kc.tracker.has(e.id)) kc.tracker.add(e.id);
+          continue;
+        }
         const key = `${kc.prefix}:${e.id}`;
         seenEmitterKeys.add(key);
         const emitter = fx.ensureEmitter(key, kc.cfg);
@@ -218,28 +279,8 @@ export function createStatusEmitterController({ world, fx }) {
           emitter.alphaMultiplier = pattern.intensity;
           emitter.rateMultiplier = pattern.intensity;
           emitter.sizeMultiplier = pattern.intensity;
-        } else if (e.kind === "fishing_spot" && emitter) {
-          const pressureMedium = Array.isArray(e.tags) && e.tags.includes("fishing_pressure_medium");
-          const phase = Number(fxTime || 0) * 2.8 + (e.id * 0.31);
-          const pulse = 0.88 + 0.12 * Math.sin(phase);
-          const pressureScale = pressureMedium ? 0.45 : 1.0;
-          emitter.alphaMultiplier = pulse * pressureScale;
-          emitter.rateMultiplier = pressureMedium ? 0.45 : 1.0;
-          emitter.sizeMultiplier = pressureMedium ? 0.72 : 1.0;
         }
-        if (e.kind === "fishing_spot") {
-          const pressureMedium = Array.isArray(e.tags) && e.tags.includes("fishing_pressure_medium");
-          const phase = Number(fxTime || 0) * (pressureMedium ? 1.6 : 2.7) + (e.id * 0.37);
-          const rx = pressureMedium ? 0.24 : 0.36;
-          const ry = pressureMedium ? 0.10 : 0.16;
-          origins.push({
-            key,
-            x: e.pos.x + Math.cos(phase) * rx,
-            y: e.pos.y + Math.sin(phase) * ry,
-          });
-        } else {
-          origins.push({ key, x: e.pos.x, y: e.pos.y });
-        }
+        origins.push({ key, x: e.pos.x, y: e.pos.y });
         if (e.kind === "familiar") {
           lightProbes.push({ kind: "familiar_ready", id: e.id, x: e.pos.x, y: e.pos.y });
         }
@@ -274,6 +315,34 @@ export function createStatusEmitterController({ world, fx }) {
     fx.step(dtSec, origins);
   }
 
+  function drawFishingDroplets(ctx) {
+    if (!ctx || fishingDropPool.count === 0) return;
+    ctx.save();
+    ctx.globalCompositeOperation = "source-over";
+    ctx.lineCap = "round";
+    for (let i = 0; i < fishingDropPool.count; i++) {
+      const u = 1 - (fishingDropPool.life[i] / fishingDropPool.lifeMax[i]);
+      const alpha = fishingDropPool.a0[i] + (fishingDropPool.a1[i] - fishingDropPool.a0[i]) * u;
+      if (alpha < 0.01) continue;
+      const px = fishingDropPool.x[i];
+      const py = fishingDropPool.y[i];
+      const pvx = fishingDropPool.vx[i];
+      const pvy = fishingDropPool.vy[i];
+      const speed = Math.sqrt(pvx * pvx + pvy * pvy);
+      if (speed < 0.001) continue;
+      const inv = 1 / speed;
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = `rgb(${fishingDropPool.r[i] | 0},${fishingDropPool.g[i] | 0},${fishingDropPool.b[i] | 0})`;
+      ctx.lineWidth = 0.055;
+      ctx.beginPath();
+      ctx.moveTo(px, py);
+      ctx.lineTo(px - pvx * inv * FISHING_DROP_STREAK_LEN, py - pvy * inv * FISHING_DROP_STREAK_LEN);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
   function getActiveLights() {
     const out = [];
     for (let i = 0; i < lightProbes.length; i++) {
@@ -303,5 +372,5 @@ export function createStatusEmitterController({ world, fx }) {
     return out;
   }
 
-  return { installListeners, step, getActiveLights };
+  return { installListeners, step, drawFishingDroplets, getActiveLights };
 }

@@ -18,8 +18,8 @@ export const IRON_RATION_NUTRITION = 700;
 // Consumed by foodDecaySystem, native food-use hooks, and display name resolver.
 
 /** Default shelf life by food kind (turns in inventory before fully putrid). */
-export const SHELF_LIFE_RATION = 500;
-export const SHELF_LIFE_CORPSE = 150;
+export const SHELF_LIFE_RATION = TURNS_PER_DAY * 7;
+export const SHELF_LIFE_CORPSE = TURNS_PER_DAY * 2;
 
 /** Decay stage thresholds as fractions of shelfLife. */
 export const DECAY_STAGES = Object.freeze([
@@ -36,12 +36,45 @@ export const DECAY_STAGES = Object.freeze([
  * @returns {{ stage: string, nutritionMult: number, sicknessChance: number }}
  */
 export function getDecayStage(turnsHeld, shelfLife) {
-  const frac = shelfLife > 0 ? turnsHeld / shelfLife : 1;
+  const resolvedShelfLife = resolveFoodShelfLife(shelfLife);
+  if (resolvedShelfLife <= 0) {
+    const fresh = DECAY_STAGES[0];
+    return { stage: fresh.name, nutritionMult: fresh.nutritionMult, sicknessChance: fresh.sicknessChance };
+  }
+  const frac = turnsHeld / resolvedShelfLife;
   for (const s of DECAY_STAGES) {
     if (frac <= s.maxFrac) return { stage: s.name, nutritionMult: s.nutritionMult, sicknessChance: s.sicknessChance };
   }
   const last = DECAY_STAGES[DECAY_STAGES.length - 1];
   return { stage: last.name, nutritionMult: last.nutritionMult, sicknessChance: last.sicknessChance };
+}
+
+/**
+ * Resolve numeric or expression-based food shelf life.
+ * Expressions intentionally evaluate as content data, with a tiny canonical
+ * context instead of ad hoc per-item math.
+ *
+ * @param {number|string} shelfLife
+ * @returns {number}
+ */
+export function resolveFoodShelfLife(shelfLife) {
+  if (typeof shelfLife === "number") {
+    if (!Number.isFinite(shelfLife)) return SHELF_LIFE_RATION;
+    return Math.max(0, Math.floor(shelfLife));
+  }
+  const source = String(shelfLife ?? "").trim();
+  if (!source) return SHELF_LIFE_RATION;
+  const numeric = Number(source);
+  if (Number.isFinite(numeric)) return Math.max(0, Math.floor(numeric));
+  try {
+    const T = TURNS_PER_DAY;
+    const DAY = TURNS_PER_DAY;
+    const DAYS = TURNS_PER_DAY;
+    const value = eval(source);
+    return Number.isFinite(Number(value)) ? Math.max(0, Math.floor(Number(value))) : SHELF_LIFE_RATION;
+  } catch {
+    return SHELF_LIFE_RATION;
+  }
 }
 
 /**

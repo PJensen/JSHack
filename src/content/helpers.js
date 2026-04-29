@@ -98,11 +98,11 @@ export function inferItemCategory(type) {
 
 /** Standard shelf-life constants matching Food.js */
 export const SHELF_LIFE = Object.freeze({
-  ration:  200,
-  short:   90,   // ~0.45 × ration
-  medium:  130,  // ~0.65 × ration
-  long:    160,  // ~0.80 × ration
-  iron:    400,  // iron ration
+  ration:  5040, // 7 days at TURNS_PER_DAY=720
+  short:   720,  // 1 day
+  medium:  2160, // 3 days
+  long:    5040, // 7 days
+  iron:    10080, // 14 days
 });
 
 /** Standard rarity tiers. */
