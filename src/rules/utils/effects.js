@@ -7,6 +7,17 @@ import { Duration } from "../components/Duration.js";
 import { Source } from "../components/Source.js";
 import { StatusEffectNode } from "../components/StatusEffectNode.js";
 import { TimedEffectNode } from "../components/TimedEffectNode.js";
+import { upsertTimedEffect } from "./effectSemantics.js";
+import { descendantsWith } from "./topology.js";
+
+function normalizeEffectKey(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+export function isInvulnerabilityEffectKey(value) {
+  const key = normalizeEffectKey(value);
+  return key === "invulnerable" || key === "invuln";
+}
 
 /**
  * Ensure `entityId` has an ActiveEffects component with an `effects` array.
@@ -57,17 +68,55 @@ export function applyStatusEffect(world, actorId, effect, opts = {}) {
 
   const potency = Number.isFinite(effect?.potency) ? Number(effect.potency) : 1;
   const stacks = Number.isInteger(effect?.stacks) && effect.stacks > 0 ? effect.stacks : 1;
-  const nodeId = world.create();
+  const normalizedKey = normalizeEffectKey(key);
+  let nodeId = 0;
 
-  attach(world, nodeId, id);
-  world.add(nodeId, StatusEffectNode, { key, potency, stacks });
-  world.add(nodeId, TimedEffectNode, { key });
-  world.add(nodeId, Duration, {
+  for (const [candidateId, node] of descendantsWith(world, id, StatusEffectNode)) {
+    if (normalizeEffectKey(node?.key) !== normalizedKey) continue;
+    nodeId = candidateId;
+    break;
+  }
+
+  if (!(nodeId > 0)) {
+    nodeId = world.create();
+    attach(world, nodeId, id);
+  }
+
+  const existingStatus = world.get(nodeId, StatusEffectNode);
+  const existingDuration = world.get(nodeId, Duration);
+  const nextStatus = {
+    key,
+    potency: Math.max(Number(existingStatus?.potency || 0), potency),
+    stacks: existingStatus
+      ? Math.max(1, Number(existingStatus.stacks || 0) | 0) + stacks
+      : stacks,
+  };
+  const nextDuration = {
     turnsLeft,
     onsetLeft: Number(effect?.onsetLeft ?? 0) | 0,
     maxTurns: Number(effect?.maxTurns ?? turnsLeft) | 0,
     startedAtTurn: Number(effect?.startedAtTurn ?? 0) | 0,
-  });
+  };
+  if (existingDuration) {
+    nextDuration.turnsLeft = Math.max(Number(existingDuration.turnsLeft || 0) | 0, nextDuration.turnsLeft);
+    nextDuration.onsetLeft = Math.min(
+      Math.max(0, Number(existingDuration.onsetLeft || 0) | 0),
+      Math.max(0, nextDuration.onsetLeft),
+    );
+    nextDuration.maxTurns = Math.max(Number(existingDuration.maxTurns || 0) | 0, nextDuration.maxTurns);
+    nextDuration.startedAtTurn = Number.isFinite(existingDuration.startedAtTurn)
+      ? (Number(existingDuration.startedAtTurn) | 0)
+      : nextDuration.startedAtTurn;
+  }
+
+  if (existingStatus) world.set(nodeId, StatusEffectNode, nextStatus);
+  else world.add(nodeId, StatusEffectNode, nextStatus);
+
+  if (world.has(nodeId, TimedEffectNode)) world.set(nodeId, TimedEffectNode, { key });
+  else world.add(nodeId, TimedEffectNode, { key });
+
+  if (existingDuration) world.set(nodeId, Duration, nextDuration);
+  else world.add(nodeId, Duration, nextDuration);
 
   if (effect?.sourceId != null || effect?.sourceKind || effect?.sourceKey) {
     world.add(nodeId, Source, {
@@ -80,7 +129,7 @@ export function applyStatusEffect(world, actorId, effect, opts = {}) {
   if (opts.mirrorLegacy !== false) {
     const ae = ensureActiveEffects(world, id);
     if (ae) {
-      ae.effects.push({ ...effect, key, turnsLeft, potency, stacks });
+      upsertTimedEffect(ae.effects, { ...effect, key, turnsLeft, potency, stacks });
     }
   }
 

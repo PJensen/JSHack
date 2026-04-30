@@ -139,7 +139,7 @@ Suggested tests:
 
 ## 6. Migrate One Status Family To Topology
 
-Status: `Migration`, blocked by item 5
+Status: `Done`
 
 Goal: prove the status migration path with one small status family.
 

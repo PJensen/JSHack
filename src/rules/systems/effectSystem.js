@@ -8,7 +8,10 @@ import { Stamina } from '../components/Stamina.js';
 import { Mana } from '../components/Mana.js';
 import { Brain } from '../components/Brain.js';
 import { Channeling } from '../components/Channeling.js';
+import { Duration } from '../components/Duration.js';
 import { Faction } from '../components/Faction.js';
+import { StatusEffectNode } from '../components/StatusEffectNode.js';
+import { TimedEffectNode } from '../components/TimedEffectNode.js';
 import { areFactionsHostile } from '../utils/factionHostility.js';
 import { EFFECT_DEFS } from '../data/effectDefs.js';
 import { dealDamage } from '../utils/dealDamage.js';
@@ -301,6 +304,8 @@ export function effectSystem(world) {
     /** @type {Array<{sourceId:number, effect:any}>} */
     const _pendingSwarmJumps = [];
 
+    tickTopologyStatusDurations(world);
+
     for (const [id, ae] of world.query(ActiveEffects)) {
         if (!ae || !Array.isArray(ae.effects)) continue;
         compactDotEffects(ae.effects);
@@ -434,6 +439,23 @@ export function effectSystem(world) {
     // ── Process pending swarm jumps ─────────────────────────────────────
     if (_pendingSwarmJumps.length > 0) {
         _processSwarmJumps(world, _pendingSwarmJumps);
+    }
+}
+
+function tickTopologyStatusDurations(world) {
+    for (const [nodeId, duration] of world.query(Duration)) {
+        if (!world.has(nodeId, StatusEffectNode) && !world.has(nodeId, TimedEffectNode)) continue;
+        if (!duration) continue;
+
+        const onsetLeft = Number(duration.onsetLeft || 0) | 0;
+        const turnsLeft = Number(duration.turnsLeft || 0) | 0;
+        if (onsetLeft > 0) {
+            world.set(nodeId, Duration, { ...duration, onsetLeft: Math.max(0, onsetLeft - 1) });
+            continue;
+        }
+        if (turnsLeft > 0) {
+            world.set(nodeId, Duration, { ...duration, turnsLeft: Math.max(0, turnsLeft - 1) });
+        }
     }
 }
 

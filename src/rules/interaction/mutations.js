@@ -29,7 +29,7 @@ import { markExplored } from "../environment/dungeon/exploredMap.js";
 import { forEachLoadedTile } from "../environment/dungeon/tileMap.js";
 import { dealDamage } from "../utils/dealDamage.js";
 import { isDotEffectKey, upsertTimedEffect } from "../utils/effectSemantics.js";
-import { ensureActiveEffects } from "../utils/effects.js";
+import { applyStatusEffect, ensureActiveEffects, isInvulnerabilityEffectKey } from "../utils/effects.js";
 import { spawnHazard } from "../utils/hazardSpawn.js";
 import { spawnMonsterEntity } from "../utils/spawnMonsterEntity.js";
 import { setItemCooldown } from "../utils/itemCooldowns.js";
@@ -79,6 +79,10 @@ export function applyMutation(world, op, resolvers = {}) {
     }
     case "pushEffect": {
       if (isEffectImmune(world, op.entityId, op.effect?.key)) break;
+      if (isInvulnerabilityEffectKey(op.effect?.key)) {
+        applyStatusEffect(world, op.entityId, { stacks: 1, ...(op.effect || {}) });
+        break;
+      }
       const ae = ensureActiveEffects(world, op.entityId);
       if (ae) {
         upsertTimedEffect(ae.effects, { stacks: 1, ...(op.effect || {}) });
@@ -95,6 +99,18 @@ export function applyMutation(world, op, resolvers = {}) {
       if (!key) break;
       const turnsLeft = Math.max(0, Number(input.turnsLeft ?? input.duration ?? 0) | 0);
       if (turnsLeft <= 0) break;
+      if (isInvulnerabilityEffectKey(key)) {
+        applyStatusEffect(world, op.entityId, {
+          ...input,
+          key,
+          turnsLeft,
+          potency: Number(input.potency || 0),
+          onsetLeft: Math.max(0, Number(input.onsetLeft ?? input.onset ?? 0) | 0),
+          startedAtTurn: Number.isFinite(input.startedAtTurn) ? (input.startedAtTurn | 0) : (world.step | 0),
+          sourceId: Number(input.sourceId || 0) | 0,
+        });
+        break;
+      }
 
       const normalized = {
         key,

@@ -2,6 +2,8 @@ import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from '../src/lib/ecs-js/index.js';
 import { Vitality } from '../src/rules/components/Vitality.js';
 import { ActiveEffects } from '../src/rules/components/ActiveEffects.js';
+import { StatusEffectNode } from '../src/rules/components/StatusEffectNode.js';
+import { applyStatusEffect } from '../src/rules/utils/effects.js';
 import { Resistances } from '../src/rules/components/Resistences.js';
 import { dealDamage, resolveResistance } from '../src/rules/utils/dealDamage.js';
 
@@ -70,6 +72,18 @@ Deno.test("dealDamage: invulnerable target blocks damage", () => {
   assertEquals(result.reason, 'invulnerable');
   assertEquals(world.get(id, Vitality).hp, 20);
   assert(events.some(e => e.kind === 'immune'), 'IMMUNE status emitted');
+});
+
+Deno.test("dealDamage: topology-only invulnerable target blocks damage", () => {
+  const world = new World({ seed: 1 });
+  const id = makeTarget(world);
+  applyStatusEffect(world, id, { key: 'invulnerable', turnsLeft: 5 }, { mirrorLegacy: false });
+  const result = dealDamage(world, { target: id, amount: 10 });
+  assertEquals(result.applied, false);
+  assertEquals(result.reason, 'invulnerable');
+  assertEquals(world.get(id, Vitality).hp, 20);
+  assertEquals(world.get(id, ActiveEffects), null);
+  assertEquals([...world.query(StatusEffectNode)].length, 1);
 });
 
 Deno.test("dealDamage: bypassInvuln ignores invulnerability", () => {

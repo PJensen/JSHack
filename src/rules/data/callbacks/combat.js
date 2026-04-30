@@ -15,6 +15,7 @@ import { combatSeed, createRng, mulberry32, rngInt } from "../../utils/rng.js";
 import { createCombatStatFacade } from "../../utils/resolveCombatSnapshot.js";
 import { createStatusFacade } from "../../utils/statusFacade.js";
 import { upsertTimedEffect } from "../../utils/effectSemantics.js";
+import { applyStatusEffect, isInvulnerabilityEffectKey } from "../../utils/effects.js";
 import { findNearestValidTileAround } from "../../utils/queries.js";
 import { inventoryItems, addToInventory, removeFromInventory } from "../../utils/inventoryFacade.js";
 import { dealDamage } from "../../utils/dealDamage.js";
@@ -112,6 +113,10 @@ export class CombatCallbackContext {
    * @param {{ key:string, turnsLeft:number, potency:number, stacks?:number }} effect
    */
   pushEffect(entityId, effect) {
+    if (isInvulnerabilityEffectKey(effect?.key)) {
+      applyStatusEffect(this.world, entityId, { stacks: 1, ...effect });
+      return;
+    }
     const ae = this.world.get(entityId, ActiveEffects);
     if (ae && Array.isArray(ae.effects)) {
       upsertTimedEffect(ae.effects, { stacks: 1, ...effect });
