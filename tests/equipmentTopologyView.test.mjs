@@ -50,6 +50,21 @@ Deno.test("set and clear equipment topology slots attach through slot nodes", ()
   assertEquals(resolveEquipmentView(world, actor).offhand, 0);
 });
 
+Deno.test("setting an equipment topology slot replaces the previous child", () => {
+  const world = new World({ seed: 8104 });
+  const actor = world.create();
+  const oldSword = world.create();
+  const newSword = world.create();
+
+  const slotNode = setEquippedSlotTopology(world, actor, "weapon", oldSword);
+  setEquippedSlotTopology(world, actor, "weapon", newSword);
+
+  assertEquals([...children(world, slotNode)], [newSword]);
+  assertEquals(getParent(world, oldSword), actor);
+  assertEquals(getParent(world, newSword), slotNode);
+  assertEquals(resolveEquipmentView(world, actor).weapon, newSword);
+});
+
 function slotNodeFor(world, actor, slot) {
   const root = findEquipmentRoot(world, actor);
   for (const child of children(world, root)) {

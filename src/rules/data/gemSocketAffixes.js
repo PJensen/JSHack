@@ -271,7 +271,7 @@ export function installGemSocketListener(world) {
     const eq = world.get(actorId, Equipment);
     if (!eq) return;
     // Check main hand weapon for fluorite socket
-    const weaponId = Number(eq.hand || 0) | 0;
+    const weaponId = Number(eq.weapon || 0) | 0;
     if (!(weaponId > 0)) return;
     const state = resolveFluoriteCharges(world, weaponId);
     const max = Number(state.max || 0);

@@ -11,6 +11,7 @@ import { Equipment }   from '../src/rules/components/Equipment.js';
 import { ItemInfo }    from '../src/rules/components/ItemInfo.js';
 import { AggroState, AGGRO_LEVELS, SEARCH_TURNS_HUNTING_GRACE } from '../src/rules/components/AggroState.js';
 import { aiWeaponPickupSystem } from '../src/rules/systems/aiWeaponPickupSystem.js';
+import { resolveEquipmentView } from '../src/rules/utils/equipmentTopology.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -74,6 +75,7 @@ Deno.test("lich picks up an adjacent weapon when unarmed and hunting", () => {
 
   const eq = world.get(lich, Equipment);
   assertEquals(eq.weapon, sword, 'lich should have equipped the sword');
+  assertEquals(resolveEquipmentView(world, lich).weapon, sword, 'pickup should mirror main-hand topology');
   assert(!world.has(sword, Position), 'sword should be removed from floor after pickup');
 });
 
