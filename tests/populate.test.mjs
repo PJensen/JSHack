@@ -297,8 +297,8 @@ Deno.test("populateChunk can generate a shallow spawner", () => {
   const spawns = populateChunk(chunk, floorPlan, rng);
   const spawners = spawns.filter((s) => s.kind === 'spawner');
   assert(spawners.length > 0, 'expected at least one spawner');
-  // Mock rng always passes chance gates (next: () => 0), so rat → cave_bear rare upgrade fires.
-  assert(spawners[0].params?.monsterType?.identity === 'cave_bear', 'expected shallow spawner monster to be cave_bear (rare rat upgrade)');
+  // Mock rng always passes chance gates (next: () => 0) and picks first element of every array.
+  assert(spawners[0].params?.monsterType?.identity === 'dragon_whelp', 'expected shallow spawner monster to be dragon_whelp (rng picks first eligible)');
 });
 
 Deno.test("populateChunk shallow spawners draw from tier pool", () => {

@@ -12,7 +12,7 @@ import { initDungeon } from '../src/rules/environment/dungeon/index.js';
 import { clearAll } from '../src/rules/environment/dungeon/tileMap.js';
 import { addToInventory, inventoryItems } from '../src/rules/utils/inventoryFacade.js';
 
-function setup() {
+async function setup() {
   clearAll();
   clearFloorCache();
   const world = new World({ seed: 42 });
@@ -42,7 +42,7 @@ function setup() {
 }
 
 Deno.test("inventory survives single round-trip overworld→dungeon→overworld", async () => {
-  const { world, pid, items } = setup();
+  const { world, pid, items } = await setup();
 
   // Overworld (depth 0) → dungeon (depth 1)
   await transitionToDepth(world, 1, { x: 5, y: 5 });
@@ -64,7 +64,7 @@ Deno.test("inventory survives single round-trip overworld→dungeon→overworld"
 });
 
 Deno.test("inventory survives TWO round-trips (the zombie hierarchy bug)", async () => {
-  const { world, pid, items } = setup();
+  const { world, pid, items } = await setup();
 
   // First round-trip
   await transitionToDepth(world, 1, { x: 5, y: 5 });
@@ -86,7 +86,7 @@ Deno.test("inventory survives TWO round-trips (the zombie hierarchy bug)", async
 });
 
 Deno.test("floor-picked items survive transition (not destroyed with floor entities)", async () => {
-  const { world, pid, items } = setup();
+  const { world, pid, items } = await setup();
 
   // Descend to dungeon depth 1
   await transitionToDepth(world, 1, { x: 5, y: 5 });
@@ -119,7 +119,7 @@ Deno.test("floor-picked items survive transition (not destroyed with floor entit
 });
 
 Deno.test("equipment references survive two round-trips", async () => {
-  const { world, pid, items } = setup();
+  const { world, pid, items } = await setup();
 
   // Two full round-trips
   await transitionToDepth(world, 1, { x: 5, y: 5 });
