@@ -1,9 +1,13 @@
 import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";
 import { Charges } from "../src/rules/components/Charges.js";
+import { Equipment } from "../src/rules/components/Equipment.js";
 import { GemSocketNode } from "../src/rules/components/GemSocketNode.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
-import { attachGemSocketNodes } from "../src/rules/data/gemSocketAffixes.js";
+import {
+  attachGemSocketNodes,
+  installGemSocketListener,
+} from "../src/rules/data/gemSocketAffixes.js";
 import { runScript, ScriptVerb } from "../src/rules/scripting.js";
 import { resolveCharges, setCharges } from "../src/rules/utils/charges.js";
 import { childrenWith } from "../src/rules/utils/topology.js";
@@ -100,4 +104,23 @@ Deno.test("fluorite discharge spends topology charges and mirrors legacy", () =>
   assertEquals(proc.bonus, 8);
   assertEquals(proc.statuses, [{ target: 2, key: "blinded", turnsLeft: 1, potency: 1 }]);
   assertEquals(proc.events[0]?.payload?.chargesSpent, 4);
+});
+
+Deno.test("shrine combat scaling charges fluorite on equipped weapon", () => {
+  const world = new World({ seed: 7204 });
+  const actor = world.create();
+  const weapon = makeWeapon(world);
+  world.add(actor, Equipment, { weapon });
+  attachGemSocketNodes(world, weapon, "gem_fluorite");
+  installGemSocketListener(world);
+
+  const events = [];
+  world.on("proc:fluorite:charge", (event) => events.push(event));
+
+  world.emit("shrine:combat:scaling", { attacker: actor, mult: 1.5 });
+
+  const socket = fluoriteSocket(world, weapon);
+  assertEquals(world.get(socket, Charges), { current: 1, max: 6 });
+  assertEquals(world.get(weapon, ItemInfo).charges, 1);
+  assertEquals(events[0]?.source, "shrine");
 });

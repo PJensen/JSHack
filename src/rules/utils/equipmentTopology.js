@@ -57,6 +57,10 @@ function firstItemChild(world, slotNode) {
   return 0;
 }
 
+function itemChildren(world, slotNode) {
+  return Array.from(children(world, slotNode));
+}
+
 export function getEquippedItemFromTopology(world, actorId, slot) {
   const slotNode = findEquippedSlotNode(world, actorId, slot);
   return slotNode > 0 ? firstItemChild(world, slotNode) : 0;
@@ -69,6 +73,9 @@ export function setEquippedSlotTopology(world, actorId, slot, itemId) {
   if (!(actor > 0) || !wanted) return 0;
   const slotNode = getOrCreateEquippedSlotNode(world, actor, wanted);
   if (!(slotNode > 0)) return 0;
+  for (const childId of itemChildren(world, slotNode)) {
+    if (childId !== item) attach(world, childId, actor);
+  }
   if (item > 0) attach(world, item, slotNode);
   return slotNode;
 }
@@ -76,10 +83,9 @@ export function setEquippedSlotTopology(world, actorId, slot, itemId) {
 export function clearEquippedSlotTopology(world, actorId, slot) {
   const slotNode = findEquippedSlotNode(world, actorId, slot);
   if (!(slotNode > 0)) return 0;
-  const itemId = firstItemChild(world, slotNode);
-  if (!(itemId > 0)) return 0;
-  attach(world, itemId, actorId);
-  return itemId;
+  const items = itemChildren(world, slotNode);
+  for (const itemId of items) attach(world, itemId, actorId);
+  return Number(items[0] || 0) | 0;
 }
 
 export function resolveEquipmentView(world, actorId) {

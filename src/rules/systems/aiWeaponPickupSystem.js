@@ -17,6 +17,10 @@ import { Unpaid }       from "../components/Unpaid.js";
 import { Player }       from "../components/Player.js";
 import { getMonster }   from "../data/monsters.js";
 import { forEachInRadius } from "../utils/spatialIndex.js";
+import {
+  resolveEquipmentView,
+  setEquippedSlotTopology,
+} from "../utils/equipmentTopology.js";
 
 // Only check near the player so we don't burn time on distant monsters.
 const WEAPON_PICKUP_ACTIVE_RADIUS = 24;
@@ -50,7 +54,7 @@ export function aiWeaponPickupSystem(world) {
 
     // Only arm when currently unarmed.
     const eq = world.get(id, Equipment);
-    if (!eq || eq.weapon !== null) return;
+    if (!eq || resolveEquipmentView(world, id).weapon > 0) return;
 
     // Scan adjacent floor tiles for a droppable weapon.
     let weaponId = null;
@@ -75,6 +79,7 @@ export function aiWeaponPickupSystem(world) {
     // Pick it up: remove from floor and slot it as the weapon.
     try { world.remove(weaponId, Position); } catch {}
     world.mutate(id, Equipment, r => { r.weapon = weaponId; });
+    setEquippedSlotTopology(world, id, "weapon", weaponId);
 
     world.emit("pickup",  { id, itemId: weaponId, at: { x: pos.x | 0, y: pos.y | 0 } });
     world.emit("message", { text: `The ${def.name} snatches up a weapon!`, kind: "warning" });
