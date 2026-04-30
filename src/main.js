@@ -697,7 +697,15 @@ let spawnPos = await initDungeon(world, {
   tombstoneRepo,
   dungeonType: runtimeConfig.dungeonType,
   onProgress: (progress) => {
-    if (!progress || progress.phase !== 'chunks') return;
+    if (!progress) return;
+    if (progress.phase === 'plan') {
+      // Heavy planning steps (overworld terrain/coastline/town) report a label
+      // so the boot bar shows live progress instead of a deadzone before chunks.
+      const label = typeof progress.label === 'string' ? progress.label : 'Planning floor';
+      updateBootProgress(`${label}…`, _bootDungeonBase);
+      return;
+    }
+    if (progress.phase !== 'chunks') return;
     const total = Math.max(1, Number(progress.total) || _bootChunkTotal);
     const processed = Math.max(0, Math.min(total, Number(progress.processed) || 0));
     if (total !== _bootChunkUnits) {

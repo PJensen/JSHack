@@ -104,8 +104,8 @@ function loadAll(chunks) {
   for (const chunk of chunks) loadChunk(chunk.chunkX, chunk.chunkY, chunk.tiles);
 }
 
-Deno.test("overworld procedurally stamps the required town economy", () => {
-  const { chunks } = generateOverworldChunks(SEED);
+Deno.test("overworld procedurally stamps the required town economy", async () => {
+  const { chunks } = await generateOverworldChunks(SEED);
 
   assertEquals(countKind(chunks, "tavern_sign"), 1, "market district should anchor on a tavern");
   assertEquals(countKind(chunks, "smithy_sign"), 1, "workshop district should anchor on a smithy");
@@ -121,7 +121,7 @@ Deno.test("overworld procedurally stamps the required town economy", () => {
   assert(countKind(chunks, "townfolk") >= 8, "buildings should open town professions");
 });
 
-Deno.test("building rotation transforms tiles, spawns, waypoints, and shop rooms around the keystone", () => {
+Deno.test("building rotation transforms tiles, spawns, waypoints, and shop rooms around the keystone", async () => {
   const tavern = rotateBuildingDef(BUILDING_DEFS.tavern, 1);
   const door = tavern.tiles.find((tile) => tile.tile === "door");
   const sign = tavern.spawns.find((spawn) => spawn.kind === "tavern_sign");
@@ -136,8 +136,8 @@ Deno.test("building rotation transforms tiles, spawns, waypoints, and shop rooms
   assert(apothecary.rooms[0].w > 0 && apothecary.rooms[0].h > 0, "rotated rooms should keep positive extents");
 });
 
-Deno.test("terrain heuristics bias resource buildings toward useful landscape", () => {
-  const { chunks, spawnX, spawnY } = generateOverworldChunks(SEED);
+Deno.test("terrain heuristics bias resource buildings toward useful landscape", async () => {
+  const { chunks, spawnX, spawnY } = await generateOverworldChunks(SEED);
   const smithy = spawnsOfKind(chunks, "smithy_sign")[0];
   const farmCrop = spawnsOfKind(chunks, "crop_wheat")[0];
   const mill = spawnsOfKind(chunks, "millstone")[0];
@@ -153,8 +153,8 @@ Deno.test("terrain heuristics bias resource buildings toward useful landscape", 
   assertEquals(getWorldTile(chunks, farmCrop.x, farmCrop.y), TILE_FARMLAND, "farm crops must sit on stamped farmland");
 });
 
-Deno.test("procedural building stamps do not overlap destructively", () => {
-  const { chunks } = generateOverworldChunks(SEED);
+Deno.test("procedural building stamps do not overlap destructively", async () => {
+  const { chunks } = await generateOverworldChunks(SEED);
   const structureTiles = new Set([TILE_FLOOR, TILE_WALL, TILE_DOOR, TILE_STAIR_DOWN, TILE_FARMLAND, TILE_FENCE]);
 
   for (const [key, def] of Object.entries(BUILDING_DEFS)) {
@@ -186,8 +186,8 @@ Deno.test("procedural building stamps do not overlap destructively", () => {
   }
 });
 
-Deno.test("procedural paths connect district doors without punching through walls", () => {
-  const { chunks, spawnX, spawnY } = generateOverworldChunks(SEED);
+Deno.test("procedural paths connect district doors without punching through walls", async () => {
+  const { chunks, spawnX, spawnY } = await generateOverworldChunks(SEED);
   loadAll(chunks);
 
   const start = { x: spawnX, y: spawnY };
@@ -213,8 +213,8 @@ Deno.test("procedural paths connect district doors without punching through wall
   clearAll();
 });
 
-Deno.test("TILE_FARMLAND is walkable and flyable, TILE_FENCE is not walkable but flyable", () => {
-  const { chunks } = generateOverworldChunks(SEED);
+Deno.test("TILE_FARMLAND is walkable and flyable, TILE_FENCE is not walkable but flyable", async () => {
+  const { chunks } = await generateOverworldChunks(SEED);
   loadAll(chunks);
   const crop = spawnsOfKind(chunks, "crop_wheat")[0];
   const fence = (() => {
