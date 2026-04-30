@@ -9,6 +9,9 @@ This doctrine makes explicit a pattern JSHack already uses in inventory and proc
 topology: when runtime things multiply, attach entities instead of hiding active
 objects inside arrays on one component.
 
+For the incremental migration backlog, see
+[RUNTIME_TOPOLOGY_WORK_ITEMS.md](RUNTIME_TOPOLOGY_WORK_ITEMS.md).
+
 ## Canonical Rule
 
 If a runtime thing has identity, lifecycle, ownership, source, duration, charges,
