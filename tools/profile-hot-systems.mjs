@@ -101,8 +101,8 @@ function p95(samples) {
   return sorted[idx];
 }
 
-function makeLiveWaitScenario() {
-  const runtime = createGameRuntime({
+async function makeLiveWaitScenario() {
+  const runtime = await createGameRuntime({
     seed: 0xC0FFEE,
     classId: "outlaw",
     playerName: "Profiler",
@@ -213,11 +213,11 @@ function makeCombatHeavyScenario() {
   };
 }
 
-function makeScenario(name) {
+async function makeScenario(name) {
   const key = String(name || "").trim().toLowerCase();
   if (key === "full_tick_actors") return makeFullTickActorsScenario();
   if (key === "combat_heavy") return makeCombatHeavyScenario();
-  return makeLiveWaitScenario();
+  return await makeLiveWaitScenario();
 }
 
 function printReport(name, profile, topN) {
@@ -262,9 +262,9 @@ function printReport(name, profile, topN) {
   }
 }
 
-function main() {
+async function main() {
   const opts = parseArgs(Deno.args);
-  const scenario = makeScenario(opts.scenario);
+  const scenario = await makeScenario(opts.scenario);
   const profiler = installProfilingScheduler(scenario.world);
 
   for (let i = 0; i < opts.ticks; i++) {
@@ -275,4 +275,4 @@ function main() {
   printReport(opts.scenario, profiler.report(), opts.top);
 }
 
-main();
+await main();

@@ -692,7 +692,7 @@ const _bootDungeonBase = _bootDoneUnits;
 await bootPaint(`Generating dungeon 0/${_bootChunkTotal} chunks`, _bootDungeonBase);
 
 // Initialize the procedural dungeon (entire floor generated up front)
-let spawnPos = initDungeon(world, {
+let spawnPos = await initDungeon(world, {
   startDepth: _startDepth,
   tombstoneRepo,
   dungeonType: runtimeConfig.dungeonType,
@@ -750,7 +750,7 @@ if (_pendingSavegame) {
 // _finalizeNewGame: called after character creation confirms (new game)
 // or immediately (savegame loaded). Creates the player, applies class loadout,
 // initializes deity, then starts the simulation and render loop.
-function _finalizeNewGame(classData) {
+async function _finalizeNewGame(classData) {
   // Fade in game world (4s, matches enter_world.mp3 dramatic moment)
   canvas.style.opacity = '0';
   canvas.style.transition = 'opacity 4s ease-out';
@@ -801,7 +801,7 @@ function _finalizeNewGame(classData) {
       // Re-init gem pricing with the new seed
       reseedRunGemPricing(world);
       // Regenerate the dungeon
-      spawnPos = initDungeon(world, {
+      spawnPos = await initDungeon(world, {
         startDepth: _startDepth,
         tombstoneRepo,
         dungeonType: runtimeConfig.dungeonType,

@@ -25,11 +25,11 @@ import { dungeonConfig } from '../src/rules/environment/dungeon/dungeonConfig.js
 
 const CARDINALS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
-function withDungeonScale(scale, fn) {
+async function withDungeonScale(scale, fn) {
   const previous = dungeonConfig.dungeonScale;
   dungeonConfig.dungeonScale = scale;
   try {
-    return fn();
+    return await fn();
   } finally {
     dungeonConfig.dungeonScale = previous;
     clearAll();
@@ -80,7 +80,7 @@ function floodFillWorld(sx, sy) {
 // Tests
 // ---------------------------------------------------------------------------
 
-Deno.test("loadPrefabRoom returns the boulder puzzle definition", () => {
+Deno.test("loadPrefabRoom returns the boulder puzzle definition", async () => {
   const def = loadPrefabRoom("room_boulder_puzzle");
   assert(def !== null);
   assertEquals(def.name, "room_boulder_puzzle");
@@ -91,7 +91,7 @@ Deno.test("loadPrefabRoom returns the boulder puzzle definition", () => {
   assert(def.waypoints.length === 2);
 });
 
-Deno.test("loadPrefabRoom returns the lava dead-end definition", () => {
+Deno.test("loadPrefabRoom returns the lava dead-end definition", async () => {
   const def = loadPrefabRoom("room_lava_puzzle_dead_end");
   assert(def !== null);
   assertEquals(def.name, "lava_puzzle_dead_end");
@@ -102,7 +102,7 @@ Deno.test("loadPrefabRoom returns the lava dead-end definition", () => {
   assert(def.waypoints.length >= 1);
 });
 
-Deno.test("floor plan at depth 1 includes authored prefab rooms in non-origin chunks", () => {
+Deno.test("floor plan at depth 1 includes authored prefab rooms in non-origin chunks", async () => {
   withDungeonScale(2, () => {
     const SEEDS = [42, 123, 777, 9999, 31337];
     for (const seed of SEEDS) {
@@ -119,13 +119,13 @@ Deno.test("floor plan at depth 1 includes authored prefab rooms in non-origin ch
   });
 });
 
-Deno.test("floor plan at depth 2 has no authored prefabRooms", () => {
+Deno.test("floor plan at depth 2 has no authored prefabRooms", async () => {
   const plan = generateFloorPlan(42, 2);
   assert(Array.isArray(plan.prefabRooms));
   assertEquals(plan.prefabRooms.length, 0);
 });
 
-Deno.test("stampPrefabInChunk writes correct tile layout", () => {
+Deno.test("stampPrefabInChunk writes correct tile layout", async () => {
   const def = loadPrefabRoom("room_boulder_puzzle");
   // Create a chunk with one large enough BSP room.
   const rng = createRng(42);
@@ -154,7 +154,7 @@ Deno.test("stampPrefabInChunk writes correct tile layout", () => {
   }
 });
 
-Deno.test("no TILE_DOOR inside prefab bounding rect", () => {
+Deno.test("no TILE_DOOR inside prefab bounding rect", async () => {
   const def = loadPrefabRoom("room_boulder_puzzle");
   const rng = createRng(123);
   const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
@@ -179,7 +179,7 @@ Deno.test("no TILE_DOOR inside prefab bounding rect", () => {
   }
 });
 
-Deno.test("entrance and exit waypoints connect to corridor network", () => {
+Deno.test("entrance and exit waypoints connect to corridor network", async () => {
   const def = loadPrefabRoom("room_boulder_puzzle");
   const rng = createRng(777);
   const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
@@ -222,7 +222,7 @@ Deno.test("entrance and exit waypoints connect to corridor network", () => {
   assert(reachesOutside, "prefab should connect to tiles outside its bounding rect");
 });
 
-Deno.test("populateChunk uses prefab spawns and skips normal population", () => {
+Deno.test("populateChunk uses prefab spawns and skips normal population", async () => {
   withDungeonScale(2, () => {
     const seed = 42;
     const plan = generateFloorPlan(seed, 1);
@@ -257,7 +257,7 @@ Deno.test("populateChunk uses prefab spawns and skips normal population", () => 
   });
 });
 
-Deno.test("lava dead-end prefab can author a skeleton archer spawn via explicit monster params", () => {
+Deno.test("lava dead-end prefab can author a skeleton archer spawn via explicit monster params", async () => {
   withDungeonScale(2, () => {
     const seed = 42;
     const plan = generateFloorPlan(seed, 1);
@@ -276,14 +276,14 @@ Deno.test("lava dead-end prefab can author a skeleton archer spawn via explicit 
   });
 });
 
-Deno.test("prefab room is reachable from player spawn on full floor", () => {
-  withDungeonScale(2, () => {
+Deno.test("prefab room is reachable from player spawn on full floor", async () => {
+  await withDungeonScale(2, async () => {
     const SEEDS = [42, 123, 777];
     for (const seed of SEEDS) {
       clearAll();
       const world = new World({ seed });
       const plan = generateFloorPlan(seed, 1);
-      const { spawnX, spawnY } = generateFloor(world, seed, 1);
+      const { spawnX, spawnY } = await generateFloor(world, seed, 1);
 
       assert(plan.prefabRooms.length >= 2, `seed ${seed}: should have authored prefabs`);
       const reachable = floodFillWorld(spawnX, spawnY);

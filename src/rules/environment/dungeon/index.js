@@ -47,9 +47,22 @@ import { generateOverworldChunks } from './overworld.js';
 import { WeatherState } from '../../components/WeatherState.js';
 import { getCachedHighscores } from '../../../shared/tombstoneApi.js';
 
+// Cooperative yield: returns a promise resolved on next animation frame
+// (or microtask in non-DOM environments like Deno tests).
+const _yieldFrame = () => {
+  if (typeof requestAnimationFrame === 'function') {
+    return new Promise((r) => requestAnimationFrame(() => r()));
+  }
+  return Promise.resolve();
+};
+
 /**
  * Generate all chunks for a floor and materialize everything at once.
  * Returns entity IDs created for bulk cleanup on transition.
+ *
+ * Async: when `onProgress` is provided, yields to the browser between chunks
+ * so the loading UI can repaint. Without `onProgress` the function still
+ * returns a Promise (for API consistency) but does no yields.
  *
  * @param {import('../../../lib/ecs-js/index.js').World} world
  * @param {number} worldSeed
@@ -59,9 +72,12 @@ import { getCachedHighscores } from '../../../shared/tombstoneApi.js';
  * @param {{x:number,y:number}[]|null} [priorDownStairPositions]
  *   Actual world positions of down-stairs on the floor above; passed to
  *   generateFloorPlan so up-stairs inherit those exact positions.
- * @returns {{ spawnX: number, spawnY: number, entityIds: number[], downStairPositions: {x:number,y:number}[], profileType: string }}
+ * @returns {Promise<{ spawnX: number, spawnY: number, entityIds: number[], downStairPositions: {x:number,y:number}[], profileType: string }>}
  */
-export function generateFloor(world, worldSeed, depth, tombstoneRepo = null, onProgress = null, priorDownStairPositions = null, opts = {}) {
+export async function generateFloor(world, worldSeed, depth, tombstoneRepo = null, onProgress = null, priorDownStairPositions = null, opts = {}) {
+  const _yield = onProgress ? _yieldFrame : null;
+  // Yield every N chunks to keep UI responsive without slowing gen too much.
+  const _YIELD_EVERY = 2;
   if (depth === 0) {
     const ow = generateOverworldChunks(worldSeed);
 
@@ -164,6 +180,7 @@ export function generateFloor(world, worldSeed, depth, tombstoneRepo = null, onP
           cy: chunkData.chunkY,
         });
       }
+      if (_yield && (processedChunks % _YIELD_EVERY) === 0) await _yield();
     }
 
     reconcileShopDoorAccess(world);
@@ -310,6 +327,7 @@ export function generateFloor(world, worldSeed, depth, tombstoneRepo = null, onP
           cy,
         });
       }
+      if (_yield && (processedChunks % _YIELD_EVERY) === 0) await _yield();
     }
   }
 
@@ -325,9 +343,9 @@ export function generateFloor(world, worldSeed, depth, tombstoneRepo = null, onP
  * @param {number} [opts.startDepth=1]
  * @param {Object} [opts.tombstoneRepo] - Tombstone repository for placing tombstones
  * @param {(progress: { phase: 'chunks', depth: number, processed: number, total: number, cx?: number, cy?: number }) => void} [opts.onProgress]
- * @returns {{ x: number, y: number }} spawn position for the player
+ * @returns {Promise<{ x: number, y: number }>} spawn position for the player
  */
-export function initDungeon(world, opts = {}) {
+export async function initDungeon(world, opts = {}) {
   const depthArg = Number(opts.startDepth);
   const depth = Number.isFinite(depthArg) ? Math.max(0, Math.floor(depthArg)) : 1;
   const worldSeed = world.seed >>> 0;
@@ -339,7 +357,7 @@ export function initDungeon(world, opts = {}) {
   clearPerceptionMemory();
   clearSpatialIndex(world);
 
-  const { spawnX, spawnY, entityIds, downStairPositions, profileType } = generateFloor(world, worldSeed, depth, tombstoneRepo, onProgress, null, { dungeonType: opts.dungeonType ?? null });
+  const { spawnX, spawnY, entityIds, downStairPositions, profileType } = await generateFloor(world, worldSeed, depth, tombstoneRepo, onProgress, null, { dungeonType: opts.dungeonType ?? null });
 
   // Create dungeon state singleton
   const dsId = world.create();

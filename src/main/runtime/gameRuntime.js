@@ -399,7 +399,7 @@ export function createRuntimeFacade(world, opts = {}) {
  *   onAction?: (turn:number, type:string, payload:object)=>void,
  * }} [opts]
  */
-export function createGameRuntime(opts = {}) {
+export async function createGameRuntime(opts = {}) {
   const seed = Number.isFinite(Number(opts.seed)) ? (Number(opts.seed) >>> 0) : 0xC0FFEE;
   const classId = String(opts.classId || "outlaw");
   const classDef = getClass(classId) || getClass("outlaw");
@@ -412,7 +412,7 @@ export function createGameRuntime(opts = {}) {
     pendingSavegame: opts.pendingSavegame || null,
   });
 
-  const spawnPos = initDungeon(world, {
+  const spawnPos = await initDungeon(world, {
     startDepth,
     dungeonType: opts.dungeonType ?? null,
     tombstoneRepo: null,

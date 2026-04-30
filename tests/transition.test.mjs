@@ -22,41 +22,41 @@ function makePlayerAt(world, x, y) {
   return id;
 }
 
-Deno.test("transitionToDepth clears and regenerates floor", () => {
+Deno.test("transitionToDepth clears and regenerates floor", async () => {
   clearAll();
   const world = new World({ seed: 42 });
-  const spawn = initDungeon(world);
+  const spawn = await initDungeon(world);
   makePlayerAt(world, spawn.x, spawn.y);
 
   const chunksFloor1 = loadedChunkCount();
   assert(chunksFloor1 > 0, 'floor 1 has tile data');
 
-  transitionToDepth(world, 2, { x: 10, y: 10 });
+  await transitionToDepth(world, 2, { x: 10, y: 10 });
 
   const chunksFloor2 = loadedChunkCount();
   assert(chunksFloor2 > 0, 'floor 2 has tile data after transition');
 });
 
-Deno.test("transitionToDepth updates DungeonState.currentDepth", () => {
+Deno.test("transitionToDepth updates DungeonState.currentDepth", async () => {
   clearAll();
   const world = new World({ seed: 42 });
-  initDungeon(world);
+  await initDungeon(world);
   makePlayerAt(world, 0, 0);
 
-  transitionToDepth(world, 5, { x: 0, y: 0 });
+  await transitionToDepth(world, 5, { x: 0, y: 0 });
 
   for (const [_id, ds] of world.query(DungeonState)) {
     assert(ds.currentDepth === 5, `depth updated to 5, got ${ds.currentDepth}`);
   }
 });
 
-Deno.test("transitionToDepth moves player to destination", () => {
+Deno.test("transitionToDepth moves player to destination", async () => {
   clearAll();
   const world = new World({ seed: 42 });
-  initDungeon(world);
+  await initDungeon(world);
   makePlayerAt(world, 0, 0);
 
-  transitionToDepth(world, 2, { x: 100, y: -50 });
+  await transitionToDepth(world, 2, { x: 100, y: -50 });
 
   for (const [id] of world.query(Player)) {
     const pos = world.get(id, Position);
@@ -64,29 +64,29 @@ Deno.test("transitionToDepth moves player to destination", () => {
   }
 });
 
-Deno.test("transitionToDepth emits dungeon:transitioned event", () => {
+Deno.test("transitionToDepth emits dungeon:transitioned event", async () => {
   clearAll();
   const world = new World({ seed: 42 });
-  initDungeon(world);
+  await initDungeon(world);
   makePlayerAt(world, 0, 0);
 
   const events = [];
   world.on('dungeon:transitioned', e => events.push(e));
 
-  transitionToDepth(world, 3, { x: 5, y: 5 });
+  await transitionToDepth(world, 3, { x: 5, y: 5 });
 
   assert(events.length === 1, 'event emitted');
   assert(events[0].depth === 3, 'correct depth');
   assert(events[0].pos.x === 5 && events[0].pos.y === 5, 'correct pos');
 });
 
-Deno.test("transitionToDepth updates floorEntityIds", () => {
+Deno.test("transitionToDepth updates floorEntityIds", async () => {
   clearAll();
   const world = new World({ seed: 42 });
-  initDungeon(world);
+  await initDungeon(world);
   makePlayerAt(world, 0, 0);
 
-  transitionToDepth(world, 2, { x: 0, y: 0 });
+  await transitionToDepth(world, 2, { x: 0, y: 0 });
 
   for (const [_id, ds] of world.query(DungeonState)) {
     assert(Array.isArray(ds.floorEntityIds), 'floorEntityIds is array');
@@ -94,10 +94,10 @@ Deno.test("transitionToDepth updates floorEntityIds", () => {
   }
 });
 
-Deno.test("transitionToDepth destroys tracked hazards from prior floor", () => {
+Deno.test("transitionToDepth destroys tracked hazards from prior floor", async () => {
   clearAll();
   const world = new World({ seed: 42 });
-  const spawn = initDungeon(world);
+  const spawn = await initDungeon(world);
   makePlayerAt(world, spawn.x, spawn.y);
 
   const cloudId = spawnPlasmaCloud(world, {
@@ -117,7 +117,7 @@ Deno.test("transitionToDepth destroys tracked hazards from prior floor", () => {
   }
   assert(tracked, "spawned cloud should be tracked on current floor");
 
-  transitionToDepth(world, 2, { x: spawn.x, y: spawn.y });
+  await transitionToDepth(world, 2, { x: spawn.x, y: spawn.y });
 
   let plasmaHazards = 0;
   for (const [, hazard, ident] of world.query(HazardArea, NamedIdentity)) {
@@ -128,42 +128,42 @@ Deno.test("transitionToDepth destroys tracked hazards from prior floor", () => {
   assert(plasmaHazards === 0, "tracked cloud hazards should not survive transition");
 });
 
-Deno.test("transition caches and restores explored tiles through repository", () => {
+Deno.test("transition caches and restores explored tiles through repository", async () => {
   clearAll();
   clearExplored();
   clearFloorCache();
   const world = new World({ seed: 42 });
-  const spawn = initDungeon(world);
+  const spawn = await initDungeon(world);
   makePlayerAt(world, spawn.x, spawn.y);
 
   markExplored(spawn.x, spawn.y);
   assert(isExplored(spawn.x, spawn.y), "tile should start explored");
 
-  transitionToDepth(world, 2, { x: spawn.x, y: spawn.y });
+  await transitionToDepth(world, 2, { x: spawn.x, y: spawn.y });
   assert(exploredFloorRepository.getSnapshot(1) instanceof Map, "depth 1 explored snapshot should be cached");
   assert(!isExplored(spawn.x, spawn.y), "depth 2 starts with different explored state");
 
-  transitionToDepth(world, 1, { x: spawn.x, y: spawn.y });
+  await transitionToDepth(world, 1, { x: spawn.x, y: spawn.y });
   assert(isExplored(spawn.x, spawn.y), "returning restores explored tiles from repository cache");
 });
 
-Deno.test("clearFloorCache clears explored repository snapshots", () => {
+Deno.test("clearFloorCache clears explored repository snapshots", async () => {
   clearAll();
   clearExplored();
   clearFloorCache();
   const world = new World({ seed: 42 });
-  const spawn = initDungeon(world);
+  const spawn = await initDungeon(world);
   makePlayerAt(world, spawn.x, spawn.y);
 
   markExplored(spawn.x, spawn.y);
-  transitionToDepth(world, 2, { x: spawn.x, y: spawn.y });
+  await transitionToDepth(world, 2, { x: spawn.x, y: spawn.y });
   assert(exploredFloorRepository.listDepths().length === 1, "precondition: one cached explored depth");
 
   clearFloorCache();
   assert(exploredFloorRepository.listDepths().length === 0, "clearFloorCache should clear explored repository");
 });
 
-Deno.test("inherited up stairs preserve exact world coordinates across dungeon scales", () => {
+Deno.test("inherited up stairs preserve exact world coordinates across dungeon scales", async () => {
   const previousScale = dungeonConfig.dungeonScale;
   const scales = [0.1, 0.3, 1.0, 2.0];
   const seeds = [42, 777, 9999];
@@ -174,12 +174,12 @@ Deno.test("inherited up stairs preserve exact world coordinates across dungeon s
       for (const seed of seeds) {
         clearAll();
         const upperWorld = new World({ seed });
-        const upperFloor = generateFloor(upperWorld, seed, 1);
+        const upperFloor = await generateFloor(upperWorld, seed, 1);
         const priorDownStairPositions = upperFloor.downStairPositions.slice();
 
         clearAll();
         const lowerWorld = new World({ seed });
-        const lowerFloor = generateFloor(lowerWorld, seed, 2, null, null, priorDownStairPositions);
+        const lowerFloor = await generateFloor(lowerWorld, seed, 2, null, null, priorDownStairPositions);
 
         const reachable = new Set();
         const queue = [[lowerFloor.spawnX, lowerFloor.spawnY]];

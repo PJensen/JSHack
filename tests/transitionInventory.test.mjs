@@ -16,7 +16,7 @@ function setup() {
   clearAll();
   clearFloorCache();
   const world = new World({ seed: 42 });
-  const spawn = initDungeon(world);
+  const spawn = await initDungeon(world);
 
   // Create player with inventory
   const pid = world.create();
@@ -41,11 +41,11 @@ function setup() {
   return { world, pid, items };
 }
 
-Deno.test("inventory survives single round-trip overworld→dungeon→overworld", () => {
+Deno.test("inventory survives single round-trip overworld→dungeon→overworld", async () => {
   const { world, pid, items } = setup();
 
   // Overworld (depth 0) → dungeon (depth 1)
-  transitionToDepth(world, 1, { x: 5, y: 5 });
+  await transitionToDepth(world, 1, { x: 5, y: 5 });
 
   let inv = inventoryItems(world, pid);
   assert(inv.length === 3, `after descent: expected 3 items, got ${inv.length}`);
@@ -54,7 +54,7 @@ Deno.test("inventory survives single round-trip overworld→dungeon→overworld"
   }
 
   // Dungeon (depth 1) → overworld (depth 0)
-  transitionToDepth(world, 0, { x: 5, y: 5 });
+  await transitionToDepth(world, 0, { x: 5, y: 5 });
 
   inv = inventoryItems(world, pid);
   assert(inv.length === 3, `after ascent: expected 3 items, got ${inv.length}`);
@@ -63,15 +63,15 @@ Deno.test("inventory survives single round-trip overworld→dungeon→overworld"
   }
 });
 
-Deno.test("inventory survives TWO round-trips (the zombie hierarchy bug)", () => {
+Deno.test("inventory survives TWO round-trips (the zombie hierarchy bug)", async () => {
   const { world, pid, items } = setup();
 
   // First round-trip
-  transitionToDepth(world, 1, { x: 5, y: 5 });
-  transitionToDepth(world, 0, { x: 5, y: 5 });
+  await transitionToDepth(world, 1, { x: 5, y: 5 });
+  await transitionToDepth(world, 0, { x: 5, y: 5 });
 
   // Second round-trip — this is where the bug manifested
-  transitionToDepth(world, 1, { x: 5, y: 5 });
+  await transitionToDepth(world, 1, { x: 5, y: 5 });
 
   let inv = inventoryItems(world, pid);
   assert(inv.length === 3, `after 2nd descent: expected 3 items, got ${inv.length}`);
@@ -79,17 +79,17 @@ Deno.test("inventory survives TWO round-trips (the zombie hierarchy bug)", () =>
     assert(world.isAlive(iid), `item ${iid} should be alive after 2nd descent`);
   }
 
-  transitionToDepth(world, 0, { x: 5, y: 5 });
+  await transitionToDepth(world, 0, { x: 5, y: 5 });
 
   inv = inventoryItems(world, pid);
   assert(inv.length === 3, `after 2nd ascent: expected 3 items, got ${inv.length}`);
 });
 
-Deno.test("floor-picked items survive transition (not destroyed with floor entities)", () => {
+Deno.test("floor-picked items survive transition (not destroyed with floor entities)", async () => {
   const { world, pid, items } = setup();
 
   // Descend to dungeon depth 1
-  transitionToDepth(world, 1, { x: 5, y: 5 });
+  await transitionToDepth(world, 1, { x: 5, y: 5 });
 
   // Simulate picking up a floor item: create an item, register it in floorEntityIds,
   // then add it to the player's inventory (same as itemPickupSystem does).
@@ -104,28 +104,28 @@ Deno.test("floor-picked items survive transition (not destroyed with floor entit
   addToInventory(world, pid, floorItemId, { silent: true });
 
   // Transition to depth 2 — this destroys depth 1 floor, including floorItemId
-  transitionToDepth(world, 2, { x: 5, y: 5 });
+  await transitionToDepth(world, 2, { x: 5, y: 5 });
 
   assert(world.isAlive(floorItemId), `floor-picked item should survive transition to depth 2`);
   const inv = inventoryItems(world, pid);
   assert(inv.length === 4, `expected 4 items after picking up floor item, got ${inv.length}`);
 
   // Ascend back — this is the exact scenario the user reported
-  transitionToDepth(world, 1, { x: 5, y: 5 });
+  await transitionToDepth(world, 1, { x: 5, y: 5 });
 
   assert(world.isAlive(floorItemId), `floor-picked item should survive return to depth 1`);
   const inv2 = inventoryItems(world, pid);
   assert(inv2.length === 4, `inventory should still have 4 items on return, got ${inv2.length}`);
 });
 
-Deno.test("equipment references survive two round-trips", () => {
+Deno.test("equipment references survive two round-trips", async () => {
   const { world, pid, items } = setup();
 
   // Two full round-trips
-  transitionToDepth(world, 1, { x: 5, y: 5 });
-  transitionToDepth(world, 0, { x: 5, y: 5 });
-  transitionToDepth(world, 1, { x: 5, y: 5 });
-  transitionToDepth(world, 0, { x: 5, y: 5 });
+  await transitionToDepth(world, 1, { x: 5, y: 5 });
+  await transitionToDepth(world, 0, { x: 5, y: 5 });
+  await transitionToDepth(world, 1, { x: 5, y: 5 });
+  await transitionToDepth(world, 0, { x: 5, y: 5 });
 
   const eq = world.get(pid, Equipment);
   assert(eq.weapon === items[0], `equipped weapon should still reference original item`);

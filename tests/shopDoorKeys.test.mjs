@@ -58,7 +58,7 @@ function isDoorOnRoomPerimeter(pos, room) {
     || pos.y === room.y + room.h - 1;
 }
 
-Deno.test("matching shop key unlocks and opens the locked shop door", () => {
+Deno.test("matching shop key unlocks and opens the locked shop door", async () => {
   const world = new World({ seed: 7 });
   const actor = world.create();
   world.add(actor, Inventory, { capacity: 5 });
@@ -78,7 +78,7 @@ Deno.test("matching shop key unlocks and opens the locked shop door", () => {
   assertEquals(collider.blocksSight, false);
 });
 
-Deno.test("shopkeeper locks their shop door behind them after moving off it", () => {
+Deno.test("shopkeeper locks their shop door behind them after moving off it", async () => {
   const world = new World({ seed: 8 });
   const actor = world.create();
   const lockId = "overworld:shop:gem_vendor:3,3";
@@ -134,7 +134,7 @@ Deno.test("shopkeeper locks their shop door behind them after moving off it", ()
   assertEquals(collider.blocksSight, true);
 });
 
-Deno.test("shopkeeper entering their shop closes the door without locking it", () => {
+Deno.test("shopkeeper entering their shop closes the door without locking it", async () => {
   const world = new World({ seed: 81 });
   const actor = world.create();
   const lockId = "overworld:shop:alchemist:6,6";
@@ -187,7 +187,7 @@ Deno.test("shopkeeper entering their shop closes the door without locking it", (
   assertEquals(door.locked, false);
 });
 
-Deno.test("shopkeeper AI can unlock their own shop door with the matching key", () => {
+Deno.test("shopkeeper AI can unlock their own shop door with the matching key", async () => {
   clearAll();
   const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
   tiles.fill(TILE_FLOOR);
@@ -248,7 +248,7 @@ Deno.test("shopkeeper AI can unlock their own shop door with the matching key", 
   assert(!world.has(actor, MoveIntent), "opening the door should consume the action for this tick");
 });
 
-Deno.test("dead shopkeeper drops their shop key", () => {
+Deno.test("dead shopkeeper drops their shop key", async () => {
   const world = new World({ seed: 10 });
   const actor = world.create();
   const lockId = "overworld:shop:alchemist:12,9";
@@ -271,10 +271,10 @@ Deno.test("dead shopkeeper drops their shop key", () => {
   assertEquals(world.get(keyId, DoorKey)?.lockId, lockId);
 });
 
-Deno.test("overworld gem vendor gets a keyed locked shop door after generation", () => {
+Deno.test("overworld gem vendor gets a keyed locked shop door after generation", async () => {
   clearAll();
   const world = new World({ seed: 0xC0FFEE });
-  generateFloor(world, world.seed >>> 0, 0);
+  await generateFloor(world, world.seed >>> 0, 0);
 
   let gemVendorId = 0;
   for (const [id, named] of world.query(NamedIdentity)) {
@@ -315,10 +315,10 @@ Deno.test("overworld gem vendor gets a keyed locked shop door after generation",
   assertEquals(world.get(keyIds[0], DoorKey)?.lockId, doorLock.lockId);
 });
 
-Deno.test("overworld book vendor gets a keyed locked shop door and owned stock after generation", () => {
+Deno.test("overworld book vendor gets a keyed locked shop door and owned stock after generation", async () => {
   clearAll();
   const world = new World({ seed: 0xC0FFEE });
-  generateFloor(world, world.seed >>> 0, 0);
+  await generateFloor(world, world.seed >>> 0, 0);
 
   let bookVendorId = 0;
   for (const [id, named] of world.query(NamedIdentity)) {
@@ -370,11 +370,11 @@ Deno.test("overworld book vendor gets a keyed locked shop door and owned stock a
   assert(ownedBookStock > 0, "expected the bookseller to own unpaid book or scroll stock inside the shop");
 });
 
-Deno.test("overworld bookseller blocks leaving with unpaid stock", () => {
+Deno.test("overworld bookseller blocks leaving with unpaid stock", async () => {
   clearAll();
   const world = new World({ seed: 0xC0FFEE });
   configureWorld(world);
-  initDungeon(world, { startDepth: 0 });
+  await initDungeon(world, { startDepth: 0 });
 
   let bookVendorId = 0;
   let shopRoom = null;
@@ -458,10 +458,10 @@ Deno.test("overworld bookseller blocks leaving with unpaid stock", () => {
   assertEquals(world.get(playerId, Position), insideDoorPos, "blocked exit should keep the player on the interior door tile");
 });
 
-Deno.test("overworld herbalist does not get the apothecary key", () => {
+Deno.test("overworld herbalist does not get the apothecary key", async () => {
   clearAll();
   const world = new World({ seed: 0xC0FFEE });
-  generateFloor(world, world.seed >>> 0, 0);
+  await generateFloor(world, world.seed >>> 0, 0);
 
   let herbalistId = 0;
   let alchemistId = 0;
@@ -496,7 +496,7 @@ Deno.test("overworld herbalist does not get the apothecary key", () => {
   assertEquals(matchingKeyIds.length, 0, "herbalist should not have apothecary access");
 });
 
-Deno.test("scheduled gem vendor stays in the shop while the player is inside", () => {
+Deno.test("scheduled gem vendor stays in the shop while the player is inside", async () => {
   const world = new World({ seed: 11 });
   const dungeonId = world.create();
   world.add(dungeonId, DungeonState, {

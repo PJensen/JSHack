@@ -1,13 +1,13 @@
 import { createGameRuntime } from "../../src/main/runtime/gameRuntime.js";
 
-const runtimeTick = createGameRuntime({
+const runtimeTick = await createGameRuntime({
   seed: 0xC0FFEE,
   classId: "outlaw",
   playerName: "Bench Tick",
   startDepth: 1,
 });
 
-const runtimeDispatch = createGameRuntime({
+const runtimeDispatch = await createGameRuntime({
   seed: 0xA77A77,
   classId: "outlaw",
   playerName: "Bench Dispatch",

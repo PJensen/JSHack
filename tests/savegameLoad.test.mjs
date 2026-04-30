@@ -120,11 +120,11 @@ Deno.test("restoreSnapshotFromSavegame rejects invalid player snapshot", () => {
   assertThrows(() => restoreSnapshotFromSavegame(world, bad), Error, "invalid save");
 });
 
-Deno.test("overworld dropped ground items persist through save/restore", () => {
+Deno.test("overworld dropped ground items persist through save/restore", async () => {
   const seed = 0xa77a77;
   const source = new World({ seed });
   configureWorld(source);
-  const spawn = initDungeon(source, { startDepth: 0 });
+  const spawn = await initDungeon(source, { startDepth: 0 });
   createPlayer(source, { x: spawn.x, y: spawn.y, name: "Hero" });
 
   const pe = playerEntity(source);
@@ -155,7 +155,7 @@ Deno.test("overworld dropped ground items persist through save/restore", () => {
 
   const restored = new World({ seed: readSavedSeed(payload) ?? seed });
   configureWorld(restored);
-  initDungeon(restored, { startDepth: readSavedDepth(payload) ?? 0 });
+  await initDungeon(restored, { startDepth: readSavedDepth(payload) ?? 0 });
   restoreSnapshotFromSavegame(restored, payload);
 
   assert(restored.isAlive(droppedId), "dropped stack should be alive after restore");

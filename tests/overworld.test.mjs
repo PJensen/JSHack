@@ -22,10 +22,10 @@ function makePlayerAt(world, x, y) {
   return id;
 }
 
-Deno.test("initDungeon supports depth 0 overworld", () => {
+Deno.test("initDungeon supports depth 0 overworld", async () => {
   clearAll();
   const world = new World({ seed: 0xa77a77 });
-  const spawn = initDungeon(world, { startDepth: 0 });
+  const spawn = await initDungeon(world, { startDepth: 0 });
 
   assert(isWalkable(spawn.x, spawn.y), "overworld spawn tile is walkable");
 
@@ -37,10 +37,10 @@ Deno.test("initDungeon supports depth 0 overworld", () => {
   assert(depth === 0, `expected currentDepth 0, got ${depth}`);
 });
 
-Deno.test("overworld contains a down stair entity", () => {
+Deno.test("overworld contains a down stair entity", async () => {
   clearAll();
   const world = new World({ seed: 0xC0FFEE });
-  initDungeon(world, { startDepth: 0 });
+  await initDungeon(world, { startDepth: 0 });
 
   let found = false;
   for (const [, ni] of world.query(NamedIdentity)) {
@@ -52,10 +52,10 @@ Deno.test("overworld contains a down stair entity", () => {
   assert(found, "expected at least one stair_down in overworld");
 });
 
-Deno.test("overworld includes home interactables and harvest nodes", () => {
+Deno.test("overworld includes home interactables and harvest nodes", async () => {
   clearAll();
   const world = new World({ seed: 0xC0FFEE });
-  initDungeon(world, { startDepth: 0 });
+  await initDungeon(world, { startDepth: 0 });
 
   let bed = 0;
   let sign = 0;
@@ -86,27 +86,27 @@ Deno.test("overworld includes home interactables and harvest nodes", () => {
   assert(venom >= 1, "expected dangerous venom ferns");
 });
 
-Deno.test("can transition depth 0 -> 1 -> 0", () => {
+Deno.test("can transition depth 0 -> 1 -> 0", async () => {
   clearAll();
   const world = new World({ seed: 42 });
-  const spawn = initDungeon(world, { startDepth: 0 });
+  const spawn = await initDungeon(world, { startDepth: 0 });
   makePlayerAt(world, spawn.x, spawn.y);
 
-  transitionToDepth(world, 1, { x: 0, y: 0 }, { direction: "down" });
+  await transitionToDepth(world, 1, { x: 0, y: 0 }, { direction: "down" });
   let d1 = -1;
   for (const [, ds] of world.query(DungeonState)) { d1 = ds.currentDepth; break; }
   assert(d1 === 1, "expected depth 1 after descending");
 
-  transitionToDepth(world, 0, { x: 0, y: 0 }, { direction: "up" });
+  await transitionToDepth(world, 0, { x: 0, y: 0 }, { direction: "up" });
   let d0 = -1;
   for (const [, ds] of world.query(DungeonState)) { d0 = ds.currentDepth; break; }
   assert(d0 === 0, "expected depth 0 after ascending");
 });
 
-Deno.test("overworld stash chest and harvest states persist across transitions", () => {
+Deno.test("overworld stash chest and harvest states persist across transitions", async () => {
   clearAll();
   const world = new World({ seed: 4242 });
-  const spawn = initDungeon(world, { startDepth: 0 });
+  const spawn = await initDungeon(world, { startDepth: 0 });
   const actor = makePlayerAt(world, spawn.x, spawn.y);
   world.add(actor, Inventory, { capacity: 20 });
 
@@ -129,8 +129,8 @@ Deno.test("overworld stash chest and harvest states persist across transitions",
   const pickedState = world.get(harvestId, HarvestNode);
   assert(pickedState.ready === false, "harvest node should be on cooldown after harvest");
 
-  transitionToDepth(world, 1, { x: 0, y: 0 }, { direction: "down" });
-  transitionToDepth(world, 0, { x: 0, y: 0 }, { direction: "up" });
+  await transitionToDepth(world, 1, { x: 0, y: 0 }, { direction: "down" });
+  await transitionToDepth(world, 0, { x: 0, y: 0 }, { direction: "up" });
 
   let chest2 = 0;
   let harvest2 = 0;

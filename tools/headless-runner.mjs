@@ -79,7 +79,7 @@ async function main() {
   const cfg = parseArgs(Deno.args);
   const actionSchedule = await loadActionSchedule(cfg.actionsFile);
 
-  const runtime = createGameRuntime({
+  const runtime = await createGameRuntime({
     seed: cfg.seed,
     classId: cfg.classId,
     playerName: cfg.playerName,
