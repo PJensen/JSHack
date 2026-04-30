@@ -326,7 +326,7 @@ import './content/items/fishingRod.js';
 import './content/items/lodbrokSerpentBoundBreeches.js';
 import './content/monsters/barrowWight.js';
 import { installContent } from './content/install.js';
-import { getChannelAction } from './rules/content/useActions/useActionRegistry.js';
+import { getUseAction } from './rules/content/useActions/useActionRegistry.js';
 installContent();
 
 // Initialize identification & gem pricing for this game run
@@ -1446,7 +1446,7 @@ function tryOpenItemChannelTargeter(itemId) {
   const id = Number(itemId || 0) | 0;
   if (!(id > 0)) return false;
   const identity = String(world.get(id, NamedIdentity)?.identity || '');
-  const action = getChannelAction(identity);
+  const action = getUseAction(identity);
   if (!action?.targeting) return false;
 
   const pe = playerEntity(world);
