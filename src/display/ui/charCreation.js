@@ -1100,17 +1100,26 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
     }
     render();
 
-    const timers = [];
-    for (let i = 1; i < rows.length; i++) {
-      timers.push(setTimeout(() => {
-        active = i;
-        render();
-      }, i * 140));
-    }
+    // Plan-phase progress drives panel rows live (no blind setTimeout chain).
+    // Real `phase: 'plan'` events advance the active row in order and update
+    // the footer with the phase label, giving explicit feedback during the
+    // heavy planning steps that previously read as a deadzone.
     return {
       readyDelayMs: 140,
       progress(progress = {}) {
-        if (progress?.phase !== 'chunks') return;
+        if (!progress) return;
+        if (progress.phase === 'plan') {
+          const step = Math.max(0, Number(progress.step) || 0);
+          const total = Math.max(1, Number(progress.total) || 1);
+          const planRowCap = Math.max(1, rows.length - 1);
+          active = Math.min(planRowCap, Math.floor((step / total) * planRowCap));
+          if (typeof progress.label === 'string' && progress.label) {
+            footer.textContent = `${progress.label}…`;
+          }
+          render();
+          return;
+        }
+        if (progress.phase !== 'chunks') return;
         const total = Math.max(1, Number(progress.total) || 1);
         const processed = Math.max(0, Math.min(total, Number(progress.processed) || 0));
         const p = processed / total;
@@ -1123,9 +1132,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
         render();
         footer.textContent = 'Entering world...';
       },
-      dispose() {
-        for (const timer of timers) clearTimeout(timer);
-      },
+      dispose() { /* no-op */ },
     };
   }
 

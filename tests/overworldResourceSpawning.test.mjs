@@ -20,8 +20,8 @@ function allSpawns(ow) {
   return out;
 }
 
-Deno.test("overworld generates biome resources in the hinterlands", () => {
-  const ow = generateOverworldChunks(0xC0FFEE);
+Deno.test("overworld generates biome resources in the hinterlands", async () => {
+  const ow = await generateOverworldChunks(0xC0FFEE);
   const spawns = allSpawns(ow);
   const resources = spawns.filter((spawn) => RESOURCE_KINDS.has(spawn.kind));
   assert(resources.length > 0, "expected hinterland resource spawns");
@@ -34,8 +34,8 @@ Deno.test("overworld generates biome resources in the hinterlands", () => {
   assert(hinterlandResources.length > 0, "expected at least one resource outside the town exclusion");
 });
 
-Deno.test("overworld includes sand crab as coastal monster content", () => {
-  const ow = generateOverworldChunks(0xC0FFEE);
+Deno.test("overworld includes sand crab as coastal monster content", async () => {
+  const ow = await generateOverworldChunks(0xC0FFEE);
   const sandCrabs = allSpawns(ow).filter((spawn) =>
     spawn.kind === "monster" && spawn.params?.identity === "sand_crab"
   );

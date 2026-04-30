@@ -932,7 +932,24 @@ function spawnOverworldResources(chunks, townCenter, bounds, worldSeed) {
  * @param {number} worldSeed
  * @returns {{ extent:{minCX:number,maxCX:number,minCY:number,maxCY:number}, chunks:Array<{chunkX:number,chunkY:number,depth:number,seed:number,tiles:Uint8Array,rooms:any[],doors:any[],spawns:any[]}>, spawnX:number, spawnY:number }}
  */
-export function generateOverworldChunks(worldSeed) {
+// Cooperative yield used between planning phases so the loading UI can repaint.
+// Returns a Promise resolved on next animation frame (or microtask in non-DOM
+// environments like Deno tests).
+const _yieldFrame = () => {
+  if (typeof requestAnimationFrame === 'function') {
+    return new Promise((r) => requestAnimationFrame(() => r()));
+  }
+  return Promise.resolve();
+};
+
+export async function generateOverworldChunks(worldSeed, onPlanProgress = null) {
+  const _emit = (label, step, total) => {
+    if (typeof onPlanProgress === 'function') {
+      onPlanProgress({ phase: 'plan', label, step, total });
+    }
+  };
+  const _yield = onPlanProgress ? _yieldFrame : null;
+
   const extent = { ...OVERWORLD_EXTENT };
   const perm = buildPermutation(worldSeed >>> 0);
   /** @type {Map<string, { chunkX:number, chunkY:number, tiles:Uint8Array, spawns:any[] }>} */
@@ -949,6 +966,9 @@ export function generateOverworldChunks(worldSeed) {
   rngSeed = (rngSeed * 1103515245 + 12345) >>> 0;
   const gradientDir = directions[rngSeed % 4];
 
+  const PLAN_TOTAL = 6;
+  _emit('Generating terrain', 0, PLAN_TOTAL);
+  if (_yield) await _yield();
   for (let cy = extent.minCY; cy <= extent.maxCY; cy++) {
     for (let cx = extent.minCX; cx <= extent.maxCX; cx++) {
       const rec = {
@@ -962,6 +982,8 @@ export function generateOverworldChunks(worldSeed) {
     }
   }
 
+  _emit('Carving coastline', 1, PLAN_TOTAL);
+  if (_yield) await _yield();
   forceEdgeOcean(chunks, minX, maxX, minY, maxY, worldSeed >>> 0, perm);
 
   // Default spawn point at center of overworld
@@ -970,20 +992,25 @@ export function generateOverworldChunks(worldSeed) {
   let spawnX = homeX;
   let spawnY = homeY;
 
-  // Carve rivers and ponds
+  _emit('Carving rivers and ponds', 2, PLAN_TOTAL);
+  if (_yield) await _yield();
   carveRivers(chunks, minX, maxX, minY, maxY, worldSeed >>> 0, perm);
   carvePondsAndLakes(chunks, minX, maxX, minY, maxY, homeX, homeY, worldSeed >>> 0, perm);
 
+  _emit('Placing buildings', 3, PLAN_TOTAL);
+  if (_yield) await _yield();
   const townPlan = applyTownPlacement(chunks, { minX, maxX, minY, maxY }, worldSeed >>> 0);
   if (townPlan?.center) {
     spawnX = townPlan.center.x;
     spawnY = townPlan.center.y;
   }
 
-  // Spawn creatures in hinterlands (far from town)
+  _emit('Spawning creatures', 4, PLAN_TOTAL);
+  if (_yield) await _yield();
   spawnOverworldCreatures(chunks, townPlan?.center || { x: spawnX, y: spawnY }, { minX, maxX, minY, maxY }, worldSeed >>> 0);
 
-  // Spawn resources in the hinterlands; townPlacement owns the town-adjacent work sites.
+  _emit('Placing resources', 5, PLAN_TOTAL);
+  if (_yield) await _yield();
   spawnOverworldResources(chunks, townPlan?.center || { x: spawnX, y: spawnY }, { minX, maxX, minY, maxY }, worldSeed >>> 0);
 
   const outChunks = [];

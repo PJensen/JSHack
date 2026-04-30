@@ -79,7 +79,7 @@ export async function generateFloor(world, worldSeed, depth, tombstoneRepo = nul
   // Yield every N chunks to keep UI responsive without slowing gen too much.
   const _YIELD_EVERY = 2;
   if (depth === 0) {
-    const ow = generateOverworldChunks(worldSeed);
+    const ow = await generateOverworldChunks(worldSeed, onProgress);
 
     // Church graveyard epitaph source priority:
     // 1) Pin top 5 global highscores in rank order to the five church graves.
