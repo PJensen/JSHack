@@ -2,17 +2,6 @@
 import { createTorchThrowHook } from "./itemCatalogHooks.js";
 import { WEAPON_FAMILIES } from "./weaponFamilies.js";
 
-function fishingRodUseHook(ctx, state) {
-  const actor = Number(state?.actor || ctx.actor || 0) | 0;
-  const itemId = Number(state?.itemId || ctx.primary || 0) | 0;
-  ctx.io.emit("fishing:cast:request", {
-    actor,
-    itemId,
-    turns: 12,
-  });
-  return { consumed: false };
-}
-
 export const EQUIPMENT_ITEMS = {
   staff_oak: {
     id: "staff_oak",
@@ -31,41 +20,6 @@ export const EQUIPMENT_ITEMS = {
     maxSockets: 1,
     description: "A sturdy staff of ancient oak. Channels natural energies.",
     weight: 2.5, // wood staff
-  },
-  fishing_rod: {
-    id: "fishing_rod",
-    catalogKind: "equipment",
-    name: "Fishing Rod",
-    type: "equip",
-    slot: "weapon",
-    twoHanded: true,
-    material: "wood",
-    rarity: 1,
-    rarityName: "common",
-    value: 16,
-    bonuses: { luck: 1 },
-    damageDice: "1d2",
-    damageType: "blunt",
-    staminaCost: 4,
-    description: "A flexible rod, cord, hook, and hope. Cast it near water to channel a catch.",
-    weight: 1.0,
-    tags: ["tool", "fishing"],
-    hooks: {
-      onUse: fishingRodUseHook,
-    },
-    _contentAbilities: {
-      cast_line: {
-        id: "cast_line",
-        name: "Cast Line",
-        icon: "F",
-        targeting: "none",
-        range: 1,
-        cooldown: 0,
-        cost: 0,
-        costKind: "item",
-        description: "Cast into nearby water and wait for a bite.",
-      },
-    },
   },
   longsword: {
     id: "longsword",
