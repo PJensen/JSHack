@@ -1,7 +1,11 @@
 import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";
+import { attach } from "../src/lib/ecs-js/hierarchy.js";
 import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
+import { Duration } from "../src/rules/components/Duration.js";
 import { Status } from "../src/rules/components/Status.js";
+import { StatusEffectNode } from "../src/rules/components/StatusEffectNode.js";
+import { TimedEffectNode } from "../src/rules/components/TimedEffectNode.js";
 import {
   createStatusFacade,
   effectStrength,
@@ -66,6 +70,69 @@ Deno.test("status facade: onset effects do not project statuses until active", (
 
   assertEquals(hasEffect(world, actor, "hangover"), false);
   assertEquals(hasStatus(world, actor, "confused"), false);
+});
+
+Deno.test("status facade: derives statuses from topology status nodes", () => {
+  const world = new World({ seed: 61041 });
+  const actor = world.create();
+  const statusNode = world.create();
+  attach(world, statusNode, actor);
+  world.add(statusNode, StatusEffectNode, {
+    key: "hangover",
+    potency: 3,
+    stacks: 2,
+  });
+  world.add(statusNode, Duration, {
+    turnsLeft: 4,
+    onsetLeft: 0,
+    maxTurns: 4,
+    startedAtTurn: 9,
+  });
+
+  assertEquals(hasEffect(world, actor, "hangover"), true);
+  assertEquals(effectStrength(world, actor, "hangover"), 6);
+  assertEquals(statusStrength(world, actor, "confused"), 6);
+});
+
+Deno.test("status facade: topology rows take precedence over duplicate legacy active effects", () => {
+  const world = new World({ seed: 61042 });
+  const actor = world.create();
+  const statusNode = world.create();
+  attach(world, statusNode, actor);
+  world.add(statusNode, StatusEffectNode, {
+    key: "poison",
+    potency: 2,
+    stacks: 1,
+  });
+  world.add(statusNode, Duration, {
+    turnsLeft: 4,
+    onsetLeft: 0,
+    maxTurns: 4,
+    startedAtTurn: 0,
+  });
+  world.add(actor, ActiveEffects, {
+    effects: [{ key: "poison", turnsLeft: 5, potency: 9, stacks: 1 }],
+  });
+
+  assertEquals(effectStrength(world, actor, "poison"), 2);
+  assertEquals(statusStrength(world, actor, "poisoned"), 2);
+});
+
+Deno.test("status facade: topology timed nodes can expose effects without StatusEffectNode", () => {
+  const world = new World({ seed: 61043 });
+  const actor = world.create();
+  const timedNode = world.create();
+  attach(world, timedNode, actor);
+  world.add(timedNode, TimedEffectNode, { key: "hangover" });
+  world.add(timedNode, Duration, {
+    turnsLeft: 2,
+    onsetLeft: 0,
+    maxTurns: 2,
+    startedAtTurn: 0,
+  });
+
+  assertEquals(hasEffect(world, actor, "hangover"), true);
+  assertEquals(statusStrength(world, actor, "confused"), 1);
 });
 
 Deno.test("createStatusFacade: exposes anchored helpers for callbacks/runtime contexts", () => {

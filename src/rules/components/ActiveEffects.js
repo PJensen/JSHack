@@ -1,5 +1,9 @@
 import { defineComponent } from '../../lib/ecs-js/index.js';
 
+// Legacy compatibility component.
+// Runtime topology should prefer attached StatusEffectNode / TimedEffectNode
+// entities. See RUNTIME_TOPOLOGY_DOCTRINE.md before adding new effect families
+// that write directly to effects[].
 function  isEffect(e) {
   if (!e || typeof e !== 'object') throw new Error('ActiveEffects: effect must be an object');
   if (typeof e.key !== 'string' || !e.key) throw new Error('ActiveEffects: key must be a non-empty string');

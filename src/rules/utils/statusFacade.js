@@ -1,6 +1,10 @@
 import { ActiveEffects } from "../components/ActiveEffects.js";
+import { Duration } from "../components/Duration.js";
 import { Status } from "../components/Status.js";
+import { StatusEffectNode } from "../components/StatusEffectNode.js";
+import { TimedEffectNode } from "../components/TimedEffectNode.js";
 import { EFFECT_DEFS } from "../data/effectDefs.js";
+import { descendantsWith } from "./topology.js";
 
 function normalizeKey(value) {
   return String(value || "").trim().toLowerCase();
@@ -55,10 +59,49 @@ function validEntity(world, entityId) {
   return true;
 }
 
+function readTopologyEffect(world, nodeId, effectNode, fallbackKey = "") {
+  const key = normalizeKey(effectNode?.key || fallbackKey);
+  if (!key) return null;
+
+  const duration = world.get(nodeId, Duration);
+  if ((Number(duration?.onsetLeft || 0) | 0) > 0) return null;
+  if (!hasPositiveDuration(duration?.turnsLeft)) return null;
+
+  return {
+    key,
+    turnsLeft: Number(duration.turnsLeft || 0) | 0,
+    onsetLeft: Number(duration.onsetLeft || 0) | 0,
+    potency: effectNode?.potency,
+    stacks: effectNode?.stacks,
+  };
+}
+
+function collectTopologyEffects(world, entityId) {
+  const out = [];
+  const seen = new Set();
+
+  for (const [nodeId, effectNode] of descendantsWith(world, entityId, StatusEffectNode)) {
+    const row = readTopologyEffect(world, nodeId, effectNode);
+    if (!row) continue;
+    out.push(row);
+    seen.add(nodeId);
+  }
+
+  for (const [nodeId, timedNode] of descendantsWith(world, entityId, TimedEffectNode)) {
+    if (seen.has(nodeId)) continue;
+    const row = readTopologyEffect(world, nodeId, timedNode);
+    if (!row) continue;
+    out.push(row);
+  }
+
+  return out;
+}
+
 /**
- * Build an ActiveEffects-first status/effect snapshot for one entity.
+ * Build a topology-aware status/effect snapshot for one entity.
  *
- * - Effects are read from ActiveEffects where turnsLeft > 0 and onsetLeft <= 0.
+ * - Effects are read from runtime topology nodes first.
+ * - Legacy ActiveEffects entries are included for keys with no topology row.
  * - Statuses are projected from active effects via EFFECT_DEFS.
  * - If a status has no projected active-effect value, falls back to Status component.
  *
@@ -74,8 +117,14 @@ export function snapshotStatusState(world, entityId) {
   /** @type {Map<string, number>} */
   const projectedStatusStrengths = new Map();
 
+  const topologyEffects = collectTopologyEffects(world, id);
+  const topologyKeys = new Set(topologyEffects.map((effect) => effect.key));
+
   const ae = world.get(id, ActiveEffects);
-  const effects = Array.isArray(ae?.effects) ? ae.effects : [];
+  const legacyEffects = Array.isArray(ae?.effects) ? ae.effects : [];
+  const effects = topologyEffects.concat(
+    legacyEffects.filter((effect) => !topologyKeys.has(normalizeKey(effect?.key)))
+  );
   for (let i = 0; i < effects.length; i++) {
     const e = effects[i];
     if (!isActiveEffect(e)) continue;

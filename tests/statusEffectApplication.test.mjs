@@ -1,0 +1,88 @@
+import { assert, assertEquals } from "jsr:@std/assert";
+import { getParent } from "../src/lib/ecs-js/hierarchy.js";
+import { World } from "../src/lib/ecs-js/index.js";
+import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
+import { Duration } from "../src/rules/components/Duration.js";
+import { Source } from "../src/rules/components/Source.js";
+import { StatusEffectNode } from "../src/rules/components/StatusEffectNode.js";
+import { TimedEffectNode } from "../src/rules/components/TimedEffectNode.js";
+import { applyStatusEffect } from "../src/rules/utils/effects.js";
+import {
+  effectStrength,
+  statusStrength,
+} from "../src/rules/utils/statusFacade.js";
+
+Deno.test("applyStatusEffect creates topology node and legacy mirror", () => {
+  const world = new World({ seed: 6201 });
+  const actor = world.create();
+  const source = world.create();
+
+  const node = applyStatusEffect(world, actor, {
+    key: "hangover",
+    turnsLeft: 4,
+    maxTurns: 6,
+    startedAtTurn: 2,
+    potency: 2,
+    stacks: 3,
+    sourceId: source,
+    sourceKind: "potion",
+    sourceKey: "ale",
+  });
+
+  assertEquals(getParent(world, node), actor);
+  assertEquals(world.get(node, StatusEffectNode), {
+    key: "hangover",
+    potency: 2,
+    stacks: 3,
+  });
+  assertEquals(world.get(node, TimedEffectNode), { key: "hangover" });
+  assertEquals(world.get(node, Duration), {
+    turnsLeft: 4,
+    onsetLeft: 0,
+    maxTurns: 6,
+    startedAtTurn: 2,
+  });
+  assertEquals(world.get(node, Source), {
+    kind: "potion",
+    id: source,
+    key: "ale",
+  });
+
+  const legacy = world.get(actor, ActiveEffects);
+  assert(legacy, "legacy ActiveEffects mirror should exist");
+  assertEquals(legacy.effects.length, 1);
+  assertEquals(effectStrength(world, actor, "hangover"), 6);
+  assertEquals(statusStrength(world, actor, "confused"), 6);
+});
+
+Deno.test("applyStatusEffect can create topology without legacy mirror", () => {
+  const world = new World({ seed: 6202 });
+  const actor = world.create();
+
+  applyStatusEffect(world, actor, {
+    key: "poison",
+    turnsLeft: 5,
+    potency: 2,
+    stacks: 1,
+  }, { mirrorLegacy: false });
+
+  assertEquals(world.get(actor, ActiveEffects), null);
+  assertEquals(effectStrength(world, actor, "poison"), 2);
+  assertEquals(statusStrength(world, actor, "poisoned"), 2);
+});
+
+Deno.test("applyStatusEffect topology honors onset before projecting status", () => {
+  const world = new World({ seed: 6203 });
+  const actor = world.create();
+
+  applyStatusEffect(world, actor, {
+    key: "hangover",
+    turnsLeft: 5,
+    onsetLeft: 2,
+    potency: 2,
+    stacks: 1,
+  }, { mirrorLegacy: false });
+
+  assertEquals(effectStrength(world, actor, "hangover"), 0);
+  assertEquals(statusStrength(world, actor, "confused"), 0);
+});
