@@ -1,6 +1,6 @@
 // src/rules/systems/channelingSystem.js
-// Counts down active channel timers each tick. When a channel completes,
-// injects a CastSpellIntent so castSpellSystem fires the spell.
+// Counts down active channel timers each tick. Completed item use-actions
+// dispatch through the registry; completed spell casts inject CastSpellIntent.
 // Cancellation from the app layer (ESC) removes Channeling directly.
 
 import { Channeling } from "../components/Channeling.js";
@@ -10,7 +10,7 @@ import { Mana } from "../components/Mana.js";
 import { Stamina } from "../components/Stamina.js";
 import { Position } from "../components/Position.js";
 import { Vitality } from "../components/Vitality.js";
-import { getChannelAction } from "../content/useActions/useActionRegistry.js";
+import { getUseAction } from "../content/useActions/useActionRegistry.js";
 import { getSpell } from "../data/spells.js";
 import { MANA_REGEN_COOLDOWN, STAMINA_REGEN_COOLDOWN } from "../data/regenConstants.js";
 import { runSpellScript } from "../scripts/spells.js";
@@ -197,7 +197,7 @@ export function channelingSystem(world) {
     ch.turnsRemaining -= 1;
 
     if (ch.turnsRemaining <= 0) {
-      const itemAction = getChannelAction(ch.itemActionId || "");
+      const itemAction = getUseAction(ch.itemActionId || "");
       if (itemAction) {
         try { world.remove(id, Channeling); } catch {}
         itemAction.onComplete(world, id, ch);

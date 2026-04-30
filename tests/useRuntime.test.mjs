@@ -119,7 +119,7 @@ Deno.test("equipped fishing rod use channels and rolls normal-water fishing loot
   }
 });
 
-Deno.test("fishing is a targeted channeled spell that requires water", () => {
+Deno.test("fishing is a targeted channeled use-action that requires water", () => {
   clearAll();
   const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
   tiles.fill(TILE_FLOOR);
@@ -144,13 +144,13 @@ Deno.test("fishing is a targeted channeled spell that requires water", () => {
 
   world.emit("fishing:cast:request", { actor, itemId: rod, turns: 12, x: 2, y: 0 });
 
-  assert(world.has(actor, Channeling), "fishing spell should start a channel");
+  assert(world.has(actor, Channeling), "fishing use-action should start a channel");
   assertEquals(casts[0]?.x, 2);
   assertEquals(casts[0]?.y, 0);
 
   for (let i = 0; i < 12; i++) channelingSystem(world);
 
-  assertEquals(world.has(actor, Channeling), false, "fishing spell channel should complete");
+  assertEquals(world.has(actor, Channeling), false, "fishing use-action channel should complete");
   assertEquals(caught.length, 1);
   assertEquals(caught[0]?.tableId, "fishing:normal_water");
   if (caught[0]?.caughtId) {
@@ -264,7 +264,7 @@ Deno.test("fishing loot context records rain, tile profile, and repeat pressure"
   assertEquals(caught[2]?.pressureBefore, 0);
 });
 
-Deno.test("fishing spell refuses non-water tiles", () => {
+Deno.test("fishing use-action refuses non-water tiles", () => {
   clearAll();
   const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
   tiles.fill(TILE_FLOOR);

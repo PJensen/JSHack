@@ -72,11 +72,17 @@ Adding a new damage type or proc means touching every branch in every handler.
 
 **Scope**: 1–2 days. Isolated. Proves the architecture before the slog.
 
-1. Create `src/rules/content/useActions/useActionRegistry.js` — `defineUseAction`, `getUseAction`, lookup by identity.
-2. Port fishing to a `defineUseAction` declaration in `src/content/items/fishingRod.js`.
-3. Remove identity branches from `castSpellSystem.js` and `main.js`.
-4. Route channeling system through registry lookup instead of hardcoded branches.
-5. Document the pattern so next tool just declares, doesn't modify systems.
+Status: complete as of 2026-04-30, with compatibility aliases left in place for migration.
+
+1. [x] Create `src/rules/content/useActions/useActionRegistry.js` — `defineUseAction`, `getUseAction`, lookup by identity.
+2. [x] Port fishing to a `defineUseAction` declaration in `src/rules/content/useActions/fishingAction.js`; `src/content/items/fishingRod.js` owns the item/ability declaration.
+3. [x] Remove fishing identity branches from `castSpellSystem.js` and `main.js`; main now opens item targeters through use-action metadata.
+4. [x] Route channeling system through registry lookup instead of hardcoded branches.
+5. [x] Document the pattern so next tool just declares, doesn't modify systems: `src/rules/content/useActions/README.md`.
+
+Follow-up:
+
+- Keep `defineChannelAction` / `getChannelAction` aliases temporarily only for migration; new code must use `defineUseAction` / `getUseAction`.
 
 ### Phase A — Kill Dual Registry (the slog, highest unlock)
 

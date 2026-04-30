@@ -1,7 +1,7 @@
 // All fishing channel logic lives here.
 // defineItem declares the rod; this file registers its channel action + installs the event listener.
 
-import { defineChannelAction } from "./useActionRegistry.js";
+import { defineUseAction } from "./useActionRegistry.js";
 import { Channeling } from "../../components/Channeling.js";
 import { Equipment, getEquippedSlot } from "../../components/Equipment.js";
 import { HarvestNode } from "../../components/HarvestNode.js";
@@ -349,11 +349,11 @@ export function installFishingAction(world) {
     requestFishingCast(world, Number(actor || 0) | 0, Number(itemId || 0) | 0, { turns, x, y });
   });
 
-  defineChannelAction('fishing_rod', {
+  defineUseAction('fishing_rod', {
+    channelTurns: 12,
     targeting: FISHING_TARGETING,
     onComplete(world, actorId, ch) {
       resolveFishingChannel(world, actorId, ch);
     },
   });
 }
-
