@@ -11,7 +11,6 @@
 //     or remove MoveIntent (wait/hold).
 //   • Falls back silently if no trained weights exist for this tier (TRAINED_WEIGHTS empty).
 
-import { Position }      from '../components/Position.js';
 import { Faction }       from '../components/Faction.js';
 import { Brain }         from '../components/Brain.js';
 import { AggroState, AGGRO_LEVELS } from '../components/AggroState.js';

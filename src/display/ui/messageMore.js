@@ -4,8 +4,6 @@
 // messages are pending the ticker shows one at a time with "--More--"
 // and locks player input until the queue is drained.
 
-import { setInputLock } from "../input/inputLock.js";
-
 const LOCK_KEY = "messageMore";
 
 /**

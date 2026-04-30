@@ -19,7 +19,6 @@ import {
   TILE_FLOOR,
   TILE_TREE,
   TILE_GRASS,
-  TILE_VOID,
 } from "../environment/dungeon/constants.js";
 
 /**

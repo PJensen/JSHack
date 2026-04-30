@@ -1,4 +1,3 @@
-import { Inventory } from "../components/Inventory.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Polymorph } from "../components/Polymorph.js";
 import { Position } from "../components/Position.js";

@@ -3,7 +3,7 @@
 // Works in both Deno and browser (uses Web Crypto API).
 // No game engine imports — pure async crypto.
 
-import { PROOF_VERSION, canonicalizeAction, validateBundle } from "./proofBundle.js";
+import { canonicalizeAction, validateBundle } from "./proofBundle.js";
 
 const _encoder = new TextEncoder();
 
