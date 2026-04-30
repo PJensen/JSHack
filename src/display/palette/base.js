@@ -297,6 +297,7 @@ export const basePalette = {
   townfolk_fisher:     { glyph: "@", fg: "#64b5f6", glow: "#1565c0" },
   townfolk_gem_vendor: { glyph: "@", fg: "#8fdcff", glow: "#3ea0d4" },
   townfolk_book_vendor: { glyph: "@", fg: "#d4a76a", glow: "#8b6914" },
+  townfolk_general_vendor: { glyph: "@", fg: "#c8a87a", glow: "#7a5c2e" },
 
   // Containers
   chest:            { glyph: "]", fg: "#c8a050", glow: "#a07830" },
