@@ -3,10 +3,13 @@ import { World } from '../src/lib/ecs-js/index.js';
 import { EquipIntent } from '../src/rules/components/Intents/EquipIntent.js';
 import { Inventory } from '../src/rules/components/Inventory.js';
 import { Equipment } from '../src/rules/components/Equipment.js';
+import { EquippedSlotNode } from '../src/rules/components/EquippedSlotNode.js';
 import { ItemInfo } from '../src/rules/components/ItemInfo.js';
 import { NamedIdentity } from '../src/rules/components/NamedIdentity.js';
 import { equipItemSystem } from '../src/rules/systems/equipItemSystem.js';
 import { addToInventory, inventoryContains } from '../src/rules/utils/inventoryFacade.js';
+import { resolveEquipmentView } from '../src/rules/utils/equipmentTopology.js';
+import { descendantsWith } from '../src/rules/utils/topology.js';
 
 function makeItem(world, { id, name, slot, type = 'equip', count = 1 }) {
   const eid = world.create();
@@ -31,6 +34,8 @@ Deno.test("equip item system: weapon, armor, head, neck, belt, gloves, legs, rin
 
   let eq = world.get(actor, Equipment);
   assert(eq.weapon === sword, `weapon should be sword, got ${eq.weapon}`);
+  assert(resolveEquipmentView(world, actor).weapon === sword, 'equipment topology should mirror main hand');
+  assert([...descendantsWith(world, actor, EquippedSlotNode)].some(([, node]) => node.slot === 'weapon'), 'weapon slot node should exist');
   assert(!world.has(actor, EquipIntent), 'EquipIntent should be consumed');
 
   // Equip second 1H weapon → cascades to offhand (dual-wield)
@@ -202,6 +207,7 @@ Deno.test("equip item system: selecting an already equipped starter item unequip
 
   assert(eq.weapon == null, 'starter weapon should unequip when selected again');
   assert(inventoryContains(world, actor, starterSword), 'unequipped item remains in inventory');
+  assert(resolveEquipmentView(world, actor).weapon === 0, 'main-hand topology should clear on unequip');
   assert(!world.has(actor, EquipIntent), 'EquipIntent should be consumed');
 });
 
