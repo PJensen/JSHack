@@ -9,12 +9,16 @@
 // Tests run across several world seeds at depths 1 and 4 to catch edge cases.
 
 import { assert } from "jsr:@std/assert";
+import "../src/content/items/index.js";
+import { installContent } from "../src/content/install.js";
 import { World } from '../src/lib/ecs-js/index.js';
 import {
   clearAll, isWalkable, forEachLoadedTile,
 } from '../src/rules/environment/dungeon/tileMap.js';
 import { generateFloor } from '../src/rules/environment/dungeon/index.js';
 import { TILE_STAIR_DOWN, TILE_STAIR_UP } from '../src/rules/environment/dungeon/constants.js';
+
+installContent();
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -1,4 +1,6 @@
 import { assert } from "jsr:@std/assert";
+import "../src/content/items/index.js";
+import { installContent } from "../src/content/install.js";
 import { World } from "../src/lib/ecs-js/index.js";
 import { initDungeon } from "../src/rules/environment/dungeon/index.js";
 import { transitionToDepth } from "../src/rules/environment/dungeon/transition.js";
@@ -14,6 +16,8 @@ import { createFrom } from "../src/lib/ecs-js/archetype.js";
 import { WildBerries } from "../src/rules/archetypes/Food.js";
 import { interactionSystem } from "../src/rules/systems/interactionSystem.js";
 import { addToInventory, inventoryContains, inventoryItems } from "../src/rules/utils/inventoryFacade.js";
+
+installContent();
 
 function makePlayerAt(world, x, y) {
   const id = world.create();

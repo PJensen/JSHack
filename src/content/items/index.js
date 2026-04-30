@@ -1,9 +1,9 @@
 // Barrel import: loads all content-DSL item definitions.
-// Importing this file ensures all items are registered in the content registry.
-// Call installContent() afterward to merge into ITEM_CATALOG.
-export * from "./potionOfRadiance.js";
-export * from "./sunVessel.js";
-export * from "./dawnbreaker.js";
-export * from "./sunsword.js";
-export * from "./fishingRod.js";
-export * from "./lodbrokSerpentBoundBreeches.js";
+// Importing this file triggers defineItem() side effects for all content items.
+// Call installContent() afterward to merge the content registry into ITEM_CATALOG.
+import "./potionOfRadiance.js";
+import "./sunVessel.js";
+import "./dawnbreaker.js";
+import "./sunsword.js";
+import "./fishingRod.js";
+import "./lodbrokSerpentBoundBreeches.js";
