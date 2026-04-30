@@ -2,8 +2,8 @@ import { assert, assertAlmostEquals, assertEquals } from "jsr:@std/assert";
 import { createFountainAmbientController, computeFountainLoopVolume } from "../src/display/audio/fountainAmbientController.js";
 
 Deno.test("computeFountainLoopVolume fades from the basin to silence", () => {
-  assertAlmostEquals(computeFountainLoopVolume(0), 0.72, 1e-10);
-  assertAlmostEquals(computeFountainLoopVolume(1), 0.72, 1e-10);
+  assertAlmostEquals(computeFountainLoopVolume(0), 0.24, 1e-10);
+  assertAlmostEquals(computeFountainLoopVolume(1), 0.24, 1e-10);
   assert(computeFountainLoopVolume(3) < computeFountainLoopVolume(2));
   assertEquals(computeFountainLoopVolume(7), 0);
   assertEquals(computeFountainLoopVolume(99), 0);
@@ -41,7 +41,7 @@ Deno.test("fountain ambient controller starts, updates, and stops the loop aroun
   });
   assertEquals(calls[0]?.type, "start");
   assertEquals(calls[0]?.url, "./assets/audio/ambient_fountain.mp3");
-  assertAlmostEquals(calls[0]?.opts?.volume, 0.72, 1e-10);
+  assertAlmostEquals(calls[0]?.opts?.volume, 0.24, 1e-10);
 
   controller.syncWorldView({
     player: { pos: { x: 10, y: 10 } },

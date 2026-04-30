@@ -31,7 +31,8 @@ Deno.test("venomous monsters route to drop:venomous and can drop poison resistan
   const snake = getMonster("snake");
   const spider = getMonster("spider");
   assert(getMonsterLootTable(snake) === "drop:venomous", "snake should use drop:venomous");
-  assert(getMonsterLootTable(spider) === "drop:venomous", "spider should use drop:venomous");
+  // Spiders now have dedicated drop:spider table (added OVERWORLD: spawns commit).
+  assert(getMonsterLootTable(spider) === "drop:spider", "spider uses dedicated drop:spider table");
 
   const ids = tableItemIds("drop:venomous");
   assert(ids.has("potion_resist_poison"), "drop:venomous should include potion_resist_poison");

@@ -33,9 +33,12 @@ function collectEquipPoolsFromLootTables() {
   return seen;
 }
 
+// Items only obtainable via crafting/smithing — not dropped as loot.
+const CRAFTED_ONLY_EQUIPMENT = new Set(["tool_hatchet", "tool_kitchen_knife"]);
+
 Deno.test("equipment catalog ids are represented in loot table equip pools", () => {
   const allEquipmentIds = Object.values(ITEM_CATALOG)
-    .filter((def) => def?.catalogKind === "equipment")
+    .filter((def) => def?.catalogKind === "equipment" && !CRAFTED_ONLY_EQUIPMENT.has(def.id))
     .map((def) => def.id)
     .sort();
 
