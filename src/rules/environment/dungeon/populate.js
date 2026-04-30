@@ -2518,6 +2518,24 @@ export function materializeSpawn(world, spawn) {
             try { world.add(itemId, Unpaid, { shopkeeperId: id, price }); } catch {}
           }
         }
+      } else if (def.role === "general_vendor") {
+        world.add(id, Interactable, {
+          action: "openShop",
+          params: { dialogue: def.dialogue, townfolkId: spawn.params.townfolkId },
+        });
+        world.add(id, ShopInventory, { buyMarkup: 1.3, sellDiscount: 0.5 });
+        assignShopDoorKey(world, id, spawn.params.shopDoorRole || def.role, spawn.params.shopDoor);
+        if (spawn.params.shopRoom) {
+          const roomEntity = world.create();
+          world.add(roomEntity, RoomMetadata, {
+            roomType: 'shop',
+            x: spawn.params.shopRoom.x,
+            y: spawn.params.shopRoom.y,
+            w: spawn.params.shopRoom.w,
+            h: spawn.params.shopRoom.h,
+            shopkeeperId: id,
+          });
+        }
       } else {
         world.add(id, Interactable, {
           action: "talkToNPC",

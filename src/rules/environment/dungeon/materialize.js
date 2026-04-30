@@ -16,8 +16,8 @@ import {
   CHUNK_SIZE, TILE_DOOR, TILE_STAIR_DOWN, TILE_STAIR_UP,
 } from './constants.js';
 
-const SHOP_FLOOR_ITEM_KINDS = new Set(["shop_item", "alchemy_shop_item", "book_shop_item"]);
-const SHOP_DISPLAY_IDENTITIES = new Set(["potion_shelf", "gem_display_case"]);
+const SHOP_FLOOR_ITEM_KINDS = new Set(["shop_item", "alchemy_shop_item", "book_shop_item", "general_store_item"]);
+const SHOP_DISPLAY_IDENTITIES = new Set(["potion_shelf", "gem_display_case", "weapon_rack"]);
 
 /**
  * Create ECS entities for interactive tiles and spawn features.

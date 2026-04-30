@@ -15,6 +15,7 @@ export const TOWNFOLK_ROLES = Object.freeze({
   fisher:     "fisher",
   gem_vendor: "gem_vendor",
   book_vendor: "book_vendor",
+  general_vendor: "general_vendor",
 });
 
 export const TOWNFOLK_STATES = Object.freeze({

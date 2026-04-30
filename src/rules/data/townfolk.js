@@ -114,4 +114,12 @@ export const TOWNFOLK = Object.freeze({
     maxHp: 25,
     dialogue: "Spells, scrolls, and stories — knowledge is the sharpest weapon.",
   },
+  general_vendor: {
+    name: "General Store Merchant",
+    identity: "townfolk_general_vendor",
+    role: "general_vendor",
+    speed: 2,
+    maxHp: 35,
+    dialogue: "Weapons, armor, potions — if you need it underground, I've got it.",
+  },
 });
