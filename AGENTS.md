@@ -2,7 +2,7 @@
 
 JSHack is a hackable, zero-dependency, browser-based roguelike engine built with pure JavaScript and Entity-Component-System (ECS) architecture. This document provides autonomous agents, copilots, and automated operators with the context needed to understand, maintain, and extend the codebase without fighting the architecture or violating its core principles.
 
-Think of this as the field manual for working with JSHack. For API details and conceptual deep dives, see [README.md](README.md). For architectural boundaries, see [SEPARATION_MANIFEST.md](SEPARATION_MANIFEST.md). For project philosophy and constraints, see [TEN_COMMANDMENTS.md](TEN_COMMANDMENTS.md). When you need to keep the project humming without derailing it, stay here.
+Think of this as the field manual for working with JSHack. For API details and conceptual deep dives, see [README.md](README.md). For architectural boundaries, see [SEPARATION_MANIFEST.md](SEPARATION_MANIFEST.md). For project philosophy and constraints, see [TEN_COMMANDMENTS.md](TEN_COMMANDMENTS.md). For runtime multiplicity and entity hierarchy rules, see [RUNTIME_TOPOLOGY_DOCTRINE.md](RUNTIME_TOPOLOGY_DOCTRINE.md). When you need to keep the project humming without derailing it, stay here.
 
 ---
 
@@ -33,6 +33,7 @@ JSHack has burned twice (Oct 23 and Nov 6, 2025) by violating these constraints.
 0.5. **No build step, ever**: Pure ES modules, no transpilation, no bundling. This is non-negotiable.
 0.6. **Deno, not Node**: All tooling, testing, and scripts use Deno. If you write a test or utility script, it runs on Deno.
 0.7. **CANNON, not release valves**: For each domain operation, there must be one canonical implementation path. Every alternate entry point must delegate to it and stay parity-tested.
+0.8. **Runtime topology is attached entities**: Runtime multiplicity belongs in parent/child entity topology, not hidden arrays on one component. Components describe flat facts; hierarchy describes containment and attachment; resolvers derive views. Read [RUNTIME_TOPOLOGY_DOCTRINE.md](RUNTIME_TOPOLOGY_DOCTRINE.md) before adding systems that create effects, enchantments, sockets, equipment slots, procs, or other repeatable runtime objects.
 
 **Game-specific constraints (keep the roguelike pure):**
 
@@ -102,6 +103,43 @@ Required parity pattern:
 - Add/maintain a parity test that compares outcomes across all spawn vectors for the same entity family.
 - Example for monsters: debug mutation spawn, dungeon materialize spawn, and spawner child spawn must produce equivalent gameplay-relevant components (identity, brain/spells, mana, resistances, speed, creature type, hooks behavior).
 - Treat parity drift as a blocker, not a cleanup task.
+
+### Runtime topology doctrine
+
+Runtime multiplicity is modeled as attached child entities.
+
+JSHack already uses this pattern for inventory:
+
+```txt
+owner entity
+  InventoryRoot entity
+    item entity
+    item entity
+    item entity
+```
+
+Use the same doctrine for new repeatable runtime objects such as enchantments,
+gem sockets, socketed items, status effects, timed effects, equipment slots,
+charges, sources, and proc graphs.
+
+Rules:
+- Components describe flat facts.
+- Hierarchy describes topology.
+- Resolvers derive compatibility views and UI-ready summaries.
+- Systems execute behavior through events.
+- Arrays are acceptable for static authoring data and small private values.
+- Arrays are suspicious when they contain active runtime things.
+
+If another system needs to find it, remove it, target it, tick it, save it,
+inspect it, or react to it, it probably deserves to be an entity.
+
+Legacy array-backed components such as `ActiveEffects.effects[]`, slot records,
+socket arrays, or `ItemInfo.affixes[]` may remain temporarily as compatibility
+state, but they are not precedent for new runtime topology. Touched systems
+should migrate toward child entities behind canonical facades and resolvers.
+
+See [RUNTIME_TOPOLOGY_DOCTRINE.md](RUNTIME_TOPOLOGY_DOCTRINE.md) for migration
+targets and traversal helper guidance.
 
 ---
 
@@ -564,16 +602,19 @@ This prevents duplicate listener registration when systems are re-initialized.
 ### Applying status effects
 
 ```js
-import { ActiveEffects } from './rules/components/ActiveEffects.js';
+import { ensureActiveEffects } from './rules/utils/effects.js';
 
-const effects = world.get(entityId, ActiveEffects) || { effects: [] };
+const effects = ensureActiveEffects(world, entityId);
 effects.effects.push({
   key: 'poison',
   turnsLeft: 3,
   potency: 2,
 });
-world.set(entityId, ActiveEffects, effects);
 ```
+
+`ActiveEffects.effects[]` is legacy compatibility state. Use existing helpers
+when working with it, and prefer `StatusEffectNode` / `TimedEffectNode` child
+entities for new status-effect topology.
 
 ### Modifying equipment stats
 
