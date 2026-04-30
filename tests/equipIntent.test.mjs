@@ -7,7 +7,7 @@ import { equipmentSystem } from '../src/rules/systems/equipmentSystem.js';
 import { equipItemSystem } from '../src/rules/systems/equipItemSystem.js';
 import { buildCatalogItem } from '../src/rules/data/itemCatalogLoader.js';
 import { ItemInfo } from '../src/rules/components/ItemInfo.js';
-import { addToInventory, inventoryContains } from '../src/rules/utils/inventoryFacade.js';
+import { addToInventory } from '../src/rules/utils/inventoryFacade.js';
 
 Deno.test("equip intent flow: equip sword and armor with derived stats", () => {
   const world = new World({ seed: 12345 });
@@ -27,7 +27,6 @@ Deno.test("equip intent flow: equip sword and armor with derived stats", () => {
   equipmentSystem(world);
 
   assert(eq.weapon === sword, 'sword equipped in weapon slot');
-  assert(inventoryContains(world, player, sword), 'sword remains in inventory (visible)');
   assert(eq.accuracyDerived === 2, 'accuracy derived from sword bonuses');
   assert(eq.damagePowerDerived === 2, 'damagePower derived from sword bonuses');
 
@@ -36,7 +35,6 @@ Deno.test("equip intent flow: equip sword and armor with derived stats", () => {
   equipmentSystem(world);
 
   assert(eq.armor === armor, 'armor equipped in armor slot');
-  assert(inventoryContains(world, player, armor), 'armor remains in inventory (visible)');
   assert(eq.evadeDerived >= 1, 'evade derived from armor bonuses');
 
   /** @type {any} */

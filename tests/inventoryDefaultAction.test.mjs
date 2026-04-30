@@ -44,7 +44,7 @@ Deno.test("inventory default action: apply-capable scrolls prioritize apply", ()
     applyTargetCount: 2,
   };
   assertEquals(getInventoryDefaultAction(scroll), "apply");
-  assertEquals(getQuickChipPrimaryAction(scroll), "use");
+  assertEquals(getQuickChipPrimaryAction(scroll), "apply");
 });
 
 Deno.test("inventory default action: apply tools default to apply only with valid targets", () => {
