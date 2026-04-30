@@ -88,6 +88,13 @@ Follow-up:
 
 **Scope**: ~1 week. Boring but unblocks everything else.
 
+Status: started as of 2026-04-30.
+
+Guardrail now in place:
+
+- `tests/contentCatalogCanonical.test.mjs` fails if any DSL item also exists in `itemCatalogEquipment.js` or `itemCatalogMagic.js`.
+- `fishing_rod` has been removed from `itemCatalogEquipment.js`; it is now owned only by `src/content/items/fishingRod.js`.
+
 1. Port all static defs from `itemCatalogEquipment.js` + `itemCatalogMagic.js` to `src/content/items/<group>.js` files.
 2. Ensure DSL `installContent()` remains the single registration path.
 3. Delete static catalog god files once empty.
@@ -97,14 +104,29 @@ Follow-up:
 
 **Scope**: Parallel to or after Phase A.
 
-1. Create `src/display/ui/wiring/messages/messageRegistry.js` — `defineMessage(eventKey, template)`.
-2. Template receives `{ actor, target, isCrit, damageType, ... }` context object. Returns `{ text, type }`.
-3. Extract verb/adverb/death tables to `messageTemplates.js` as pure data.
-4. Replace three-way branches with single registry lookup throughout `combatMessages.js` and peers.
+Status: started as of 2026-04-30.
+
+Guardrail now in place:
+
+- `src/display/ui/wiring/messages/messageRegistry.js` provides `defineMessage(eventKey, template)` and `renderMessage(eventKey, ctx)`.
+- `tests/messageRegistry.test.mjs` pins actor/target/witness perspective rendering.
+- `monster:ability:windup` and `monster:ability:cast` in `combatMessages.js` are the first converted handlers.
+
+1. [x] Create `src/display/ui/wiring/messages/messageRegistry.js` — `defineMessage(eventKey, template)`.
+2. [x] Template receives `{ actorName, targetName, isCrit, damageType, ... }` context object. Returns `{ text, type }`.
+3. [ ] Extract verb/adverb/death tables to `messageTemplates.js` as pure data.
+4. [ ] Replace three-way branches with single registry lookup throughout `combatMessages.js` and peers.
 
 ### Phase D — Content Feature Manifests (authoring polish, do last)
 
 One folder owns one feature: `src/content/fishing/` holds item + use-action + loot + messages + palette. No cross-feature registry hunting.
+
+Acceptance shape:
+
+- Feature folders may contain `item.js`, `useAction.js`, `loot.js`, `messages.js`, `palette.js`, and `index.js`.
+- `index.js` imports the feature-local modules for registration side effects.
+- Main startup imports feature indexes, not individual feature files.
+- Existing content files move only after Phase A removes their static shadows and Phase B gives messages a stable registry target.
 
 ---
 

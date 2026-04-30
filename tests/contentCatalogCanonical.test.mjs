@@ -2,6 +2,8 @@ import { assert, assertEquals, assertStrictEquals } from "jsr:@std/assert";
 import "./helpers/installContentCatalog.mjs";
 import { allContentItems } from "../src/content/registry.js";
 import { getCatalogItem } from "../src/rules/data/itemCatalog.js";
+import { EQUIPMENT_ITEMS } from "../src/rules/data/itemCatalogEquipment.js";
+import { MAGIC_ITEMS } from "../src/rules/data/itemCatalogMagic.js";
 import { getItemHooksByIdentity } from "../src/rules/content/items/itemHooks.js";
 
 const CATALOG_PARITY_FIELDS = Object.freeze([
@@ -50,6 +52,14 @@ Deno.test("content DSL items are canonical catalog entries after installContent"
 
   for (const id of contentItems.keys()) {
     assertCatalogParityFields(id);
+  }
+});
+
+Deno.test("content DSL items do not have static catalog shadows", () => {
+  const contentItems = allContentItems();
+  for (const id of contentItems.keys()) {
+    assert(!EQUIPMENT_ITEMS[id], `content item ${id} must not also live in itemCatalogEquipment.js`);
+    assert(!MAGIC_ITEMS[id], `content item ${id} must not also live in itemCatalogMagic.js`);
   }
 });
 

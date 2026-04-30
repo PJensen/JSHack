@@ -2,6 +2,30 @@
  * Combat, damage, healing, death, ranged, shield, procs, and special strike wiring.
  * Lines ~919-1249, ~1028-1249, ~1167-1249, ~1481-1491, ~2354-2430 from original.
  */
+import { defineMessage, renderMessage } from "./messageRegistry.js";
+
+defineMessage("monster:ability:windup", {
+  target: ({ actorName, abilityLabel }) => ({
+    text: `${actorName} rears back - ${abilityLabel.toLowerCase()} incoming!`,
+    type: "danger",
+  }),
+  witness: ({ actorName, abilityLabel }) => ({
+    text: `${actorName} prepares ${abilityLabel.toLowerCase()}.`,
+    type: "combat",
+  }),
+});
+
+defineMessage("monster:ability:cast", {
+  target: ({ actorName, abilityLabel }) => ({
+    text: `${actorName} unleashes ${abilityLabel.toLowerCase()} on you!`,
+    type: "danger",
+  }),
+  witness: ({ actorName, abilityLabel }) => ({
+    text: `${actorName} unleashes ${abilityLabel.toLowerCase()}.`,
+    type: "combat",
+  }),
+});
+
 export function installCombatMessages(ctx) {
   const { world, log, nameOfEntity, bracketizeName, compGet, compHas, playerEntity,
           canSeeAt, normalizeStatusEvent, Equipment, ItemInfo, NamedIdentity, Pet, Owner, Player, Position, Status, ActiveEffects } = ctx;
@@ -10,20 +34,20 @@ export function installCombatMessages(ctx) {
   // === Monster ability messages ===
   world.on('monster:ability:windup', ({ actor, targetId, abilityName }) => {
     if (!_playerCanSee([actor, targetId])) return;
-    const who = nameOfEntity(actor);
-    const tgt = nameOfEntity(targetId);
-    const label = String(abilityName || "ability");
-    if (tgt === 'You') { log(`${who} rears back \u2014 ${label.toLowerCase()} incoming!`, 'danger'); return; }
-    log(`${who} prepares ${label.toLowerCase()}.`, 'combat');
+    _logRendered("monster:ability:windup", {
+      actorName: nameOfEntity(actor),
+      targetName: nameOfEntity(targetId),
+      abilityLabel: String(abilityName || "ability"),
+    });
   });
 
   world.on('monster:ability:cast', ({ actor, targetId, abilityName }) => {
     if (!_playerCanSee([actor, targetId])) return;
-    const who = nameOfEntity(actor);
-    const tgt = nameOfEntity(targetId);
-    const label = String(abilityName || "ability");
-    if (tgt === 'You') { log(`${who} unleashes ${label.toLowerCase()} on you!`, 'danger'); return; }
-    log(`${who} unleashes ${label.toLowerCase()}.`, 'combat');
+    _logRendered("monster:ability:cast", {
+      actorName: nameOfEntity(actor),
+      targetName: nameOfEntity(targetId),
+      abilityLabel: String(abilityName || "ability"),
+    });
   });
 
   world.on('monster:firebreath', ({ actor, target, tiles }) => {
@@ -250,6 +274,12 @@ export function installCombatMessages(ctx) {
 
   // ── Helpers ──
   function _v(name, you, they) { return name === 'You' ? you : they; }
+
+  function _logRendered(eventKey, data) {
+    const rendered = renderMessage(eventKey, data);
+    if (!rendered) return;
+    log(rendered.text, rendered.type);
+  }
 
   /** True if the player is involved OR the event is visible to the player. */
   function _playerCanSee(ids, at) {
