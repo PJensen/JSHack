@@ -259,7 +259,7 @@ Acceptance criteria:
 
 ## 11. Create Equipment Topology View
 
-Status: `Blocked` by item 1
+Status: `Done`
 
 Goal: define the read model for equipment slots before changing canonical state.
 
@@ -283,7 +283,7 @@ Suggested test:
 
 ## 12. Migrate One Equipment Slot
 
-Status: `Migration`, blocked by item 11
+Status: `Done`
 
 Goal: prove equipment topology with one slot while keeping legacy quick lookups.
 
@@ -327,7 +327,7 @@ Acceptance criteria:
 
 ## 14. Add Runtime Topology Boundary Test
 
-Status: `Ready`
+Status: `Done`
 
 Goal: make topology doctrine mechanically visible without over-policing legacy
 systems.

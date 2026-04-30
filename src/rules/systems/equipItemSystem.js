@@ -9,6 +9,11 @@ import {
   addToInventory,
   removeFromInventory,
 } from "../utils/inventoryFacade.js";
+import {
+  clearEquippedSlotTopology,
+  isEquippedInTopology,
+  setEquippedSlotTopology,
+} from "../utils/equipmentTopology.js";
 import { emitSafe } from "../utils/emitSafe.js";
 
 /**
@@ -25,9 +30,6 @@ export function equipItemSystem(world) {
     const itemId = intent.itemId | 0;
     if (!(itemId > 0)) { world.remove(actor, EquipIntent); continue; }
 
-    // Ensure the item is in inventory (hierarchy check)
-    if (!inventoryContains(world, actor, itemId)) { world.remove(actor, EquipIntent); continue; }
-
     const info = world.get(itemId, ItemInfo);
     if (!info || (info.type !== 'equip' && info.type !== 'ammo' && info.type !== 'wand')) { world.remove(actor, EquipIntent); continue; }
 
@@ -40,7 +42,7 @@ export function equipItemSystem(world) {
     if (!eq) { world.remove(actor, EquipIntent); continue; }
 
     // Toggle path: selecting an item that's already equipped unequips it.
-    const equippedSlot = getEquippedSlot(eq, itemId);
+    const equippedSlot = getEquippedSlot(eq, itemId) || isEquippedInTopology(world, actor, itemId);
     if (equippedSlot) {
       // Cursed items cannot be unequipped — they are welded to the player.
       const beat = world.get(itemId, Beatitude);
@@ -55,6 +57,10 @@ export function equipItemSystem(world) {
         continue;
       }
       eq[equippedSlot] = null;
+      if (equippedSlot === 'weapon') {
+        clearEquippedSlotTopology(world, actor, 'weapon');
+        addToInventory(world, actor, itemId, { silent: true });
+      }
       emitSafe(world, 'item:unequipped', {
         actor,
         itemId,
@@ -64,6 +70,10 @@ export function equipItemSystem(world) {
       world.remove(actor, EquipIntent);
       continue;
     }
+
+    // Ensure the item is in inventory (hierarchy check) unless it was handled
+    // by the already-equipped toggle path above.
+    if (!inventoryContains(world, actor, itemId)) { world.remove(actor, EquipIntent); continue; }
 
     // Determine target slot (legacy "shield" → "offhand" compat)
     const rawSlot = (info.slot || '').toLowerCase();
@@ -88,6 +98,7 @@ export function equipItemSystem(world) {
       if (!GEAR_SLOT_SET.has(slotName)) return false;
       if (Number.isInteger(eq[slotName]) && eq[slotName] > 0) pushToInventory(eq[slotName]);
       eq[slotName] = itemId;
+      if (slotName === 'weapon') setEquippedSlotTopology(world, actor, 'weapon', itemId);
       appliedSlot = slotName;
       return true;
     };
