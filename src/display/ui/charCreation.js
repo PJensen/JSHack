@@ -1069,7 +1069,11 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
         const total = Math.max(1, Number(progress.total) || 1);
         const processed = Math.max(0, Math.min(total, Number(progress.processed) || 0));
         const cxStr = Number.isFinite(progress.cx) ? ` (${progress.cx}, ${progress.cy})` : '';
-        status.textContent = `Materializing chunk ${processed}/${total}${cxStr}`;
+        const detail = [];
+        if (Number.isFinite(progress.rooms) && progress.rooms > 0) detail.push(`${progress.rooms} rooms`);
+        if (Number.isFinite(progress.spawns) && progress.spawns > 0) detail.push(`${progress.spawns} spawns`);
+        const detailStr = detail.length > 0 ? ` — ${detail.join(', ')}` : '';
+        status.textContent = `Materializing chunk ${processed}/${total}${cxStr}${detailStr}`;
         footer.textContent = `${50 + Math.floor((processed / total) * 50)}%`;
       },
       complete() {
