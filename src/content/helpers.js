@@ -69,18 +69,24 @@ export function inferItemCategory(type) {
       return { catalogKind: 'equipment', slot: 'helm', itemType: 'equip' };
     case 'shield':
       return { catalogKind: 'equipment', slot: 'shield', itemType: 'equip' };
-    case 'boots':
-      return { catalogKind: 'equipment', slot: 'boots', itemType: 'equip' };
+    case 'boots': case 'feet':
+      return { catalogKind: 'equipment', slot: 'feet', itemType: 'equip' };
     case 'gloves':
       return { catalogKind: 'equipment', slot: 'gloves', itemType: 'equip' };
     case 'ring':
       return { catalogKind: 'equipment', slot: 'ring', itemType: 'equip' };
-    case 'amulet':
-      return { catalogKind: 'equipment', slot: 'amulet', itemType: 'equip' };
+    case 'amulet': case 'neck':
+      return { catalogKind: 'equipment', slot: 'neck', itemType: 'equip' };
     case 'belt':
       return { catalogKind: 'equipment', slot: 'belt', itemType: 'equip' };
     case 'legs':
       return { catalogKind: 'equipment', slot: 'legs', itemType: 'equip' };
+    case 'offhand':
+      return { catalogKind: 'equipment', slot: 'offhand', itemType: 'equip' };
+    case 'ranged':
+      return { catalogKind: 'equipment', slot: 'ranged', itemType: 'equip' };
+    case 'head':
+      return { catalogKind: 'equipment', slot: 'head', itemType: 'equip' };
     case 'potion':
       return { catalogKind: 'magic', slot: 'bag', itemType: 'potion' };
     case 'scroll':
