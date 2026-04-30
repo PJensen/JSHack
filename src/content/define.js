@@ -7,6 +7,8 @@ import { registerItem, registerMonster, registerPalette, registerPresentation, r
 import { compileHook, ScriptCtx } from './scriptCtx.js';
 import { createWorldFacade } from './worldFacade.js';
 import { inferItemCategory, resolveRarity, SHELF_LIFE } from './helpers.js';
+import { resolveWeaponFamily } from '../rules/data/weaponFamilies.js';
+import { resolveWeaponVisualMeta, isWeaponCatalogItem } from '../rules/data/weaponVisuals.js';
 
 // ── Hook names the DSL recognises, mapped to catalog hook keys ──────
 const ITEM_HOOK_MAP = {
@@ -135,6 +137,8 @@ export function defineItem(id, def) {
     if (def.combatFlavor) catalogEntry.combatFlavor = def.combatFlavor;
     if (def.range) catalogEntry.range = def.range;
     if (def.affixes) catalogEntry.affixes = def.affixes;
+    if (def.subtype) catalogEntry.subtype = def.subtype;
+    if (def.beatitude) catalogEntry.beatitude = def.beatitude;
     if (Array.isArray(def.procPackages) && def.procPackages.length > 0) catalogEntry.procPackages = def.procPackages.slice();
     if (def.tags) catalogEntry.tags = def.tags;
 
@@ -155,6 +159,18 @@ export function defineItem(id, def) {
       // String shorthand: "sword", "axe", "mace" etc.
       if (typeof sp === 'string') catalogEntry.weaponVfxProfile = sp;
     }
+
+    // Auto-resolve weapon visual meta (length + profile) and family
+    // for items that don't have an explicit swingProfile — mirrors buildItemCatalog().
+    if (isWeaponCatalogItem(catalogEntry)) {
+      if (!catalogEntry.weaponLengthCm || !catalogEntry.weaponVfxProfile) {
+        const meta = resolveWeaponVisualMeta(catalogEntry);
+        if (!catalogEntry.weaponLengthCm) catalogEntry.weaponLengthCm = meta.weaponLengthCm;
+        if (!catalogEntry.weaponVfxProfile) catalogEntry.weaponVfxProfile = meta.weaponVfxProfile;
+      }
+    }
+    const resolvedFamily = def.weaponFamily || resolveWeaponFamily(catalogEntry);
+    if (resolvedFamily) catalogEntry.weaponFamily = resolvedFamily;
   }
 
   // Potion-specific
