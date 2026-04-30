@@ -210,6 +210,8 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     const pe = playerEntity(world);
     if (!pe || actor !== pe.id) return;
     if (!isPlayerAdjacentToEntity(Number(targetId) || 0)) return;
+    const sid = Number(targetId) || 0;
+    if (sid > 0 && activeShopSession.shopkeeperId === sid) return;
     log("You approach the shopkeeper.");
     const shop = world.get(targetId, ShopInventory);
     const markup = buyMarkup ?? shop?.buyMarkup ?? 1.0;
