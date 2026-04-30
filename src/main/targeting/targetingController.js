@@ -571,7 +571,7 @@ export function createTargetingController({ world, messageLog, playerEntity, dis
     }, { capture: true });
 
     canvas.addEventListener('pointerdown', (ev) => {
-      if (!_spell?.spellId && !_throw?.itemId) return;
+      if (!_spell && !_throw?.itemId) return;
       const [wx, wy] = clientToWorld(ev);
       const rawTx = worldToTile(wx);
       const rawTy = worldToTile(wy);
