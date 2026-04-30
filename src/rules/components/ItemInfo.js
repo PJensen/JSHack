@@ -17,6 +17,8 @@ export const ItemInfo = defineComponent(
     twoHanded: false, // requires both hands; blocks offhand slot
     rarity: 1,
     rarityName: "common",
+    // Legacy compatibility arrays. Runtime affixes/enchantments/sockets should
+    // prefer attached topology nodes; see RUNTIME_TOPOLOGY_DOCTRINE.md.
     affixes: [], // list of affix ids applied to this item (rules/data/affixes)
     sockets: [], // gem ids socketed into this item (e.g. ['gem_ruby'])
     maxSockets: 0, // maximum number of gem sockets this item can hold

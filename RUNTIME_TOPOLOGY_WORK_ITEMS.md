@@ -12,7 +12,7 @@ Status key:
 
 ## 1. Canonize Topology Traversal Helpers
 
-Status: `Ready`
+Status: `Done`
 
 Goal: provide one shared way to traverse child and descendant topology by
 component.
@@ -37,7 +37,7 @@ Suggested test:
 
 ## 2. Add Runtime State Node Components
 
-Status: `Ready`
+Status: `Done`
 
 Goal: introduce the small flat components needed by later migrations without
 changing behavior yet.
@@ -64,7 +64,7 @@ Suggested test:
 
 ## 3. Document Legacy Runtime Arrays In Code
 
-Status: `Ready`
+Status: `Done`
 
 Goal: mark known legacy array-backed runtime state so future edits do not treat
 it as precedent.
@@ -88,7 +88,7 @@ Suggested verification:
 
 ## 4. Create Status Topology Resolver
 
-Status: `Blocked` by item 1 and item 2
+Status: `Done`
 
 Goal: provide one read facade that can see both legacy `ActiveEffects.effects[]`
 and new status child entities.
@@ -113,7 +113,7 @@ Suggested test:
 
 ## 5. Add Canonical Status Effect Creation Helper
 
-Status: `Blocked` by item 4
+Status: `Done`
 
 Goal: create status effects through one canonical helper that can emit topology
 while maintaining legacy compatibility.
