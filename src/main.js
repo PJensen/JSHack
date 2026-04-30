@@ -680,44 +680,50 @@ const _startDepth = _hasFloorOverride
   ? runtimeConfig.startDepth
   : (readSavedDepth(_pendingSavegame) ?? runtimeConfig.startDepth);
 const _initialDepth = (Number.isFinite(_startDepth) && _startDepth >= 0) ? _startDepth : 0;
-const _bootFloorPlan = generateFloorPlan(world.seed >>> 0, _initialDepth, null, { dungeonType: runtimeConfig.dungeonType });
-const _bootChunkTotal = Math.max(
-  1,
-  (_bootFloorPlan.extent.maxCX - _bootFloorPlan.extent.minCX + 1)
-  * (_bootFloorPlan.extent.maxCY - _bootFloorPlan.extent.minCY + 1),
-);
-let _bootChunkUnits = _bootChunkTotal;
-_bootTotalUnits += _bootChunkUnits;
-const _bootDungeonBase = _bootDoneUnits;
-await bootPaint(`Generating dungeon 0/${_bootChunkTotal} chunks`, _bootDungeonBase);
+// Skip boot dungeon gen for the new-game-with-char-creation path: we'd just
+// throw it away when the player picks a character (their entropy-derived seed
+// won't match the boot's random seed). Generate ONCE, after Begin is clicked.
+// Savegames and ?test=1 still pre-generate at boot because they have a known
+// seed and need entities ready immediately.
+const _willShowCharCreation = !_pendingSavegame && runtimeConfig.params.get('test') !== '1';
+let spawnPos = null;
+if (!_willShowCharCreation) {
+  const _bootFloorPlan = generateFloorPlan(world.seed >>> 0, _initialDepth, null, { dungeonType: runtimeConfig.dungeonType });
+  const _bootChunkTotal = Math.max(
+    1,
+    (_bootFloorPlan.extent.maxCX - _bootFloorPlan.extent.minCX + 1)
+    * (_bootFloorPlan.extent.maxCY - _bootFloorPlan.extent.minCY + 1),
+  );
+  let _bootChunkUnits = _bootChunkTotal;
+  _bootTotalUnits += _bootChunkUnits;
+  const _bootDungeonBase = _bootDoneUnits;
+  await bootPaint(`Generating dungeon 0/${_bootChunkTotal} chunks`, _bootDungeonBase);
 
-// Initialize the procedural dungeon (entire floor generated up front)
-let spawnPos = await initDungeon(world, {
-  startDepth: _startDepth,
-  tombstoneRepo,
-  dungeonType: runtimeConfig.dungeonType,
-  onProgress: (progress) => {
-    if (!progress) return;
-    if (progress.phase === 'plan') {
-      // Heavy planning steps (overworld terrain/coastline/town) report a label
-      // so the boot bar shows live progress instead of a deadzone before chunks.
-      const label = typeof progress.label === 'string' ? progress.label : 'Planning floor';
-      updateBootProgress(`${label}…`, _bootDungeonBase);
-      return;
-    }
-    if (progress.phase !== 'chunks') return;
-    const total = Math.max(1, Number(progress.total) || _bootChunkTotal);
-    const processed = Math.max(0, Math.min(total, Number(progress.processed) || 0));
-    if (total !== _bootChunkUnits) {
-      _bootTotalUnits += (total - _bootChunkUnits);
-      _bootChunkUnits = total;
-    }
-    updateBootProgress(`Generating dungeon ${processed}/${total} chunks`, _bootDungeonBase + processed);
-  },
-});
-_bootDoneUnits = _bootDungeonBase + _bootChunkUnits;
-updateBootProgress(`Dungeon ready (${_bootChunkUnits} chunks)`, _bootDoneUnits);
-await bootPaint(`Dungeon ready (${_bootChunkUnits} chunks)`, _bootDoneUnits);
+  spawnPos = await initDungeon(world, {
+    startDepth: _startDepth,
+    tombstoneRepo,
+    dungeonType: runtimeConfig.dungeonType,
+    onProgress: (progress) => {
+      if (!progress) return;
+      if (progress.phase === 'plan') {
+        const label = typeof progress.label === 'string' ? progress.label : 'Planning floor';
+        updateBootProgress(`${label}…`, _bootDungeonBase);
+        return;
+      }
+      if (progress.phase !== 'chunks') return;
+      const total = Math.max(1, Number(progress.total) || _bootChunkTotal);
+      const processed = Math.max(0, Math.min(total, Number(progress.processed) || 0));
+      if (total !== _bootChunkUnits) {
+        _bootTotalUnits += (total - _bootChunkUnits);
+        _bootChunkUnits = total;
+      }
+      updateBootProgress(`Generating dungeon ${processed}/${total} chunks`, _bootDungeonBase + processed);
+    },
+  });
+  _bootDoneUnits = _bootDungeonBase + _bootChunkUnits;
+  updateBootProgress(`Dungeon ready (${_bootChunkUnits} chunks)`, _bootDoneUnits);
+  await bootPaint(`Dungeon ready (${_bootChunkUnits} chunks)`, _bootDoneUnits);
+}
 
 let _savegameLoaded = false;
 let _tutorialDisabledThisSession = false;
@@ -797,18 +803,30 @@ async function _finalizeNewGame(classData) {
     try { localStorage.setItem('jshack.disableGore', classData.disableGore ? 'true' : 'false'); } catch {}
   }
 
-  // If the player chose a different seed, regenerate the world
+  // For new games (no savegame), generate the dungeon HERE — we deferred it
+  // out of boot so we don't waste work on a seed the player will replace via
+  // the entropy-driven seed input. The seed-compare/regen branch is only used
+  // when a savegame pre-populated the world but the player still picked a new
+  // seed somehow (rare; defensive).
   if (classData && typeof classData.seed === 'number') {
     const chosenSeed = classData.seed >>> 0;
-    if (chosenSeed !== (world.seed >>> 0)) {
-      // Re-seed the world RNG
+    if (spawnPos === null) {
+      // First-time gen: world has no entities yet (boot skipped initDungeon).
       world.seed = chosenSeed;
       world.rand = mulberry32(chosenSeed);
-      // Destroy all existing entities (the pre-generated dungeon)
-      for (const id of Array.from(world.alive)) world.destroy(id);
-      // Re-init gem pricing with the new seed
       reseedRunGemPricing(world);
-      // Regenerate the dungeon
+      spawnPos = await initDungeon(world, {
+        startDepth: _startDepth,
+        tombstoneRepo,
+        dungeonType: runtimeConfig.dungeonType,
+        onProgress: typeof classData?.onProgress === "function" ? classData.onProgress : undefined,
+      });
+    } else if (chosenSeed !== (world.seed >>> 0)) {
+      // Defensive re-gen path: pre-existing world but seed changed.
+      world.seed = chosenSeed;
+      world.rand = mulberry32(chosenSeed);
+      for (const id of Array.from(world.alive)) world.destroy(id);
+      reseedRunGemPricing(world);
       spawnPos = await initDungeon(world, {
         startDepth: _startDepth,
         tombstoneRepo,

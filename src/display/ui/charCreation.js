@@ -1025,112 +1025,56 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
     });
     box.appendChild(title);
 
-    const sub = document.createElement('div');
-    sub.textContent = 'The coast, town, roads, and local economy are being settled.';
-    Object.assign(sub.style, {
-      color: UI.muted,
-      fontSize: '12px',
-      lineHeight: '1.45',
+    // Single live status line — replaced in place with the current generation
+    // step. No fixed list, no log, no rewinds.
+    const status = document.createElement('div');
+    status.textContent = 'Starting…';
+    Object.assign(status.style, {
+      color: '#e6d1a0',
+      fontSize: '13px',
       textAlign: 'center',
-      marginBottom: '18px',
+      padding: '14px 0',
+      borderTop: '1px solid rgba(120, 105, 90, 0.22)',
+      borderBottom: '1px solid rgba(120, 105, 90, 0.22)',
+      fontFamily: 'monospace',
+      letterSpacing: '0.02em',
     });
-    box.appendChild(sub);
-
-    const rows = [
-      'Carving coastline',
-      'Generating terrain',
-      'Placing buildings',
-      'Placing resources',
-      'Opening roads',
-    ].map((label) => {
-      const row = document.createElement('div');
-      Object.assign(row.style, {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '10px',
-        padding: '8px 0',
-        borderTop: '1px solid rgba(120, 105, 90, 0.22)',
-        color: UI.low,
-        fontSize: '12px',
-      });
-      const mark = document.createElement('span');
-      mark.textContent = '·';
-      Object.assign(mark.style, {
-        width: '18px',
-        textAlign: 'center',
-        color: '#7c8792',
-      });
-      const text = document.createElement('span');
-      text.textContent = label;
-      row.appendChild(mark);
-      row.appendChild(text);
-      box.appendChild(row);
-      return { row, mark, text };
-    });
+    box.appendChild(status);
 
     const footer = document.createElement('div');
-    footer.textContent = 'Please wait...';
+    footer.textContent = '0%';
     Object.assign(footer.style, {
       color: '#9fb4c8',
       fontSize: '11px',
       textAlign: 'center',
-      marginTop: '18px',
+      marginTop: '14px',
       textTransform: 'uppercase',
       letterSpacing: '0.08em',
     });
     box.appendChild(footer);
 
-    let active = 0;
-    function render() {
-      rows.forEach((entry, i) => {
-        if (i < active) {
-          entry.mark.textContent = '✓';
-          entry.mark.style.color = '#8fbf8f';
-          entry.text.style.color = '#b8c7b8';
-        } else if (i === active) {
-          entry.mark.textContent = '>';
-          entry.mark.style.color = '#d8b56f';
-          entry.text.style.color = '#e6d1a0';
-        } else {
-          entry.mark.textContent = '·';
-          entry.mark.style.color = '#7c8792';
-          entry.text.style.color = UI.low;
-        }
-      });
-    }
-    render();
-
-    // Plan-phase progress drives panel rows live (no blind setTimeout chain).
-    // Real `phase: 'plan'` events advance the active row in order and update
-    // the footer with the phase label, giving explicit feedback during the
-    // heavy planning steps that previously read as a deadzone.
     return {
-      readyDelayMs: 140,
+      readyDelayMs: 60,
       progress(progress = {}) {
         if (!progress) return;
         if (progress.phase === 'plan') {
           const step = Math.max(0, Number(progress.step) || 0);
           const total = Math.max(1, Number(progress.total) || 1);
-          const planRowCap = Math.max(1, rows.length - 1);
-          active = Math.min(planRowCap, Math.floor((step / total) * planRowCap));
-          if (typeof progress.label === 'string' && progress.label) {
-            footer.textContent = `${progress.label}…`;
-          }
-          render();
+          const label = String(progress.label || 'Planning');
+          status.textContent = `${label}…`;
+          footer.textContent = `${Math.floor((step / total) * 50)}%`;
           return;
         }
         if (progress.phase !== 'chunks') return;
         const total = Math.max(1, Number(progress.total) || 1);
         const processed = Math.max(0, Math.min(total, Number(progress.processed) || 0));
-        const p = processed / total;
-        active = Math.min(rows.length - 1, Math.floor(p * rows.length));
-        footer.textContent = `Generating floor ${processed}/${total}`;
-        render();
+        const cxStr = Number.isFinite(progress.cx) ? ` (${progress.cx}, ${progress.cy})` : '';
+        status.textContent = `Materializing chunk ${processed}/${total}${cxStr}`;
+        footer.textContent = `${50 + Math.floor((processed / total) * 50)}%`;
       },
       complete() {
-        active = rows.length;
-        render();
-        footer.textContent = 'Entering world...';
+        status.textContent = 'World ready';
+        footer.textContent = '100%';
       },
       dispose() { /* no-op */ },
     };
@@ -1167,14 +1111,6 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
         onProgress: generationPanel.progress,
       });
       generationPanel.complete();
-      // Pre-warm the world's render loop BEHIND the still-opaque loading panel.
-      // The first few frame() calls are heavy (cold worldView, FOV, lighting,
-      // particle reconciliation, hud feeds). Letting them tick before the fade
-      // begins keeps the opacity transition smooth instead of competing with
-      // GC, audio decode, and cache fills.
-      for (let i = 0; i < 4; i++) {
-        await new Promise((r) => requestAnimationFrame(() => r()));
-      }
       generationPanel.dispose();
       dispose({ fade: true });
     });
