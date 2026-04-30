@@ -2,7 +2,7 @@ import { Mana } from "../components/Mana.js";
 import { Stamina } from "../components/Stamina.js";
 import { Vitality } from "../components/Vitality.js";
 import { upsertTimedEffect } from "./effectSemantics.js";
-import { ensureActiveEffects } from "./effects.js";
+import { applyStatusEffect, ensureActiveEffects, isInvulnerabilityEffectKey } from "./effects.js";
 import { effectiveMaxHp, effectiveMaxMana, effectiveMaxStamina } from "./passiveBonuses.js";
 
 function applyStatusEffects(world, out) {
@@ -10,6 +10,10 @@ function applyStatusEffects(world, out) {
     const entry = out.statusesToApply[i];
     const entityId = Number(entry?.target || 0) | 0;
     if (!(entityId > 0) || !world.isAlive?.(entityId)) continue;
+    if (isInvulnerabilityEffectKey(entry?.status?.key)) {
+      applyStatusEffect(world, entityId, { stacks: 1, ...(entry.status || {}), sourceId: Number(entry?.source || 0) | 0 });
+      continue;
+    }
     const activeEffects = ensureActiveEffects(world, entityId);
     if (!activeEffects || !Array.isArray(activeEffects.effects)) continue;
     upsertTimedEffect(activeEffects.effects, { stacks: 1, ...(entry.status || {}) });
