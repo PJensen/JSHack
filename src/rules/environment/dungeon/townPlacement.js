@@ -422,7 +422,37 @@ function hashKey(key) {
   return hash >>> 0;
 }
 
-function addTownfolkForBuilding(chunks, building, roles, tavernDoor) {
+const ROLE_DELIVERY_CHEST = {
+  woodcutter: "lumber_chest",
+  miner: "smithy_chest",
+  herbalist: "herb_chest",
+  fisher: "tavern_chest",
+};
+
+function findChestDropTile(chunks, chest) {
+  if (!chest) return null;
+  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    const nx = chest.x + dx;
+    const ny = chest.y + dy;
+    const t = getWorldTile(chunks, nx, ny);
+    if (t === TILE_FLOOR || t === TILE_DOOR) return { x: nx, y: ny };
+  }
+  return chest;
+}
+
+function indexChestPositions(chunks, buildings) {
+  const out = {};
+  const kinds = ["smithy_chest", "lumber_chest", "herb_chest", "tavern_chest"];
+  for (const b of buildings) {
+    if (!b?.spawns) continue;
+    for (const kind of kinds) {
+      if (!out[kind] && b.spawns[kind]) out[kind] = findChestDropTile(chunks, b.spawns[kind]);
+    }
+  }
+  return out;
+}
+
+function addTownfolkForBuilding(chunks, building, roles, tavernDoor, chestPositions) {
   for (const role of roles) {
     const home = (role === "enchantress" ? (building.waypoints.enchantress_work || building.waypoints.vendor_work) : null)
       || building.waypoints.resident_home
@@ -435,6 +465,8 @@ function addTownfolkForBuilding(chunks, building, roles, tavernDoor) {
       || building.waypoints.shop_door
       || building.waypoints.front_door
       || building.door;
+    const chestKind = ROLE_DELIVERY_CHEST[role];
+    const chest = chestKind ? chestPositions?.[chestKind] : null;
     addChunkSpawn(chunks, work.x, work.y, "townfolk", {
       townfolkId: role,
       homeX: home.x,
@@ -445,6 +477,8 @@ function addTownfolkForBuilding(chunks, building, roles, tavernDoor) {
       workY: work.y,
       pubX: tavernDoor?.x ?? work.x,
       pubY: tavernDoor?.y ?? work.y,
+      deliverX: chest?.x ?? 0,
+      deliverY: chest?.y ?? 0,
       shopDoor: building.shop?.door || null,
       shopDoorRole: building.shop?.vendorRole || role,
       shopRoom: building.shop?.room || null,
@@ -673,9 +707,10 @@ export function applyTownPlacement(chunks, bounds, seed) {
   }
 
   const tavern = buildings.find((b) => b.key === "tavern");
+  const chestPositions = indexChestPositions(chunks, buildings);
   for (const building of buildings) {
     const def = BUILDING_PLANS.find((entry) => entry.key === building.key);
-    addTownfolkForBuilding(chunks, building, def?.roles || [], tavern?.door || null);
+    addTownfolkForBuilding(chunks, building, def?.roles || [], tavern?.door || null, chestPositions);
   }
 
   addCivicFixtures(chunks, plan.center, buildings);
