@@ -13,7 +13,6 @@
 // Runs before aiChaseSystem in the 'ai' phase so the existing intent-skip guard
 // (`if (world.has(id, MoveIntent)) return`) prevents aiChaseSystem from overriding.
 
-import { Position }    from "../components/Position.js";
 import { Faction }     from "../components/Faction.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { MoveIntent }  from "../components/Intents/MoveIntent.js";

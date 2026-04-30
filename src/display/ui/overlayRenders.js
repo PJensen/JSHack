@@ -8,10 +8,9 @@ export { renderShop, renderChest, renderRack } from './shopOverlay.js';
 
 import {
   appendCharacterMenuTabs, markScrollable,
-  decorateButton, humanize, sanitize, bracketize,
-  show, hide, showItemTooltip, hideItemTooltip,
-  rarityStyle, formatMessageLine, getMessageColor,
-  CHARACTER_SLOT_ORDER, renderItemDetails,
+  decorateButton, sanitize, bracketize,
+  hide, showItemTooltip,
+  rarityStyle, getMessageColor,
   UI, createChooserRow, createSimpleSel, installKeyHandler, installDetachableKeyHandler,
   pulseRow,
 } from './overlayUtils.js';

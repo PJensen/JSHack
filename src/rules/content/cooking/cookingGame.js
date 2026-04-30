@@ -2,7 +2,6 @@
 // Cooking fire interaction logic: convert corpses into rations.
 // Future: herbs as optional seasoning, varied recipes.
 
-import { Inventory } from "../../components/Inventory.js";
 import { ItemInfo } from "../../components/ItemInfo.js";
 import { NamedIdentity } from "../../components/NamedIdentity.js";
 import { inventoryItems, inventoryContains } from "../../utils/inventoryFacade.js";

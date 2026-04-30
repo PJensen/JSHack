@@ -300,9 +300,9 @@ export function materializeDrop(world, drop, pos) {
     }
 
     case "equip": {
-      const id = buildCatalogItem(world, drop.params.equipId, {
-        affixes: drop.params.affixes || [],
-      });
+      let id = null;
+      try { id = buildCatalogItem(world, drop.params.equipId, { affixes: drop.params.affixes || [] }); } catch { return null; }
+      if (!(id > 0)) return null;
       world.add(id, Position, { x: pos.x, y: pos.y });
       return id;
     }

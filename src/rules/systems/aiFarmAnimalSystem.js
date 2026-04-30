@@ -2,7 +2,6 @@
 // Simple wandering AI for passive farm animals on the overworld (depth 0).
 // Animals randomly scurry with a high rest chance, staying near their spawn.
 
-import { Position } from "../components/Position.js";
 import { Faction } from "../components/Faction.js";
 import { CreatureType, CREATURE_TYPES } from "../components/CreatureType.js";
 import { MoveIntent } from "../components/Intents/MoveIntent.js";

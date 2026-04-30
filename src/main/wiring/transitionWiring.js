@@ -2,7 +2,7 @@
 // Stair, portal, and depth-transition controller.
 // Owns pending-transition state and the flush logic called each frame.
 
-import { transitionToDepth, clearFloorCache } from "../../rules/environment/dungeon/transition.js";
+import { transitionToDepth } from "../../rules/environment/dungeon/transition.js";
 import { DungeonState } from "../../rules/components/DungeonState.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 import { Position } from "../../rules/components/Position.js";

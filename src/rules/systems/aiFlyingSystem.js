@@ -3,7 +3,7 @@
 // adjacency, and floor eligibility. Takeoff / landing resolves later as a
 // full action in flyIntentSystem so it consumes the turn.
 
-import { AggroState, AGGRO_LEVELS } from "../components/AggroState.js";
+import { AGGRO_LEVELS } from "../components/AggroState.js";
 import { Position } from "../components/Position.js";
 import { Speed } from "../components/Speed.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";

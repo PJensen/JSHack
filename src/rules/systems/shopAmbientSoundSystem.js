@@ -1,4 +1,3 @@
-import { Position } from "../components/Position.js";
 import { RoomMetadata } from "../components/RoomMetadata.js";
 import { playerEntity } from "../utils/queries.js";
 import { createRng } from "../../lib/ecs-js/rng.js";
