@@ -42,7 +42,7 @@ roofTest("overworld roofs appear from outside and hide only the building the pla
   clearExplored();
 
   const world = new World({ seed: 0xC0FFEE });
-  const spawn = initDungeon(world, { startDepth: 0 });
+  const spawn = await initDungeon(world, { startDepth: 0 });
   const player = world.create();
   world.add(player, Player, {});
   world.add(player, NamedIdentity, { name: "Hero", identity: "player" });
@@ -91,7 +91,7 @@ roofTest("overworld door roof tiles render translucent so entrances read through
   clearExplored();
 
   const world = new World({ seed: 0xC0FFEE });
-  const spawn = initDungeon(world, { startDepth: 0 });
+  const spawn = await initDungeon(world, { startDepth: 0 });
   const player = world.create();
   world.add(player, Player, {});
   world.add(player, NamedIdentity, { name: "Hero", identity: "player" });
@@ -111,7 +111,7 @@ roofTest("overworld roof shading bands run straight across each building instead
   clearExplored();
 
   const world = new World({ seed: 0xC0FFEE });
-  const spawn = initDungeon(world, { startDepth: 0 });
+  const spawn = await initDungeon(world, { startDepth: 0 });
   const player = world.create();
   world.add(player, Player, {});
   world.add(player, NamedIdentity, { name: "Hero", identity: "player" });
@@ -143,7 +143,7 @@ roofTest("overworld roofs char and smoke as fire moves through a breached buildi
   clearExplored();
 
   const world = new World({ seed: 0xC0FFEE });
-  const spawn = initDungeon(world, { startDepth: 0 });
+  const spawn = await initDungeon(world, { startDepth: 0 });
   const player = world.create();
   world.add(player, Player, {});
   world.add(player, NamedIdentity, { name: "Hero", identity: "player" });
@@ -210,7 +210,7 @@ roofTest("overworld roof damage persists after nearby fire burns out", () => {
   clearExplored();
 
   const world = new World({ seed: 0xBAD5EED });
-  const spawn = initDungeon(world, { startDepth: 0 });
+  const spawn = await initDungeon(world, { startDepth: 0 });
   const player = world.create();
   world.add(player, Player, {});
   world.add(player, NamedIdentity, { name: "Hero", identity: "player" });

@@ -6,19 +6,19 @@ import { initDungeon, generateFloor } from '../src/rules/environment/dungeon/ind
 import { generateFloorPlan } from '../src/rules/environment/dungeon/floorPlan.js';
 import { DungeonState } from '../src/rules/components/DungeonState.js';
 
-Deno.test("initDungeon generates floor with tile data", () => {
+Deno.test("initDungeon generates floor with tile data", async () => {
   clearAll();
   const world = new World({ seed: 42 });
-  const spawn = initDungeon(world);
+  const spawn = await initDungeon(world);
 
   assert(loadedChunkCount() > 0, `expected loaded tileMap chunks, got ${loadedChunkCount()}`);
   assert(typeof spawn.x === 'number' && typeof spawn.y === 'number', 'spawn position returned');
 });
 
-Deno.test("initDungeon creates DungeonState with floorEntityIds", () => {
+Deno.test("initDungeon creates DungeonState with floorEntityIds", async () => {
   clearAll();
   const world = new World({ seed: 42 });
-  initDungeon(world);
+  await initDungeon(world);
 
   let ds = null;
   for (const [_id, state] of world.query(DungeonState)) {
@@ -30,18 +30,18 @@ Deno.test("initDungeon creates DungeonState with floorEntityIds", () => {
   assert(ds.floorEntityIds.length > 0, 'floorEntityIds is not empty');
 });
 
-Deno.test("spawn position is on a walkable tile", () => {
+Deno.test("spawn position is on a walkable tile", async () => {
   clearAll();
   const world = new World({ seed: 42 });
-  const spawn = initDungeon(world);
+  const spawn = await initDungeon(world);
 
   assert(isWalkable(spawn.x, spawn.y), `spawn (${spawn.x},${spawn.y}) should be walkable`);
 });
 
-Deno.test("generateFloor is deterministic", () => {
+Deno.test("generateFloor is deterministic", async () => {
   clearAll();
   const world1 = new World({ seed: 42 });
-  const result1 = generateFloor(world1, 42, 1);
+  const result1 = await generateFloor(world1, 42, 1);
 
   const walkable1 = new Set();
   for (let ly = 0; ly < CHUNK_SIZE; ly++) {
@@ -52,7 +52,7 @@ Deno.test("generateFloor is deterministic", () => {
 
   clearAll();
   const world2 = new World({ seed: 42 });
-  const result2 = generateFloor(world2, 42, 1);
+  const result2 = await generateFloor(world2, 42, 1);
 
   const walkable2 = new Set();
   for (let ly = 0; ly < CHUNK_SIZE; ly++) {
@@ -69,22 +69,22 @@ Deno.test("generateFloor is deterministic", () => {
   assert(result1.spawnY === result2.spawnY, 'same spawn Y');
 });
 
-Deno.test("floor loads exactly the chunks described by the floor extent", () => {
+Deno.test("floor loads exactly the chunks described by the floor extent", async () => {
   clearAll();
   const world = new World({ seed: 42 });
   const plan = generateFloorPlan(world.seed >>> 0, 1);
-  initDungeon(world);
+  await initDungeon(world);
 
   const expectedChunks = (plan.extent.maxCX - plan.extent.minCX + 1)
     * (plan.extent.maxCY - plan.extent.minCY + 1);
   assert(loadedChunkCount() === expectedChunks, `expected ${expectedChunks} loaded chunks, got ${loadedChunkCount()}`);
 });
 
-Deno.test("floor boundary does not expose walkable tiles into unloaded void", () => {
+Deno.test("floor boundary does not expose walkable tiles into unloaded void", async () => {
   clearAll();
   const world = new World({ seed: 42 });
   const plan = generateFloorPlan(world.seed >>> 0, 1);
-  generateFloor(world, 42, 1);
+  await generateFloor(world, 42, 1);
 
   const minX = plan.extent.minCX * CHUNK_SIZE;
   const maxX = (plan.extent.maxCX + 1) * CHUNK_SIZE - 1;
@@ -101,12 +101,12 @@ Deno.test("floor boundary does not expose walkable tiles into unloaded void", ()
   }
 });
 
-Deno.test("generateFloor emits monotonic chunk progress callbacks", () => {
+Deno.test("generateFloor emits monotonic chunk progress callbacks", async () => {
   clearAll();
   const world = new World({ seed: 42 });
   const calls = [];
 
-  generateFloor(world, 42, 1, null, (progress) => {
+  await generateFloor(world, 42, 1, null, (progress) => {
     if (progress?.phase === 'chunks') calls.push(progress);
   });
 
@@ -123,12 +123,12 @@ Deno.test("generateFloor emits monotonic chunk progress callbacks", () => {
   }
 });
 
-Deno.test("initDungeon forwards chunk progress callback", () => {
+Deno.test("initDungeon forwards chunk progress callback", async () => {
   clearAll();
   const world = new World({ seed: 42 });
   const calls = [];
 
-  initDungeon(world, {
+  await initDungeon(world, {
     onProgress: (progress) => {
       if (progress?.phase === 'chunks') calls.push(progress);
     },

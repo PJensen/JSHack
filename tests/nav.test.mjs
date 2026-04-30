@@ -89,12 +89,12 @@ function collectWalkableComponents() {
 const SEEDS = [42, 123, 777, 9999, 31337];
 const DEPTHS = [1, 4];
 
-Deno.test("all stair tiles are reachable from spawn", () => {
+Deno.test("all stair tiles are reachable from spawn", async () => {
   for (const depth of DEPTHS) {
     for (const seed of SEEDS) {
       clearAll();
       const world = new World({ seed });
-      const { spawnX, spawnY } = generateFloor(world, seed, depth);
+      const { spawnX, spawnY } = await generateFloor(world, seed, depth);
 
       assert(isWalkable(spawnX, spawnY),
         `depth ${depth} seed ${seed}: spawn (${spawnX},${spawnY}) must be walkable`);
@@ -113,12 +113,12 @@ Deno.test("all stair tiles are reachable from spawn", () => {
   }
 });
 
-Deno.test("every stair tile has at least one walkable neighbour (player can step off)", () => {
+Deno.test("every stair tile has at least one walkable neighbour (player can step off)", async () => {
   for (const depth of DEPTHS) {
     for (const seed of SEEDS) {
       clearAll();
       const world = new World({ seed });
-      generateFloor(world, seed, depth);
+      await generateFloor(world, seed, depth);
 
       for (const { x, y, kind } of collectStairs()) {
         const walkableNeighbours = CARDINALS.filter(([dx, dy]) => isWalkable(x + dx, y + dy));
@@ -129,12 +129,12 @@ Deno.test("every stair tile has at least one walkable neighbour (player can step
   }
 });
 
-Deno.test("all walkable tiles form one connected component", () => {
+Deno.test("all walkable tiles form one connected component", async () => {
   for (const depth of DEPTHS) {
     for (const seed of SEEDS) {
       clearAll();
       const world = new World({ seed });
-      const { spawnX, spawnY } = generateFloor(world, seed, depth);
+      const { spawnX, spawnY } = await generateFloor(world, seed, depth);
       const components = collectWalkableComponents();
 
       if (depth === 1) {
@@ -162,7 +162,7 @@ Deno.test("all walkable tiles form one connected component", () => {
   }
 });
 
-Deno.test("forced up-stairs stay connected after descent (positional-identity)", () => {
+Deno.test("forced up-stairs stay connected after descent (positional-identity)", async () => {
   // Simulate the actual game path: overworld → depth 1.
   // The overworld's down-stair position becomes a forced up-stair on depth 1.
   // This up-stair may land on TILE_WALL or TILE_VOID, so a corridor must be carved.
@@ -170,12 +170,12 @@ Deno.test("forced up-stairs stay connected after descent (positional-identity)",
     // Generate overworld to collect down-stair positions
     clearAll();
     const w0 = new World({ seed });
-    const ow = generateFloor(w0, seed, 0);
+    const ow = await generateFloor(w0, seed, 0);
 
     // Generate depth 1 via descent (with priorDownStairPositions)
     clearAll();
     const w1 = new World({ seed });
-    const d1 = generateFloor(w1, seed, 1, null, null, ow.downStairPositions);
+    const d1 = await generateFloor(w1, seed, 1, null, null, ow.downStairPositions);
 
     // Every forced up-stair must be walkable and have walkable neighbors
     for (const sp of ow.downStairPositions) {

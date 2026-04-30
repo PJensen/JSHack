@@ -23,12 +23,12 @@ function makePlayer(world, pos) {
   return player;
 }
 
-Deno.test("buildWorldView recomputes FOV after explored state is cleared on the same step", () => {
+Deno.test("buildWorldView recomputes FOV after explored state is cleared on the same step", async () => {
   clearAll();
   clearExplored();
 
   const firstWorld = new World({ seed: 0xC0FFEE });
-  const firstSpawn = initDungeon(firstWorld, { startDepth: 1 });
+  const firstSpawn = await initDungeon(firstWorld, { startDepth: 1 });
   makePlayer(firstWorld, firstSpawn);
   buildWorldView(firstWorld);
 
@@ -36,7 +36,7 @@ Deno.test("buildWorldView recomputes FOV after explored state is cleared on the 
   clearExplored();
 
   const secondWorld = new World({ seed: 0xC0FFEE });
-  const secondSpawn = initDungeon(secondWorld, { startDepth: 0 });
+  const secondSpawn = await initDungeon(secondWorld, { startDepth: 0 });
   makePlayer(secondWorld, secondSpawn);
 
   const view = buildWorldView(secondWorld);

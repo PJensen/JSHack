@@ -103,7 +103,7 @@ function _buildSnapshotRegistry(world) {
  * @param {{x: number, y: number}} destinationPos - world coords for player placement
  * @param {{direction?: 'up'|'down', stairPos?: {x:number,y:number}|null, tombstoneRepo?: Object, onProgress?: (progress: { phase: 'chunks', depth: number, processed: number, total: number, cx?: number, cy?: number }) => void}} [opts]
  */
-export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
+export async function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
   // Find dungeon state
   let dungeonId = null;
   let ds = null;
@@ -187,7 +187,7 @@ export function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
   const priorDownStairPositions = (isDescending && Array.isArray(ds?.downStairPositions) && ds.downStairPositions.length > 0)
     ? ds.downStairPositions : null;
   const { spawnX, spawnY, entityIds: generatedEntityIds, downStairPositions: newDownStairPositions, profileType: newProfileType } =
-    generateFloor(world, worldSeed, newDepth, tombstoneRepo, onProgress, priorDownStairPositions);
+    await generateFloor(world, worldSeed, newDepth, tombstoneRepo, onProgress, priorDownStairPositions);
   let entityIds = generatedEntityIds;
 
   // Re-apply destroyed tiles from the ledger so burned walls stay destroyed

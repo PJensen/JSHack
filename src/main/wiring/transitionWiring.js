@@ -164,7 +164,7 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
 
   // ── Flush pending transition (called each frame) ──────────────────────
 
-  function flush() {
+  async function flush() {
     const pending = _pending;
     if (!pending) return;
     if (isLocked()) return;
@@ -187,7 +187,7 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
 
       const hasTargetPos = Number.isFinite(pending.targetPos?.x) && Number.isFinite(pending.targetPos?.y);
       if (hasTargetPos) {
-        transitionToDepth(world, newDepth, { x: pending.targetPos.x | 0, y: pending.targetPos.y | 0 }, { tombstoneRepo });
+        await transitionToDepth(world, newDepth, { x: pending.targetPos.x | 0, y: pending.targetPos.y | 0 }, { tombstoneRepo });
         if (pending.fragActorsAtTarget) {
           const pe = playerEntity();
           const playerId = pe?.id || 0;
@@ -198,7 +198,7 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
         }
       } else {
         const direction = newDepth > currentDepth ? 'down' : 'up';
-        transitionToDepth(world, newDepth, { x: 0, y: 0 }, { direction, stairPos: pending.stairPos || null, tombstoneRepo });
+        await transitionToDepth(world, newDepth, { x: 0, y: 0 }, { direction, stairPos: pending.stairPos || null, tombstoneRepo });
       }
 
       // Homecoming landing: reposition player at the town fountain

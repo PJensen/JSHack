@@ -1148,8 +1148,9 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
 
     nextPaint().then(() => {
       return new Promise((resolve) => setTimeout(resolve, generationPanel.readyDelayMs));
-    }).then(() => {
-      onConfirm({
+    }).then(async () => {
+      // onConfirm now returns a Promise (generation yields between chunks).
+      await onConfirm({
         name,
         classId: classes[classIndex].id,
         seed: seedVal,
@@ -1159,6 +1160,14 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
         onProgress: generationPanel.progress,
       });
       generationPanel.complete();
+      // Pre-warm the world's render loop BEHIND the still-opaque loading panel.
+      // The first few frame() calls are heavy (cold worldView, FOV, lighting,
+      // particle reconciliation, hud feeds). Letting them tick before the fade
+      // begins keeps the opacity transition smooth instead of competing with
+      // GC, audio decode, and cache fills.
+      for (let i = 0; i < 4; i++) {
+        await new Promise((r) => requestAnimationFrame(() => r()));
+      }
       generationPanel.dispose();
       dispose({ fade: true });
     });
