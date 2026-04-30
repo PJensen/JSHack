@@ -163,7 +163,7 @@ Acceptance criteria:
 
 ## 7. Create Charges Resolver
 
-Status: `Blocked` by item 1 and item 2
+Status: `Done`
 
 Goal: stop charge-aware logic from reading only item-info fields.
 
@@ -186,7 +186,7 @@ Suggested test:
 
 ## 8. Move Gem Socket Charges To Runtime Nodes
 
-Status: `Migration`, blocked by item 7
+Status: `Done`
 
 Goal: make socket charge state live on socketed child entities instead of only
 inside item info.
@@ -213,7 +213,7 @@ Suggested tests:
 
 ## 9. Create Enchantment Runtime Node Path
 
-Status: `Blocked` by item 1 and item 2
+Status: `Done`
 
 Goal: let scrolls, shrines, oils, curses, and similar effects create runtime
 enchantment children rather than only mutating affix arrays.
@@ -239,7 +239,7 @@ Suggested test:
 
 ## 10. Migrate Scroll-To-Affix Enchanting
 
-Status: `Migration`, blocked by item 9
+Status: `Done`
 
 Goal: make enchanting runtime output topology-backed.
 

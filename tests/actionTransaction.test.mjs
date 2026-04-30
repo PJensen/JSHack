@@ -3,8 +3,10 @@ import { World } from '../src/lib/ecs-js/index.js';
 import { Vitality } from '../src/rules/components/Vitality.js';
 import { ActiveEffects } from '../src/rules/components/ActiveEffects.js';
 import { DamageSpec } from "../src/rules/components/DamageSpec.js";
+import { EnchantmentNode } from "../src/rules/components/EnchantmentNode.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 import { ActionTransaction, applyMutation } from '../src/rules/interaction/mutations.js';
+import { descendantsWith } from '../src/rules/utils/topology.js';
 
 function makeWorld() {
   return new World({ seed: 1 });
@@ -139,6 +141,24 @@ Deno.test("commit patchItemInfo merges item info fields", () => {
   assert(info?.coating, "coating should be patched in");
   assertEquals(info.coating.kind, "poison");
   assertEquals(info.coating.charges, 12);
+});
+
+Deno.test("commit attachEnchantment creates runtime enchantment topology", () => {
+  const world = makeWorld();
+  const e = world.create();
+  world.add(e, ItemInfo, { type: "equip", slot: "weapon", affixes: [] });
+
+  const q = new ActionTransaction();
+  q.enqueue({
+    type: "attachEnchantment",
+    entityId: e,
+    def: { defId: "ench.fire", affixId: "firestorm1", sourceKind: "scroll" },
+  });
+  q.commit(world);
+
+  const nodes = [...descendantsWith(world, e, EnchantmentNode)];
+  assertEquals(nodes.length, 1);
+  assertEquals(nodes[0][1].defId, "ench.fire");
 });
 
 Deno.test("commit multiple ops: all applied in order", () => {

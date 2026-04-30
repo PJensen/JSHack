@@ -30,6 +30,7 @@ import { forEachLoadedTile } from "../environment/dungeon/tileMap.js";
 import { dealDamage } from "../utils/dealDamage.js";
 import { isDotEffectKey, upsertTimedEffect } from "../utils/effectSemantics.js";
 import { applyStatusEffect, ensureActiveEffects, isInvulnerabilityEffectKey } from "../utils/effects.js";
+import { attachEnchantmentNode } from "../utils/enchantmentTopology.js";
 import { spawnHazard } from "../utils/hazardSpawn.js";
 import { spawnMonsterEntity } from "../utils/spawnMonsterEntity.js";
 import { setItemCooldown } from "../utils/itemCooldowns.js";
@@ -184,6 +185,10 @@ export function applyMutation(world, op, resolvers = {}) {
         }
         info[key] = value;
       }
+      break;
+    }
+    case "attachEnchantment": {
+      attachEnchantmentNode(world, op.entityId, op.def || {});
       break;
     }
     case "setBeatitude": {
@@ -500,6 +505,7 @@ export function applyMutation(world, op, resolvers = {}) {
  * @typedef {{ type: 'upsertTimedEffect', entityId: number, effect: { key: string, potency: number, onsetLeft?: number, onset?: number, peakLeft?: number, peak?: number, turnsLeft?: number, duration?: number, stack?: string, maxStacks?: number, sourceId?: number, startedAtTurn?: number, meta?: Record<string, unknown> } }} UpsertTimedEffectOp
  * @typedef {{ type: 'appendDamageChannels', entityId: number, channels: Array<Record<string, unknown>> }} AppendDamageChannelsOp
  * @typedef {{ type: 'patchItemInfo', entityId: number, patch: Record<string, unknown> }} PatchItemInfoOp
+ * @typedef {{ type: 'attachEnchantment', entityId: number, def: Record<string, unknown> }} AttachEnchantmentOp
  * @typedef {{ type: 'setBeatitude', entityId: number, state: 'blessed'|'uncursed'|'cursed' }} SetBeatitudeOp
  * @typedef {{ type: 'removeTimedEffectsByKey', entityId: number, keys: string[] }} RemoveTimedEffectsByKeyOp
  * @typedef {{ type: 'setMaterial', entityId: number, kind: string }} SetMaterialOp
@@ -514,7 +520,7 @@ export function applyMutation(world, op, resolvers = {}) {
  * @typedef {{ type: 'spawnHazard', spec: Record<string, unknown> }} SpawnHazardOp
  * @typedef {{ type: 'destroy', entityId: number }} DestroyOp
  * @typedef {{ type: 'setItemCooldown', entityId: number, turns: number }} SetItemCooldownOp
- * @typedef {DamageOp | HealOp | PushEffectOp | UpsertTimedEffectOp | AppendDamageChannelsOp | PatchItemInfoOp | SetBeatitudeOp | RemoveTimedEffectsByKeyOp | SetMaterialOp | SpawnItemOp | SpawnMonsterOp | LearnSpellOp | ConsumeOp | DropFromInventoryOp | NutritionOp | AddCorpseAdaptationOp | RevealLoadedMapOp | SpawnHazardOp | DestroyOp | SetItemCooldownOp} MutationOp
+ * @typedef {DamageOp | HealOp | PushEffectOp | UpsertTimedEffectOp | AppendDamageChannelsOp | PatchItemInfoOp | AttachEnchantmentOp | SetBeatitudeOp | RemoveTimedEffectsByKeyOp | SetMaterialOp | SpawnItemOp | SpawnMonsterOp | LearnSpellOp | ConsumeOp | DropFromInventoryOp | NutritionOp | AddCorpseAdaptationOp | RevealLoadedMapOp | SpawnHazardOp | DestroyOp | SetItemCooldownOp} MutationOp
  */
 
 export class ActionTransaction {

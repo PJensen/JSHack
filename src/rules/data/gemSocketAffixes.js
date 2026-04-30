@@ -16,8 +16,14 @@ import {
   effectAddCritChance,
 } from "../utils/statProcAuthoring.js";
 import { GemSocketNode } from "../components/GemSocketNode.js";
+import { Charges } from "../components/Charges.js";
 import { Equipment } from "../components/Equipment.js";
 import { ItemInfo } from "../components/ItemInfo.js";
+import {
+  addCharges,
+  resolveCharges,
+  spendCharges,
+} from "../utils/charges.js";
 
 // ── Passive script keys ──────────────────────────────────────────
 const S_RUBY     = "gem_socket:ruby:passive";
@@ -39,6 +45,18 @@ const FLUO_MAX_CHARGES      = 6;  // stacks to full charge
 const FLUO_DISCHARGE_MIN    = 3;  // minimum stacks to discharge
 const FLUO_DAMAGE_PER_STACK = 2;  // bonus electric damage per charge consumed
 const FLUO_SHRINE_STANDING_MIN = 5; // normalized standing threshold for shrine gift (out of 8)
+
+function isFluoriteChargeNode(world, nodeId) {
+  return String(world.get(nodeId, GemSocketNode)?.gemId || "") === "gem_fluorite";
+}
+
+function resolveFluoriteCharges(world, weaponId) {
+  return resolveCharges(world, weaponId, { filter: (nodeId) => isFluoriteChargeNode(world, nodeId) });
+}
+
+function addFluoriteCharges(world, weaponId, amount) {
+  return addCharges(world, weaponId, amount, { filter: (nodeId) => isFluoriteChargeNode(world, nodeId) });
+}
 
 // ── Register passive scripts ─────────────────────────────────────
 registerScript(S_RUBY,     { [ScriptVerb.AffixPassive]: (_w, ctx) => ctx.addBonus("fireResist", 0.10) });
@@ -81,15 +99,13 @@ registerScript("gem_socket:fluorite:charge", {
     const dmgType = String(ctx.damage?.type || "");
     if (dmgType !== "electric" && dmgType !== "lightning") return;
     const item = Number(ctx?.item || 0) | 0;
-    const info = world.get(item, ItemInfo);
-    if (!info) return;
-    const max = Number(info.maxCharges || 0);
+    const state = resolveFluoriteCharges(world, item);
+    const max = Number(state.max || 0);
     if (!max) return;
-    const curr = Number(info.charges || 0);
-    if (curr >= max) return;
-    info.charges = Math.min(max, curr + 2);  // electric hits charge fast
+    if (state.current >= max) return;
+    const next = addFluoriteCharges(world, item, 2);  // electric hits charge fast
     ctx.proc.emit("proc:fluorite:charge", {
-      actor: ctx.source, item, charges: info.charges, maxCharges: max, source: "electric",
+      actor: ctx.source, item, charges: next.current, maxCharges: next.max, source: "electric",
     });
   },
 });
@@ -100,14 +116,13 @@ registerScript("gem_socket:fluorite:discharge", {
   [ScriptVerb.ProcEvaluate]: (world, ctx) => {
     if (ctx.kind !== "onBeforeHit") return;
     const item = Number(ctx?.item || 0) | 0;
-    const info = world.get(item, ItemInfo);
-    if (!info) return;
-    const curr = Number(info.charges || 0);
+    const state = resolveFluoriteCharges(world, item);
+    const curr = Number(state.current || 0);
     if (curr < FLUO_DISCHARGE_MIN) return;
     const dmg = curr * FLUO_DAMAGE_PER_STACK;
     ctx.proc.addBonusDamage(dmg, dmg, "electric");
     ctx.proc.applyStatus(ctx.target, "blinded", 1, 1);  // phosphorescent flash
-    info.charges = 0;
+    spendCharges(world, item, curr, { filter: (nodeId) => isFluoriteChargeNode(world, nodeId) });
     ctx.proc.emit("proc:fluorite:discharge", {
       actor: ctx.source, target: ctx.target, item, chargesSpent: curr,
     });
@@ -194,7 +209,9 @@ const GEM_PROC_BUILDERS = {
     });
   },
   gem_fluorite(world, weaponId, socketNodeId) {
-    // Initialize charge state on the weapon — persists across combat
+    // Runtime charges live on the fluorite socket node; ItemInfo mirrors remain
+    // for compatibility while socket state migrates.
+    world.add(socketNodeId, Charges, { current: 0, max: FLUO_MAX_CHARGES });
     const info = world.get(weaponId, ItemInfo);
     if (info) {
       info.charges = 0;
@@ -256,17 +273,18 @@ export function installGemSocketListener(world) {
     // Check main hand weapon for fluorite socket
     const weaponId = Number(eq.hand || 0) | 0;
     if (!(weaponId > 0)) return;
+    const state = resolveFluoriteCharges(world, weaponId);
+    const max = Number(state.max || 0);
+    if (!max) return;
     const info = world.get(weaponId, ItemInfo);
     if (!info) return;
-    const max = Number(info.maxCharges || 0);
-    if (!max) return;
     const sockets = Array.isArray(info.sockets) ? info.sockets : [];
     if (!sockets.includes("gem_fluorite")) return;
-    const curr = Number(info.charges || 0);
+    const curr = Number(state.current || 0);
     if (curr >= max) return;
-    info.charges = Math.min(max, curr + 1);
+    const next = addFluoriteCharges(world, weaponId, 1);
     world.emit?.("proc:fluorite:charge", {
-      actor: actorId, item: weaponId, charges: info.charges, maxCharges: max, source: "shrine",
+      actor: actorId, item: weaponId, charges: next.current, maxCharges: next.max, source: "shrine",
     });
   });
 }

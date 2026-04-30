@@ -246,6 +246,13 @@ export function createFacets(init) {
         patch: (patch && typeof patch === "object") ? { ...patch } : {},
       });
     },
+    attachEnchantment(entityId, def) {
+      return tx.queueMutation({
+        type: "attachEnchantment",
+        entityId: entityId | 0,
+        def: (def && typeof def === "object") ? { ...def } : {},
+      });
+    },
     setBeatitude(entityId, state) {
       return tx.queueMutation({
         type: "setBeatitude",
@@ -484,6 +491,9 @@ export function createFacets(init) {
     },
     patchItemInfo(entityId, patch) {
       return mutate.patchItemInfo(entityId, patch);
+    },
+    attachEnchantment(entityId, def) {
+      return mutate.attachEnchantment(entityId, def);
     },
     setBeatitude(entityId, state) {
       return mutate.setBeatitude(entityId, state);
