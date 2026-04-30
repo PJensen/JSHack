@@ -197,6 +197,12 @@ export async function generateFloor(world, worldSeed, depth, tombstoneRepo = nul
     return { spawnX: ow.spawnX, spawnY: ow.spawnY, entityIds: allEntityIds, downStairPositions, profileType: 'overworld' };
   }
 
+  const _emitPlan = (label, step, total) => {
+    if (typeof onProgress === 'function') onProgress({ phase: 'plan', label, step, total });
+  };
+
+  _emitPlan(`Planning floor ${depth}`, 0, 3);
+  if (_yield) await _yield();
   const floorPlan = generateFloorPlan(worldSeed, depth, priorDownStairPositions, opts);
   const { extent } = floorPlan;
   const allEntityIds = [];
@@ -209,6 +215,11 @@ export async function generateFloor(world, worldSeed, depth, tombstoneRepo = nul
     (extent.maxCX - extent.minCX + 1) * (extent.maxCY - extent.minCY + 1),
   );
   let processedChunks = 0;
+
+  _emitPlan(`Carving rooms across ${totalChunks} chunks`, 1, 3);
+  if (_yield) await _yield();
+  _emitPlan(`Stocking chambers with monsters and loot`, 2, 3);
+  if (_yield) await _yield();
 
   if (typeof onProgress === 'function') {
     onProgress({ phase: 'chunks', depth, processed: 0, total: totalChunks });
@@ -325,6 +336,8 @@ export async function generateFloor(world, worldSeed, depth, tombstoneRepo = nul
           total: totalChunks,
           cx,
           cy,
+          rooms: chunkData.rooms?.length || 0,
+          spawns: chunkData.spawns?.length || 0,
         });
       }
       if (_yield && (processedChunks % _YIELD_EVERY) === 0) await _yield();
