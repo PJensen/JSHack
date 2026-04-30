@@ -8,6 +8,7 @@ export { AffixTopologyNode } from './AffixTopologyNode.js';
 export { ProcPackageNode } from './ProcPackageNode.js';
 export { StatusEffectNode } from './StatusEffectNode.js';
 export { TimedEffectNode } from './TimedEffectNode.js';
+export { EnchantmentNode } from './EnchantmentNode.js';
 export { Duration } from './Duration.js';
 export { Source } from './Source.js';
 export { Charges } from './Charges.js';

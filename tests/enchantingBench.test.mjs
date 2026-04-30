@@ -4,6 +4,7 @@ import { EnchantingBench } from "../src/rules/archetypes/Overworld.js";
 import { GoldStack } from "../src/rules/archetypes/Items.js";
 import { Inventory } from "../src/rules/components/Inventory.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
+import { EnchantmentNode } from "../src/rules/components/EnchantmentNode.js";
 import { NON_AMMO_GEAR_SLOTS } from "../src/rules/components/Equipment.js";
 import { InteractIntent } from "../src/rules/components/Intents/InteractIntent.js";
 import { ApplyIntent } from "../src/rules/components/Intents/ApplyIntent.js";
@@ -11,6 +12,7 @@ import { interactionSystem } from "../src/rules/systems/interactionSystem.js";
 import { applySystem } from "../src/rules/systems/applySystem.js";
 import { createItemById } from "../src/rules/utils/itemFactory.js";
 import { addToInventory, getStackCount, inventoryItems } from "../src/rules/utils/inventoryFacade.js";
+import { descendantsWith } from "../src/rules/utils/topology.js";
 import "../src/rules/data/affixes.js";
 
 function makeActor(world) {
@@ -96,6 +98,7 @@ Deno.test("enchant scroll applies persistent affixes, supports accessories, and 
   assertEquals(results[0]?.metrics?.consumedTool, true);
   assert(!world.isAlive(firstScroll), "successful enchant should consume the scroll");
   assert((world.get(weapon, ItemInfo)?.affixes || []).includes("firestorm1"));
+  assertEquals([...descendantsWith(world, weapon, EnchantmentNode)].length, 1, "weapon enchant should create runtime topology");
 
   world.add(actor, ApplyIntent, { itemId: wardScroll, targetItemId: amulet });
   applySystem(world);
@@ -103,6 +106,7 @@ Deno.test("enchant scroll applies persistent affixes, supports accessories, and 
   assertEquals(results.length, 2);
   assertEquals(results[1]?.ok, true);
   assert((world.get(amulet, ItemInfo)?.affixes || []).includes("fireWard1"));
+  assertEquals([...descendantsWith(world, amulet, EnchantmentNode)].length, 1, "ward enchant should create runtime topology");
 
   const secondScroll = createItemById(world, "scroll_enchant_fire");
   addToInventory(world, actor, secondScroll);

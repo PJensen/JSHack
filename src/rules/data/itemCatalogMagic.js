@@ -122,6 +122,14 @@ function createGearEnchantDipHook({ affixId, enchantType, enchantLabel, detail, 
       return { applied: false, consumedTool: false, resultType: "nothing" };
     }
     ctx.helpers.patchItemInfo(targetId, { affixes: [...currentAffixes, resolvedAffixId] });
+    ctx.helpers.attachEnchantment(targetId, {
+      defId: `ench.${resolvedAffixId}`,
+      affixId: resolvedAffixId,
+      level: Math.max(1, Number(magnitude || 1) | 0),
+      sourceKind: "scroll",
+      sourceId: Number(state?.toolId || 0) | 0,
+      sourceKey: String(state?.toolIdentity || ""),
+    });
     ctx.io.emit("item:applied", {
       actor: state.actor,
       toolId: state.toolId,
