@@ -689,8 +689,14 @@ export function planTownPlacement(chunks, bounds, seed) {
   return { center, districts, byDistrict, resources, seed };
 }
 
-export function applyTownPlacement(chunks, bounds, seed) {
+// `tick` is an optional async callback (label) => Promise. Called between
+// stages so the loading panel can update its status line and the browser can
+// paint. Async return type is only used when tick is provided; sync callers
+// can still await the returned Promise.
+export async function applyTownPlacement(chunks, bounds, seed, tick = null) {
+  const _tick = typeof tick === 'function' ? tick : null;
   const plan = planTownPlacement(chunks, bounds, seed);
+  if (_tick) await _tick(`Surveying town districts at (${plan.center.x}, ${plan.center.y})`);
   const occupied = new Set();
   const protectedTiles = new Set();
   const buildings = [];
@@ -703,21 +709,26 @@ export function applyTownPlacement(chunks, bounds, seed) {
     if (placed) {
       buildings.push(placed);
       addBuildingResourceSpawns(chunks, placed, buildingPlan, bounds);
+      if (_tick) await _tick(`Placed ${placed.key} at (${placed.door?.x ?? '?'}, ${placed.door?.y ?? '?'})`);
     }
   }
 
   const tavern = buildings.find((b) => b.key === "tavern");
   const chestPositions = indexChestPositions(chunks, buildings);
+  if (_tick) await _tick(`Settling ${buildings.length} townsfolk into homes`);
   for (const building of buildings) {
     const def = BUILDING_PLANS.find((entry) => entry.key === building.key);
     addTownfolkForBuilding(chunks, building, def?.roles || [], tavern?.door || null, chestPositions);
   }
 
+  if (_tick) await _tick(`Raising civic fixtures (well, signs, fountain)`);
   addCivicFixtures(chunks, plan.center, buildings);
 
   const civic = plan.byDistrict.civic_core || plan.districts[0];
   const routeCenter = { x: civic.x, y: civic.y };
+  if (_tick) await _tick(`Routing roads between ${plan.districts.length} districts`);
   for (const district of plan.districts) routePath(chunks, bounds, routeCenter, district, protectedTiles);
+  if (_tick) await _tick(`Routing footpaths to ${buildings.length} buildings`);
   for (const building of buildings) {
     const district = plan.byDistrict[building.district] || civic;
     routePath(chunks, bounds, district, building.door, protectedTiles);
@@ -729,6 +740,7 @@ export function applyTownPlacement(chunks, bounds, seed) {
     if (consumer) routePath(chunks, bounds, building.door, consumer.door, protectedTiles);
   }
 
+  if (_tick) await _tick(`Sowing resource spawns around the town`);
   addResourceSpawns(chunks, plan.center, bounds);
 
   return {

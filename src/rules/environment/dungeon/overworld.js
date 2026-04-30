@@ -714,7 +714,8 @@ function addWaterSpawnIfOpen(chunks, x, y, kind, params = {}) {
   return true;
 }
 
-function spawnOverworldCreatures(chunks, townCenter, bounds, worldSeed) {
+async function spawnOverworldCreatures(chunks, townCenter, bounds, worldSeed, tick = null) {
+  const _tick = typeof tick === 'function' ? tick : null;
   const TOWN_EXCLUSION_RADIUS_SQ = 45 * 45; // covers districts up to r=36 + footprint
 
   const OVERWORLD_CREATURES = [
@@ -810,10 +811,12 @@ function spawnOverworldCreatures(chunks, townCenter, bounds, worldSeed) {
         }
       }
     }
+    if (_tick && placed > 0) await _tick(`Spawned ${creatureType.id} ×${placed}`);
   }
 }
 
-function spawnOverworldResources(chunks, townCenter, bounds, worldSeed) {
+async function spawnOverworldResources(chunks, townCenter, bounds, worldSeed, tick = null) {
+  const _tick = typeof tick === 'function' ? tick : null;
   const TOWN_EXCLUSION_RADIUS_SQ = 45 * 45;
 
   const OVERWORLD_RESOURCES = [
@@ -925,6 +928,7 @@ function spawnOverworldResources(chunks, townCenter, bounds, worldSeed) {
         }
       }
     }
+    if (_tick && placed > 0) await _tick(`Sowed ${resourceType.kind} ×${placed}`);
   }
 }
 
@@ -969,6 +973,7 @@ export async function generateOverworldChunks(worldSeed, onPlanProgress = null) 
   const PLAN_TOTAL = 6;
   _emit('Generating terrain', 0, PLAN_TOTAL);
   if (_yield) await _yield();
+  let _terrainCount = 0;
   for (let cy = extent.minCY; cy <= extent.maxCY; cy++) {
     for (let cx = extent.minCX; cx <= extent.maxCX; cx++) {
       const rec = {
@@ -979,6 +984,10 @@ export async function generateOverworldChunks(worldSeed, onPlanProgress = null) 
       };
       chunks.set(chunkKey(cx, cy), rec);
       fillChunkTerrain(chunks, cx, cy, worldSeed >>> 0, perm, gradientDir, minX, maxX, minY, maxY);
+      _terrainCount++;
+      // Yield every few chunks so the loading-screen background animation
+      // (flames, particles) can continue ticking during heavy terrain fill.
+      if (_yield && (_terrainCount & 3) === 0) await _yield();
     }
   }
 
@@ -999,7 +1008,13 @@ export async function generateOverworldChunks(worldSeed, onPlanProgress = null) 
 
   _emit('Placing buildings', 3, PLAN_TOTAL);
   if (_yield) await _yield();
-  const townPlan = applyTownPlacement(chunks, { minX, maxX, minY, maxY }, worldSeed >>> 0);
+  const _townTick = onPlanProgress
+    ? async (label) => {
+        onPlanProgress({ phase: 'plan', label, step: 3, total: PLAN_TOTAL });
+        await _yieldFrame();
+      }
+    : null;
+  const townPlan = await applyTownPlacement(chunks, { minX, maxX, minY, maxY }, worldSeed >>> 0, _townTick);
   if (townPlan?.center) {
     spawnX = townPlan.center.x;
     spawnY = townPlan.center.y;
@@ -1007,11 +1022,23 @@ export async function generateOverworldChunks(worldSeed, onPlanProgress = null) 
 
   _emit('Spawning creatures', 4, PLAN_TOTAL);
   if (_yield) await _yield();
-  spawnOverworldCreatures(chunks, townPlan?.center || { x: spawnX, y: spawnY }, { minX, maxX, minY, maxY }, worldSeed >>> 0);
+  const _creatureTick = onPlanProgress
+    ? async (label) => {
+        onPlanProgress({ phase: 'plan', label, step: 4, total: PLAN_TOTAL });
+        await _yieldFrame();
+      }
+    : null;
+  await spawnOverworldCreatures(chunks, townPlan?.center || { x: spawnX, y: spawnY }, { minX, maxX, minY, maxY }, worldSeed >>> 0, _creatureTick);
 
   _emit('Placing resources', 5, PLAN_TOTAL);
   if (_yield) await _yield();
-  spawnOverworldResources(chunks, townPlan?.center || { x: spawnX, y: spawnY }, { minX, maxX, minY, maxY }, worldSeed >>> 0);
+  const _resourceTick = onPlanProgress
+    ? async (label) => {
+        onPlanProgress({ phase: 'plan', label, step: 5, total: PLAN_TOTAL });
+        await _yieldFrame();
+      }
+    : null;
+  await spawnOverworldResources(chunks, townPlan?.center || { x: spawnX, y: spawnY }, { minX, maxX, minY, maxY }, worldSeed >>> 0, _resourceTick);
 
   const outChunks = [];
   for (const rec of chunks.values()) {
