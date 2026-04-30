@@ -37,7 +37,7 @@ function roofTest(name, fn) {
   });
 }
 
-roofTest("overworld roofs appear from outside and hide only the building the player is inside", () => {
+roofTest("overworld roofs appear from outside and hide only the building the player is inside", async () => {
   clearAll();
   clearExplored();
 
@@ -86,7 +86,7 @@ roofTest("overworld roofs appear from outside and hide only the building the pla
   clearExplored();
 });
 
-roofTest("overworld door roof tiles render translucent so entrances read through the roofline", () => {
+roofTest("overworld door roof tiles render translucent so entrances read through the roofline", async () => {
   clearAll();
   clearExplored();
 
@@ -106,7 +106,7 @@ roofTest("overworld door roof tiles render translucent so entrances read through
   clearExplored();
 });
 
-roofTest("overworld roof shading bands run straight across each building instead of diagonally", () => {
+roofTest("overworld roof shading bands run straight across each building instead of diagonally", async () => {
   clearAll();
   clearExplored();
 
@@ -138,7 +138,7 @@ roofTest("overworld roof shading bands run straight across each building instead
   clearExplored();
 });
 
-roofTest("overworld roofs char and smoke as fire moves through a breached building", () => {
+roofTest("overworld roofs char and smoke as fire moves through a breached building", async () => {
   clearAll();
   clearExplored();
 
@@ -205,7 +205,7 @@ roofTest("overworld roofs char and smoke as fire moves through a breached buildi
   clearExplored();
 });
 
-roofTest("overworld roof damage persists after nearby fire burns out", () => {
+roofTest("overworld roof damage persists after nearby fire burns out", async () => {
   clearAll();
   clearExplored();
 

@@ -1079,8 +1079,8 @@ Deno.test("cooking fire: phase 2 transmogrifies corpse into ration", () => {
   const fd = world.get(corpse, FoodDecay);
   assert(fd.turnsHeld === 0, "turnsHeld should be reset to 0");
   assert(
-    fd.shelfLife === 500,
-    `shelfLife should be 500 (ration), got ${fd.shelfLife}`,
+    fd.shelfLife === 5040,
+    `shelfLife should be 5040 (ration = 7 days), got ${fd.shelfLife}`,
   );
 });
 
