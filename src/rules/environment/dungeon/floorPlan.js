@@ -28,9 +28,9 @@ function resolveFloorProfile(profile, depth) {
   if (profile.roomSparsity != null) return profile;
 
   const base = clamp(Number(dungeonConfig.roomSparsity) || 0, 0, 1);
-  // Floor 1 way denser: lower sparsity = more rooms
+  // Floor 1 sparser: fewer rooms keeps the first floor tight
   const sparsity = depth === 1
-    ? clamp(base * 0.4, 0.05, 0.75)
+    ? clamp(base * 2.0, 0.05, 0.75)
     : clamp(base, 0.05, 0.75);
 
   return {
