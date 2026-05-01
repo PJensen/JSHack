@@ -112,7 +112,7 @@ Deno.test("overworld procedurally stamps the required town economy", async () =>
   assertEquals(countKind(chunks, "church_sign"), 1, "churchyard district should anchor on a church");
   assertEquals(countKind(chunks, "home_sign"), 1, "civic core should expose a home sign");
   assertEquals(countKind(chunks, "message_board"), 1, "town should have a bulletin board");
-  assertEquals(countKind(chunks, "well"), 1, "civic core should include a well plaza");
+  assertEquals(countKind(chunks, "fountain"), 1, "civic core should include a fountain plaza");
 
   assert(countKind(chunks, "crop_wheat") >= 12, "farm should plant wheat");
   assert(countKind(chunks, "crop_carrot") >= 6, "farm should plant carrots");
@@ -163,7 +163,7 @@ Deno.test("procedural building stamps do not overlap destructively", async () =>
       smithy: "smithy_sign",
       church: "church_sign",
       farm: "crop_wheat",
-      well_plaza: "well",
+      well_plaza: "fountain",
       graveyard: "grave_tombstone",
       apothecary: "apothecary_sign",
       gem_store: "gem_shop_sign",
@@ -195,7 +195,7 @@ Deno.test("procedural paths connect district doors without punching through wall
     spawnsOfKind(chunks, "tavern_sign")[0],
     spawnsOfKind(chunks, "smithy_sign")[0],
     spawnsOfKind(chunks, "church_sign")[0],
-    spawnsOfKind(chunks, "well")[0],
+    spawnsOfKind(chunks, "fountain")[0],
   ];
   for (const target of targets) {
     assert(target, "expected reachable target spawn");

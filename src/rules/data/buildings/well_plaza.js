@@ -41,6 +41,6 @@ export default {
     { "dx": 1, "dy": 2, "kind": "flower_tulip" },
     { "dx": 2, "dy": -1, "kind": "flower_sunflower" },
     { "dx": 2, "dy": 1, "kind": "flower_sunflower" },
-    { "dx": 0, "dy": 0, "kind": "well" }
+    { "dx": 0, "dy": 0, "kind": "fountain" }
   ]
 };

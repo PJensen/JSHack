@@ -259,7 +259,7 @@ function chooseVillagerHaul(world) {
   const lumber = storage.lumber > 0 ? countInventoryByIdentity(world, storage.lumber) : {};
   const smith = storage.smithy > 0 ? countInventoryByIdentity(world, storage.smithy) : {};
   const tavern = storage.tavern > 0 ? countInventoryByIdentity(world, storage.tavern) : {};
-  const well = findTownFeature(world, "well");
+  const well = findTownFeature(world, "fountain");
   const tavernPos = getEntityPosition(world, storage.tavern);
   const millPos = getEntityPosition(world, storage.mill);
   const lumberPos = getEntityPosition(world, storage.lumber);
