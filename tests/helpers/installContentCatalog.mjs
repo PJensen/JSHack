@@ -1,5 +1,6 @@
 import "../../src/content/items/dawnbreaker.js";
 import "../../src/content/items/weapons.js";
+import "../../src/content/items/rangedWeapons.js";
 import "../../src/content/items/lodbrokSerpentBoundBreeches.js";
 import "../../src/content/items/potionOfRadiance.js";
 import "../../src/content/items/sunVessel.js";
