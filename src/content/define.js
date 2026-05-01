@@ -273,6 +273,7 @@ export function defineItem(id, def) {
     if (def.color) paletteEntry.fg = def.color;
     paletteEntry.glow = def.glow || def.color || null;
     if (def.scale != null) paletteEntry.baseScale = def.scale;
+    if (Array.isArray(def.layers)) paletteEntry.layers = def.layers;
     registerPalette(id, paletteEntry);
   }
 

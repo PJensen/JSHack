@@ -7,3 +7,4 @@ import "./dawnbreaker.js";
 import "./sunsword.js";
 import "./fishingRod.js";
 import "./lodbrokSerpentBoundBreeches.js";
+import "./weapons.js";
