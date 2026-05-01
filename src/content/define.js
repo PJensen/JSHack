@@ -141,6 +141,9 @@ export function defineItem(id, def) {
     if (def.beatitude) catalogEntry.beatitude = def.beatitude;
     if (Array.isArray(def.procPackages) && def.procPackages.length > 0) catalogEntry.procPackages = def.procPackages.slice();
     if (def.tags) catalogEntry.tags = def.tags;
+    if (def.maxCharges != null) catalogEntry.maxCharges = def.maxCharges;
+    if (def.charges != null) catalogEntry.charges = def.charges;
+    if (def.dropRequirement) catalogEntry.dropRequirement = def.dropRequirement;
 
     // Swing profile — authored weapon VFX identity
     if (def.swingProfile) {
