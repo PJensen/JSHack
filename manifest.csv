@@ -139,3 +139,6 @@ equip_ranged.mp3,1.03,-16,128
 paper_collect_1.mp3,0.46,-16,128
 paper_collect_2.mp3,0.41,-16,128
 ambient_bubbles.mp3,7.56,-16,128
+door_open.wav,3.71,-16,PCM
+stair_ascend.wav,2.01,-16,PCM
+stair_descend.wav,2.67,-16,PCM
