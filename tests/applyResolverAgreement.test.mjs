@@ -1,3 +1,4 @@
+import "./helpers/installContentCatalog.mjs";
 import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";
 import { Inventory } from "../src/rules/components/Inventory.js";

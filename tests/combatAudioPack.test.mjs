@@ -1,3 +1,4 @@
+import "./helpers/installContentCatalog.mjs";
 import { assert, assertEquals, assertExists } from "jsr:@std/assert";
 import { allUrls, resolve, resolveUrls } from "../src/display/audio/sounds.js";
 import { allAdapterCombatSoundIds, planMeleeDeath, planWeaponDeflect, planWeaponDrop, planWeaponImpact, planWeaponReady, planWeaponWhoosh } from "../src/display/audio/combatAudioAdapter.js";
