@@ -344,10 +344,15 @@ export const basePalette = {
 
   ember_root_patch: { glyph: "♨", fg: "#d57b3a", glow: "#9a3f14" },
   venom_spores: { glyph: "◌", fg: "#9dd46f", glow: "#5f8d3c" },
-  // Mining nodes
+  // Mining nodes — filled = ore present, hollow = vein exhausted
   ore_vein_iron:  { glyph: "◈", fg: "#c0754a", glow: "#8a3e1e" },
-  ore_vein_coal:  { glyph: "◆", fg: "#3a3a3a", glow: "#1a1a1a" },
-  ore_vein_stone: { glyph: "◇", fg: "#8a8e93", glow: "#555a5e" },
+  ore_vein_coal:  { glyph: "◈", fg: "#3a3a3a", glow: "#1a1a1a" },
+  ore_vein_stone: { glyph: "◈", fg: "#8a8e93", glow: "#555a5e" },
+  ore_vein_iron_exhausted:  { glyph: "◇", fg: "#c0754a", glow: "#8a3e1e" },
+  ore_vein_coal_exhausted:  { glyph: "◇", fg: "#3a3a3a", glow: "#1a1a1a" },
+  ore_vein_stone_exhausted: { glyph: "◇", fg: "#8a8e93", glow: "#555a5e" },
+  // Bare soil left behind by a harvested plant node
+  harvest_node_bare: { glyph: "·", fg: "#7a6550", glow: "#5a4a38" },
   // Crafting stations
   anvil:        { glyph: "⚒", fg: "#9aacba", glow: "#4a6070" },
   anvil_active: { glyph: "⚒", fg: "#ffd08a", glow: "#ff7a18" },

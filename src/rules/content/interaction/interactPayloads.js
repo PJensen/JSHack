@@ -131,6 +131,17 @@ const HARVEST_BONUS_DROPS = Object.freeze({
   tree: Object.freeze({ itemId: "reagent_resin", chance: 0.65, count: 1 }),
   thorn_bramble: Object.freeze({ itemId: "reagent_resin", chance: 0.55, count: 1 }),
 });
+const HARVEST_EXHAUSTED_IDENTITY = Object.freeze({
+  iron_ore:      "ore_vein_iron_exhausted",
+  coal_ore:      "ore_vein_coal_exhausted",
+  stone:         "ore_vein_stone_exhausted",
+  berries:       "harvest_node_bare",
+  herbs:         "harvest_node_bare",
+  thorn_bramble: "harvest_node_bare",
+  venom_fern:    "harvest_node_bare",
+  moonleaf:      "harvest_node_bare",
+  ember_root:    "harvest_node_bare",
+});
 const FOUNTAIN_MIN_CHARGES = 2;
 const FOUNTAIN_MAX_CHARGES = 4;
 const FOUNTAIN_COOLDOWN_MIN = 201;
@@ -1885,6 +1896,14 @@ export const INTERACT_PAYLOADS = {
             identity: "mushrooms_picked",
           });
         }
+      }
+      // Ore veins and plant nodes: disable collider and swap to exhausted glyph.
+      const exhaustedIdentity = HARVEST_EXHAUSTED_IDENTITY[node.kind];
+      if (exhaustedIdentity) {
+        const col = world.get(targetId, Collider);
+        if (col) world.set(targetId, Collider, { solid: false, blocksSight: false });
+        const ni = world.get(targetId, NamedIdentity);
+        if (ni) world.set(targetId, NamedIdentity, { ...ni, identity: exhaustedIdentity });
       }
 
       world.emit?.("harvest:picked", {

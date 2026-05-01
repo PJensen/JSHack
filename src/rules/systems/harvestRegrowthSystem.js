@@ -7,6 +7,18 @@ import { Changed } from "../../lib/ecs-js/index.js";
 const HARVEST_REGROW_ACTIVE = Symbol.for("jshack:harvestRegrowth:active");
 const HARVEST_REGROW_SEEDED = Symbol.for("jshack:harvestRegrowth:seeded");
 
+const HARVEST_READY_IDENTITY = Object.freeze({
+  iron_ore:      "ore_vein_iron",
+  coal_ore:      "ore_vein_coal",
+  stone:         "ore_vein_stone",
+  berries:       "berry_bush",
+  herbs:         "herb_patch",
+  thorn_bramble: "thorn_bramble",
+  venom_fern:    "venom_fern",
+  moonleaf:      "moonleaf_cluster",
+  ember_root:    "ember_root_patch",
+});
+
 /**
  * @param {import("../../lib/ecs-js/index.js").World} world
  */
@@ -112,6 +124,14 @@ export function harvestRegrowthSystem(world) {
           identity: "mushrooms",
         });
       }
+    }
+    // Ore veins and plant nodes: re-enable collider and restore ready glyph.
+    const readyIdentity = HARVEST_READY_IDENTITY[node.kind];
+    if (readyIdentity) {
+      const col = world.get(id, Collider);
+      if (col) world.set(id, Collider, { solid: true, blocksSight: false });
+      const ni = world.get(id, NamedIdentity);
+      if (ni) world.set(id, NamedIdentity, { ...ni, identity: readyIdentity });
     }
     world.emit?.("harvest:regrown", { id, kind: node.kind });
   }
