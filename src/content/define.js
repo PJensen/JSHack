@@ -209,9 +209,11 @@ export function defineItem(id, def) {
   // Scrolls: charges
   if (def.charges) catalogEntry.charges = def.charges;
 
-  // Hooks
-  if (!hooks) catalogEntry.hooks = {};
-  else catalogEntry.hooks = hooks;
+  // Hooks: merge DSL-compiled hooks with any raw snake_case hooks passed directly
+  catalogEntry.hooks = hooks ? { ...hooks } : {};
+  if (def.hooks && typeof def.hooks === 'object') {
+    Object.assign(catalogEntry.hooks, def.hooks);
+  }
 
   // Auto-generate on_use for items with abilities:
   // When the player "uses" a weapon that has a single ability, dispatch it.
