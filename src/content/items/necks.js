@@ -141,3 +141,23 @@ defineItem('eclipse_torc', {
   description: 'Cast in two halves — fire-gold and frost-silver, fused at the clasp. Hits alternate: sun phase scatters 2 fire damage and burning to all adjacent enemies; moon phase scatters 2 cold damage and frost. Every swing advances the cycle automatically.',
   procPackages: ['moonfireCycle'],
 });
+
+// ── Cursed amulets ────────────────────────────────────────────────────
+
+defineItem('amulet_strangulation', {
+  name: 'Amulet of Strangulation', type: 'neck',
+  glyph: '"', color: '#5a4a4a', glow: '#3a2a2a', scale: 0.55,
+  material: 'iron', rarity: 'magic', beatitude: 'cursed',
+  bonuses: { maxHp: -3 },
+  weight: 0.2,
+  description: 'The chain tightens around your throat. You can feel it constricting.',
+});
+
+defineItem('amulet_aggravation', {
+  name: 'Amulet of Aggravation', type: 'neck',
+  glyph: '"', color: '#c8a870', glow: '#907040', scale: 0.55,
+  material: 'bone', rarity: 'magic', beatitude: 'cursed',
+  bonuses: { defense: -1 },
+  weight: 0.1,
+  description: 'A crude fetish of yellowed bone. Everything in the dungeon knows exactly where you are.',
+});

@@ -180,3 +180,68 @@ defineItem('bloodward_signet', {
   procPackages: ['bloodTithe'],
   weight: 0.06,
 });
+
+// ── Cursed rings ──────────────────────────────────────────────────────
+
+defineItem('ring_hunger', {
+  name: 'Ring of Hunger', type: 'ring',
+  glyph: '◌', color: '#7a6a5a', glow: '#4a3a2a', scale: 0.45,
+  material: 'iron', rarity: 'magic', beatitude: 'cursed',
+  bonuses: { hungerRate: 2 },
+  weight: 0.06,
+  description: 'A dull iron band that gnaws at your stomach. You feel ravenous.',
+});
+
+defineItem('ring_fumbling', {
+  name: 'Ring of Fumbling', type: 'ring',
+  glyph: '◌', color: '#8a7a6a', glow: '#5a4a3a', scale: 0.45,
+  material: 'copper', rarity: 'magic', beatitude: 'cursed',
+  bonuses: { attack: -3 },
+  weight: 0.05,
+  description: 'A tarnished copper ring. Your hands feel clumsy.',
+});
+
+defineItem('ring_weakness', {
+  name: 'Ring of Weakness', type: 'ring',
+  glyph: '◌', color: '#6a6a6a', glow: '#3a3a3a', scale: 0.45,
+  material: 'lead', rarity: 'magic', beatitude: 'cursed',
+  bonuses: { maxHp: -5 },
+  weight: 0.09,
+  description: 'A heavy leaden ring. It saps your vitality.',
+});
+
+defineItem('ring_blindness', {
+  name: 'Ring of Blindness', type: 'ring',
+  glyph: '◌', color: '#2a2a3a', glow: '#1a1a2a', scale: 0.45,
+  material: 'obsidian', rarity: 'magic', beatitude: 'cursed',
+  bonuses: { visionRange: -4 },
+  weight: 0.07,
+  description: 'A ring of polished obsidian. Shadows creep at the edge of your vision.',
+});
+
+defineItem('ring_teleportation', {
+  name: 'Ring of Teleportation', type: 'ring',
+  glyph: '◌', color: '#c0b0e0', glow: '#8080b0', scale: 0.45,
+  material: 'silver', rarity: 'rare', beatitude: 'cursed',
+  bonuses: { luck: -5, visionRange: -2 },
+  weight: 0.05,
+  description: 'A shimmering silver ring. Reality warps and shifts around you.',
+});
+
+defineItem('ring_fragility', {
+  name: 'Ring of Fragility', type: 'ring',
+  glyph: '◌', color: '#c0d8e8', glow: '#8090a8', scale: 0.45,
+  material: 'glass', rarity: 'magic', beatitude: 'cursed',
+  bonuses: { defense: -3, bluntResist: -0.15, slashResist: -0.15 },
+  weight: 0.03,
+  description: 'A brittle glass ring. Your skin feels paper-thin.',
+});
+
+defineItem('ring_mana_drain', {
+  name: 'Ring of Mana Drain', type: 'ring',
+  glyph: '◌', color: '#5a5a7a', glow: '#2a2a4a', scale: 0.45,
+  material: 'lead', rarity: 'magic', beatitude: 'cursed',
+  bonuses: { manaRegen: -1.0, maxMana: -10 },
+  weight: 0.09,
+  description: 'A dull leaden band that devours arcane energy. Your spells wither on your tongue.',
+});

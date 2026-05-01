@@ -18,3 +18,8 @@ import "./boots.js";
 import "./rings.js";
 import "./necks.js";
 import "./offhands.js";
+import "./potions.js";
+import "./spellbooks.js";
+import "./scrolls.js";
+import "./wands.js";
+import "./economy.js";
