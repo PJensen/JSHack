@@ -1,6 +1,15 @@
 import "../../src/content/items/dawnbreaker.js";
 import "../../src/content/items/weapons.js";
 import "../../src/content/items/rangedWeapons.js";
+import "../../src/content/items/armors.js";
+import "../../src/content/items/helms.js";
+import "../../src/content/items/belts.js";
+import "../../src/content/items/gloves.js";
+import "../../src/content/items/legs.js";
+import "../../src/content/items/boots.js";
+import "../../src/content/items/rings.js";
+import "../../src/content/items/necks.js";
+import "../../src/content/items/offhands.js";
 import "../../src/content/items/lodbrokSerpentBoundBreeches.js";
 import "../../src/content/items/potionOfRadiance.js";
 import "../../src/content/items/sunVessel.js";
