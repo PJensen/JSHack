@@ -328,8 +328,146 @@ The Ten Commandments are still in the repository. They haven't been updated. The
 
 ---
 
+## The Holy Sword
+
+The sunsword arrived in mid-April as a commit called *"ADDED: SUNSWORD."*
+
+This is the kind of item that could have been a one-liner — a sword with a fire damage flag, tagged holy, done. Instead there are twelve commits about the sunsword before it stabilizes. *"SUNSWORD: USE (early)." "SUNSWORD BEAM." "BEAM TUNES." "SUNSWORD BEAM DURATION." "PERMA B ON SUNSWORD."* A dedicated DSL expression, `sunsword dsl`, so future items of its type can be authored the same way. A fixed light beam that clips at walls. An abilities system that the sunsword appears to have motivated into existence.
+
+The sunsword emits a beam. The beam has a duration. The beam is holy. The beam stops at walls because the lighting engine can do that now. The beam has its own entry in `getActiveLights` — 0.45 seconds with a fade curve, distinct from the brief flash that spell bolts produce. The developer noted this in the commit message: *"spell:bolt → getActiveLights → brief flash, 0.14s ✓ content:beam:vfx (sunsword only) → _holyBeams in lighting engine → maxAge: 0.45s with fade curve."* That's not a commit message. That's a specification written in past tense after the fact, to document an architectural decision that had just been made.
+
+The barrow wight arrived around the same time — a new monster appropriate to a game that now has a sunsword. Skeletal archers got arrows, because of course they should have had arrows already.
+
+---
+
+## The Sound of Everything
+
+The audio engine had arrived by early April. By late April, it was everywhere.
+
+The commit log from this period is almost entirely audio. Not one system — dozens. Ambient loops that crossfade when you descend into a dungeon. Biome-specific music: forest, meadow, swamp, dungeon, night. Creature voices: a large creature snarl, a cat eating. Status sounds: frozen, electrocuted (then renamed), slimed. A jump scare system, complete with scare range tuning. Channeling sounds. Eating sounds. Spell sounds replaced, then replaced again. Death. Pickup sounds for gems, food, gold, generic items. Door sounds. Chest open. Equip weapon.
+
+*"ADDED: jump scare system."*
+
+That commit is six words and it's a whole design philosophy. A roguelike with jump scares. The developer added a jump scare system, tuned the scare range, and then left it in the game. No commit was needed to explain why — the scare range commit is the explanation. Somebody tested it at various ranges, found the right one, committed the fix. Moving on.
+
+The audio engine got a priority ordering system in late April — *"ADDED: AUDIO ENGINE PRIORITY ORDERING"* — because once you have dozens of sounds competing for channels, some sounds need to win. The engine had grown complicated enough to need a scheduler of its own. A deterministic pitch bucket was added so audio randomization is seeded properly. An audio manifest, an audio downloader tool from he audio engineers dropbox, silence trimming, normalization. The audio work became its own project running parallel to the game.
+
+The audio engine is complex enough now to have non-obvious bugs. That's what it means for a system to be real.
+
+---
+
+## The Status Effects Are Having a Moment
+
+*"CONFUSED (IS SUPER COOL)."*
+
+That commit message, mid-April, is the developer stepping back from the implementation and experiencing it as a player. The confused status effect causes movement to snap in unexpected directions — you intend to go north and you go northeast instead. The visual marker is distinct from stun. There's a float text indicator. The commit before it says *"FIXED VISUAL CONFUSION BETWEEN STUNNED AND CONFUSED"* — the game had two similar CC states, and one of them was being mistaken for the other, and the fix is a dedicated visual language for each.
+
+Entangle — a rooting spell — got its own VFX around the same time. *"ROOTED VFX."* Then a series of commits that read like surgery: *"CC MESSING WITH ENTANGLE." "CHECK ENTANGLE." "FIXED? ORDER G." "ENTANGLE CHURN FINAL." "ENT EARLY."* The collaborator touched entangle and the developer spent several sessions untangling the result. This is a recurring pattern now: CC adds something, the developer fixes the ordering, the sequencing, the interaction with other systems. The collaborator is faster at first implementations. The developer is faster at the second ones.
+
+Spore clouds got fixed twice. Vision range got fixed. The ring of conflict — which makes everything in your LOS target each other — had its LOS behavior adjusted. The combat status space is complex enough now that each effect has to negotiate with all the others, and the negotiations occasionally fail.
+
+---
+
+## Minerals That Think About Light
+
+The gem system had been updated before April — material-specific drops, fourteen new entries in the material catalog. What happened in April was the gems learning to interact with their environment.
+
+*"ADDED: gem dispersion and refraction." "ADDED: new temporal patterns for gems." "ADDED: dark flouro shrine (early)." "ADDED: REACTIVE / ADAPTIVE SHRINE LIGHTING."*
+
+Gems found on the floor now cast light based on their mineral composition. Fluorite glows under high-energy sources. A fluorite socket proc was added — *"Phosphorescent Discharge"* — where killing near a shrine with sufficient standing causes a fluorite stone to manifest at the player's feet. The deity system, the material system, the lighting system, and the kill event pipeline all have to agree for this to work. Four systems. One proc. Six months ago this would have required touching four files and hoping nothing broke. Now it's a data hook.
+
+The developer ran into a subtle bug: *"FIXED: getActiveLights should not be used for certain types of BOLTS!"* Some light sources should flash briefly. Others should linger. Spell bolts and the sunsword's holy beam needed different treatment, and the existing lighting API wasn't distinguishing them. The fix is in the commit message, in full: the architectural boundary was drawn and documented in the same breath.
+
+*"Glints"* arrived. Then *"GLINTS CONTINUED."* Small sparkle VFX for gems and metallic surfaces. The developer who once deleted 12,924 lines of lighting infrastructure was now adding particle sparkles to gem tiles, and it was fine, because the game had earned them.
+
+---
+
+## The Dungeon as Architecture
+
+The dungeon generator has always produced rooms and corridors. In April, the dungeon started producing *places*.
+
+*"ADDED: chain winch, pressure plates, steam vent, bone chime."*
+
+Four dungeon features in one commit. Each one is a mechanical object — something that responds when you interact with it or when something else interacts with it. The hydraulics room, which had existed as a concept since late April, got its portcullis wired to the pressure plinth: stand on the plinth, the gate opens. The pit trap was fixed — *"FIXED: pit-trap now drops you to the floor below as initially intended"* — because the original implementation had been wrong about where dropping into a pit should take you. A void pit variant was added. Two pre-fab rooms appeared in the commit log.
+
+Then: *"ADDED: TARGET DUMMY."* Then *"EFFIGY CONT."*
+
+A target dummy. Something you can hit that doesn't hit back, that exists in the dungeon specifically so you can calibrate how the combat feels. The developer needs this because the combat has become detailed enough — hitstop, recoil, visual slash profiles, tints, cleave — that testing it on live monsters is noisy. The target dummy is a testing instrument that shipped as a game feature.
+
+---
+
+## Fishing
+
+*"FISHING: fishing in normal water tiles is allowed as it is now; we generate a specialized harvest node for better fishing spots — increased the number of fishing turns to 12 — created rare fish(es) that can appear in normal spots, but are somewhat common in fishing spots, a 'fishing spot' (a water tile) now has a VFX-particle swirl, a 'fishing spot' may now be exhausted and replenished on a cooldown. while fishing — other items may be reeled in — added a specialized loot-table entry for fishing nodes. (Soggy Boot, Kelp, Epic Weapon, Legendary Weapon)"*
+
+That single commit message tells you everything about how the developer thinks about features. The feature is complete in one go — mechanics, VFX, exhaustion loop, loot table, edge cases. The parenthetical at the end (Soggy Boot, Kelp, Epic Weapon, Legendary Weapon) is the developer noting, perhaps with some amusement, that the fishing loot table has the full range from garbage to rare.
+
+The fishing rod ended up in the general store. Rain improves the odds. Repeatedly fishing the same spot exhausts the resource. A second commit refined the rod to be tile-aware — you can only fish where there's water. The VFX accumulated incorrectly on visibility changes and was fixed. The fishing spots got their own audio.
+
+Fishing is a contemplative counterpoint to everything else in the game. You stand at the edge of water. You wait twelve turns. Something happens or it doesn't. The game has gods and dungeon traps and a sword that emits holy beams — and also fishing, as a thing you do when you want the game to slow down.
+
+---
+
+## The Enchanting Table
+
+The enchanting system arrived as a pull request — *"feat: add enchanting bench and scroll-based gear enchants"* — which is how the bigger CC contributions appear in the log now. A bench in the dungeon where you can apply scrolls to gear. A dedicated NPC enchanter in the overworld with a reagent economy. Polish and validation fixes in a followup commit. A refactor of the inventory action helpers. Then *"ENCHANTING: adjusting test ++ better isolation"* and *"ENCHANTING: followup legibility and fixes."*
+
+The pattern is legible: CC submits, the developer reviews and follows up. The followup commits are shorter than the original PR and they fix the things CC doesn't know to fix — the ordering, the edge cases, the places where the new system steps on existing assumptions. The merger message is terse: *"Merge pull request #136 from PJensen/copilot/add-gear-enchanting-system."* No editorializing. It works, it's in, moving on.
+
+---
+
+## The World Gets Wider
+
+The overworld had been a village surrounded by terrain. In April it became a region.
+
+*"OVERWORLD: jagged coastline, rivers, ponds; fix biome walkability."*
+
+One commit. Coastlines. Rivers. Ponds. Swamp added. Ocean added. A graveyard stamp. A farm stamp. The town compression commit — *"TOWN COMPRESSION"* — suggests the village got smaller so the world could get bigger around it. Walkways appeared. The fountain got adjusted.
+
+Town gossip arrived: *"TOWN GOSSIP."* The NPCs now have things to say to each other. The overworld that started as a terrain generator with a village attached now has a shoreline you can walk along, a graveyard outside town, a farm by the road, and villagers who gossip. This is what a world feels like — not features stacked on a foundation, but details accumulating until the place has texture.
+
+The developer committed a clock face — *"CLOCK"* — and then fixed the hand sequencing two weeks later. Moon phases are tracked. The quest pulse was moved higher in the display and given a linger time. These are the commits of someone who is playing the game for hours and noticing the small things that don't feel right.
+
+---
+
+## Legendary Items
+
+*"ADDED: lodbrok_serpent_bound_breeches."*
+
+This is a legendary item, and the name is doing all the work. Not "pants of snakes." Not "cursed leggings." The item has a proper noun in it — a person's name, suggesting history, ownership, a story that predates the player's encounter with these breeches. The proc: spectral snakes spawn from an ability, not a passive, with lightning-fast aggression. A fix: *"FIXED: proc nod on lod breeches."* Then *"BUFF: spectral snakes lightning-fast aggression."* Then *"TWEAK SPECTRAL."* The snakes were too slow, then fast enough, then right.
+
+Monsters started carrying gear. *"MOB GEAR." "MORE MONSTER GEAR." "INFER SLOTS FROM ITEM."* The slot inference is the interesting bit — the system can look at an item and figure out where it would be equipped, rather than requiring explicit slot declarations in the monster definition. This is the architecture making content authoring easier, which is still the point.
+
+---
+
+## The Architecture Thinking About Itself
+
+*"ARCH: hasEquippedTag — newer concept for managing behavior modification more succinctly across systems."*
+
+This commit message is the developer pausing to name a pattern. `hasEquippedTag` is a query — does the player have an equipped item with this tag? — and it's powerful enough to replace a whole class of item-behavior conditionals. Instead of each system checking which items are equipped and what their properties are, systems can query for tags. The ring of conflict works by tag. The sunsword's beam behavior works by tag. The item is data; the tag is the interface; the system doesn't need to know what the item is.
+
+The skip-list scheduler is the other architectural event from this period. Fountains and harvest nodes had been running on every tick, which was wasteful. The skip-list lets you schedule a future action — *"check this fountain in N turns"* — and skip all the intervening ticks. Then a series of benchmarking commits: *"BENCH." "BENCH." "BENCH."* followed by performance commits. The developer profiled something, found the bottleneck, fixed it, and committed the benchmark to track whether it stayed fixed.
+
+*"RULES LEAK (CONTAINERS)." "FIXING MORE RULES VIOLATIONS." "MORE RULES LEAKS."*
+
+Three commits in a row about architectural rules being violated — display layer reaching into rules layer, systems calling each other directly. The boundaries are enforced actively, which means they're being found, not just declared. A codebase that has rules it enforces is different from one that has rules it writes down.
+
+---
+
+## What April Built
+
+The closing section of this document, written on April 6th, ended with: *"The Ten Commandments are still in the repository. They haven't been updated. They don't need to be."*
+
+Three weeks later, the game has a holy sword that emits a beam clipped by line-of-sight. It has jump scares. It has fishing. It has legendary breeches that spawn spectral snakes. It has a coastline. It has enchanting. It has fluorite that glows under the right conditions and a deity who rewards you with a stone for killing at their shrine. It has gossip. It has a graveyard stamp and a farm stamp and rivers and ponds and ocean at the edge of the world.
+
+The commit count passed 1,600. The commit messages are still short. The changes are still small. The architecture is still invisible. You edit a file, hit refresh, see your changes — and now you can also go fishing while you do it.
+
+The Ten Commandments remain unedited. The work continues.
+
+---
+
 *The repository is at https://github.com/PJensen/JSHack.*
 *The Ten Commandments are in [TEN_COMMANDMENTS.md](TEN_COMMANDMENTS.md).*
 *The first commit was October 15, 2025.*
-*Today is April 6, 2026.*
+*Today is May 1, 2026.*
 *The work continues.*
