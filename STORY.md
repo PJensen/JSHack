@@ -467,7 +467,7 @@ The Ten Commandments remain unedited. The work continues.
 ---
 
 *The repository is at https://github.com/PJensen/JSHack.*
-*The Ten Commandments are in [TEN_COMMANDMENTS.md](TEN_COMMANDMENTS.md).*
+*The Ten Commandments are in [TEN_COMMANDMENTS.md](docs/arch/TEN_COMMANDMENTS.md).*
 *The first commit was October 15, 2025.*
 *Today is May 1, 2026.*
 *The work continues.*
