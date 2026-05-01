@@ -139,9 +139,9 @@ Deno.test("floor profile respects configured room sparsity", () => {
     const early = generateFloorPlan(42, 1);
     const late = generateFloorPlan(42, 12);
 
-    // Floor 1 has lower sparsity (denser with rooms) - 0.35 * 0.4 = 0.14
-    const expectedFloor1Sparsity = 0.35 * 0.4;
-    assert(early.profile.roomSparsity < 0.35, `floor 1 should be denser (lower sparsity); got ${early.profile.roomSparsity}`);
+    // Floor 1 has higher sparsity (sparser) - 0.35 * 2.0 = 0.70
+    const expectedFloor1Sparsity = 0.35 * 2.0;
+    assert(early.profile.roomSparsity > 0.35, `floor 1 should be sparser (higher sparsity); got ${early.profile.roomSparsity}`);
     assert(Math.abs(early.profile.roomSparsity - expectedFloor1Sparsity) < 0.001, `floor 1 sparsity should be ~${expectedFloor1Sparsity}; got ${early.profile.roomSparsity}`);
     assert(late.profile.roomSparsity === 0.35, `deeper floors should preserve configured room sparsity; got ${late.profile.roomSparsity}`);
     assert(extentChunkCount(early) < extentChunkCount(late), 'later floors should span a larger footprint');
