@@ -10,8 +10,8 @@ open an issue first and let's talk about it.
 
 Please read these two documents, hard lessons were learned:
 
-- **[TEN_COMMANDMENTS.md](TEN_COMMANDMENTS.md)** — The project constraints. These are hard rules.
-- **[SEPARATION_MANIFEST.md](SEPARATION_MANIFEST.md)** — The layer boundaries between rules and display.
+- **[TEN_COMMANDMENTS.md](docs/arch/TEN_COMMANDMENTS.md)** — The project constraints. These are hard rules.
+- **[SEPARATION_MANIFEST.md](docs/arch/SEPARATION_MANIFEST.md)** — The layer boundaries between rules and display.
 
 If your change violates either of these, it won't be merged.
 

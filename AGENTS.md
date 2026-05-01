@@ -2,7 +2,7 @@
 
 JSHack is a hackable, zero-dependency, browser-based roguelike engine built with pure JavaScript and Entity-Component-System (ECS) architecture. This document provides autonomous agents, copilots, and automated operators with the context needed to understand, maintain, and extend the codebase without fighting the architecture or violating its core principles.
 
-Think of this as the field manual for working with JSHack. For API details and conceptual deep dives, see [README.md](README.md). For architectural boundaries, see [SEPARATION_MANIFEST.md](SEPARATION_MANIFEST.md). For project philosophy and constraints, see [TEN_COMMANDMENTS.md](TEN_COMMANDMENTS.md). For runtime multiplicity and entity hierarchy rules, see [RUNTIME_TOPOLOGY_DOCTRINE.md](RUNTIME_TOPOLOGY_DOCTRINE.md). When you need to keep the project humming without derailing it, stay here.
+Think of this as the field manual for working with JSHack. For API details and conceptual deep dives, see [README.md](README.md). For architectural boundaries, see [SEPARATION_MANIFEST.md](docs/arch/SEPARATION_MANIFEST.md). For project philosophy and constraints, see [TEN_COMMANDMENTS.md](docs/arch/TEN_COMMANDMENTS.md). For runtime multiplicity and entity hierarchy rules, see [RUNTIME_TOPOLOGY_DOCTRINE.md](docs/arch/RUNTIME_TOPOLOGY_DOCTRINE.md). When you need to keep the project humming without derailing it, stay here.
 
 ---
 
@@ -12,7 +12,7 @@ Think of this as the field manual for working with JSHack. For API details and c
 
 - **Zero build step**: Pure ES modules. Edit a file, refresh the browser. No webpack, no babel, no transpilation. Perfect for iterative agent-driven development. **We will NEVER add a build step.**
 - **Deterministic core**: Seeded RNG (`0xC0FFEE`, `0xa77a77`) means every run is reproducible. Given the same seed and input sequence, the simulation produces identical results.
-- **Strict separation**: Three-layer architecture (`rules/` → `bridge/` → `display/`) with enforced boundaries. **Church (visuals) and State (rules) are separated** per [SEPARATION_MANIFEST.md](SEPARATION_MANIFEST.md). Rules are pure logic, display is pure presentation, bridge is the contract.
+- **Strict separation**: Three-layer architecture (`rules/` → `bridge/` → `display/`) with enforced boundaries. **Church (visuals) and State (rules) are separated** per [SEPARATION_MANIFEST.md](docs/arch/SEPARATION_MANIFEST.md). Rules are pure logic, display is pure presentation, bridge is the contract.
 - **ECS architecture**: Built on [ecs-js](src/lib/ecs-js/), which has its own [AGENTS.md](src/lib/ecs-js/AGENTS.md). **Read and know the ecs-js AGENTS.md**. Composable systems, reusable components, archetype-based spawning. **ECS-js is an external library (vendored as a module)** - changes here must truly be bugs in the architecture, not feature additions.
 - **One file = one idea**: Modular design where each file has a single, clear purpose. Easy to locate, read, and modify.
 - **Mobile-first roguelike**: **Touch is primary, phone is the default platform.** Desktop keyboard is secondary. All UX decisions prioritize touch/mobile experience.
@@ -21,19 +21,19 @@ Think of this as the field manual for working with JSHack. For API details and c
 
 ### Critical constraints (read this twice)
 
-JSHack has burned twice (Oct 23 and Nov 6, 2025) by violating these constraints. The [TEN_COMMANDMENTS.md](TEN_COMMANDMENTS.md) exists because the same mistakes were made repeatedly. **Agents must internalize these rules**:
+JSHack has burned twice (Oct 23 and Nov 6, 2025) by violating these constraints. The [TEN_COMMANDMENTS.md](docs/arch/TEN_COMMANDMENTS.md) exists because the same mistakes were made repeatedly. **Agents must internalize these rules**:
 
 **Meta-constraints (never violate these):**
 
 0. **Know and use ecs-js**: Read [ecs-js/AGENTS.md](src/lib/ecs-js/AGENTS.md) before touching any ECS code. ECS-js is an external library vendored as a module. **Only modify ecs-js if you find a genuine architecture bug.** Do not add features to ecs-js; add them to JSHack's rules layer instead.
 0.1. **No system-to-system calls**: Systems never call other systems directly. Use events (`world.emit` / `world.on`) for inter-system communication. When installing event listeners, **use a Symbol to track installation status** and check it before re-installing. Symbol names must be clear and domain-specific (e.g., `Symbol.for('jshack:affixTriggers:installed')`).
 0.2. **Mobile-first always**: We are building a **mobile-first roguelike**. Touch is primary, phones are the target device. Desktop keyboard is a secondary convenience. Every UX decision must work on mobile first.
-0.3. **Separation is law**: Read [SEPARATION_MANIFEST.md](SEPARATION_MANIFEST.md). Church (visuals in `display/`) and State (logic in `rules/`) are absolutely separated. Never mix them.
+0.3. **Separation is law**: Read [SEPARATION_MANIFEST.md](docs/arch/SEPARATION_MANIFEST.md). Church (visuals in `display/`) and State (logic in `rules/`) are absolutely separated. Never mix them.
 0.4. **Hacking is the point**: We are **absolutely HACKING and having fun exploiting JavaScript**. Clever tricks are encouraged. Over-engineering is not. Push the language, don't fight it.
 0.5. **No build step, ever**: Pure ES modules, no transpilation, no bundling. This is non-negotiable.
 0.6. **Deno, not Node**: All tooling, testing, and scripts use Deno. If you write a test or utility script, it runs on Deno.
 0.7. **CANNON, not release valves**: For each domain operation, there must be one canonical implementation path. Every alternate entry point must delegate to it and stay parity-tested.
-0.8. **Runtime topology is attached entities**: Runtime multiplicity belongs in parent/child entity topology, not hidden arrays on one component. Components describe flat facts; hierarchy describes containment and attachment; resolvers derive views. Read [RUNTIME_TOPOLOGY_DOCTRINE.md](RUNTIME_TOPOLOGY_DOCTRINE.md) before adding systems that create effects, enchantments, sockets, equipment slots, procs, or other repeatable runtime objects.
+0.8. **Runtime topology is attached entities**: Runtime multiplicity belongs in parent/child entity topology, not hidden arrays on one component. Components describe flat facts; hierarchy describes containment and attachment; resolvers derive views. Read [RUNTIME_TOPOLOGY_DOCTRINE.md](docs/arch/RUNTIME_TOPOLOGY_DOCTRINE.md) before adding systems that create effects, enchantments, sockets, equipment slots, procs, or other repeatable runtime objects.
 
 **Game-specific constraints (keep the roguelike pure):**
 
@@ -138,7 +138,7 @@ socket arrays, or `ItemInfo.affixes[]` may remain temporarily as compatibility
 state, but they are not precedent for new runtime topology. Touched systems
 should migrate toward child entities behind canonical facades and resolvers.
 
-See [RUNTIME_TOPOLOGY_DOCTRINE.md](RUNTIME_TOPOLOGY_DOCTRINE.md) for migration
+See [RUNTIME_TOPOLOGY_DOCTRINE.md](docs/arch/RUNTIME_TOPOLOGY_DOCTRINE.md) for migration
 targets and traversal helper guidance.
 
 ---
@@ -1168,7 +1168,7 @@ No force-push to master. No amend on pushed commits.
 
 **Symptom**: `import ... from '../../display/...'` in rules/
 
-**Fix**: Remove the import. This violates [SEPARATION_MANIFEST.md](SEPARATION_MANIFEST.md). **Church (display) and State (rules) are separated.** Use events or WorldView to communicate.
+**Fix**: Remove the import. This violates [SEPARATION_MANIFEST.md](docs/arch/SEPARATION_MANIFEST.md). **Church (display) and State (rules) are separated.** Use events or WorldView to communicate.
 
 ### System calling another system directly
 
@@ -1270,8 +1270,8 @@ if (!world[INSTALLED]) {
 
 ### When stuck
 
-1. Read the constraints ([TEN_COMMANDMENTS.md](TEN_COMMANDMENTS.md))
-2. Check separation boundaries ([SEPARATION_MANIFEST.md](SEPARATION_MANIFEST.md))
+1. Read the constraints ([TEN_COMMANDMENTS.md](docs/arch/TEN_COMMANDMENTS.md))
+2. Check separation boundaries ([SEPARATION_MANIFEST.md](docs/arch/SEPARATION_MANIFEST.md))
 3. Ask: "Is this a gameplay feature or an engine feature?"
 4. If engine, consider whether it's actually needed
 5. If uncertain, walk away and return fresh
@@ -1283,8 +1283,8 @@ if (!world[INSTALLED]) {
 ### Required reading (read these first)
 
 - **[ecs-js AGENTS.md](src/lib/ecs-js/AGENTS.md)**: ECS-specific agent guidance. **Know this before touching any ECS code.**
-- **[TEN_COMMANDMENTS.md](TEN_COMMANDMENTS.md)**: Project philosophy and constraints. The project burned twice ignoring these.
-- **[SEPARATION_MANIFEST.md](SEPARATION_MANIFEST.md)**: Layer boundaries and import rules. Church vs State separation.
+- **[TEN_COMMANDMENTS.md](docs/arch/TEN_COMMANDMENTS.md)**: Project philosophy and constraints. The project burned twice ignoring these.
+- **[SEPARATION_MANIFEST.md](docs/arch/SEPARATION_MANIFEST.md)**: Layer boundaries and import rules. Church vs State separation.
 
 ### Reference documentation
 

@@ -162,7 +162,7 @@ The deterministic simulation lives in `rules/`. Rendering, particles, camera, UI
 
 The rules layer has zero DOM, zero rendering, and zero async code. It is pure, testable game logic. The display layer consumes stable snapshots and renders them.
 
-See [SEPARATION_MANIFEST.md](SEPARATION_MANIFEST.md) for the philosophy.
+See [SEPARATION_MANIFEST.md](docs/arch/SEPARATION_MANIFEST.md) for the philosophy.
 
 ### Built to be hacked
 
@@ -438,7 +438,7 @@ JSHack/
 
 Import boundaries enforce separation. Rules cannot import Display. Display cannot import Rules. Bridge is the contract.
 
-See [SEPARATION_MANIFEST.md](SEPARATION_MANIFEST.md) for details.
+See [SEPARATION_MANIFEST.md](docs/arch/SEPARATION_MANIFEST.md) for details.
 
 ---
 
@@ -598,7 +598,7 @@ Contributions that align with the project's vision are welcome.
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) for setup, guidelines, and expectations.
 
-The short version: keep it simple, test your changes, and do not break the constraints in [TEN_COMMANDMENTS.md](TEN_COMMANDMENTS.md).
+The short version: keep it simple, test your changes, and do not break the constraints in [TEN_COMMANDMENTS.md](docs/arch/TEN_COMMANDMENTS.md).
 
 ---
 
@@ -625,8 +625,8 @@ Key constraints:
 ### Documentation
 
 * [AGENTS.md](AGENTS.md) — Guide for AI agents and autonomous operators
-* [TEN_COMMANDMENTS.md](TEN_COMMANDMENTS.md) — Project philosophy and constraints
-* [SEPARATION_MANIFEST.md](SEPARATION_MANIFEST.md) — Layer boundaries and import rules
+* [TEN_COMMANDMENTS.md](docs/arch/TEN_COMMANDMENTS.md) — Project philosophy and constraints
+* [SEPARATION_MANIFEST.md](docs/arch/SEPARATION_MANIFEST.md) — Layer boundaries and import rules
 * [ecs-js](http://github.com/pjensen/ecs-js) — Canonical ECS library
 * [ecs-js README](src/lib/ecs-js/README.md) — Vendored ECS core API docs
 * [ecs-js AGENTS.md](src/lib/ecs-js/AGENTS.md) — ECS-specific guidance
