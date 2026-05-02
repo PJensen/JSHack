@@ -4,6 +4,7 @@
 import { perlin2, buildPermutation, fbm01 } from "./generators/noise.js";
 import { applyTownPlacement } from "./townPlacement.js";
 import { pickSpecificMonster } from "./tables.js";
+import { isRoofed } from "./tileMap.js";
 import {
   CHUNK_SIZE,
   TILE_FLOOR,
@@ -533,7 +534,18 @@ export function addSpawn(chunks, x, y, kind, params = {}) {
 
 function setStructureTile(chunks, x, y, tile, roofed = false) {
   setWorldTile(chunks, x, y, tile);
-  setRoofed(x, y, roofed);
+  if (roofed) {
+    const cx = Math.floor(x / CHUNK_SIZE);
+    const cy = Math.floor(y / CHUNK_SIZE);
+    const chunk = chunks.get(chunkKey(cx, cy));
+    if (chunk?.roofed) {
+      const lx = x - cx * CHUNK_SIZE;
+      const ly = y - cy * CHUNK_SIZE;
+      if (lx >= 0 && ly >= 0 && lx < CHUNK_SIZE && ly < CHUNK_SIZE) {
+        chunk.roofed[ly * CHUNK_SIZE + lx] = 1;
+      }
+    }
+  }
 }
 
 /**
@@ -946,7 +958,21 @@ const _yieldFrame = () => {
   return Promise.resolve();
 };
 
+const _owCache = new Map();
+
 export async function generateOverworldChunks(worldSeed, onPlanProgress = null) {
+  if (!onPlanProgress) {
+    const key = worldSeed >>> 0;
+    if (!_owCache.has(key)) _owCache.set(key, _generateOverworldChunks(worldSeed, null));
+    const cached = await _owCache.get(key);
+    // Return fresh tile/roofed copies — loadChunk stores Uint8Array references, and setTile
+    // mutates them in-place. Without copies, test mutations corrupt the cache.
+    return { ...cached, chunks: cached.chunks.map(c => ({ ...c, tiles: Uint8Array.from(c.tiles), roofed: c.roofed ? Uint8Array.from(c.roofed) : null })) };
+  }
+  return _generateOverworldChunks(worldSeed, onPlanProgress);
+}
+
+async function _generateOverworldChunks(worldSeed, onPlanProgress) {
   const _emit = (label, step, total) => {
     if (typeof onPlanProgress === 'function') {
       onPlanProgress({ phase: 'plan', label, step, total });
@@ -980,6 +1006,7 @@ export async function generateOverworldChunks(worldSeed, onPlanProgress = null) 
         chunkX: cx,
         chunkY: cy,
         tiles: new Uint8Array(CHUNK_SIZE * CHUNK_SIZE),
+        roofed: new Uint8Array(CHUNK_SIZE * CHUNK_SIZE),
         spawns: [],
       };
       chunks.set(chunkKey(cx, cy), rec);
@@ -1042,12 +1069,21 @@ export async function generateOverworldChunks(worldSeed, onPlanProgress = null) 
 
   const outChunks = [];
   for (const rec of chunks.values()) {
+    const ox = rec.chunkX * CHUNK_SIZE;
+    const oy = rec.chunkY * CHUNK_SIZE;
+    const roofed = rec.roofed;
+    for (let ly = 0; ly < CHUNK_SIZE; ly++) {
+      for (let lx = 0; lx < CHUNK_SIZE; lx++) {
+        if (isRoofed(ox + lx, oy + ly)) roofed[ly * CHUNK_SIZE + lx] = 1;
+      }
+    }
     outChunks.push({
       chunkX: rec.chunkX,
       chunkY: rec.chunkY,
       depth: 0,
       seed: worldSeed >>> 0,
       tiles: rec.tiles,
+      roofed,
       rooms: [],
       doors: [],
       spawns: rec.spawns,
