@@ -1,3 +1,4 @@
+import "./helpers/installContentCatalog.mjs";
 import { assert, assertEquals } from "jsr:@std/assert";
 import { createFrom, World } from "../src/lib/ecs-js/index.js";
 import { EnchantingBench } from "../src/rules/archetypes/Overworld.js";

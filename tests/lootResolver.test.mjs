@@ -1,3 +1,4 @@
+import "./helpers/installContentCatalog.mjs";
 import { assert, assertEquals } from "jsr:@std/assert";
 import { createRng } from "../src/lib/ecs-js/rng.js";
 import { resolveLootTable } from "../src/rules/data/lootResolver.js";

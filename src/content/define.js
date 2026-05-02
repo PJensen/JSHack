@@ -141,6 +141,9 @@ export function defineItem(id, def) {
     if (def.beatitude) catalogEntry.beatitude = def.beatitude;
     if (Array.isArray(def.procPackages) && def.procPackages.length > 0) catalogEntry.procPackages = def.procPackages.slice();
     if (def.tags) catalogEntry.tags = def.tags;
+    if (def.maxCharges != null) catalogEntry.maxCharges = def.maxCharges;
+    if (def.charges != null) catalogEntry.charges = def.charges;
+    if (def.dropRequirement) catalogEntry.dropRequirement = def.dropRequirement;
 
     // Swing profile — authored weapon VFX identity
     if (def.swingProfile) {
@@ -205,10 +208,14 @@ export function defineItem(id, def) {
 
   // Scrolls: charges
   if (def.charges) catalogEntry.charges = def.charges;
+  if (def.noQuickChip) catalogEntry.noQuickChip = true;
+  if (def.beatitude && catalogKind !== 'equipment') catalogEntry.beatitude = def.beatitude;
 
-  // Hooks
-  if (!hooks) catalogEntry.hooks = {};
-  else catalogEntry.hooks = hooks;
+  // Hooks: merge DSL-compiled hooks with any raw snake_case hooks passed directly
+  catalogEntry.hooks = hooks ? { ...hooks } : {};
+  if (def.hooks && typeof def.hooks === 'object') {
+    Object.assign(catalogEntry.hooks, def.hooks);
+  }
 
   // Auto-generate on_use for items with abilities:
   // When the player "uses" a weapon that has a single ability, dispatch it.
@@ -273,6 +280,7 @@ export function defineItem(id, def) {
     if (def.color) paletteEntry.fg = def.color;
     paletteEntry.glow = def.glow || def.color || null;
     if (def.scale != null) paletteEntry.baseScale = def.scale;
+    if (Array.isArray(def.layers)) paletteEntry.layers = def.layers;
     registerPalette(id, paletteEntry);
   }
 

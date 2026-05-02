@@ -1,3 +1,4 @@
+import "./helpers/installContentCatalog.mjs";
 // tests/aiTownfolk.test.mjs
 // Townfolk NPC AI: state machine transitions, tile effects, depth gating.
 

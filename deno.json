@@ -7,6 +7,8 @@
   },
   "tasks": {
     "test": "deno test --no-check --allow-read",
+    "test:fast": "deno test --no-check --allow-read --ignore=tests/nav.test.mjs,tests/overworld.test.mjs,tests/transitionInventory.test.mjs,tests/shopDoorKeys.test.mjs,tests/prefabRoom.test.mjs,tests/overworldStructures.test.mjs,tests/overworldRoofView.test.mjs,tests/overworldResourceSpawning.test.mjs,tests/savegameLoad.test.mjs,tests/hazardSystem.test.mjs,tests/worldViewFovReset.test.mjs,tests/transition.test.mjs,tests/runContract.test.mjs,tests/populate.test.mjs",
+    "test:slow": "deno test --no-check --allow-read tests/nav.test.mjs tests/overworld.test.mjs tests/transitionInventory.test.mjs tests/shopDoorKeys.test.mjs tests/prefabRoom.test.mjs tests/overworldStructures.test.mjs tests/overworldRoofView.test.mjs tests/overworldResourceSpawning.test.mjs tests/savegameLoad.test.mjs tests/hazardSystem.test.mjs tests/worldViewFovReset.test.mjs tests/transition.test.mjs tests/runContract.test.mjs tests/populate.test.mjs",
     "coverage": "deno test --no-check --allow-read --coverage=coverage/ && deno coverage coverage/ --lcov --output=coverage.lcov",
     "bench": "deno bench --no-check --allow-read tests/perf/*.bench.mjs",
     "headless": "deno run --no-check --allow-read tools/headless-runner.mjs",

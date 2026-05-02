@@ -1,3 +1,4 @@
+import "./helpers/installContentCatalog.mjs";
 // tests/prefabRoom.test.mjs
 // Tests for prefab room integration into dungeon generation.
 

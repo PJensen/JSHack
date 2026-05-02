@@ -94,9 +94,25 @@ export function inferItemCategory(type) {
     case 'wand':
       return { catalogKind: 'magic', slot: 'bag', itemType: 'wand' };
     case 'food':
-      return { catalogKind: 'magic', slot: 'bag', itemType: 'food' };
+      return { catalogKind: 'food', slot: 'bag', itemType: 'food' };
     case 'tool':
       return { catalogKind: 'magic', slot: 'bag', itemType: 'tool' };
+    case 'learn':
+      return { catalogKind: 'magic', slot: 'bag', itemType: 'learn' };
+    case 'book':
+      return { catalogKind: 'magic', slot: 'bag', itemType: 'book' };
+    case 'material':
+      return { catalogKind: 'material', slot: 'bag', itemType: 'material' };
+    case 'ingredient':
+      return { catalogKind: 'material', slot: 'bag', itemType: 'ingredient' };
+    case 'seed':
+      return { catalogKind: 'seed', slot: 'bag', itemType: 'seed' };
+    case 'utility':
+      return { catalogKind: 'utility', slot: 'bag', itemType: 'utility' };
+    case 'fuel':
+      return { catalogKind: 'fuel', slot: 'bag', itemType: 'fuel' };
+    case 'junk':
+      return { catalogKind: 'junk', slot: 'bag', itemType: 'junk' };
     default:
       return { catalogKind: 'magic', slot: 'bag', itemType: t || 'item' };
   }
@@ -117,8 +133,10 @@ export const RARITY = Object.freeze({
   uncommon:  { rarity: 2, rarityName: 'uncommon' },
   magic:     { rarity: 2, rarityName: 'magic' },
   rare:      { rarity: 3, rarityName: 'rare' },
+  unique:    { rarity: 3, rarityName: 'unique' },
   epic:      { rarity: 4, rarityName: 'epic' },
   legendary: { rarity: 5, rarityName: 'legendary' },
+  artifact:  { rarity: 5, rarityName: 'artifact' },
 });
 
 /**

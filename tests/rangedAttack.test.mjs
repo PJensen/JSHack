@@ -1,3 +1,4 @@
+import "./helpers/installContentCatalog.mjs";
 import { assert, assertEquals } from "jsr:@std/assert";
 import { children, World } from '../src/lib/ecs-js/index.js';
 import { Position } from '../src/rules/components/Position.js';

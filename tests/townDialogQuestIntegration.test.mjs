@@ -1,3 +1,4 @@
+import "./helpers/installContentCatalog.mjs";
 import { assertEquals, assert } from "jsr:@std/assert";
 import { World, composeScheduler } from "../src/lib/ecs-js/index.js";
 import { buildCatalogItem } from "../src/rules/data/itemCatalogLoader.js";
