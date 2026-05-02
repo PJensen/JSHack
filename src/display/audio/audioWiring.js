@@ -971,6 +971,10 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     sfxAt(PUSH_STONE_SOUND_ID, pos, pp(), { priority: 1 }, zg());
   });
 
+  world.on('tile:dug', ({ x, y }) => {
+    sfxAt(PUSH_STONE_SOUND_ID, { x, y }, pp(), { priority: 1 }, zg());
+  });
+
   world.on('status', (payload) => {
     const { id, kind, at } = payload || {};
     if (kind === 'alert') {
