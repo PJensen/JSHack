@@ -318,17 +318,7 @@ installChannelingController(world, () => (playerEntity(world)?.id || 0));
 bootAdvance("Configured ECS systems");
 
 // ---- Content DSL: load all scripted content, then install into engine -------
-import './content/items/potionOfRadiance.js';
-import './content/items/sunVessel.js';
-import './content/items/dawnbreaker.js';
-import './content/items/sunsword.js';
-import './content/items/fishingRod.js';
-import './content/items/lodbrokSerpentBoundBreeches.js';
-import './content/items/potions.js';
-import './content/items/spellbooks.js';
-import './content/items/scrolls.js';
-import './content/items/wands.js';
-import './content/items/economy.js';
+import './content/items/index.js';
 import './content/monsters/barrowWight.js';
 import { installContent } from './content/install.js';
 import { getUseAction } from './rules/content/useActions/useActionRegistry.js';
