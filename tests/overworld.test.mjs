@@ -1,3 +1,4 @@
+import "./helpers/installContentCatalog.mjs";
 import { assert } from "jsr:@std/assert";
 import "../src/content/items/index.js";
 import { installContent } from "../src/content/install.js";

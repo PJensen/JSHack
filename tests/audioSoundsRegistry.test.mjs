@@ -1,3 +1,4 @@
+import "./helpers/installContentCatalog.mjs";
 import { assert, assertEquals, assertExists } from "jsr:@std/assert";
 import { allUrls, resolve, resolveUrls } from "../src/display/audio/sounds.js";
 

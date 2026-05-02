@@ -1,3 +1,4 @@
+import "./helpers/installContentCatalog.mjs";
 import { assert } from "jsr:@std/assert";
 
 const KNOWN_LEGACY_ARRAYS = Object.freeze([
