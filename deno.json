@@ -7,6 +7,7 @@
   },
   "tasks": {
     "test": "deno test --no-check --allow-read",
+    "test:fast": "deno test --no-check --allow-read --ignore=tests/nav.test.mjs,tests/overworld.test.mjs,tests/transitionInventory.test.mjs,tests/shopDoorKeys.test.mjs,tests/prefabRoom.test.mjs",
     "coverage": "deno test --no-check --allow-read --coverage=coverage/ && deno coverage coverage/ --lcov --output=coverage.lcov",
     "bench": "deno bench --no-check --allow-read tests/perf/*.bench.mjs",
     "headless": "deno run --no-check --allow-read tools/headless-runner.mjs",
