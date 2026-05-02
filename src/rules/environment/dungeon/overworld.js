@@ -4,7 +4,7 @@
 import { perlin2, buildPermutation, fbm01 } from "./generators/noise.js";
 import { applyTownPlacement } from "./townPlacement.js";
 import { pickSpecificMonster } from "./tables.js";
-import { isRoofed } from "./tileMap.js";
+import { exportRoofedChunk } from "./tileMap.js";
 import {
   CHUNK_SIZE,
   TILE_FLOOR,
@@ -1006,7 +1006,6 @@ async function _generateOverworldChunks(worldSeed, onPlanProgress) {
         chunkX: cx,
         chunkY: cy,
         tiles: new Uint8Array(CHUNK_SIZE * CHUNK_SIZE),
-        roofed: new Uint8Array(CHUNK_SIZE * CHUNK_SIZE),
         spawns: [],
       };
       chunks.set(chunkKey(cx, cy), rec);
@@ -1069,21 +1068,13 @@ async function _generateOverworldChunks(worldSeed, onPlanProgress) {
 
   const outChunks = [];
   for (const rec of chunks.values()) {
-    const ox = rec.chunkX * CHUNK_SIZE;
-    const oy = rec.chunkY * CHUNK_SIZE;
-    const roofed = rec.roofed;
-    for (let ly = 0; ly < CHUNK_SIZE; ly++) {
-      for (let lx = 0; lx < CHUNK_SIZE; lx++) {
-        if (isRoofed(ox + lx, oy + ly)) roofed[ly * CHUNK_SIZE + lx] = 1;
-      }
-    }
     outChunks.push({
       chunkX: rec.chunkX,
       chunkY: rec.chunkY,
       depth: 0,
       seed: worldSeed >>> 0,
       tiles: rec.tiles,
-      roofed,
+      roofed: exportRoofedChunk(rec.chunkX, rec.chunkY),
       rooms: [],
       doors: [],
       spawns: rec.spawns,

@@ -126,6 +126,19 @@ export function loadChunk(cx, cy, tiles) {
   _chunks.set(_key(cx, cy), tiles);
 }
 
+/** Returns a copy of the roofed bitmap for a chunk, or null if not present. */
+export function exportRoofedChunk(cx, cy) {
+  const arr = _roofed.get(_key(cx, cy));
+  return arr ? Uint8Array.from(arr) : null;
+}
+
+/** Bulk-loads a pre-computed roofed bitmap for a chunk (skips per-tile setRoofed overhead). */
+export function loadRoofedChunk(cx, cy, roofed) {
+  if (!roofed) return;
+  _roofed.set(_key(cx, cy), roofed);
+  _roofedVersion++;
+}
+
 /**
  * Remove a chunk's tile data.
  * @param {number} cx

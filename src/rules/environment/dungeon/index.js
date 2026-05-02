@@ -37,7 +37,7 @@ import { createRng } from '../../../lib/ecs-js/rng.js';
 import { createFrom } from '../../../lib/ecs-js/archetype.js';
 import { StairDown, StairUp } from '../../archetypes/Stairs.js';
 import { CHUNK_SIZE, TILE_VOID, TILE_WALL, TILE_FLOOR, TILE_STAIR_DOWN, TILE_STAIR_UP } from './constants.js';
-import { loadChunk as tileMapLoad, clearAll as clearTileMap, setRoofed } from './tileMap.js';
+import { loadChunk as tileMapLoad, clearAll as clearTileMap, loadRoofedChunk } from './tileMap.js';
 import { clearExplored } from './exploredMap.js';
 import { clearPerceptionMemory } from './perceptionMemory.js';
 import { ensureCalendarState } from '../../utils/calendarState.js';
@@ -167,12 +167,7 @@ export async function generateFloor(world, worldSeed, depth, tombstoneRepo = nul
     const allEntityIds = [];
     for (const chunkData of ow.chunks) {
       tileMapLoad(chunkData.chunkX, chunkData.chunkY, chunkData.tiles);
-      if (chunkData.roofed) {
-        const ox = chunkData.chunkX * CHUNK_SIZE, oy = chunkData.chunkY * CHUNK_SIZE;
-        for (let i = 0; i < chunkData.roofed.length; i++) {
-          if (chunkData.roofed[i]) setRoofed(ox + (i % CHUNK_SIZE), oy + Math.floor(i / CHUNK_SIZE), true);
-        }
-      }
+      loadRoofedChunk(chunkData.chunkX, chunkData.chunkY, chunkData.roofed);
       const ids = materializeChunk(world, chunkData, stairOpts);
       allEntityIds.push(...ids);
       processedChunks++;

@@ -1040,6 +1040,14 @@ export function buildWorldView(world) {
 			if (harvestNode && String(harvestNode.kind || "") === "fishing_spot" && harvestNode.ready !== true) {
 				kind = "fishing_spot_depleted";
 			}
+			if (harvestNode && harvestNode.ready !== true && Number(harvestNode.regrowCountdown || 0) > 0) {
+				const _hk = String(harvestNode.kind || "");
+				if (_hk === "iron_ore") kind = "ore_vein_iron_exhausted";
+				else if (_hk === "coal_ore") kind = "ore_vein_coal_exhausted";
+				else if (_hk === "stone") kind = "ore_vein_stone_exhausted";
+				else if (_hk === "berries" || _hk === "herbs" || _hk === "thorn_bramble" ||
+				         _hk === "venom_fern" || _hk === "moonleaf" || _hk === "ember_root") kind = "harvest_node_bare";
+			}
 
 			let layer = 300; // actors
 			if (itemInfo) layer = 250; // items/ground (above doors/stairs, below actors)
@@ -1155,6 +1163,14 @@ export function buildWorldView(world) {
 			const harvestNode2 = /** @type {any} */ (world.get(id, HarvestNode));
 			if (harvestNode2 && String(harvestNode2.kind || "") === "fishing_spot" && harvestNode2.ready !== true) {
 				kind = "fishing_spot_depleted";
+			}
+			if (harvestNode2 && harvestNode2.ready !== true && Number(harvestNode2.regrowCountdown || 0) > 0) {
+				const _hk2 = String(harvestNode2.kind || "");
+				if (_hk2 === "iron_ore") kind = "ore_vein_iron_exhausted";
+				else if (_hk2 === "coal_ore") kind = "ore_vein_coal_exhausted";
+				else if (_hk2 === "stone") kind = "ore_vein_stone_exhausted";
+				else if (_hk2 === "berries" || _hk2 === "herbs" || _hk2 === "thorn_bramble" ||
+				         _hk2 === "venom_fern" || _hk2 === "moonleaf" || _hk2 === "ember_root") kind = "harvest_node_bare";
 			}
 
 			let layer = 300; // actors

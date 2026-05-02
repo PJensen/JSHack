@@ -165,6 +165,7 @@ When adding emergent gameplay interactions (materials, status interactions, item
 - Define trigger conditions as data (e.g., `sourceStatuses`) instead of hardcoded `if` helpers per status.
 - For item reactions, handle both containment scopes explicitly: items on the ground and items in inventories/equipment.
 - Do not keep legacy/back-compat shims in rules code unless explicitly requested for migration.
+- Do not write save-game migration or compatibility code. There are no live players; all old saves can be discarded.
 
 This keeps mechanics scalable as content grows (many statuses, many materials) without exploding system count.
 
