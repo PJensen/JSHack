@@ -141,7 +141,7 @@ Deno.test("overworld stash chest and harvest states persist across transitions",
   let harvest2 = 0;
   for (const [id, ni, pos] of world.query(NamedIdentity, Position)) {
     if (ni.name === "Stash Chest") chest2 = id;
-    if (!harvest2 && (ni.identity === "berry_bush" || ni.identity === "herb_patch")) {
+    if (!harvest2) {
       const hn = world.get(id, HarvestNode);
       if (hn?.kind === harvestKind && pos.x === harvestPos.x && pos.y === harvestPos.y) {
         harvest2 = id;
