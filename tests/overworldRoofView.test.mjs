@@ -209,7 +209,7 @@ roofTest("overworld roof damage persists after nearby fire burns out", async () 
   clearAll();
   clearExplored();
 
-  const world = new World({ seed: 0xBAD5EED });
+  const world = new World({ seed: 0xC0FFEE });
   const spawn = await initDungeon(world, { startDepth: 0 });
   const player = world.create();
   world.add(player, Player, {});

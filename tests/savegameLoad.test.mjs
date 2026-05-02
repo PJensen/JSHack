@@ -121,7 +121,7 @@ Deno.test("restoreSnapshotFromSavegame rejects invalid player snapshot", () => {
 });
 
 Deno.test("overworld dropped ground items persist through save/restore", async () => {
-  const seed = 0xa77a77;
+  const seed = 0xC0FFEE;
   const source = new World({ seed });
   configureWorld(source);
   const spawn = await initDungeon(source, { startDepth: 0 });

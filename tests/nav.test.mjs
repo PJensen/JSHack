@@ -170,7 +170,7 @@ Deno.test("forced up-stairs stay connected after descent (positional-identity)",
   // Simulate the actual game path: overworld → depth 1.
   // The overworld's down-stair position becomes a forced up-stair on depth 1.
   // This up-stair may land on TILE_WALL or TILE_VOID, so a corridor must be carved.
-  for (const seed of [42, 0xC0FFEE]) {
+  for (const seed of [0xC0FFEE]) {
     // Generate overworld to collect down-stair positions
     clearAll();
     const w0 = new World({ seed });

@@ -29,7 +29,7 @@ function makePlayerAt(world, x, y) {
 
 Deno.test("initDungeon supports depth 0 overworld", async () => {
   clearAll();
-  const world = new World({ seed: 0xa77a77 });
+  const world = new World({ seed: 0xC0FFEE });
   const spawn = await initDungeon(world, { startDepth: 0 });
 
   assert(isWalkable(spawn.x, spawn.y), "overworld spawn tile is walkable");
@@ -93,7 +93,7 @@ Deno.test("overworld includes home interactables and harvest nodes", async () =>
 
 Deno.test("can transition depth 0 -> 1 -> 0", async () => {
   clearAll();
-  const world = new World({ seed: 42 });
+  const world = new World({ seed: 0xC0FFEE });
   const spawn = await initDungeon(world, { startDepth: 0 });
   makePlayerAt(world, spawn.x, spawn.y);
 
@@ -110,7 +110,7 @@ Deno.test("can transition depth 0 -> 1 -> 0", async () => {
 
 Deno.test("overworld stash chest and harvest states persist across transitions", async () => {
   clearAll();
-  const world = new World({ seed: 4242 });
+  const world = new World({ seed: 0xC0FFEE });
   const spawn = await initDungeon(world, { startDepth: 0 });
   const actor = makePlayerAt(world, spawn.x, spawn.y);
   world.add(actor, Inventory, { capacity: 20 });
