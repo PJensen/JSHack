@@ -7,24 +7,6 @@ Phase 2 fills creature voices, missing/stub sounds, spell coverage, the spirit w
 
 ---
 
-## Orphaned Files (on disk, not used)
-
-These files exist in `assets/audio/` but nothing in the registry points to them. They were either replaced or never wired:
-
-| File | What replaced it | Notes |
-|------|-----------------|-------|
-| `stair_ascend`, `stair_descend` | `transition_coating.mp3` (both directions) | Dedicated files exist — just need registry entries pointing at them. Easy win. |
-| `move_boulder`, `move_boulder_alt` | `action_move_boulder.mp3` | Same content, renamed. Registry could use both as a `files: []` array for variation. |
-| `eat_food` | `action_eat.mp3` | Same. Could become a variant. |
-| `equip_weapon` | Combat pack equip sounds | Legacy file. Could be a fallback for exotic weapon types not in combat pack. |
-| `melee_hit`, `melee_hit_alt`, `melee_crit`, `melee_miss` | Combat pack impact/whoosh | Original melee sounds, now superseded. Possibly delete. |
-| `melee_shield_hit_1–6` | `SHIELD METAL/WOOD-Deflect-*` pack | Superseded. |
-| `chest_opened` | `chest_open.mp3` | Minor naming variation. Merge or drop. |
-| `player_death_1` | `player_death.mp3` (`player:death`) | Registry maps `player:death` → `player_death.mp3`, `player:death:heavy` → `player_death_2.mp3`. `player_death_1` is unreachable. |
-| `pickup_scroll_or_this` | `pickup_scroll.mp3` | Stale alternate. |
-
----
-
 ## Priority 0 — Stubs / Broken Wiring
 
 ### stair:ascend / stair:descend
