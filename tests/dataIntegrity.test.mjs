@@ -1,3 +1,4 @@
+import "./helpers/installContentCatalog.mjs";
 import { assert } from "jsr:@std/assert";
 import { SPELL_DEFS, getSpell, listSpells } from '../src/rules/data/spells.js';
 import { ITEM_CATALOG, getCatalogItem, listCatalogItems } from '../src/rules/data/itemCatalog.js';

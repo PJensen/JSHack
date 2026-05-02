@@ -1,3 +1,4 @@
+import "./helpers/installContentCatalog.mjs";
 import { assert, assertEquals } from "jsr:@std/assert";
 import { CLASS_DEFS, getClass, listClassIds } from '../src/rules/data/classes.js';
 import { DEITY_DEFS } from '../src/rules/data/deities.js';

@@ -1,3 +1,4 @@
+import "./helpers/installContentCatalog.mjs";
 // tests/contentDsl.test.mjs
 // Tests for the content authoring DSL: helpers, registry, defineItem, defineMonster, ScriptCtx.
 
