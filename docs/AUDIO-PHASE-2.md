@@ -36,14 +36,14 @@ The overall character: *light made barely audible*. Nearly inaudible at rest. Re
 
 | File | What's happening | Vibe | Duration / type |
 |------|-----------------|------|----------------|
-| `wisp_hum_calm` | Wisp orbiting player, all quiet | Faint electrical shimmer, like a warm fluorescent tube at the edge of hearing. Slow, breathing LFO. | ~3s seamless loop |
-| `wisp_hum_combat` | Combat active — wisp orbit tightens, spins faster | Same hum but quicker and slightly edged. Agitated but not alarming. Fades back to calm ~2s after combat ends. | ~3s seamless loop |
+| `wisp_hum_calm` | Wisp orbiting player, all quiet | Faint electrical shimmer, like a warm fluorescent tube at the edge of hearing. Slow, breathing LFO. | ~3s  loop |
+| `wisp_hum_combat` | Combat active — wisp orbit tightens, spins faster | Same hum but quicker and slightly edged. Agitated but not alarming. Fades back to calm ~2s after combat ends. | ~3s  loop |
 | `wisp_surge` | Wisp darts alongside a spell projectile | Short forward zip with an ethereal shimmer tail. Needs a hard front — if the attack lands late the sync breaks. | 0.4–0.5s one-shot |
 | `wisp_flare` | Wisp arrives at target — brief burst of brightness | Compressed light releasing. A pocket of "aha." | 0.3–0.5s one-shot |
 | `wisp_miracle_flight` | Deity intervenes — wisp flies out to deliver a miracle, then returns | Arc in two movements: purposeful departure shimmer → bright peak at target → softer return fade. Can be one file or two (`_out` / `_return`). | ~1.5–2s one-shot |
-| `wisp_harvest_loop` | Wisp circles a freshly killed enemy, absorbing essence | Slow, rising, satisfied. Like a glass harmonic being drawn out. Circles for ~2.4s before the absorb fires. | ~2.4s seamless loop |
+| `wisp_harvest_loop` | Wisp circles a freshly killed enemy, absorbing essence | Slow, rising, satisfied. Like a glass harmonic being drawn out. Circles for ~2.4s before the absorb fires. | ~2.4s  loop |
 | `wisp_harvest_absorb` | Absorption moment — wisp pulls in the essence | Single bright ping, clean decay. The payoff. | ~0.5s one-shot |
-| `wisp_death_vigil` | Player dies — wisp slowly descends onto the corpse and holds, indefinitely | Mournful sustained shimmer. Warmth withdrawing but the light stays on. Holds until the game-over screen. **Must be a loop** — not a one-shot. | ~5–6s seamless loop |
+| `wisp_death_vigil` | Player dies — wisp slowly descends onto the corpse and holds, indefinitely | Mournful sustained shimmer. Warmth withdrawing but the light stays on. Holds until the game-over screen. **Must be a loop** — not a one-shot. | ~5–6s  loop |
 | `wisp_spell_boost` | Spirit deity amplifies the next spell cast | Resonant pulse layered *under* the spell sound, not over it. Adds depth, doesn't compete. | 0.3–0.5s one-shot |
 | `wisp_guidance` | A tip fires — wisp pulses to draw attention somewhere | Gentle two-tone chime. "Hey, look over here" not "DANGER." | 0.5–0.8s one-shot |
 | `wisp_prayer` | Player prays — wisp spirals inward, then eases back out | Soft, contemplative, inward-curling shimmer. | 0.8–1.2s one-shot |
