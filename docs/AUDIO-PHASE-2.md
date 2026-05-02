@@ -9,14 +9,6 @@ Phase 2 fills creature voices, missing/stub sounds, spell coverage, the spirit w
 
 ## Priority 0 — Stubs / Broken Wiring
 
-### stair:ascend / stair:descend
-Dedicated files exist on disk but are never played — both stair directions use `transition_coating.mp3`. One registry edit activates them:
-
-```js
-"stair:descend": { file: "stair_descend.mp3", bus: "ambient" },
-"stair:ascend":  { file: "stair_ascend.mp3",  bus: "ambient" },
-```
-
 ### Portcullis raise / drop
 `hydraulics:portcullis` fires with `{ raised: bool }` — no audio handler exists. Needs files + 3 lines in `audioWiring.js`.
 
