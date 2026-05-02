@@ -32,29 +32,138 @@ The spirit wisp is a fully realized VFX entity — it orbits the player, surges 
 
 This is the most synthesis-rich opportunity in the entire game. The wisp is otherworldly, ethereal, tiny. Its sounds should feel like light made audible — barely-there at rest, reactive when active.
 
-### Ambient (loop while active)
+All timings below are derived directly from the FX constants in `src/display/fx/spiritWispFx.js`.
 
-| ID | Description | Notes |
-|----|-------------|-------|
-| `wisp:hum` | Soft orbital hum. Barely present, like a faint electrical shimmer 3 octaves above normal hearing range brought just into audibility. Modulates slowly. `[synth]` FM carrier with very low index, sine-ish, pitch ~1.8–2.2kHz, gentle LFO tremolo. | Loop, ambient bus, vol ~0.12, max 1 voice |
+---
 
-The hum should tighten and quicken in combat (orbit speed increases), slow in calm. Ideally the engine would pitch-shift it in real-time, but a separate `wisp:hum:combat` variant works if that's simpler.
+### `wisp_hum_calm` + `wisp_hum_combat` — seamless loops
 
-### One-shots
+The hum runs the entire time the wisp is alive. Two states:
 
-| ID | Description | Notes |
-|----|-------------|-------|
-| `wisp:surge` | Wisp darts to spell target or guidance target. Short forward whoosh with ethereal shimmer trailing. `[synth]` short pitch-rise + airy release. ~0.3s. | ambient, max 3, randomPitch 30 |
-| `wisp:harvest` | Wisp circles a killed enemy, absorbing essence. A rising, satisfied tone — like a small bell being rubbed into resonance. `[synth]` glass harmonic, slow attack, ~0.6s. | ambient, max 2 |
-| `wisp:flare` | Deity miracle delivery. Wisp reaches target, flares bright, returns. Compressed light releasing. `[synth]` fast transient + bright shimmer decay. ~0.5s. | spells, max 1 |
-| `wisp:death_vigil` | Player dies — wisp slowly descends onto corpse and holds. Mournful, fading shimmer. Should feel like a lantern being cupped. `[synth]` slow pitch fall, ~4s fade. | ambient, max 1 |
-| `wisp:spell_boost` | Spirit amplifies a spell (`spirit:spellBoost` event). A resonant pulse layered on top of the spell cast sound. `[synth]` mid-high resonant ping. ~0.4s. | spells, max 2 |
-| `wisp:guidance` | Tip fires — wisp pulses to draw attention. Gentle two-tone chime. "Pay attention, not alarm." `[synth]` soft bell dyad. ~0.5s. | ui, max 1 |
-| `wisp:mood:shift` | Optional — when deity mood changes noticeably (wrath → serenity etc.) a brief audio telegraph. `[synth]` pitch glide matching mood color. ~0.3s. | ambient, max 1 |
+- **Calm** — orbit speed `1.4 rad/s` = ~4.5s per revolution. Slow, wide.
+- **Combat** — orbit speed `4.0 rad/s` = ~1.6s per revolution. Tight, agitated. Returns to calm in **2.0s** after last hit.
 
-### Mood-colored hum variants (optional)
+The wisp also pulses its light at **1.8 Hz** (0.56s cycle) and bobs vertically at **2.2 Hz** (0.45s cycle). For a seamless loop that feels coherent with the visual rhythm, target **~3.3s** (6× the light pulse cycle). The two frequencies don't share a clean LCM so longer is fine — any length where LFO start = LFO end will work.
 
-The wisp changes color with deity mood (wrath=red, serenity=blue, sorrow=indigo, amusement=yellow, chaos=purple). If the engineer has bandwidth, distinct tonal registers per mood create a passive information layer:
+`[synth]` FM carrier, very low modulation index, sine-ish. Pitch ~1.8–2.2kHz. Gentle LFO tremolo. Combat variant: same carrier, faster tremolo rate, slight harmonic edge.
+
+**Bus:** ambient · **vol:** ~0.12 · **max voices:** 1 per variant
+
+---
+
+### `wisp_surge` — one-shot
+
+Wisp darts from player to spell target alongside the projectile. Duration is computed as `dist / speed`, hard capped at **0.7s**, floor at **0.06s**. Typical spell range 3–8 tiles at speed 8–14 → **0.2–0.5s** in practice.
+
+File must feel complete even if only 0.2s is heard. Fast attack essential — if the transient arrives late the sync is lost. Target file length **0.4–0.5s**, front-loaded.
+
+`[synth]` short pitch-rise, airy shimmer release. Tail can decay naturally.
+
+**Bus:** ambient · **max voices:** 3 · **randomPitch:** 30
+
+---
+
+### `wisp_flare` — one-shot
+
+Fires when wisp arrives at target. Spell surge holds **0.3s** at impact (`SURGE_FLARE_TIME`); miracle flight holds **0.4s** (`MIRACLE_FLARE_TIME`). Compressed light releasing.
+
+`[synth]` fast transient, bright shimmer decay. Target **0.3–0.5s**.
+
+**Bus:** spells · **max voices:** 1
+
+---
+
+### `wisp_miracle_flight` — one-shot (optional split)
+
+Full deity miracle sequence: flies out at **12 tiles/sec**, flares for 0.4s, returns at **8 tiles/sec**. At typical range (4–8 tiles): ~0.33–0.67s out, ~0.5–1.0s back. Total round trip **~1.5–2s**.
+
+Can be one arc file (departure shimmer → bright peak at halfway → gentler return fade) or split into `wisp_miracle_out` + `wisp_miracle_return`. Single file is simpler for the engine.
+
+**Bus:** spells · **max voices:** 1
+
+---
+
+### `wisp_harvest_loop` + `wisp_harvest_absorb` — loop + one-shot
+
+Two-part sequence triggered when the wisp circles a vanquished enemy:
+
+1. **1.8s of calm** must pass after combat before harvest activates (`HARVEST_LINGER_DELAY`)
+2. Wisp circles the corpse for **2.4s** (`VANQUISH_CIRCLE_DURATION`)
+3. Absorption burst fires — wisp glow flares for **0.55s** (`HARVEST_FLARE_DURATION`)
+
+`wisp_harvest_loop` should be a **~2.4s loop** — a slow, rising, satisfied swell. Cuts to `wisp_harvest_absorb` on absorption: **0.5s** glass harmonic peak.
+
+`[synth]` loop = glass harmonic, very slow attack, building resonance. Absorb = single bright ping with clean decay.
+
+**Bus:** ambient · **max voices:** 2
+
+---
+
+### `wisp_death_vigil` — seamless loop (long)
+
+Player dies → wisp circles for **2.2s** (`DEATH_CIRCLE_DURATION`), then eases down to the corpse tile over **6.2s** (`DEATH_LAND_DURATION`). Total time to settle: **~8.4s**. After that the wisp holds indefinitely until game-over screen.
+
+This is **not a one-shot**. Needs a seamless loop that starts mournful and stays mournful. Engine fades it out on scene transition.
+
+Suggested approach: a **~5–6s loop** starting at the death event, with enough internal variation to not feel mechanical over 10–15s of hold time.
+
+`[synth]` slow pitch fall settling into sustained minor resonance. Should feel like a lantern being cupped — warmth withdrawing but light remaining.
+
+**Bus:** ambient · **vol:** ~0.35 · **max voices:** 1 · **fadeOut:** 2.0s on stop
+
+---
+
+### `wisp_spell_boost` — one-shot
+
+Fires on `spirit:spellBoost`, one microtask before the actual spell cast event. Layered *under* the spell sound, not over it — should add resonance without competing.
+
+`[synth]` mid-high resonant ping. **0.3–0.5s**.
+
+**Bus:** spells · **max voices:** 2
+
+---
+
+### `wisp_guidance` — one-shot
+
+Guidance tip fires, wisp active for **2.0s** pointing at target (`GUIDANCE_PULSE_DURATION`). Sound should sit comfortably under that window.
+
+`[synth]` gentle two-tone chime. "Pay attention, not alarm." **0.5–0.8s** with tail decaying within 2s.
+
+**Bus:** ui · **max voices:** 1
+
+---
+
+### `wisp_prayer` — one-shot
+
+Player prays — wisp spirals inward then eases back out over **1.2s** (`PRAYER_SPIRAL_DURATION`).
+
+`[synth]` soft contemplative shimmer, inward-feeling. **0.8–1.2s**.
+
+**Bus:** ambient · **max voices:** 1
+
+---
+
+### Quick-reference timing table
+
+| File | Type | Duration | Key constant |
+|------|------|----------|-------------|
+| `wisp_hum_calm` | loop | ~3.3s | `BASE_ORBIT_SPEED 1.4`, `LIGHT_PULSE_FREQ 1.8 Hz` |
+| `wisp_hum_combat` | loop | ~3.3s | `COMBAT_ORBIT_SPEED 4.0`, decays in `COMBAT_DECAY 2.0s` |
+| `wisp_surge` | one-shot | 0.4–0.5s (front-loaded) | cap `0.7s`, floor `0.06s` |
+| `wisp_flare` | one-shot | 0.3–0.5s | `SURGE_FLARE_TIME 0.3s` / `MIRACLE_FLARE_TIME 0.4s` |
+| `wisp_miracle_flight` | one-shot | ~1.5–2s | fly `12 t/s` out, `8 t/s` back |
+| `wisp_harvest_loop` | loop | ~2.4s | `VANQUISH_CIRCLE_DURATION 2.4s` |
+| `wisp_harvest_absorb` | one-shot | ~0.5s | `HARVEST_FLARE_DURATION 0.55s` |
+| `wisp_death_vigil` | loop | ~5–6s | `DEATH_LAND_DURATION 6.2s` + `DEATH_CIRCLE_DURATION 2.2s` |
+| `wisp_spell_boost` | one-shot | 0.3–0.5s | fires 1 microtask before spell cast |
+| `wisp_guidance` | one-shot | 0.5–0.8s | `GUIDANCE_PULSE_DURATION 2.0s` window |
+| `wisp_prayer` | one-shot | 0.8–1.2s | `PRAYER_SPIRAL_DURATION 1.2s` |
+
+---
+
+### Mood-colored hum variants (optional bandwidth)
+
+The wisp changes color with deity mood (wrath=red, serenity=blue, sorrow=indigo, amusement=yellow, chaos=purple). Distinct tonal registers per mood create a passive information layer — same loop structure, different FM character:
 
 - **wrath** — slightly dissonant, buzzy undertone
 - **serenity** — purest tone, widest, most peaceful
