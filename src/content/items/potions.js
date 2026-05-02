@@ -51,7 +51,8 @@ defineItem('potion_water', {
 defineItem('potion_holy_water', {
   name: 'Vial of Holy Water', type: 'potion', material: 'glass', rarity: 'magic', value: 30, weight: 0.5,
   description: 'Consecrated water that purges flame and carries a blessing.',
-  potion: { route: 'oral', doses: 1, channels: [], effects: [], toxicity: null, beatitude: 'blessed', feel: 'It tastes pure and faintly warm.' },
+  beatitude: 'blessed',
+  potion: { route: 'oral', doses: 1, channels: [], effects: [], toxicity: null, feel: 'It tastes pure and faintly warm.' },
   hooks: createWaterPotionHooks(),
 });
 

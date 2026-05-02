@@ -74,7 +74,7 @@ Deno.test("inferItemCategory: weapon", () => {
 
 Deno.test("inferItemCategory: food", () => {
   const r = inferItemCategory("food");
-  assertEquals(r.catalogKind, "magic");
+  assertEquals(r.catalogKind, "food");
   assertEquals(r.slot, "bag");
   assertEquals(r.itemType, "food");
 });
@@ -153,7 +153,7 @@ Deno.test("defineItem: basic food item registers catalog + palette", () => {
 
   const entry = getContentItem("test_bread");
   assertEquals(entry.id, "test_bread");
-  assertEquals(entry.catalogKind, "magic");
+  assertEquals(entry.catalogKind, "food");
   assertEquals(entry.type, "food");
   assertEquals(entry.slot, "bag");
   assertEquals(entry.name, "Bread");
