@@ -208,6 +208,8 @@ export function defineItem(id, def) {
 
   // Scrolls: charges
   if (def.charges) catalogEntry.charges = def.charges;
+  if (def.noQuickChip) catalogEntry.noQuickChip = true;
+  if (def.beatitude && catalogKind !== 'equipment') catalogEntry.beatitude = def.beatitude;
 
   // Hooks: merge DSL-compiled hooks with any raw snake_case hooks passed directly
   catalogEntry.hooks = hooks ? { ...hooks } : {};
