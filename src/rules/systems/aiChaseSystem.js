@@ -4,19 +4,23 @@
 // actually simulated on each individual creature.
 //
 // Intelligence-gated behaviours (sourced from MONSTERS[].intelligence):
-//   passive  (aggro:'passive') — sight never triggers hunting while unaware;
-//                                only damage-based aggro works.
-//   packSense (any intelligence) — first sighting alerts nearby same-species.
+//   passive    (aggro:'passive') — sight never triggers hunting while unaware;
+//                                  only damage-based aggro works.
+//   packSense  (any intel)       — first sighting alerts nearby same-species.
 //                                  safety in numbers: unaware pack creatures
-//                                  won't aggro from sight unless an ally of the
-//                                  same species is within packRadius.
-//   packSpread (packSense monsters, always active while hunting) — pack members
-//                                  penalize approach angles already covered by
-//                                  a hunting ally, causing the pack to fan out
-//                                  and surround rather than stack from one direction.
-//   ambush   (def.ambush)      — creature holds position until player is adjacent.
-//   retreat  (def.retreatHpPct) — creature flees when HP < threshold.
-//   anticipate (intel ≥ 8)     — on LOS break, projects player's last observed
+//                                  won't aggro from sight unless an ally is nearby.
+//   packSpread (packSense, always while hunting) — pack members penalise approach
+//                                  angles already covered by a hunting ally, causing
+//                                  the pack to fan out and surround naturally.
+//   ambush     (def.ambush)      — creature holds position until player is adjacent.
+//   retreat    (def.retreatHpPct) — creature flees when HP < threshold.
+//   kite       (has spells or ranged weapon) — retreater holds shoot distance instead
+//                                  of blindly fleeing; closes if player moves away.
+//   rally      (packSense, intel 4-6) — retreating pack members regroup toward the
+//                                  nearest non-retreating hunting ally.
+//   chokepoint (intel ≥ 7)      — retreater paths to the nearest corridor tile and
+//                                  holds there to fight from a defensible position.
+//   anticipate (intel ≥ 8)      — on LOS break, projects player's last observed
 //                                  movement direction 3 tiles forward as the new
 //                                  search target, predicting the escape route.
 
@@ -93,6 +97,87 @@ function findNearestRival(world, selfId, ox, oy, sightRange, isBlocked) {
 
 function isSmartPathingMonster(brain, def) {
   return Number(brain?.intelligence ?? def?.intelligence ?? 10) > 3;
+}
+
+/** Returns true when this monster kites — attacks at range while retreating. */
+function resolveIsKiter(world, id, brain) {
+  if (Array.isArray(brain?.learnedSpellIds) && brain.learnedSpellIds.length > 0) return true;
+  const eq = world.get(id, Equipment);
+  return !!(eq?.ranged && world.isAlive?.(eq.ranged));
+}
+
+/**
+ * Count walkable cardinal neighbours of (x, y) using the actor's traversal fn.
+ * Used to identify chokepoint (corridor) tiles.
+ */
+function walkableNeighborCount(x, y, canTraverse) {
+  let count = 0;
+  for (const dir of CARDINAL_DIRS) {
+    if (canTraverse(x + dir.dx, y + dir.dy)) count++;
+  }
+  return count;
+}
+
+/**
+ * Find the nearest chokepoint tile (≤ 2 walkable cardinal neighbours) within
+ * CHOKE_SCAN_RADIUS and return the first step toward it, or null if none found.
+ */
+const CHOKE_SCAN_RADIUS = 8;
+
+function findNearestChokepointDir(world, id, pos, canTraverseTile, canOpenDoors) {
+  const ox = pos.x | 0, oy = pos.y | 0;
+  let bestX = null, bestY = null, bestDist = Infinity;
+
+  for (let ddy = -CHOKE_SCAN_RADIUS; ddy <= CHOKE_SCAN_RADIUS; ddy++) {
+    for (let ddx = -CHOKE_SCAN_RADIUS; ddx <= CHOKE_SCAN_RADIUS; ddx++) {
+      const cx = ox + ddx, cy = oy + ddy;
+      if (!canTraverseTile(cx, cy)) continue;
+      if (walkableNeighborCount(cx, cy, canTraverseTile) > 2) continue;
+      const d = chebyshevScalar(ox, oy, cx, cy);
+      if (d > 0 && d < bestDist) { bestDist = d; bestX = cx; bestY = cy; }
+    }
+  }
+
+  if (bestX === null) return null;
+
+  return findNextCardinalStep(world, ox, oy, bestX, bestY, id, {
+    goalRadius: 0,
+    maxNodes: 128,
+    isPassable: canTraverseTile,
+    passThroughDoors: canOpenDoors,
+    searchPadding: CHOKE_SCAN_RADIUS + 2,
+  });
+}
+
+/**
+ * Rally retreat: path toward the nearest non-retreating hunting ally of the same
+ * species.  Returns first step toward ally, or null if no valid ally found.
+ */
+function chooseRallyDir(world, id, pos, ni, def, canTraverseTile, canOpenDoors) {
+  const myIdentity = ni?.identity;
+  if (!myIdentity) return null;
+  const searchRadius = Math.max(1, (def.packRadius ?? 8) | 0) * 2;
+
+  let bestX = null, bestY = null, bestDist = Infinity;
+  forEachInRadius(world, pos.x | 0, pos.y | 0, searchRadius, (neighborId, neighborPos) => {
+    if (neighborId === id) return;
+    const neighborNI = world.get(neighborId, NamedIdentity);
+    if (!neighborNI || neighborNI.identity !== myIdentity) return;
+    const neighborAggro = world.get(neighborId, AggroState);
+    if (!neighborAggro || neighborAggro.alertLevel !== AGGRO_LEVELS.hunting || neighborAggro.retreating) return;
+    const d = chebyshevScalar(pos.x | 0, pos.y | 0, neighborPos.x | 0, neighborPos.y | 0);
+    if (d > 0 && d < bestDist) { bestDist = d; bestX = neighborPos.x | 0; bestY = neighborPos.y | 0; }
+  });
+
+  if (bestX === null) return null;
+
+  return findNextCardinalStep(world, pos.x | 0, pos.y | 0, bestX, bestY, id, {
+    goalRadius: 1,
+    maxNodes: 128,
+    isPassable: canTraverseTile,
+    passThroughDoors: canOpenDoors,
+    searchPadding: 8,
+  });
 }
 
 /**
@@ -333,6 +418,7 @@ export function aiChaseSystem(world) {
     const ni = world.get(id, NamedIdentity);
     const def = ni ? getMonster(String(ni.identity || "")) : null;
     const brain = world.get(id, Brain);
+    const intel = Number(brain?.intelligence ?? def?.intelligence ?? 10);
 
     const canActThisTurn = speedGateCheck(world, id);
     const hasQueuedAction = world.has(id, MoveIntent) || world.has(id, FlyIntent);
@@ -469,8 +555,7 @@ export function aiChaseSystem(world) {
         case AGGRO_LEVELS.hunting: {
           // Intel ≥ 8: anticipate escape route by projecting player's last observed
           // movement direction forward rather than searching from the last seen tile.
-          const anticipateIntel = Number(brain?.intelligence ?? def?.intelligence ?? 10);
-          if (anticipateIntel >= 8 && (aggro.lastKnownMoveDx !== 0 || aggro.lastKnownMoveDy !== 0)) {
+          if (intel >= 8 && (aggro.lastKnownMoveDx !== 0 || aggro.lastKnownMoveDy !== 0)) {
             aggro.lastKnownX += aggro.lastKnownMoveDx * 3;
             aggro.lastKnownY += aggro.lastKnownMoveDy * 3;
           }
@@ -560,7 +645,10 @@ export function aiChaseSystem(world) {
     // ── Ranged attack: prefer shooting when hunting and in LOS ──────
     const rangedTargetId = conflictRivalId || playerId;
     const canSeeRangedTarget = conflictRivalId ? true : canSee; // rival already LOS-checked
-    if (aggro.alertLevel === AGGRO_LEVELS.hunting && canSeeRangedTarget && !aggro.retreating) {
+    const isKiter = resolveIsKiter(world, id, brain);
+    // Kiters (ranged weapon or spells) may shoot even while retreating — their movement
+    // logic will hold them at a safe distance rather than fleeing past shoot range.
+    if (aggro.alertLevel === AGGRO_LEVELS.hunting && canSeeRangedTarget && (!aggro.retreating || isKiter)) {
       const eq = world.get(id, Equipment);
       if (eq && eq.ranged && eq.ammo && world.isAlive(eq.ammo)) {
         const weaponInfo = eq.ranged ? world.get(eq.ranged, ItemInfo) : null;
@@ -602,7 +690,6 @@ export function aiChaseSystem(world) {
       const nx = (pos.x | 0) + dx;
       const ny = (pos.y | 0) + dy;
       if (!isStepTraversable(world, id, nx, ny, targetX, targetY, canTraverseTile)) {
-        const intel = Number(brain?.intelligence ?? def?.intelligence ?? 10);
         const next = findNextCardinalStep(world, pos.x | 0, pos.y | 0, targetX, targetY, id, {
           goalRadius: 0,
           maxNodes: 256,
@@ -617,10 +704,40 @@ export function aiChaseSystem(world) {
       }
     }
 
-    // Retreating creatures flip their direction — run away from the target.
+    // ── Retreat movement dispatch ────────────────────────────────────
+    // Each tier gets a tactically distinct retreat behaviour based on intelligence
+    // and capability.  Higher tiers take priority over lower ones.
     if (aggro.retreating) {
-      dx = -dx;
-      dy = -dy;
+      const dist = chebyshevScalar(pos.x | 0, pos.y | 0, targetX, targetY);
+
+      if (isKiter) {
+        // Kite: hold at shoot distance (≥ 3 tiles) and let spell/ranged fire.
+        // Flee only when the player closes to melee range.
+        if (dist < 3) { dx = -dx; dy = -dy; }
+        else { return; }
+
+      } else if (intel >= 7) {
+        // Chokepoint defense: path to the nearest corridor tile and hold.
+        // neighborCount in [1,2] = real corridor; 0 = unloaded/test environment, skip.
+        const neighborCount = walkableNeighborCount(pos.x | 0, pos.y | 0, canTraverseTile);
+        if (neighborCount >= 1 && neighborCount <= 2) {
+          return; // already in a chokepoint — hold and fight
+        }
+        const chokeDir = findNearestChokepointDir(world, id, pos, canTraverseTile, canOpenDoors);
+        if (chokeDir) { dx = chokeDir.dx | 0; dy = chokeDir.dy | 0; }
+        else { dx = -dx; dy = -dy; }
+
+      } else if (def?.packSense && intel >= 4 && intel <= 6) {
+        // Rally: regroup with the nearest non-retreating hunting ally.
+        const rallyDir = chooseRallyDir(world, id, pos, ni, def, canTraverseTile, canOpenDoors);
+        if (rallyDir) { dx = rallyDir.dx | 0; dy = rallyDir.dy | 0; }
+        else { dx = -dx; dy = -dy; }
+
+      } else {
+        // Default: flee directly away from the target.
+        dx = -dx;
+        dy = -dy;
+      }
     }
 
     // Blinded creatures stumble: random direction instead of intended path.
