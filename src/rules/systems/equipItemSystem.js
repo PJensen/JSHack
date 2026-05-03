@@ -3,7 +3,6 @@ import { Inventory } from "../components/Inventory.js";
 import { Equipment, GEAR_SLOT_SET, getEquippedSlot } from "../components/Equipment.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
-import { Beatitude } from "../components/Beatitude.js";
 import {
   inventoryContains,
   addToInventory,
@@ -15,6 +14,7 @@ import {
   setEquippedSlotTopology,
 } from "../utils/equipmentTopology.js";
 import { emitSafe } from "../utils/emitSafe.js";
+import { isItemCursed, blockIfCursed } from "../utils/curseUtils.js";
 
 /**
  * equipItemSystem — resolves EquipIntent:
@@ -44,18 +44,7 @@ export function equipItemSystem(world) {
     // Toggle path: selecting an item that's already equipped unequips it.
     const equippedSlot = getEquippedSlot(eq, itemId) || isEquippedInTopology(world, actor, itemId);
     if (equippedSlot) {
-      // Cursed items cannot be unequipped — they are welded to the player.
-      const beat = world.get(itemId, Beatitude);
-      if (beat && beat.state === 'cursed') {
-        emitSafe(world, 'item:welded', {
-          actor,
-          itemId,
-          slot: equippedSlot,
-          name: world.get(itemId, NamedIdentity)?.name,
-        });
-        world.remove(actor, EquipIntent);
-        continue;
-      }
+      if (blockIfCursed(world, actor, itemId)) { world.remove(actor, EquipIntent); continue; }
       eq[equippedSlot] = null;
       if (equippedSlot === 'weapon') {
         clearEquippedSlotTopology(world, actor, 'weapon');
@@ -94,9 +83,15 @@ export function equipItemSystem(world) {
       }
     };
 
+    const blockOnCursed = (id) => blockIfCursed(world, actor, id);
+
     const equipSingleSlot = (slotName) => {
       if (!GEAR_SLOT_SET.has(slotName)) return false;
-      if (Number.isInteger(eq[slotName]) && eq[slotName] > 0) pushToInventory(eq[slotName]);
+      const occupant = eq[slotName];
+      if (Number.isInteger(occupant) && occupant > 0) {
+        if (blockOnCursed(occupant)) return false;
+        pushToInventory(occupant);
+      }
       eq[slotName] = itemId;
       if (slotName === 'weapon') setEquippedSlotTopology(world, actor, 'weapon', itemId);
       appliedSlot = slotName;
@@ -108,14 +103,23 @@ export function equipItemSystem(world) {
         ? intent.targetSlot : '';
 
       if (chosenSlot) {
+        // Pre-check: a 2H in weapon must also displace offhand — block if offhand cursed.
+        if (chosenSlot === 'weapon' && info.twoHanded && Number.isInteger(eq.offhand) && eq.offhand > 0) {
+          if (blockOnCursed(eq.offhand)) { world.remove(actor, EquipIntent); continue; }
+        }
+        // Pre-check: a 1H in offhand while weapon is 2H must displace weapon — block if weapon cursed.
+        if (chosenSlot === 'offhand' && Number.isInteger(eq.weapon) && eq.weapon > 0) {
+          const weaponInfo = world.get(eq.weapon, ItemInfo);
+          if (weaponInfo?.twoHanded && blockOnCursed(eq.weapon)) { world.remove(actor, EquipIntent); continue; }
+        }
         // Player explicitly chose a slot — honour it directly.
-        equipSingleSlot(chosenSlot);
-        // If they put a 2H in weapon, kick offhand
+        if (!equipSingleSlot(chosenSlot)) { world.remove(actor, EquipIntent); continue; }
+        // Kick offhand after placing 2H weapon (already verified not cursed above).
         if (chosenSlot === 'weapon' && info.twoHanded && Number.isInteger(eq.offhand) && eq.offhand > 0) {
           pushToInventory(eq.offhand);
           eq.offhand = null;
         }
-        // If they put a 1H in offhand while weapon is 2H, kick the 2H
+        // Kick 2H weapon after placing 1H in offhand (already verified not cursed above).
         if (chosenSlot === 'offhand' && Number.isInteger(eq.weapon) && eq.weapon > 0) {
           const weaponInfo = world.get(eq.weapon, ItemInfo);
           if (weaponInfo?.twoHanded) {
@@ -133,14 +137,18 @@ export function equipItemSystem(world) {
         if (mainOccupied && offhandEmpty && isOneHanded) {
           const mainInfo = world.get(eq.weapon, ItemInfo);
           if (mainInfo && !mainInfo.twoHanded) {
-            equipSingleSlot('offhand');
+            if (!equipSingleSlot('offhand')) { world.remove(actor, EquipIntent); continue; }
           } else {
             // Main hand is 2H — replace it, not cascade
-            equipSingleSlot('weapon');
+            if (!equipSingleSlot('weapon')) { world.remove(actor, EquipIntent); continue; }
           }
         } else {
-          equipSingleSlot('weapon');
-          // two-handers occupy both hands — kick out any equipped offhand
+          // Pre-check: 2H weapon must also displace offhand — block if cursed.
+          if (info.twoHanded && Number.isInteger(eq.offhand) && eq.offhand > 0) {
+            if (blockOnCursed(eq.offhand)) { world.remove(actor, EquipIntent); continue; }
+          }
+          if (!equipSingleSlot('weapon')) { world.remove(actor, EquipIntent); continue; }
+          // Kick offhand after placing 2H (already verified not cursed above).
           if (info.twoHanded && Number.isInteger(eq.offhand) && eq.offhand > 0) {
             pushToInventory(eq.offhand);
             eq.offhand = null;
@@ -153,15 +161,25 @@ export function equipItemSystem(world) {
       } else if (!Number.isInteger(eq.ring2) || eq.ring2 <= 0) {
         eq.ring2 = itemId; appliedSlot = 'ring2';
       } else {
-        // both rings occupied — swap with ring1 by default
-        pushToInventory(eq.ring1);
-        eq.ring1 = itemId; appliedSlot = 'ring1';
+        // both rings occupied — swap with whichever ring isn't cursed (ring1 preferred)
+        if (!isItemCursed(world, eq.ring1)) {
+          pushToInventory(eq.ring1);
+          eq.ring1 = itemId; appliedSlot = 'ring1';
+        } else if (!isItemCursed(world, eq.ring2)) {
+          pushToInventory(eq.ring2);
+          eq.ring2 = itemId; appliedSlot = 'ring2';
+        } else {
+          // both cursed — block on ring1
+          blockOnCursed(eq.ring1);
+          world.remove(actor, EquipIntent); continue;
+        }
       }
     } else if (slot === 'offhand') {
       // can't equip an offhand while wielding a two-handed weapon — kick it out first
       if (Number.isInteger(eq.weapon) && eq.weapon > 0) {
         const weaponInfo = world.get(eq.weapon, ItemInfo);
         if (weaponInfo?.twoHanded) {
+          if (blockOnCursed(eq.weapon)) { world.remove(actor, EquipIntent); continue; }
           pushToInventory(eq.weapon);
           eq.weapon = null;
         }
