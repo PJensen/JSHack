@@ -4,9 +4,23 @@
 
 **The one thing that would make the game sing.**
 
-Status combos: wet (rain/water potion) + lightning scroll = room arc. Burning + ice = steam blind. Poison + fire = toxic cloud. Infrastructure half-exists: weather sets wet tiles, burning structures already tracked. One `statusInteraction` lookup table + a few emitters.
+This is **dungeon content**, not weather. Player creates both halves — that's what makes it legible and feel like mastery rather than luck.
 
-**Why:** Creates "OH that's what that does" discovery moments — the soul of roguelikes. Every other system becomes more interesting.
+**Combos:**
+- Throw water potion → wet tiles in radius → zap with lightning spell → room arc
+- Throw water potion → wet tiles → fire spell → steam cloud (blinds)
+- Throw oil flask → oily tiles → fire → spreading burning floor
+- Ice spell on burning tiles → extinguish + steam
+- Poison cloud + fire → toxic cloud
+
+**Architecture:**
+- Sparse tile state map: `wet`, `burning`, `oily`, `poisoned` flags (not per-tile storage — just a `Map` keyed on `x|y`)
+- Potion throw → splashes tile states in radius on land
+- Spell/attack resolver checks destination tile state before applying → triggers interaction
+- `statusInteraction` table: `{ wet+lightning → arc, wet+fire → steam, burning+ice → steam, oily+fire → burning, poisoned+fire → toxic_cloud }`
+- Burning structures already tracked (destroyedTileLedger) — burning floor tiles reuse same extinguish logic
+
+**Why:** Player caused both halves — they feel clever, not lucky. Creates "OH that's what that does" discovery moments — the soul of roguelikes. Every other system becomes more interesting.
 
 ---
 
