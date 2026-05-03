@@ -10,8 +10,15 @@
 //                                  safety in numbers: unaware pack creatures
 //                                  won't aggro from sight unless an ally of the
 //                                  same species is within packRadius.
+//   packSpread (packSense monsters, always active while hunting) — pack members
+//                                  penalize approach angles already covered by
+//                                  a hunting ally, causing the pack to fan out
+//                                  and surround rather than stack from one direction.
 //   ambush   (def.ambush)      — creature holds position until player is adjacent.
 //   retreat  (def.retreatHpPct) — creature flees when HP < threshold.
+//   anticipate (intel ≥ 8)     — on LOS break, projects player's last observed
+//                                  movement direction 3 tiles forward as the new
+//                                  search target, predicting the escape route.
 
 import { Position }     from "../components/Position.js";
 import { Collider } from "../components/Collider.js";
@@ -52,6 +59,7 @@ import { getEffectiveVisionRange } from "../utils/blind.js";
 import { chebyshevScalar } from "../utils/distance.js";
 import { CARDINAL_DIRS } from "../utils/directions.js";
 import { CentipedeSegment } from "../components/CentipedeSegment.js";
+import { Facing } from "../components/Facing.js";
 
 const ACTIVE_RADIUS = 32; // tiles; keep AI work bounded to nearby entities
 
@@ -85,6 +93,80 @@ function findNearestRival(world, selfId, ox, oy, sightRange, isBlocked) {
 
 function isSmartPathingMonster(brain, def) {
   return Number(brain?.intelligence ?? def?.intelligence ?? 10) > 3;
+}
+
+/**
+ * Pack spread: score all four cardinal directions and penalise any direction
+ * within 45° of a hunting ally's current approach vector.  Returns the best
+ * traversable direction, or null if no hunting allies are nearby (fast path).
+ *
+ * @param {any} world
+ * @param {number} id
+ * @param {{x:number,y:number}} pos
+ * @param {number} targetX
+ * @param {number} targetY
+ * @param {any} ni  — NamedIdentity component
+ * @param {any} def — monster def
+ * @param {(x:number,y:number)=>boolean} canTraverseTile
+ * @returns {{dx:number,dy:number}|null}
+ */
+function choosePackSpreadDir(world, id, pos, targetX, targetY, ni, def, canTraverseTile) {
+  const myIdentity = ni?.identity;
+  if (!myIdentity) return null;
+  const packRadius = Math.max(1, (def.packRadius ?? 8) | 0);
+
+  // Collect ally approach vectors (ally → target, normalised).
+  const allyNx = [];
+  const allyNy = [];
+  forEachInRadius(world, pos.x | 0, pos.y | 0, packRadius, (neighborId, neighborPos) => {
+    if (neighborId === id) return;
+    const neighborNI = world.get(neighborId, NamedIdentity);
+    if (!neighborNI || neighborNI.identity !== myIdentity) return;
+    const neighborAggro = world.get(neighborId, AggroState);
+    if (!neighborAggro || neighborAggro.alertLevel !== AGGRO_LEVELS.hunting) return;
+    const adx = targetX - (neighborPos.x | 0);
+    const ady = targetY - (neighborPos.y | 0);
+    const len = Math.sqrt(adx * adx + ady * ady);
+    if (len < 0.001) return;
+    allyNx.push(adx / len);
+    allyNy.push(ady / len);
+  });
+
+  if (allyNx.length === 0) return null; // no hunting allies nearby — default pathing
+
+  // Self direction to target (normalised).
+  const sdx = targetX - (pos.x | 0);
+  const sdy = targetY - (pos.y | 0);
+  const selfLen = Math.sqrt(sdx * sdx + sdy * sdy);
+  const selfNx = selfLen > 0.001 ? sdx / selfLen : 0;
+  const selfNy = selfLen > 0.001 ? sdy / selfLen : 0;
+
+  // Score each cardinal direction; penalise overlap with ally approach vectors.
+  // dot > cos(45°) ≈ 0.707 means the two vectors are within 45° of each other.
+  const OVERLAP_PENALTY = 2;
+  let bestScore = -Infinity;
+  let bestDir = null;
+
+  for (const dir of CARDINAL_DIRS) {
+    const nx = (pos.x | 0) + dir.dx;
+    const ny = (pos.y | 0) + dir.dy;
+    if (!isStepTraversable(world, id, nx, ny, targetX, targetY, canTraverseTile)) continue;
+
+    // Base score: how well this direction points toward the target.
+    let score = dir.dx * selfNx + dir.dy * selfNy;
+
+    // Penalise if this approach angle is already covered by a hunting ally.
+    for (let i = 0; i < allyNx.length; i++) {
+      if (dir.dx * allyNx[i] + dir.dy * allyNy[i] > 0.707) score -= OVERLAP_PENALTY;
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestDir = dir;
+    }
+  }
+
+  return bestDir;
 }
 
 /**
@@ -316,6 +398,17 @@ export function aiChaseSystem(world) {
       aggro.lastKnownY      = playerPos.y | 0;
       aggro.searchTurnsLeft = SEARCH_TURNS_HUNTING_GRACE;
 
+      // Track player movement direction for intel ≥ 8 anticipation on LOS break.
+      const playerFacing = world.get(playerId, Facing);
+      if (playerFacing) {
+        const fdx = playerFacing.dx | 0;
+        const fdy = playerFacing.dy | 0;
+        if (fdx !== 0 || fdy !== 0) {
+          aggro.lastKnownMoveDx = fdx;
+          aggro.lastKnownMoveDy = fdy;
+        }
+      }
+
       // ── First sighting: onSeen hooks + pack alerting ────────────
       if (!wasHunting) {
         world.emit('status', { id, kind: 'alert', at: { x: pos.x | 0, y: pos.y | 0 } });
@@ -373,11 +466,18 @@ export function aiChaseSystem(world) {
     } else {
       // No LOS — tick down the search budget.
       switch (aggro.alertLevel) {
-        case AGGRO_LEVELS.hunting:
-          // Just lost LOS; transition to alerted with existing lastKnown.
+        case AGGRO_LEVELS.hunting: {
+          // Intel ≥ 8: anticipate escape route by projecting player's last observed
+          // movement direction forward rather than searching from the last seen tile.
+          const anticipateIntel = Number(brain?.intelligence ?? def?.intelligence ?? 10);
+          if (anticipateIntel >= 8 && (aggro.lastKnownMoveDx !== 0 || aggro.lastKnownMoveDy !== 0)) {
+            aggro.lastKnownX += aggro.lastKnownMoveDx * 3;
+            aggro.lastKnownY += aggro.lastKnownMoveDy * 3;
+          }
           aggro.alertLevel      = AGGRO_LEVELS.alerted;
           aggro.searchTurnsLeft = SEARCH_TURNS_ALERTED;
           break;
+        }
         case AGGRO_LEVELS.alerted:
           aggro.searchTurnsLeft--;
           if (aggro.searchTurnsLeft <= 0) {
@@ -484,14 +584,21 @@ export function aiChaseSystem(world) {
     // ── Chase / retreat: step on dominant axis ──────────────────────
     if (dxt === 0 && dyt === 0) return;
 
+    const canTraverseTile = world.has(id, Flying) ? isFlyable : isWalkable;
+    const canOpenDoors = monsterCanOpenDoors(world, id);
+
     const ax = Math.abs(dxt);
     const ay = Math.abs(dyt);
     let dx = 0, dy = 0;
     if (ax >= ay) { dx = Math.sign(dxt); dy = 0; } else { dy = Math.sign(dyt); dx = 0; }
 
+    // ── Pack spread: fan out to avoid stacking approach angles with allies ──
+    if (!aggro.retreating && def?.packSense && aggro.alertLevel === AGGRO_LEVELS.hunting) {
+      const spreadDir = choosePackSpreadDir(world, id, pos, targetX, targetY, ni, def, canTraverseTile);
+      if (spreadDir) { dx = spreadDir.dx; dy = spreadDir.dy; }
+    }
+
     if (!aggro.retreating && isSmartPathingMonster(brain, def)) {
-      const canTraverseTile = world.has(id, Flying) ? isFlyable : isWalkable;
-      const canOpenDoors = monsterCanOpenDoors(world, id);
       const nx = (pos.x | 0) + dx;
       const ny = (pos.y | 0) + dy;
       if (!isStepTraversable(world, id, nx, ny, targetX, targetY, canTraverseTile)) {

@@ -17,6 +17,8 @@ export const SEARCH_TURNS_CURIOUS       = 6;    // turns curious → unaware dow
  *
  * alertLevel: current awareness tier (see AGGRO_LEVELS).
  * lastKnownX/Y: last recorded position of the target (updated each hunting tick).
+ * lastKnownMoveDx/Dy: last observed movement direction of the target.
+ *   Used by intel ≥ 8 monsters to anticipate escape routes on LOS break.
  * searchTurnsLeft: countdown before downgrading to the next lower tier.
  * retreating: true while the creature is below its retreat HP threshold and
  *             actively fleeing rather than chasing. Cleared when HP recovers.
@@ -26,11 +28,13 @@ export const SEARCH_TURNS_CURIOUS       = 6;    // turns curious → unaware dow
  * Managed by aiChaseSystem, aiScurrySystem, and soundPropagationSystem.
  */
 export const AggroState = defineComponent("AggroState", {
-  alertLevel:      AGGRO_LEVELS.unaware,
-  lastKnownX:      0,
-  lastKnownY:      0,
-  searchTurnsLeft: 0,
-  retreating:      false,
-  patrolDx:        0,
-  patrolDy:        0,
+  alertLevel:        AGGRO_LEVELS.unaware,
+  lastKnownX:        0,
+  lastKnownY:        0,
+  lastKnownMoveDx:   0,
+  lastKnownMoveDy:   0,
+  searchTurnsLeft:   0,
+  retreating:        false,
+  patrolDx:          0,
+  patrolDy:          0,
 });
