@@ -313,7 +313,6 @@ defineMonster('snake', {
   },
   specials: ["Poison 25%", "Fang Strike"],
   description: 'A hissing serpent with venomous fangs.',
-  lootTable: 'drop:snake',
 });
 
 defineMonster('pit_viper', {

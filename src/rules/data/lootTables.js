@@ -853,8 +853,8 @@ export const LOOT_TABLES = {
     entries: [
       { type: "nothing",   weight: 30 },
       { type: "gold",      weight: 30, count: { base: 14, perDepth: 7 } },
-      { type: "equip",     weight: 20, pool: ["axe_heavy", "warhammer", "morningstar"], affixChance: 0.15, affixCountMax: 1 },
-      { type: "equip",     weight: 12, pool: ["chain_armor", "helm_iron"],              affixChance: 0,    affixCountMax: 0 },
+      { type: "equip",     weight: 20, pool: ["axe_heavy", "morningstar"],              affixChance: 0.15, affixCountMax: 1 },
+      { type: "equip",     weight: 12, pool: ["chain_armor", "helm_iron", "warhammer"], affixChance: 0,    affixCountMax: 0 },
       { type: "item",      weight: 14, itemId: "reagent_beast_claw" },
       { type: "archetype", weight: 16, archetype: "ArrowsStack" },
       { type: "archetype", weight: 6,  archetype: "FireArrowsStack" },
