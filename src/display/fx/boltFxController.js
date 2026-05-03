@@ -34,6 +34,16 @@ const LINE_FX_STYLE = Object.freeze({
     pulseLight: Object.freeze([255, 246, 205]),
     shake: 2,
   }),
+  wet_arc: Object.freeze({
+    outer: 'rgba(0,210,230,ALPHA)',
+    mid: 'rgba(60,240,255,ALPHA)',
+    core: 'rgba(200,255,255,ALPHA)',
+    pulseOuter: 'rgba(40,225,245,ALPHA)',
+    pulseCore: 'rgba(190,252,255,ALPHA)',
+    light: Object.freeze([60, 220, 240]),
+    pulseLight: Object.freeze([110, 235, 255]),
+    shake: 3,
+  }),
 });
 
 function getLineFxStyle(style) {
@@ -397,9 +407,9 @@ export function createBoltFxController({ world, cam, fx, getPosition }) {
   }
 
   function installListeners() {
-    world.on('spell:bolt', ({ actor, targetId, spellId, from, to, chainIndex = 0 }) => {
+    world.on('spell:bolt', ({ actor, targetId, spellId, from, to, chainIndex = 0, wet = false }) => {
       if (from && to) {
-        _boltFx.push(new LineFx({ from: { x: from.x, y: from.y }, to: { x: to.x, y: to.y }, ttl: 0.14, chainIndex: Number(chainIndex || 0) }));
+        _boltFx.push(new LineFx({ from: { x: from.x, y: from.y }, to: { x: to.x, y: to.y }, ttl: 0.14, chainIndex: Number(chainIndex || 0), style: wet ? 'wet_arc' : undefined }));
         _lightPulses.push(new PulseFx({ x: to.x, y: to.y, ttl: 0.12 }));
         startShake(cam, 4, 0.18);
       }

@@ -15,6 +15,7 @@ import { Stamina } from "../components/Stamina.js";
 import { Mana } from "../components/Mana.js";
 import { createStatusEvent } from "../../shared/events/statusEvent.js";
 import { getPassiveBonuses } from "../utils/passiveBonuses.js";
+import { markWet } from "../utils/wetTileMap.js";
 
 /**
  * @param {string} identity
@@ -458,6 +459,12 @@ export function createWaterPotionHooks() {
         sourceKind: "potion_water",
         meta: { waterType },
       }, to);
+
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+          markWet(ctx.world, to.x + dx, to.y + dy, 15);
+        }
+      }
 
       ctx.io.emit("item:thrown", {
         actor: actorId,

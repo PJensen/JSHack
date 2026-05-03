@@ -54,6 +54,7 @@ import { resolveCombatSnapshot } from "../utils/resolveCombatSnapshot.js";
 import { CreatureType, CREATURE_TYPES } from "../components/CreatureType.js";
 import { getTile } from "../environment/dungeon/tileMap.js";
 import { TILE_WATER, TILE_SHALLOW_WATER, TILE_WATER_DEEP } from "../environment/dungeon/constants.js";
+import { isWetAt } from "../utils/wetTileMap.js";
 import { WeatherState } from "../components/WeatherState.js";
 import {
   calculateBlindedPhysicalDamage,
@@ -477,6 +478,57 @@ REGISTRY['lightning'] = function lightningScript(world, actor, spell, intent) {
       salt: 0xBAC1,
     }));
     emitSafe(world, 'spell:lightning:backlash', { actor, damage: backlashDmg });
+  }
+
+  // ── Wet arc: targets standing on wet tiles arc at full damage, no chain cap ──
+  const WET_ARC_RADIUS = 10;
+  // Arc nodes = caster + all chain targets (arcs propagate from any of these)
+  const arcNodes = [{ x: apos.x, y: apos.y }, ...chain.map(c => ({ x: c.x, y: c.y }))];
+  let arcIdx = 0;
+  for (const [id, p] of world.query(Position)) {
+    if (used.has(id)) continue;
+    const fac = world.get(id, Faction);
+    if (!fac || !areFactionsHostile(actorFaction, fac.key)) continue;
+    const vit = world.get(id, Vitality);
+    if (!vit || (vit.hp | 0) <= 0) continue;
+    if (actorFaction === 'player' && !isTileVisible(p.x | 0, p.y | 0)) continue;
+    if (d2(apos.x, apos.y, p.x, p.y) > WET_ARC_RADIUS * WET_ARC_RADIUS) continue;
+    if (!isWetAt(world, p.x | 0, p.y | 0)) continue;
+    // Find nearest arc node with LOS
+    let srcNode = null; let srcD2 = Infinity;
+    for (const node of arcNodes) {
+      const dist2 = d2(node.x, node.y, p.x, p.y);
+      if (dist2 < srcD2 && hasSpellLineOfSight(world, {
+        sourceId: actor,
+        targetId: id,
+        sourcePos: node,
+        targetPos: { x: p.x, y: p.y },
+        range: WET_ARC_RADIUS,
+        isBlocked,
+      })) { srcNode = node; srcD2 = dist2; }
+    }
+    if (!srcNode) continue;
+    used.add(id);
+    emitSafe(world, 'spell:bolt', {
+      actor, targetId: id, spellId: spell.id,
+      from: { x: srcNode.x, y: srcNode.y },
+      to: { x: p.x, y: p.y },
+      chainIndex: chain.length + arcIdx,
+      wet: true,
+    });
+    dealDamage(world, buildSpellDamageSpec(world, actor, id, {
+      spell,
+      baseAmount: Math.max(1, Math.round(7 * _rainMult)),
+      type: 'electric',
+      cause: 'spell:lightning:arc',
+      at: { x: p.x, y: p.y },
+      salt: 0xA2C0 + arcIdx,
+    }));
+    arcNodes.push({ x: p.x, y: p.y }); // wet arcs can propagate from newly hit wet targets
+    arcIdx++;
+  }
+  if (arcIdx > 0) {
+    emitSafe(world, 'spell:lightning:wetarc', { actor, spellId: spell.id, arcCount: arcIdx });
   }
 };
 
