@@ -6,9 +6,10 @@ import { STARTER_PRIEST_FETCH_QUEST_ID, getQuestRecord } from "../quests/runtime
 import { RAT_INFESTATION_QUEST_ID, REQUIRED_RAT_KILLS } from "../quests/definitions/ratInfestation.js";
 import { getTownState, getWeather } from "../utils/townStateAccess.js";
 import { Vitality } from "../components/Vitality.js";
-import { Equipment } from "../components/Equipment.js";
+import { Equipment, NON_AMMO_GEAR_SLOTS } from "../components/Equipment.js";
 import { Status } from "../components/Status.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
+import { isItemCursed } from "../utils/curseUtils.js";
 
 const PRIEST_FETCH_ITEM_ID = "book_dead";
 
@@ -146,6 +147,14 @@ function getPlayerObservation(world, playerId, npcRole) {
   // Check for notable status conditions
   const statuses = status?.statuses || [];
   const statusStrs = new Set(statuses.map(s => String(s.type || "")));
+
+  // Also detect cursed from equipped items — Status component misses Beatitude.
+  if (!statusStrs.has("cursed") && eq) {
+    for (let i = 0; i < NON_AMMO_GEAR_SLOTS.length; i++) {
+      const slotId = Number(eq[NON_AMMO_GEAR_SLOTS[i]] || 0) | 0;
+      if (slotId > 0 && isItemCursed(world, slotId)) { statusStrs.add("cursed"); break; }
+    }
+  }
 
   // Poison: herbalist/priest react specifically
   if (statusStrs.has("poisoned")) {

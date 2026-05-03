@@ -358,7 +358,17 @@ export function praySystem(world) {
           // Praying at 1 HP: even an unfavorable deity might answer
           const playerVit = world.get(id, Vitality);
           const deathsDoorBonus = (playerVit && (playerVit.hp | 0) <= 1) ? 0.35 : 0;
-          const chance = Math.min(0.95, baseChance + distressBonus + pityBonus + droughtBonus + deathsDoorBonus);
+          // Cursed equipped items offend the divine — each one dulls the prayer.
+          const prayEq = world.get(id, Equipment);
+          let cursedEquippedCount = 0;
+          if (prayEq) {
+            for (const slot of NON_AMMO_GEAR_SLOTS) {
+              const slotId = Number(prayEq[slot] || 0) | 0;
+              if (slotId > 0) { const b = world.get(slotId, Beatitude); if (b?.state === 'cursed') cursedEquippedCount++; }
+            }
+          }
+          const cursedPenalty = Math.min(0.30, cursedEquippedCount * 0.07);
+          const chance = Math.min(0.95, baseChance + distressBonus + pityBonus + droughtBonus + deathsDoorBonus - cursedPenalty);
           const roll = deterministicRoll(world, id, streak + 17);
 
           if (roll < chance) {

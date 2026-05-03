@@ -1,5 +1,7 @@
 import { ActiveEffects } from "../components/ActiveEffects.js";
+import { Beatitude } from "../components/Beatitude.js";
 import { Duration } from "../components/Duration.js";
+import { Equipment, NON_AMMO_GEAR_SLOTS } from "../components/Equipment.js";
 import { Status } from "../components/Status.js";
 import { StatusEffectNode } from "../components/StatusEffectNode.js";
 import { TimedEffectNode } from "../components/TimedEffectNode.js";
@@ -155,6 +157,24 @@ export function snapshotStatusState(world, entityId) {
       if (projectedStatusStrengths.has(type)) continue;
       const strength = normalizeStrength(s?.potency, s?.stacks);
       statusStrengths.set(type, (statusStrengths.get(type) || 0) + strength);
+    }
+  }
+
+  // Cursed equipped items contribute a 'cursed' status penalty each.
+  // Blessed items grant no passive bonus — their benefit lives in their stats.
+  {
+    const eq = world.get(id, Equipment);
+    if (eq) {
+      let cursedCount = 0;
+      for (let i = 0; i < NON_AMMO_GEAR_SLOTS.length; i++) {
+        const slotId = Number(eq[NON_AMMO_GEAR_SLOTS[i]] || 0) | 0;
+        if (slotId <= 0) continue;
+        const beat = world.get(slotId, Beatitude);
+        if (beat?.state === 'cursed') cursedCount++;
+      }
+      if (cursedCount > 0) {
+        statusStrengths.set('cursed', (statusStrengths.get('cursed') || 0) + cursedCount);
+      }
     }
   }
 

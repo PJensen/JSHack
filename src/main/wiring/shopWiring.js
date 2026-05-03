@@ -13,6 +13,7 @@ import {
 } from "../../rules/utils/inventoryFacade.js";
 import { resolveItemDisplayName, buildItemDisplayData } from "./itemName.js";
 import { appraiseItemValue, getUnidentifiedGemAppraisal } from "../../rules/utils/shopAppraisal.js";
+import { isItemCursed } from "../../rules/utils/curseUtils.js";
 import { chebyshevScalar } from "../../rules/utils/distance.js";
 import { identify, isIdentified } from "../../rules/data/identification.js";
 import { requiresIdentification, getUnidentifiedName } from "../../rules/data/itemAppearances.js";
@@ -300,6 +301,11 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     const eq = world.get(pe.id, Equipment);
     if (getEquippedSlot(eq, itemId)) {
       log("You must unequip that item before selling it.");
+      return;
+    }
+
+    if (isItemCursed(world, itemId)) {
+      log("The shopkeeper recoils. \"I don't deal in cursed goods.\"");
       return;
     }
 

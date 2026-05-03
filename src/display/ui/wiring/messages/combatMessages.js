@@ -1,9 +1,15 @@
 /**
  * Combat, damage, healing, death, ranged, shield, procs, and special strike wiring.
- * Lines ~919-1249, ~1028-1249, ~1167-1249, ~1481-1491, ~2354-2430 from original.
  */
 import { defineMessage, renderMessage } from "./messageRegistry.js";
+import {
+  MELEE_VERBS, SPELL_VERBS, CRIT_MELEE, MISS_VERBS, FLAVOR_ADVERBS,
+  IMPACT_BY_WEAPON,
+  DEATH_BY_ATTACK, DEATH_BY_ELEMENT, DEATH_BY_GORE, DEATH_BY_SIZE, DEATH_CRIT, DEATH_FALLBACK,
+  v, toPastVerb, adverbForFlavor, impactLabel, pick, pickImpact,
+} from "./messageTemplates.js";
 
+// === Monster ability windups / casts ===
 defineMessage("monster:ability:windup", {
   target: ({ actorName, abilityLabel }) => ({
     text: `${actorName} rears back - ${abilityLabel.toLowerCase()} incoming!`,
@@ -24,6 +30,156 @@ defineMessage("monster:ability:cast", {
     text: `${actorName} unleashes ${abilityLabel.toLowerCase()}.`,
     type: "combat",
   }),
+});
+
+// === Melee ability handlers ===
+defineMessage("spell:boar_charge", {
+  target: ({ actorName, hit, missed }) => {
+    if (hit) return { text: `${actorName} slams into you like a battering ram! The ground shakes.`, type: "danger" };
+    if (missed) return { text: `${actorName} thunders past — the wind alone knocks you back!`, type: "danger" };
+    return { text: `${actorName} lowers its head and charges straight at you!`, type: "danger" };
+  },
+  witness: ({ actorName, targetName, hit }) =>
+    hit ? { text: `${actorName} tramples ${targetName}.`, type: "combat" } : null,
+});
+
+defineMessage("spell:boar_bite", {
+  target: ({ actorName, hit, missed }) => {
+    if (hit) return { text: `${actorName} clamps down on your arm — you feel bone grind!`, type: "danger" };
+    if (missed) return { text: `${actorName} snaps its jaws shut on empty air.`, type: "combat" };
+    return null;
+  },
+  witness: ({ actorName, targetName, hit }) =>
+    hit ? { text: `${actorName} sinks its teeth into ${targetName}.`, type: "combat" } : null,
+});
+
+defineMessage("spell:rat_gnaw", {
+  target: ({ actorName, hit, missed }) => {
+    if (hit) return { text: `${actorName} gnaws through your boot leather — blood wells up!`, type: "danger" };
+    if (missed) return { text: `${actorName} lunges for your ankle and misses.`, type: "combat" };
+    return null;
+  },
+  witness: ({ actorName, targetName, hit }) =>
+    hit ? { text: `${actorName} gnaws into ${targetName}.`, type: "combat" } : null,
+});
+
+defineMessage("spell:goblin_dirty_trick", {
+  target: ({ actorName, hit, missed }) => {
+    if (hit) return { text: `${actorName} hurls dirt in your eyes! You can't see!`, type: "danger" };
+    if (missed) return { text: `${actorName} tries to throw dirt in your eyes, but you flinch away.`, type: "combat" };
+    return null;
+  },
+  witness: ({ actorName, targetName, hit }) =>
+    hit ? { text: `${actorName} blinds ${targetName} with a fistful of dirt.`, type: "combat" } : null,
+});
+
+defineMessage("spell:snake_fang", {
+  target: ({ actorName, hit, missed }) => {
+    if (hit) return { text: `${actorName} buries its fangs in your flesh — venom burns through your veins!`, type: "danger" };
+    if (missed) return { text: `${actorName} strikes — fangs flash past your skin, barely missing.`, type: "combat" };
+    return null;
+  },
+  witness: ({ actorName, targetName, hit }) =>
+    hit ? { text: `${actorName} sinks venomous fangs into ${targetName}.`, type: "combat" } : null,
+});
+
+defineMessage("spell:spider_lunge", {
+  target: ({ actorName, hit, missed }) => {
+    if (hit) return { text: `${actorName} launches itself at your face! Legs everywhere!`, type: "danger" };
+    if (missed) return { text: `${actorName} pounces — you twist aside just in time.`, type: "combat" };
+    return null;
+  },
+  witness: ({ actorName, targetName, hit }) =>
+    hit ? { text: `${actorName} pounces on ${targetName}.`, type: "combat" } : null,
+});
+
+defineMessage("spell:shield_bash", {
+  target: ({ actorName, hit, missed }) => {
+    if (hit) return { text: `${actorName} drives a shield into your chest — your ribs creak!`, type: "danger" };
+    if (missed) return { text: `${actorName} swings a shield at your head — you duck!`, type: "combat" };
+    return null;
+  },
+  witness: ({ actorName, targetName, hit }) =>
+    hit ? { text: `${actorName} smashes a shield into ${targetName}.`, type: "combat" } : null,
+});
+
+defineMessage("spell:acid_spit", {
+  target: ({ actorName, hit }) => ({
+    text: hit
+      ? `${actorName} rears back and spits — acid sizzles across your skin!`
+      : `${actorName} spits acid that spatters at your feet, hissing on the stone!`,
+    type: "danger",
+  }),
+  witness: ({ actorName, targetName }) => ({
+    text: `${actorName} hawks a glob of acid at ${targetName}.`,
+    type: "combat",
+  }),
+});
+
+// === Proc messages ===
+defineMessage("proc:bleeding", {
+  target: ({ actorName }) => ({ text: `Blood — yours — hits the floor. ${actorName} opened a wound.`, type: "danger" }),
+  actor:  ({ targetName }) => ({ text: `You open a vein. ${targetName} starts to bleed.`, type: "combat" }),
+  witness:({ actorName, targetName }) => ({ text: `${actorName} opens a wound on ${targetName}.`, type: "combat" }),
+});
+
+defineMessage("proc:hemorrhage", {
+  target: () => ({ text: `The wound tears wider — blood pours freely!`, type: "danger" }),
+  actor:  ({ targetName }) => ({ text: `${targetName}'s wound rips open. Blood everywhere.`, type: "combat" }),
+  witness:({ actorName, targetName }) => ({ text: `${actorName} tears ${targetName}'s wound wider.`, type: "combat" }),
+});
+
+defineMessage("proc:paralyzed", {
+  target: () => ({ text: `Your muscles lock up — you can't move!`, type: "danger" }),
+  actor:  ({ targetName }) => ({ text: `Your blow locks ${targetName}'s joints solid!`, type: "combat" }),
+  witness:({ actorName, targetName }) => ({ text: `${actorName}'s strike paralyzes ${targetName}!`, type: "combat" }),
+});
+
+defineMessage("proc:rot_grub:burrow", {
+  target: () => ({ text: `Something wriggles under your skin — a rot grub! You are bleeding badly!`, type: "danger" }),
+  witness:({ targetName }) => ({ text: `A rot grub burrows into ${targetName}!`, type: "combat" }),
+});
+
+defineMessage("proc:blinded", {
+  target: () => ({ text: `The coating sears your eyes — everything goes dark!`, type: "danger" }),
+  actor:  ({ targetName }) => ({ text: `Blinding liquid coats ${targetName}'s eyes!`, type: "combat" }),
+  witness:({ actorName, targetName }) => ({ text: `${actorName}'s coated weapon blinds ${targetName}!`, type: "combat" }),
+});
+
+defineMessage("proc:confused", {
+  target: () => ({ text: `Your thoughts scatter — which way was forward?`, type: "danger" }),
+  actor:  ({ targetName }) => ({ text: `The coating muddles ${targetName}'s mind!`, type: "combat" }),
+  witness:({ actorName, targetName }) => ({ text: `${actorName}'s strike leaves ${targetName} reeling in confusion!`, type: "combat" }),
+});
+
+defineMessage("proc:hallucinating", {
+  target: () => ({ text: `Oh wow, the ceiling is made of bees! Wait—`, type: "danger" }),
+  actor:  ({ targetName }) => ({ text: `${targetName} stumbles, eyes wide and glassy!`, type: "combat" }),
+  witness:({ targetName }) => ({ text: `${targetName} starts seeing things that aren’t there!`, type: "combat" }),
+});
+
+defineMessage("proc:weakened", {
+  target: () => ({ text: `Strength drains from your limbs!`, type: "danger" }),
+  actor:  ({ targetName }) => ({ text: `The coating saps ${targetName}'s strength!`, type: "combat" }),
+  witness:({ actorName, targetName }) => ({ text: `${actorName}'s coated weapon weakens ${targetName}!`, type: "combat" }),
+});
+
+defineMessage("proc:acid_splash", {
+  target: () => ({ text: `Acid eats into your flesh!`, type: "danger" }),
+  actor:  ({ targetName }) => ({ text: `Acid sizzles across ${targetName}'s skin!`, type: "combat" }),
+  witness:({ actorName, targetName }) => ({ text: `${actorName}'s acid-coated weapon burns ${targetName}!`, type: "combat" }),
+});
+
+defineMessage("proc:ignited", {
+  target: () => ({ text: `Your attacker’s oiled blade sets you ablaze!`, type: "danger" }),
+  actor:  ({ targetName }) => ({ text: `The oil-slicked blade ignites ${targetName}!`, type: "combat" }),
+  witness:({ actorName, targetName }) => ({ text: `${actorName}'s oiled weapon sets ${targetName} alight!`, type: "combat" }),
+});
+
+defineMessage("proc:serpentBound:spectralSnakes", {
+  target: () => ({ text: `Spectral serpents coil and bite at your legs!`, type: "danger" }),
+  actor:  ({ targetName }) => ({ text: `Spectral serpents surge from your breeches and lash ${targetName}.`, type: "combat" }),
+  witness:({ actorName, targetName }) => ({ text: `Spectral serpents whirl around ${actorName} and strike ${targetName}.`, type: "combat" }),
 });
 
 export function installCombatMessages(ctx) {
@@ -56,7 +212,7 @@ export function installCombatMessages(ctx) {
     const len = Array.isArray(tiles) ? tiles.length : 0;
     const tgt = nameOfEntity(target);
     if (tgt === 'You') {
-      log(`${who} opens its jaws \u2014 a torrent of fire roars toward you!`, 'danger');
+      log(`${who} opens its jaws — a torrent of fire roars toward you!`, 'danger');
     } else if (len > 3) {
       log(`${who} rears back and bathes the corridor in dragonfire!`, 'combat');
     } else {
@@ -75,122 +231,60 @@ export function installCombatMessages(ctx) {
 
   world.on('spell:boar_charge', ({ actor, targetId, hit, missed }) => {
     if (!_playerCanSee([actor, targetId])) return;
-    const who = nameOfEntity(actor);
-    const tgt = nameOfEntity(targetId);
-    if (tgt === 'You') {
-      if (hit) log(`${who} slams into you like a battering ram! The ground shakes.`, 'danger');
-      else if (missed) log(`${who} thunders past \u2014 the wind alone knocks you back!`, 'danger');
-      else log(`${who} lowers its head and charges straight at you!`, 'danger');
-      return;
-    }
-    if (hit) log(`${who} tramples ${tgt}.`, 'combat');
+    _logRendered("spell:boar_charge", { actorName: nameOfEntity(actor), targetName: nameOfEntity(targetId), hit, missed });
   });
 
   world.on('spell:boar_bite', ({ actor, targetId, hit, missed }) => {
     if (!_playerCanSee([actor, targetId])) return;
-    const who = nameOfEntity(actor);
-    const tgt = nameOfEntity(targetId);
-    if (tgt === 'You') {
-      if (hit) log(`${who} clamps down on your arm \u2014 you feel bone grind!`, 'danger');
-      else if (missed) log(`${who} snaps its jaws shut on empty air.`, 'combat');
-      return;
-    }
-    if (hit) log(`${who} sinks its teeth into ${tgt}.`, 'combat');
+    _logRendered("spell:boar_bite", { actorName: nameOfEntity(actor), targetName: nameOfEntity(targetId), hit, missed });
   });
 
   world.on('spell:rat_gnaw', ({ actor, targetId, hit, missed }) => {
     if (!_playerCanSee([actor, targetId])) return;
-    const who = nameOfEntity(actor);
-    const tgt = nameOfEntity(targetId);
-    if (tgt === 'You') {
-      if (hit) log(`${who} gnaws through your boot leather \u2014 blood wells up!`, 'danger');
-      else if (missed) log(`${who} lunges for your ankle and misses.`, 'combat');
-      return;
-    }
-    if (hit) log(`${who} gnaws into ${tgt}.`, 'combat');
+    _logRendered("spell:rat_gnaw", { actorName: nameOfEntity(actor), targetName: nameOfEntity(targetId), hit, missed });
   });
 
   world.on('spell:goblin_dirty_trick', ({ actor, targetId, hit, missed }) => {
     if (!_playerCanSee([actor, targetId])) return;
-    const who = nameOfEntity(actor);
-    const tgt = nameOfEntity(targetId);
-    if (tgt === 'You') {
-      if (hit) log(`${who} hurls dirt in your eyes! You can't see!`, 'danger');
-      else if (missed) log(`${who} tries to throw dirt in your eyes, but you flinch away.`, 'combat');
-      return;
-    }
-    if (hit) log(`${who} blinds ${tgt} with a fistful of dirt.`, 'combat');
+    _logRendered("spell:goblin_dirty_trick", { actorName: nameOfEntity(actor), targetName: nameOfEntity(targetId), hit, missed });
   });
 
   world.on('spell:snake_fang', ({ actor, targetId, hit, missed }) => {
     if (!_playerCanSee([actor, targetId])) return;
-    const who = nameOfEntity(actor);
-    const tgt = nameOfEntity(targetId);
-    if (tgt === 'You') {
-      if (hit) log(`${who} buries its fangs in your flesh \u2014 venom burns through your veins!`, 'danger');
-      else if (missed) log(`${who} strikes \u2014 fangs flash past your skin, barely missing.`, 'combat');
-      return;
-    }
-    if (hit) log(`${who} sinks venomous fangs into ${tgt}.`, 'combat');
+    _logRendered("spell:snake_fang", { actorName: nameOfEntity(actor), targetName: nameOfEntity(targetId), hit, missed });
   });
 
   world.on('spell:spider_lunge', ({ actor, targetId, hit, missed }) => {
     if (!_playerCanSee([actor, targetId])) return;
-    const who = nameOfEntity(actor);
-    const tgt = nameOfEntity(targetId);
-    if (tgt === 'You') {
-      if (hit) log(`${who} launches itself at your face! Legs everywhere!`, 'danger');
-      else if (missed) log(`${who} pounces \u2014 you twist aside just in time.`, 'combat');
-      return;
-    }
-    if (hit) log(`${who} pounces on ${tgt}.`, 'combat');
+    _logRendered("spell:spider_lunge", { actorName: nameOfEntity(actor), targetName: nameOfEntity(targetId), hit, missed });
   });
 
   world.on('proc:bleeding', ({ actor, target }) => {
     if (!_playerCanSee([actor, target])) return;
-    const who = nameOfEntity(actor);
-    const tgt = nameOfEntity(target);
-    if (tgt === 'You') { log(`Blood \u2014 yours \u2014 hits the floor. ${who} opened a wound.`, 'danger'); return; }
-    if (who === 'You') { log(`You open a vein. ${tgt} starts to bleed.`, 'combat'); return; }
-    log(`${who} opens a wound on ${tgt}.`, 'combat');
+    _logRendered('proc:bleeding', { actorName: nameOfEntity(actor), targetName: nameOfEntity(target) });
   });
 
   world.on('proc:hemorrhage', ({ actor, target }) => {
     if (!_playerCanSee([actor, target])) return;
-    const who = nameOfEntity(actor);
-    const tgt = nameOfEntity(target);
-    if (tgt === 'You') { log(`The wound tears wider \u2014 blood pours freely!`, 'danger'); return; }
-    if (who === 'You') { log(`${tgt}'s wound rips open. Blood everywhere.`, 'combat'); return; }
-    log(`${who} tears ${tgt}'s wound wider.`, 'combat');
+    _logRendered('proc:hemorrhage', { actorName: nameOfEntity(actor), targetName: nameOfEntity(target) });
   });
 
   world.on('proc:paralyzed', ({ actor, target }) => {
     if (!_playerCanSee([actor, target])) return;
-    const who = nameOfEntity(actor);
-    const tgt = nameOfEntity(target);
-    if (tgt === 'You') { log(`Your muscles lock up \u2014 you can't move!`, 'danger'); return; }
-    if (who === 'You') { log(`Your blow locks ${tgt}'s joints solid!`, 'combat'); return; }
-    log(`${who}'s strike paralyzes ${tgt}!`, 'combat');
+    _logRendered('proc:paralyzed', { actorName: nameOfEntity(actor), targetName: nameOfEntity(target) });
   });
 
   world.on('spell:wolf_howl', ({ actor, alertedIds }) => {
     if (!_playerCanSee([actor])) return;
     const who = nameOfEntity(actor);
     const count = Array.isArray(alertedIds) ? alertedIds.length : 0;
-    if (count > 0) { log(`${who} throws back its head and howls \u2014 ${count} more ${count === 1 ? 'answers' : 'answer'} from the dark!`, 'danger'); return; }
+    if (count > 0) { log(`${who} throws back its head and howls — ${count} more ${count === 1 ? 'answers' : 'answer'} from the dark!`, 'danger'); return; }
     log(`${who} howls. The sound echoes and dies.`, 'combat');
   });
 
   world.on('spell:shield_bash', ({ actor, targetId, hit, missed }) => {
     if (!_playerCanSee([actor, targetId])) return;
-    const who = nameOfEntity(actor);
-    const tgt = nameOfEntity(targetId);
-    if (tgt === 'You') {
-      if (hit) log(`${who} drives a shield into your chest \u2014 your ribs creak!`, 'danger');
-      else if (missed) log(`${who} swings a shield at your head \u2014 you duck!`, 'combat');
-      return;
-    }
-    if (hit) log(`${who} smashes a shield into ${tgt}.`, 'combat');
+    _logRendered("spell:shield_bash", { actorName: nameOfEntity(actor), targetName: nameOfEntity(targetId), hit, missed });
   });
 
   // Shield / dodge / parry combat messages
@@ -200,7 +294,7 @@ export function installCombatMessages(ctx) {
     const attacker = nameOfEntity(source);
     if (who === 'You') {
       log(broken
-        ? `Your shield catches the blow \u2014 and shatters!`
+        ? `Your shield catches the blow — and shatters!`
         : `Your shield catches ${attacker}'s blow. (${stacks} guard left)`, broken ? 'danger' : 'combat');
     } else {
       log(broken
@@ -220,7 +314,7 @@ export function installCombatMessages(ctx) {
     if (!_playerCanSee([defender, attacker])) return;
     const who = nameOfEntity(defender);
     const atk = nameOfEntity(attacker);
-    if (who === 'You') log(`You twist aside \u2014 ${atk}'s attack sails past!`, 'combat');
+    if (who === 'You') log(`You twist aside — ${atk}'s attack sails past!`, 'combat');
     else log(`${who} sidesteps your attack!`, 'combat');
   });
 
@@ -229,38 +323,28 @@ export function installCombatMessages(ctx) {
     const who = nameOfEntity(defender);
     const atk = nameOfEntity(attacker);
     const wName = String(weaponName || 'weapon');
-    if (who === 'You') log(`Steel meets steel \u2014 you deflect ${atk}'s strike with your ${wName}!`, 'combat');
+    if (who === 'You') log(`Steel meets steel — you deflect ${atk}'s strike with your ${wName}!`, 'combat');
     else log(`${who} deflects your attack with a ringing parry!`, 'combat');
   });
 
   world.on('spell:acid_spit', ({ actor, targetId, hit }) => {
     if (!_playerCanSee([actor, targetId])) return;
-    const who = nameOfEntity(actor);
-    const tgt = nameOfEntity(targetId);
-    if (tgt === 'You') {
-      log(hit
-        ? `${who} rears back and spits \u2014 acid sizzles across your skin!`
-        : `${who} spits acid that spatters at your feet, hissing on the stone!`, 'danger');
-      return;
-    }
-    log(`${who} hawks a glob of acid at ${tgt}.`, 'combat');
+    _logRendered("spell:acid_spit", { actorName: nameOfEntity(actor), targetName: nameOfEntity(targetId), hit });
   });
 
   world.on('monster:death:fire_puff', ({ at }) => {
     if (!at || !canSeeAt(at.x, at.y)) return;
-    log('The creature bursts \u2014 a flash of heat, then nothing but ash.', 'combat');
+    log('The creature bursts — a flash of heat, then nothing but ash.', 'combat');
   });
 
   world.on('monster:death:gas_spore', ({ at }) => {
     if (!at || !canSeeAt(at.x, at.y)) return;
-    log('The gas spore ruptures with a wet pop \u2014 toxic clouds billow outward!', 'danger');
+    log('The gas spore ruptures with a wet pop — toxic clouds billow outward!', 'danger');
   });
 
   world.on('proc:rot_grub:burrow', ({ actor, target }) => {
     if (!_playerCanSee([actor, target])) return;
-    const tgt = nameOfEntity(target);
-    if (tgt === 'You') { log('Something wriggles under your skin \u2014 a rot grub! You are bleeding badly!', 'danger'); return; }
-    log(`A rot grub burrows into ${tgt}!`, 'combat');
+    _logRendered('proc:rot_grub:burrow', { actorName: nameOfEntity(actor), targetName: nameOfEntity(target) });
   });
 
   // === Core combat events ===
@@ -273,8 +357,6 @@ export function installCombatMessages(ctx) {
   });
 
   // ── Helpers ──
-  function _v(name, you, they) { return name === 'You' ? you : they; }
-
   function _logRendered(eventKey, data) {
     const rendered = renderMessage(eventKey, data);
     if (!rendered) return;
@@ -310,148 +392,6 @@ export function installCombatMessages(ctx) {
     return ` with <b style="color:${color}" data-entity-id="${wid}" data-tip="item">[${wname}]</b>`;
   }
 
-  // verb pairs: [you-form, third-person-form]
-  const _meleeVerbs = {
-    stab:  ['stab', 'stabs'],
-    slash: ['slash', 'slashes'],
-    blunt: ['bash', 'bashes'],
-    strike:['hit', 'hits'],
-  };
-  const _spellVerbs = {
-    fire:      ['burn', 'burns'],
-    lightning: ['shock', 'shocks'],
-    electric:  ['shock', 'shocks'],
-    ice:       ['freeze', 'freezes'],
-    frost:     ['freeze', 'freezes'],
-    cold:      ['freeze', 'freezes'],
-    poison:    ['poison', 'poisons'],
-    acid:      ['corrode', 'corrodes'],
-    arcane:    ['blast', 'blasts'],
-    plasma:    ['sear', 'sears'],
-    radiation: ['irradiate', 'irradiates'],
-    shadow:    ['torment', 'torments'],
-    nature:    ['ravage', 'ravages'],
-    generic:   ['wound', 'wounds'],
-  };
-  const _critMelee = {
-    stab:  ['skewer', 'skewers'],
-    slash: ['cleave', 'cleaves'],
-    blunt: ['crush', 'crushes'],
-  };
-  const _flavorAdverbs = Object.freeze({
-    brutal: 'brutally',
-    vicious: 'viciously',
-    savage: 'savagely',
-    precise: 'precisely',
-    ruthless: 'ruthlessly',
-  });
-
-  function _toPastVerb(verb) {
-    const v = String(verb || '').toLowerCase();
-    if (!v) return '';
-    if (v === 'hit' || v === 'hits') return 'hit';
-    if (v === 'slash' || v === 'slashes') return 'slashed';
-    if (v === 'stab' || v === 'stabs') return 'stabbed';
-    if (v === 'bash' || v === 'bashes') return 'bashed';
-    if (v === 'skewer' || v === 'skewers') return 'skewered';
-    if (v === 'cleave' || v === 'cleaves') return 'cleaved';
-    if (v === 'crush' || v === 'crushes') return 'crushed';
-    if (v.endsWith('es')) return `${v.slice(0, -2)}ed`;
-    if (v.endsWith('s')) return `${v.slice(0, -1)}ed`;
-    return `${v}ed`;
-  }
-
-  function _adverbForFlavor(flavor) {
-    const f = String(flavor || '').trim().toLowerCase();
-    if (!f) return '';
-    return _flavorAdverbs[f] || f;
-  }
-
-  function _impactLabel(amount, maxHp, isCrit) {
-    const dmg = Math.max(0, Number(amount || 0));
-    const max = Math.max(0, Number(maxHp || 0));
-    const ratio = max > 0 ? (dmg / max) : 0;
-    let label = 'light';
-    if (ratio >= 0.4 || dmg >= 16) label = 'devastating';
-    else if (ratio >= 0.25 || dmg >= 10) label = 'heavy';
-    else if (ratio >= 0.12 || dmg >= 5) label = 'solid';
-    if (isCrit && label !== 'devastating') {
-      if (label === 'solid') label = 'heavy';
-      else if (label === 'heavy') label = 'devastating';
-      else label = 'solid';
-    }
-    return label;
-  }
-
-  const _impactByWeapon = Object.freeze({
-    pickaxe: Object.freeze({
-      light: ["The pick's point chips in."],
-      solid: ["The pick bites deep and twists."],
-      heavy: ["The pickaxe hooks bone and wrenches free."],
-      devastating: ["A devastating quarry-bite caves everything in."],
-    }),
-    mace: Object.freeze({
-      light: ["The mace clips hard enough to rattle teeth."],
-      solid: ["The mace lands square and the frame buckles."],
-      heavy: ["The mace caves ribs with a wet thud."],
-      devastating: ["A devastating crush folds armor like tin."],
-    }),
-    dagger: Object.freeze({
-      light: ["A quick nick draws first blood."],
-      solid: ["The dagger slides between plates."],
-      heavy: ["The dagger drives in to the hilt."],
-      devastating: ["A devastating thrust finds something vital."],
-    }),
-    sword: Object.freeze({
-      light: ["Steel kisses and opens a line."],
-      solid: ["The edge bites and parts flesh cleanly."],
-      heavy: ["The blade shears through with brutal leverage."],
-      devastating: ["A devastating cut nearly takes them in half."],
-    }),
-    axe: Object.freeze({
-      light: ["The axe nicks and tears away."],
-      solid: ["The axe buries and rips free."],
-      heavy: ["The axe hews deep with a splintering crack."],
-      devastating: ["A devastating hew nearly drops them where they stand."],
-    }),
-    spear: Object.freeze({
-      light: ["The spear jabs and tests the guard."],
-      solid: ["The spear punches through the centerline."],
-      heavy: ["The spear drives through and jerks back bloody."],
-      devastating: ["A devastating impalement pins them in place."],
-    }),
-    bow: Object.freeze({
-      light: ["The shot grazes and stings."],
-      solid: ["The arrow thunks in deep."],
-      heavy: ["The shaft punches through with force."],
-      devastating: ["A devastating shot hammers straight through."],
-    }),
-    unarmed: Object.freeze({
-      light: ["A sharp clip catches them."],
-      solid: ["A hard strike snaps the head back."],
-      heavy: ["A brutal body shot empties their lungs."],
-      devastating: ["A devastating blow drops them to a knee."],
-    }),
-    weapon: Object.freeze({
-      light: ["A glancing cut still draws blood."],
-      solid: ["A clean hit lands true."],
-      heavy: ["A heavy strike tears through defenses."],
-      devastating: ["A devastating strike breaks the fight open."],
-    }),
-    spell: Object.freeze({
-      light: ["The magic scorches, but only just."],
-      solid: ["The spell hits with a sharp pulse."],
-      heavy: ["The spell detonates across their body."],
-      devastating: ["A devastating surge of power rips through them."],
-    }),
-  });
-
-  function _pickImpact(pool, seed) {
-    if (!Array.isArray(pool) || pool.length === 0) return '';
-    const n = Math.abs((Number(seed || 0) | 0)) % pool.length;
-    return String(pool[n]);
-  }
-
   function _getProseState() {
     if (!world[PROSE_STATE]) {
       world[PROSE_STATE] = { recentByContext: new Map() };
@@ -477,7 +417,7 @@ export function installCombatMessages(ctx) {
     const recent = state.recentByContext.get(key) || [];
     let chosen = '';
     for (let shift = 0; shift < Math.max(1, pool.length); shift++) {
-      const candidate = _pickImpact(pool, seed + shift);
+      const candidate = pickImpact(pool, seed + shift);
       if (!recent.includes(candidate)) {
         chosen = candidate;
         break;
@@ -489,10 +429,10 @@ export function installCombatMessages(ctx) {
   }
 
   function _impactSentence(amount, maxHp, isCrit, weaponClass, step, contextKey = '') {
-    const level = _impactLabel(amount, maxHp, isCrit);
+    const level = impactLabel(amount, maxHp, isCrit);
     const wc = String(weaponClass || '').toLowerCase();
-    const bank = _impactByWeapon[wc] || _impactByWeapon.weapon;
-    const pool = bank[level] || _impactByWeapon.weapon[level] || _impactByWeapon.weapon.solid;
+    const bank = IMPACT_BY_WEAPON[wc] || IMPACT_BY_WEAPON.weapon;
+    const pool = bank[level] || IMPACT_BY_WEAPON.weapon[level] || IMPACT_BY_WEAPON.weapon.solid;
     const seed = (step | 0) + (Number(amount || 0) | 0) + (Number(maxHp || 0) | 0);
     if (!Array.isArray(pool) || pool.length === 0) return '';
     const key = `${String(contextKey || '')}:impact`;
@@ -501,7 +441,7 @@ export function installCombatMessages(ctx) {
 
     let chosen = '';
     for (let shift = 0; shift < Math.max(1, pool.length); shift++) {
-      const line = _pickImpact(pool, seed + shift);
+      const line = pickImpact(pool, seed + shift);
       const candidate = isCrit ? `${line} Critical!` : line;
       if (!recent.includes(candidate)) {
         chosen = candidate;
@@ -578,7 +518,7 @@ export function installCombatMessages(ctx) {
     const isCrit = !!(critical || crit);
     const targetBleeding = _hasBleedingStatus(target);
     const handTxt = offhand ? ' (off-hand)' : '';
-    const critTxt = isCrit ? ' \u2014 CRIT!' : '';
+    const critTxt = isCrit ? ' — CRIT!' : '';
     const causeKey = String(cause || '').toLowerCase();
     const usingRanged = causeKey === 'ranged';
     const isMelee = causeKey === 'melee' || causeKey === 'retaliation' || !!impactProfile;
@@ -592,8 +532,8 @@ export function installCombatMessages(ctx) {
 
       if (!isWeaponHit) {
         const detailTxt = _combatDetailText(defName, amount, maxHp, hpAfter, isCrit, 'spell', world.step || 0, targetBleeding, proseCtxKey);
-        const pair = _spellVerbs[dt] || ['hit', 'hits'];
-        log(`${atkName} ${_v(atkName, pair[0], pair[1])} ${defName} for ${amount}${critTxt}.${detailTxt}`, 'combat');
+        const pair = SPELL_VERBS[dt] || ['hit', 'hits'];
+        log(`${atkName} ${v(atkName, pair[0], pair[1])} ${defName} for ${amount}${critTxt}.${detailTxt}`, 'combat');
         return;
       }
 
@@ -617,12 +557,12 @@ export function installCombatMessages(ctx) {
         weaponPlain = ' with bare fists';
         weaponRich = ' with bare fists';
       }
-      const pair = (isCrit && _critMelee[attackKind])
-        || _meleeVerbs[attackKind]
+      const pair = (isCrit && CRIT_MELEE[attackKind])
+        || MELEE_VERBS[attackKind]
         || ['hit', 'hits'];
-      const verb = _v(atkName, pair[0], pair[1]);
-      const flavorAdverb = _adverbForFlavor(weaponFlavor);
-      const actionVerb = flavorAdverb ? `${flavorAdverb} ${_toPastVerb(verb)}` : verb;
+      const verb = v(atkName, pair[0], pair[1]);
+      const flavorAdverb = adverbForFlavor(weaponFlavor);
+      const actionVerb = flavorAdverb ? `${flavorAdverb} ${toPastVerb(verb)}` : verb;
       const detailTxt = _combatDetailText(
         defName,
         amount,
@@ -641,85 +581,17 @@ export function installCombatMessages(ctx) {
       log({ text, html, type: 'combat' });
     } else {
       const detailTxt = _combatDetailText(defName, amount, maxHp, hpAfter, isCrit, String(impactProfile?.weaponClass || ''), world.step || 0, targetBleeding, proseCtxKey);
-      log(`${defName} ${_v(defName, 'take', 'takes')} ${amount} damage${critTxt}${handTxt}.${detailTxt}`, 'combat');
+      log(`${defName} ${v(defName, 'take', 'takes')} ${amount} damage${critTxt}${handTxt}.${detailTxt}`, 'combat');
     }
   });
 
   world.on('healed', ({ id, amount }) => {
     if (!_playerCanSee([id])) return;
     const who = nameOfEntity(id);
-    log(`${who} ${_v(who, 'heal', 'heals')} ${amount}.`, 'system');
+    log(`${who} ${v(who, 'heal', 'heals')} ${amount}.`, 'system');
   });
 
   // ── Context-aware death messages ──
-  // Keyed by: attackKind (stab/slash/blunt/strike), goreType (blood/ichor/spark/none),
-  //           sizeClass (S/M/L), damageType (fire/lightning/poison/acid/etc.), critical
-  const _deathByAttack = {
-    stab:  [(w) => `${w} slumps off the blade.`,
-            (w) => `${w} is run through.`,
-            (w) => `${w} staggers and falls, pierced clean.`],
-    slash: [(w) => `${w} is cut down.`,
-            (w) => `${w} is cleaved apart.`,
-            (w) => `${w} drops in a spray of gore.`],
-    blunt: [(w) => `${w} crumples from the impact.`,
-            (w) => `${w} is bludgeoned into the ground.`,
-            (w) => `${w} folds like a sack of wet grain.`],
-    strike:[(w) => `${w} falls.`,
-            (w) => `${w} goes limp.`,
-            (w) => `${w} collapses.`],
-  };
-  const _deathByElement = {
-    fire:      [(w) => `${w} burns to cinders.`,
-                (w) => `${w} is consumed by flame.`],
-    cold:      [(w) => `${w} freezes solid and shatters.`,
-                (w) => `${w} is flash-frozen where it stands.`],
-    lightning: [(w) => `${w} is fried to a crisp.`,
-                (w) => `${w} convulses and drops, smoking.`],
-    poison:    [(w) => `${w} chokes on venom and expires.`,
-                (w) => `${w} froths and collapses.`],
-    acid:      [(w) => `${w} dissolves in a hiss of acid.`,
-                (w) => `${w} melts into a puddle.`],
-    plasma:    [(w) => `${w} is vaporized.`,
-                (w) => `${w} disintegrates in a flash of plasma.`],
-    arcane:    [(w) => `${w} unravels under the arcane force.`,
-                (w) => `${w} is torn apart by raw magic.`],
-    starvation:[(w) => `${w} keels over from hunger.`],
-  };
-  const _deathByGore = {
-    spark:  [(w) => `${w} sparks violently and shuts down.`,
-             (w) => `${w} detonates in a shower of sparks.`],
-    ichor:  [(w) => `${w} bursts, spattering ichor across the floor.`,
-             (w) => `${w} oozes apart.`],
-    none:   [(w) => `${w} is destroyed.`,
-             (w) => `${w} is no more.`],
-  };
-  const _deathCrit = {
-    stab:      [(w) => `${w} is skewered \u2014 dead before hitting the floor.`],
-    slash:     [(w) => `${w} is bisected in a single stroke.`],
-    blunt:     [(w) => `${w} is pulverized.`],
-    fire:      [(w) => `${w} explodes into a pillar of flame!`],
-    cold:      [(w) => `${w} shatters into a thousand frozen pieces!`],
-    lightning: [(w) => `A bolt rips through ${w} \u2014 nothing but char remains.`],
-    acid:      [(w) => `${w} dissolves into nothing \u2014 not even bones remain.`],
-  };
-  const _deathBySize = {
-    S: [(w) => `${w} pops like a grape.`,
-        (w) => `${w} crumples into a tiny heap.`],
-    L: [(w) => `${w} topples like a felled tree.`,
-        (w) => `${w} crashes to the ground \u2014 the floor shakes.`],
-  };
-  const _deathFallback = [
-    (w) => `${w} dies.`,
-    (w) => `${w} expires.`,
-    (w) => `${w} is no more.`,
-    (w) => `${w} falls.`,
-    (w) => `${w} collapses in a heap.`,
-  ];
-
-  function _pick(arr, step) {
-    return arr[(step || 0) % arr.length];
-  }
-
   world.on('died', (ev) => {
     const { id, killer, critical, damageType, goreType, sizeClass, impactProfile } = ev;
     if (!_playerCanSee([id, killer])) return;
@@ -747,34 +619,28 @@ export function installCombatMessages(ctx) {
 
     // 1. Crit kills — most dramatic
     if (critical) {
-      const pool = _deathCrit[attackKind] || _deathCrit[dt];
-      if (pool) { log(_pick(pool, step)(who), 'combat'); return; }
+      const pool = DEATH_CRIT[attackKind] || DEATH_CRIT[dt];
+      if (pool) { log(pick(pool, step)(who), 'combat'); return; }
     }
     // 2. Elemental kills
-    if (_deathByElement[dt]) {
-      log(_pick(_deathByElement[dt], step)(who), 'combat'); return;
+    if (DEATH_BY_ELEMENT[dt]) {
+      log(pick(DEATH_BY_ELEMENT[dt], step)(who), 'combat'); return;
     }
     // 3. Size-specific flavor for small/large
-    if (_deathBySize[size] && step % 3 === 0) {
-      log(_pick(_deathBySize[size], step)(who), 'combat'); return;
+    if (DEATH_BY_SIZE[size] && step % 3 === 0) {
+      log(pick(DEATH_BY_SIZE[size], step)(who), 'combat'); return;
     }
     // 4. Attack-kind flavor (melee weapon shape)
-    if (_deathByAttack[attackKind]) {
-      log(_pick(_deathByAttack[attackKind], step)(who), 'combat'); return;
+    if (DEATH_BY_ATTACK[attackKind]) {
+      log(pick(DEATH_BY_ATTACK[attackKind], step)(who), 'combat'); return;
     }
     // 5. Gore-type flavor (non-blood creatures)
-    if (gore !== 'blood' && _deathByGore[gore]) {
-      log(_pick(_deathByGore[gore], step)(who), 'combat'); return;
+    if (gore !== 'blood' && DEATH_BY_GORE[gore]) {
+      log(pick(DEATH_BY_GORE[gore], step)(who), 'combat'); return;
     }
     // 6. Fallback
-    log(_pick(_deathFallback, step)(who), 'combat');
+    log(pick(DEATH_FALLBACK, step)(who), 'combat');
   });
-
-  const _missVerbs = {
-    stab:  ['stab at', 'stabs at'],
-    slash: ['swing at', 'swings at'],
-    blunt: ['swing at', 'swings at'],
-  };
 
   function _getAttackKindFor(srcId) {
     const eq = compGet(Number(srcId || 0), Equipment);
@@ -798,15 +664,15 @@ export function installCombatMessages(ctx) {
     const src = srcId ? nameOfEntity(source) : null;
     if (style === 'miss' && src) {
       const ak = _getAttackKindFor(srcId);
-      const pair = _missVerbs[ak];
+      const pair = MISS_VERBS[ak];
       if (pair) {
-        log(`${src} ${_v(src, pair[0], pair[1])} ${tgt} and ${_v(src, 'miss', 'misses')}.`, 'combat');
+        log(`${src} ${v(src, pair[0], pair[1])} ${tgt} and ${v(src, 'miss', 'misses')}.`, 'combat');
       } else {
-        log(`${src} ${_v(src, 'miss', 'misses')} ${tgt}.`, 'combat');
+        log(`${src} ${v(src, 'miss', 'misses')} ${tgt}.`, 'combat');
       }
     }
     if (style === 'immune' && src) {
-      log(`${src} ${_v(src, 'attack', 'attacks')} ${tgt}. It does nothing.`, 'combat');
+      log(`${src} ${v(src, 'attack', 'attacks')} ${tgt}. It does nothing.`, 'combat');
     }
   });
 
@@ -831,18 +697,18 @@ export function installCombatMessages(ctx) {
   world.on('battle_fury:heal', ({ id, amount }) => {
     const pe = playerEntity(world);
     if (!pe || id !== pe.id) return;
-    log(`Warchief fury surges \u2014 you recover ${amount} HP!`, 'system');
+    log(`Warchief fury surges — you recover ${amount} HP!`, 'system');
   });
 
   world.on('lichdom_echo:saved', ({ id }) => {
     const pe = playerEntity(world);
     if (!pe || id !== pe.id) return;
-    log('The phylactery pulse shatters \u2014 death is cheated!', 'legendary');
+    log('The phylactery pulse shatters — death is cheated!', 'legendary');
   });
 
   // === Wild Interactions: blessed/holy combat ===
   world.on('combat:holy_strike', () => {
-    log('Your blade blazes with holy light \u2014 the undead recoils!', 'system');
+    log('Your blade blazes with holy light — the undead recoils!', 'system');
   });
   world.on('combat:blessed_strike', ({ creatureType }) => {
     const label = creatureType === 'undead' ? 'undead' : 'demon';
@@ -871,7 +737,7 @@ export function installCombatMessages(ctx) {
     log('The blessed potion surges with amplified power!', 'system');
   });
   world.on('scroll:wasted_blind', () => {
-    log("You fumble blindly at the scroll \u2014 the words blur and fade to nothing!", 'warning');
+    log("You fumble blindly at the scroll — the words blur and fade to nothing!", 'warning');
   });
   world.on('proc:blessed_resist_rust', ({ itemName }) => {
     log(`The blessing on your ${bracketizeName(String(itemName || 'equipment'))} flares, repelling the corrosion!`, 'system');
@@ -895,58 +761,30 @@ export function installCombatMessages(ctx) {
   // === Weapon coating proc messages ===
   world.on('proc:blinded', ({ actor, target }) => {
     if (!_playerCanSee([actor, target])) return;
-    const who = nameOfEntity(actor);
-    const tgt = nameOfEntity(target);
-    if (tgt === 'You') { log('The coating sears your eyes \u2014 everything goes dark!', 'danger'); return; }
-    if (who === 'You') { log(`Blinding liquid coats ${tgt}'s eyes!`, 'combat'); return; }
-    log(`${who}'s coated weapon blinds ${tgt}!`, 'combat');
+    _logRendered('proc:blinded', { actorName: nameOfEntity(actor), targetName: nameOfEntity(target) });
   });
   world.on('proc:confused', ({ actor, target }) => {
     if (!_playerCanSee([actor, target])) return;
-    const who = nameOfEntity(actor);
-    const tgt = nameOfEntity(target);
-    if (tgt === 'You') { log('Your thoughts scatter \u2014 which way was forward?', 'danger'); return; }
-    if (who === 'You') { log(`The coating muddles ${tgt}'s mind!`, 'combat'); return; }
-    log(`${who}'s strike leaves ${tgt} reeling in confusion!`, 'combat');
+    _logRendered('proc:confused', { actorName: nameOfEntity(actor), targetName: nameOfEntity(target) });
   });
   world.on('proc:hallucinating', ({ actor, target }) => {
     if (!_playerCanSee([actor, target])) return;
-    const who = nameOfEntity(actor);
-    const tgt = nameOfEntity(target);
-    if (tgt === 'You') { log('Oh wow, the ceiling is made of bees! Wait\u2014', 'danger'); return; }
-    if (who === 'You') { log(`${tgt} stumbles, eyes wide and glassy!`, 'combat'); return; }
-    log(`${tgt} starts seeing things that aren\u2019t there!`, 'combat');
+    _logRendered('proc:hallucinating', { actorName: nameOfEntity(actor), targetName: nameOfEntity(target) });
   });
   world.on('proc:weakened', ({ actor, target }) => {
     if (!_playerCanSee([actor, target])) return;
-    const who = nameOfEntity(actor);
-    const tgt = nameOfEntity(target);
-    if (tgt === 'You') { log('Strength drains from your limbs!', 'danger'); return; }
-    if (who === 'You') { log(`The coating saps ${tgt}'s strength!`, 'combat'); return; }
-    log(`${who}'s coated weapon weakens ${tgt}!`, 'combat');
+    _logRendered('proc:weakened', { actorName: nameOfEntity(actor), targetName: nameOfEntity(target) });
   });
   world.on('proc:acid_splash', ({ actor, target }) => {
     if (!_playerCanSee([actor, target])) return;
-    const who = nameOfEntity(actor);
-    const tgt = nameOfEntity(target);
-    if (tgt === 'You') { log('Acid eats into your flesh!', 'danger'); return; }
-    if (who === 'You') { log(`Acid sizzles across ${tgt}'s skin!`, 'combat'); return; }
-    log(`${who}'s acid-coated weapon burns ${tgt}!`, 'combat');
+    _logRendered('proc:acid_splash', { actorName: nameOfEntity(actor), targetName: nameOfEntity(target) });
   });
   world.on('proc:ignited', ({ actor, target }) => {
     if (!_playerCanSee([actor, target])) return;
-    const who = nameOfEntity(actor);
-    const tgt = nameOfEntity(target);
-    if (tgt === 'You') { log('Your attacker\u2019s oiled blade sets you ablaze!', 'danger'); return; }
-    if (who === 'You') { log(`The oil-slicked blade ignites ${tgt}!`, 'combat'); return; }
-    log(`${who}'s oiled weapon sets ${tgt} alight!`, 'combat');
+    _logRendered('proc:ignited', { actorName: nameOfEntity(actor), targetName: nameOfEntity(target) });
   });
   world.on('proc:serpentBound:spectralSnakes', ({ actor, target }) => {
     if (!_playerCanSee([actor, target])) return;
-    const who = nameOfEntity(actor);
-    const tgt = nameOfEntity(target);
-    if (tgt === 'You') { log('Spectral serpents coil and bite at your legs!', 'danger'); return; }
-    if (who === 'You') { log(`Spectral serpents surge from your breeches and lash ${tgt}.`, 'combat'); return; }
-    log(`Spectral serpents whirl around ${who} and strike ${tgt}.`, 'combat');
+    _logRendered('proc:serpentBound:spectralSnakes', { actorName: nameOfEntity(actor), targetName: nameOfEntity(target) });
   });
 }
