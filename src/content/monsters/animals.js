@@ -3,17 +3,10 @@
 import { defineMonster } from '../define.js';
 import {
   statusEffectOnHit,
-  selfBuffOnHit,
-  bonusDamageOnBeforeHit,
-  bonusDamageIfTargetAfflicted,
-  healOnDamaged,
-  retaliateOnDamaged,
-  statusEffectOnDamaged,
   phaseOutOnDamaged,
   sandBurrowOnDamaged,
   corrodeEquipmentOnHit,
   typedDamageOnHit,
-  spillLootAndShortBlinkOnDamaged,
   burrowAndDieOnHit,
 } from '../../rules/data/callbacks/combat.js';
 import { selfThrowNearTargetOnSeen, fireBreathLineOnLOS, castSpellOnLOS } from '../../rules/data/callbacks/ai.js';
@@ -287,8 +280,8 @@ defineMonster('cave_spider', {
 defineMonster('snake', {
   name: 'Snake',
   glyph: 'S',
-  color: '#88aa66',
-  glow: '#667744',
+  color: '#55aa44',
+  glow: '#338822',
   tags: ['beast', 'venomous', 'overworld'],
   tier: 0,
   minDepth: 2,
