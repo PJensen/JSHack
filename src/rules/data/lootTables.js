@@ -571,7 +571,7 @@ export const LOOT_TABLES = {
   "drop:beast": {
     rolls: { min: 1, max: 1 },
     entries: [
-      { type: "nothing",   weight: 50 },
+      { type: "nothing",   weight: 40 },
       { type: "gold",      weight: 28, count: { base: 5, perDepth: 3 } },
       { type: "table",     weight: 18, tableId: "sub:reagents_beast" },
       { type: "archetype", weight: 15, archetype: "Ration" },
@@ -611,7 +611,7 @@ export const LOOT_TABLES = {
   "drop:humanoid": {
     rolls: { min: 1, max: 1 },
     entries: [
-      { type: "nothing",   weight: 40 },
+      { type: "nothing",   weight: 25 },
       { type: "gold",      weight: 35, count: { base: 12, perDepth: 7 } },
       { type: "table",     weight: 11, tableId: "sub:potions" },
       { type: "item",      weight: 5, itemId: "potion_mana" },
