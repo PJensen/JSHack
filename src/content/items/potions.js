@@ -33,7 +33,7 @@ defineItem('potion_poison', {
   name: 'Potion of Poison', type: 'potion', material: 'glass', rarity: 'common', value: 20, weight: 0.5,
   coating_color: '#66dd66',
   description: 'A toxic brew that can be used to coat a weapon.',
-  potion: { route: 'oral', doses: 1, channels: [], effects: [], toxicity: null, feel: 'It tastes acrid and vile.' },
+  potion: { route: 'oral', doses: 1, channels: [], effects: [{ key: 'poison', duration: 10, turnsLeft: 10, potency: 2, stack: 'add', maxStacks: 3 }], toxicity: null, feel: 'It tastes acrid and vile. Your stomach heaves!' },
   hooks: {
     can_dip_target: canPoisonDipTarget,
     on_dip: createPoisonCoatDipHook({ chargesGranted: 12, coatingColor: '#66dd66', messageTemplate: 'You coat $targetName with poison (+$chargesGranted charges, total $chargesTotal).' }),

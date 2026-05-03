@@ -307,6 +307,14 @@ export function installItemMessages(ctx) {
       log('Dark words slither off the page, but find nothing to corrupt.', 'system');
     }
   });
+  world.on('scroll:remove_curse', ({ actor, count }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    if (count > 0) {
+      log(`A holy light washes over you. ${count} cursed item${count > 1 ? 's are' : ' is'} cleansed!`, 'system');
+    } else {
+      log('A holy light washes over you, but finds nothing to cleanse.', 'system');
+    }
+  });
   world.on('scroll:summoning', ({ actor }) => {
     if (nameOfEntity(actor) !== 'You') return;
     log('Shapes claw their way out of the parchment! Hostile creatures surround you!', 'danger');

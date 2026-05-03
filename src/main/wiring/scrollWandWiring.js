@@ -26,6 +26,7 @@ import { emitSafe } from "../../rules/utils/emitSafe.js";
 import { inventoryItems, removeFromInventory } from "../../rules/utils/inventoryFacade.js";
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
 import { getEffectiveVisionRange, blind } from "../../rules/utils/blind.js";
+import { listApplyTargetsForTool } from "../../rules/content/items/applyPayloads.js";
 
 const INSTALLED_KEY = Symbol.for('jshack:scrollWandWiring:installed');
 
@@ -142,6 +143,16 @@ export function installScrollWandWiring({ world, targeting, playerEntity }) {
         world.emit?.('scroll:taming:apply', { actor, target: enemyId });
       },
     });
+  });
+
+  // ── Scroll of Identify (Use verb with no apply target selected) ────────
+  world.on('scroll:identify', ({ actor, scrollId }) => {
+    const targets = listApplyTargetsForTool(world, actor, scrollId);
+    if (targets.length === 0) {
+      world.emit?.('message', { text: 'You have nothing that needs identifying.', type: 'system' });
+      return;
+    }
+    window.dispatchEvent(new CustomEvent('ui:openApplyForTool', { detail: { toolId: scrollId } }));
   });
 
   // ── Wand of Stasis ──────────────────────────────────────────────────────

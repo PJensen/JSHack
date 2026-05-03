@@ -131,6 +131,12 @@ defineItem('scroll_identify', {
   identified: true, noQuickChip: true,
   description: 'Reveals the true nature of an item.',
   hooks: {
+    on_use: (ctx, state) => {
+      const actor = Number(state?.actor || ctx.actor || 0) | 0;
+      const scrollId = Number(state?.itemId || 0) | 0;
+      ctx.io.emit('scroll:identify', { actor, scrollId });
+      return { consumed: false, cancelled: true, code: 'IDENTIFY_PENDING_UI', consumesTurn: false };
+    },
     can_dip_target: (state) => {
       const targetInfo = state?.targetInfo;
       if (!targetInfo) return false;
@@ -155,6 +161,24 @@ defineItem('scroll_remove_curse', {
   name: 'Scroll of Remove Curse', type: 'scroll', material: 'paper', rarity: 'magic', value: 50, weight: 0.1,
   description: 'Holy words purge corruption from an item.',
   hooks: {
+    on_use: (ctx, state) => {
+      const actor = Number(state?.actor || ctx.actor || 0) | 0;
+      const equip = ctx.query.get(actor, Equipment);
+      let count = 0;
+      if (equip) {
+        for (const slot of GEAR_SLOTS) {
+          const itemId = equip[slot];
+          if (!(itemId > 0)) continue;
+          const beat = ctx.query.get(itemId, Beatitude);
+          if (!beat || beat.state !== 'cursed') continue;
+          const name = String(ctx.query.name?.(itemId) || 'item');
+          ctx.io.emit('curse:removed', { actor, itemId, name, source: 'scroll' });
+          count++;
+        }
+      }
+      ctx.io.emit('scroll:remove_curse', { actor, count });
+      return { consumed: true };
+    },
     can_dip_target: (state) => state?.targetBeatitude === 'cursed',
     on_dip: (ctx, state) => {
       const targetId = state?.targetId;

@@ -38,12 +38,12 @@ export function popUntilActionableTop(stack, isActionable) {
 export function getQuickChipPrimaryAction(it) {
   const identity = String(it?.identity || it?.details?.identity || '');
   if (identity === 'scroll_identify') return 'apply';
-  if (it?.canApply) return 'apply';
   const t = String(it?.type || '');
+  if (t === 'potion') return 'drink';
+  if (it?.canApply) return 'apply';
   if (it?.canUse && !!it?.equipped) return 'use';
   if (t === 'gem') return 'apply';
   if (t === 'equip' || t === 'ammo' || t === 'wand') return 'equip';
-  if (t === 'potion') return 'drink';
   return 'use';
 }
 
@@ -2028,6 +2028,7 @@ function createQuickSlot(opts = {}) {
     const chip = renderQuickChip(it, {
       startExpanded: !!(opts && opts.startExpanded),
       onUse: () => dispatchAction(it),
+      onApply: Number(it?.id || 0) > 0 && it?.canApply && String(it?.type || '') === 'potion' ? () => dispatchApply(it) : null,
       onThrow: Number(it?.id || 0) > 0 ? () => dispatchThrow(it) : null,
       onDrop: Number(it?.id || 0) > 0 ? () => dispatchDrop(it) : null,
       onPin: Number(it?.id || 0) > 0 && onPinItem ? () => dispatchPin(it) : null,
@@ -2048,6 +2049,10 @@ function createQuickSlot(opts = {}) {
     } else {
       window.dispatchEvent(new CustomEvent('ui:requestUse', { detail: { itemId: it.id } }));
     }
+  }
+
+  function dispatchApply(it) {
+    window.dispatchEvent(new CustomEvent('ui:openApplyForTool', { detail: { toolId: it.id } }));
   }
 
   function dispatchThrow(it) {
@@ -2424,6 +2429,20 @@ function renderQuickChip(it, h) {
     }
   }
 
+  let applyBtn = null;
+  if (typeof h.onApply === 'function') {
+    applyBtn = document.createElement('button');
+    Object.assign(applyBtn.style, {
+      padding: '6px 10px', background: '#101626', color: '#cfe8ff',
+      border: '1px solid #2d3b52', borderRadius: '6px', cursor: 'pointer'
+    });
+    applyBtn.textContent = 'Apply';
+    applyBtn.addEventListener('click', () => {
+      markInteracted();
+      h.onApply && h.onApply();
+    });
+  }
+
   let throwBtn = null;
   if (typeof h.onThrow === 'function') {
     throwBtn = document.createElement('button');
@@ -2498,6 +2517,7 @@ function renderQuickChip(it, h) {
   });
   if (actionable) actions.appendChild(btn);
   if (identifyBtn) actions.appendChild(identifyBtn);
+  if (applyBtn) actions.appendChild(applyBtn);
   if (throwBtn) actions.appendChild(throwBtn);
   if (dropBtn) actions.appendChild(dropBtn);
   if (actions.childElementCount > 0) expandedWrap.appendChild(actions);
