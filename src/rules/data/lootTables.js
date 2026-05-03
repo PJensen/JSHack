@@ -964,7 +964,8 @@ export const LOOT_TABLES = {
     entries: [
       { type: "nothing",   weight: 30 },
       { type: "gold",      weight: 32, count: { base: 30, perDepth: 10 } },
-      { type: "equip",     weight: 20, pool: ["warhammer", "smoldering_club", "axe_heavy"], affixChance: 0.10, affixCountMax: 1 },
+      { type: "equip",     weight: 10, pool: ["axe_heavy"],                                 affixChance: 0.10, affixCountMax: 1 },
+      { type: "equip",     weight: 10, pool: ["warhammer", "smoldering_club"],              affixChance: 0,    affixCountMax: 0 },
       { type: "equip",     weight: 14, pool: ["chain_armor", "belt_ironhide", "helm_steel"], affixChance: 0.10, affixCountMax: 1 },
       { type: "archetype", weight: 16, archetype: "IronRation" },
       { type: "table",     weight: 8,  tableId: "sub:equip_common" },
