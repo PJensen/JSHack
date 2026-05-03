@@ -1,7 +1,7 @@
 // src/main/bootstrap/loadGameData.js
 // Bootstrap-time data warm-up with progress callbacks.
 
-import { MONSTERS } from "../../rules/data/monsters.js";
+import { getAllMonsters } from "../../rules/data/monsters.js";
 import { SPELL_DEFS } from "../../rules/data/spells.js";
 import { ITEM_CATALOG } from "../../rules/data/itemCatalog.js";
 import { AMMO_DEFS } from "../../rules/data/ammo.js";
@@ -42,7 +42,7 @@ export function getGameDataLoadPlan() {
   const affixEntries = listAffixEntries();
   /** @type {DataLoadPlanItem[]} */
   const datasets = [
-    { id: "monsters", label: "Loading monster defs", total: MONSTERS.length },
+    { id: "monsters", label: "Loading monster defs", total: getAllMonsters().length },
     { id: "spells", label: "Loading spell defs", total: Object.keys(SPELL_DEFS).length },
     { id: "items", label: "Loading item catalog", total: Object.keys(ITEM_CATALOG).length },
     { id: "affixes", label: "Loading affix defs", total: affixEntries.length },
@@ -98,8 +98,9 @@ export function loadGameData(opts = {}) {
     emit(ds, 0);
 
     if (ds.id === "monsters") {
-      for (let i = 0; i < MONSTERS.length; i++) {
-        void MONSTERS[i];
+      const allMonsters = getAllMonsters();
+      for (let i = 0; i < allMonsters.length; i++) {
+        void allMonsters[i];
         completed++;
         emit(ds, i + 1);
       }
@@ -250,7 +251,7 @@ export function loadGameData(opts = {}) {
         USE_ITEM_MATCHER_PAYLOADS,
         EFFECT_DEFS,
         EFFECT_OPERATION_IDS,
-        MONSTERS,
+        MONSTERS: getAllMonsters(),
       });
       completed++;
       emit(ds, 1);

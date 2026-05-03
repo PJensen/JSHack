@@ -13,7 +13,7 @@ import { Vitality } from "../../rules/components/Vitality.js";
 import { DungeonState } from "../../rules/components/DungeonState.js";
 import { createItemById } from "../../rules/utils/itemFactory.js";
 import { addToInventory, inventoryItems } from "../../rules/utils/inventoryFacade.js";
-import { MONSTERS } from "../../rules/data/monsters.js";
+import { getAllMonsters } from "../../rules/data/monsters.js";
 import { markExplored } from "../../rules/environment/dungeon/exploredMap.js";
 import { spawnDebugMonsterNearPlayer } from "./spawnDebugMonster.js";
 import { WeatherState } from "../../rules/components/WeatherState.js";
@@ -321,7 +321,7 @@ export function registerBuiltinCommands(console, { world, messageLog, lightingEn
   console.registerCommand('spawn', 'spawn <monster_id> — spawn monster near player', (argsStr) => {
     const monsterId = argsStr.trim();
     if (!monsterId) {
-      const ids = MONSTERS.map(m => m.id).join(', ');
+      const ids = getAllMonsters().map(m => m.id).join(', ');
       return `Usage: spawn <monster_id>\nAvailable: ${ids}`;
     }
     const result = spawnDebugMonsterNearPlayer(world, monsterId);

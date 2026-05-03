@@ -2167,7 +2167,12 @@ export function resolveMonsterMaxHp(monster, depth = 1) {
 
 /** @returns {string[]} */
 export function listAllMonsterIds() {
-  return MONSTERS.map((monster) => monster.id).slice().sort();
+  return [..._byId.keys()].sort();
+}
+
+/** @returns {MonsterDef[]} */
+export function getAllMonsters() {
+  return [..._byId.values()];
 }
 
 /** @param {MonsterDef} def @returns {string} loot table ID */

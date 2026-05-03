@@ -1,4 +1,4 @@
-import { MONSTERS, addGenocide } from "../data/monsters.js";
+import { getAllMonsters, addGenocide } from "../data/monsters.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Faction } from "../components/Faction.js";
 import { Vitality } from "../components/Vitality.js";
@@ -32,7 +32,7 @@ function resolveGenocideTarget(query) {
 
   let best = null;
   let bestScore = Infinity;
-  for (const monster of MONSTERS) {
+  for (const monster of getAllMonsters()) {
     const name = monster.name.toLowerCase();
     if (name === normalized) {
       best = monster;

@@ -447,7 +447,9 @@ export function defineMonster(id, def) {
   // Flags
   if (def.canFly) monsterDef.canFly = def.canFly;
   if (def.rare) monsterDef.rare = def.rare;
+  if (def.disabled) monsterDef.disabled = def.disabled;
   if (def.minDepth != null) monsterDef.minDepth = def.minDepth;
+  if (def.equipment) monsterDef.equipment = def.equipment;
 
   // Corpse eating
   if (def.corpseEat) monsterDef.corpseEat = def.corpseEat;

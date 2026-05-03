@@ -13,7 +13,7 @@ import { Position } from "../../rules/components/Position.js";
 import { Traits } from "../../rules/components/Traits.js";
 import { Vitality } from "../../rules/components/Vitality.js";
 import { setItemCooldown } from "../../rules/utils/itemCooldowns.js";
-import { listAllMonsterIds, MONSTERS, getMonster } from "../../rules/data/monsters.js";
+import { listAllMonsterIds, getAllMonsters, getMonster } from "../../rules/data/monsters.js";
 import { Polymorph } from "../../rules/components/Polymorph.js";
 import { resolvePolymorph } from "../../rules/systems/polymorphSystem.js";
 import { spawnMonsterEntity } from "../../rules/utils/spawnMonsterEntity.js";
@@ -80,7 +80,7 @@ export function installScrollWandWiring({ world, targeting, playerEntity }) {
           const query = input.trim().toLowerCase();
           let best = null;
           let bestScore = Infinity;
-          for (const monster of MONSTERS) {
+          for (const monster of getAllMonsters()) {
             const name = monster.name.toLowerCase();
             if (name === query) { best = monster; bestScore = 0; break; }
             const score = name.startsWith(query) ? 1
