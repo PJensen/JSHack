@@ -18,7 +18,7 @@
 //                                  of blindly fleeing; closes if player moves away.
 //   rally      (packSense, intel 4-6) — retreating pack members regroup toward the
 //                                  nearest non-retreating hunting ally.
-//   chokepoint (intel ≥ 7)      — retreater paths to the nearest corridor tile and
+//   chokepoint (intel ≥ 8)      — retreater paths to the nearest corridor tile and
 //                                  holds there to fight from a defensible position.
 //   anticipate (intel ≥ 8)      — on LOS break, projects player's last observed
 //                                  movement direction 3 tiles forward as the new
@@ -716,7 +716,7 @@ export function aiChaseSystem(world) {
         if (dist < 3) { dx = -dx; dy = -dy; }
         else { return; }
 
-      } else if (intel >= 7) {
+      } else if (intel >= 8) {
         // Chokepoint defense: path to the nearest corridor tile and hold.
         // neighborCount in [1,2] = real corridor; 0 = unloaded/test environment, skip.
         const neighborCount = walkableNeighborCount(pos.x | 0, pos.y | 0, canTraverseTile);
