@@ -65,6 +65,7 @@ import { chebyshevScalar } from "../utils/distance.js";
 import { CARDINAL_DIRS } from "../utils/directions.js";
 import { CentipedeSegment } from "../components/CentipedeSegment.js";
 import { Facing } from "../components/Facing.js";
+import { Trap } from "../components/Trap.js";
 
 const ACTIVE_RADIUS = 32; // tiles; keep AI work bounded to nearby entities
 
@@ -117,6 +118,19 @@ function walkableNeighborCount(x, y, canTraverse) {
     if (canTraverse(x + dir.dx, y + dir.dy)) count++;
   }
   return count;
+}
+
+/**
+ * Returns true when the tile at (x, y) contains an armed, revealed trap.
+ * Intel ≥ 6 monsters refuse to step onto these tiles.
+ */
+function hasRevealedArmedTrap(world, x, y) {
+  for (const [, pos, trap] of world.query(Position, Trap)) {
+    if (!pos || !trap) continue;
+    if ((pos.x | 0) !== x || (pos.y | 0) !== y) continue;
+    if (trap.armed && trap.revealed) return true;
+  }
+  return false;
 }
 
 /**
@@ -744,6 +758,24 @@ export function aiChaseSystem(world) {
       const dir = CARDINAL_DIRS[Math.floor(world.rand() * CARDINAL_DIRS.length)];
       dx = dir.dx;
       dy = dir.dy;
+    }
+
+    // Intel ≥ 6: avoid stepping onto a revealed armed trap.
+    // Try each remaining cardinal direction; if all are trapped, proceed anyway.
+    if (intel >= 6 && (dx !== 0 || dy !== 0)) {
+      const stepX = (pos.x | 0) + dx;
+      const stepY = (pos.y | 0) + dy;
+      if (hasRevealedArmedTrap(world, stepX, stepY)) {
+        for (const dir of CARDINAL_DIRS) {
+          if (dir.dx === dx && dir.dy === dy) continue;
+          const altX = (pos.x | 0) + dir.dx;
+          const altY = (pos.y | 0) + dir.dy;
+          if (hasRevealedArmedTrap(world, altX, altY)) continue;
+          if (!isStepTraversable(world, id, altX, altY, targetX, targetY, canTraverseTile)) continue;
+          dx = dir.dx; dy = dir.dy;
+          break;
+        }
+      }
     }
 
     try { world.add(id, MoveIntent, { dx, dy }); } catch {}
