@@ -9,9 +9,10 @@
 //   packSense  (any intel)       — first sighting alerts nearby same-species.
 //                                  safety in numbers: unaware pack creatures
 //                                  won't aggro from sight unless an ally is nearby.
-//   packSpread (packSense, always while hunting) — pack members penalise approach
-//                                  angles already covered by a hunting ally, causing
-//                                  the pack to fan out and surround naturally.
+//   tacticalSpread (intel > 3, always while hunting) — any enemy with intel > 3
+//                                  penalises approach angles already covered by any
+//                                  other nearby hunting enemy (regardless of species),
+//                                  causing groups to fan out and flank naturally.
 //   ambush     (def.ambush)      — creature holds position until player is adjacent.
 //   retreat    (def.retreatHpPct) — creature flees when HP < threshold.
 //   kite       (has spells or ranged weapon) — retreater holds shoot distance instead
@@ -181,32 +182,30 @@ function chooseRallyDir(world, id, pos, ni, def, canTraverseTile, canOpenDoors) 
 }
 
 /**
- * Pack spread: score all four cardinal directions and penalise any direction
- * within 45° of a hunting ally's current approach vector.  Returns the best
- * traversable direction, or null if no hunting allies are nearby (fast path).
+ * Tactical spread: score all four cardinal directions and penalise any direction
+ * within 45° of a nearby hunting enemy's current approach vector.  Applies to
+ * any enemy with intel > 3, regardless of species — a goblin and a troll closing
+ * from the same angle will naturally split without any explicit coordination.
  *
  * @param {any} world
  * @param {number} id
  * @param {{x:number,y:number}} pos
  * @param {number} targetX
  * @param {number} targetY
- * @param {any} ni  — NamedIdentity component
  * @param {any} def — monster def
  * @param {(x:number,y:number)=>boolean} canTraverseTile
  * @returns {{dx:number,dy:number}|null}
  */
-function choosePackSpreadDir(world, id, pos, targetX, targetY, ni, def, canTraverseTile) {
-  const myIdentity = ni?.identity;
-  if (!myIdentity) return null;
-  const packRadius = Math.max(1, (def.packRadius ?? 8) | 0);
+function choosePackSpreadDir(world, id, pos, targetX, targetY, def, canTraverseTile) {
+  const searchRadius = Math.max(1, (def?.packRadius ?? 8) | 0);
 
-  // Collect ally approach vectors (ally → target, normalised).
+  // Collect approach vectors from any nearby hunting enemy (any species).
   const allyNx = [];
   const allyNy = [];
-  forEachInRadius(world, pos.x | 0, pos.y | 0, packRadius, (neighborId, neighborPos) => {
+  forEachInRadius(world, pos.x | 0, pos.y | 0, searchRadius, (neighborId, neighborPos) => {
     if (neighborId === id) return;
-    const neighborNI = world.get(neighborId, NamedIdentity);
-    if (!neighborNI || neighborNI.identity !== myIdentity) return;
+    const neighborFac = world.get(neighborId, Faction);
+    if (!neighborFac || neighborFac.key !== 'enemy') return;
     const neighborAggro = world.get(neighborId, AggroState);
     if (!neighborAggro || neighborAggro.alertLevel !== AGGRO_LEVELS.hunting) return;
     const adx = targetX - (neighborPos.x | 0);
@@ -680,9 +679,9 @@ export function aiChaseSystem(world) {
     let dx = 0, dy = 0;
     if (ax >= ay) { dx = Math.sign(dxt); dy = 0; } else { dy = Math.sign(dyt); dx = 0; }
 
-    // ── Pack spread: fan out to avoid stacking approach angles with allies ──
-    if (!aggro.retreating && def?.packSense && aggro.alertLevel === AGGRO_LEVELS.hunting) {
-      const spreadDir = choosePackSpreadDir(world, id, pos, targetX, targetY, ni, def, canTraverseTile);
+    // ── Tactical spread: intel > 3 enemies avoid stacking approach angles ──
+    if (!aggro.retreating && intel > 3 && aggro.alertLevel === AGGRO_LEVELS.hunting) {
+      const spreadDir = choosePackSpreadDir(world, id, pos, targetX, targetY, def, canTraverseTile);
       if (spreadDir) { dx = spreadDir.dx; dy = spreadDir.dy; }
     }
 
