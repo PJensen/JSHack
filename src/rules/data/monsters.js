@@ -388,6 +388,7 @@ export const MONSTERS = [
     hooks: null,
     specials: [],
     description: 'A small, harmless serpent that slithers through the dark.',
+    lootTable: 'drop:snake',
   },
   {
     id: 'cave_spider',
@@ -469,6 +470,7 @@ export const MONSTERS = [
     },
     specials: ["Poison 25%", "Fang Strike"],
     description: 'A hissing serpent with venomous fangs.',
+    lootTable: 'drop:snake',
   },
 
   {
@@ -517,6 +519,7 @@ export const MONSTERS = [
     },
     specials: ["Stun 30%"],
     description: 'A massive bear with matted fur and scarred hide. Its claws can split stone.',
+    lootTable: 'drop:cave_bear',
   },
   {
     id: 'dragon_whelp',
@@ -583,6 +586,7 @@ export const MONSTERS = [
     hooks: null,
     specials: ['Ranged weapon user (shortbow)'],
     description: 'A rattling skeleton clutching a short bow.',
+    lootTable: 'drop:skeleton',
     equipped: ["bow_short", { slot: 'ammo', itemId: 'ammo_arrows' }],
   },
 
@@ -653,6 +657,7 @@ export const MONSTERS = [
       onHit: [mindflayerBlastOnHit(10, 0xdead000e)],
     },
     description: 'A pulsing violet eye that drifts in silence. Gaze into it too long and your mind unravels.',
+    lootTable: 'drop:floating_eye',
   },
 
   {
@@ -718,6 +723,7 @@ export const MONSTERS = [
     },
     specials: ["Bleed 20%"],
     description: 'A skeletal bowman with practiced aim. Its arrows leave jagged wounds.',
+    lootTable: 'drop:skeleton',
     equipped: ["bow_short", { slot: 'ammo', itemId: 'ammo_arrows' }],
   },
   {
@@ -922,6 +928,7 @@ export const MONSTERS = [
     },
     specials: ["Rage +2 dmg (25%)", "Armed and armored"],
     description: 'A thick-skulled brute with a chipped cleaver.',
+    lootTable: 'drop:orc',
   },
   {
     id: 'skeleton',
@@ -954,6 +961,7 @@ export const MONSTERS = [
     },
     specials: ["Self-heal 2 HP (20%)", "Wields rusty weapons"],
     description: 'Bones held together by spite. Resistant to piercing but brittle against blunt force.',
+    lootTable: 'drop:skeleton',
   },
   {
     id: 'orc_shaman',
@@ -999,6 +1007,7 @@ export const MONSTERS = [
     },
     specials: ['Casts Frost', 'Self-heals', 'Frost 20%'],
     description: 'A hulking orc draped in fetish charms, breath fogging with stolen winter.',
+    lootTable: 'drop:orc_shaman',
   },
   {
     id: 'hobgoblin',
@@ -1033,6 +1042,7 @@ export const MONSTERS = [
     },
     specials: ["Rage +3 dmg (20%)", "Serrated warblade", "Fully armored"],
     description: 'A tall, iron-jawed warrior bred for war. Stronger and meaner than any goblin.',
+    lootTable: 'drop:hobgoblin',
   },
   {
     id: 'phase_spider',
@@ -1225,6 +1235,7 @@ export const MONSTERS = [
     },
     specials: ["Burn 20%"],
     description: 'A grim skeleton nocking arrows tipped with alchemical fire.',
+    lootTable: 'drop:skeleton',
     equipped: ["bow_short", "ammo_fire_arrows"],
   },
   {
@@ -1252,6 +1263,7 @@ export const MONSTERS = [
     },
     specials: ["Stun 15%"],
     description: 'A headless torso that somehow never misses.',
+    lootTable: 'drop:skeleton',
     equipped: ["bow_short", { slot: 'ammo', itemId: 'ammo_arrows' }],
   },
   {
@@ -1275,6 +1287,7 @@ export const MONSTERS = [
     },
     specials: ["Regen buff on hit", "Self-heal 1 HP (30%)"],
     description: 'A hulking regenerator. Weak to fire.',
+    lootTable: 'drop:troll',
     corpseEat: { behavior: "devour", cooldownTurns: 10 },
   },
   {
@@ -1302,6 +1315,7 @@ export const MONSTERS = [
     },
     specials: ["Drain 3 HP (20%)"],
     description: 'A spectral horror. Physical attacks pass through it.',
+    lootTable: 'drop:wraith',
   },
   {
     id: 'ogre',
@@ -1322,6 +1336,7 @@ export const MONSTERS = [
     hooks: null,
     specials: ["Crushing club"],
     description: 'A lumbering slab of muscle and bad intentions.',
+    lootTable: 'drop:ogre',
   },
 
   {
@@ -1434,6 +1449,7 @@ export const MONSTERS = [
     },
     specials: ["Rage +3 dmg (30%)", "Warcry retaliation", "Warchief maul"],
     description: 'A scarred orc captain in heavy plate. Its war-cry alone can stop a heart.',
+    lootTable: 'drop:orc',
   },
 
   // ── Tier 3 (floors 16+) ────────────────────────────────────────────
@@ -1476,6 +1492,7 @@ export const MONSTERS = [
     },
     specials: ["Telegraphed volley", "Drain 3 HP (20%)"],
     description: 'An ancient undead marksman wreathed in cold flame. Its arrows sap the life from their targets.',
+    lootTable: 'drop:skeleton',
     equipped: ["bow_short", "ammo_fire_arrows"],
   },
   {
@@ -1503,6 +1520,7 @@ export const MONSTERS = [
     },
     specials: ["Burn 30%", "Hellfire retaliation"],
     description: 'Sulphur and malice given form. Immune to fire.',
+    lootTable: 'drop:demon',
   },
   {
     id: 'dragon',
@@ -1728,6 +1746,7 @@ export const MONSTERS = [
     },
     specials: ["Petrifying touch (slow 80%)", "Confuse 60%", "Weaken 40%", "Passive"],
     description: 'A scaly hen-lizard with dead white eyes. Its touch numbs flesh to stone.',
+    lootTable: 'drop:cockatrice',
   },
   // ── Shrieker (tier 0, minDepth 3) — alarm fungus ───────────────────
   {

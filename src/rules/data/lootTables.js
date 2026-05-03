@@ -843,6 +843,175 @@ export const LOOT_TABLES = {
     ],
   },
 
+  // ── Named-type monster tables ────────────────────────────────────────
+  // Dedicated per-monster tables. Caster variants get separate tables.
+  // Shared: orc+orc_warchief → drop:orc; all skeletal non-casters → drop:skeleton;
+  //         cave_snake+snake → drop:snake.
+
+  "drop:orc": {
+    rolls: { min: 1, max: 1 },
+    entries: [
+      { type: "nothing",   weight: 30 },
+      { type: "gold",      weight: 30, count: { base: 14, perDepth: 7 } },
+      { type: "equip",     weight: 20, pool: ["axe_heavy", "warhammer", "morningstar"], affixChance: 0.15, affixCountMax: 1 },
+      { type: "equip",     weight: 12, pool: ["chain_armor", "helm_iron"],              affixChance: 0,    affixCountMax: 0 },
+      { type: "item",      weight: 14, itemId: "reagent_beast_claw" },
+      { type: "archetype", weight: 16, archetype: "ArrowsStack" },
+      { type: "archetype", weight: 6,  archetype: "FireArrowsStack" },
+      { type: "archetype", weight: 14, archetype: "HealthPotion" },
+      { type: "archetype", weight: 10, archetype: "IronRation" },
+    ],
+  },
+
+  "drop:orc_shaman": {
+    rolls: { min: 1, max: 1 },
+    entries: [
+      { type: "nothing",   weight: 30 },
+      { type: "gold",      weight: 22, count: { base: 12, perDepth: 6 } },
+      { type: "table",     weight: 20, tableId: "sub:reagents_occult" },
+      { type: "table",     weight: 14, tableId: "sub:scrolls" },
+      { type: "table",     weight: 10, tableId: "sub:potions" },
+      { type: "item",      weight: 10, itemId: "reagent_rune_fragment" },
+      { type: "item",      weight: 8,  itemId: "reagent_cursed_thread" },
+      { type: "equip",     weight: 8,  pool: ["ring_arcana", "amulet_vigor"], affixChance: 0.20, affixCountMax: 1 },
+      { type: "table",     weight: 5,  tableId: "sub:spellbooks" },
+    ],
+  },
+
+  "drop:hobgoblin": {
+    rolls: { min: 1, max: 1 },
+    entries: [
+      { type: "nothing",   weight: 28 },
+      { type: "gold",      weight: 30, count: { base: 18, perDepth: 8 } },
+      { type: "equip",     weight: 22, pool: ["longsword", "sword_plain", "axe_heavy"], affixChance: 0.20, affixCountMax: 1 },
+      { type: "equip",     weight: 14, pool: ["chain_armor", "shield_iron", "helm_iron"], affixChance: 0.15, affixCountMax: 1 },
+      { type: "archetype", weight: 18, archetype: "ArrowsStack" },
+      { type: "archetype", weight: 8,  archetype: "PiercingArrowsStack" },
+      { type: "archetype", weight: 8,  archetype: "HealthPotion" },
+      { type: "table",     weight: 8,  tableId: "sub:equip_common" },
+      { type: "table",     weight: 6,  tableId: "sub:potions" },
+    ],
+  },
+
+  "drop:skeleton": {
+    rolls: { min: 1, max: 1 },
+    entries: [
+      { type: "nothing",   weight: 38 },
+      { type: "table",     weight: 24, tableId: "sub:reagents_undead" },
+      { type: "gold",      weight: 20, count: { base: 8, perDepth: 4 } },
+      { type: "item",      weight: 10, itemId: "scroll_remove_curse" },
+      { type: "item",      weight: 8,  itemId: "potion_holy_water" },
+      { type: "archetype", weight: 18, archetype: "ArrowsStack" },
+      { type: "archetype", weight: 8,  archetype: "PiercingArrowsStack" },
+      { type: "archetype", weight: 6,  archetype: "BodkinArrowsStack" },
+      { type: "equip",     weight: 6,  pool: ["bow_short", "bow_recurve"], affixChance: 0 },
+    ],
+  },
+
+  "drop:snake": {
+    rolls: { min: 1, max: 1 },
+    entries: [
+      { type: "nothing",   weight: 45 },
+      { type: "item",      weight: 22, itemId: "reagent_venom_gland" },
+      { type: "item",      weight: 16, itemId: "reagent_beast_claw" },
+      { type: "archetype", weight: 18, archetype: "Ration" },
+      { type: "gold",      weight: 10, count: { base: 4, perDepth: 2 } },
+    ],
+  },
+
+  "drop:cave_bear": {
+    rolls: { min: 1, max: 1 },
+    entries: [
+      { type: "nothing",   weight: 35 },
+      { type: "item",      weight: 28, itemId: "reagent_beast_claw" },
+      { type: "archetype", weight: 20, archetype: "Ration" },
+      { type: "archetype", weight: 12, archetype: "IronRation" },
+      { type: "gold",      weight: 12, count: { base: 6, perDepth: 3 } },
+      { type: "table",     weight: 6,  tableId: "sub:potions" },
+    ],
+  },
+
+  "drop:troll": {
+    rolls: { min: 1, max: 1 },
+    entries: [
+      { type: "nothing",   weight: 30 },
+      { type: "gold",      weight: 28, count: { base: 30, perDepth: 10 } },
+      { type: "item",      weight: 20, itemId: "reagent_beast_claw" },
+      { type: "item",      weight: 12, itemId: "reagent_resin" },
+      { type: "equip",     weight: 16, pool: ["warhammer", "smoldering_club"], affixChance: 0, affixCountMax: 0 },
+      { type: "archetype", weight: 14, archetype: "HealthPotion" },
+      { type: "archetype", weight: 12, archetype: "IronRation" },
+      { type: "table",     weight: 5,  tableId: "sub:equip_common" },
+    ],
+  },
+
+  "drop:wraith": {
+    rolls: { min: 1, max: 1 },
+    entries: [
+      { type: "nothing",   weight: 35 },
+      { type: "item",      weight: 24, itemId: "reagent_ectoplasm" },
+      { type: "item",      weight: 14, itemId: "reagent_cursed_thread" },
+      { type: "item",      weight: 10, itemId: "scroll_remove_curse" },
+      { type: "item",      weight: 8,  itemId: "potion_holy_water" },
+      { type: "equip",     weight: 12, pool: ["leggings_wraith", "armor_phantom", "ring_voidchannel"], affixChance: 0 },
+      { type: "table",     weight: 8,  tableId: "sub:equip_magic" },
+      { type: "gold",      weight: 16, count: { base: 18, perDepth: 6 } },
+    ],
+  },
+
+  "drop:ogre": {
+    rolls: { min: 1, max: 1 },
+    entries: [
+      { type: "nothing",   weight: 30 },
+      { type: "gold",      weight: 32, count: { base: 30, perDepth: 10 } },
+      { type: "equip",     weight: 20, pool: ["warhammer", "smoldering_club", "axe_heavy"], affixChance: 0.10, affixCountMax: 1 },
+      { type: "equip",     weight: 14, pool: ["chain_armor", "belt_ironhide", "helm_steel"], affixChance: 0.10, affixCountMax: 1 },
+      { type: "archetype", weight: 16, archetype: "IronRation" },
+      { type: "table",     weight: 8,  tableId: "sub:equip_common" },
+    ],
+  },
+
+  "drop:cockatrice": {
+    rolls: { min: 1, max: 1 },
+    entries: [
+      { type: "nothing",   weight: 40 },
+      { type: "item",      weight: 22, itemId: "reagent_beast_claw" },
+      { type: "item",      weight: 16, itemId: "reagent_resin" },
+      { type: "archetype", weight: 14, archetype: "Ration" },
+      { type: "gold",      weight: 10, count: { base: 8, perDepth: 3 } },
+      { type: "table",     weight: 6,  tableId: "sub:potions" },
+    ],
+  },
+
+  "drop:floating_eye": {
+    rolls: { min: 1, max: 1 },
+    entries: [
+      { type: "nothing",   weight: 40 },
+      { type: "item",      weight: 24, itemId: "reagent_ectoplasm" },
+      { type: "item",      weight: 14, itemId: "reagent_rune_fragment" },
+      { type: "table",     weight: 12, tableId: "sub:scrolls" },
+      { type: "equip",     weight: 8,  pool: ["ring_arcana", "ring_blindness"], affixChance: 0 },
+      { type: "table",     weight: 8,  tableId: "sub:potions" },
+      { type: "gold",      weight: 10, count: { base: 6, perDepth: 3 } },
+    ],
+  },
+
+  "drop:demon": {
+    rolls: { min: 1, max: 1 },
+    entries: [
+      { type: "nothing",   weight: 28 },
+      { type: "gold",      weight: 28, count: { base: 40, perDepth: 12 } },
+      { type: "item",      weight: 16, itemId: "reagent_cursed_thread" },
+      { type: "item",      weight: 12, itemId: "reagent_rune_fragment" },
+      { type: "item",      weight: 10, itemId: "reagent_frost_core" },
+      { type: "equip",     weight: 18, pool: ["nightfang_dagger", "smoldering_club", "witchfire_sword"], affixChance: 0 },
+      { type: "equip",     weight: 8,  pool: ["ring_fire_resist", "ring_shock_resist"], affixChance: 0.20, affixCountMax: 1 },
+      { type: "table",     weight: 8,  tableId: "sub:equip_magic" },
+      { type: "table",     weight: 5,  tableId: "sub:spellbooks" },
+      { type: "table",     weight: 4,  tableId: "sub:equip_rare" },
+    ],
+  },
+
   // ── Chest tables ──────────────────────────────────────────────────
   // Max 1 weapon per chest - equipment split into weapon vs armor/jewelry
 
