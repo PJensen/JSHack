@@ -1,3 +1,4 @@
+import "./helpers/installContentMonsters.mjs";
 // Nymph: item theft on hit, teleport away, cooldown, player-only targeting.
 
 import { assert, assertEquals } from "jsr:@std/assert";

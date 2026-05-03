@@ -1,3 +1,4 @@
+import "./helpers/installContentMonsters.mjs";
 // tests/nav.test.mjs
 // Navigation / connectivity tests for full dungeon floors.
 //

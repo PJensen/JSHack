@@ -1,3 +1,4 @@
+import "./helpers/installContentMonsters.mjs";
 // tests/aiPatrol.test.mjs
 // Directed patrol behavior: high-intelligence (> 3) unaware enemies maintain a
 // persistent patrol heading rather than scurrying randomly.

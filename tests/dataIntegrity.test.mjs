@@ -3,7 +3,8 @@ import { assert } from "jsr:@std/assert";
 import { SPELL_DEFS, getSpell, listSpells } from '../src/rules/data/spells.js';
 import { ITEM_CATALOG, getCatalogItem, listCatalogItems } from '../src/rules/data/itemCatalog.js';
 import { getAffix, listAffixEntries, listAffixes } from '../src/rules/data/affixes.js';
-import { MONSTERS } from '../src/rules/data/monsters.js';
+import { getAllMonsters } from '../src/rules/data/monsters.js';
+const MONSTERS = getAllMonsters();
 import { registerScript, runScript, listRegisteredScripts, ScriptVerb } from '../src/rules/scripting.js';
 
 Deno.test("spell definitions are valid", () => {

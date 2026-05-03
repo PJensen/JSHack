@@ -1,3 +1,4 @@
+import "./helpers/installContentMonsters.mjs";
 // Floating eye gaze: channeled beam — 8 turns LOS → 3-turn stun + 1 mindwipe stack.
 // Gaze is now a proper channeled spell (gaze_beam) with breakOnNoLos/breakOnMove.
 

@@ -1,3 +1,4 @@
+import "./helpers/installContentMonsters.mjs";
 // Rust Monster: corrodes metal equipment on hit, stacks up to 3x, material immunity.
 
 import { assert, assertEquals } from "jsr:@std/assert";

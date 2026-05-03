@@ -1,3 +1,4 @@
+import "./helpers/installContentMonsters.mjs";
 import { assert } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";
 import { buildWorldView } from "../src/bridge/schema/worldView.js";

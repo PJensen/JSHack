@@ -1,3 +1,4 @@
+import "./helpers/installContentMonsters.mjs";
 import { assert, assertEquals } from "jsr:@std/assert";
 import { basePalette } from "../src/display/palette/base.js";
 import { buildPalette } from "../src/display/palette/index.js";

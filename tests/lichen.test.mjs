@@ -1,3 +1,4 @@
+import "./helpers/installContentMonsters.mjs";
 // Lichen: tier 0, sessile, never-rotting corpse, safe food source.
 
 import { assert, assertEquals } from "jsr:@std/assert";

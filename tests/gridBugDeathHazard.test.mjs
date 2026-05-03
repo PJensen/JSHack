@@ -1,3 +1,4 @@
+import "./helpers/installContentMonsters.mjs";
 import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";
 import { HazardArea } from "../src/rules/components/HazardArea.js";

@@ -4,6 +4,7 @@
 // registrations (catalog entry, palette entry, monster def, hooks).
 
 import { registerItem, registerMonster, registerPalette, registerPresentation, registerAbility } from './registry.js';
+import { registerMonsterDef } from '../rules/data/monsters.js';
 import { compileHook, ScriptCtx } from './scriptCtx.js';
 import { createWorldFacade } from './worldFacade.js';
 import { inferItemCategory, resolveRarity, SHELF_LIFE } from './helpers.js';
@@ -467,6 +468,7 @@ export function defineMonster(id, def) {
 
   // ── Register ──────────────────────────────────────────────────
   registerMonster(id, monsterDef);
+  registerMonsterDef(monsterDef);  // eager: available via getMonster() immediately
 
   // ── Palette ───────────────────────────────────────────────────
   if (def.glyph || def.color) {

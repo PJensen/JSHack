@@ -1,3 +1,4 @@
+import "./helpers/installContentMonsters.mjs";
 // Mimic: ambush predator with disguise, adhesive grip stun onHit.
 
 import { assert, assertEquals } from "jsr:@std/assert";

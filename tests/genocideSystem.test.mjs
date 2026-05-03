@@ -1,3 +1,4 @@
+import "./helpers/installContentMonsters.mjs";
 // @ts-nocheck
 import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";

@@ -1,3 +1,4 @@
+import "./helpers/installContentMonsters.mjs";
 // tests/aiCorpseEat.test.mjs
 // Monsters with corpseEat config consume floor corpses for healing or overhealth.
 

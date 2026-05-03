@@ -1,3 +1,4 @@
+import "./helpers/installContentMonsters.mjs";
 import { assert } from "jsr:@std/assert";
 import { getGameDataLoadPlan, loadGameData } from "../src/main/bootstrap/loadGameData.js";
 

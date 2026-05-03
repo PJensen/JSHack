@@ -1,3 +1,4 @@
+import "./helpers/installContentMonsters.mjs";
 // Prove that kinetic DR applies to melee hits (post bypassResist removal).
 // Combos: mace (blunt) and sword (physical) vs cave_bear (DR:3).
 

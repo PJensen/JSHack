@@ -1,3 +1,4 @@
+import "./helpers/installContentMonsters.mjs";
 // tests/aiWeaponPickup.test.mjs
 // Sapient humanoid monsters pick up weapons from the floor when unarmed and hunting.
 

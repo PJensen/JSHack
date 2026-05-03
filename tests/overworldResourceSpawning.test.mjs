@@ -1,3 +1,4 @@
+import "./helpers/installContentMonsters.mjs";
 import { assert } from "jsr:@std/assert";
 import { generateOverworldChunks } from "../src/rules/environment/dungeon/overworld.js";
 

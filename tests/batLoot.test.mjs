@@ -1,3 +1,4 @@
+import "./helpers/installContentMonsters.mjs";
 import { assert, assertEquals } from "jsr:@std/assert";
 import { getMonster, getMonsterLootTable } from "../src/rules/data/monsters.js";
 import { resolveLootTable } from "../src/rules/data/lootResolver.js";

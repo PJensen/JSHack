@@ -1,3 +1,4 @@
+import "./helpers/installContentMonsters.mjs";
 import { assertEquals } from "jsr:@std/assert";
 import { getMonster, MONSTER_HP_SCALAR, resolveMonsterMaxHp } from "../src/rules/data/monsters.js";
 import { pickSpecificMonster } from "../src/rules/environment/dungeon/tables.js";

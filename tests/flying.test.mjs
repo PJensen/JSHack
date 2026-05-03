@@ -1,3 +1,4 @@
+import "./helpers/installContentMonsters.mjs";
 // tests/flying.test.mjs
 // Flying component: AI toggle, terrain bypass, melee immunity, floor eligibility.
 

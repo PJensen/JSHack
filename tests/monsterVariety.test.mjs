@@ -1,3 +1,4 @@
+import "./helpers/installContentMonsters.mjs";
 // tests/monsterVariety.test.mjs
 // Verify new monster definitions, encounter groups, sentinel roll, and tier pools.
 

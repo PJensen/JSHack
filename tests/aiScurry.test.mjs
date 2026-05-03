@@ -1,3 +1,4 @@
+import "./helpers/installContentMonsters.mjs";
 // tests/aiScurry.test.mjs
 // Scurry system: dumb idle enemies wander randomly; smart/alerted ones do not.
 
