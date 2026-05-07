@@ -59,6 +59,8 @@ export function setupDisplayRuntime({
   isPet,
   isPlayer,
   getPlayerEntity,
+  getHiddenTrapPositions,
+  getSacredSitePositions,
   getItemInfo,
   getItemMaterial,
   resolveItemDisplayName,
@@ -105,7 +107,16 @@ export function setupDisplayRuntime({
   });
   deathEssenceFx.installListeners();
 
-  const spiritWispFx = createSpiritWispFxController({ world, fx, getPosition, getPlayerEntity, sampleMood, deathEssenceFx });
+  const spiritWispFx = createSpiritWispFxController({
+    world,
+    fx,
+    getPosition,
+    getPlayerEntity,
+    sampleMood,
+    getHiddenTrapPositions,
+    getSacredSitePositions,
+    deathEssenceFx,
+  });
   spiritWispFx.installListeners();
 
   const bumpFx = createBumpFxController();

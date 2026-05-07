@@ -2730,7 +2730,24 @@ const displayRuntime = setupDisplayRuntime({
   isPet: isPetEntity,
   isPlayer: isPlayerEntity,
   getPlayerEntity,
-  getPosition,
+  getHiddenTrapPositions: () => {
+    const out = [];
+    for (const [, pos, trap] of world.query(Position, Trap)) {
+      if (!trap?.armed || trap.revealed) continue;
+      out.push({ x: pos.x, y: pos.y });
+    }
+    return out;
+  },
+  getSacredSitePositions: () => {
+    const out = [];
+    for (const [, pos, ident] of world.query(Position, NamedIdentity)) {
+      const key = String(ident?.identity || "").toLowerCase();
+      if (key === "altar" || key === "shrine" || key === "church_altar") {
+        out.push({ x: pos.x, y: pos.y });
+      }
+    }
+    return out;
+  },
   getItemInfo,
   getItemMaterial: (id) => String(world.get(Number(id || 0) | 0, Material)?.kind || ""),
   resolveItemDisplayName: resolveDisplayName,

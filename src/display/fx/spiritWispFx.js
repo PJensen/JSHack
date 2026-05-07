@@ -8,9 +8,6 @@
 //   Betrayal        — at low standing the wisp drifts away and dims
 
 import { Particle } from "../passes/vfx/particles/particlePool.js";
-import { Position } from "../../rules/components/Position.js";
-import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
-import { Trap } from "../../rules/components/Trap.js";
 import { computeMissEndpoint, missSeedFromIds } from "./projectileMiss.js";
 
 const INSTALLED_KEY = Symbol.for("jshack:display:spiritWisp:installed");
@@ -93,7 +90,6 @@ const PET_REBIRTH_CIRCLE_DURATION = 3.4;
 const PET_REBIRTH_ORBIT_RADIUS = 0.96;
 const ITEM_FETCH_COOLDOWN = 1.15;
 const ITEM_FETCH_RADIUS = 7;
-const SACRED_IDENTITIES = new Set(["altar", "shrine", "church_altar"]);
 
 // ── Essence harvest (passive soul-pull aura) ─────────────────────
 const HARVEST_DOWNTIME_THRESHOLD = 0.15; // agitation must be below this
@@ -112,11 +108,13 @@ const GUIDANCE_FLY_SPEED = 10;
  *   getPosition: (id:number) => ({x:number,y:number}|null),
  *   getPlayerEntity: () => ({id:number, pos:{x:number,y:number}}|null),
  *   sampleMood: () => ({wrath:number,serenity:number,hunger:number,amusement:number,sorrow:number,chaos:number}|null),
+ *   getHiddenTrapPositions?: () => Array<{x:number,y:number}>,
+ *   getSacredSitePositions?: () => Array<{x:number,y:number}>,
  *   deathEssenceFx?: { peekOrbs():Array, consumeOrbAt(i:number):object|null },
  * }} deps
  */
 export function createSpiritWispFxController(
-  { world, fx, getPosition, getPlayerEntity, sampleMood, deathEssenceFx },
+  { world, fx, getPosition, getPlayerEntity, sampleMood, getHiddenTrapPositions, getSacredSitePositions, deathEssenceFx },
 ) {
   let _active = false;
   let _phase = Math.random() * Math.PI * 2;
@@ -294,8 +292,10 @@ export function createSpiritWispFxController(
     let dx = 0, dy = 0;
     let found = false;
 
-    for (const [id, pos, trap] of world.query(Position, Trap)) {
-      if (trap.revealed || !trap.armed) continue;
+    const traps = typeof getHiddenTrapPositions === "function"
+      ? getHiddenTrapPositions()
+      : [];
+    for (const pos of traps) {
       const dist = Math.max(Math.abs(pos.x - px), Math.abs(pos.y - py));
       if (dist > effectiveRadius || dist < 1) continue;
       if (dist < closestDist) {
@@ -674,9 +674,10 @@ export function createSpiritWispFxController(
     if (_betrayed) return;
     let best = null;
     let bestDist = Infinity;
-    for (const [, pos, ident] of world.query(Position, NamedIdentity)) {
-      const key = String(ident?.identity || "").toLowerCase();
-      if (!SACRED_IDENTITIES.has(key)) continue;
+    const sites = typeof getSacredSitePositions === "function"
+      ? getSacredSitePositions()
+      : [];
+    for (const pos of sites) {
       const dist = Math.max(
         Math.abs((pos.x | 0) - px),
         Math.abs((pos.y | 0) - py),
