@@ -1,0 +1,2236 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Cognitive Profile Mapper · Aphantasia & Beyond</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+        :root {
+            --bg: #020617;
+            --bg-elevated: #020617;
+            --panel: #020617;
+            --border-subtle: #1f2937;
+            --accent: #4f46e5;
+            --accent-soft: rgba(79, 70, 229, 0.18);
+            --accent-strong: rgba(79, 70, 229, 0.35);
+            --text: #e5e7eb;
+            --muted: #9ca3af;
+            --danger: #f97373;
+            --good: #4ade80;
+            --radius-lg: 18px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: stretch;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+                "Segoe UI", sans-serif;
+            background: radial-gradient(circle at top left, #020617 0, #020617 36%, #020617 65%, #020617 100%);
+            color: var(--text);
+        }
+
+        .app-shell {
+            margin: 16px;
+            max-width: 1180px;
+            width: 100%;
+            background: radial-gradient(circle at top left, #020617 0, #020617 40%, #020617 100%);
+            border-radius: 24px;
+            border: 1px solid rgba(148, 163, 184, 0.15);
+            box-shadow:
+                0 24px 80px rgba(15, 23, 42, 0.95),
+                0 0 0 1px rgba(15, 23, 42, 0.9);
+            display: grid;
+            grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.1fr);
+            column-gap: 0;
+            overflow: hidden;
+        }
+
+        @media (max-width: 960px) {
+            .app-shell {
+                display: flex;
+                flex-direction: column;
+            }
+        }
+
+        .field-canvas-wrapper {
+            border-radius: 14px;
+            overflow: hidden;
+            border: 1px solid rgba(30, 64, 175, 0.7);
+            background:
+                radial-gradient(circle at top,
+                    rgba(30, 64, 175, 0.55),
+                    rgba(15, 23, 42, 1));
+            margin-bottom: 6px;
+        }
+
+        #fieldCanvas {
+            display: block;
+            width: 100%;
+            height: auto;
+            background: radial-gradient(circle at top,
+                    rgba(15, 23, 42, 0.95),
+                    #020617 70%);
+        }
+
+        /* Optional: small axis labels overlay, if you want to use HTML instead */
+        .field-axis-label {
+            font-size: 0.7rem;
+            color: rgba(148, 163, 184, 0.95);
+        }
+
+
+        .panel {
+            padding: 22px 24px 20px 24px;
+        }
+
+        .panel--left {
+            border-right: 1px solid rgba(30, 64, 175, 0.4);
+            background: radial-gradient(circle at top left,
+                    rgba(37, 99, 235, 0.24) 0,
+                    rgba(15, 23, 42, 0.98) 44%,
+                    #020617 100%);
+        }
+
+        .panel--right {
+            background:
+                radial-gradient(circle at top right, rgba(79, 70, 229, 0.7) 0, transparent 65%),
+                radial-gradient(circle at bottom, rgba(30, 64, 175, 0.75) 0, transparent 70%),
+                #020617;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 10px;
+            gap: 12px;
+        }
+
+        .title {
+            font-size: 1.1rem;
+            letter-spacing: 0.03em;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: #e5e7eb;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .title-pill {
+            font-size: 0.7rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            padding: 3px 8px;
+            border-radius: 999px;
+            border: 1px solid rgba(129, 140, 248, 0.7);
+            background: radial-gradient(circle at top left,
+                    rgba(129, 140, 248, 0.35),
+                    transparent 70%);
+            color: #e0e7ff;
+        }
+
+        .subtitle {
+            font-size: 0.8rem;
+            color: var(--muted);
+            max-width: 480px;
+            line-height: 1.4;
+        }
+
+        .badge-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 6px;
+        }
+
+        .badge {
+            font-size: 0.7rem;
+            padding: 2px 8px;
+            border-radius: 999px;
+            border: 1px solid rgba(148, 163, 184, 0.4);
+            color: #cbd5f5;
+            background: radial-gradient(circle at top left,
+                    rgba(148, 163, 184, 0.2),
+                    rgba(15, 23, 42, 0.95));
+        }
+
+        .scroll {
+            max-height: calc(100vh - 100px);
+            overflow-y: auto;
+            padding-right: 8px;
+            scrollbar-width: thin;
+        }
+
+        .scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .scroll::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.55);
+            border-radius: 999px;
+        }
+
+        .question-group {
+            border-radius: var(--radius-lg);
+            padding: 12px 12px 10px 12px;
+            margin-bottom: 10px;
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            background: radial-gradient(circle at top left,
+                    rgba(15, 23, 42, 0.95),
+                    rgba(15, 23, 42, 0.98));
+            box-shadow:
+                0 14px 35px rgba(15, 23, 42, 0.9),
+                inset 0 0 0 1px rgba(15, 23, 42, 0.9);
+        }
+
+        .question-group-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 6px;
+            gap: 8px;
+        }
+
+        .question-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: #e5e7eb;
+        }
+
+        .question-tag {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.09em;
+            color: #93c5fd;
+            padding: 2px 7px;
+            border-radius: 999px;
+            border: 1px solid rgba(59, 130, 246, 0.6);
+            background: radial-gradient(circle at top left,
+                    rgba(37, 99, 235, 0.48),
+                    rgba(15, 23, 42, 0.98));
+        }
+
+        .question-text {
+            font-size: 0.8rem;
+            color: var(--muted);
+            margin-bottom: 6px;
+            line-height: 1.4;
+        }
+
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            margin-bottom: 4px;
+        }
+
+        .option {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.78rem;
+            padding: 5px 7px;
+            border-radius: 999px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: border-color 0.14s ease, background 0.14s ease, transform 0.06s ease;
+        }
+
+        .option input {
+            accent-color: var(--accent);
+        }
+
+        .option:hover {
+            border-color: rgba(129, 140, 248, 0.6);
+            background: rgba(15, 23, 42, 0.95);
+            transform: translateY(-0.5px);
+        }
+
+        .option-label-main {
+            color: #e5e7eb;
+        }
+
+        .option-label-sub {
+            color: #9ca3af;
+            font-size: 0.75rem;
+        }
+
+        .option-label {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .footnote {
+            font-size: 0.7rem;
+            color: rgba(148, 163, 184, 0.9);
+            margin-top: 2px;
+        }
+
+        .actions-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 8px;
+            gap: 10px;
+            padding: 8px 2px 4px 2px;
+        }
+
+        .btn-primary {
+            border: none;
+            outline: none;
+            border-radius: 999px;
+            padding: 7px 14px;
+            font-size: 0.78rem;
+            font-weight: 500;
+            letter-spacing: 0.07em;
+            text-transform: uppercase;
+            cursor: pointer;
+            color: #e5e7eb;
+            background: linear-gradient(135deg, #4f46e5, #0ea5e9);
+            box-shadow:
+                0 0 0 1px rgba(191, 219, 254, 0.35),
+                0 12px 30px rgba(37, 99, 235, 0.85);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+        }
+
+        .btn-primary span.dots {
+            font-size: 1.1rem;
+        }
+
+        .mini-meta {
+            font-size: 0.7rem;
+            color: rgba(148, 163, 184, 0.9);
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 10px;
+            gap: 10px;
+        }
+
+        .results-main-title {
+            font-size: 1.05rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            font-weight: 600;
+            color: #e5e7eb;
+        }
+
+        .results-subtitle {
+            font-size: 0.75rem;
+            color: var(--muted);
+            max-width: 260px;
+            line-height: 1.4;
+        }
+
+        .profile-label {
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.16em;
+            color: #c7d2fe;
+            margin-bottom: 4px;
+        }
+
+        .profile-type {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #e5e7eb;
+            margin-bottom: 4px;
+        }
+
+        .profile-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+
+        .tag {
+            padding: 3px 8px;
+            border-radius: 999px;
+            border: 1px solid rgba(191, 219, 254, 0.65);
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.09em;
+            color: #e0f2fe;
+            background: radial-gradient(circle at top left,
+                    rgba(59, 130, 246, 0.65),
+                    rgba(15, 23, 42, 0.98));
+        }
+
+        .profile-summary {
+            font-size: 0.8rem;
+            color: var(--muted);
+            margin-bottom: 10px;
+            line-height: 1.5;
+        }
+
+        .heatmap {
+            border-radius: var(--radius-lg);
+            padding: 10px 12px 8px;
+            border: 1px solid rgba(148, 163, 184, 0.4);
+            background: radial-gradient(circle at top,
+                    rgba(15, 23, 42, 0.98),
+                    rgba(15, 23, 42, 0.98));
+            margin-bottom: 10px;
+            box-shadow:
+                0 18px 40px rgba(15, 23, 42, 0.95),
+                inset 0 0 0 1px rgba(15, 23, 42, 0.98);
+        }
+
+        .heatmap-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 6px;
+        }
+
+        .heatmap-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: #e5e7eb;
+        }
+
+        .heatmap-legend {
+            font-size: 0.7rem;
+            color: rgba(148, 163, 184, 0.9);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .legend-bar {
+            display: flex;
+            align-items: center;
+            gap: 1px;
+        }
+
+        .legend-swatch {
+            width: 14px;
+            height: 6px;
+            border-radius: 999px;
+            background: linear-gradient(to right,
+                    #0f172a,
+                    #1d4ed8,
+                    #22c55e,
+                    #f59e0b,
+                    #ef4444);
+        }
+
+        .heatmap-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 0.9fr);
+            gap: 4px 6px;
+            align-items: stretch;
+            font-size: 0.76rem;
+        }
+
+        .heat-label {
+            color: #cbd5f5;
+            padding: 4px 2px;
+            border-bottom: 1px dashed rgba(51, 65, 85, 0.9);
+        }
+
+        .heat-label span {
+            font-size: 0.7rem;
+            color: #9ca3af;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-left: 4px;
+        }
+
+        .heat-cell {
+            border-radius: 999px;
+            padding: 3px 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px;
+            border: 1px solid rgba(15, 23, 42, 0.9);
+            background: #020617;
+            color: #e5e7eb;
+            min-height: 22px;
+        }
+
+        .heat-value {
+            font-variant-numeric: tabular-nums;
+            font-size: 0.78rem;
+        }
+
+        .heat-desc {
+            font-size: 0.7rem;
+            color: #e5e7eb;
+            opacity: 0.92;
+        }
+
+        .heat-cell.empty .heat-desc {
+            color: rgba(148, 163, 184, 0.7);
+        }
+
+        .detail-block {
+            border-radius: var(--radius-lg);
+            padding: 10px 12px 8px;
+            border: 1px solid rgba(148, 163, 184, 0.32);
+            background: radial-gradient(circle at top right,
+                    rgba(56, 189, 248, 0.25),
+                    rgba(15, 23, 42, 0.98));
+            margin-bottom: 8px;
+            font-size: 0.78rem;
+            color: #e5e7eb;
+            line-height: 1.5;
+        }
+
+        .detail-title {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: #bae6fd;
+            margin-bottom: 4px;
+        }
+
+        .detail-kicker {
+            font-size: 0.73rem;
+            color: #93c5fd;
+            margin-bottom: 3px;
+        }
+
+        .detail-body {
+            font-size: 0.78rem;
+            color: #e5e7eb;
+        }
+
+        .detail-columns {
+            display: grid;
+            grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.2fr);
+            gap: 6px;
+        }
+
+        @media (max-width: 960px) {
+            .detail-columns {
+                grid-template-columns: minmax(0, 1fr);
+            }
+        }
+
+        .pill-row-soft {
+            margin-top: 4px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .pill-soft {
+            padding: 2px 7px;
+            border-radius: 999px;
+            font-size: 0.68rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            border: 1px solid rgba(148, 163, 184, 0.7);
+            color: #cbd5f5;
+            background: radial-gradient(circle at top left,
+                    rgba(148, 163, 184, 0.25),
+                    rgba(15, 23, 42, 0.98));
+        }
+
+        .error-banner {
+            display: none;
+            margin-top: 4px;
+            font-size: 0.75rem;
+            color: #fecaca;
+        }
+
+        .error-banner.visible {
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-shell">
+        <section class="panel panel--left">
+            <header class="header">
+                <div>
+                    <div class="title">
+                        Cognitive Profile Mapper
+                        <span class="title-pill">Aphantasia · Imagery · Style</span>
+                    </div>
+                    <div class="subtitle">
+                        Answer a compact battery of questions across imagery, memory, learning, and stress. The app
+                        infers your
+                        cognitive subtype and renders a heat map of your mental “hardware.”
+                    </div>
+                    <div class="badge-row">
+                        <span class="badge">Visual &amp; Auditory Imagery</span>
+                        <span class="badge">Spatial Simulation</span>
+                        <span class="badge">Semantic vs Episodic Memory</span>
+                        <span class="badge">Learning &amp; Creativity Style</span>
+                    </div>
+                </div>
+            </header>
+
+            <div class="scroll" id="questionScroll">
+                <!-- Visual Imagery -->
+                <div class="question-group" data-dimension="visual">
+                    <div class="question-group-header">
+                        <div class="question-title">Visual Imagery · Mind’s Eye</div>
+                        <div class="question-tag">Imagery</div>
+                    </div>
+                    <div class="question-text">
+                        When you “picture” an apple or your front door, what actually happens in your mind?
+                    </div>
+                    <div class="options">
+                        <label class="option">
+                            <input type="radio" name="visual1" value="0">
+                            <div class="option-label">
+                                <span class="option-label-main">No image at all</span>
+                                <span class="option-label-sub">Just the concept; pure knowledge of “apple-ness”, no
+                                    picture.</span>
+                            </div>
+                        </label>
+                        <label class="option">
+                            <input type="radio" name="visual1" value="30">
+                            <div class="option-label">
+                                <span class="option-label-main">Ghost image</span>
+                                <span class="option-label-sub">Vague, gray, unstable, more like a hint than a
+                                    picture.</span>
+                            </div>
+                        </label>
+                        <label class="option">
+                            <input type="radio" name="visual1" value="65">
+                            <div class="option-label">
+                                <span class="option-label-main">Cartoon / wireframe</span>
+                                <span class="option-label-sub">Simple shape, stable but not photorealistic; you can kind
+                                    of “see” it.</span>
+                            </div>
+                        </label>
+                        <label class="option">
+                            <input type="radio" name="visual1" value="90">
+                            <div class="option-label">
+                                <span class="option-label-main">Vivid mental image</span>
+                                <span class="option-label-sub">Clear color, lighting, texture; you can zoom or rotate it
+                                    in your mind.</span>
+                            </div>
+                        </label>
+                    </div>
+                    <div class="footnote">
+                        This anchors your visual scale from aphantasia (0) to hyperphantasia (90+).
+                    </div>
+                </div>
+
+                <!-- Auditory Imagery -->
+                <div class="question-group" data-dimension="auditory">
+                    <div class="question-group-header">
+                        <div class="question-title">Auditory Imagery · Mind’s Ear</div>
+                        <div class="question-tag">Sound</div>
+                    </div>
+                    <div class="question-text">
+                        Think of a song you know well and read a line of text silently. What happens internally?
+                    </div>
+                    <div class="options">
+                        <label class="option">
+                            <input type="radio" name="auditory1" value="15">
+                            <div class="option-label">
+                                <span class="option-label-main">Concepts only, no sound</span>
+                                <span class="option-label-sub">You know the melody and words, but there’s no inner
+                                    audio.</span>
+                            </div>
+                        </label>
+                        <label class="option">
+                            <input type="radio" name="auditory1" value="45">
+                            <div class="option-label">
+                                <span class="option-label-main">Fragmented sound</span>
+                                <span class="option-label-sub">You get brief inner audio for songs or phrases, but it’s
+                                    fuzzy or unstable.</span>
+                            </div>
+                        </label>
+                        <label class="option">
+                            <input type="radio" name="auditory1" value="75">
+                            <div class="option-label">
+                                <span class="option-label-main">Clear inner music, weak voice</span>
+                                <span class="option-label-sub">Songs are vivid, your inner reading voice is more
+                                    conceptual.</span>
+                            </div>
+                        </label>
+                        <label class="option">
+                            <input type="radio" name="auditory1" value="90">
+                            <div class="option-label">
+                                <span class="option-label-main">Strong internal audio</span>
+                                <span class="option-label-sub">You clearly “hear” songs and your inner reading voice as
+                                    sound.</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Spatial Simulation -->
+                <div class="question-group" data-dimension="spatial">
+                    <div class="question-group-header">
+                        <div class="question-title">Spatial Simulation · Rotation & Layout</div>
+                        <div class="question-tag">Spatial</div>
+                    </div>
+                    <div class="question-text">
+                        Imagine rotating a cube and walking through a familiar building. How does your mind represent
+                        this?
+                    </div>
+                    <div class="options">
+                        <label class="option">
+                            <input type="radio" name="spatial1" value="20">
+                            <div class="option-label">
+                                <span class="option-label-main">Hard to rotate, weak layout</span>
+                                <span class="option-label-sub">You struggle to track orientation and can’t easily
+                                    retrace spaces.</span>
+                            </div>
+                        </label>
+                        <label class="option">
+                            <input type="radio" name="spatial1" value="55">
+                            <div class="option-label">
+                                <span class="option-label-main">Logical map, minimal “feel”</span>
+                                <span class="option-label-sub">You know the order of rooms or faces, but it’s
+                                    conceptual, not felt.</span>
+                            </div>
+                        </label>
+                        <label class="option">
+                            <input type="radio" name="spatial1" value="75">
+                            <div class="option-label">
+                                <span class="option-label-main">Kinesthetic & structural</span>
+                                <span class="option-label-sub">You can “walk it” in your head and sense turns or
+                                    rotations in your body.</span>
+                            </div>
+                        </label>
+                        <label class="option">
+                            <input type="radio" name="spatial1" value="90">
+                            <div class="option-label">
+                                <span class="option-label-main">Fully navigable mental space</span>
+                                <span class="option-label-sub">You can roam and inspect details with ease, like an
+                                    internal 3D environment.</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Emotion coupling -->
+                <div class="question-group" data-dimension="emotion">
+                    <div class="question-group-header">
+                        <div class="question-title">Emotion · Coupling to Imagination</div>
+                        <div class="question-tag">Affect</div>
+                    </div>
+                    <div class="question-text">
+                        Think of standing near a cliff edge or recalling something deeply nostalgic. How strongly does
+                        your body react?
+                    </div>
+                    <div class="options">
+                        <label class="option">
+                            <input type="radio" name="emotion1" value="20">
+                            <div class="option-label">
+                                <span class="option-label-main">Very mild</span>
+                                <span class="option-label-sub">You understand it could be scary or moving, but your body
+                                    barely reacts.</span>
+                            </div>
+                        </label>
+                        <label class="option">
+                            <input type="radio" name="emotion1" value="50">
+                            <div class="option-label">
+                                <span class="option-label-main">Moderate</span>
+                                <span class="option-label-sub">You feel some tension or warmth, but it’s easily
+                                    overridden by logic.</span>
+                            </div>
+                        </label>
+                        <label class="option">
+                            <input type="radio" name="emotion1" value="75">
+                            <div class="option-label">
+                                <span class="option-label-main">Strong</span>
+                                <span class="option-label-sub">Your stomach drops, your chest tightens, or you feel a
+                                    heavy emotional swell.</span>
+                            </div>
+                        </label>
+                        <label class="option">
+                            <input type="radio" name="emotion1" value="90">
+                            <div class="option-label">
+                                <span class="option-label-main">Very strong</span>
+                                <span class="option-label-sub">Your body reacts sharply; imagination and memory hit with
+                                    full emotional force.</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Memory: semantic vs episodic -->
+                <div class="question-group" data-dimension="memory">
+                    <div class="question-group-header">
+                        <div class="question-title">Memory · Semantic vs Episodic</div>
+                        <div class="question-tag">Memory</div>
+                    </div>
+                    <div class="question-text">
+                        When you recall events from years ago, what surfaces first and most reliably?
+                    </div>
+                    <div class="options">
+                        <label class="option">
+                            <input type="radio" name="memory1" value="80_semantic">
+                            <div class="option-label">
+                                <span class="option-label-main">Facts and structure</span>
+                                <span class="option-label-sub">What happened, why, and in what order; scenes are fuzzy
+                                    or absent.</span>
+                            </div>
+                        </label>
+                        <label class="option">
+                            <input type="radio" name="memory1" value="60_semantic">
+                            <div class="option-label">
+                                <span class="option-label-main">Facts with some scene</span>
+                                <span class="option-label-sub">You recall meaning and some fragments of what it “looked
+                                    like”.</span>
+                            </div>
+                        </label>
+                        <label class="option">
+                            <input type="radio" name="memory1" value="60_episodic">
+                            <div class="option-label">
+                                <span class="option-label-main">Scenes with context</span>
+                                <span class="option-label-sub">You see moments replay and remember roughly what they
+                                    meant.</span>
+                            </div>
+                        </label>
+                        <label class="option">
+                            <input type="radio" name="memory1" value="80_episodic">
+                            <div class="option-label">
+                                <span class="option-label-main">Full scenes first</span>
+                                <span class="option-label-sub">Visual or sensory replay dominates, and you re-derive the
+                                    meaning from that.</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Learning Style -->
+                <div class="question-group" data-dimension="learning">
+                    <div class="question-group-header">
+                        <div class="question-title">Learning Style · How You Absorb Systems</div>
+                        <div class="question-tag">Learning</div>
+                    </div>
+                    <div class="question-text">
+                        When learning something non-trivial (a framework, instrument, or new domain), where do you
+                        naturally gravitate?
+                    </div>
+                    <div class="options">
+                        <label class="option">
+                            <input type="radio" name="learning1" value="80_hands">
+                            <div class="option-label">
+                                <span class="option-label-main">Hands-on tinkering</span>
+                                <span class="option-label-sub">You learn best by poking, breaking, and fixing things
+                                    directly.</span>
+                            </div>
+                        </label>
+                        <label class="option">
+                            <input type="radio" name="learning1" value="80_principles">
+                            <div class="option-label">
+                                <span class="option-label-main">Principles & theory</span>
+                                <span class="option-label-sub">You want the deep model or why-structure first, then
+                                    examples.</span>
+                            </div>
+                        </label>
+                        <label class="option">
+                            <input type="radio" name="learning1" value="80_examples">
+                            <div class="option-label">
+                                <span class="option-label-main">Examples & patterns</span>
+                                <span class="option-label-sub">You study worked examples and infer the pattern from
+                                    repetition.</span>
+                            </div>
+                        </label>
+                        <label class="option">
+                            <input type="radio" name="learning1" value="80_visual">
+                            <div class="option-label">
+                                <span class="option-label-main">Diagrams & visuals</span>
+                                <span class="option-label-sub">You think and remember best in charts, maps, and
+                                    diagrams.</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Creativity Style -->
+                <div class="question-group" data-dimension="creativity">
+                    <div class="question-group-header">
+                        <div class="question-title">Creativity · Generative Mode</div>
+                        <div class="question-tag">Creation</div>
+                    </div>
+                    <div class="question-text">
+                        When you create (writing, music, design, code), where does the first spark tend to come from?
+                    </div>
+                    <div class="options">
+                        <label class="option">
+                            <input type="radio" name="creativity1" value="80_vibe">
+                            <div class="option-label">
+                                <span class="option-label-main">Vibe / atmosphere</span>
+                                <span class="option-label-sub">You start from a feeling, tone, or energy and build
+                                    structure around it.</span>
+                            </div>
+                        </label>
+                        <label class="option">
+                            <input type="radio" name="creativity1" value="80_structure">
+                            <div class="option-label">
+                                <span class="option-label-main">Structure / model</span>
+                                <span class="option-label-sub">You start from an architecture, outline, or schema and
+                                    then fill it.</span>
+                            </div>
+                        </label>
+                        <label class="option">
+                            <input type="radio" name="creativity1" value="80_problem">
+                            <div class="option-label">
+                                <span class="option-label-main">Problem / constraint</span>
+                                <span class="option-label-sub">You begin with a sharp problem or constraint and invent
+                                    to solve it.</span>
+                            </div>
+                        </label>
+                        <label class="option">
+                            <input type="radio" name="creativity1" value="80_visual">
+                            <div class="option-label">
+                                <span class="option-label-main">Visual concept</span>
+                                <span class="option-label-sub">You start from an image or scene in your mind and
+                                    translate it outward.</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Planning Style -->
+                <div class="question-group" data-dimension="planning">
+                    <div class="question-group-header">
+                        <div class="question-title">Planning · How You Move Through Time</div>
+                        <div class="question-tag">Planning</div>
+                    </div>
+                    <div class="question-text">
+                        When planning a non-trivial project (trip, renovation, system), what’s your default approach?
+                    </div>
+                    <div class="options">
+                        <label class="option">
+                            <input type="radio" name="planning1" value="80_feel">
+                            <div class="option-label">
+                                <span class="option-label-main">Feel the next right move</span>
+                                <span class="option-label-sub">You sense the next step and adjust as you go, guided by
+                                    intuition.</span>
+                            </div>
+                        </label>
+                        <label class="option">
+                            <input type="radio" name="planning1" value="80_sequence">
+                            <div class="option-label">
+                                <span class="option-label-main">Linear sequence</span>
+                                <span class="option-label-sub">You write lists, plan milestones, and follow a mostly
+                                    ordered path.</span>
+                            </div>
+                        </label>
+                        <label class="option">
+                            <input type="radio" name="planning1" value="80_visual">
+                            <div class="option-label">
+                                <span class="option-label-main">Visual end-state</span>
+                                <span class="option-label-sub">You imagine the finished outcome and work backwards from
+                                    it.</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Stress & Overload -->
+                <div class="question-group" data-dimension="stress">
+                    <div class="question-group-header">
+                        <div class="question-title">Stress Load · Overwhelm Channels</div>
+                        <div class="question-tag">Stress</div>
+                    </div>
+                    <div class="question-text">
+                        When you feel overloaded (loud environment, parenting, work), what’s the clearest source of
+                        strain?
+                    </div>
+                    <div class="options">
+                        <label class="option">
+                            <input type="radio" name="stress1" value="80_sensory">
+                            <div class="option-label">
+                                <span class="option-label-main">Sensory overload</span>
+                                <span class="option-label-sub">Noise, chaos, and competing stimuli slam your nervous
+                                    system.</span>
+                            </div>
+                        </label>
+                        <label class="option">
+                            <input type="radio" name="stress1" value="80_decision">
+                            <div class="option-label">
+                                <span class="option-label-main">Decision pressure</span>
+                                <span class="option-label-sub">Multiple choices, no clear priorities, and constant
+                                    trade-offs drain you.</span>
+                            </div>
+                        </label>
+                        <label class="option">
+                            <input type="radio" name="stress1" value="80_unstructured">
+                            <div class="option-label">
+                                <span class="option-label-main">Lack of structure</span>
+                                <span class="option-label-sub">Unclear expectations and shifting goals are the primary
+                                    stressors.</span>
+                            </div>
+                        </label>
+                        <label class="option">
+                            <input type="radio" name="stress1" value="80_emotional">
+                            <div class="option-label">
+                                <span class="option-label-main">Emotional load</span>
+                                <span class="option-label-sub">Holding other people’s feelings and conflicts leaves you
+                                    exhausted.</span>
+                            </div>
+                        </label>
+                    </div>
+                    <div class="footnote">
+                        This doesn’t measure “toughness”. It’s a routing diagram for how overwhelm enters the system.
+                    </div>
+                </div>
+
+                <div class="actions-row">
+                    <button class="btn-primary" id="computeBtn">
+                        Compute Profile
+                        <span class="dots">•••</span>
+                    </button>
+                    <div class="mini-meta">
+                        Changes update live once computed. You can tweak answers and recompute freely.
+                    </div>
+                </div>
+                <div class="error-banner" id="errorBanner">
+                    Some core questions are unanswered. Fill at least one option in each group, then recompute.
+                </div>
+            </div>
+        </section>
+
+        <section class="panel panel--right">
+            <header class="results-header">
+                <div>
+                    <div class="results-main-title">Your Cognitive Type</div>
+                    <div class="results-subtitle">
+                        Heat map + subtype labels + archetype & domain-specific notes for learning, creativity,
+                        planning, and stress.
+                    </div>
+                </div>
+            </header>
+            <div class="heatmap" id="fieldBlock">
+                <div class="heatmap-header">
+                    <div class="heatmap-title">Sensory Field Map</div>
+                    <div class="heatmap-legend">
+                        <span>Conceptual</span>
+                        <span style="opacity:0.65;">⟷</span>
+                        <span>Sensory</span>
+                    </div>
+                </div>
+                <div class="field-canvas-wrapper">
+                    <canvas id="fieldCanvas" width="360" height="260"></canvas>
+                </div>
+                <div class="footnote">
+                    Position shows where you sit between conceptual vs sensory and structured vs intuitive.
+                    Glow radius encodes emotional / stress load — your “light cone” into experience.
+                </div>
+            </div>
+
+            <div class="scroll">
+                <div>
+                    <div class="profile-label">Primary Archetype</div>
+                    <div class="profile-type" id="profileType">Waiting for data…</div>
+                    <div class="profile-tags" id="profileTags"></div>
+                    <div class="profile-summary" id="profileSummary">
+                        Once you answer the questions and hit <strong>Compute Profile</strong>, this section will
+                        describe your dominant cognitive archetype and the tag cluster that led to it.
+                    </div>
+                </div>
+
+                <div class="heatmap" id="heatmap">
+                    <div class="heatmap-header">
+                        <div class="heatmap-title">Imagery & Style Heat Map</div>
+                        <div class="heatmap-legend">
+                            <span>Low</span>
+                            <div class="legend-bar">
+                                <div class="legend-swatch"></div>
+                            </div>
+                            <span>High</span>
+                        </div>
+                    </div>
+                    <div class="heatmap-grid" id="heatmapGrid">
+                        <!-- rows injected by JS -->
+                    </div>
+                </div>
+
+                <div class="detail-columns">
+                    <div class="detail-block" id="detailImagery">
+                        <div class="detail-title">Imagery & Spatial Stack</div>
+                        <div class="detail-kicker" id="detailImageryKicker">No data yet.</div>
+                        <div class="detail-body" id="detailImageryBody">
+                            After computing, this block explains how your mind renders (or doesn’t), how you navigate
+                            spaces, and how sound fits into the mix.
+                        </div>
+                    </div>
+
+                    <div class="detail-block" id="detailMemory">
+                        <div class="detail-title">Memory, Learning & Creativity</div>
+                        <div class="detail-kicker" id="detailMemoryKicker">No data yet.</div>
+                        <div class="detail-body" id="detailMemoryBody">
+                            This will outline whether you lean semantic or episodic, how you prefer to learn, and where
+                            your creative “spark” typically ignites.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="detail-block" id="detailStress">
+                    <div class="detail-title">Planning & Stress Load</div>
+                    <div class="detail-kicker" id="detailStressKicker">No data yet.</div>
+                    <div class="detail-body" id="detailStressBody">
+                        Here you’ll get a short operational brief on how you naturally plan through time — and which
+                        channels most often carry overload into your system.
+                    </div>
+                    <div class="pill-row-soft" id="detailPills"></div>
+                </div>
+
+                <div class="detail-block" id="detailArchetype">
+                    <div class="detail-title">Archetype Notes</div>
+                    <div class="detail-kicker" id="detailArchetypeKicker">No archetype yet.</div>
+                    <div class="detail-body" id="detailArchetypeBody">
+                        After computing, this summarizes how your tag pattern maps to a named archetype and what that
+                        implies for how you work, create, and handle load.
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        // Core dimensions and descriptions
+        const DIMENSIONS = [
+            {
+                key: "visual",
+                label: "Visual Imagery",
+                short: "Mind’s eye",
+                descLow: "Little to no internal pictures; concepts dominate.",
+                descHigh: "Vivid, controllable internal images.",
+            },
+            {
+                key: "auditory",
+                label: "Auditory Imagery",
+                short: "Mind’s ear",
+                descLow: "Thoughts are mostly silent or conceptual.",
+                descHigh: "Songs and inner voice are clearly heard internally.",
+            },
+            {
+                key: "spatial",
+                label: "Spatial Simulation",
+                short: "Navigation",
+                descLow: "Limited ability to mentally rotate and navigate.",
+                descHigh: "Strong sense of layout, orientation, and motion.",
+            },
+            {
+                key: "emotion",
+                label: "Emotion Coupling",
+                short: "Body load",
+                descLow: "Imagination and recall trigger mild bodily response.",
+                descHigh: "Scenarios and memories hit with full emotional force.",
+            },
+            {
+                key: "semantic",
+                label: "Semantic Memory",
+                short: "Meaning",
+                descLow: "Meanings and structures are weaker or secondary.",
+                descHigh: "You recall facts, patterns, and reasons first.",
+            },
+            {
+                key: "episodic",
+                label: "Episodic Memory",
+                short: "Scenes",
+                descLow: "Scenes are faded; events feel more abstract.",
+                descHigh: "Rich scenes and sensory details replay vividly.",
+            },
+            {
+                key: "learningHands",
+                label: "Learning · Hands-on",
+                short: "Tinkering",
+                descLow: "Hands-on helps, but not your primary mode.",
+                descHigh: "You learn best by direct interaction and iteration.",
+            },
+            {
+                key: "learningPrinciples",
+                label: "Learning · Principles",
+                short: "Theory",
+                descLow: "High-level theory helps but isn’t central.",
+                descHigh: "You want the deep model and “why” first.",
+            },
+            {
+                key: "learningExamples",
+                label: "Learning · Examples",
+                short: "Patterns",
+                descLow: "Examples help, but pattern spotting isn’t primary.",
+                descHigh: "Worked examples and repetition drive your learning.",
+            },
+            {
+                key: "learningVisual",
+                label: "Learning · Diagrams",
+                short: "Visual",
+                descLow: "Diagrams are optional, not required.",
+                descHigh: "You think and remember best in visual structures.",
+            },
+            {
+                key: "creativityVibe",
+                label: "Creativity · Vibe",
+                short: "Atmosphere",
+                descLow: "Emotion and tone are secondary.",
+                descHigh: "You create from feeling, rhythm, and atmosphere.",
+            },
+            {
+                key: "creativityStructure",
+                label: "Creativity · Structure",
+                short: "Architecture",
+                descLow: "Loose exploration over strict outlines.",
+                descHigh: "You build from schemas, outlines, and models.",
+            },
+            {
+                key: "creativityProblem",
+                label: "Creativity · Problem",
+                short: "Constraint",
+                descLow: "You don’t need sharp constraints to create.",
+                descHigh: "You create by solving crisp problems or constraints.",
+            },
+            {
+                key: "creativityVisual",
+                label: "Creativity · Visual",
+                short: "Imagery",
+                descLow: "Visual scenes don’t drive your creativity.",
+                descHigh: "You begin from mental images or visual motifs.",
+            },
+            {
+                key: "planningFeel",
+                label: "Planning · Intuitive",
+                short: "Feel",
+                descLow: "You prefer explicit plans over pure intuition.",
+                descHigh: "You sense the next right move and adapt on the fly.",
+            },
+            {
+                key: "planningSequence",
+                label: "Planning · Sequential",
+                short: "Linear",
+                descLow: "You’re comfortable without strict step-by-step plans.",
+                descHigh: "You like lists, milestones, and ordered progress.",
+            },
+            {
+                key: "planningVisual",
+                label: "Planning · Visual",
+                short: "End-state",
+                descLow: "You don’t depend on visualizing outcomes.",
+                descHigh: "You picture the end-state and reverse-engineer steps.",
+            },
+            {
+                key: "stressSensory",
+                label: "Stress · Sensory",
+                short: "Noise",
+                descLow: "Sensory chaos is noticeable but tolerable.",
+                descHigh: "Noise and chaos are your primary overload vector.",
+            },
+            {
+                key: "stressDecision",
+                label: "Stress · Decision",
+                short: "Choice",
+                descLow: "Decisions are manageable.",
+                descHigh: "Ambiguous choices and trade-offs drain you fast.",
+            },
+            {
+                key: "stressUnstructured",
+                label: "Stress · Unstructured",
+                short: "Chaos",
+                descLow: "Loose structure is tolerable.",
+                descHigh: "Unclear expectations are intrinsically stressful.",
+            },
+            {
+                key: "stressEmotional",
+                label: "Stress · Emotional",
+                short: "Affect",
+                descLow: "You’re less affected by others’ emotional states.",
+                descHigh: "Holding emotional load is a major drain.",
+            },
+        ];
+
+        const ARCHETYPE_RULES = [
+            {
+                name: "Feeling–Sensing Architect",
+                requireAll: [
+                    "Strong Internal Audio",
+                    "Robust Spatial Simulator",
+                    "Hands-On Learner",
+                    "Vibe-Driven Creative",
+                    "Intuitive Planner",
+                    "Sensory Overload Prone",
+                ],
+                preferAny: [
+                    "Episodic-Dominant Memory",
+                    "Balanced Memory Blend",
+                ],
+                summary:
+                    "Embodied, atmospheric, system-minded. Strong auditory and spatial channels, rich experiential recall, and an intuitive planning style.",
+                detail:
+                    "You navigate by feel and meaning rather than pictures. Prototyping flows, spaces, or experiences comes naturally, especially when you can move through them physically or interactively. Noise and chaos hit hard, so managing sensory load dramatically boosts your bandwidth.",
+            },
+            {
+                name: "Conceptual Systems Architect",
+                requireAll: [
+                    "Semantic-Dominant Memory",
+                    "Principle-First Learner",
+                    "Structure-First Creative",
+                    "Sequential Planner",
+                ],
+                preferAny: [
+                    "Low Visual Imagery",
+                    "Quiet Mind’s Ear",
+                    "Structure-Sensitive",
+                    "Decision-Load Sensitive",
+                ],
+                summary:
+                    "Abstraction engine. You compress reality into principles and architectures, then design from the top down.",
+                detail:
+                    "You think in invariants, interfaces, and constraints. When domains are messy, you reach for models and frameworks. You’re at your best when expectations are clear and the problem space is well-bounded; your weak spot is unstructured chaos and fuzzily-defined asks.",
+            },
+            {
+                name: "Sensory Storyteller",
+                requireAll: [
+                    "High Visual Imagery",
+                    "Strong Internal Audio",
+                    "Episodic-Dominant Memory",
+                ],
+                preferAny: [
+                    "Pattern / Example Learner",
+                    "Diagram-Driven Learner",
+                    "Visual-Origin Creative",
+                    "Vibe-Driven Creative",
+                    "End-State Planner",
+                    "Emotional Load Carrier",
+                ],
+                summary:
+                    "You live in scenes, sounds, and episodes. Stories and experiences replay as rich internal movies.",
+                detail:
+                    "This is ideal for narrative work, UX, teaching, and any domain where concrete examples matter. Emotions and sensory cues bind tightly to your memory, which is a superpower and a vulnerability: deliberate decompression and emotional boundaries are important.",
+            },
+            {
+                name: "Diagram Cartographer",
+                requireAll: [
+                    "High Visual Imagery",
+                    "Robust Spatial Simulator",
+                    "Diagram-Driven Learner",
+                    "Structure-First Creative",
+                ],
+                preferAny: [
+                    "End-State Planner",
+                    "Sequential Planner",
+                    "Semantic-Dominant Memory",
+                    "Balanced Memory Blend",
+                ],
+                summary:
+                    "You think in maps, graphs, and flows. Diagrams are how your ideas take shape.",
+                detail:
+                    "When you can sketch or diagram a system, you own it. You’re well suited to architecture, process design, complex data flows, and documentation that makes the invisible visible.",
+            },
+            {
+                name: "Acoustic Narrator",
+                requireAll: [
+                    "Strong Internal Audio",
+                ],
+                preferAny: [
+                    "Semantic-Dominant Memory",
+                    "Vibe-Driven Creative",
+                    "Structure-First Creative",
+                    "Intuitive Planner",
+                    "Sequential Planner",
+                    "Emotional Load Carrier",
+                    "Low Visual Imagery",
+                ],
+                summary:
+                    "Language, rhythm, and pacing are your primary tools. You think in voice more than in pictures.",
+                detail:
+                    "You’re naturally good at conversation, teaching verbally, writing with strong voice, and working with music or timing. Reading, speaking, and listening are high-bandwidth channels for you.",
+            },
+            {
+                name: "Constraint Engineer",
+                requireAll: [
+                    "Semantic-Dominant Memory",
+                    "Constraint-Driven Creative",
+                    "Sequential Planner",
+                ],
+                preferAny: [
+                    "Principle-First Learner",
+                    "Pattern / Example Learner",
+                    "Decision-Load Sensitive",
+                    "Low Visual Imagery",
+                ],
+                summary:
+                    "You’re happiest when there’s a sharp problem and clear constraints. You engineer your way to elegant solutions.",
+                detail:
+                    "Bounded problem spaces, well-defined requirements, and metrics light you up. You’re ideal for optimization, infra, refactoring, and complex operations where trade-offs must be explicit.",
+            },
+            {
+                name: "Tinkering Explorer",
+                requireAll: [
+                    "Hands-On Learner",
+                    "Intuitive Planner",
+                ],
+                preferAny: [
+                    "Vibe-Driven Creative",
+                    "Constraint-Driven Creative",
+                    "Sensory Overload Prone",
+                    "Decision-Load Sensitive",
+                    "Balanced Memory Blend",
+                    "Episodic-Dominant Memory",
+                ],
+                summary:
+                    "You discover by poking reality. Prototypes, experiments, and direct interaction are your native learning mode.",
+                detail:
+                    "You excel in labs, workshops, sandboxes, and any environment that encourages iterative, exploratory work. Specs should be minimal scaffolding, not rigid scripts.",
+            },
+            {
+                name: "Pattern Synthesist",
+                requireAll: [
+                    "Pattern / Example Learner",
+                ],
+                preferAny: [
+                    "Balanced Memory Blend",
+                    "Structure-First Creative",
+                    "Vibe-Driven Creative",
+                    "Sequential Planner",
+                    "End-State Planner",
+                ],
+                summary:
+                    "You see what keeps happening. Patterns across cases and examples are your primary data.",
+                detail:
+                    "Given enough input, you extract recurring motifs and rules. You’re strong in analytics, debugging, coaching, and any role where seeing the ‘shape’ of repeated events matters.",
+            },
+            {
+                name: "Grounded Stabilizer",
+                requireAll: [
+                    "Semantic-Dominant Memory",
+                    "Structure-First Creative",
+                    "Sequential Planner",
+                ],
+                preferAny: [
+                    "Structure-Sensitive",
+                    "Quiet Mind’s Ear",
+                    "Low Visual Imagery",
+                ],
+                summary:
+                    "You turn chaos into sustainable process. You stabilize teams and projects with clear scaffolding.",
+                detail:
+                    "You’re good at operationalizing ideas, setting realistic expectations, and making sure things keep working. You thrive when roles, timelines, and success criteria are explicit.",
+            },
+            {
+                name: "Emotional Anchor",
+                requireAll: [
+                    "Vibe-Driven Creative",
+                    "Emotional Load Carrier",
+                ],
+                preferAny: [
+                    "Intuitive Planner",
+                    "Sensory Overload Prone",
+                ],
+                summary:
+                    "You track emotional tone in high resolution and often end up regulating the room without being asked.",
+                detail:
+                    "This is incredibly valuable in parenting, leadership, and close relationships. The flip side is saturation: you need intentional offloading and environments where you’re allowed to not hold the entire emotional field.",
+            },
+            {
+                name: "Visual Composer",
+                requireAll: [
+                    "High Visual Imagery",
+                ],
+                preferAny: [
+                    "Diagram-Driven Learner",
+                    "Visual-Origin Creative",
+                    "End-State Planner",
+                    "Sensory Overload Prone",
+                ],
+                summary:
+                    "You architect in images. Layouts, scenes, and compositions are your natural scaffolding.",
+                detail:
+                    "Whether it’s code, design, or narrative, you tend to see the form first. You’re ideal for UI/UX, visual design, worldbuilding, and domains where spatial or visual coherence is key.",
+            },
+            {
+                name: "Abstract Theorist",
+                requireAll: [
+                    "Semantic-Dominant Memory",
+                    "Principle-First Learner",
+                ],
+                preferAny: [
+                    "Low Visual Imagery",
+                    "Quiet Mind’s Ear",
+                    "Structure-First Creative",
+                    "End-State Planner",
+                    "Decision-Load Sensitive",
+                ],
+                summary:
+                    "You live close to pure concept-space: models, theories, and generalized structures.",
+                detail:
+                    "You’re strong in proofs, frameworks, and long-range conceptual design. The risk is disconnecting from concrete constraints or lived experience unless you deliberately ground your abstractions.",
+            },
+        ];
+
+        function inferArchetypeFromTags(tags) {
+            let best = { score: 0, rule: null };
+
+            ARCHETYPE_RULES.forEach(rule => {
+                let score = 0;
+                for (const req of (rule.requireAll || [])) {
+                    if (!tags.includes(req)) {
+                        score = -1e6;
+                        break;
+                    }
+                    score += 3;
+                }
+                if (score < 0) return;
+                for (const pref of (rule.preferAny || [])) {
+                    if (tags.includes(pref)) score += 1;
+                }
+                if (score > best.score) best = { score, rule };
+            });
+
+            if (!best.rule) {
+                return {
+                    name: "Cognitive Generalist",
+                    summary:
+                        "No single archetype dominates. Your profile is flexible and balanced across imagery, memory, learning, and stress.",
+                    detail:
+                        "You can flex into multiple operating modes depending on context. To specialize further, adjust the questions until one cluster of tags becomes clearly dominant.",
+                };
+            }
+
+            return {
+                name: best.rule.name,
+                summary: best.rule.summary,
+                detail: best.rule.detail,
+            };
+        }
+
+        function initHeatmap() {
+            const grid = document.getElementById("heatmapGrid");
+            grid.innerHTML = "";
+            DIMENSIONS.forEach(dim => {
+                const label = document.createElement("div");
+                label.className = "heat-label";
+                label.textContent = dim.label;
+                const span = document.createElement("span");
+                span.textContent = dim.short;
+                label.appendChild(span);
+
+                const cell = document.createElement("div");
+                cell.className = "heat-cell empty";
+                cell.dataset.key = dim.key;
+                cell.dataset.score = "0";
+
+                const value = document.createElement("div");
+                value.className = "heat-value";
+                value.textContent = "--";
+
+                const desc = document.createElement("div");
+                desc.className = "heat-desc";
+                desc.textContent = "No data yet.";
+
+                cell.appendChild(value);
+                cell.appendChild(desc);
+
+                const spacer = document.createElement("div");
+                spacer.className = "heat-cell";
+                spacer.style.visibility = "hidden";
+
+                grid.appendChild(label);
+                grid.appendChild(cell);
+                grid.appendChild(spacer);
+            });
+        }
+
+        function scoreToColor(score) {
+            const s = Math.max(0, Math.min(100, score));
+            const hue = 220 - (s * 2.2);
+            const sat = 80;
+            const light = s < 15 ? 10 : s < 40 ? 18 : 30;
+            return `hsl(${hue}, ${sat}%, ${light}%)`;
+        }
+
+        function scoreToDesc(dim, score) {
+            if (score === null) return "No data yet.";
+            if (score <= 40) return dim.descLow;
+            if (score >= 60) return dim.descHigh;
+            return "Balanced or mixed expression between low and high extremes.";
+        }
+
+        function updateHeatmap(scores) {
+            const grid = document.getElementById("heatmapGrid");
+            const cells = grid.querySelectorAll(".heat-cell[data-key]");
+            cells.forEach(cell => {
+                const key = cell.dataset.key;
+                const dimension = DIMENSIONS.find(d => d.key === key);
+                const score = scores[key] ?? null;
+                const valueEl = cell.querySelector(".heat-value");
+                const descEl = cell.querySelector(".heat-desc");
+
+                if (score === null) {
+                    cell.classList.add("empty");
+                    cell.style.background = "#020617";
+                    cell.style.borderColor = "rgba(31, 41, 55, 0.9)";
+                    valueEl.textContent = "--";
+                    descEl.textContent = "No data yet.";
+                    return;
+                }
+
+                cell.classList.remove("empty");
+                valueEl.textContent = String(Math.round(score));
+                descEl.textContent = scoreToDesc(dimension, score);
+                const bg = scoreToColor(score);
+                cell.style.background = bg;
+                cell.style.borderColor = "rgba(15, 23, 42, 0.9)";
+            });
+        }
+
+        function getRadioValue(name) {
+            const el = document.querySelector(`input[name="${name}"]:checked`);
+            return el ? el.value : null;
+        }
+
+        function computeScores() {
+            const requiredGroups = [
+                "visual1",
+                "auditory1",
+                "spatial1",
+                "emotion1",
+                "memory1",
+                "learning1",
+                "creativity1",
+                "planning1",
+                "stress1",
+            ];
+
+            let missing = false;
+            for (const g of requiredGroups) {
+                if (!getRadioValue(g)) {
+                    missing = true;
+                }
+            }
+
+            const errorBanner = document.getElementById("errorBanner");
+            if (missing) {
+                errorBanner.classList.add("visible");
+            } else {
+                errorBanner.classList.remove("visible");
+            }
+
+            const scores = {};
+
+            const v1 = parseInt(getRadioValue("visual1") || "0", 10);
+            scores.visual = v1 || null;
+
+            const a1 = parseInt(getRadioValue("auditory1") || "0", 10);
+            scores.auditory = a1 || null;
+
+            const s1 = parseInt(getRadioValue("spatial1") || "0", 10);
+            scores.spatial = s1 || null;
+
+            const e1 = parseInt(getRadioValue("emotion1") || "0", 10);
+            scores.emotion = e1 || null;
+
+            const mRaw = getRadioValue("memory1");
+            if (mRaw) {
+                const [valStr, type] = mRaw.split("_");
+                const val = parseInt(valStr, 10);
+                if (type === "semantic") {
+                    scores.semantic = val;
+                    scores.episodic = 100 - Math.max(0, Math.min(100, val));
+                } else {
+                    scores.episodic = val;
+                    scores.semantic = 100 - Math.max(0, Math.min(100, val));
+                }
+            } else {
+                scores.semantic = null;
+                scores.episodic = null;
+            }
+
+            const lRaw = getRadioValue("learning1");
+            scores.learningHands = null;
+            scores.learningPrinciples = null;
+            scores.learningExamples = null;
+            scores.learningVisual = null;
+            if (lRaw) {
+                const [valStr, mode] = lRaw.split("_");
+                const val = parseInt(valStr, 10);
+                scores[`learning${mode.charAt(0).toUpperCase() + mode.slice(1)}`] = val;
+            }
+
+            const cRaw = getRadioValue("creativity1");
+            scores.creativityVibe = null;
+            scores.creativityStructure = null;
+            scores.creativityProblem = null;
+            scores.creativityVisual = null;
+            if (cRaw) {
+                const [valStr, mode] = cRaw.split("_");
+                const val = parseInt(valStr, 10);
+                const key = `creativity${mode.charAt(0).toUpperCase() + mode.slice(1)}`;
+                scores[key] = val;
+            }
+
+            const pRaw = getRadioValue("planning1");
+            scores.planningFeel = null;
+            scores.planningSequence = null;
+            scores.planningVisual = null;
+            if (pRaw) {
+                const [valStr, mode] = pRaw.split("_");
+                const val = parseInt(valStr, 10);
+                const key = `planning${mode.charAt(0).toUpperCase() + mode.slice(1)}`;
+                scores[key] = val;
+            }
+
+            const stRaw = getRadioValue("stress1");
+            scores.stressSensory = null;
+            scores.stressDecision = null;
+            scores.stressUnstructured = null;
+            scores.stressEmotional = null;
+            if (stRaw) {
+                const [valStr, mode] = stRaw.split("_");
+                const val = parseInt(valStr, 10);
+                const key = `stress${mode.charAt(0).toUpperCase() + mode.slice(1)}`;
+                scores[key] = val;
+            }
+
+            return scores;
+        }
+
+        function inferType(scores) {
+            const v = scores.visual ?? 0;
+            const a = scores.auditory ?? 0;
+            const sp = scores.spatial ?? 0;
+            const em = scores.emotion ?? 0;
+            const sem = scores.semantic ?? 0;
+            const epi = scores.episodic ?? 0;
+
+            const lHands = scores.learningHands ?? 0;
+            const lPrinciples = scores.learningPrinciples ?? 0;
+            const lExamples = scores.learningExamples ?? 0;
+            const lVisual = scores.learningVisual ?? 0;
+
+            const cVibe = scores.creativityVibe ?? 0;
+            const cStructure = scores.creativityStructure ?? 0;
+            const cProblem = scores.creativityProblem ?? 0;
+            const cVisual = scores.creativityVisual ?? 0;
+
+            const pFeel = scores.planningFeel ?? 0;
+            const pSeq = scores.planningSequence ?? 0;
+            const pVis = scores.planningVisual ?? 0;
+
+            const sSens = scores.stressSensory ?? 0;
+            const sDec = scores.stressDecision ?? 0;
+            const sUn = scores.stressUnstructured ?? 0;
+            const sEmo = scores.stressEmotional ?? 0;
+
+            const tags = [];
+
+            let primaryType = "Cognitive Generalist";
+            let summary = "Balanced cognitive profile without a single dominating imagery or memory axis.";
+
+            if (v < 35 && a >= 60 && sp >= 60 && sem >= epi) {
+                primaryType = "Kinesthetic–Conceptual with High Auditory Bandwidth";
+                summary = "Your mind runs more like a simulator than a camera: strong spatial and auditory channels, rich semantics, and relatively low reliance on visual imagery. You navigate systems, spaces, and conversations by feel and meaning rather than pictures.";
+            } else if (v >= 70 && epi >= 60 && em >= 60) {
+                primaryType = "Sensory Storyteller";
+                summary = "You think in scenes. Memories replay as rich sensory tapes with strong emotional coupling, and visual imagery is one of your core engines for understanding and creativity.";
+            } else if (sem >= 70 && v <= 40 && a <= 60) {
+                primaryType = "Conceptual Architect";
+                summary = "You operate in abstractions and models. Meaning, theory, and structure are your anchors; sensory imagery is present at most as a light sketch on top of deep conceptual scaffolding.";
+            } else if (a >= 75 && v <= 50) {
+                primaryType = "Auditory Narrator";
+                summary = "Your mind is acoustically tilted: the inner voice and internal music are vivid, while visuals are comparatively weaker. Language, rhythm, and conversation are your natural playgrounds.";
+            } else if (v >= 70 && sem >= 60 && cVisual >= 60) {
+                primaryType = "Visual–Structural Designer";
+                summary = "You build and reason with images and structures. Visualizations, diagrams, and spatial layouts are the natural substrate of your thought.";
+            }
+
+            if (v <= 25) tags.push("Low Visual Imagery");
+            else if (v >= 75) tags.push("High Visual Imagery");
+
+            if (a <= 30) tags.push("Quiet Mind’s Ear");
+            else if (a >= 70) tags.push("Strong Internal Audio");
+
+            if (sp >= 70) tags.push("Robust Spatial Simulator");
+            else if (sp <= 35) tags.push("Minimal Spatial Simulation");
+
+            if (sem >= 65 && sem > epi) tags.push("Semantic-Dominant Memory");
+            else if (epi >= 65 && epi > sem) tags.push("Episodic-Dominant Memory");
+            else tags.push("Balanced Memory Blend");
+
+            const learningMax = Math.max(lHands, lPrinciples, lExamples, lVisual);
+            if (learningMax > 0) {
+                if (learningMax === lHands) tags.push("Hands-On Learner");
+                else if (learningMax === lPrinciples) tags.push("Principle-First Learner");
+                else if (learningMax === lExamples) tags.push("Pattern / Example Learner");
+                else if (learningMax === lVisual) tags.push("Diagram-Driven Learner");
+            }
+
+            const cMax = Math.max(cVibe, cStructure, cProblem, cVisual);
+            if (cMax > 0) {
+                if (cMax === cVibe) tags.push("Vibe-Driven Creative");
+                else if (cMax === cStructure) tags.push("Structure-First Creative");
+                else if (cMax === cProblem) tags.push("Constraint-Driven Creative");
+                else if (cMax === cVisual) tags.push("Visual-Origin Creative");
+            }
+
+            const pMax = Math.max(pFeel, pSeq, pVis);
+            if (pMax > 0) {
+                if (pMax === pFeel) tags.push("Intuitive Planner");
+                else if (pMax === pSeq) tags.push("Sequential Planner");
+                else if (pMax === pVis) tags.push("End-State Planner");
+            }
+
+            const sMax = Math.max(sSens, sDec, sUn, sEmo);
+            if (sMax > 0) {
+                if (sMax === sSens) tags.push("Sensory Overload Prone");
+                else if (sMax === sDec) tags.push("Decision-Load Sensitive");
+                else if (sMax === sUn) tags.push("Structure-Sensitive");
+                else if (sMax === sEmo) tags.push("Emotional Load Carrier");
+            }
+
+            return { primaryType, summary, tags };
+        }
+
+        function clamp01FromScore(v) {
+            if (v == null) return null;
+            const n = Math.max(0, Math.min(100, v));
+            return n / 100;
+        }
+
+        function avgOrNull(arr) {
+            const vals = arr.filter(v => v != null);
+            if (!vals.length) return null;
+            return vals.reduce((a, b) => a + b, 0) / vals.length;
+        }
+
+        // Map scores → 2D position + intensity
+        function computeFieldVector(scores) {
+            const v = scores.visual ?? null;
+            const a = scores.auditory ?? null;
+            const sp = scores.spatial ?? null;
+            const em = scores.emotion ?? null;
+            const sem = scores.semantic ?? null;
+            const epi = scores.episodic ?? null;
+
+            const lHands = scores.learningHands ?? null;
+            const lPrinciples = scores.learningPrinciples ?? null;
+            const lExamples = scores.learningExamples ?? null;
+            const lVisual = scores.learningVisual ?? null;
+
+            const cVibe = scores.creativityVibe ?? null;
+            const cStructure = scores.creativityStructure ?? null;
+            const cProblem = scores.creativityProblem ?? null;
+            const cVisual = scores.creativityVisual ?? null;
+
+            const pFeel = scores.planningFeel ?? null;
+            const pSeq = scores.planningSequence ?? null;
+            const pVis = scores.planningVisual ?? null;
+
+            const sSens = scores.stressSensory ?? null;
+            const sDec = scores.stressDecision ?? null;
+            const sUn = scores.stressUnstructured ?? null;
+            const sEmo = scores.stressEmotional ?? null;
+
+            // Sensory vs Conceptual “bandwidth”
+            const sensory = avgOrNull([
+                clamp01FromScore(v),
+                clamp01FromScore(a),
+                clamp01FromScore(sp),
+                clamp01FromScore(epi),
+                clamp01FromScore(em),
+            ]);
+
+            const conceptual = avgOrNull([
+                clamp01FromScore(sem),
+                clamp01FromScore(lPrinciples),
+                clamp01FromScore(cStructure),
+                clamp01FromScore(cProblem),
+                clamp01FromScore(pSeq),
+                clamp01FromScore(sDec),
+                clamp01FromScore(sUn),
+            ]);
+
+            // Intuitive vs Structured lane
+            const intuitive = avgOrNull([
+                clamp01FromScore(pFeel),
+                clamp01FromScore(cVibe),
+                clamp01FromScore(lHands),
+            ]);
+
+            const structured = avgOrNull([
+                clamp01FromScore(pSeq),
+                clamp01FromScore(pVis),
+                clamp01FromScore(lPrinciples),
+                clamp01FromScore(sUn),
+            ]);
+
+            // Load/intensity: emotion + stress
+            const load = avgOrNull([
+                clamp01FromScore(em),
+                clamp01FromScore(sSens),
+                clamp01FromScore(sEmo),
+                clamp01FromScore(sDec),
+                clamp01FromScore(sUn),
+            ]);
+
+            // If we really have no data, abort
+            if (sensory == null && conceptual == null && intuitive == null && structured == null && load == null) {
+                return null;
+            }
+
+            // Default midpoints when one side missing
+            const sensVal = sensory != null ? sensory : 0.5;
+            const concVal = conceptual != null ? conceptual : 0.5;
+            const intVal = intuitive != null ? intuitive : 0.5;
+            const structVal = structured != null ? structured : 0.5;
+
+            // X: Conceptual ⟶ Sensory  (negative = conceptual, positive = sensory)
+            let x = sensVal - concVal; // in [-1,1]
+
+            // Y: Structured ⟶ Intuitive (negative = structured, positive = intuitive)
+            let y = intVal - structVal; // in [-1,1]
+
+            // Clamp and soften extremes a bit
+            x = Math.max(-1, Math.min(1, x));
+            y = Math.max(-1, Math.min(1, y));
+
+            const intensity = load != null ? Math.max(0, Math.min(1, load)) : 0.4;
+
+            return { x, y, intensity };
+        }
+
+        function renderField(scores) {
+            const canvas = document.getElementById("fieldCanvas");
+            if (!canvas) return;
+            const ctx = canvas.getContext("2d");
+            const w = canvas.width;
+            const h = canvas.height;
+
+            // Clear background
+            ctx.clearRect(0, 0, w, h);
+            const gradBg = ctx.createLinearGradient(0, 0, 0, h);
+            gradBg.addColorStop(0, "#020617");
+            gradBg.addColorStop(1, "#020617");
+            ctx.fillStyle = gradBg;
+            ctx.fillRect(0, 0, w, h);
+
+            // Draw axes
+            const cx = w / 2;
+            const cy = h / 2;
+            ctx.save();
+            ctx.strokeStyle = "rgba(148, 163, 184, 0.45)";
+            ctx.lineWidth = 1;
+
+            // Main axes
+            ctx.beginPath();
+            ctx.moveTo(10, cy);
+            ctx.lineTo(w - 10, cy);
+            ctx.moveTo(cx, 10);
+            ctx.lineTo(cx, h - 10);
+            ctx.stroke();
+
+            // Crosshair ticks
+            const tick = 4;
+            for (let i = -2; i <= 2; i++) {
+                const tx = cx + (i * (w * 0.16));
+                ctx.beginPath();
+                ctx.moveTo(tx, cy - tick);
+                ctx.lineTo(tx, cy + tick);
+                ctx.stroke();
+                const ty = cy + (i * (h * 0.13));
+                ctx.beginPath();
+                ctx.moveTo(cx - tick, ty);
+                ctx.lineTo(cx + tick, ty);
+                ctx.stroke();
+            }
+
+            // Axis labels
+            ctx.font = "11px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+            ctx.fillStyle = "rgba(148, 163, 184, 0.9)";
+            ctx.textAlign = "center";
+            ctx.fillText("Conceptual", cx - (w * 0.32), cy - 8);
+            ctx.fillText("Sensory", cx + (w * 0.32), cy - 8);
+
+            ctx.save();
+            ctx.translate(10, cy - (h * 0.32));
+            ctx.rotate(-Math.PI / 2);
+            ctx.textAlign = "center";
+            ctx.fillText("Structured", 0, 0);
+            ctx.restore();
+
+            ctx.save();
+            ctx.translate(w - 10, cy + (h * 0.32));
+            ctx.rotate(Math.PI / 2);
+            ctx.textAlign = "center";
+            ctx.fillText("Intuitive", 0, 0);
+            ctx.restore();
+
+            const vec = computeFieldVector(scores);
+            if (!vec) {
+                ctx.fillStyle = "rgba(148, 163, 184, 0.8)";
+                ctx.textAlign = "center";
+                ctx.fillText("Fill in the questions and compute to see your field.", cx, cy);
+                ctx.restore();
+                return;
+            }
+
+            const { x, y, intensity } = vec;
+
+            // Map [-1,1] → position in the plot
+            const radius = Math.min(w, h) * 0.30;
+            const px = cx + x * radius;
+            const py = cy - y * radius;
+
+            // Light-cone footprint: radial glow whose size = intensity
+            const glowRadius = 16 + 40 * intensity;
+            const glow = ctx.createRadialGradient(px, py, 0, px, py, glowRadius);
+            glow.addColorStop(0, "rgba(250, 204, 21, 0.95)");
+            glow.addColorStop(0.4, "rgba(250, 204, 21, 0.55)");
+            glow.addColorStop(0.9, "rgba(56, 189, 248, 0.0)");
+
+            ctx.beginPath();
+            ctx.fillStyle = glow;
+            ctx.arc(px, py, glowRadius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Core point
+            ctx.beginPath();
+            ctx.fillStyle = "rgba(251, 191, 36, 1)";
+            ctx.strokeStyle = "rgba(251, 191, 36, 0.95)";
+            ctx.lineWidth = 1.5;
+            ctx.arc(px, py, 4.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Optional: faint “cone” upward to suggest 3D (just a soft triangle)
+            ctx.beginPath();
+            ctx.moveTo(px, py - glowRadius * 0.3);
+            ctx.lineTo(px - glowRadius * 0.35, py - glowRadius * 1.1);
+            ctx.lineTo(px + glowRadius * 0.35, py - glowRadius * 1.1);
+            ctx.closePath();
+            const coneGrad = ctx.createLinearGradient(px, py - glowRadius * 0.3, px, py - glowRadius * 1.1);
+            coneGrad.addColorStop(0, "rgba(250, 250, 250, 0.04)");
+            coneGrad.addColorStop(1, "rgba(250, 250, 250, 0.0)");
+            ctx.fillStyle = coneGrad;
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+
+        function updateProfileView(scores) {
+            const { primaryType, summary, tags } = inferType(scores);
+            const archetype = inferArchetypeFromTags(tags);
+
+            const typeEl = document.getElementById("profileType");
+            const tagsEl = document.getElementById("profileTags");
+            const summaryEl = document.getElementById("profileSummary");
+
+            typeEl.textContent = archetype.name || primaryType;
+            summaryEl.textContent = archetype.summary || summary;
+            tagsEl.innerHTML = "";
+            tags.forEach(t => {
+                const span = document.createElement("span");
+                span.className = "tag";
+                span.textContent = t;
+                tagsEl.appendChild(span);
+            });
+
+            const detailImageryKicker = document.getElementById("detailImageryKicker");
+            const detailImageryBody = document.getElementById("detailImageryBody");
+            const detailMemoryKicker = document.getElementById("detailMemoryKicker");
+            const detailMemoryBody = document.getElementById("detailMemoryBody");
+            const detailStressKicker = document.getElementById("detailStressKicker");
+            const detailStressBody = document.getElementById("detailStressBody");
+            const detailPills = document.getElementById("detailPills");
+            const detailArchetypeKicker = document.getElementById("detailArchetypeKicker");
+            const detailArchetypeBody = document.getElementById("detailArchetypeBody");
+
+            const v = scores.visual ?? null;
+            const a = scores.auditory ?? null;
+            const sp = scores.spatial ?? null;
+            const em = scores.emotion ?? null;
+            const sem = scores.semantic ?? null;
+            const epi = scores.episodic ?? null;
+
+            const lHands = scores.learningHands ?? 0;
+            const lPrinciples = scores.learningPrinciples ?? 0;
+            const lExamples = scores.learningExamples ?? 0;
+            const lVisual = scores.learningVisual ?? 0;
+
+            const cVibe = scores.creativityVibe ?? 0;
+            const cStructure = scores.creativityStructure ?? 0;
+            const cProblem = scores.creativityProblem ?? 0;
+            const cVisual = scores.creativityVisual ?? 0;
+
+            const pFeel = scores.planningFeel ?? 0;
+            const pSeq = scores.planningSequence ?? 0;
+            const pVis = scores.planningVisual ?? 0;
+
+            const sSens = scores.stressSensory ?? 0;
+            const sDec = scores.stressDecision ?? 0;
+            const sUn = scores.stressUnstructured ?? 0;
+            const sEmo = scores.stressEmotional ?? 0;
+
+            let imageryLines = [];
+            if (v !== null) {
+                if (v <= 25) imageryLines.push("Visual imagery is minimal or absent; your mind encodes structure and meaning without needing pictures.");
+                else if (v <= 55) imageryLines.push("Visual imagery exists as sketches or wireframes — useful, but not the primary substrate.");
+                else imageryLines.push("Visual imagery is vivid and manipulable, giving you strong internal scenes when needed.");
+            } else {
+                imageryLines.push("Visual imagery level is unknown; answers can be refined in the Imagery block.");
+            }
+
+            if (a !== null) {
+                if (a <= 30) imageryLines.push("Auditory imagery is quiet; thoughts are mostly silent or purely conceptual.");
+                else if (a <= 65) imageryLines.push("Auditory imagery is present in bursts: songs or phrases sometimes rise as inner audio.");
+                else imageryLines.push("Auditory imagery is strong: songs, voices, and phrasing are clearly “heard” in your mind.");
+            } else {
+                imageryLines.push("Auditory channel not yet characterized; answer the sound questions to pin it down.");
+            }
+
+            if (sp !== null) {
+                if (sp <= 35) imageryLines.push("Spatial simulation is limited; navigation and rotation may rely on external aids or explicit reasoning.");
+                else if (sp <= 65) imageryLines.push("Spatial reasoning is primarily conceptual: you track adjacency and layout without a heavy kinesthetic overlay.");
+                else imageryLines.push("Spatial simulation is robust: you can “walk” spaces mentally and handle rotations with ease.");
+            } else {
+                imageryLines.push("Spatial reasoning level undetermined; use the rotation/layout questions to specify it.");
+            }
+
+            detailImageryKicker.textContent = "Imagery channels and spatial engine.";
+            detailImageryBody.textContent = imageryLines.join(" ");
+
+            let memLines = [];
+            if (sem !== null && epi !== null) {
+                if (sem - epi >= 15) {
+                    memLines.push("Memory tilts semantic: you recall what happened, why, and in what order more than raw scenes.");
+                } else if (epi - sem >= 15) {
+                    memLines.push("Memory tilts episodic: scenes and sensory replays surface quickly, with meaning layered on later.");
+                } else {
+                    memLines.push("Semantic and episodic memory are relatively balanced; you can access both meaning and scenes as needed.");
+                }
+            } else {
+                memLines.push("Memory tilt (semantic vs episodic) is still coarse; refine via the memory questions.");
+            }
+
+            const learningMax = Math.max(lHands, lPrinciples, lExamples, lVisual);
+            if (learningMax > 0) {
+                if (learningMax === lHands) {
+                    memLines.push("Learning is hands-on dominant: you absorb systems best by direct manipulation, experiments, and tinkering.");
+                } else if (learningMax === lPrinciples) {
+                    memLines.push("Learning is principle-first: you stabilize once you understand the deeper model or governing rules.");
+                } else if (learningMax === lExamples) {
+                    memLines.push("Learning is example-based: you parse patterns through repeated, concrete instances.");
+                } else if (learningMax === lVisual) {
+                    memLines.push("Learning is diagram-driven: charts, flows, and maps give you anchoring mental hooks.");
+                }
+            } else {
+                memLines.push("Learning preference is not yet fixed; pick a primary mode in the learning block to see tailored notes.");
+            }
+
+            const cMax = Math.max(cVibe, cStructure, cProblem, cVisual);
+            if (cMax > 0) {
+                if (cMax === cVibe) {
+                    memLines.push("Creativity is vibe-driven: mood, rhythm, and atmosphere form the seed you develop into structure.");
+                } else if (cMax === cStructure) {
+                    memLines.push("Creativity is structure-first: you architect outlines, systems, or blueprints, then populate details.");
+                } else if (cMax === cProblem) {
+                    memLines.push("Creativity is constraint-driven: sharp problems and constraints light up your inventive capacity.");
+                } else if (cMax === cVisual) {
+                    memLines.push("Creativity is visual-origin: images, scenes, or aesthetic compositions are your primary launch point.");
+                }
+            } else {
+                memLines.push("Creative origin isn’t locked yet; choose a primary generator in the creativity block.");
+            }
+
+            detailMemoryKicker.textContent = "Memory tilt, learning lane, and creative spark.";
+            detailMemoryBody.textContent = memLines.join(" ");
+
+            let stressLines = [];
+            const pMax = Math.max(pFeel, pSeq, pVis);
+            if (pMax > 0) {
+                if (pMax === pFeel) {
+                    stressLines.push("Planning style is intuitive: you move by sensing the next viable step, adjusting dynamically rather than over-specifying up front.");
+                } else if (pMax === pSeq) {
+                    stressLines.push("Planning style is sequential: lists, milestones, and explicit ordering help you hold complexity under control.");
+                } else if (pMax === pVis) {
+                    stressLines.push("Planning style is end-state oriented: you picture (or otherwise represent) the goal and derive steps working backwards.");
+                }
+            } else {
+                stressLines.push("Planning style is not fully specified; pick your default lane in the planning block.");
+            }
+
+            const sMax = Math.max(sSens, sDec, sUn, sEmo);
+            if (sMax > 0) {
+                if (sMax === sSens) {
+                    stressLines.push("Primary overload vector: sensory noise and chaos. For parenting or busy environments, controlling volume, visual clutter, and concurrent demands will reduce strain significantly.");
+                } else if (sMax === sDec) {
+                    stressLines.push("Primary overload vector: decision pressure. Pre-committing to heuristics and defaults can sharply cut your cognitive load.");
+                } else if (sMax === sUn) {
+                    stressLines.push("Primary overload vector: lack of structure. Even light scaffolding — clear roles, times, and guardrails — pays huge dividends.");
+                } else if (sMax === sEmo) {
+                    stressLines.push("Primary overload vector: emotional load. You’re sensitive to other people’s states; buffering and decompression matter more than you think.");
+                }
+            } else {
+                stressLines.push("Overload entry point is still ambiguous; refine via the stress block to see tailored mitigation notes.");
+            }
+
+            detailStressKicker.textContent = "Execution lane and overload channel.";
+            detailStressBody.textContent = stressLines.join(" ");
+
+            detailPills.innerHTML = "";
+            tags.forEach(t => {
+                const pill = document.createElement("span");
+                pill.className = "pill-soft";
+                pill.textContent = t;
+                detailPills.appendChild(pill);
+            });
+
+            detailArchetypeKicker.textContent = archetype.name;
+            detailArchetypeBody.textContent = archetype.detail;
+
+            // NEW: update sensory field visualization
+            renderField(scores);
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            initHeatmap();
+
+            const computeBtn = document.getElementById("computeBtn");
+            computeBtn.addEventListener("click", () => {
+                const scores = computeScores();
+                updateHeatmap(scores);
+                updateProfileView(scores);
+            });
+
+            let autoUpdateEnabled = false;
+            computeBtn.addEventListener("click", () => {
+                if (!autoUpdateEnabled) {
+                    autoUpdateEnabled = true;
+                    document.body.addEventListener("change", (ev) => {
+                        if (ev.target && ev.target.matches("input[type=radio]")) {
+                            const scores = computeScores();
+                            updateHeatmap(scores);
+                            updateProfileView(scores);
+                        }
+                    });
+                }
+            });
+        });
+    </script>
+
+</body>
+
+</html>
