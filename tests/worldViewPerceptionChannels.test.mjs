@@ -11,6 +11,8 @@ import { Status } from "../src/rules/components/Status.js";
 import { Traits } from "../src/rules/components/Traits.js";
 import { Vitality } from "../src/rules/components/Vitality.js";
 import { DoorState } from "../src/rules/components/DoorState.js";
+import { Collider } from "../src/rules/components/Collider.js";
+import { SecretDoor } from "../src/rules/components/SecretDoor.js";
 import { clearAll, loadChunk } from "../src/rules/environment/dungeon/tileMap.js";
 import { clearExplored } from "../src/rules/environment/dungeon/exploredMap.js";
 import { clearPerceptionMemory } from "../src/rules/environment/dungeon/perceptionMemory.js";
@@ -52,6 +54,33 @@ Deno.test("WorldView keeps frozen recent-memory glyph when turning away", () => 
   assert(seen, "monster should still render from recent memory when out of view");
   assert(seen.tags.includes("memory_recent"), "out-of-view monster should project as memory");
   assertEquals(seen.pos, { x: 8, y: 10 }, "memory echo should stay frozen at last seen tile");
+});
+
+Deno.test("WorldView hides unrevealed secret doors and exposes revealed ones", () => {
+  resetFloor();
+  const world = new World({ seed: 0x5EC0E7 });
+
+  const player = world.create();
+  world.add(player, Player, {});
+  world.add(player, Position, { x: 10, y: 10 });
+  world.add(player, NamedIdentity, { name: "Hero", identity: "player" });
+  world.add(player, Facing, { dx: 1, dy: 0 });
+  world.add(player, BaseStats, { perception: 5 });
+
+  const door = world.create();
+  world.add(door, Position, { x: 11, y: 10 });
+  world.add(door, DoorState, { open: false, locked: false });
+  world.add(door, Collider, { solid: true, blocksSight: true });
+  world.add(door, SecretDoor, { fromRoomId: "main", toRoomId: "leaf", revealed: false, difficulty: 8, hintKind: "hollow" });
+
+  let view = buildWorldView(world);
+  assert(!view.entities.find((e) => e.id === door), "unrevealed secret door should not be projected");
+
+  world.set(door, SecretDoor, { fromRoomId: "main", toRoomId: "leaf", revealed: true, difficulty: 8, hintKind: "hollow" });
+  view = buildWorldView(world);
+  const doorView = view.entities.find((e) => e.id === door);
+  assert(doorView, "revealed secret door should be projected");
+  assertEquals(doorView.kind, "door_closed");
 });
 
 Deno.test("WorldView projects thermal signatures for unseen monsters", () => {

@@ -14,10 +14,12 @@ import "../src/content/items/index.js";
 import { installContent } from "../src/content/install.js";
 import { World } from '../src/lib/ecs-js/index.js';
 import {
-  clearAll, isWalkable, forEachLoadedTile,
+  clearAll, isWalkable, forEachLoadedTile, setTile,
 } from '../src/rules/environment/dungeon/tileMap.js';
 import { generateFloor } from '../src/rules/environment/dungeon/index.js';
-import { TILE_STAIR_DOWN, TILE_STAIR_UP } from '../src/rules/environment/dungeon/constants.js';
+import { TILE_DOOR, TILE_STAIR_DOWN, TILE_STAIR_UP } from '../src/rules/environment/dungeon/constants.js';
+import { Position } from "../src/rules/components/Position.js";
+import { SecretDoor } from "../src/rules/components/SecretDoor.js";
 
 installContent();
 
@@ -87,6 +89,12 @@ function collectWalkableComponents() {
   return components;
 }
 
+function revealAllSecretDoors(world) {
+  for (const [, , pos] of world.query(SecretDoor, Position)) {
+    setTile(pos.x, pos.y, TILE_DOOR);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -140,6 +148,7 @@ Deno.test("all walkable tiles form one connected component", async () => {
       clearAll();
       const world = new World({ seed });
       const { spawnX, spawnY } = await generateFloor(world, seed, depth);
+      revealAllSecretDoors(world);
       const components = collectWalkableComponents();
 
       if (depth === 1) {

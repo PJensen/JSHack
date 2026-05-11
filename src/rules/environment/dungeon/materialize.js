@@ -5,6 +5,7 @@
 import { createFrom } from '../../../lib/ecs-js/archetype.js';
 import { Door } from '../../archetypes/Door.js';
 import { materializeSpawn } from './populate.js';
+import { SecretDoor } from '../../components/SecretDoor.js';
 import { RoomMetadata } from '../../components/RoomMetadata.js';
 import { Unpaid } from '../../components/Unpaid.js';
 import { Position } from '../../components/Position.js';
@@ -56,6 +57,22 @@ export function materializeChunk(world, chunk, opts = {}) {
           }
           break;
       }
+    }
+  }
+
+  // Secret doors start as wall tiles plus a hidden door entity. Search reveals
+  // them by flipping SecretDoor.revealed and mutating the tile to TILE_DOOR.
+  if (Array.isArray(chunk.secretDoors)) {
+    for (const secret of chunk.secretDoors) {
+      const id = createFrom(world, Door, { x: secret.x, y: secret.y });
+      world.add(id, SecretDoor, {
+        fromRoomId: String(secret.fromRoomId || ""),
+        toRoomId: String(secret.toRoomId || ""),
+        revealed: false,
+        difficulty: Number(secret.difficulty || 0) | 0,
+        hintKind: String(secret.hintKind || "hollow"),
+      });
+      ids.push(id);
     }
   }
 

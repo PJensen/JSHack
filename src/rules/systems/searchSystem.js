@@ -14,7 +14,11 @@ import { Position } from "../components/Position.js";
 import { Vitality } from "../components/Vitality.js";
 import { Brain } from "../components/Brain.js";
 import { Trap } from "../components/Trap.js";
+import { SecretDoor } from "../components/SecretDoor.js";
 import { emitSafe } from "../utils/emitSafe.js";
+import { setTile, getTile } from "../environment/dungeon/tileMap.js";
+import { TILE_DOOR, TILE_WALL } from "../environment/dungeon/constants.js";
+import { invalidateTileQueryCache } from "../utils/tileQueryCache.js";
 
 /**
  * Trap search resolver — reveals hidden/armed traps within the search radius.
@@ -51,6 +55,63 @@ function trapResolver(world, actorId, pos, radius) {
   return { found, messages };
 }
 
+const SECRET_HINTS = Object.freeze({
+  draft: "You feel a draft slip through the stone.",
+  scratch: "You notice scratches near a wall.",
+  hollow: "You hear a hollow place behind the stone.",
+  moss: "The moss breaks around a hidden seam.",
+  warmth: "A warm thread of air leaks from the wall.",
+});
+
+/**
+ * Secret door resolver — adjacent search reveals; range-2 search hints.
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ * @param {number} actorId
+ * @param {{ x: number, y: number }} pos
+ * @param {number} _radius
+ * @returns {{ found: boolean, messages: string[] }}
+ */
+function secretDoorResolver(world, actorId, pos, _radius) {
+  /** @type {string[]} */
+  const messages = [];
+  let found = false;
+
+  for (const [doorId, secret, doorPos] of world.query(SecretDoor, Position)) {
+    if (secret.revealed) continue;
+
+    const dx = Math.abs((doorPos.x | 0) - (pos.x | 0));
+    const dy = Math.abs((doorPos.y | 0) - (pos.y | 0));
+    const dist = dx + dy;
+    if (dist === 1) {
+      const tile = getTile(doorPos.x, doorPos.y);
+      if (tile === TILE_WALL) setTile(doorPos.x, doorPos.y, TILE_DOOR);
+      world.set(doorId, SecretDoor, { ...secret, revealed: true });
+      invalidateTileQueryCache(world);
+      found = true;
+      messages.push("*** you find a hidden door ***");
+      emitSafe(world, "search:revealed", {
+        actorId,
+        entityId: doorId,
+        kind: "secret_door",
+        at: { x: doorPos.x, y: doorPos.y },
+      });
+    } else if (dist <= 2) {
+      found = true;
+      const hint = SECRET_HINTS[String(secret.hintKind || "hollow")] || SECRET_HINTS.hollow;
+      messages.push(`*** ${hint} ***`);
+      emitSafe(world, "search:hint", {
+        actorId,
+        entityId: doorId,
+        kind: "secret_door",
+        hintKind: secret.hintKind,
+        at: { x: doorPos.x, y: doorPos.y },
+      });
+    }
+  }
+
+  return { found, messages };
+}
+
 /**
  * The ordered list of search resolvers.
  * Add new resolvers here to extend the search pipeline.
@@ -58,9 +119,9 @@ function trapResolver(world, actorId, pos, radius) {
  */
 const searchResolvers = [
   trapResolver,
+  secretDoorResolver,
   // hiddenMonsterResolver,
   // invisibleMonsterResolver,
-  // secretDoorResolver,
   // concealedItemResolver,
 ];
 

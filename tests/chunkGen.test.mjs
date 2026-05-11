@@ -158,10 +158,17 @@ Deno.test("adjacent chunks north/south share floor at gate", () => {
   assert(isWalkable(tB), `chunk B north edge at gate (x=${gateX}) is walkable (got ${tB})`);
 });
 
-Deno.test("all rooms within a chunk are connected (internal flood-fill)", () => {
+Deno.test("all rooms within a chunk are connected after secret doors are revealed", () => {
   for (const seed of [1, 42, 123, 777]) {
     const chunk = generateChunk(seed, 2, 0, 0);
     if (chunk.rooms.length < 2) continue;
+
+    const tiles = Uint8Array.from(chunk.tiles);
+    for (const secret of chunk.secretDoors || []) {
+      const lx = secret.x - chunk.chunkX * CHUNK_SIZE;
+      const ly = secret.y - chunk.chunkY * CHUNK_SIZE;
+      tiles[ly * CHUNK_SIZE + lx] = TILE_DOOR;
+    }
 
     const ox = chunk.chunkX * CHUNK_SIZE;
     const oy = chunk.chunkY * CHUNK_SIZE;
@@ -169,7 +176,7 @@ Deno.test("all rooms within a chunk are connected (internal flood-fill)", () => 
     const cx0 = r0.x - ox + Math.floor(r0.w / 2);
     const cy0 = r0.y - oy + Math.floor(r0.h / 2);
 
-    const reachable = floodFill(chunk.tiles, CHUNK_SIZE, cx0, cy0);
+    const reachable = floodFill(tiles, CHUNK_SIZE, cx0, cy0);
 
     for (const room of chunk.rooms) {
       const cx = room.x - ox + Math.floor(room.w / 2);
@@ -177,6 +184,22 @@ Deno.test("all rooms within a chunk are connected (internal flood-fill)", () => 
       assert(reachable.has(`${cx},${cy}`),
         `room center (${cx},${cy}) reachable [seed=${seed}]`);
     }
+  }
+});
+
+Deno.test("secret doors hide terminal branch rooms behind wall tiles", () => {
+  const chunks = [];
+  for (const seed of [1, 2, 3, 4, 5, 42, 123, 777]) {
+    chunks.push(generateChunk(seed, 2, 0, 0));
+  }
+  const withSecret = chunks.find((chunk) => (chunk.secretDoors?.length || 0) > 0);
+  assert(withSecret, "expected at least one deterministic seed to create a secret leaf door");
+
+  for (const secret of withSecret.secretDoors) {
+    const lx = secret.x - withSecret.chunkX * CHUNK_SIZE;
+    const ly = secret.y - withSecret.chunkY * CHUNK_SIZE;
+    assert(withSecret.tiles[ly * CHUNK_SIZE + lx] === TILE_WALL, "unrevealed secret door remains a wall tile");
+    assert(typeof secret.toRoomId === "string" && secret.toRoomId.includes(":room:"), "secret door targets a room id");
   }
 });
 

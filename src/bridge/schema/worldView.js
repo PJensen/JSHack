@@ -5,6 +5,7 @@ import { Position } from "../../rules/components/Position.js";
 import { Player } from "../../rules/components/Player.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 import { DoorState } from "../../rules/components/DoorState.js";
+import { SecretDoor } from "../../rules/components/SecretDoor.js";
 import { Collider } from "../../rules/components/Collider.js";
 import { Status } from "../../rules/components/Status.js";
 import { Equipment } from "../../rules/components/Equipment.js";
@@ -1010,6 +1011,8 @@ export function buildWorldView(world) {
 			/** @type {any} */ const trap = /** @type any */ (world.get(id, Trap));
 			if (trap && !trap.revealed) return;
 			const isPlayer = _view.player && id === _view.player.id;
+			/** @type {any} */ const secretDoor = /** @type any */ (world.get(id, SecretDoor));
+			if (secretDoor && !secretDoor.revealed) return;
 			/** @type {any} */ const ident = /** @type any */ (world.get(id, NamedIdentity));
 			/** @type {any} */ const door = /** @type any */ (world.get(id, DoorState));
 			/** @type {any} */ const objState = /** @type any */ (world.get(id, ObjectState));

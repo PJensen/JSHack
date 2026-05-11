@@ -8,6 +8,7 @@ import { Position } from '../src/rules/components/Position.js';
 import { DoorState } from '../src/rules/components/DoorState.js';
 import { Collider } from '../src/rules/components/Collider.js';
 import { Interactable } from '../src/rules/components/Interactable.js';
+import { SecretDoor } from '../src/rules/components/SecretDoor.js';
 import { Inventory } from '../src/rules/components/Inventory.js';
 import { NamedIdentity } from '../src/rules/components/NamedIdentity.js';
 import { ItemInfo } from '../src/rules/components/ItemInfo.js';
@@ -20,11 +21,12 @@ Deno.test("materializeChunk creates correct entity count (doors + spawns only)",
   const world = new World({ seed: 42 });
   const chunk = generateChunk(42, 1, 0, 0);
 
-  // Only doors create entities (no stair opts passed, spawns empty from generateChunk)
+  // Only visible doors and secret door metadata create entities (no stair opts passed, spawns empty from generateChunk)
   let expectedDoors = 0;
   for (let i = 0; i < chunk.tiles.length; i++) {
     if (chunk.tiles[i] === TILE_DOOR) expectedDoors++;
   }
+  expectedDoors += chunk.secretDoors?.length || 0;
 
   const ids = materializeChunk(world, chunk);
   assert(ids.length === expectedDoors, `entity count matches doors: expected ${expectedDoors}, got ${ids.length}`);
@@ -82,7 +84,21 @@ Deno.test("materialized doors have DoorState, Collider, and Interactable", () =>
     assert(ds.open === false, 'door starts closed');
   }
 
-  assert(doorCount === chunk.doors.length, `door count matches: ${doorCount} vs ${chunk.doors.length}`);
+  assert(doorCount === chunk.doors.length + (chunk.secretDoors?.length || 0), `door count matches visible + secret doors: ${doorCount}`);
+});
+
+Deno.test("materialized secret doors are hidden door entities on wall tiles", () => {
+  clearAll();
+  const world = new World({ seed: 42 });
+  const chunk = generateChunk(2, 1, 0, 0);
+  loadChunk(0, 0, chunk.tiles);
+  materializeChunk(world, chunk);
+
+  for (const secret of chunk.secretDoors || []) {
+    const match = Array.from(world.query(SecretDoor, Position)).find(([, , pos]) => pos.x === secret.x && pos.y === secret.y);
+    assert(match, `secret door entity exists at ${secret.x},${secret.y}`);
+    assert(!isWalkable(secret.x, secret.y), "unrevealed secret door remains a wall tile");
+  }
 });
 
 Deno.test("materialized entities have world-space positions", () => {

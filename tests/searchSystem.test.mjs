@@ -5,7 +5,13 @@ import { Position } from '../src/rules/components/Position.js';
 import { Vitality } from '../src/rules/components/Vitality.js';
 import { Brain } from '../src/rules/components/Brain.js';
 import { Trap } from '../src/rules/components/Trap.js';
+import { DoorState } from '../src/rules/components/DoorState.js';
+import { Collider } from '../src/rules/components/Collider.js';
+import { Interactable } from '../src/rules/components/Interactable.js';
+import { SecretDoor } from '../src/rules/components/SecretDoor.js';
 import { searchSystem } from '../src/rules/systems/searchSystem.js';
+import { CHUNK_SIZE, TILE_FLOOR, TILE_WALL, TILE_DOOR } from '../src/rules/environment/dungeon/constants.js';
+import { clearAll, getTile, loadChunk } from '../src/rules/environment/dungeon/tileMap.js';
 
 Deno.test("search system consumes SearchIntent", () => {
   const world = new World({ seed: 1 });
@@ -163,4 +169,66 @@ Deno.test("search system emits search:pulse with position and actor", () => {
   assertEquals(pulseEvent.actorId, actor, 'actorId should be the searcher');
   assertEquals(pulseEvent.at.x, 10, 'at.x should match position');
   assertEquals(pulseEvent.at.y, 7, 'at.y should match position');
+});
+
+Deno.test("search system reveals adjacent secret door deterministically", () => {
+  clearAll();
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR);
+  tiles[5 * CHUNK_SIZE + 6] = TILE_WALL;
+  loadChunk(0, 0, tiles);
+  const world = new World({ seed: 9 });
+
+  const actor = world.create();
+  world.add(actor, SearchIntent);
+  world.add(actor, Position, { x: 5, y: 5 });
+  world.add(actor, Vitality, { maxHp: 20, hp: 20 });
+
+  const door = world.create();
+  world.add(door, Position, { x: 6, y: 5 });
+  world.add(door, DoorState, { open: false, locked: false });
+  world.add(door, Collider, { solid: true, blocksSight: true });
+  world.add(door, Interactable, { action: "toggleDoor" });
+  world.add(door, SecretDoor, { fromRoomId: "main", toRoomId: "leaf", revealed: false, difficulty: 8, hintKind: "hollow" });
+
+  let revealed = null;
+  const messages = [];
+  world.on("search:revealed", (ev) => { revealed = ev; });
+  world.on("message", (ev) => messages.push(ev.text));
+
+  searchSystem(world);
+
+  assertEquals(world.get(door, SecretDoor).revealed, true);
+  assertEquals(getTile(6, 5), TILE_DOOR);
+  assertEquals(revealed?.kind, "secret_door");
+  assert(messages.some((m) => m.includes("hidden door")), `expected hidden door message, got ${JSON.stringify(messages)}`);
+});
+
+Deno.test("search system hints nearby secret door without revealing it", () => {
+  clearAll();
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR);
+  tiles[5 * CHUNK_SIZE + 7] = TILE_WALL;
+  loadChunk(0, 0, tiles);
+  const world = new World({ seed: 10 });
+
+  const actor = world.create();
+  world.add(actor, SearchIntent);
+  world.add(actor, Position, { x: 5, y: 5 });
+  world.add(actor, Vitality, { maxHp: 20, hp: 20 });
+
+  const door = world.create();
+  world.add(door, Position, { x: 7, y: 5 });
+  world.add(door, DoorState, { open: false, locked: false });
+  world.add(door, Collider, { solid: true, blocksSight: true });
+  world.add(door, Interactable, { action: "toggleDoor" });
+  world.add(door, SecretDoor, { fromRoomId: "main", toRoomId: "leaf", revealed: false, difficulty: 8, hintKind: "draft" });
+
+  const messages = [];
+  world.on("message", (ev) => messages.push(ev.text));
+
+  searchSystem(world);
+
+  assertEquals(world.get(door, SecretDoor).revealed, false);
+  assertEquals(getTile(7, 5), TILE_WALL);
+  assert(messages.some((m) => m.includes("draft")), `expected draft hint, got ${JSON.stringify(messages)}`);
+  assert(!messages.some((m) => m.includes("nothing")), "hint should count as a search result");
 });

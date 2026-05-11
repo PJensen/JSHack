@@ -20,6 +20,7 @@ import { manhattanScalar } from '../../utils/distance.js';
  * @property {Uint8Array} tiles        - CHUNK_SIZE * CHUNK_SIZE flat array
  * @property {Array<{x:number,y:number,w:number,h:number}>} rooms - rooms in world coords
  * @property {Array<{x:number,y:number}>} doors  - door positions (world coords)
+ * @property {Array<{x:number,y:number,fromRoomId:string,toRoomId:string,difficulty:number,hintKind:string}>} secretDoors
  * @property {Array<{x:number,y:number,kind:string,params:Object}>} spawns
  */
 
@@ -132,6 +133,8 @@ export function generateChunk(worldSeed, depth, chunkX, chunkY, profile = null, 
   }
   sanitizeDoorTiles(tiles, CHUNK_SIZE);
 
+  const secretDoors = _addSecretLeafDoors(tiles, rooms, worldSeed, depth, chunkX, chunkY, rng, floorPlan);
+
   // Detect door positions after the final floor geometry is settled so doors
   // cannot preserve stale metadata from pre-connectivity/pre-prefab layouts.
   const doorChance = profile?.doorChance ?? 0.6;
@@ -141,7 +144,7 @@ export function generateChunk(worldSeed, depth, chunkX, chunkY, profile = null, 
     tiles[d.y * CHUNK_SIZE + d.x] = TILE_DOOR;
   }
 
-  return { chunkX, chunkY, depth, seed, tiles, rooms, doors, spawns: [] };
+  return { chunkX, chunkY, depth, seed, tiles, rooms, doors, secretDoors, spawns: [] };
 }
 
 /**
@@ -329,6 +332,129 @@ export function sanitizeDoorTiles(tiles, stride) {
       tiles[y * stride + x] = TILE_FLOOR;
     }
   }
+}
+
+const SECRET_DOOR_HINTS = Object.freeze(["draft", "scratch", "hollow", "moss", "warmth"]);
+
+function _addSecretLeafDoors(tiles, rooms, worldSeed, depth, chunkX, chunkY, rng, floorPlan = null) {
+  if (!Array.isArray(rooms) || rooms.length < 3) return [];
+  if (floorPlan?.disconnectedPocket?.chunkX === chunkX && floorPlan.disconnectedPocket?.chunkY === chunkY) return [];
+
+  const ox = chunkX * CHUNK_SIZE;
+  const oy = chunkY * CHUNK_SIZE;
+  const stairRoomCount = (floorPlan?.downStairs || []).filter(s => s.chunkX === chunkX && s.chunkY === chunkY).length;
+  const hasUpStair = (floorPlan?.upStairs || []).some(s => s.chunkX === chunkX && s.chunkY === chunkY);
+  const protectedRoomIndices = new Set();
+  if (chunkX === 0 && chunkY === 0) protectedRoomIndices.add(0);
+  if (hasUpStair) protectedRoomIndices.add(0);
+  for (let i = 0; i < stairRoomCount; i++) {
+    protectedRoomIndices.add(Math.max(0, rooms.length - 1 - i));
+  }
+  for (const stair of floorPlan?.upStairs || []) {
+    if (stair.chunkX !== chunkX || stair.chunkY !== chunkY || !stair.forced) continue;
+    let nearestIndex = -1;
+    let nearestDistance = Infinity;
+    for (let i = 0; i < rooms.length; i++) {
+      if (_roomContainsLocal(rooms[i], ox, oy, stair.localX, stair.localY)) {
+        protectedRoomIndices.add(i);
+      }
+      const rcx = rooms[i].x - ox + Math.floor(rooms[i].w / 2);
+      const rcy = rooms[i].y - oy + Math.floor(rooms[i].h / 2);
+      const dist = manhattanScalar(rcx, rcy, stair.localX, stair.localY);
+      if (dist < nearestDistance) {
+        nearestDistance = dist;
+        nearestIndex = i;
+      }
+    }
+    if (nearestIndex >= 0) protectedRoomIndices.add(nearestIndex);
+  }
+
+  const candidates = [];
+  for (let i = 0; i < rooms.length; i++) {
+    if (protectedRoomIndices.has(i)) continue;
+    const room = rooms[i];
+    if (room.prefab || room.isolated) continue;
+    const opening = _findSingleRoomOpening(tiles, room, ox, oy);
+    if (!opening) continue;
+    const area = Math.max(1, room.w * room.h);
+    const depthScore = manhattanScalar(
+      room.x + Math.floor(room.w / 2),
+      room.y + Math.floor(room.h / 2),
+      ox + Math.floor(CHUNK_SIZE / 2),
+      oy + Math.floor(CHUNK_SIZE / 2),
+    );
+    candidates.push({ room, roomIndex: i, opening, interestScore: area + depthScore });
+  }
+
+  if (candidates.length === 0) return [];
+  candidates.sort((a, b) => b.interestScore - a.interestScore);
+
+  const maxSecrets = (depth <= 0) ? 0 : 1;
+  const secretDoors = [];
+  for (const candidate of candidates) {
+    if (secretDoors.length >= maxSecrets) break;
+    // A mild deterministic gate keeps the mechanic present without hiding every
+    // terminal room on dense chunks.
+    if (secretDoors.length === 0 && candidates.length > 1 && rng.next() >= 0.65) continue;
+
+    const { x, y } = candidate.opening;
+    tiles[y * CHUNK_SIZE + x] = TILE_WALL;
+    const worldX = ox + x;
+    const worldY = oy + y;
+    const hintIndex = Math.abs((worldSeed + depth * 17 + worldX * 31 + worldY * 43) | 0) % SECRET_DOOR_HINTS.length;
+    candidate.room.secret = true;
+    candidate.room.interestScore = candidate.interestScore;
+    secretDoors.push({
+      x: worldX,
+      y: worldY,
+      fromRoomId: `chunk:${chunkX},${chunkY}:main`,
+      toRoomId: `chunk:${chunkX},${chunkY}:room:${candidate.roomIndex}`,
+      difficulty: Math.max(1, Math.min(20, 6 + Math.floor(candidate.interestScore / 8))),
+      hintKind: SECRET_DOOR_HINTS[hintIndex],
+    });
+  }
+
+  return secretDoors;
+}
+
+function _roomContainsLocal(room, ox, oy, lx, ly) {
+  const rx = room.x - ox;
+  const ry = room.y - oy;
+  return lx >= rx && lx < rx + room.w && ly >= ry && ly < ry + room.h;
+}
+
+function _findSingleRoomOpening(tiles, room, ox, oy) {
+  const rx = room.x - ox;
+  const ry = room.y - oy;
+  const rw = room.w;
+  const rh = room.h;
+  const openings = [];
+
+  function maybeOpening(roomX, roomY, outX, outY) {
+    if (outX < 1 || outY < 1 || outX >= CHUNK_SIZE - 1 || outY >= CHUNK_SIZE - 1) return;
+    if (!_isWalkableTile(tiles[roomY * CHUNK_SIZE + roomX])) return;
+    if (!_isWalkableTile(tiles[outY * CHUNK_SIZE + outX])) return;
+    openings.push({ x: outX, y: outY });
+  }
+
+  for (let y = ry; y < ry + rh; y++) {
+    maybeOpening(rx, y, rx - 1, y);
+    maybeOpening(rx + rw - 1, y, rx + rw, y);
+  }
+  for (let x = rx; x < rx + rw; x++) {
+    maybeOpening(x, ry, x, ry - 1);
+    maybeOpening(x, ry + rh - 1, x, ry + rh);
+  }
+
+  const unique = [];
+  const seen = new Set();
+  for (const opening of openings) {
+    const key = `${opening.x},${opening.y}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(opening);
+  }
+  return unique.length === 1 ? unique[0] : null;
 }
 
 // --- Edge gate internals ---
