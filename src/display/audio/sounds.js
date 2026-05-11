@@ -70,7 +70,9 @@ const SOUNDS = {
   "stair:ascend":     { file: "transition_coating.mp3", bus: "ambient" },
   "door:open":        { file: "door_open.mp3",     bus: "ambient" },
   "door:close":       { file: "door_close.mp3",    bus: "ambient" },
+  "action:secret_found": { file: "action_secret_found.mp3", bus: "ambient", maxVoices: 1, randomPitch: 8, volume: 0.95 },
   "fountain":         { file: "ambient_fountain.mp3",      bus: "ambient" },
+  "ambient:bone_chime": { file: "ambient_bone_chime.mp3",  bus: "ambient", maxVoices: 2, randomPitch: 10 },
   "church:bell":      { file: "ambient_church_bells.mp3",  bus: "ambient", maxVoices: 1 },
   "ambient:church":   { file: "ambient_church_inside.mp3", bus: "ambient" },
   "ambient:bubbles":  { file: "ambient_bubbles.mp3",       bus: "ambient" },
@@ -207,7 +209,8 @@ const SOUNDS = {
 
   // ── Soundscapes ─────────────────────────────────
   "soundscape":       { file: "soundscape.mp3",      bus: "ambient" },
-  "ambient:jump_scare": { file: "ambient_jump_scare.mp3", bus: "ambient", maxVoices: 1 },
+  "ambient:roar": { file: "ambient_roar.mp3", bus: "ambient", maxVoices: 1 },
+  "ambient:whisper": { files: ["ambient_whisper_1.mp3", "ambient_whisper_2.mp3"], bus: "ambient", maxVoices: 1, volume: 0.85 },
 
   // ── Additional Spell Variants ───────────────────
   "c":      { file: "spell_agony.mp3",     bus: "spells" },

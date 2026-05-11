@@ -5,30 +5,60 @@ import { Position } from "../components/Position.js";
 import { Brain } from "../components/Brain.js";
 import { Vitality } from "../components/Vitality.js";
 import { Player } from "../components/Player.js";
+import { NamedIdentity } from "../components/NamedIdentity.js";
 import { DungeonState } from "../components/DungeonState.js";
 import { forEachInRadius } from "../utils/spatialIndex.js";
 import { playerEntity } from "../utils/queries.js";
 import { AVG_ROOM_SIZE } from "../environment/dungeon/constants.js";
+import { getMonster } from "../data/monsters.js";
 
 const DANGEROUS_INTEL = 8;
-const DANGEROUS_TAGS = new Set(['draconic', 'demon']);
+export const JUMP_SCARE_SOUND_BY_TAG = Object.freeze({
+  draconic: "ambient:roar",
+  demon: "ambient:roar",
+  haunting: "ambient:whisper",
+  spectral: "ambient:whisper",
+  warlock: "ambient:whisper",
+  witchy: "ambient:whisper",
+});
+export const DEFAULT_JUMP_SCARE_SOUND_ID = "ambient:roar";
+const DANGEROUS_TAGS = new Set(Object.keys(JUMP_SCARE_SOUND_BY_TAG));
 const SCARE_RANGE = Math.round(AVG_ROOM_SIZE * 2);
+
+function getDungeonState(world) {
+  if (typeof world.singleton === "function") return world.singleton(DungeonState);
+  for (const [, ds] of world.query(DungeonState)) return ds;
+  return null;
+}
+
+export function resolveJumpScareSoundId(spec = {}) {
+  const identity = String(spec.identity || "").toLowerCase();
+  const def = spec.def || (identity ? getMonster(identity) : null);
+  const tags = Array.isArray(def?.tags) ? def.tags : [];
+
+  for (const tag of tags) {
+    const tagSound = JUMP_SCARE_SOUND_BY_TAG[String(tag || "").toLowerCase()];
+    if (tagSound) return tagSound;
+  }
+
+  return DEFAULT_JUMP_SCARE_SOUND_ID;
+}
 
 export function jumpScareSystem(world) {
   const player = playerEntity(world);
   if (!player) return;
 
-  const playerPos = world.get(player, Position);
+  const playerPos = player.pos;
   if (!playerPos) return;
 
-  const dungeonState = world.singleton(DungeonState);
+  const dungeonState = getDungeonState(world);
   const depth = dungeonState?.currentDepth ?? 0;
   const symbol = Symbol.for(`jshack:jumpScare:triggered:depth${depth}`);
   if (!world[symbol]) world[symbol] = new Set();
   const triggered = world[symbol];
 
   forEachInRadius(world, playerPos.x, playerPos.y, SCARE_RANGE, (id, pos) => {
-    if (id === player) return;
+    if (id === player.id) return;
 
     const brain = world.get(id, Brain);
     const vit = world.get(id, Vitality);
@@ -47,7 +77,16 @@ export function jumpScareSystem(world) {
 
     if (!triggered.has(id)) {
       triggered.add(id);
-      world.emit('audio:play', { key: 'ambient:jump_scare' });
+      const ident = world.get(id, NamedIdentity);
+      const identity = String(ident?.identity || "");
+      const soundId = resolveJumpScareSoundId({
+        id,
+        depth,
+        identity,
+        brain,
+        def: identity ? getMonster(identity) : null,
+      });
+      world.emit('audio:play', { key: soundId, at: { x: pos.x | 0, y: pos.y | 0 }, sourceId: id });
     }
   });
 }

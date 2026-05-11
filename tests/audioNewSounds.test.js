@@ -23,6 +23,10 @@ Deno.test("new audio assets are registered", async () => {
     "teleported",
     "water:magic",
     "item:pickup:paper",
+    "action:secret_found",
+    "ambient:bone_chime",
+    "ambient:roar",
+    "ambient:whisper",
   ];
 
   for (const id of ids) {

@@ -68,6 +68,10 @@ Deno.test("sounds registry adopts descriptive weather filenames", () => {
   const caveBearAlert = resolve("cave_bear:alert");
   const ratAlert = resolve("rat:alert");
   const boneDrop = resolve("item:drop:bone");
+  const secretFound = resolve("action:secret_found");
+  const boneChime = resolve("ambient:bone_chime");
+  const roar = resolve("ambient:roar");
+  const whisper = resolve("ambient:whisper");
   const shieldBlocked = resolve("shield:blocked");
   const caveBearAttack = resolve("cave_bear:attack");
   const ratAttack = resolve("rat:attack");
@@ -93,6 +97,10 @@ Deno.test("sounds registry adopts descriptive weather filenames", () => {
   assertExists(caveBearAlert);
   assertExists(ratAlert);
   assertExists(boneDrop);
+  assertExists(secretFound);
+  assertExists(boneChime);
+  assertExists(roar);
+  assertExists(whisper);
   assertExists(shieldBlocked);
   assertExists(caveBearAttack);
   assertExists(ratAttack);
@@ -120,6 +128,11 @@ Deno.test("sounds registry adopts descriptive weather filenames", () => {
   assertEquals(caveBearAlert.file, "cave_bear_alerted.mp3");
   assertEquals(ratAlert.file, "rat_alerted_1.mp3");
   assertEquals(boneDrop.file, "bone_dropped.mp3");
+  assertEquals(secretFound.file, "action_secret_found.mp3");
+  assertEquals(boneChime.file, "ambient_bone_chime.mp3");
+  assertEquals(roar.file, "ambient_roar.mp3");
+  assert(whisper.files?.includes("ambient_whisper_1.mp3"));
+  assert(whisper.files?.includes("ambient_whisper_2.mp3"));
   assert(shieldBlocked.files && shieldBlocked.files.length === 12);
   assert(shieldBlocked.files.includes("combat/SHIELD METAL/SHIELD METAL-Deflect-01.mp3"));
   assert(shieldBlocked.files.includes("combat/SHIELD WOOD/SHIELD WOOD-Deflect-01.mp3"));

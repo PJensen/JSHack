@@ -70,6 +70,9 @@ export const STATUS_SOUND_BY_KIND = Object.freeze({
   lightning: "status:electrocuted",
 });
 
+export const SECRET_FOUND_SOUND_ID = "action:secret_found";
+export const BONE_CHIME_SOUND_ID = "ambient:bone_chime";
+
 // Pet vocalization sound map
 const PET_VOCALIZE_SOUNDS = Object.freeze({
   cat: "creature:pet:meow",
@@ -914,6 +917,12 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     sfxAt(WEAPON_RACK_DROPPED_SOUND_ID, pos, pp(), { priority: 1 }, zg());
   });
 
+  world.on('search:revealed', ({ kind, at, entityId }) => {
+    if (String(kind || "") !== "secret_door") return;
+    const pos = at || (entityId != null ? getPosition(entityId) : null);
+    sfxAt(SECRET_FOUND_SOUND_ID, pos, pp(), { priority: 1 }, zg());
+  });
+
   // ── Environment ───────────────────────────────────────────
 
   world.on('stair:traverse', ({ direction }) => {
@@ -939,6 +948,11 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
   world.on('bell:rung', ({ targetId }) => {
     const pos = targetId != null ? getPosition(targetId) : null;
     sfxAt("church:bell", pos, pp(), { priority: 1 }, zg());
+  });
+
+  world.on('boneChime:rung', ({ targetId, at }) => {
+    const pos = at || (targetId != null ? getPosition(targetId) : null);
+    sfxAt(BONE_CHIME_SOUND_ID, pos, pp(), { priority: 1 }, zg());
   });
 
   world.on('fountain:drink', ({ targetId, effect }) => {

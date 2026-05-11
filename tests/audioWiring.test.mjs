@@ -3,6 +3,7 @@ import { assertAlmostEquals } from "jsr:@std/assert";
 import {
   CHANNELING_LOOP_OPTIONS,
   CHANNELING_LOOP_SOUND_ID,
+  BONE_CHIME_SOUND_ID,
   CRAFTING_MENU_LOOP_BY_KIND,
   CRAFTING_MENU_LOOP_OPTIONS,
   CRAFTING_RESULT_SOUND_BY_KIND,
@@ -13,6 +14,7 @@ import {
   FAMILIAR_FIRE_READY_SOUND_ID,
   FOOD_EAT_SOUND_ID,
   PUSH_STONE_SOUND_ID,
+  SECRET_FOUND_SOUND_ID,
   SPELL_CAST_SOUND_EVENTS,
   TRAP_SOUND_BY_TYPE,
   URN_BROKEN_SOUND_ID,
@@ -79,6 +81,8 @@ Deno.test("audio wiring maps new authored event sounds", () => {
   assert(TRAP_SOUND_BY_TYPE.spike === "trap:spike");
   assert(URN_BROKEN_SOUND_ID === "urn:broken");
   assert(WEAPON_RACK_DROPPED_SOUND_ID === "rack:weapon:dropped");
+  assert(SECRET_FOUND_SOUND_ID === "action:secret_found");
+  assert(BONE_CHIME_SOUND_ID === "ambient:bone_chime");
 });
 
 Deno.test("audio wiring zoom gain follows camera scale with clamps", () => {
