@@ -1,5 +1,6 @@
 import {
   buildNwManifest,
+  isSubPath,
   parseArgs,
   shouldSkipPath,
 } from "../packaging/nwjs/wrap.mjs";
@@ -57,5 +58,14 @@ Deno.test("NW.js staging skips repository metadata", () => {
   }
   if (shouldSkipPath("src/rules/data/items.js")) {
     throw new Error("Expected source files to be staged");
+  }
+});
+
+Deno.test("NW.js packaging detects runtime paths inside clean output", () => {
+  if (!isSubPath("/repo/dist/nwjs/runtimes/nw", "/repo/dist/nwjs")) {
+    throw new Error("Expected runtime under output to be detected");
+  }
+  if (isSubPath("/repo/dist/nwjs-cache/nw", "/repo/dist/nwjs")) {
+    throw new Error("Expected sibling runtime cache to be allowed");
   }
 });

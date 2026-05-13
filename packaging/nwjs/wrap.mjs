@@ -120,6 +120,16 @@ async function main(args) {
   }
 
   const outDir = resolveFromRoot(options.out);
+  const runtimeDir = options.runtime
+    ? resolveMaybeRelative(options.runtime)
+    : "";
+  if (runtimeDir && options.clean && isSubPath(runtimeDir, outDir)) {
+    throw new Error(
+      `Refusing to clean ${
+        fromCwd(outDir)
+      } because --runtime is inside it. Use --no-clean, a different --out, or keep downloaded runtimes outside the output directory.`,
+    );
+  }
   const appDir = joinPath(outDir, APP_DIR_NAME);
   const version = await readTextIfExists(resolveFromRoot("VERSION"));
   const manifest = buildNwManifest({ appName: options.appName, version });
@@ -140,12 +150,13 @@ async function main(args) {
 
   if (options.runtime) {
     const bundleDir = joinPath(outDir, "runtime");
-    await copyPath(resolveMaybeRelative(options.runtime), bundleDir, "");
+    await copyPath(runtimeDir, bundleDir, "");
     const packageDir = joinPath(bundleDir, PACKAGE_NW_DIR_NAME);
     await Deno.remove(packageDir, { recursive: true }).catch((err) => {
       if (!(err instanceof Deno.errors.NotFound)) throw err;
     });
     await copyPath(appDir, packageDir, "");
+    await installRuntimeLauncher(bundleDir, manifest.name);
     console.log(`NW.js runtime bundle staged at ${fromCwd(bundleDir)}`);
   }
 }
@@ -204,6 +215,35 @@ async function writeJson(path, value) {
   await Deno.writeTextFile(path, `${JSON.stringify(value, null, 2)}\n`);
 }
 
+async function installRuntimeLauncher(bundleDir, appName) {
+  const linuxNw = joinPath(bundleDir, "nw");
+  if (await isFile(linuxNw)) {
+    const launcher = joinPath(bundleDir, appName);
+    if (launcher !== linuxNw) {
+      await Deno.copyFile(linuxNw, launcher);
+      await Deno.chmod(launcher, 0o755).catch(() => {});
+    }
+    return;
+  }
+
+  const winNw = joinPath(bundleDir, "nw.exe");
+  if (await isFile(winNw)) {
+    const launcher = joinPath(bundleDir, `${appName}.exe`);
+    if (launcher !== winNw) {
+      await Deno.copyFile(winNw, launcher);
+    }
+  }
+}
+
+async function isFile(path) {
+  try {
+    return (await Deno.stat(path)).isFile;
+  } catch (err) {
+    if (err instanceof Deno.errors.NotFound) return false;
+    throw err;
+  }
+}
+
 async function readTextIfExists(path) {
   try {
     return await Deno.readTextFile(path);
@@ -243,6 +283,12 @@ function dirname(path) {
 function fromCwd(path) {
   const cwd = Deno.cwd().replace(/\/+$/, "");
   return path.startsWith(`${cwd}/`) ? path.slice(cwd.length + 1) : path;
+}
+
+export function isSubPath(path, parent) {
+  const cleanPath = path.replace(/\/+$/, "");
+  const cleanParent = parent.replace(/\/+$/, "");
+  return cleanPath === cleanParent || cleanPath.startsWith(`${cleanParent}/`);
 }
 
 if (import.meta.main) {
