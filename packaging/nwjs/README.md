@@ -31,6 +31,22 @@ deno task wrap:nwjs --runtime /path/to/nwjs-runtime
 
 The task copies the runtime into `dist/nwjs/runtime/` and places the app in `dist/nwjs/runtime/package.nw/`, which is the platform-specific folder you distribute.
 
+For macOS runtimes, the task detects the `.app` bundle and places the app at:
+
+```text
+runtime/JSHack.app/Contents/Resources/app.nw/
+```
+
+For Windows runtimes, the task creates a `jshack.exe` launcher beside `nw.exe`.
+
+Current release archive naming:
+
+```text
+dist/jshack-nwjs-v<version>-linux-x64.tar.gz
+dist/jshack-nwjs-v<version>-win-x64.zip
+dist/jshack-nwjs-v<version>-osx-arm64.zip
+```
+
 ## Boundaries
 
 - Do not import NW.js APIs from `src/rules/`, `src/bridge/`, `src/display/`, or `src/main/`.

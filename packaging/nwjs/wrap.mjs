@@ -151,12 +151,20 @@ async function main(args) {
   if (options.runtime) {
     const bundleDir = joinPath(outDir, "runtime");
     await copyPath(runtimeDir, bundleDir, "");
-    const packageDir = joinPath(bundleDir, PACKAGE_NW_DIR_NAME);
+    const runtimeAppDir = await findRuntimeAppDir(bundleDir);
+    const packageDir = runtimeAppDir
+      ? joinPath(runtimeAppDir, "Contents", "Resources", "app.nw")
+      : joinPath(bundleDir, PACKAGE_NW_DIR_NAME);
     await Deno.remove(packageDir, { recursive: true }).catch((err) => {
       if (!(err instanceof Deno.errors.NotFound)) throw err;
     });
     await copyPath(appDir, packageDir, "");
-    await installRuntimeLauncher(bundleDir, manifest.name);
+    await installRuntimeLauncher(
+      bundleDir,
+      manifest.name,
+      runtimeAppDir,
+      options.appName,
+    );
     console.log(`NW.js runtime bundle staged at ${fromCwd(bundleDir)}`);
   }
 }
@@ -215,7 +223,27 @@ async function writeJson(path, value) {
   await Deno.writeTextFile(path, `${JSON.stringify(value, null, 2)}\n`);
 }
 
-async function installRuntimeLauncher(bundleDir, appName) {
+async function installRuntimeLauncher(
+  bundleDir,
+  appName,
+  runtimeAppDir = "",
+  displayAppName = appName,
+) {
+  if (runtimeAppDir) {
+    const appParent = dirname(runtimeAppDir);
+    const appDest = joinPath(
+      appParent,
+      `${toDisplayAppName(displayAppName)}.app`,
+    );
+    if (appDest !== runtimeAppDir) {
+      await Deno.remove(appDest, { recursive: true }).catch((err) => {
+        if (!(err instanceof Deno.errors.NotFound)) throw err;
+      });
+      await Deno.rename(runtimeAppDir, appDest);
+    }
+    return;
+  }
+
   const linuxNw = joinPath(bundleDir, "nw");
   if (await isFile(linuxNw)) {
     const launcher = joinPath(bundleDir, appName);
@@ -232,6 +260,32 @@ async function installRuntimeLauncher(bundleDir, appName) {
     if (launcher !== winNw) {
       await Deno.copyFile(winNw, launcher);
     }
+  }
+}
+
+function toDisplayAppName(appName) {
+  const clean = String(appName || "").trim();
+  if (!clean) return "JSHack";
+  return clean.replace(/[/:\\]/g, "-");
+}
+
+async function findRuntimeAppDir(bundleDir) {
+  for await (const entry of Deno.readDir(bundleDir)) {
+    if (!entry.isDirectory || !entry.name.endsWith(".app")) continue;
+    const appDir = joinPath(bundleDir, entry.name);
+    if (await isDirectory(joinPath(appDir, "Contents", "Resources"))) {
+      return appDir;
+    }
+  }
+  return "";
+}
+
+async function isDirectory(path) {
+  try {
+    return (await Deno.stat(path)).isDirectory;
+  } catch (err) {
+    if (err instanceof Deno.errors.NotFound) return false;
+    throw err;
   }
 }
 
@@ -290,6 +344,10 @@ export function isSubPath(path, parent) {
   const cleanParent = parent.replace(/\/+$/, "");
   return cleanPath === cleanParent || cleanPath.startsWith(`${cleanParent}/`);
 }
+
+export const __test = Object.freeze({
+  toDisplayAppName,
+});
 
 if (import.meta.main) {
   main(Deno.args).catch((err) => {

@@ -1,4 +1,5 @@
 import {
+  __test,
   buildNwManifest,
   isSubPath,
   parseArgs,
@@ -67,5 +68,12 @@ Deno.test("NW.js packaging detects runtime paths inside clean output", () => {
   }
   if (isSubPath("/repo/dist/nwjs-cache/nw", "/repo/dist/nwjs")) {
     throw new Error("Expected sibling runtime cache to be allowed");
+  }
+});
+
+Deno.test("NW.js packaging formats macOS app names", () => {
+  const name = __test.toDisplayAppName("JSHack");
+  if (name !== "JSHack") {
+    throw new Error(`Unexpected macOS app name: ${name}`);
   }
 });
