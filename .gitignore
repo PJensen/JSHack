@@ -25,6 +25,11 @@ assets/audio/*_orig.*
 
 # Ignore Copilot instructions
 .github/**
+!.github/
+!.github/workflows/
+.github/workflows/*
+!.github/workflows/deno.yml
+!.github/workflows/release-nwjs.yml
 build.
 dist/
 local-notes.md

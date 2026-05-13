@@ -1,0 +1,120 @@
+name: NW.js Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to create or update. Defaults to v<VERSION>."
+        required: false
+        type: string
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+env:
+  NWJS_VERSION: "0.110.0"
+
+jobs:
+  package:
+    name: Package Desktop Runtimes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Resolve Versions
+        id: versions
+        run: |
+          app_version="$(tr -d '[:space:]' < VERSION)"
+          if [ -n "${{ inputs.tag }}" ]; then
+            release_tag="${{ inputs.tag }}"
+          elif [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            release_tag="${GITHUB_REF_NAME}"
+          else
+            release_tag="v${app_version}"
+          fi
+          echo "app_version=${app_version}" >> "$GITHUB_OUTPUT"
+          echo "release_tag=${release_tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Download NW.js Runtimes
+        run: |
+          mkdir -p dist/nwjs-cache/downloads
+          curl -L --fail --show-error \
+            "https://dl.nwjs.io/v${NWJS_VERSION}/nwjs-v${NWJS_VERSION}-linux-x64.tar.gz" \
+            -o "dist/nwjs-cache/downloads/nwjs-v${NWJS_VERSION}-linux-x64.tar.gz"
+          curl -L --fail --show-error \
+            "https://dl.nwjs.io/v${NWJS_VERSION}/nwjs-v${NWJS_VERSION}-win-x64.zip" \
+            -o "dist/nwjs-cache/downloads/nwjs-v${NWJS_VERSION}-win-x64.zip"
+          curl -L --fail --show-error \
+            "https://dl.nwjs.io/v${NWJS_VERSION}/nwjs-v${NWJS_VERSION}-osx-arm64.zip" \
+            -o "dist/nwjs-cache/downloads/nwjs-v${NWJS_VERSION}-osx-arm64.zip"
+
+      - name: Extract NW.js Runtimes
+        run: |
+          mkdir -p \
+            dist/nwjs-cache/runtimes/linux-x64 \
+            dist/nwjs-cache/runtimes/win-x64 \
+            dist/nwjs-cache/runtimes/osx-arm64
+          tar -xzf "dist/nwjs-cache/downloads/nwjs-v${NWJS_VERSION}-linux-x64.tar.gz" \
+            -C dist/nwjs-cache/runtimes/linux-x64
+          unzip -q "dist/nwjs-cache/downloads/nwjs-v${NWJS_VERSION}-win-x64.zip" \
+            -d dist/nwjs-cache/runtimes/win-x64
+          unzip -q "dist/nwjs-cache/downloads/nwjs-v${NWJS_VERSION}-osx-arm64.zip" \
+            -d dist/nwjs-cache/runtimes/osx-arm64
+
+      - name: Build Runtime Bundles
+        run: |
+          deno task wrap:nwjs \
+            --out dist/jshack-nwjs-linux-x64 \
+            --runtime "dist/nwjs-cache/runtimes/linux-x64/nwjs-v${NWJS_VERSION}-linux-x64"
+          deno task wrap:nwjs \
+            --out dist/jshack-nwjs-win-x64 \
+            --runtime "dist/nwjs-cache/runtimes/win-x64/nwjs-v${NWJS_VERSION}-win-x64"
+          deno task wrap:nwjs \
+            --out dist/jshack-nwjs-osx-arm64 \
+            --runtime "dist/nwjs-cache/runtimes/osx-arm64/nwjs-v${NWJS_VERSION}-osx-arm64"
+
+      - name: Archive Bundles
+        run: |
+          app_version="${{ steps.versions.outputs.app_version }}"
+          tar -czf "dist/jshack-nwjs-v${app_version}-linux-x64.tar.gz" \
+            -C dist jshack-nwjs-linux-x64
+          (
+            cd dist
+            zip -qr "jshack-nwjs-v${app_version}-win-x64.zip" jshack-nwjs-win-x64
+            zip -qry "jshack-nwjs-v${app_version}-osx-arm64.zip" jshack-nwjs-osx-arm64
+          )
+
+      - name: Verify Archives
+        run: |
+          app_version="${{ steps.versions.outputs.app_version }}"
+          test -f "dist/jshack-nwjs-v${app_version}-linux-x64.tar.gz"
+          unzip -Z1 "dist/jshack-nwjs-v${app_version}-win-x64.zip" \
+            | grep -q 'runtime/jshack.exe$'
+          unzip -Z1 "dist/jshack-nwjs-v${app_version}-osx-arm64.zip" \
+            | grep -q 'runtime/JSHack.app/Contents/Resources/app.nw/package.json$'
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          app_version="${{ steps.versions.outputs.app_version }}"
+          release_tag="${{ steps.versions.outputs.release_tag }}"
+          if ! gh release view "$release_tag" >/dev/null 2>&1; then
+            gh release create "$release_tag" \
+              --title "JSHack ${app_version}" \
+              --notes "NW.js ${NWJS_VERSION} desktop packages for JSHack ${app_version}."
+          fi
+          gh release upload "$release_tag" \
+            "dist/jshack-nwjs-v${app_version}-linux-x64.tar.gz" \
+            "dist/jshack-nwjs-v${app_version}-win-x64.zip" \
+            "dist/jshack-nwjs-v${app_version}-osx-arm64.zip" \
+            --clobber
