@@ -26,6 +26,7 @@ assets/audio/*_orig.*
 # Ignore Copilot instructions
 .github/**
 build.
+dist/
 local-notes.md
 CLAUDE.md
 
