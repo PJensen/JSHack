@@ -452,8 +452,9 @@ export function createPinnedSpellDock(mobileLayoutMq) {
         s.cdLabel.style.display = 'none';
       }
     }
-    // Always show dock on mobile — it hosts spells + pinned quick items
-    el.style.display = mobileLayoutMq.matches ? 'flex' : 'none';
+    // Canonical spell dock for touch and desktop. Desktop adds keyboard aliases,
+    // but uses this same four-slot surface.
+    el.style.display = 'flex';
   }
 
   // Listen for spell data responses (for fan rendering)
@@ -492,12 +493,10 @@ export function createPinnedSpellDock(mobileLayoutMq) {
   // Close fan when a spell is cast
   window.addEventListener('ui:castActiveSpell', () => { if (_fanOpenForSlot >= 0) closeFan(); });
 
-  // Update visibility on layout changes
+  // Keep visibility stable on layout changes.
   mobileLayoutMq.addEventListener('change', () => {
-    if (!mobileLayoutMq.matches) {
-      el.style.display = 'none';
-      if (_fanOpenForSlot >= 0) closeFan();
-    }
+    el.style.display = 'flex';
+    if (_fanOpenForSlot >= 0) closeFan();
   });
 
   return { el, fan };

@@ -1040,20 +1040,19 @@ export function initHUD() {
     const gaugeSize = isMobile ? 'min(110px, 26vw)' : 'min(188px, 22vw)';
     vitals.style.width = gaugeSize;
     vitals.style.height = gaugeSize;
-    // Hide spell slots on mobile (spell dock handles it), show on desktop
-    spellSlotsContainer.style.display = isMobile ? 'none' : 'flex';
-    bagBtn.style.display = isMobile ? 'none' : 'grid';
-    castBtn.style.display = isMobile ? 'none' : 'grid';
-    spellSelectBtn.style.display = isMobile ? 'none' : 'grid';
-    // Door button hidden on mobile
-    quickInteractBtn.style.display = isMobile ? 'none' : 'grid';
+    // Desktop and mobile share the same visible action/spell surfaces.
+    spellSlotsContainer.style.display = 'none';
+    bagBtn.style.display = 'none';
+    castBtn.style.display = 'none';
+    spellSelectBtn.style.display = 'none';
+    quickInteractBtn.style.display = 'none';
     // Hide main radial — pinned spell dock replaces it
     if (_mobileRadialEl) _mobileRadialEl.style.display = 'none';
-    if (_pinnedSpellDockEl) _pinnedSpellDockEl.style.display = isMobile ? 'flex' : 'none';
-    if (_pinnedSpellDockFanEl) _pinnedSpellDockFanEl.style.display = isMobile ? '' : 'none';
+    if (_pinnedSpellDockEl) _pinnedSpellDockEl.style.display = 'flex';
+    if (_pinnedSpellDockFanEl) _pinnedSpellDockFanEl.style.display = '';
 
-    // Move pinned quick items into the spell dock row on mobile, back to bar on desktop
-    if (isMobile && _pinnedSpellDockEl) {
+    // Pinned quick items live in the same spell dock row on all platforms.
+    if (_pinnedSpellDockEl) {
       _pinnedSpellDockEl.appendChild(pinSlots.el);
       Object.assign(pinSlots.el.style, {
         display: 'flex',
@@ -1070,82 +1069,41 @@ export function initHUD() {
           borderRadius: '50%',
         });
       }
-    } else {
-      // Reparent back into the action bar for desktop
-      if (!bar.contains(pinSlots.el)) {
-        bar.insertBefore(pinSlots.el, spellSlotsContainer);
-      }
-      Object.assign(pinSlots.el.style, {
-        display: 'grid',
-        flexDirection: '',
-        gap: '4px',
-        gridTemplateColumns: 'repeat(2, 44px)',
-        gridTemplateRows: 'repeat(2, 44px)',
-        alignItems: 'center',
-      });
-      for (const btn of pinSlots.el.children) {
-        Object.assign(btn.style, {
-          width: '', height: '',
-          minWidth: '', minHeight: '',
-          borderRadius: '6px',
-        });
-      }
-    }
-
-    if (isMobile) {
-      // Single-row action bar
-      Object.assign(bar.style, {
-        display: 'grid',
-        gridTemplateColumns: 'repeat(6, minmax(0, 1fr))',
-        gridTemplateRows: '44px',
-        alignItems: 'stretch',
-        justifyContent: 'stretch',
-        gap: '6px'
-      });
-      for (const btn of commandButtons) {
-        btn.style.width = '100%';
-        btn.style.minWidth = '0';
-        btn.style.padding = '8px 4px';
-        btn.style.fontSize = '20px';
-        btn.style.overflow = 'hidden';
-        btn.style.textOverflow = 'ellipsis';
-      }
-      const area = MOBILE_ACTION_BAR_GRID_AREAS;
-      charBtn.style.gridColumn = area.character.col;
-      charBtn.style.gridRow = area.character.row;
-      petBtn.style.gridColumn = area.pet.col;
-      petBtn.style.gridRow = area.pet.row;
-      postureBtn.style.gridColumn = area.posture.col;
-      postureBtn.style.gridRow = area.posture.row;
-      prayBtn.style.gridColumn = area.pray.col;
-      prayBtn.style.gridRow = area.pray.row;
-      waitBtn.style.gridColumn = area.wait.col;
-      waitBtn.style.gridRow = area.wait.row;
-      shootBtn.style.gridColumn = area.shoot.col;
-      shootBtn.style.gridRow = area.shoot.row;
-      refreshCommandLabels();
-      return;
     }
 
     Object.assign(bar.style, {
-      display: 'flex',
-      gridTemplateColumns: '',
-      gridTemplateRows: '',
-      alignItems: 'center',
-      justifyContent: 'flex-end',
-      gap: '8px'
+      display: 'grid',
+      gridTemplateColumns: 'repeat(6, minmax(0, 1fr))',
+      gridTemplateRows: '44px',
+      alignItems: 'stretch',
+      justifyContent: 'center',
+      gap: '6px',
+      left: isMobile ? '8px' : '50%',
+      right: isMobile ? '8px' : '',
+      width: isMobile ? '' : 'min(420px, calc(100vw - 16px))',
+      transform: isMobile ? '' : 'translateX(-50%)',
     });
     for (const btn of commandButtons) {
-      btn.style.width = '';
-      btn.style.minWidth = '44px';
-      btn.style.padding = '8px 10px';
-      btn.style.fontSize = '22px';
-      btn.style.overflow = '';
-      btn.style.textOverflow = '';
-      btn.style.gridColumn = '';
-      btn.style.gridRow = '';
+      btn.style.width = '100%';
+      btn.style.minWidth = '0';
+      btn.style.padding = '8px 4px';
+      btn.style.fontSize = '20px';
+      btn.style.overflow = 'hidden';
+      btn.style.textOverflow = 'ellipsis';
     }
-    setPinSlotsGridPlacement('', '');
+    const area = MOBILE_ACTION_BAR_GRID_AREAS;
+    charBtn.style.gridColumn = area.character.col;
+    charBtn.style.gridRow = area.character.row;
+    petBtn.style.gridColumn = area.pet.col;
+    petBtn.style.gridRow = area.pet.row;
+    postureBtn.style.gridColumn = area.posture.col;
+    postureBtn.style.gridRow = area.posture.row;
+    prayBtn.style.gridColumn = area.pray.col;
+    prayBtn.style.gridRow = area.pray.row;
+    waitBtn.style.gridColumn = area.wait.col;
+    waitBtn.style.gridRow = area.wait.row;
+    shootBtn.style.gridColumn = area.shoot.col;
+    shootBtn.style.gridRow = area.shoot.row;
     refreshCommandLabels();
   }
 
@@ -2144,8 +2102,7 @@ function createQuickSlot(opts = {}) {
   });
 
   function syncPosition(anchorEl, mobileLayout) {
-    const isMobile = !!mobileLayout?.matches;
-    if (!isMobile || !(anchorEl instanceof HTMLElement)) {
+    if (!(anchorEl instanceof HTMLElement)) {
       el.style.bottom = BASE_BOTTOM;
       return;
     }

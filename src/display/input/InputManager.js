@@ -170,11 +170,12 @@ export class InputManager {
       return;
     }
 
-    // Action bar spell slots 1-6 (WoW-style quick-cast)
-    if (key >= '1' && key <= '6' && !e.shiftKey && !e.ctrlKey && !e.altKey) {
+    // Pinned spell dock slots 1-4. Desktop gets keyboard aliases for the same
+    // four-slot spell surface used by touch.
+    if (key >= '1' && key <= '4' && !e.shiftKey && !e.ctrlKey && !e.altKey) {
       e.preventDefault();
       try {
-        this.target?.dispatchEvent?.(new CustomEvent('ui:castSpellSlot', {
+        this.target?.dispatchEvent?.(new CustomEvent('ui:castPinnedSpell', {
           detail: { slot: Number(key) - 1 }
         }));
       } catch {}

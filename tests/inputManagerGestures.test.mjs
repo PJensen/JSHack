@@ -328,6 +328,26 @@ Deno.test("InputManager: action-bar desktop hints emit canonical actions", () =>
   }
 });
 
+Deno.test("InputManager: number keys target the four-slot pinned spell dock", () => {
+  const target = new FakeEventTarget();
+  const canvas = new FakeCanvas({ left: 0, top: 0, width: 220, height: 180 });
+  const mgr = new InputManager(target, { canvas, touchFeedback: false });
+  const slots = [];
+  target.addEventListener("ui:castPinnedSpell", (event) => slots.push(event.detail?.slot));
+  try {
+    for (const key of ["1", "2", "3", "4"]) {
+      const ev = target.emit("keydown", { key, code: `Digit${key}` });
+      assertEquals(ev.defaultPrevented, true, `${key} should cast pinned slot`);
+    }
+    const ev5 = target.emit("keydown", { key: "5", code: "Digit5" });
+
+    assertEquals(slots, [0, 1, 2, 3]);
+    assertEquals(ev5.defaultPrevented, false, "hidden fifth spell slot should not be keyboard-reachable");
+  } finally {
+    mgr.dispose();
+  }
+});
+
 // ─── Walk-repeat mode tests ───────────────────────────────────────────────
 
 Deno.test("InputManager walk mode: pointerdown emits immediate move", () => {
