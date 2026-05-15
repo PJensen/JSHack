@@ -4,9 +4,39 @@ const SLEEP_PROFILES = Object.freeze({
     wakeRadius: 2,
     wakeOnDamage: true,
   }),
+  nocturnal_roost: Object.freeze({
+    wakeDifficulty: 5,
+    wakeRadius: 2,
+    wakeOnDamage: true,
+  }),
+  dormant: Object.freeze({
+    wakeDifficulty: 4,
+    wakeRadius: 1,
+    wakeOnDamage: true,
+  }),
   ancient: Object.freeze({
     wakeDifficulty: 14,
     wakeRadius: 3,
+    wakeOnDamage: true,
+  }),
+  diurnal: Object.freeze({
+    wakeDifficulty: 7,
+    wakeRadius: 2,
+    wakeOnDamage: true,
+  }),
+  nocturnal: Object.freeze({
+    wakeDifficulty: 7,
+    wakeRadius: 2,
+    wakeOnDamage: true,
+  }),
+  crepuscular: Object.freeze({
+    wakeDifficulty: 7,
+    wakeRadius: 2,
+    wakeOnDamage: true,
+  }),
+  cathemeral: Object.freeze({
+    wakeDifficulty: 6,
+    wakeRadius: 2,
     wakeOnDamage: true,
   }),
 });
@@ -22,8 +52,9 @@ function normalizeSleepChance(value, fallback = 1) {
  * Authoring accepts:
  *   sleep: "roosting"
  *   sleep: { pattern: "roosting", chance: 0.45 }
+ *   sleep: { pattern: "nocturnal", context: "roost", chance: 0.45 }
  *
- * @param {string|{pattern?:string,chance?:number}|null|undefined|false} sleep
+ * @param {string|{pattern?:string,context?:string,chance?:number}|null|undefined|false} sleep
  * @returns {{ chance:number, wakeDifficulty:number, wakeRadius:number, wakeOnDamage:boolean }|null}
  */
 export function resolveSleepProfile(sleep) {
@@ -32,7 +63,9 @@ export function resolveSleepProfile(sleep) {
   const pattern = typeof sleep === "string"
     ? sleep
     : String(sleep.pattern || "").trim();
-  const base = SLEEP_PROFILES[pattern];
+  const context = typeof sleep === "object" ? String(sleep.context || "").trim() : "";
+  const profileId = context ? `${pattern}_${context}` : pattern;
+  const base = SLEEP_PROFILES[profileId] || SLEEP_PROFILES[pattern];
   if (!base) return null;
 
   const chance = normalizeSleepChance(typeof sleep === "object" ? sleep.chance : undefined, 1);

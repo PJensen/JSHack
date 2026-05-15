@@ -19,6 +19,7 @@ import { CHUNK_SIZE, TILE_FLOOR } from "../src/rules/environment/dungeon/constan
 import { dealDamage } from "../src/rules/utils/dealDamage.js";
 import { installSleepWakeListeners, isAsleep, tryWakeActor } from "../src/rules/utils/sleep.js";
 import { getMonster } from "../src/rules/data/monsters.js";
+import { listSleepProfileIds, resolveSleepProfile } from "../src/rules/data/sleepProfiles.js";
 import { toMonsterSpawnParams } from "../src/rules/utils/monsterSpawnParams.js";
 import { spawnMonsterEntity } from "../src/rules/utils/spawnMonsterEntity.js";
 import "../src/content/monsters/index.js";
@@ -118,10 +119,23 @@ Deno.test("WorldView projects sleeping tag while SleepState is asleep", () => {
   assert(!rec.tags.includes("sleeping"), "awake entity should not carry sleeping tag");
 });
 
+Deno.test("sleep profiles expose activity-pattern vocabulary", () => {
+  const ids = listSleepProfileIds();
+  for (const id of ["diurnal", "nocturnal", "crepuscular", "cathemeral", "dormant", "ancient", "nocturnal_roost"]) {
+    assert(ids.includes(id), `expected sleep profile ${id}`);
+  }
+
+  const roost = resolveSleepProfile({ pattern: "nocturnal", context: "roost", chance: 0.25 });
+  assertEquals(roost?.chance, 0.25);
+  assertEquals(roost?.wakeDifficulty, 5);
+  assertEquals(roost?.wakeRadius, 2);
+});
+
 Deno.test("authored bat sleep chance attaches SleepState deterministically", () => {
   const def = getMonster("bat");
   assert(def?.sleep, "bat should author sleep behavior");
-  assertEquals(def.sleep.pattern, "roosting");
+  assertEquals(def.sleep.pattern, "nocturnal");
+  assertEquals(def.sleep.context, "roost");
 
   const sleepyWorld = new World({ seed: 0xB47 });
   sleepyWorld.rand = () => 0.44;

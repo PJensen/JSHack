@@ -209,7 +209,7 @@ function applyAuthoredSleep(world, entityId, params, def) {
  *   maxMana?: number,
  *   mana?: number,
  *   manaRegen?: number,
- *   sleep?: false|string|{ pattern?: string, chance?: number }|null,
+ *   sleep?: false|string|{ pattern?: string, context?: string, chance?: number }|null,
  *   equipment?: {
  *     ranged?: string,
  *     ammo?: string,

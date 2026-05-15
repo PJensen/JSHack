@@ -359,7 +359,7 @@ export function defineItem(id, def) {
  * @param {number} [def.packRadius]
  * @param {number} [def.retreatHpPct]
  * @param {boolean} [def.ambush]
- * @param {string|{pattern?:string,chance?:number}} [def.sleep]
+ * @param {string|{pattern?:string,context?:string,chance?:number}} [def.sleep]
  *
  * // Resistances
  * @param {object} [def.resistances]

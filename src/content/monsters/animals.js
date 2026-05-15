@@ -118,7 +118,7 @@ defineMonster('bat', {
   massKg: 1,
   resistances: { kinetic: { DR: 0 } },
   speed: 3,
-  sleep: { pattern: "roosting", chance: 0.45 },
+  sleep: { pattern: "nocturnal", context: "roost", chance: 0.45 },
   learnedSpellIds: ['bat_shriek'],
   hooks: {
     whileLOS: [
