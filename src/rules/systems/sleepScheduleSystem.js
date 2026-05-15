@@ -32,7 +32,7 @@ export function sleepScheduleSystem(world) {
 
     if (!shouldSleep) {
       if (isAsleep(world, id)) {
-        tryWakeActor(world, id, { reason: "daybreak", intensity: 999 });
+        tryWakeActor(world, id, { reason: "scheduled_wake", intensity: 999 });
       }
       continue;
     }
@@ -50,6 +50,6 @@ export function sleepScheduleSystem(world) {
     };
     if (world.has(id, SleepState)) world.set(id, SleepState, nextSleep);
     else world.add(id, SleepState, nextSleep);
-    world.emit?.("sleep:slept", { actor: id, reason: "nightfall" });
+    world.emit?.("sleep:slept", { actor: id, reason: "scheduled_rest" });
   }
 }

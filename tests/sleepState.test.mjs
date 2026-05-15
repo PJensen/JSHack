@@ -195,7 +195,7 @@ Deno.test("sleep schedule wakes cave bear at dawn", () => {
   sleepScheduleSystem(world);
 
   assert(!isAsleep(world, bear), "dawn should wake sleeping cave bear");
-  assertEquals(woke?.reason, "daybreak");
+  assertEquals(woke?.reason, "scheduled_wake");
 });
 
 Deno.test("sleep schedule does not put aggroed cave bear to sleep at night", () => {
@@ -226,4 +226,5 @@ Deno.test("sleep schedule can put unaware cave bear to sleep at night", () => {
 
   assert(isAsleep(world, bear), "unaware cave bear should fall asleep during night rest phase");
   assertEquals(slept?.actor, bear);
+  assertEquals(slept?.reason, "scheduled_rest");
 });
