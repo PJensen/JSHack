@@ -11,6 +11,9 @@ export const Actions = Object.freeze({
   // Rules-directed intents
   Move: "rules.move", // payload: { dx:number, dy:number }
   Wait: "rules.wait", // payload: {}
+  Search: "rules.search", // payload: {}
+  CyclePosture: "rules.cyclePosture", // payload: {}
+  QuickInteract: "rules.quickInteract", // payload: {}
   Pray: "rules.pray", // payload: {}
   DrinkPotion: "rules.drinkPotion", // payload: { itemId?:number, targetId?:number }
   CastActiveSpell: "rules.castActiveSpell", // payload: { spellId?:number, targetId?:number, x?:number, y?:number }
@@ -23,6 +26,8 @@ export const Actions = Object.freeze({
   OpenCharacter: "display.openCharacter", // payload: {}
   OpenEquipment: "display.openEquipment", // payload: {}
   OpenMessageLog: "display.openMessageLog", // payload: {}
+  OpenSpellPicker: "display.openSpellPicker", // payload: {}
+  RotatePetState: "display.rotatePetState", // payload: {}
   Zoom: "display.zoom", // payload: { factor:number } (pinch scale delta)
   // Open a chooser for items underfoot; display will query and let user pick
   OpenPickupChooser: "display.openPickupChooser", // payload: {}
@@ -41,6 +46,9 @@ export const defaultActionSinks = Object.freeze({
   // Rules-directed intents
   [Actions.Move]: Sinks.rules,
   [Actions.Wait]: Sinks.rules,
+  [Actions.Search]: Sinks.rules,
+  [Actions.CyclePosture]: Sinks.rules,
+  [Actions.QuickInteract]: Sinks.rules,
   [Actions.Pray]: Sinks.rules,
   [Actions.DrinkPotion]: Sinks.rules,
   [Actions.PickupItem]: Sinks.rules,
@@ -54,6 +62,8 @@ export const defaultActionSinks = Object.freeze({
   [Actions.OpenCharacter]: Sinks.display,
   [Actions.OpenEquipment]: Sinks.display,
   [Actions.OpenMessageLog]: Sinks.display,
+  [Actions.OpenSpellPicker]: Sinks.display,
+  [Actions.RotatePetState]: Sinks.display,
   [Actions.Zoom]: Sinks.display,
   [Actions.OpenPickupChooser]: Sinks.display,
   [Actions.TraverseStairs]: Sinks.display,

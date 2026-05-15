@@ -975,6 +975,12 @@ const inputDisposers = [];
       case "display.openMessageLog":
         window.dispatchEvent(new CustomEvent("ui:openMessageLog"));
         break;
+      case "display.openSpellPicker":
+        window.dispatchEvent(new CustomEvent("ui:openSpellPicker"));
+        break;
+      case "display.rotatePetState":
+        window.dispatchEvent(new CustomEvent("ui:rotatePetState"));
+        break;
       case "display.zoom": {
         const f = Math.max(0.5, Math.min(1.5, Number(action.payload?.factor) || 1));
         const minS = TILE_PX * 0.5;

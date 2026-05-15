@@ -208,8 +208,20 @@ export class InputManager {
       this._emit(makeAction(Actions.OpenEquipment));
       return;
     }
-    // Wait intent: '.' (period)
+    // Open spell picker: Shift+S. Plain 's' remains movement down.
+    if (key === "S") {
+      e.preventDefault();
+      this._emit(makeAction(Actions.OpenSpellPicker));
+      return;
+    }
+    // Search intent: '.' (period), matching the action-bar affordance.
     if (key === ".") {
+      e.preventDefault();
+      this._emit(makeAction(Actions.Search));
+      return;
+    }
+    // Wait intent: Shift+. ('>')
+    if (key === ">") {
       e.preventDefault();
       this._emit(makeAction(Actions.Wait));
       return;
@@ -259,7 +271,21 @@ export class InputManager {
     // Pet state rotation: 'p'
     if (lowerKey === "p") {
       e.preventDefault();
-      window.dispatchEvent(new CustomEvent('ui:rotatePetState'));
+      this._emit(makeAction(Actions.RotatePetState));
+      return;
+    }
+
+    // Contextual door/adjacent interaction: 'o'
+    if (lowerKey === "o") {
+      e.preventDefault();
+      this._emit(makeAction(Actions.QuickInteract));
+      return;
+    }
+
+    // Combat posture rotation: 'v'
+    if (lowerKey === "v") {
+      e.preventDefault();
+      this._emit(makeAction(Actions.CyclePosture));
       return;
     }
 

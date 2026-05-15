@@ -300,6 +300,34 @@ Deno.test("InputManager: keyboard e emits open equipment action", () => {
   }
 });
 
+Deno.test("InputManager: action-bar desktop hints emit canonical actions", () => {
+  const target = new FakeEventTarget();
+  const canvas = new FakeCanvas({ left: 0, top: 0, width: 220, height: 180 });
+  const mgr = new InputManager(target, { canvas, touchFeedback: false });
+  const actions = [];
+  const off = mgr.onAction((a) => actions.push(a));
+  try {
+    const cases = [
+      { event: { key: ".", code: "Period" }, type: Actions.Search },
+      { event: { key: ">", code: "Period" }, type: Actions.Wait },
+      { event: { key: "S", code: "KeyS" }, type: Actions.OpenSpellPicker },
+      { event: { key: "p", code: "KeyP" }, type: Actions.RotatePetState },
+      { event: { key: "o", code: "KeyO" }, type: Actions.QuickInteract },
+      { event: { key: "v", code: "KeyV" }, type: Actions.CyclePosture },
+    ];
+
+    for (const entry of cases) {
+      const ev = target.emit("keydown", entry.event);
+      assertEquals(ev.defaultPrevented, true, `${entry.event.key} should be claimed`);
+    }
+
+    assertEquals(actions.map((a) => a.type), cases.map((entry) => entry.type));
+  } finally {
+    off();
+    mgr.dispose();
+  }
+});
+
 // ─── Walk-repeat mode tests ───────────────────────────────────────────────
 
 Deno.test("InputManager walk mode: pointerdown emits immediate move", () => {
