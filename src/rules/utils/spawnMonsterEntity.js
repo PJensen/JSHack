@@ -6,6 +6,7 @@ import { Inventory } from "../components/Inventory.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { Mana } from "../components/Mana.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
+import { SleepState } from "../components/SleepState.js";
 import { ScriptState } from "../components/ScriptState.js";
 import { getCatalogItem } from "../data/itemCatalog.js";
 import { getMonster } from "../data/monsters.js";
@@ -160,6 +161,31 @@ function equipMonsterLoadout(world, entityId, params = {}) {
   }
 }
 
+function clampChance(v) {
+  if (!Number.isFinite(v)) return 1;
+  return Math.max(0, Math.min(1, Number(v)));
+}
+
+function applyAuthoredSleep(world, entityId, params, def) {
+  const raw = params.sleep === false
+    ? null
+    : (params.sleep && typeof params.sleep === "object" ? params.sleep : def?.sleep);
+  if (!raw || typeof raw !== "object") return;
+
+  const chance = clampChance(raw.chance);
+  if (chance <= 0) return;
+  if (chance < 1 && world.rand() >= chance) return;
+
+  try {
+    world.add(entityId, SleepState, {
+      asleep: true,
+      wakeDifficulty: Number.isFinite(raw.wakeDifficulty) ? Math.max(0, Number(raw.wakeDifficulty) | 0) : 8,
+      wakeRadius: Number.isFinite(raw.wakeRadius) ? Math.max(0, Number(raw.wakeRadius) | 0) : 2,
+      wakeOnDamage: raw.wakeOnDamage !== false,
+    });
+  } catch {}
+}
+
 /**
  * Canonical monster entity construction shared by debug spawning, dungeon
  * materialization, and runtime spawners.
@@ -187,6 +213,7 @@ function equipMonsterLoadout(world, entityId, params = {}) {
  *   maxMana?: number,
  *   mana?: number,
  *   manaRegen?: number,
+ *   sleep?: false|{ chance?: number, wakeDifficulty?: number, wakeRadius?: number, wakeOnDamage?: boolean }|null,
  *   equipment?: {
  *     ranged?: string,
  *     ammo?: string,
@@ -247,6 +274,7 @@ export function spawnMonsterEntity(world, params = {}) {
 
   // Content-DSL: attach ScriptState if the monster def has local state
   const mdef = p.identity ? getMonster(p.identity) : null;
+  applyAuthoredSleep(world, id, p, mdef);
   if (mdef?._contentState) {
     try { world.add(id, ScriptState, { data: { ...mdef._contentState } }); } catch {}
   }

@@ -18,6 +18,10 @@ import { clearPerceptionMemory } from "../src/rules/environment/dungeon/percepti
 import { CHUNK_SIZE, TILE_FLOOR } from "../src/rules/environment/dungeon/constants.js";
 import { dealDamage } from "../src/rules/utils/dealDamage.js";
 import { installSleepWakeListeners, isAsleep, tryWakeActor } from "../src/rules/utils/sleep.js";
+import { getMonster } from "../src/rules/data/monsters.js";
+import { toMonsterSpawnParams } from "../src/rules/utils/monsterSpawnParams.js";
+import { spawnMonsterEntity } from "../src/rules/utils/spawnMonsterEntity.js";
+import "../src/content/monsters/index.js";
 
 function resetFloor() {
   clearAll();
@@ -112,4 +116,34 @@ Deno.test("WorldView projects sleeping tag while SleepState is asleep", () => {
   rec = view.entities.find((e) => e.id === sleeper);
   assert(rec, "awake entity should still be projected");
   assert(!rec.tags.includes("sleeping"), "awake entity should not carry sleeping tag");
+});
+
+Deno.test("authored bat sleep chance attaches SleepState deterministically", () => {
+  const def = getMonster("bat");
+  assert(def?.sleep, "bat should author sleep behavior");
+  assertEquals(def.sleep.wakeDifficulty, 5);
+
+  const sleepyWorld = new World({ seed: 0xB47 });
+  sleepyWorld.rand = () => 0.44;
+  const sleepyBat = spawnMonsterEntity(sleepyWorld, { identity: "bat" });
+  assert(isAsleep(sleepyWorld, sleepyBat), "bat should spawn asleep when roll is below chance");
+
+  const awakeWorld = new World({ seed: 0xB48 });
+  awakeWorld.rand = () => 0.46;
+  const awakeBat = spawnMonsterEntity(awakeWorld, { identity: "bat" });
+  assert(!isAsleep(awakeWorld, awakeBat), "bat should spawn awake when roll is above chance");
+});
+
+Deno.test("authored dragon sleep is forwarded through spawn params", () => {
+  const def = getMonster("dragon");
+  assert(def?.sleep, "dragon should author sleep behavior");
+
+  const params = toMonsterSpawnParams(def, 10);
+  assertEquals(params.sleep.wakeDifficulty, 14);
+
+  const world = new World({ seed: 0xD0A60 });
+  const dragon = spawnMonsterEntity(world, params);
+  const sleep = world.get(dragon, SleepState);
+  assert(sleep?.asleep === true, "dragon should spawn asleep from authored params");
+  assertEquals(sleep.wakeRadius, 3);
 });

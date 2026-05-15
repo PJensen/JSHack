@@ -359,6 +359,7 @@ export function defineItem(id, def) {
  * @param {number} [def.packRadius]
  * @param {number} [def.retreatHpPct]
  * @param {boolean} [def.ambush]
+ * @param {{chance?:number,wakeDifficulty?:number,wakeRadius?:number,wakeOnDamage?:boolean}} [def.sleep]
  *
  * // Resistances
  * @param {object} [def.resistances]
@@ -420,6 +421,9 @@ export function defineMonster(id, def) {
   if (def.packRadius != null) monsterDef.packRadius = def.packRadius;
   if (def.retreatHpPct != null) monsterDef.retreatHpPct = def.retreatHpPct;
   if (def.ambush != null) monsterDef.ambush = def.ambush;
+  if (def.sleep && typeof def.sleep === 'object') {
+    monsterDef.sleep = { ...def.sleep };
+  }
 
   // Equipment
   if (def.wielding) monsterDef.wielding = def.wielding;

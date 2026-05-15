@@ -118,6 +118,7 @@ defineMonster('bat', {
   massKg: 1,
   resistances: { kinetic: { DR: 0 } },
   speed: 3,
+  sleep: { chance: 0.45, wakeDifficulty: 5, wakeRadius: 2, wakeOnDamage: true },
   learnedSpellIds: ['bat_shriek'],
   hooks: {
     whileLOS: [
@@ -585,6 +586,7 @@ defineMonster('dragon', {
     thermal: { igniteC: Infinity, burnMult: 0 },
   },
   speed: 2,
+  sleep: { chance: 1, wakeDifficulty: 14, wakeRadius: 3, wakeOnDamage: true },
   hooks: {
     onHit: [statusEffectOnHit(20, 0xdead0004, { key: "burn", turnsLeft: 5, potency: 4 }, "proc:burning")],
   },
