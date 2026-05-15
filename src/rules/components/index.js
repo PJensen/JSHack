@@ -20,6 +20,7 @@ export { DoorKey } from './DoorKey.js';
 export { DoorLock } from './DoorLock.js';
 export { DoorState } from './DoorState.js';
 export { SecretDoor } from './SecretDoor.js';
+export { SleepState } from './SleepState.js';
 export { ItemInfo } from './ItemInfo.js';
 export { Equipment } from './Equipment.js';
 export { EquipmentRoot } from './EquipmentRoot.js';

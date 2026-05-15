@@ -4045,6 +4045,32 @@ function drawConfusedMark(ctx, e, fxTime, scale = 1) {
 }
 
 /**
+ * Draw a small sleeping marker above sleeping actors.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {{ id:number, pos:{x:number,y:number} }} e
+ * @param {number} fxTime
+ * @param {number} scale
+ */
+function drawSleepingMarker(ctx, e, fxTime, scale = 1) {
+  const cx = e.pos.x;
+  const baseY = e.pos.y - 0.72 * scale;
+  const bob = Math.sin(fxTime * 1.7 + (e.id | 0) * 0.31) * 0.035 * scale;
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = `${0.24 * scale}px sans-serif`;
+  ctx.lineWidth = 0.035 * scale;
+  ctx.strokeStyle = 'rgba(8,12,24,0.82)';
+  ctx.fillStyle = 'rgba(190,220,255,0.92)';
+  ctx.globalAlpha = 0.88 + Math.sin(fxTime * 1.2) * 0.08;
+  ctx.strokeText('\u{1F4A4}', cx + 0.12 * scale, baseY + bob);
+  ctx.fillText('\u{1F4A4}', cx + 0.12 * scale, baseY + bob);
+  ctx.restore();
+}
+
+/**
  * Draw a yellow "!" above quest giver NPCs (mirrors drawRareStar pattern).
  * @param {CanvasRenderingContext2D} ctx
  * @param {{ id:number, pos:{x:number,y:number} }} e
@@ -4662,6 +4688,9 @@ function render(worldView) {
     }
     if (PERF.quality !== 'low' && _renderTagSet.has('confused')) {
       drawConfusedMark(bctx, renderEntity, _fxTime);
+    }
+    if (PERF.quality !== 'low' && _renderTagSet.has('sleeping')) {
+      drawSleepingMarker(bctx, renderEntity, _fxTime, entityScale);
     }
     if (PERF.quality !== 'low' && _renderTagSet.has('invisible')) {
       drawInvisibleVeil(bctx, renderEntity, _fxTime, _renderTagSet.has('shadow_cloak'));

@@ -6,6 +6,7 @@ import { Player } from "../../rules/components/Player.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 import { DoorState } from "../../rules/components/DoorState.js";
 import { SecretDoor } from "../../rules/components/SecretDoor.js";
+import { SleepState } from "../../rules/components/SleepState.js";
 import { Collider } from "../../rules/components/Collider.js";
 import { Status } from "../../rules/components/Status.js";
 import { Equipment } from "../../rules/components/Equipment.js";
@@ -1101,6 +1102,8 @@ export function buildWorldView(world) {
 			if (isFamiliar && petState && petState.rangedCooldown === 0 && !rec.tags.includes("pet_ready_glow")) {
 				rec.tags.push("pet_ready_glow");
 			}
+			const sleepState = /** @type {any} */ (world.get(id, SleepState));
+			if (sleepState && sleepState.asleep === true && !rec.tags.includes("sleeping")) rec.tags.push("sleeping");
 			if (world.has(id, Flying) && !rec.tags.includes('flying')) rec.tags.push('flying');
 			if ((kind === "bell" || kind === "tavern_sign") && !rec.tags.includes('above_roof')) rec.tags.push('above_roof');
 			if (_questGiverIds.has(id) && !rec.tags.includes('quest_giver')) rec.tags.push('quest_giver');
@@ -1221,6 +1224,8 @@ export function buildWorldView(world) {
 			if (isFamiliar2 && petState2 && petState2.rangedCooldown === 0 && !rec.tags.includes("pet_ready_glow")) {
 				rec.tags.push("pet_ready_glow");
 			}
+			const sleepState2 = /** @type {any} */ (world.get(id, SleepState));
+			if (sleepState2 && sleepState2.asleep === true && !rec.tags.includes("sleeping")) rec.tags.push("sleeping");
 			if (world.has(id, Flying) && !rec.tags.includes('flying')) rec.tags.push('flying');
 			if ((kind === "bell" || kind === "tavern_sign") && !rec.tags.includes('above_roof')) rec.tags.push('above_roof');
 			if (_questGiverIds.has(id) && !rec.tags.includes('quest_giver')) rec.tags.push('quest_giver');

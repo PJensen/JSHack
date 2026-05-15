@@ -99,6 +99,7 @@ import "../rules/data/procPackages.js";
 import "../rules/dialogues/townfolkDialogs.js";
 import { installGemSocketListener } from "../rules/data/gemSocketAffixes.js";
 import { installElectrocuteOnDamage } from "../rules/utils/electrocute.js";
+import { installSleepWakeListeners } from "../rules/utils/sleep.js";
 import { installCentipedeBodyCascade } from "../rules/utils/centipedeMovement.js";
 import { installPerceptionMemoryListeners, perceptionMemorySystem } from "../rules/systems/perceptionMemorySystem.js";
 import { installEnchantingOpenRequestListener } from "../rules/content/enchanting/benchGame.js";
@@ -158,6 +159,8 @@ export function configureWorld(world) {
   installAggroFromStealthOffenseListener(world);
   // Auto-apply electrocution (stun + blind + deafen) on any electric/lightning damage.
   installElectrocuteOnDamage(world);
+  // Wake sleeping actors on canonical disturbance events such as damage.
+  installSleepWakeListeners(world);
   // Drain Life is uniquely interrupted by incoming damage.
   installDrainLifeDamageInterruptListener(world);
   installFishingAction(world);

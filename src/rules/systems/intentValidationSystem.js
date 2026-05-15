@@ -4,6 +4,7 @@
 //
 // Currently strips intents for:
 //   - Dead actors (hp <= 0)
+//   - Sleeping actors
 //   - Stunned actors (have "stunned" status), except WaitIntent
 
 import { Vitality } from "../components/Vitality.js";
@@ -28,6 +29,7 @@ import { SearchIntent } from "../components/Intents/SearchIntent.js";
 import { SetPostureIntent } from "../components/Intents/SetPostureIntent.js";
 import { Channeling } from "../components/Channeling.js";
 import { statusStrength } from "../utils/statusFacade.js";
+import { isAsleep } from "../utils/sleep.js";
 
 /** All intent components that should be stripped when an actor cannot act. */
 const ALL_INTENTS = [
@@ -69,9 +71,10 @@ function stripIntents(world, id, intents) {
  * Remove all intent components from an entity.
  * @param {import('../../lib/ecs-js/index.js').World} world
  * @param {number} id
+ * @returns {boolean}
  */
 function stripAllIntents(world, id) {
-  stripIntents(world, id, ALL_INTENTS);
+  return stripIntents(world, id, ALL_INTENTS);
 }
 
 /**
@@ -87,6 +90,19 @@ export function intentValidationSystem(world) {
     // Dead actors cannot act
     if (vit.hp <= 0) {
       stripAllIntents(world, id);
+      continue;
+    }
+
+    // Sleeping actors cannot act until a wake event clears SleepState.asleep.
+    if (isAsleep(world, id)) {
+      const blocked = stripAllIntents(world, id);
+      if (blocked) {
+        try {
+          world.emit?.("intent:blocked", { actor: id, reason: "asleep" });
+        } catch (e) {
+          console.debug("[intentValidationSystem] emit intent:blocked failed:", e);
+        }
+      }
       continue;
     }
 
