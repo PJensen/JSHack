@@ -34,6 +34,7 @@ import { jumpScareSystem } from "../rules/systems/jumpScareSystem.js";
 import { lifespanSystem } from "../rules/systems/lifespanSystem.js";
 import { knockbackSystem } from "../rules/systems/knockbackSystem.js";
 import { soundPropagationSystem } from "../rules/systems/soundPropagationSystem.js";
+import { sleepScheduleSystem } from "../rules/systems/sleepScheduleSystem.js";
 import { encumbranceSystem } from "../rules/systems/encumbranceSystem.js";
 import { weightDerivationSystem } from "../rules/systems/weightDerivationSystem.js";
 import { installTauntListener, tauntSteeringSystem } from "../rules/systems/tauntSystem.js";
@@ -263,6 +264,7 @@ export function configureWorld(world) {
   registerSystem(harvestRegrowthSystem, 'effects');
   registerSystem(plantGrowthSystem, 'effects');
   registerSystem(calendarSystem, 'effects');
+  registerSystem(sleepScheduleSystem, 'effects', { after: [calendarSystem] });
   registerSystem(weatherSystem, 'effects');
   registerSystem(townSimulationSystem, 'effects');
   registerSystem(townfolkAmbientDialogueSystem, 'effects');

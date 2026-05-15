@@ -361,6 +361,7 @@ defineMonster('cave_bear', {
   massKg: 350,
   resistances: { kinetic: { DR: 3 } },
   speed: 1,
+  sleep: { pattern: "diurnal", context: "den" },
   hooks: {
     onHit: [statusEffectOnHit(30, 0xdead0200, { key: "stun", turnsLeft: 2, potency: 1 }, "proc:stunned")],
   },

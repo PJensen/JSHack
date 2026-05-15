@@ -10,7 +10,7 @@ import { SleepState } from "../components/SleepState.js";
 import { ScriptState } from "../components/ScriptState.js";
 import { getCatalogItem } from "../data/itemCatalog.js";
 import { getMonster } from "../data/monsters.js";
-import { resolveSleepProfile } from "../data/sleepProfiles.js";
+import { resolveSleepProfile, resolveSleepScheduleNow } from "../data/sleepProfiles.js";
 import { addToInventory } from "./inventoryFacade.js";
 import { createItemById } from "./itemFactory.js";
 
@@ -168,6 +168,8 @@ function applyAuthoredSleep(world, entityId, params, def) {
     : (params.sleep || def?.sleep || null);
   const resolved = resolveSleepProfile(authored);
   if (!resolved) return;
+  const shouldSleepNow = resolveSleepScheduleNow(authored, world.step || 0);
+  if (shouldSleepNow === false) return;
 
   if (resolved.chance <= 0) return;
   if (resolved.chance < 1 && world.rand() >= resolved.chance) return;

@@ -8,6 +8,7 @@ import { Vitality } from "../src/rules/components/Vitality.js";
 import { BaseStats } from "../src/rules/components/BaseStats.js";
 import { Facing } from "../src/rules/components/Facing.js";
 import { SleepState } from "../src/rules/components/SleepState.js";
+import { AggroState, AGGRO_LEVELS } from "../src/rules/components/AggroState.js";
 import { MoveIntent } from "../src/rules/components/Intents/MoveIntent.js";
 import { AttackIntent } from "../src/rules/components/Intents/AttackIntent.js";
 import { SearchIntent } from "../src/rules/components/Intents/SearchIntent.js";
@@ -22,7 +23,11 @@ import { getMonster } from "../src/rules/data/monsters.js";
 import { listSleepProfileIds, resolveSleepProfile } from "../src/rules/data/sleepProfiles.js";
 import { toMonsterSpawnParams } from "../src/rules/utils/monsterSpawnParams.js";
 import { spawnMonsterEntity } from "../src/rules/utils/spawnMonsterEntity.js";
+import { sleepScheduleSystem } from "../src/rules/systems/sleepScheduleSystem.js";
 import "../src/content/monsters/index.js";
+
+const SIX_AM = 180;
+const NINE_PM = 630;
 
 function resetFloor() {
   clearAll();
@@ -161,4 +166,64 @@ Deno.test("authored dragon sleep is forwarded through spawn params", () => {
   const sleep = world.get(dragon, SleepState);
   assert(sleep?.asleep === true, "dragon should spawn asleep from authored params");
   assertEquals(sleep.wakeRadius, 3);
+});
+
+Deno.test("cave bear den sleep follows time of day at spawn", () => {
+  const def = getMonster("cave_bear");
+  assertEquals(def?.sleep?.pattern, "diurnal");
+  assertEquals(def?.sleep?.context, "den");
+
+  const dayWorld = new World({ seed: 0xBEA6 });
+  dayWorld.step = SIX_AM;
+  const dayBear = spawnMonsterEntity(dayWorld, { identity: "cave_bear" });
+  assert(!isAsleep(dayWorld, dayBear), "cave bear should spawn awake during active daytime phase");
+
+  const nightWorld = new World({ seed: 0xBEA7 });
+  nightWorld.step = NINE_PM;
+  const nightBear = spawnMonsterEntity(nightWorld, { identity: "cave_bear" });
+  assert(isAsleep(nightWorld, nightBear), "cave bear should spawn asleep during night rest phase");
+});
+
+Deno.test("sleep schedule wakes cave bear at dawn", () => {
+  const world = new World({ seed: 0xDA9 });
+  world.step = SIX_AM;
+  const bear = spawnMonsterEntity(world, { identity: "cave_bear", sleep: false });
+  world.add(bear, SleepState, { asleep: true, wakeDifficulty: 8, wakeRadius: 2, wakeOnDamage: true });
+
+  let woke = null;
+  world.on("sleep:woke", (ev) => { woke = ev; });
+  sleepScheduleSystem(world);
+
+  assert(!isAsleep(world, bear), "dawn should wake sleeping cave bear");
+  assertEquals(woke?.reason, "daybreak");
+});
+
+Deno.test("sleep schedule does not put aggroed cave bear to sleep at night", () => {
+  const world = new World({ seed: 0xF19A7 });
+  world.step = NINE_PM;
+  const bear = spawnMonsterEntity(world, { identity: "cave_bear", sleep: false });
+  world.set(bear, AggroState, {
+    alertLevel: AGGRO_LEVELS.hunting,
+    lastKnownX: 5,
+    lastKnownY: 5,
+    searchTurnsLeft: 10,
+  });
+
+  sleepScheduleSystem(world);
+
+  assert(!isAsleep(world, bear), "aggroed cave bear should not fall asleep when night starts");
+});
+
+Deno.test("sleep schedule can put unaware cave bear to sleep at night", () => {
+  const world = new World({ seed: 0xBED });
+  world.step = NINE_PM;
+  const bear = spawnMonsterEntity(world, { identity: "cave_bear", sleep: false });
+  world.set(bear, AggroState, { alertLevel: AGGRO_LEVELS.unaware });
+
+  let slept = null;
+  world.on("sleep:slept", (ev) => { slept = ev; });
+  sleepScheduleSystem(world);
+
+  assert(isAsleep(world, bear), "unaware cave bear should fall asleep during night rest phase");
+  assertEquals(slept?.actor, bear);
 });
