@@ -121,7 +121,7 @@ Deno.test("WorldView projects sleeping tag while SleepState is asleep", () => {
 Deno.test("authored bat sleep chance attaches SleepState deterministically", () => {
   const def = getMonster("bat");
   assert(def?.sleep, "bat should author sleep behavior");
-  assertEquals(def.sleep.wakeDifficulty, 5);
+  assertEquals(def.sleep.pattern, "roosting");
 
   const sleepyWorld = new World({ seed: 0xB47 });
   sleepyWorld.rand = () => 0.44;
@@ -137,9 +137,10 @@ Deno.test("authored bat sleep chance attaches SleepState deterministically", () 
 Deno.test("authored dragon sleep is forwarded through spawn params", () => {
   const def = getMonster("dragon");
   assert(def?.sleep, "dragon should author sleep behavior");
+  assertEquals(def.sleep, "ancient");
 
   const params = toMonsterSpawnParams(def, 10);
-  assertEquals(params.sleep.wakeDifficulty, 14);
+  assertEquals(params.sleep, "ancient");
 
   const world = new World({ seed: 0xD0A60 });
   const dragon = spawnMonsterEntity(world, params);

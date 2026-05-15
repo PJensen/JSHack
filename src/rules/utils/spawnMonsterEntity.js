@@ -10,6 +10,7 @@ import { SleepState } from "../components/SleepState.js";
 import { ScriptState } from "../components/ScriptState.js";
 import { getCatalogItem } from "../data/itemCatalog.js";
 import { getMonster } from "../data/monsters.js";
+import { resolveSleepProfile } from "../data/sleepProfiles.js";
 import { addToInventory } from "./inventoryFacade.js";
 import { createItemById } from "./itemFactory.js";
 
@@ -161,27 +162,22 @@ function equipMonsterLoadout(world, entityId, params = {}) {
   }
 }
 
-function clampChance(v) {
-  if (!Number.isFinite(v)) return 1;
-  return Math.max(0, Math.min(1, Number(v)));
-}
-
 function applyAuthoredSleep(world, entityId, params, def) {
-  const raw = params.sleep === false
+  const authored = params.sleep === false
     ? null
-    : (params.sleep && typeof params.sleep === "object" ? params.sleep : def?.sleep);
-  if (!raw || typeof raw !== "object") return;
+    : (params.sleep || def?.sleep || null);
+  const resolved = resolveSleepProfile(authored);
+  if (!resolved) return;
 
-  const chance = clampChance(raw.chance);
-  if (chance <= 0) return;
-  if (chance < 1 && world.rand() >= chance) return;
+  if (resolved.chance <= 0) return;
+  if (resolved.chance < 1 && world.rand() >= resolved.chance) return;
 
   try {
     world.add(entityId, SleepState, {
       asleep: true,
-      wakeDifficulty: Number.isFinite(raw.wakeDifficulty) ? Math.max(0, Number(raw.wakeDifficulty) | 0) : 8,
-      wakeRadius: Number.isFinite(raw.wakeRadius) ? Math.max(0, Number(raw.wakeRadius) | 0) : 2,
-      wakeOnDamage: raw.wakeOnDamage !== false,
+      wakeDifficulty: resolved.wakeDifficulty,
+      wakeRadius: resolved.wakeRadius,
+      wakeOnDamage: resolved.wakeOnDamage,
     });
   } catch {}
 }
@@ -213,7 +209,7 @@ function applyAuthoredSleep(world, entityId, params, def) {
  *   maxMana?: number,
  *   mana?: number,
  *   manaRegen?: number,
- *   sleep?: false|{ chance?: number, wakeDifficulty?: number, wakeRadius?: number, wakeOnDamage?: boolean }|null,
+ *   sleep?: false|string|{ pattern?: string, chance?: number }|null,
  *   equipment?: {
  *     ranged?: string,
  *     ammo?: string,
