@@ -25,7 +25,7 @@ export const ALERT_SOUND_BY_IDENTITY = Object.freeze({
   spider: "spider:alert",
   cave_spider: "spider:alert",
   phase_spider: "spider:alert",
-  grid_bug: "insect:alert",
+  grid_bug: "grid_bug:alert",
   centipede: "insect:alert",
   gelatinous_cube: "gelatinous_cube:alert",
   cave_bear: "creature:alert:large_beast",

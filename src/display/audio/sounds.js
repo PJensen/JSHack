@@ -96,6 +96,7 @@ const SOUNDS = {
   "snake:alert":      { file: "snake_alerted.mp3",         bus: "combat", maxVoices: 2, randomPitch: 18 },
   "spider:alert":     { file: "insect_alerted.mp3",       bus: "combat", maxVoices: 2, randomPitch: 20 },
   "insect:alert":     { file: "insect_alerted.mp3",        bus: "combat", maxVoices: 3, randomPitch: 24 },
+  "grid_bug:alert":     { file: "grid_bug_alerted.mp3",        bus: "combat", maxVoices: 3, randomPitch: 24 },
   "gelatinous_cube:alert": { file: "gelatinous_cube_alerted.mp3", bus: "combat", maxVoices: 1, randomPitch: 8 },
   "cave_bear:alert":  { file: "cave_bear_alerted.mp3",     bus: "combat", maxVoices: 2, randomPitch: 15 },
   "rat:alert":        { file: "rat_alerted_1.mp3",         bus: "combat", maxVoices: 3, randomPitch: 25 },
