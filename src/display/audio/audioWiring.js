@@ -1072,13 +1072,15 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     });
   }
 
-  world.on('spell:blink', (payload) => {
-    sfxAt("teleported", payload?.to || payload?.at || payload?.from || null, pp(), { priority: 1 }, zg());
-  });
+  // NOTE: this has been silenced since spell:blink has a bespoke sound
+  // world.on('spell:blink', (payload) => {
+  //   sfxAt("teleported", payload?.to || payload?.at || payload?.from || null, pp(), { priority: 1 }, zg());
+  // });
 
-  world.on('spell:phase_strike', (payload) => {
-    sfxAt("teleported", payload?.to || payload?.at || payload?.from || null, pp(), { priority: 1 }, zg());
-  });
+  // NOTE: this has been silenced since adding a bespoke sound
+  // world.on('spell:phase_strike', (payload) => {
+  //   sfxAt("teleported", payload?.to || payload?.at || payload?.from || null, pp(), { priority: 1 }, zg());
+  // });
 
   world.on('familiar:ready', ({ id }) => {
     const pos = id != null ? getPosition(id) : null;
