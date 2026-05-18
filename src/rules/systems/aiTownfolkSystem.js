@@ -50,8 +50,7 @@ import { getTownPhase } from "../data/calendar.js";
 import { actorHasDoorKey, setDoorState } from "../utils/doorAccess.js";
 import { SMITH_RECIPES, chooseSmithRecipe } from "../data/smithRecipes.js";
 import { CARDINAL_DIRS } from "../utils/directions.js";
-import { hasLOS } from "../../shared/math/gridLOS.js";
-import { buildBlocksVisionMap, blockedCallback } from "../utils/vision.js";
+import { nearestPerceivedHostile } from "../utils/perception.js";
 import { getQuestRecord } from "../quests/runtime.js";
 import { RAT_INFESTATION_QUEST_ID } from "../quests/definitions/ratInfestation.js";
 import { getTownState, getWeather } from "../utils/townStateAccess.js";
@@ -216,28 +215,6 @@ function armTownfolkSuperficially(world, id) {
   return false;
 }
 
-function isTownHostile(world, id) {
-  const fac = world.get(id, Faction);
-  if (fac?.key !== "enemy") return false;
-  const pos = world.get(id, Position);
-  return !!pos;
-}
-
-function nearestVisibleTownHostile(world, pos, range = TOWNFOLK_MONSTER_SIGHT_RANGE) {
-  const isBlocked = blockedCallback(buildBlocksVisionMap(world));
-  let best = null;
-  let bestDist = Infinity;
-  forEachInRadius(world, pos.x, pos.y, range, (eid, epos) => {
-    if (!isTownHostile(world, eid)) return;
-    const d = Math.max(Math.abs(epos.x - pos.x), Math.abs(epos.y - pos.y));
-    if (d >= bestDist) return;
-    if (!hasLOS(pos.x | 0, pos.y | 0, epos.x | 0, epos.y | 0, isBlocked)) return;
-    best = { id: eid, x: epos.x, y: epos.y, dist: d };
-    bestDist = d;
-  });
-  return best;
-}
-
 function assignBellRun(world, actorId, monsterId) {
   const bell = findTownBell(world);
   if (!bell) return false;
@@ -268,11 +245,11 @@ function detectTownBreachSightings(world) {
   if (state.bellRingerId > 0 && world.isAlive(state.bellRingerId)) return;
   if (!findTownBell(world)) return;
 
-  for (const [id, pos, fac] of world.query(Position, Faction)) {
+  for (const [id, , fac] of world.query(Position, Faction)) {
     if (fac?.key !== "townfolk") continue;
     const job = world.get(id, TownfolkJob);
     if (!job || job.state === TOWNFOLK_STATES.sleeping) continue;
-    const hostile = nearestVisibleTownHostile(world, pos);
+    const hostile = nearestPerceivedHostile(world, id, { maxRange: TOWNFOLK_MONSTER_SIGHT_RANGE });
     if (!hostile) continue;
     assignBellRun(world, id, hostile.id);
     return;
@@ -327,7 +304,7 @@ function handleArmedTownfolk(world, id, pos, job) {
     job.stuckTurns = 0;
     return;
   }
-  const hostile = nearestVisibleTownHostile(world, pos, 10);
+  const hostile = nearestPerceivedHostile(world, id, { maxRange: 10 });
   if (!hostile) return;
   if (hostile.dist <= 1) {
     try { world.add(id, AttackIntent, { targetId: hostile.id }); } catch {}

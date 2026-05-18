@@ -21,6 +21,7 @@ import { TownfolkJob, TOWNFOLK_STATES, TOWNFOLK_ROLES } from "../src/rules/compo
 import { AggroState, AGGRO_LEVELS } from "../src/rules/components/AggroState.js";
 import { Inventory } from "../src/rules/components/Inventory.js";
 import { Equipment } from "../src/rules/components/Equipment.js";
+import { Brain } from "../src/rules/components/Brain.js";
 import { NamedIdentity as ItemNamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { aiTownfolkSystem, installTownfolkDoorListener, installBellListener } from "../src/rules/systems/aiTownfolkSystem.js";
 import { aiChaseSystem }    from "../src/rules/systems/aiChaseSystem.js";
@@ -70,6 +71,7 @@ function addTownfolk(world, x, y, role, opts = {}) {
   world.add(id, Faction, { key: "townfolk" });
   world.add(id, Inventory, { capacity: 6 });
   world.add(id, Equipment, {});
+  world.add(id, Brain, { intelligence: opts.intelligence ?? 10, visionRange: opts.visionRange ?? 8 });
   world.add(id, TownfolkJob, {
     role,
     state:        opts.state        ?? TOWNFOLK_STATES.idle,
@@ -220,6 +222,20 @@ Deno.test("town breach sighting assigns a witness to physically run to the bell"
   assert(world.has(witness, MoveIntent), "bell runner should walk toward the bell");
   assertEquals(bellEvents.length, 0, "sighting should not ring the bell until the NPC reaches it");
   assert(enemy > 0, "enemy exists for sighting");
+});
+
+Deno.test("town breach sighting requires townfolk Brain perception", () => {
+  const world = makeWorld(4001);
+  addBell(world, 12, 5);
+  const witness = addTownfolk(world, 6, 5, "villager", { idleTurns: 20 });
+  addEnemy(world, 6, 7);
+  world.remove(witness, Brain);
+
+  aiTownfolkSystem(world);
+
+  const job = world.get(witness, TownfolkJob);
+  assertEquals(job.state, TOWNFOLK_STATES.idle, "townfolk without Brain should not become a bell runner");
+  assert(!world.has(witness, MoveIntent), "townfolk without Brain perception should not move to the bell");
 });
 
 Deno.test("bell runner rings on arrival and alarmed townsfolk fight or flee instead of freezing", () => {
