@@ -60,6 +60,66 @@ function nearestTileDistance(chunks, from, wantedTiles, maxR = 48) {
   return Infinity;
 }
 
+function nearestDoorTile(chunks, from, maxR = 12) {
+  let best = null;
+  for (let r = 0; r <= maxR; r++) {
+    for (let dx = -r; dx <= r; dx++) {
+      for (let dy = -r; dy <= r; dy++) {
+        if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
+        const x = from.x + dx;
+        const y = from.y + dy;
+        if (getWorldTile(chunks, x, y) === TILE_DOOR) {
+          const dist = Math.abs(dx) + Math.abs(dy);
+          if (!best || dist < best.dist) best = { x, y, dist };
+        }
+      }
+    }
+    if (best) return best;
+  }
+  return null;
+}
+
+function doorOffsetFor(def) {
+  const point = (def.waypoints || []).find((entry) => entry.name === "shop_door")
+    || (def.waypoints || []).find((entry) => entry.name === "front_door")
+    || (def.waypoints || []).find((entry) => String(entry.name || "").includes("door"));
+  if (point) return { dx: Number(point.dx) | 0, dy: Number(point.dy) | 0 };
+  const tile = (def.tiles || []).find((entry) => entry.tile === "door");
+  return tile ? { dx: Number(tile.dx) | 0, dy: Number(tile.dy) | 0 } : { dx: 0, dy: 0 };
+}
+
+function doorNormalFor(def) {
+  const door = doorOffsetFor(def);
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const tile of def.tiles || []) {
+    const dx = Number(tile.dx) | 0;
+    const dy = Number(tile.dy) | 0;
+    minX = Math.min(minX, dx);
+    minY = Math.min(minY, dy);
+    maxX = Math.max(maxX, dx);
+    maxY = Math.max(maxY, dy);
+  }
+  const candidates = [
+    { nx: -1, ny: 0, d: Math.abs(door.dx - minX) },
+    { nx: 1, ny: 0, d: Math.abs(door.dx - maxX) },
+    { nx: 0, ny: -1, d: Math.abs(door.dy - minY) },
+    { nx: 0, ny: 1, d: Math.abs(door.dy - maxY) },
+  ];
+  candidates.sort((a, b) => a.d - b.d);
+  return { x: candidates[0].nx, y: candidates[0].ny };
+}
+
+function doorFacesPoint(def, anchorX, anchorY, target) {
+  const door = doorOffsetFor(def);
+  const normal = doorNormalFor(def);
+  const vx = Math.sign((target.x | 0) - ((anchorX | 0) + door.dx));
+  const vy = Math.sign((target.y | 0) - ((anchorY | 0) + door.dy));
+  return normal.x * vx + normal.y * vy > 0;
+}
+
 function key(x, y) {
   return `${x},${y}`;
 }
@@ -119,6 +179,40 @@ Deno.test("overworld procedurally stamps the required town economy", async () =>
   assert(countKind(chunks, "crop_corn") >= 6, "farm should plant corn");
   assert(countKind(chunks, "farm_animal") >= 4, "farm should support animals");
   assert(countKind(chunks, "townfolk") >= 8, "buildings should open town professions");
+});
+
+Deno.test("church entrance and bell anchor north of the fountain", async () => {
+  const { chunks } = await generateOverworldChunks(SEED);
+  const fountain = spawnsOfKind(chunks, "fountain")[0];
+  const bell = spawnsOfKind(chunks, "town_bell")[0];
+  const churchDoor = nearestDoorTile(chunks, bell, 5);
+
+  assert(fountain, "expected civic fountain");
+  assert(bell, "expected church bell");
+  assert(churchDoor, "expected a church door near the bell");
+  assert(bell.y < fountain.y, "church bell should sit north of the fountain");
+  assert(churchDoor.y < fountain.y, "church entrance should sit north of the fountain");
+  assert(Math.abs(bell.x - fountain.x) <= 8, "church bell should stay central to the town square");
+  assert(Math.abs(churchDoor.x - fountain.x) <= 8, "church entrance should stay central to the town square");
+});
+
+Deno.test("procedural building doors mostly face the fountain", async () => {
+  const { townPlan } = await generateOverworldChunks(SEED);
+  const center = townPlan.center;
+  let checked = 0;
+  let facing = 0;
+
+  for (const building of townPlan.buildings) {
+    if (building.key === "well_plaza") continue;
+    const base = BUILDING_DEFS[building.defKey || building.key];
+    if (!base) continue;
+    const def = rotateBuildingDef(base, building.rotation | 0);
+    checked++;
+    if (doorFacesPoint(def, building.anchorX, building.anchorY, center)) facing++;
+  }
+
+  assert(checked >= 8, "expected enough placed buildings to evaluate door orientation");
+  assert(facing >= Math.ceil(checked * 0.75), `expected most building doors to face the fountain, got ${facing}/${checked}`);
 });
 
 Deno.test("building rotation transforms tiles, spawns, waypoints, and shop rooms around the keystone", async () => {

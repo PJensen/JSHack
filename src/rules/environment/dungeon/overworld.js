@@ -1081,5 +1081,5 @@ async function _generateOverworldChunks(worldSeed, onPlanProgress) {
     });
   }
 
-  return { extent, chunks: outChunks, spawnX, spawnY };
+  return { extent, chunks: outChunks, spawnX, spawnY, townPlan };
 }

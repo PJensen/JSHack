@@ -615,6 +615,11 @@ export default {
       "dx": 0,
       "dy": 0,
       "name": "crossing"
+    },
+    {
+      "dx": 0,
+      "dy": 7,
+      "name": "front_door"
     }
   ]
 };

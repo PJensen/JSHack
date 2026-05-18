@@ -81,15 +81,15 @@ const STRUCTURE_TILES = new Set([TILE_FLOOR, TILE_WALL, TILE_DOOR, TILE_FARMLAND
 
 const BUILDING_PLANS = Object.freeze([
   Object.freeze({ key: "well_plaza", district: "civic_core", coreDx: 0, coreDy: 0, wants: ["flat"], roles: [] }),
+  Object.freeze({ key: "church", district: "churchyard", coreDx: 0, coreDy: -3, wants: ["quiet", "flat"], roles: ["priest"], rotations: FIXED_ROTATION, searchRadius: 24 }),
+  Object.freeze({ key: "smithy", district: "workshop_row", coreDx: 12, coreDy: -4, wants: ["mountain", "flat"], roles: ["smith"], rotations: FIXED_ROTATION }),
   Object.freeze({ key: "cottage", district: "civic_core", coreDx: -20, coreDy: 20, wants: ["flat"], roles: ["villager"] }),
   Object.freeze({ key: "tavern", district: "market_green", coreDx: -8, coreDy: -3, wants: ["flat"], roles: ["barkeep"] }),
   Object.freeze({ key: "general_store", district: "market_green", coreDx: -3, coreDy: 9, wants: ["flat"], roles: ["general_vendor"] }),
-  Object.freeze({ key: "smithy", district: "workshop_row", coreDx: 12, coreDy: -4, wants: ["mountain", "flat"], roles: ["smith"], rotations: FIXED_ROTATION }),
   Object.freeze({ key: "apothecary", district: "workshop_row", coreDx: 4, coreDy: 13, wants: ["forest", "water"], roles: ["alchemist", "enchantress"] }),
   Object.freeze({ key: "gem_store", district: "workshop_row", coreDx: -1, coreDy: 12, wants: ["flat"], roles: ["gem_vendor"] }),
-  Object.freeze({ key: "book_shop", district: "civic_core", coreDx: 7, coreDy: -10, wants: ["flat"], roles: ["book_vendor"] }),
-  Object.freeze({ key: "church", district: "churchyard", coreDx: -12, coreDy: 8, wants: ["quiet", "flat"], roles: ["priest"] }),
-  Object.freeze({ key: "graveyard", district: "churchyard", coreDx: 4, coreDy: 11, wants: ["quiet", "flat"], roles: [] }),
+  Object.freeze({ key: "book_shop", district: "civic_core", coreDx: 12, coreDy: -2, wants: ["flat"], roles: ["book_vendor"] }),
+  Object.freeze({ key: "graveyard", district: "churchyard", coreDx: 12, coreDy: -14, wants: ["quiet", "flat"], roles: [], searchRadius: 36 }),
   Object.freeze({ key: "farm", district: "market_green", resource: "waterFlat", wants: ["flat", "water"], roles: ["farmer"] }),
   Object.freeze({ key: "windmill", district: "market_green", resource: "waterFlat", wants: ["flat"], roles: [] }),
   Object.freeze({ key: "fishery", defKey: "cottage", district: "market_green", resource: "waterFlat", wants: ["water", "flat"], roles: ["fisher"], supplies: "tavern" }),
@@ -252,7 +252,54 @@ function doorOffsetForDef(def) {
   const point = (def.waypoints || []).find((entry) => entry.name === "shop_door")
     || (def.waypoints || []).find((entry) => entry.name === "front_door")
     || (def.waypoints || []).find((entry) => String(entry.name || "").includes("door"));
-  return point ? { dx: Number(point.dx) | 0, dy: Number(point.dy) | 0 } : { dx: 0, dy: 0 };
+  if (point) return { dx: Number(point.dx) | 0, dy: Number(point.dy) | 0 };
+  const tile = (def.tiles || []).find((entry) => entry.tile === "door");
+  return tile ? { dx: Number(tile.dx) | 0, dy: Number(tile.dy) | 0 } : { dx: 0, dy: 0 };
+}
+
+function boundsForDef(def) {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const tile of def.tiles || []) {
+    const dx = Number(tile.dx) | 0;
+    const dy = Number(tile.dy) | 0;
+    minX = Math.min(minX, dx);
+    minY = Math.min(minY, dy);
+    maxX = Math.max(maxX, dx);
+    maxY = Math.max(maxY, dy);
+  }
+  if (!Number.isFinite(minX)) return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+  return { minX, minY, maxX, maxY };
+}
+
+function doorNormalForDef(def) {
+  const door = doorOffsetForDef(def);
+  const bounds = boundsForDef(def);
+  const candidates = [
+    { nx: -1, ny: 0, d: Math.abs(door.dx - bounds.minX) },
+    { nx: 1, ny: 0, d: Math.abs(door.dx - bounds.maxX) },
+    { nx: 0, ny: -1, d: Math.abs(door.dy - bounds.minY) },
+    { nx: 0, ny: 1, d: Math.abs(door.dy - bounds.maxY) },
+  ];
+  candidates.sort((a, b) => a.d - b.d);
+  return { x: candidates[0].nx, y: candidates[0].ny };
+}
+
+function doorFacingScore(def, anchorX, anchorY, target) {
+  if (!target) return 0;
+  const door = doorOffsetForDef(def);
+  const doorX = anchorX + door.dx;
+  const doorY = anchorY + door.dy;
+  const vx = Math.sign((target.x | 0) - doorX);
+  const vy = Math.sign((target.y | 0) - doorY);
+  if (vx === 0 && vy === 0) return 0;
+  const normal = doorNormalForDef(def);
+  const dot = normal.x * vx + normal.y * vy;
+  if (dot > 0) return 28;
+  if (dot === 0) return 4;
+  return -28;
 }
 
 function terrainScore(chunks, x, y) {
@@ -325,7 +372,7 @@ function chooseDistricts(chunks, center, bounds) {
     civic_core: { x: center.x, y: center.y },
     market_green: { x: center.x - 6, y: center.y + 2 },
     workshop_row: { x: center.x + 10, y: center.y },
-    churchyard: { x: center.x, y: center.y + 12 },
+    churchyard: { x: center.x, y: center.y - 10 },
   };
   return TOWN_DISTRICT_DEFS.map((def) => ({
     key: def.key,
@@ -358,14 +405,15 @@ function canBuildOn(chunks, x, y) {
   return NATURAL_BUILDABLE.has(getWorldTile(chunks, x, y));
 }
 
-function placeBuilding(chunks, bounds, plan, district, occupied, protectedTiles, seed) {
+function placeBuilding(chunks, bounds, plan, district, occupied, protectedTiles, seed, townCenter = null) {
   const baseDef = BUILDING_DEFS[plan.defKey || plan.key];
   if (!baseDef) return null;
   const rng = mulberry((seed ^ hashKey(plan.key)) >>> 0);
   let best = null;
-  const searchRadius = plan.resource ? 36 : 16;
+  const searchRadius = Number.isFinite(plan.searchRadius) ? Math.max(0, Number(plan.searchRadius) | 0) : (plan.resource ? 36 : 16);
   const targetX = district.x + (Number(plan.coreDx) | 0);
   const targetY = district.y + (Number(plan.coreDy) | 0);
+  const facingTarget = plan.key === "well_plaza" ? null : townCenter;
   const rotations = plan.rotations || ALL_ROTATIONS;
   for (let r = 0; r <= searchRadius; r++) {
     for (let dy = -r; dy <= r; dy++) {
@@ -385,6 +433,7 @@ function placeBuilding(chunks, bounds, plan, district, occupied, protectedTiles,
           const score = wantsScore(chunks, anchorX, anchorY, plan.wants || [])
             - dist * 4
             - doorDist * 1.5
+            + doorFacingScore(def, anchorX, anchorY, facingTarget)
             + rng() * 0.01;
           if (!best || score > best.score) best = { def, anchorX, anchorY, rotation, score };
         }
@@ -704,7 +753,7 @@ export async function applyTownPlacement(chunks, bounds, seed, tick = null) {
     const district = buildingPlan.resource
       ? (plan.resources[buildingPlan.resource] || plan.byDistrict[buildingPlan.district] || plan.districts[0])
       : (plan.byDistrict[buildingPlan.district] || plan.districts[0]);
-    const placed = placeBuilding(chunks, bounds, buildingPlan, district, occupied, protectedTiles, seed);
+    const placed = placeBuilding(chunks, bounds, buildingPlan, district, occupied, protectedTiles, seed, plan.center);
     if (placed) {
       buildings.push(placed);
       addBuildingResourceSpawns(chunks, placed, buildingPlan, bounds);
