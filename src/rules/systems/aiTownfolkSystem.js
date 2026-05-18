@@ -58,7 +58,6 @@ import { getTownState, getWeather } from "../utils/townStateAccess.js";
 const TOWNFOLK_RADIUS = 40;
 const MAX_STUCK_TURNS = 5;
 const WORK_RANGE = 15;
-const TOWNFOLK_MONSTER_SIGHT_RANGE = 8;
 const BELL_GUARD_TURNS = 120;
 const TOWN_BREACH_STATE = Symbol.for("jshack:townBreach:state");
 
@@ -249,7 +248,7 @@ function detectTownBreachSightings(world) {
     if (fac?.key !== "townfolk") continue;
     const job = world.get(id, TownfolkJob);
     if (!job || job.state === TOWNFOLK_STATES.sleeping) continue;
-    const hostile = nearestPerceivedHostile(world, id, { maxRange: TOWNFOLK_MONSTER_SIGHT_RANGE });
+    const hostile = nearestPerceivedHostile(world, id);
     if (!hostile) continue;
     assignBellRun(world, id, hostile.id);
     return;
@@ -304,7 +303,7 @@ function handleArmedTownfolk(world, id, pos, job) {
     job.stuckTurns = 0;
     return;
   }
-  const hostile = nearestPerceivedHostile(world, id, { maxRange: 10 });
+  const hostile = nearestPerceivedHostile(world, id);
   if (!hostile) return;
   if (hostile.dist <= 1) {
     try { world.add(id, AttackIntent, { targetId: hostile.id }); } catch {}

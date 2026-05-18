@@ -238,6 +238,19 @@ Deno.test("town breach sighting requires townfolk Brain perception", () => {
   assert(!world.has(witness, MoveIntent), "townfolk without Brain perception should not move to the bell");
 });
 
+Deno.test("town breach sighting uses Brain vision range as the range authority", () => {
+  const world = makeWorld(4002);
+  addBell(world, 12, 5);
+  const witness = addTownfolk(world, 6, 5, "villager", { idleTurns: 20, visionRange: 0 });
+  addEnemy(world, 6, 7);
+
+  aiTownfolkSystem(world);
+
+  const job = world.get(witness, TownfolkJob);
+  assertEquals(job.state, TOWNFOLK_STATES.idle, "enemy outside Brain vision range should not trigger breach sighting");
+  assert(!world.has(witness, MoveIntent), "short-sighted townfolk should not move to the bell");
+});
+
 Deno.test("bell runner rings on arrival and alarmed townsfolk fight or flee instead of freezing", () => {
   const world = makeWorld(401);
   installBellListener(world);

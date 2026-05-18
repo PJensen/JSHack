@@ -17,7 +17,7 @@ import { getEffectiveVisionRange } from "./blind.js";
  * @param {any} world
  * @param {number} actorId
  * @param {number} targetId
- * @param {{ maxRange?: number, isBlocked?: (x:number, y:number)=>boolean }} [opts]
+ * @param {{ isBlocked?: (x:number, y:number)=>boolean }} [opts]
  * @returns {{ id:number, x:number, y:number, dist:number } | null}
  */
 export function perceiveEntity(world, actorId, targetId, opts = {}) {
@@ -33,12 +33,9 @@ export function perceiveEntity(world, actorId, targetId, opts = {}) {
   const targetVit = world.get(target, Vitality);
   if (targetVit && (targetVit.hp | 0) <= 0) return null;
 
-  const effectiveRange = Math.max(0, Math.trunc(getEffectiveVisionRange(world, actor)));
-  const maxRange = Number.isFinite(opts.maxRange)
-    ? Math.min(effectiveRange, Math.max(0, Number(opts.maxRange) | 0))
-    : effectiveRange;
+  const range = Math.max(0, Math.trunc(getEffectiveVisionRange(world, actor)));
   const dist = Math.max(Math.abs((targetPos.x | 0) - (actorPos.x | 0)), Math.abs((targetPos.y | 0) - (actorPos.y | 0)));
-  if (dist > maxRange) return null;
+  if (dist > range) return null;
 
   const isBlocked = opts.isBlocked || blockedCallback(buildBlocksVisionMap(world));
   const canSee = hasOverworldAerialLOS(world, {
@@ -46,7 +43,7 @@ export function perceiveEntity(world, actorId, targetId, opts = {}) {
     targetId: target,
     sourcePos: actorPos,
     targetPos,
-    range: maxRange,
+    range,
   }) || hasLOS(actorPos.x | 0, actorPos.y | 0, targetPos.x | 0, targetPos.y | 0, isBlocked);
   if (!canSee) return null;
 
@@ -58,7 +55,7 @@ export function perceiveEntity(world, actorId, targetId, opts = {}) {
  *
  * @param {any} world
  * @param {number} actorId
- * @param {{ maxRange?: number, isBlocked?: (x:number, y:number)=>boolean }} [opts]
+ * @param {{ isBlocked?: (x:number, y:number)=>boolean }} [opts]
  * @returns {{ id:number, x:number, y:number, dist:number } | null}
  */
 export function nearestPerceivedHostile(world, actorId, opts = {}) {
@@ -68,10 +65,7 @@ export function nearestPerceivedHostile(world, actorId, opts = {}) {
   const actorFaction = world.get(actor, Faction)?.key || "";
   if (!actorPos || !actorFaction) return null;
 
-  const effectiveRange = Math.max(0, Math.trunc(getEffectiveVisionRange(world, actor)));
-  const range = Number.isFinite(opts.maxRange)
-    ? Math.min(effectiveRange, Math.max(0, Number(opts.maxRange) | 0))
-    : effectiveRange;
+  const range = Math.max(0, Math.trunc(getEffectiveVisionRange(world, actor)));
   const isBlocked = opts.isBlocked || blockedCallback(buildBlocksVisionMap(world));
   let best = null;
   let bestDist = Infinity;
@@ -80,7 +74,7 @@ export function nearestPerceivedHostile(world, actorId, opts = {}) {
     if (id === actor) return;
     const targetFaction = world.get(id, Faction)?.key || "";
     if (!areFactionsHostile(actorFaction, targetFaction)) return;
-    const seen = perceiveEntity(world, actor, id, { maxRange: range, isBlocked });
+    const seen = perceiveEntity(world, actor, id, { isBlocked });
     if (!seen || seen.dist >= bestDist) return;
     best = seen;
     bestDist = seen.dist;
