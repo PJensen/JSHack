@@ -5,6 +5,7 @@ import { Position } from "../components/Position.js";
 import { Faction } from "../components/Faction.js";
 import { Speed } from "../components/Speed.js";
 import { MoveIntent } from "../components/Intents/MoveIntent.js";
+import { AttackIntent } from "../components/Intents/AttackIntent.js";
 import { playerEntity } from "../utils/queries.js";
 import { DungeonState } from "../components/DungeonState.js";
 import { TownfolkJob, TOWNFOLK_STATES, TOWNFOLK_ROLES } from "../components/TownfolkJob.js";
@@ -49,6 +50,8 @@ import { getTownPhase } from "../data/calendar.js";
 import { actorHasDoorKey, setDoorState } from "../utils/doorAccess.js";
 import { SMITH_RECIPES, chooseSmithRecipe } from "../data/smithRecipes.js";
 import { CARDINAL_DIRS } from "../utils/directions.js";
+import { hasLOS } from "../../shared/math/gridLOS.js";
+import { buildBlocksVisionMap, blockedCallback } from "../utils/vision.js";
 import { getQuestRecord } from "../quests/runtime.js";
 import { RAT_INFESTATION_QUEST_ID } from "../quests/definitions/ratInfestation.js";
 import { getTownState, getWeather } from "../utils/townStateAccess.js";
@@ -56,6 +59,9 @@ import { getTownState, getWeather } from "../utils/townStateAccess.js";
 const TOWNFOLK_RADIUS = 40;
 const MAX_STUCK_TURNS = 5;
 const WORK_RANGE = 15;
+const TOWNFOLK_MONSTER_SIGHT_RANGE = 8;
+const BELL_GUARD_TURNS = 120;
+const TOWN_BREACH_STATE = Symbol.for("jshack:townBreach:state");
 
 // Per-tick cached result of findTownContainers — set once at the start of
 // aiTownfolkSystem and reused by all helper functions that need storage IDs.
@@ -151,6 +157,250 @@ function findTownFeature(world, identity) {
     if (String(ni.identity || "") === identity) return { id, x: pos.x, y: pos.y };
   }
   return null;
+}
+
+function townBreachState(world) {
+  if (!world[TOWN_BREACH_STATE]) {
+    world[TOWN_BREACH_STATE] = {
+      alarmActiveUntil: 0,
+      bellRingerId: 0,
+      sightedMonsterId: 0,
+      sightedAtStep: -1,
+    };
+  }
+  return world[TOWN_BREACH_STATE];
+}
+
+function currentDepth(world, fallback = 1) {
+  for (const [, ds] of world.query(DungeonState)) return Number(ds?.currentDepth ?? fallback) | 0;
+  return fallback;
+}
+
+function findTownBell(world) {
+  return findTownFeature(world, "bell");
+}
+
+function rand01(world, salt = 0) {
+  if (typeof world.rand === "function") return world.rand();
+  const x = Math.sin(((world.step | 0) + 1) * 1103515245 + salt * 12345) * 10000;
+  return x - Math.floor(x);
+}
+
+function townfolkHasServiceWeapon(world, id) {
+  const eq = world.get(id, Equipment);
+  if (eq?.weapon > 0) return true;
+  return actorHasIdentity(world, id, "iron_pickaxe")
+    || actorHasIdentity(world, id, "tool_hatchet")
+    || actorHasIdentity(world, id, "tool_kitchen_knife");
+}
+
+function armTownfolkSuperficially(world, id) {
+  if (!world.has(id, Equipment)) world.add(id, Equipment, {});
+  const eq = world.get(id, Equipment);
+  if (eq?.weapon > 0) return true;
+
+  for (const identity of ["iron_pickaxe", "tool_hatchet", "tool_kitchen_knife"]) {
+    const itemId = findFirstInventoryItemByIdentity(world, id, identity);
+    if (itemId > 0) {
+      eq.weapon = itemId;
+      return true;
+    }
+  }
+
+  ensureCarryInventory(world, id);
+  const weaponId = createInventoryItem(world, id, "tool_kitchen_knife");
+  if (weaponId > 0) {
+    eq.weapon = weaponId;
+    return true;
+  }
+  return false;
+}
+
+function isTownHostile(world, id) {
+  const fac = world.get(id, Faction);
+  if (fac?.key !== "enemy") return false;
+  const pos = world.get(id, Position);
+  return !!pos;
+}
+
+function nearestVisibleTownHostile(world, pos, range = TOWNFOLK_MONSTER_SIGHT_RANGE) {
+  const isBlocked = blockedCallback(buildBlocksVisionMap(world));
+  let best = null;
+  let bestDist = Infinity;
+  forEachInRadius(world, pos.x, pos.y, range, (eid, epos) => {
+    if (!isTownHostile(world, eid)) return;
+    const d = Math.max(Math.abs(epos.x - pos.x), Math.abs(epos.y - pos.y));
+    if (d >= bestDist) return;
+    if (!hasLOS(pos.x | 0, pos.y | 0, epos.x | 0, epos.y | 0, isBlocked)) return;
+    best = { id: eid, x: epos.x, y: epos.y, dist: d };
+    bestDist = d;
+  });
+  return best;
+}
+
+function assignBellRun(world, actorId, monsterId) {
+  const bell = findTownBell(world);
+  if (!bell) return false;
+  const job = world.get(actorId, TownfolkJob);
+  if (!job) return false;
+  const state = townBreachState(world);
+  if (state.bellRingerId > 0 && world.isAlive(state.bellRingerId)) return false;
+
+  state.bellRingerId = actorId;
+  state.sightedMonsterId = monsterId | 0;
+  state.sightedAtStep = world.step | 0;
+
+  job.state = TOWNFOLK_STATES.alarming;
+  job.targetX = bell.x | 0;
+  job.targetY = bell.y | 0;
+  job.workSiteKind = "ring_town_bell";
+  job.routineKind = "ring_town_bell";
+  job.workTurns = 0;
+  job.stuckTurns = 0;
+  emitSafe(world, "town:breach:sighted", { witnessId: actorId, monsterId, bellId: bell.id, at: { x: bell.x | 0, y: bell.y | 0 } });
+  return true;
+}
+
+function detectTownBreachSightings(world) {
+  if (currentDepth(world, 1) !== 0) return;
+  const state = townBreachState(world);
+  if (state.alarmActiveUntil > (world.step | 0)) return;
+  if (state.bellRingerId > 0 && world.isAlive(state.bellRingerId)) return;
+  if (!findTownBell(world)) return;
+
+  for (const [id, pos, fac] of world.query(Position, Faction)) {
+    if (fac?.key !== "townfolk") continue;
+    const job = world.get(id, TownfolkJob);
+    if (!job || job.state === TOWNFOLK_STATES.sleeping) continue;
+    const hostile = nearestVisibleTownHostile(world, pos);
+    if (!hostile) continue;
+    assignBellRun(world, id, hostile.id);
+    return;
+  }
+}
+
+function handleBellRun(world, id, pos, job) {
+  const bell = findTownBell(world);
+  if (!bell) {
+    setIdle(job, world);
+    return;
+  }
+  job.targetX = bell.x | 0;
+  job.targetY = bell.y | 0;
+  if (nearPoint(pos, bell.x, bell.y, 1)) {
+    emitSafe(world, "bell:rung", { actor: id, targetId: bell.id, reason: "monster_sighted" });
+    return;
+  }
+  const moved = stepToward(world, id, pos, bell.x, bell.y);
+  if (!moved) {
+    job.stuckTurns++;
+    if (job.stuckTurns >= MAX_STUCK_TURNS) {
+      townBreachState(world).bellRingerId = 0;
+      setIdle(job, world);
+    }
+    return;
+  }
+  job.stuckTurns = 0;
+}
+
+function handleHiding(world, id, pos, job) {
+  const tx = Number.isFinite(job.targetX) ? job.targetX : job.homeX;
+  const ty = Number.isFinite(job.targetY) ? job.targetY : job.homeY;
+  if (nearPoint(pos, tx, ty, 1)) {
+    closeOwnedShopDoors(world, id);
+    job.guardTurnsLeft--;
+    if (job.guardTurnsLeft <= 0) setIdle(job, world);
+    return;
+  }
+  if (!stepToward(world, id, pos, tx, ty)) {
+    job.guardTurnsLeft--;
+    if (job.guardTurnsLeft <= 0) setIdle(job, world);
+  }
+}
+
+function handleArmedTownfolk(world, id, pos, job) {
+  job.guardTurnsLeft--;
+  if (job.guardTurnsLeft <= 0) {
+    job.state = TOWNFOLK_STATES.idle;
+    job.guardTurnsLeft = 0;
+    job.workTurns = 0;
+    job.stuckTurns = 0;
+    return;
+  }
+  const hostile = nearestVisibleTownHostile(world, pos, 10);
+  if (!hostile) return;
+  if (hostile.dist <= 1) {
+    try { world.add(id, AttackIntent, { targetId: hostile.id }); } catch {}
+    return;
+  }
+  stepToward(world, id, pos, hostile.x, hostile.y);
+}
+
+function applyTownAlarmResponse(world, bellActorId = 0, sightedMonsterId = 0) {
+  const state = townBreachState(world);
+  state.alarmActiveUntil = Math.max(state.alarmActiveUntil | 0, (world.step | 0) + BELL_GUARD_TURNS);
+  state.bellRingerId = 0;
+
+  for (const [id, job] of world.query(TownfolkJob)) {
+    if (!world.isAlive(id)) continue;
+    if (id === bellActorId) {
+      job.state = TOWNFOLK_STATES.armed;
+      job.guardTurnsLeft = BELL_GUARD_TURNS;
+      job.workTurns = 0;
+      job.stuckTurns = 0;
+      armTownfolkSuperficially(world, id);
+      continue;
+    }
+
+    const pos = world.get(id, Position);
+    const hasTool = townfolkHasServiceWeapon(world, id);
+    const defenderRole = job.role === TOWNFOLK_ROLES.miner
+      || job.role === TOWNFOLK_ROLES.woodcutter
+      || job.role === TOWNFOLK_ROLES.mason
+      || job.role === TOWNFOLK_ROLES.smith;
+    const roll = rand01(world, id);
+    const rally = hasTool || defenderRole || roll < 0.35;
+    if (rally) {
+      armTownfolkSuperficially(world, id);
+      job.state = TOWNFOLK_STATES.armed;
+      job.guardTurnsLeft = BELL_GUARD_TURNS + Math.floor(rand01(world, id + 17) * 40);
+      if (pos) {
+        const hostilePos = world.get(sightedMonsterId, Position);
+        job.targetX = hostilePos?.x ?? pos.x;
+        job.targetY = hostilePos?.y ?? pos.y;
+      }
+    } else {
+      job.state = TOWNFOLK_STATES.hiding;
+      job.guardTurnsLeft = 60 + Math.floor(rand01(world, id + 31) * 80);
+      job.targetX = job.homeX;
+      job.targetY = job.homeY;
+    }
+    job.workTurns = 0;
+    job.stuckTurns = 0;
+  }
+}
+
+function processTownEmergencyActors(world) {
+  const processed = new Set();
+  for (const [id, pos, fac] of world.query(Position, Faction)) {
+    if (fac?.key !== "townfolk") continue;
+    const job = world.get(id, TownfolkJob);
+    if (!job) continue;
+    if (
+      job.state !== TOWNFOLK_STATES.alarming
+      && job.state !== TOWNFOLK_STATES.armed
+      && job.state !== TOWNFOLK_STATES.hiding
+    ) continue;
+    if (world.has(id, MoveIntent)) {
+      processed.add(id);
+      continue;
+    }
+    if (job.state === TOWNFOLK_STATES.alarming) handleBellRun(world, id, pos, job);
+    else if (job.state === TOWNFOLK_STATES.armed) handleArmedTownfolk(world, id, pos, job);
+    else handleHiding(world, id, pos, job);
+    processed.add(id);
+  }
+  return processed;
 }
 
 function isFishableTile(tile) {
@@ -435,6 +685,16 @@ function openOwnedShopDoors(world, actorId) {
     if (doorState.open) continue;
     if (!actorHasDoorKey(world, actorId, doorId)) continue;
     setDoorState(world, doorId, { open: true, locked: false }, actorId);
+  }
+}
+
+function closeOwnedShopDoors(world, actorId) {
+  for (const [doorId, pos, doorState] of world.query(Position, DoorState)) {
+    if (!actorHasDoorKey(world, actorId, doorId)) continue;
+    if (doorOccupied(world, pos.x, pos.y)) continue;
+    const canLock = !!world.get(doorId, DoorLock)?.lockId;
+    if (!doorState.open && doorState.locked === canLock) continue;
+    setDoorState(world, doorId, { open: false, locked: canLock }, actorId);
   }
 }
 
@@ -1452,6 +1712,8 @@ export function aiTownfolkSystem(world) {
     break;
   }
   if (depth !== 0) return;
+  detectTownBreachSightings(world);
+  const emergencyProcessed = processTownEmergencyActors(world);
 
   // Cache storage container IDs for this tick (avoids 11 redundant world scans)
   _cachedStorage = findTownContainers(world);
@@ -1475,6 +1737,7 @@ export function aiTownfolkSystem(world) {
   const playerPos = _player.pos;
 
   forEachInRadius(world, playerPos.x, playerPos.y, TOWNFOLK_RADIUS, (id, pos) => {
+    if (emergencyProcessed.has(id)) return;
     const fac = world.get(id, Faction);
     if (fac?.key !== "townfolk") return;
 
@@ -1488,13 +1751,17 @@ export function aiTownfolkSystem(world) {
 
     // Armed state overrides all other behaviour
     if (job.state === TOWNFOLK_STATES.armed) {
-      job.guardTurnsLeft--;
-      if (job.guardTurnsLeft <= 0) {
-        job.state = TOWNFOLK_STATES.idle;
-        job.guardTurnsLeft = 0;
-        job.workTurns = 0;
-        job.stuckTurns = 0;
-      }
+      handleArmedTownfolk(world, id, pos, job);
+      return;
+    }
+
+    if (job.state === TOWNFOLK_STATES.alarming) {
+      handleBellRun(world, id, pos, job);
+      return;
+    }
+
+    if (job.state === TOWNFOLK_STATES.hiding) {
+      handleHiding(world, id, pos, job);
       return;
     }
 
@@ -1526,19 +1793,20 @@ export function aiTownfolkSystem(world) {
 }
 
 const BELL_INSTALLED = Symbol.for("jshack:bellListener:installed");
-const BELL_GUARD_TURNS = 120;
 
 export function installBellListener(world) {
   if (!world || world[BELL_INSTALLED]) return;
   world[BELL_INSTALLED] = true;
 
-  world.on("bell:rung", () => {
-    for (const [id, job] of world.query(TownfolkJob)) {
-      if (!world.isAlive(id)) continue;
-      job.state = TOWNFOLK_STATES.armed;
-      job.guardTurnsLeft = BELL_GUARD_TURNS;
-      job.workTurns = 0;
-      job.stuckTurns = 0;
-    }
+  world.on("bell:rung", ({ actor, reason }) => {
+    const state = townBreachState(world);
+    const sightedMonsterId = state.sightedMonsterId | 0;
+    applyTownAlarmResponse(world, Number(actor || 0) | 0, sightedMonsterId);
+    emitSafe(world, "town:alarm", {
+      actor: Number(actor || 0) | 0,
+      reason: String(reason || "bell"),
+      sightedMonsterId,
+      activeTurns: BELL_GUARD_TURNS,
+    });
   });
 }

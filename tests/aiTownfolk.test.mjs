@@ -10,8 +10,11 @@ import { NamedIdentity }  from "../src/rules/components/NamedIdentity.js";
 import { Faction }        from "../src/rules/components/Faction.js";
 import { Collider }       from "../src/rules/components/Collider.js";
 import { DoorState }      from "../src/rules/components/DoorState.js";
+import { DoorLock }       from "../src/rules/components/DoorLock.js";
+import { DoorKey }        from "../src/rules/components/DoorKey.js";
 import { Interactable }   from "../src/rules/components/Interactable.js";
 import { MoveIntent }     from "../src/rules/components/Intents/MoveIntent.js";
+import { AttackIntent }   from "../src/rules/components/Intents/AttackIntent.js";
 import { DungeonState }   from "../src/rules/components/DungeonState.js";
 import { ObjectState } from "../src/rules/components/ObjectState.js";
 import { TownfolkJob, TOWNFOLK_STATES, TOWNFOLK_ROLES } from "../src/rules/components/TownfolkJob.js";
@@ -19,7 +22,7 @@ import { AggroState, AGGRO_LEVELS } from "../src/rules/components/AggroState.js"
 import { Inventory } from "../src/rules/components/Inventory.js";
 import { Equipment } from "../src/rules/components/Equipment.js";
 import { NamedIdentity as ItemNamedIdentity } from "../src/rules/components/NamedIdentity.js";
-import { aiTownfolkSystem, installTownfolkDoorListener } from "../src/rules/systems/aiTownfolkSystem.js";
+import { aiTownfolkSystem, installTownfolkDoorListener, installBellListener } from "../src/rules/systems/aiTownfolkSystem.js";
 import { aiChaseSystem }    from "../src/rules/systems/aiChaseSystem.js";
 import { clearAll, loadChunk, getTile, setTile } from "../src/rules/environment/dungeon/tileMap.js";
 import {
@@ -31,6 +34,7 @@ import { createItemById } from "../src/rules/utils/itemFactory.js";
 import { Unpaid } from "../src/rules/components/Unpaid.js";
 import { HarvestNode } from "../src/rules/components/HarvestNode.js";
 import { Material } from "../src/rules/components/Material.js";
+import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 
 // ── helpers ────────────────────────────────────────────────────────
 
@@ -107,6 +111,24 @@ function addTownfolk(world, x, y, role, opts = {}) {
   return id;
 }
 
+function addBell(world, x, y) {
+  const id = world.create();
+  world.add(id, Position, { x, y });
+  world.add(id, NamedIdentity, { name: "Town Bell", identity: "bell" });
+  world.add(id, Collider, { solid: true, blocksSight: false });
+  world.add(id, Interactable, { action: "ringBell", params: null });
+  return id;
+}
+
+function addEnemy(world, x, y) {
+  const id = world.create();
+  world.add(id, Position, { x, y });
+  world.add(id, NamedIdentity, { name: "Cave Bear", identity: "cave_bear" });
+  world.add(id, Faction, { key: "enemy" });
+  world.add(id, Collider, { solid: true, blocksSight: false });
+  return id;
+}
+
 function countInventory(world, ownerId, identity) {
   let total = 0;
   for (const itemId of inventoryItems(world, ownerId)) {
@@ -178,6 +200,82 @@ Deno.test("walking townfolk issues MoveIntent toward target", () => {
   const intent = world.get(npc, MoveIntent);
   assertEquals(intent.dx, 1, "should move east toward target");
   assertEquals(intent.dy, 0, "should not move vertically");
+});
+
+Deno.test("town breach sighting assigns a witness to physically run to the bell", () => {
+  const world = makeWorld(400);
+  addBell(world, 12, 5);
+  const witness = addTownfolk(world, 6, 5, "villager", { idleTurns: 20 });
+  const enemy = addEnemy(world, 6, 7);
+
+  const bellEvents = [];
+  world.on("bell:rung", (ev) => bellEvents.push(ev));
+
+  aiTownfolkSystem(world);
+
+  const job = world.get(witness, TownfolkJob);
+  assertEquals(job.state, TOWNFOLK_STATES.alarming, "witness should become the bell runner");
+  assertEquals(job.targetX, 12, "bell runner should target the existing bell");
+  assertEquals(job.targetY, 5, "bell runner should target the existing bell");
+  assert(world.has(witness, MoveIntent), "bell runner should walk toward the bell");
+  assertEquals(bellEvents.length, 0, "sighting should not ring the bell until the NPC reaches it");
+  assert(enemy > 0, "enemy exists for sighting");
+});
+
+Deno.test("bell runner rings on arrival and alarmed townsfolk fight or flee instead of freezing", () => {
+  const world = makeWorld(401);
+  installBellListener(world);
+  addBell(world, 12, 5);
+  const witness = addTownfolk(world, 6, 5, "villager", { idleTurns: 20 });
+  const miner = addTownfolk(world, 7, 7, "miner", { idleTurns: 20 });
+  const enemy = addEnemy(world, 8, 7);
+
+  const alarms = [];
+  world.on("town:alarm", (ev) => alarms.push(ev));
+
+  aiTownfolkSystem(world);
+  assertEquals(world.get(witness, TownfolkJob).state, TOWNFOLK_STATES.alarming, "precondition: witness is running to bell");
+  try { world.remove(witness, MoveIntent); } catch {}
+  world.set(witness, Position, { x: 11, y: 5 });
+
+  aiTownfolkSystem(world);
+
+  assertEquals(alarms.length, 1, "arrival at bell should ring the town alarm");
+  assertEquals(world.get(witness, TownfolkJob).state, TOWNFOLK_STATES.armed, "bell runner should rally after ringing");
+
+  const minerJob = world.get(miner, TownfolkJob);
+  assertEquals(minerJob.state, TOWNFOLK_STATES.armed, "tool-carrying miner should rally");
+  try { world.remove(miner, MoveIntent); } catch {}
+  aiTownfolkSystem(world);
+  assert(world.has(miner, AttackIntent), "armed adjacent miner should attack a visible town hostile");
+  assertEquals(world.get(miner, AttackIntent).targetId, enemy, "miner should target the sighted hostile");
+});
+
+Deno.test("hiding keyed townfolk closes and locks owned doors during alarm", () => {
+  const world = makeWorld(402);
+  const vendor = addTownfolk(world, 6, 5, "general_vendor", {
+    state: TOWNFOLK_STATES.hiding,
+    homeX: 6,
+    homeY: 5,
+    targetX: 6,
+    targetY: 5,
+    guardTurnsLeft: 20,
+  });
+  const door = world.create();
+  world.add(door, Position, { x: 7, y: 5 });
+  world.add(door, DoorState, { open: true, locked: false });
+  world.add(door, DoorLock, { lockId: "shop:test" });
+  world.add(door, Collider, { solid: false, blocksSight: false });
+  const key = world.create();
+  world.add(key, DoorKey, { lockId: "shop:test" });
+  world.add(key, ItemInfo, { type: "key", count: 1 });
+  addToInventory(world, vendor, key);
+
+  aiTownfolkSystem(world);
+
+  const state = world.get(door, DoorState);
+  assertEquals(state.open, false, "hiding vendor should close owned door");
+  assertEquals(state.locked, true, "hiding vendor should lock owned keyed door");
 });
 
 Deno.test("walking townfolk transitions to working when at target", () => {

@@ -339,8 +339,12 @@ export function installEnvironmentMessages(ctx) {
     log('The altar rejects your offering. The item clatters to the floor.', 'system');
   });
 
+  world.on('town:breach:sighted', ({ witnessId }) => {
+    log(`${nameOfEntity(witnessId)} sees something from below and bolts for the town bell!`, 'warning');
+  });
+
   world.on('bell:rung', () => {
-    log('The bell\u2019s iron voice rings across the town \u2014 villagers grab whatever\u2019s sharp and rally!', 'warning');
+    log('The bell\u2019s iron voice rings across the town. Doors slam, feet scatter, and the brave grab whatever is sharp.', 'warning');
   });
 
   world.on('shrine:touch', ({ actor }) => {
