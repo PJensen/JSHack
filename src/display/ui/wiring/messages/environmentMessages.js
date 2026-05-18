@@ -152,6 +152,17 @@ export function installEnvironmentMessages(ctx) {
   });
 
   // === Environment events ===
+  world.on('dungeon:pursuit', ({ pursuerIds, count }) => {
+    const ids = Array.isArray(pursuerIds) ? pursuerIds : [];
+    const n = Math.max(0, Number(count || ids.length || 0) | 0);
+    if (n <= 0) return;
+    if (n === 1 && ids[0]) {
+      log(`${nameOfEntity(ids[0])} follows you through the stairs!`, 'danger');
+      return;
+    }
+    log(`${n} enemies follow you through the stairs!`, 'danger');
+  });
+
   world.on('engrave', ({ actor, text, x, y }) => {
     const who = nameOfEntity(actor);
     if (who === 'You' && _playerHas('blinded')) log(`You scratch something into the stone by feel. You hope it says "${text}".`, 'system');

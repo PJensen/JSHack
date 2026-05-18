@@ -9,7 +9,12 @@ import { PetState } from '../../components/PetState.js';
 import { MonsterSpawner } from '../../components/MonsterSpawner.js';
 import { NamedIdentity } from '../../components/NamedIdentity.js';
 import { Flying } from '../../components/Flying.js';
+import { Faction } from '../../components/Faction.js';
+import { AggroState, AGGRO_LEVELS, SEARCH_TURNS_HUNTING_GRACE } from '../../components/AggroState.js';
+import { Vitality } from '../../components/Vitality.js';
+import { Collider } from '../../components/Collider.js';
 import { clearAll as clearTileMap, setTile } from './tileMap.js';
+import { isWalkable } from './tileMap.js';
 import { clearExplored, saveExplored, restoreExplored } from './exploredMap.js';
 import { exploredFloorRepository } from './floorMemory.js';
 import { generateFloor } from './index.js';
@@ -24,6 +29,8 @@ const _floorEntityCache = new Map();
 
 /** Max floor entity snapshots held in the JS heap; older entries are evicted to localStorage. */
 const MAX_MEMORY_FLOORS = 5;
+const PURSUIT_RADIUS = 4;
+const MAX_PURSUERS = 8;
 
 /** @param {number} worldSeed @param {number} depth @returns {string} */
 function _floorStorageKey(worldSeed, depth) {
@@ -73,6 +80,89 @@ function _evictMemoryFloors(currentDepth) {
   }
 }
 
+function _collectStairPursuers(world, currentDepth, newDepth, stairPos) {
+  if (!stairPos) return [];
+  if (Math.abs((newDepth | 0) - (currentDepth | 0)) !== 1) return [];
+
+  const sx = stairPos.x | 0;
+  const sy = stairPos.y | 0;
+  const pursuers = [];
+  for (const [id, pos, fac, aggro] of world.query(Position, Faction, AggroState)) {
+    if (fac?.key !== 'enemy') continue;
+    if (aggro.alertLevel !== AGGRO_LEVELS.hunting) continue;
+    if (aggro.retreating) continue;
+    const vit = world.get(id, Vitality);
+    if (vit && (vit.hp | 0) <= 0) continue;
+    const dist = Math.max(Math.abs((pos.x | 0) - sx), Math.abs((pos.y | 0) - sy));
+    if (dist > PURSUIT_RADIUS) continue;
+    pursuers.push({ id, dist });
+  }
+  pursuers.sort((a, b) => a.dist - b.dist || a.id - b.id);
+  return pursuers.slice(0, MAX_PURSUERS).map((p) => p.id);
+}
+
+function _tileHasSolid(world, x, y, ignoreIds) {
+  for (const [id, pos, col] of world.query(Position, Collider)) {
+    if (ignoreIds?.has(id)) continue;
+    if (!col?.solid) continue;
+    if ((pos.x | 0) === x && (pos.y | 0) === y) return true;
+  }
+  return false;
+}
+
+function _findPursuerLanding(world, origin, used, ignoreIds) {
+  const ox = origin.x | 0;
+  const oy = origin.y | 0;
+  for (let r = 1; r <= 5; r++) {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const x = ox + dx;
+        const y = oy + dy;
+        const key = `${x},${y}`;
+        if (used.has(key)) continue;
+        if (!isWalkable(x, y)) continue;
+        if (_tileHasSolid(world, x, y, ignoreIds)) continue;
+        used.add(key);
+        return { x, y };
+      }
+    }
+  }
+  return null;
+}
+
+function _placeStairPursuers(world, pursuerIds, destinationPos, entityIds) {
+  if (!Array.isArray(pursuerIds) || pursuerIds.length <= 0) return [];
+  const carried = pursuerIds.filter((id) => world.isAlive(id) && world.has(id, Position));
+  if (carried.length <= 0) return [];
+
+  const ignoreIds = new Set(carried);
+  for (const [id] of world.query(Player)) ignoreIds.add(id);
+  for (const [id] of world.query(Pet)) ignoreIds.add(id);
+
+  const used = new Set([`${destinationPos.x | 0},${destinationPos.y | 0}`]);
+  const placed = [];
+  for (const id of carried) {
+    const landing = _findPursuerLanding(world, destinationPos, used, ignoreIds);
+    if (!landing) {
+      try { world.destroy(id); } catch {}
+      continue;
+    }
+    world.set(id, Position, landing);
+    const aggro = world.get(id, AggroState);
+    if (aggro) {
+      aggro.alertLevel = AGGRO_LEVELS.hunting;
+      aggro.lastKnownX = destinationPos.x | 0;
+      aggro.lastKnownY = destinationPos.y | 0;
+      aggro.searchTurnsLeft = SEARCH_TURNS_HUNTING_GRACE;
+      aggro.retreating = false;
+    }
+    if (!entityIds.includes(id)) entityIds.push(id);
+    placed.push(id);
+  }
+  return placed;
+}
+
 /**
  * Build a runtime component registry from currently known stores.
  * @param {import('../../../lib/ecs-js/index.js').World} world
@@ -118,6 +208,7 @@ export async function transitionToDepth(world, newDepth, destinationPos, opts = 
 
   // Save explored map for the current floor before clearing
   const currentDepth = ds ? ds.currentDepth : 0;
+  const stairPursuerIds = _collectStairPursuers(world, currentDepth, newDepth, opts.stairPos || null);
 
   // Build the permanent-entity set once and reuse it for both snapshot saving
   // and the destroy phase. This prevents picked-up floor items (whose entity IDs
@@ -126,6 +217,7 @@ export async function transitionToDepth(world, newDepth, destinationPos, opts = 
   for (const [id] of world.query(Player)) _permanentIds.add(id);
   for (const [id] of world.query(Pet)) _permanentIds.add(id);
   for (const [id] of world.query(DungeonState)) _permanentIds.add(id);
+  for (const id of stairPursuerIds) _permanentIds.add(id);
   // Walk full hierarchy: InventoryRoot, inventory items, equipment, etc.
   for (const root of [..._permanentIds]) {
     const stack = [root];
@@ -345,6 +437,17 @@ export async function transitionToDepth(world, newDepth, destinationPos, opts = 
       r.targetItemId = 0;
       r.lastPlayerX = destinationPos.x;
       r.lastPlayerY = destinationPos.y;
+    });
+  }
+
+  const placedPursuerIds = _placeStairPursuers(world, stairPursuerIds, destinationPos, entityIds);
+  if (placedPursuerIds.length > 0) {
+    world.emit?.('dungeon:pursuit', {
+      depth: newDepth,
+      fromDepth: currentDepth,
+      pos: destinationPos,
+      pursuerIds: placedPursuerIds,
+      count: placedPursuerIds.length,
     });
   }
 
