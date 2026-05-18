@@ -20,6 +20,7 @@ import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Inventory } from "../components/Inventory.js";
 import { Equipment } from "../components/Equipment.js";
 import { ObjectState } from "../components/ObjectState.js";
+import { ThreatMemory, THREAT_MEMORY_LEVELS } from "../components/ThreatMemory.js";
 import { RoomMetadata } from "../components/RoomMetadata.js";
 import { createItemById } from "../utils/itemFactory.js";
 import { forEachInRadius } from "../utils/spatialIndex.js";
@@ -169,6 +170,46 @@ function townBreachState(world) {
   return world[TOWN_BREACH_STATE];
 }
 
+function currentThreatMemory(world) {
+  for (const [id, memory] of world.query(ThreatMemory)) {
+    return { id, memory };
+  }
+  const id = world.create();
+  world.add(id, ThreatMemory, {});
+  return { id, memory: world.get(id, ThreatMemory) };
+}
+
+function recordThreatSighting(world, witnessId, threatId) {
+  const threatPos = world.get(threatId, Position);
+  if (!threatPos) return;
+  const ident = world.get(threatId, NamedIdentity);
+  const { memory } = currentThreatMemory(world);
+  const turn = world.step | 0;
+  if ((memory.threatId | 0) !== (threatId | 0) || memory.firstSeenTurn < 0) {
+    memory.firstSeenTurn = turn;
+  }
+  memory.threatId = threatId | 0;
+  memory.threatIdentity = String(ident?.identity || "");
+  memory.threatName = String(ident?.name || "");
+  memory.level = THREAT_MEMORY_LEVELS.sighted;
+  memory.depth = currentDepth(world, 0);
+  memory.lastSeenTurn = turn;
+  memory.lastKnownX = threatPos.x | 0;
+  memory.lastKnownY = threatPos.y | 0;
+  memory.witnessId = witnessId | 0;
+}
+
+function confirmThreatAlarm(world, bellRingerId, threatId) {
+  const { memory } = currentThreatMemory(world);
+  if (threatId > 0 && (memory.threatId | 0) !== (threatId | 0)) {
+    recordThreatSighting(world, bellRingerId, threatId);
+  }
+  memory.level = THREAT_MEMORY_LEVELS.alarmed;
+  memory.depth = currentDepth(world, memory.depth | 0);
+  memory.alarmTurn = world.step | 0;
+  memory.bellRingerId = bellRingerId | 0;
+}
+
 function currentDepth(world, fallback = 1) {
   for (const [, ds] of world.query(DungeonState)) return Number(ds?.currentDepth ?? fallback) | 0;
   return fallback;
@@ -225,6 +266,7 @@ function assignBellRun(world, actorId, monsterId) {
   state.bellRingerId = actorId;
   state.sightedMonsterId = monsterId | 0;
   state.sightedAtStep = world.step | 0;
+  recordThreatSighting(world, actorId, monsterId);
 
   job.state = TOWNFOLK_STATES.alarming;
   job.targetX = bell.x | 0;
@@ -1777,6 +1819,7 @@ export function installBellListener(world) {
   world.on("bell:rung", ({ actor, reason }) => {
     const state = townBreachState(world);
     const sightedMonsterId = state.sightedMonsterId | 0;
+    confirmThreatAlarm(world, Number(actor || 0) | 0, sightedMonsterId);
     applyTownAlarmResponse(world, Number(actor || 0) | 0, sightedMonsterId);
     emitSafe(world, "town:alarm", {
       actor: Number(actor || 0) | 0,

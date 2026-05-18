@@ -73,6 +73,7 @@ export function nearestPerceivedHostile(world, actorId, opts = {}) {
   forEachInRadius(world, actorPos.x, actorPos.y, range, (id) => {
     if (id === actor) return;
     const targetFaction = world.get(id, Faction)?.key || "";
+    if (!targetFaction) return;
     if (!areFactionsHostile(actorFaction, targetFaction)) return;
     const seen = perceiveEntity(world, actor, id, { isBlocked });
     if (!seen || seen.dist >= bestDist) return;

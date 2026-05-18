@@ -18,6 +18,7 @@ import { AttackIntent }   from "../src/rules/components/Intents/AttackIntent.js"
 import { DungeonState }   from "../src/rules/components/DungeonState.js";
 import { ObjectState } from "../src/rules/components/ObjectState.js";
 import { TownfolkJob, TOWNFOLK_STATES, TOWNFOLK_ROLES } from "../src/rules/components/TownfolkJob.js";
+import { ThreatMemory, THREAT_MEMORY_LEVELS } from "../src/rules/components/ThreatMemory.js";
 import { AggroState, AGGRO_LEVELS } from "../src/rules/components/AggroState.js";
 import { Inventory } from "../src/rules/components/Inventory.js";
 import { Equipment } from "../src/rules/components/Equipment.js";
@@ -222,6 +223,13 @@ Deno.test("town breach sighting assigns a witness to physically run to the bell"
   assert(world.has(witness, MoveIntent), "bell runner should walk toward the bell");
   assertEquals(bellEvents.length, 0, "sighting should not ring the bell until the NPC reaches it");
   assert(enemy > 0, "enemy exists for sighting");
+  const [, memory] = [...world.query(ThreatMemory)][0];
+  assertEquals(memory.level, THREAT_MEMORY_LEVELS.sighted, "sighting should create threat memory");
+  assertEquals(memory.depth, 0, "memory should record the depth where the threat was seen");
+  assertEquals(memory.threatId, enemy, "memory should track sighted threat");
+  assertEquals(memory.witnessId, witness, "memory should track witness");
+  assertEquals(memory.lastKnownX, 6, "memory should track last known threat x");
+  assertEquals(memory.lastKnownY, 7, "memory should track last known threat y");
 });
 
 Deno.test("town breach sighting requires townfolk Brain perception", () => {
@@ -271,6 +279,10 @@ Deno.test("bell runner rings on arrival and alarmed townsfolk fight or flee inst
 
   assertEquals(alarms.length, 1, "arrival at bell should ring the town alarm");
   assertEquals(world.get(witness, TownfolkJob).state, TOWNFOLK_STATES.armed, "bell runner should rally after ringing");
+  const [, memory] = [...world.query(ThreatMemory)][0];
+  assertEquals(memory.level, THREAT_MEMORY_LEVELS.alarmed, "bell should confirm threat memory");
+  assertEquals(memory.depth, 0, "alarm memory should keep the threat depth");
+  assertEquals(memory.bellRingerId, witness, "memory should record bell ringer");
 
   const minerJob = world.get(miner, TownfolkJob);
   assertEquals(minerJob.state, TOWNFOLK_STATES.armed, "tool-carrying miner should rally");

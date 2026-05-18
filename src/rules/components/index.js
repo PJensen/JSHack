@@ -96,6 +96,7 @@ export { Encumbrance } from './Encumbrance.js';
 export { Flying } from './Flying.js';
 export { Traits } from './Traits.js';
 export { TownState } from './TownState.js';
+export { ThreatMemory, THREAT_MEMORY_LEVELS } from './ThreatMemory.js';
 export { EntranceProfile } from './EntranceProfile.js';
 export { EntranceState } from './EntranceState.js';
 export { DistrictProfile } from './DistrictProfile.js';
