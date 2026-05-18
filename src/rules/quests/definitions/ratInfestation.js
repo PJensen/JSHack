@@ -15,6 +15,7 @@ import { getQuestRecord } from "../runtime.js";
 export const RAT_INFESTATION_QUEST_ID = "starter.rat_infestation";
 export const REQUIRED_RAT_KILLS = 5;
 const REWARD_GOLD = 75;
+const REWARD_ITEM_IDS = Object.freeze(["bow_mirror"]);
 
 const RAT_HOOKS_KEY = Symbol.for("jshack:quests:ratInfestation:installed");
 
@@ -68,6 +69,7 @@ export const RatInfestationQuest = registerQuest({
   version: 1,
   journal: {
     flavorText: "The barkeep is tired of hearing claws in the cellar walls. He wants the infestation culled before the tavern loses its stores.",
+    rewardItemIds: REWARD_ITEM_IDS,
     rewardItems: [
       { label: "a hot stew from the barkeep", count: 1 },
     ],
@@ -76,6 +78,9 @@ export const RatInfestationQuest = registerQuest({
     accepted: false,
     killCount: 0,
     reported: false,
+    rewardItemIds: REWARD_ITEM_IDS,
+    rewardGold: REWARD_GOLD,
+    rewardGranted: false,
   },
   nodes: {
     offer: {
@@ -89,6 +94,8 @@ export const RatInfestationQuest = registerQuest({
             actions: [
               setVar("accepted", true),
               setVar("killCount", 0),
+              setVar("rewardItemIds", REWARD_ITEM_IDS),
+              setVar("rewardGold", REWARD_GOLD),
               (ctx) => {
                 const giverId = Number(ctx.bind.giver || 0);
                 if (!(giverId > 0)) return;
@@ -211,6 +218,7 @@ export const RatInfestationQuest = registerQuest({
             },
             actions: [
               setVar("reported", true),
+              setVar("rewardGranted", true),
               (ctx) => {
                 const giverId = Number(ctx.bind.giver || 0);
                 const giverPos = giverId > 0 ? ctx.world.get(giverId, Position) : null;
@@ -218,6 +226,10 @@ export const RatInfestationQuest = registerQuest({
                 const y = giverPos?.y ?? 0;
                 const playerId = Number(ctx.bind.player || 0) | 0;
                 if (playerId > 0) {
+                  for (const rewardItemId of REWARD_ITEM_IDS) {
+                    const rewardId = createItemById(ctx.world, rewardItemId);
+                    if (rewardId > 0) addToInventory(ctx.world, playerId, rewardId);
+                  }
                   const goldId = createItemById(ctx.world, "gold", { count: REWARD_GOLD });
                   if (goldId > 0) addToInventory(ctx.world, playerId, goldId);
                 }
@@ -234,6 +246,7 @@ export const RatInfestationQuest = registerQuest({
                 giverId: ctx.bind.giver,
                 title: "Rat Infestation",
                 rewardGold: REWARD_GOLD,
+                rewardItemIds: REWARD_ITEM_IDS,
                 at: (() => {
                   const p = ctx.world.get(Number(ctx.bind.player || 0) | 0, Position);
                   return p ? { x: Number(p.x) | 0, y: Number(p.y) | 0 } : null;

@@ -50,6 +50,7 @@ import { Traits } from "../../rules/components/Traits.js";
 import { getQuestDef } from "../../rules/quests/registry.js";
 import { buildPalette } from "../../display/palette/index.js";
 import { getItemHooksByIdentity } from "../../rules/content/items/itemHooks.js";
+import { questRewardDetailText } from "./questRewards.js";
 
 const TRAIT_DISPLAY = Object.freeze({
   iron_stomach:  { label: "Iron Stomach",  description: "Halves sickness chance from spoiled food." },
@@ -92,22 +93,7 @@ function questJournalFlavorText(questDef, vars, questId) {
 }
 
 function questJournalRewardText(questDef, vars, questId) {
-  const parts = [];
-  const rewardGold = Math.max(0, Number(vars?.rewardGold || 0) | 0);
-  if (rewardGold > 0) parts.push(`${rewardGold} gold`);
-  const rewardItems = Array.isArray(questDef?.journal?.rewardItems)
-    ? questDef.journal.rewardItems
-    : [];
-  for (const item of rewardItems) {
-    const label = String(item?.label || "").trim();
-    if (!label) continue;
-    const count = Math.max(1, Number(item?.count || 1) | 0);
-    parts.push(count > 1 ? `${count}x ${label}` : label);
-  }
-  const explicit = String(vars?.rewardText || questDef?.journal?.rewardText || "").trim();
-  if (parts.length <= 0 && explicit) return explicit;
-  if (parts.length > 0) return parts.join(" and ");
-  return "No reward recorded.";
+  return questRewardDetailText(questDef, vars);
 }
 
 function questJournalCompletionText(state, vars) {

@@ -1409,6 +1409,19 @@ export function initHUD() {
       textOverflow: 'ellipsis',
     });
 
+    const reward = document.createElement('div');
+    const rewardText = String(focused?.rewardPreview || '').trim();
+    reward.textContent = rewardText ? `Reward: ${rewardText}` : '';
+    Object.assign(reward.style, {
+      display: rewardText ? 'block' : 'none',
+      fontSize: '10px',
+      lineHeight: '1.1',
+      color: 'rgba(255,216,90,0.82)',
+      whiteSpace: 'nowrap',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+    });
+
     const progress = document.createElement('div');
     const current = Math.max(0, Number(focused?.progress || 0) | 0);
     const target = Math.max(0, Number(focused?.target || 0) | 0);
@@ -1424,6 +1437,7 @@ export function initHUD() {
 
     textWrap.appendChild(title);
     textWrap.appendChild(summary);
+    textWrap.appendChild(reward);
     card.appendChild(icon);
     card.appendChild(textWrap);
     card.appendChild(progress);

@@ -33,6 +33,7 @@ import { QuestVars } from "../../rules/components/QuestVars.js";
 import { getQuestDef } from "../../rules/quests/registry.js";
 import { STARTER_RAT_QUEST_ID } from "../../rules/quests/runtime.js";
 import { REQUIRED_RAT_KILLS } from "../../rules/quests/definitions/ratInfestation.js";
+import { questRewardPreviewText } from "./questRewards.js";
 
 /**
  * Provides HUD feed updaters that cache the last dispatched values.
@@ -156,6 +157,8 @@ export function createHudFeeds(world, deps) {
     }
     if (!summary && node === "report") summary = "Turn it in";
 
+    const rewardPreview = questRewardPreviewText(questDef, data);
+
     let icon = "✦";
     if (questId === STARTER_RAT_QUEST_ID) icon = "🐀";
     else if (questId === "starter.priest_fetch") icon = "📕";
@@ -168,6 +171,7 @@ export function createHudFeeds(world, deps) {
       progress,
       target,
       summary,
+      rewardPreview,
       icon,
       sortKey: Number(state?.t0 || 0),
       priority: (
@@ -208,6 +212,7 @@ export function createHudFeeds(world, deps) {
         progress: focused.progress,
         target: focused.target,
         summary: focused.summary,
+        rewardPreview: focused.rewardPreview,
       } : null,
     });
     if (sig === lastQuestTrackerSig) return;
@@ -222,6 +227,7 @@ export function createHudFeeds(world, deps) {
             progress: focused.progress,
             target: focused.target,
             summary: focused.summary,
+            rewardPreview: focused.rewardPreview,
             icon: focused.icon,
           } : null,
         },

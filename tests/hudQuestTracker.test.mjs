@@ -1,4 +1,5 @@
 import { assert, assertEquals } from "jsr:@std/assert";
+import "./helpers/installContentCatalog.mjs";
 import { World } from "../src/lib/ecs-js/index.js";
 import { createHudFeeds } from "../src/main/ui/hudFeeds.js";
 import { Player } from "../src/rules/components/Player.js";
@@ -88,6 +89,8 @@ Deno.test("hud quest tracker prioritizes accepted measurable progress quests", (
     assertEquals(detail.focused.target, 5);
     assertEquals(detail.focused.icon, "🐀");
     assertEquals(detail.focused.summary, "Clear the tavern cellar");
+    assert(String(detail.focused.rewardPreview || "").includes("Mirror Bow"));
+    assert(String(detail.focused.rewardPreview || "").includes("wall-side impacts"));
     assertEquals("moreCount" in detail, false);
   } finally {
     restoreWindow();

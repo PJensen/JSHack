@@ -114,9 +114,7 @@ Suggested fields:
 
 ```js
 {
-  rewardPreview: "Glacier Sigil - frost spells can root struck enemies.",
-  rewardItemId: "glacier_sigil",
-  rewardItemLabel: "Glacier Sigil",
+  rewardItemIds: ["bow_mirror"],
   rewardServiceUnlock: "",
   rewardChoice: [],
   rewardGold: 0,
@@ -124,26 +122,21 @@ Suggested fields:
 }
 ```
 
+Reward display text should be derived from the item catalog at render time. Do not duplicate item names or descriptions in quest definitions.
+
 For reward choices:
 
 ```js
 {
-  rewardPreview: "Choose one: Glacier Sigil, Mirror Bow, or Fishing Rod.",
   rewardChoice: [
     {
       itemId: "glacier_sigil",
-      label: "Glacier Sigil",
-      summary: "Frost spells can root struck enemies.",
     },
     {
       itemId: "bow_mirror",
-      label: "Mirror Bow",
-      summary: "Wall-side arrow impacts ricochet into nearby hostiles.",
     },
     {
       itemId: "fishing_rod",
-      label: "Fishing Rod",
-      summary: "Cast near water to channel a catch.",
     },
   ],
 }
@@ -168,9 +161,9 @@ Proposed payoff:
 
 Candidate reward options:
 
-- `glacier_sigil`: teaches the player that offhand gear can modify spells and make frost more tactical.
 - `bow_mirror`: extends the bow/arrows acceptance beat into a real ranged build hook.
 - `fishing_rod`: opens a town/overworld activity and hidden loot economy.
+- `glacier_sigil`: strong later/class-aware reward, but only useful once the player knows Frost.
 
 Possible presentation:
 
@@ -181,7 +174,7 @@ Reward: choose one tavern prize - Glacier Sigil, Mirror Bow, or Fishing Rod.
 If a choice UI is too large for the first slice, start with a fixed reward:
 
 ```text
-Reward: Glacier Sigil - frost spells can root struck enemies.
+Reward: Mirror Bow - wall-side arrow impacts ricochet into nearby hostiles.
 ```
 
 ### The Book Below
@@ -375,12 +368,12 @@ Actions:
 
 Suggested first fixed reward:
 
-- `glacier_sigil`
+- `bow_mirror`
 
 Reason:
 
-- It is unusual, powerful, and build-shaping.
-- It teaches that offhand gear can change spell behavior.
+- It is useful immediately because the barkeep already gives a bow and arrows on acceptance.
+- It turns the starter quest's ranged tutorial beat into a real build hook.
 - It is not merely a stat stick.
 
 ### Phase 3: Priest Quest Service Unlock
@@ -438,7 +431,7 @@ Add regression tests around player-facing reward promises.
 
 Required tests:
 
-- Major active quests expose `rewardPreview` or equivalent reward text.
+- Major active quests expose `rewardItemIds`, `rewardChoice`, `rewardServiceUnlock`, or equivalent structured reward data.
 - Quest journal includes the promised reward.
 - HUD tracker receives the promised reward.
 - Completion grants the promised item/service/unlock.
@@ -460,14 +453,14 @@ The fastest slice that would prove the new direction:
 1. Rat Infestation reward preview:
 
 ```text
-Reward: Glacier Sigil - frost spells can root struck enemies.
+Reward: Mirror Bow - wall-side arrow impacts ricochet into nearby hostiles.
 ```
 
 2. Tracker shows the reward while the quest is active.
 
 3. Journal shows the full reward.
 
-4. Turn-in grants `glacier_sigil`, plus small gold/stew if desired.
+4. Turn-in grants `bow_mirror`, plus small gold/stew if desired.
 
 5. Barkeep or smith has a post-completion line acknowledging the reward.
 

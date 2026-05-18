@@ -1,4 +1,5 @@
 import { assert, assertEquals } from "jsr:@std/assert";
+import "./helpers/installContentCatalog.mjs";
 import { World } from "../src/lib/ecs-js/index.js";
 import { installInventoryDataProvider } from "../src/main/ui/inventoryDataProvider.js";
 import { Player } from "../src/rules/components/Player.js";
@@ -30,6 +31,7 @@ Deno.test("quest journal payload includes flavor, reward, and completion details
         { text: "Kill 5 rats.", done: false },
         { text: "Report back to the barkeep.", done: false },
       ],
+      rewardItemIds: ["bow_mirror"],
       rewardGold: 75,
     },
   });
@@ -56,7 +58,10 @@ Deno.test("quest journal payload includes flavor, reward, and completion details
   assertEquals(quests.length, 1);
   assertEquals(String(quests[0]?.summary || ""), "Clear the tavern cellar of rats.");
   assert(String(quests[0]?.flavorText || "").includes("barkeep"), "flavor text should be journal-ready");
-  assertEquals(String(quests[0]?.rewardText || ""), "75 gold and a hot stew from the barkeep");
+  assertEquals(
+    String(quests[0]?.rewardText || ""),
+    "Mirror Bow - A polished bow that throws wall-side impacts into nearby hostiles. and 75 gold and a hot stew from the barkeep",
+  );
   assertEquals(String(quests[0]?.completionText || ""), "Clear the tavern cellar of rats.");
   assertEquals(Number(quests[0]?.progress || 0), 3);
   assertEquals(Number(quests[0]?.target || 0), 5);

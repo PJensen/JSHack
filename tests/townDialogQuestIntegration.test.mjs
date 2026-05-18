@@ -138,3 +138,45 @@ Deno.test("barkeep rat quest acceptance drops starter bow + arrows and announces
   assertEquals(dropped.some((it) => it.identity === "ammo_arrows" && it.count >= 20), true);
   assertEquals(chatter.some((evt) => String(evt?.text || "").includes("there are bats down there too")), true);
 });
+
+Deno.test("barkeep rat quest turn-in grants promised Mirror Bow reward", () => {
+  const world = new World({ seed: 93 });
+  world.setScheduler(composeScheduler("scripts"));
+  installDialogRuntime(world);
+  installQuestRuntime(world);
+
+  const player = world.create();
+  world.add(player, Player);
+  world.add(player, Inventory, { capacity: 12 });
+
+  const barkeep = world.create();
+  world.add(barkeep, NamedIdentity, { name: "Barkeep", identity: "townfolk_barkeep" });
+  world.add(barkeep, Position, { x: 12, y: 7 });
+
+  instantiateQuest(world, RAT_INFESTATION_QUEST_ID, {
+    player,
+    giver: barkeep,
+    target: barkeep,
+  }, {
+    accepted: true,
+    killCount: 5,
+    reported: false,
+  }, { node: "report" });
+  world.tick(0);
+
+  const opened = [];
+  const completed = [];
+  world.on("dialog:opened", (payload) => opened.push(payload));
+  world.on("quest:completed", (payload) => completed.push(payload));
+
+  world.emit("dialog:openRequest", { actorId: player, targetId: barkeep, dialogId: "townfolk:barkeep" });
+  assert(opened.length > 0, "barkeep dialog should open");
+  assertEquals(opened.at(-1).choices.some((choice) => choice.id === "turn_in_rats"), true);
+  const sessionId = opened.at(-1).sessionId;
+  world.emit("dialog:choose", { sessionId, choiceId: "turn_in_rats" });
+  world.tick(0);
+
+  assert(inventoryHasIdentity(world, player, "bow_mirror", 1), "turn-in should grant the promised Mirror Bow");
+  assert(inventoryHasIdentity(world, player, "gold", 75), "turn-in should still grant secondary gold");
+  assertEquals(completed.at(-1)?.rewardItemIds, ["bow_mirror"]);
+});
