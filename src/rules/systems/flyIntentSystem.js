@@ -4,6 +4,7 @@ import { Position } from "../components/Position.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { getMonster } from "../data/monsters.js";
 import { emitSafe } from "../utils/emitSafe.js";
+import { sleepPreventsMovement } from "../utils/sleep.js";
 
 /**
  * Resolve FlyIntent as a full action: taking off or landing consumes the turn.
@@ -11,6 +12,11 @@ import { emitSafe } from "../utils/emitSafe.js";
  */
 export function flyIntentSystem(world) {
   for (const [id, intent] of world.query(FlyIntent)) {
+    if (sleepPreventsMovement(world, id)) {
+      try { world.remove(id, FlyIntent); } catch {}
+      continue;
+    }
+
     const airborne = !!intent?.airborne;
     const isFlying = world.has(id, Flying);
     const pos = world.get(id, Position);

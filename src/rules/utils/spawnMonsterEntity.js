@@ -6,11 +6,11 @@ import { Inventory } from "../components/Inventory.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { Mana } from "../components/Mana.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
-import { SleepState } from "../components/SleepState.js";
 import { ScriptState } from "../components/ScriptState.js";
 import { getCatalogItem } from "../data/itemCatalog.js";
 import { getMonster } from "../data/monsters.js";
 import { resolveSleepProfile, resolveSleepScheduleNow } from "../data/sleepProfiles.js";
+import { putActorToSleep } from "./sleep.js";
 import { addToInventory } from "./inventoryFacade.js";
 import { createItemById } from "./itemFactory.js";
 
@@ -174,14 +174,13 @@ function applyAuthoredSleep(world, entityId, params, def) {
   if (resolved.chance <= 0) return;
   if (resolved.chance < 1 && world.rand() >= resolved.chance) return;
 
-  try {
-    world.add(entityId, SleepState, {
-      asleep: true,
-      wakeDifficulty: resolved.wakeDifficulty,
-      wakeRadius: resolved.wakeRadius,
-      wakeOnDamage: resolved.wakeOnDamage,
-    });
-  } catch {}
+  putActorToSleep(world, entityId, {
+    reason: "spawn",
+    wakeDifficulty: resolved.wakeDifficulty,
+    wakeRadius: resolved.wakeRadius,
+    wakeOnDamage: resolved.wakeOnDamage,
+    suppressEvent: true,
+  });
 }
 
 /**

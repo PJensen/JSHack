@@ -3,6 +3,7 @@ import { World } from "../src/lib/ecs-js/index.js";
 import { attach } from "../src/lib/ecs-js/hierarchy.js";
 import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
 import { Duration } from "../src/rules/components/Duration.js";
+import { SleepState } from "../src/rules/components/SleepState.js";
 import { Status } from "../src/rules/components/Status.js";
 import { StatusEffectNode } from "../src/rules/components/StatusEffectNode.js";
 import { TimedEffectNode } from "../src/rules/components/TimedEffectNode.js";
@@ -15,6 +16,40 @@ import {
   snapshotStatusState,
   statusStrength,
 } from "../src/rules/utils/statusFacade.js";
+
+Deno.test("status facade: SleepState projects canonical sleep status with aliases", () => {
+  const world = new World({ seed: 0x51EE9 });
+  const actor = world.create();
+  world.add(actor, SleepState, { asleep: true, wakeDifficulty: 8, wakeRadius: 2, wakeOnDamage: true });
+
+  assertEquals(hasStatus(world, actor, "sleep"), true);
+  assertEquals(statusStrength(world, actor, "sleep"), 1);
+  assertEquals(statusStrength(world, actor, "asleep"), 1);
+  assertEquals(statusStrength(world, actor, "sleeping"), 1);
+
+  const snap = snapshotStatusState(world, actor);
+  assert(snap, "snapshot should exist");
+  assertEquals(snap.statuses.some((s) => s.type === "sleep"), false);
+  assertEquals(snap.allStatuses.some((s) => s.type === "sleep"), true);
+});
+
+Deno.test("status facade: sleep aliases from legacy rows resolve to canonical sleep", () => {
+  const world = new World({ seed: 0xA11A5 });
+  const fromStatus = world.create();
+  const fromEffect = world.create();
+
+  world.add(fromStatus, Status, {
+    statuses: [{ type: "asleep", duration: 2, potency: 1, stacks: 1 }],
+  });
+  world.add(fromEffect, ActiveEffects, {
+    effects: [{ key: "sleeping", turnsLeft: 2, potency: 1, stacks: 1 }],
+  });
+
+  assertEquals(hasStatus(world, fromStatus, "sleep"), true);
+  assertEquals(hasStatus(world, fromEffect, "sleep"), true);
+  assertEquals(statusStrength(world, fromStatus, "asleep"), 1);
+  assertEquals(statusStrength(world, fromEffect, "sleeping"), 1);
+});
 
 Deno.test("status facade: derives semantic statuses from active effects", () => {
   const world = new World({ seed: 6101 });

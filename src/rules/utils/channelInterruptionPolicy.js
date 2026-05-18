@@ -1,5 +1,6 @@
 import { statusStrength } from "./statusFacade.js";
 import { Vitality } from "../components/Vitality.js";
+import { sleepPreventsAction } from "./sleep.js";
 
 /**
  * Canonical channel/cast interruption policy.
@@ -41,10 +42,7 @@ export const CHANNEL_INTERRUPTION_RULES = Object.freeze([
   Object.freeze({
     reason: "asleep",
     detail: "Sleep is a hard interrupt and blocks channel/cast start.",
-    when: (world, actorId) => (
-      statusStrength(world, actorId, "asleep") > 0
-      || statusStrength(world, actorId, "sleep") > 0
-    ),
+    when: (world, actorId) => sleepPreventsAction(world, actorId),
   }),
 ]);
 

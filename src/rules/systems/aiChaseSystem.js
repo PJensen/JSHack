@@ -54,6 +54,7 @@ import { playerEntity }      from "../utils/queries.js";
 import { findNextCardinalStep } from "../utils/gridPathfind.js";
 import { forEachInRadius }   from "../utils/spatialIndex.js";
 import { statusStrength }    from "../utils/statusFacade.js";
+import { sleepPreventsPerception } from "../utils/sleep.js";
 import { canActThisTurn as speedGateCheck } from "../utils/speedGate.js";
 import { hasLOS }            from "../../shared/math/gridLOS.js";
 import { buildBlocksVisionMap, blockedCallback } from "../utils/vision.js";
@@ -373,6 +374,7 @@ export function installAggroFromStealthOffenseListener(world) {
       if (!fac || fac.key !== "enemy") return;
       const aggro = world.get(id, AggroState);
       if (!aggro) return;
+      if (sleepPreventsPerception(world, id)) return;
 
       const sightRange = Math.max(0, Math.trunc(getEffectiveVisionRange(world, id)));
       if (chebyshevScalar(pos.x, pos.y, attackerPos.x, attackerPos.y) > sightRange) return;
@@ -426,6 +428,7 @@ export function aiChaseSystem(world) {
 
     const aggro = world.get(id, AggroState);
     if (!aggro) return; // no AggroState = no AI behaviour
+    if (sleepPreventsPerception(world, id)) return;
 
     // ── Look up monster def and brain-backed awareness ──────────────
     const ni = world.get(id, NamedIdentity);
@@ -483,6 +486,7 @@ export function aiChaseSystem(world) {
           forEachInRadius(world, pos.x, pos.y, packRadius, (neighborId) => {
             if (hasAlly) return;
             if (neighborId === id) return;
+            if (sleepPreventsPerception(world, neighborId)) return;
             const neighborNI = world.get(neighborId, NamedIdentity);
             if (neighborNI && neighborNI.identity === myIdentity) hasAlly = true;
           });
@@ -533,6 +537,7 @@ export function aiChaseSystem(world) {
             const packRadius = Math.max(1, (def.packRadius ?? 8) | 0);
             forEachInRadius(world, pos.x, pos.y, packRadius, (neighborId) => {
               if (neighborId === id) return;
+              if (sleepPreventsPerception(world, neighborId)) return;
               const neighborNI = world.get(neighborId, NamedIdentity);
               if (!neighborNI || neighborNI.identity !== myIdentity) return;
               const neighborAggro = world.get(neighborId, AggroState);

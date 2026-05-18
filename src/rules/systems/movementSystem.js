@@ -23,6 +23,7 @@ import { Flying } from "../components/Flying.js";
 import { getTileQuerySnapshot, forEachItemAt } from "../utils/tileQueryCache.js";
 import { combatSeed, mulberry32 } from "../utils/rng.js";
 import { statusStrength } from "../utils/statusFacade.js";
+import { sleepPreventsMovement } from "../utils/sleep.js";
 import { addToInventory, hasCapacityForItem } from "../utils/inventoryFacade.js";
 import { resolveBump } from "../data/bumpResolvers.js";
 import { CentipedeSegment } from "../components/CentipedeSegment.js";
@@ -148,6 +149,7 @@ export function movementSystem(world) {
       // the entity's position between the flush and the cleanup.
       const vit = world.get(actor, Vitality);
       if (vit && (vit.hp | 0) <= 0) { world.remove(actor, MoveIntent); continue; }
+      if (sleepPreventsMovement(world, actor)) { world.remove(actor, MoveIntent); continue; }
       if (statusStrength(world, actor, "stunned") > 0 || statusStrength(world, actor, "rooted") > 0) { world.remove(actor, MoveIntent); continue; }
 
       const intendedDx = intent.dx | 0;

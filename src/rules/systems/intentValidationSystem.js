@@ -29,7 +29,7 @@ import { SearchIntent } from "../components/Intents/SearchIntent.js";
 import { SetPostureIntent } from "../components/Intents/SetPostureIntent.js";
 import { Channeling } from "../components/Channeling.js";
 import { statusStrength } from "../utils/statusFacade.js";
-import { isAsleep } from "../utils/sleep.js";
+import { sleepPreventsAction } from "../utils/sleep.js";
 
 /** All intent components that should be stripped when an actor cannot act. */
 const ALL_INTENTS = [
@@ -93,8 +93,8 @@ export function intentValidationSystem(world) {
       continue;
     }
 
-    // Sleeping actors cannot act until a wake event clears SleepState.asleep.
-    if (isAsleep(world, id)) {
+    // Sleeping actors cannot act until a wake event clears the sleep status.
+    if (sleepPreventsAction(world, id)) {
       const blocked = stripAllIntents(world, id);
       if (blocked) {
         try {

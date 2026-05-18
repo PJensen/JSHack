@@ -11,7 +11,8 @@ import { Brain } from '../src/rules/components/Brain.js';
 import { Vitality } from '../src/rules/components/Vitality.js';
 import { Flying } from '../src/rules/components/Flying.js';
 import { DungeonState } from '../src/rules/components/DungeonState.js';
-import { aiChaseSystem } from '../src/rules/systems/aiChaseSystem.js';
+import { aiChaseSystem, installAggroFromStealthOffenseListener } from '../src/rules/systems/aiChaseSystem.js';
+import { putActorToSleep } from '../src/rules/utils/sleep.js';
 import { clearAll, isWalkable, loadChunk, setTile } from "../src/rules/environment/dungeon/tileMap.js";
 import { CHUNK_SIZE, TILE_FLOOR, TILE_WALL } from "../src/rules/environment/dungeon/constants.js";
 
@@ -757,6 +758,120 @@ Deno.test("spider onSeen self-throw is cooldown-gated for 3 turns", () => {
     world.step = 4;
     aiChaseSystem(world);
     assertEquals(thrown.length, 2, "spider should jump again after cooldown window");
+  } finally {
+    clearAll();
+  }
+});
+
+Deno.test("sleeping enemy does not acquire LOS aggro or chase movement", () => {
+  clearAll();
+  loadChunk(0, 0, new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR));
+  try {
+    const world = new World({ seed: 0x51EE9 });
+
+    const player = world.create();
+    world.add(player, Player);
+    world.add(player, Position, { x: 5, y: 5 });
+    world.add(player, NamedIdentity, { name: "Hero", identity: "player" });
+
+    const enemy = world.create();
+    world.add(enemy, Position, { x: 8, y: 5 });
+    world.add(enemy, NamedIdentity, { name: "Warlock", identity: "warlock" });
+    world.add(enemy, Faction, { key: "enemy" });
+    world.add(enemy, AggroState, {
+      alertLevel: AGGRO_LEVELS.unaware,
+      lastKnownX: 0,
+      lastKnownY: 0,
+      searchTurnsLeft: 0,
+      retreating: false,
+    });
+    putActorToSleep(world, enemy, { suppressEvent: true });
+
+    aiChaseSystem(world);
+
+    const aggro = world.get(enemy, AggroState);
+    assertEquals(aggro.alertLevel, AGGRO_LEVELS.unaware);
+    assertEquals(world.has(enemy, MoveIntent), false);
+  } finally {
+    clearAll();
+  }
+});
+
+Deno.test("sleeping witnesses ignore stealth offense", () => {
+  clearAll();
+  loadChunk(0, 0, new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR));
+  try {
+    const world = new World({ seed: 0x57EA17 });
+    installAggroFromStealthOffenseListener(world);
+
+    const attacker = world.create();
+    world.add(attacker, Player);
+    world.add(attacker, Position, { x: 5, y: 5 });
+
+    const witness = world.create();
+    world.add(witness, Position, { x: 6, y: 5 });
+    world.add(witness, NamedIdentity, { name: "Goblin", identity: "goblin" });
+    world.add(witness, Faction, { key: "enemy" });
+    world.add(witness, AggroState, {
+      alertLevel: AGGRO_LEVELS.unaware,
+      lastKnownX: 0,
+      lastKnownY: 0,
+      searchTurnsLeft: 0,
+      retreating: false,
+    });
+    putActorToSleep(world, witness, { suppressEvent: true });
+
+    world.emit("stealth:offense", { entityId: attacker, at: { x: 5, y: 5 } });
+
+    const aggro = world.get(witness, AggroState);
+    assertEquals(aggro.alertLevel, AGGRO_LEVELS.unaware);
+    assertEquals(aggro.lastKnownX, 0);
+    assertEquals(aggro.lastKnownY, 0);
+  } finally {
+    clearAll();
+  }
+});
+
+Deno.test("pack alerting skips sleeping allies", () => {
+  clearAll();
+  loadChunk(0, 0, new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR));
+  try {
+    const world = new World({ seed: 0xA11E7 });
+
+    const player = world.create();
+    world.add(player, Player);
+    world.add(player, Position, { x: 5, y: 5 });
+    world.add(player, NamedIdentity, { name: "Hero", identity: "player" });
+
+    const scout = world.create();
+    world.add(scout, Position, { x: 8, y: 5 });
+    world.add(scout, NamedIdentity, { name: "Goblin", identity: "goblin" });
+    world.add(scout, Faction, { key: "enemy" });
+    world.add(scout, AggroState, {
+      alertLevel: AGGRO_LEVELS.unaware,
+      lastKnownX: 0,
+      lastKnownY: 0,
+      searchTurnsLeft: 0,
+      retreating: false,
+    });
+
+    const ally = world.create();
+    world.add(ally, Position, { x: 9, y: 5 });
+    world.add(ally, NamedIdentity, { name: "Goblin", identity: "goblin" });
+    world.add(ally, Faction, { key: "enemy" });
+    world.add(ally, AggroState, {
+      alertLevel: AGGRO_LEVELS.unaware,
+      lastKnownX: 0,
+      lastKnownY: 0,
+      searchTurnsLeft: 0,
+      retreating: false,
+    });
+    putActorToSleep(world, ally, { suppressEvent: true });
+
+    aiChaseSystem(world);
+
+    assertEquals(world.get(scout, AggroState).alertLevel, AGGRO_LEVELS.unaware);
+    assertEquals(world.get(ally, AggroState).alertLevel, AGGRO_LEVELS.unaware);
   } finally {
     clearAll();
   }

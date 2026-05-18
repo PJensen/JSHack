@@ -1,10 +1,9 @@
 import { AggroState, AGGRO_LEVELS } from "../components/AggroState.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
-import { SleepState } from "../components/SleepState.js";
 import { Vitality } from "../components/Vitality.js";
 import { getMonster } from "../data/monsters.js";
 import { resolveSleepProfile, resolveSleepScheduleNow } from "../data/sleepProfiles.js";
-import { isAsleep, tryWakeActor } from "../utils/sleep.js";
+import { isAsleep, putActorToSleep, tryWakeActor } from "../utils/sleep.js";
 
 function isSafeToFallAsleep(world, id) {
   const aggro = world.get(id, AggroState);
@@ -42,14 +41,11 @@ export function sleepScheduleSystem(world) {
 
     const resolved = resolveSleepProfile(def.sleep);
     if (!resolved) continue;
-    const nextSleep = {
-      asleep: true,
+    putActorToSleep(world, id, {
+      reason: "scheduled_rest",
       wakeDifficulty: resolved.wakeDifficulty,
       wakeRadius: resolved.wakeRadius,
       wakeOnDamage: resolved.wakeOnDamage,
-    };
-    if (world.has(id, SleepState)) world.set(id, SleepState, nextSleep);
-    else world.add(id, SleepState, nextSleep);
-    world.emit?.("sleep:slept", { actor: id, reason: "scheduled_rest" });
+    });
   }
 }

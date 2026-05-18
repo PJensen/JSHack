@@ -2,6 +2,7 @@ import { ActiveEffects } from "../components/ActiveEffects.js";
 import { Beatitude } from "../components/Beatitude.js";
 import { Duration } from "../components/Duration.js";
 import { Equipment, NON_AMMO_GEAR_SLOTS } from "../components/Equipment.js";
+import { SleepState } from "../components/SleepState.js";
 import { Status } from "../components/Status.js";
 import { StatusEffectNode } from "../components/StatusEffectNode.js";
 import { TimedEffectNode } from "../components/TimedEffectNode.js";
@@ -10,6 +11,16 @@ import { descendantsWith } from "./topology.js";
 
 function normalizeKey(value) {
   return String(value || "").trim().toLowerCase();
+}
+
+export const STATUS_ALIASES = Object.freeze(new Map([
+  ["asleep", "sleep"],
+  ["sleeping", "sleep"],
+]));
+
+export function canonicalStatusType(value) {
+  const key = normalizeKey(value);
+  return STATUS_ALIASES.get(key) || key;
 }
 
 function hasPositiveDuration(duration) {
@@ -139,7 +150,7 @@ export function snapshotStatusState(world, entityId) {
     const statuses = EFFECT_KEY_TO_STATUSES.get(key);
     if (!Array.isArray(statuses) || statuses.length <= 0) continue;
     for (let s = 0; s < statuses.length; s++) {
-      const statusType = statuses[s];
+      const statusType = canonicalStatusType(statuses[s]);
       projectedStatusStrengths.set(statusType, (projectedStatusStrengths.get(statusType) || 0) + strength);
     }
   }
@@ -150,7 +161,7 @@ export function snapshotStatusState(world, entityId) {
   if (stat && Array.isArray(stat.statuses)) {
     for (let i = 0; i < stat.statuses.length; i++) {
       const s = stat.statuses[i];
-      const type = normalizeKey(s?.type);
+      const type = canonicalStatusType(s?.type);
       if (!type) continue;
       if (!hasPositiveDuration(s?.duration)) continue;
       // ActiveEffects is canonical for projected statuses.
@@ -176,6 +187,11 @@ export function snapshotStatusState(world, entityId) {
         statusStrengths.set('cursed', (statusStrengths.get('cursed') || 0) + cursedCount);
       }
     }
+  }
+
+  const sleep = world.get(id, SleepState);
+  if (sleep?.asleep === true) {
+    statusStrengths.set("sleep", Math.max(1, Number(statusStrengths.get("sleep") || 0)));
   }
 
   const effectRows = Array.from(effectStrengths.entries())
@@ -229,7 +245,7 @@ export function hasEffect(world, entityId, effectKey) {
  * @param {string} statusType
  */
 export function statusStrength(world, entityId, statusType) {
-  const key = normalizeKey(statusType);
+  const key = canonicalStatusType(statusType);
   if (!key) return 0;
   const snap = snapshotStatusState(world, entityId);
   if (!snap) return 0;
@@ -290,7 +306,7 @@ export function createStatusFacade(world, anchors = {}) {
    * @param {string} key
    */
   function readStatusStrength(entityId, key) {
-    const normalized = normalizeKey(key);
+    const normalized = canonicalStatusType(key);
     if (!normalized) return 0;
     const snap = snapshot(entityId);
     if (!snap) return 0;

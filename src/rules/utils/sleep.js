@@ -1,6 +1,9 @@
 import { SleepState } from "../components/SleepState.js";
+import { statusStrength } from "./statusFacade.js";
 
 const INSTALLED = Symbol.for("jshack:sleep:wakeListeners:installed");
+export const SLEEP_STATUS = "sleep";
+export const SLEEP_DISPLAY_TAG = "sleeping";
 
 /**
  * @param {import("../../lib/ecs-js/index.js").World} world
@@ -8,8 +11,56 @@ const INSTALLED = Symbol.for("jshack:sleep:wakeListeners:installed");
  * @returns {boolean}
  */
 export function isAsleep(world, id) {
-  const sleep = world.get(Number(id || 0) | 0, SleepState);
-  return !!sleep && sleep.asleep === true;
+  return statusStrength(world, Number(id || 0) | 0, SLEEP_STATUS) > 0;
+}
+
+export function sleepPreventsAction(world, id) {
+  return isAsleep(world, id);
+}
+
+export function sleepPreventsMovement(world, id) {
+  return isAsleep(world, id);
+}
+
+export function sleepPreventsPerception(world, id) {
+  return isAsleep(world, id);
+}
+
+/**
+ * Canonical sleep transition. Returns true only when this call changes state
+ * from awake to asleep. Existing SleepState data may still be refreshed.
+ *
+ * @param {import("../../lib/ecs-js/index.js").World} world
+ * @param {number} id
+ * @param {{ reason?: string, wakeDifficulty?: number, wakeRadius?: number, wakeOnDamage?: boolean, source?: number, suppressEvent?: boolean }} [opts]
+ * @returns {boolean}
+ */
+export function putActorToSleep(world, id, opts = {}) {
+  const actorId = Number(id || 0) | 0;
+  if (!(actorId > 0)) return false;
+  if (typeof world?.isAlive === "function" && !world.isAlive(actorId)) return false;
+
+  const prev = world.get(actorId, SleepState);
+  const wasAsleep = prev?.asleep === true;
+  const next = {
+    ...(prev || {}),
+    asleep: true,
+    wakeDifficulty: Math.max(0, Number(opts.wakeDifficulty ?? prev?.wakeDifficulty ?? 8) || 0),
+    wakeRadius: Math.max(0, Number(opts.wakeRadius ?? prev?.wakeRadius ?? 2) || 0),
+    wakeOnDamage: opts.wakeOnDamage ?? prev?.wakeOnDamage ?? true,
+  };
+
+  if (world.has(actorId, SleepState)) world.set(actorId, SleepState, next);
+  else world.add(actorId, SleepState, next);
+
+  if (!wasAsleep && opts.suppressEvent !== true) {
+    world.emit?.("sleep:slept", {
+      actor: actorId,
+      reason: String(opts.reason || "sleep"),
+      source: Number(opts.source || 0) | 0,
+    });
+  }
+  return !wasAsleep;
 }
 
 /**
@@ -29,7 +80,7 @@ export function tryWakeActor(world, id, opts = {}) {
   const reason = String(opts.reason || "disturbance");
   const intensity = Number.isFinite(opts.intensity) ? Number(opts.intensity) : 0;
   const difficulty = Math.max(0, Number(sleep.wakeDifficulty || 0));
-  if (reason !== "damage" && difficulty > 0 && intensity > 0 && intensity < difficulty) {
+  if (reason !== "damage" && difficulty > 0 && intensity < difficulty) {
     return false;
   }
 

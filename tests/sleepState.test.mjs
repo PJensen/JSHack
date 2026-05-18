@@ -7,18 +7,22 @@ import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { Vitality } from "../src/rules/components/Vitality.js";
 import { BaseStats } from "../src/rules/components/BaseStats.js";
 import { Facing } from "../src/rules/components/Facing.js";
+import { Flying } from "../src/rules/components/Flying.js";
 import { SleepState } from "../src/rules/components/SleepState.js";
 import { AggroState, AGGRO_LEVELS } from "../src/rules/components/AggroState.js";
 import { MoveIntent } from "../src/rules/components/Intents/MoveIntent.js";
+import { FlyIntent } from "../src/rules/components/Intents/FlyIntent.js";
 import { AttackIntent } from "../src/rules/components/Intents/AttackIntent.js";
 import { SearchIntent } from "../src/rules/components/Intents/SearchIntent.js";
 import { intentValidationSystem } from "../src/rules/systems/intentValidationSystem.js";
+import { movementSystem } from "../src/rules/systems/movementSystem.js";
+import { flyIntentSystem } from "../src/rules/systems/flyIntentSystem.js";
 import { clearAll, loadChunk } from "../src/rules/environment/dungeon/tileMap.js";
 import { clearExplored } from "../src/rules/environment/dungeon/exploredMap.js";
 import { clearPerceptionMemory } from "../src/rules/environment/dungeon/perceptionMemory.js";
 import { CHUNK_SIZE, TILE_FLOOR } from "../src/rules/environment/dungeon/constants.js";
 import { dealDamage } from "../src/rules/utils/dealDamage.js";
-import { installSleepWakeListeners, isAsleep, tryWakeActor } from "../src/rules/utils/sleep.js";
+import { installSleepWakeListeners, isAsleep, putActorToSleep, SLEEP_DISPLAY_TAG, tryWakeActor } from "../src/rules/utils/sleep.js";
 import { getMonster } from "../src/rules/data/monsters.js";
 import { listSleepProfileIds, resolveSleepProfile } from "../src/rules/data/sleepProfiles.js";
 import { toMonsterSpawnParams } from "../src/rules/utils/monsterSpawnParams.js";
@@ -61,6 +65,48 @@ Deno.test("SleepState blocks queued actor intents", () => {
   assert(!world.has(actor, AttackIntent), "sleeping actor should lose AttackIntent");
   assert(!world.has(actor, SearchIntent), "sleeping actor should lose SearchIntent");
   assertEquals(blocked?.reason, "asleep");
+});
+
+Deno.test("putActorToSleep emits only on awake to asleep transition", () => {
+  const world = new World({ seed: 0x51EED });
+  const actor = makeActor(world);
+  const events = [];
+  world.on("sleep:slept", (ev) => events.push(ev));
+
+  assertEquals(putActorToSleep(world, actor, { reason: "test", wakeDifficulty: 12 }), true);
+  assertEquals(isAsleep(world, actor), true);
+  assertEquals(events.length, 1);
+  assertEquals(events[0].reason, "test");
+
+  assertEquals(putActorToSleep(world, actor, { reason: "test_again", wakeDifficulty: 4 }), false);
+  assertEquals(events.length, 1);
+  assertEquals(world.get(actor, SleepState)?.wakeDifficulty, 4);
+});
+
+Deno.test("movementSystem rejects sleepers even when validation is bypassed", () => {
+  resetFloor();
+  const world = new World({ seed: 0x510 });
+  const actor = makeActor(world, 5, 5);
+  putActorToSleep(world, actor, { suppressEvent: true });
+  world.add(actor, MoveIntent, { dx: 1, dy: 0 });
+
+  movementSystem(world);
+
+  assertEquals(world.get(actor, Position)?.x, 5);
+  assertEquals(world.get(actor, Position)?.y, 5);
+  assertEquals(world.has(actor, MoveIntent), false);
+});
+
+Deno.test("flyIntentSystem rejects sleepers even when validation is bypassed", () => {
+  const world = new World({ seed: 0xF17 });
+  const actor = makeActor(world, 5, 5);
+  putActorToSleep(world, actor, { suppressEvent: true });
+  world.add(actor, FlyIntent, { airborne: true });
+
+  flyIntentSystem(world);
+
+  assertEquals(world.has(actor, FlyIntent), false);
+  assertEquals(world.has(actor, Flying), false);
 });
 
 Deno.test("damage wakes a sleeping actor through canonical listener", () => {
@@ -115,13 +161,13 @@ Deno.test("WorldView projects sleeping tag while SleepState is asleep", () => {
   let view = buildWorldView(world);
   let rec = view.entities.find((e) => e.id === sleeper);
   assert(rec, "visible sleeper should be projected");
-  assert(rec.tags.includes("sleeping"), "asleep entity should carry sleeping tag");
+  assert(rec.tags.includes(SLEEP_DISPLAY_TAG), "asleep entity should carry sleeping tag");
 
   world.set(sleeper, SleepState, { asleep: false, wakeDifficulty: 8, wakeRadius: 2, wakeOnDamage: true });
   view = buildWorldView(world);
   rec = view.entities.find((e) => e.id === sleeper);
   assert(rec, "awake entity should still be projected");
-  assert(!rec.tags.includes("sleeping"), "awake entity should not carry sleeping tag");
+  assert(!rec.tags.includes(SLEEP_DISPLAY_TAG), "awake entity should not carry sleeping tag");
 });
 
 Deno.test("sleep profiles expose activity-pattern vocabulary", () => {

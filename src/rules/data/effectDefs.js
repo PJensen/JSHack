@@ -134,6 +134,13 @@ export const EFFECT_DEFS = [
     description: "Silenced. Cannot cast spells.",
   },
   {
+    id: "sleep",
+    keys: ["sleep", "asleep", "sleeping"],
+    operation: "none",
+    statuses: ["sleep"],
+    description: "Asleep. Cannot act or perceive.",
+  },
+  {
     id: "mindwipe",
     keys: ["mindwipe", "mindwiped"],
     operation: "none",
