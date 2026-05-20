@@ -87,3 +87,21 @@ Deno.test("gem vendor stock is pre-identified and carries gem detail metadata", 
     }
   }
 });
+
+Deno.test("gem vendor stock surfaces multiple gemstone identities across seeds", () => {
+  const seen = new Set();
+  for (let seed = 1; seed <= 160; seed++) {
+    const world = new World({ seed });
+    const rng = createRng(seed * 97);
+    const items = generateGemShopStock(world, rng);
+    for (const itemId of items) {
+      const identity = String(world.get(itemId, NamedIdentity)?.identity || "");
+      if (!identity) continue;
+      if (identity.startsWith("glass_") || identity.startsWith("stone_")) {
+        throw new Error(`gem vendor stocked non-gemstone identity: ${identity}`);
+      }
+      if (identity.startsWith("gem_")) seen.add(identity);
+    }
+  }
+  assert(seen.size > 1, `expected multiple gemstone identities in gem vendor stock, got ${Array.from(seen).join(", ") || "none"}`);
+});

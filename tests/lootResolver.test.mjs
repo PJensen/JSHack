@@ -130,3 +130,21 @@ Deno.test("spell-proc offhands become eligible when matching spells are known", 
   assert(seen.has("conduction_lens"), "conduction_lens should become eligible when lightning is known");
   assert(seen.has("echo_grimoire"), "echo_grimoire should become eligible once any spell is known");
 });
+
+Deno.test("gemstone loot pool produces varied real gems", () => {
+  const seen = new Set();
+  for (let seed = 1; seed <= 1200; seed++) {
+    const rng = createRng(seed);
+    const drops = resolveLootTable("sarcophagus:contents", rng, 5);
+    for (const drop of drops) {
+      if (drop.kind !== "gem") continue;
+      const id = String(drop.params?.gemId || "");
+      if (id.startsWith("glass_") || id.startsWith("stone_")) {
+        throw new Error(`unexpected non-gemstone in gemstone pool: ${id}`);
+      }
+      seen.add(id);
+    }
+  }
+  assert(seen.size > 1, `expected varied gemstone identities, got ${Array.from(seen).join(", ") || "none"}`);
+  assert(!seen.has("gem_dilithium") || seen.size > 2, "gemstone pool should not collapse to dilithium-only");
+});

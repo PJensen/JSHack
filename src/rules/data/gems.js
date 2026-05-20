@@ -66,6 +66,18 @@ export function getGem(id) { return GEM_DEFS[id] || null; }
 export function listGems() { return Object.values(GEM_DEFS); }
 export function listGemIds() { return Object.keys(GEM_DEFS); }
 
+export function isRealGemstone(gem) {
+  return !!gem && typeof gem.id === "string" && gem.id.startsWith("gem_") && Number(gem.value) > 0;
+}
+
+function matchesGemMaterial(gem, materialTag) {
+  const tag = String(materialTag || "").toLowerCase();
+  if (!tag) return false;
+  if (tag === "gemstone") return isRealGemstone(gem);
+  if (tag === "glass") return String(gem.material || "").toLowerCase() === "glass";
+  return String(gem.material || "").toLowerCase() === tag;
+}
+
 const GEM_SOCKET_DETAIL_LINES = Object.freeze({
   gem_diamond: Object.freeze([
     "Socketed: +2 attack, +2 defense.",
@@ -174,7 +186,7 @@ export function buildGemItemParams(gemOrId, opts = {}) {
  */
 export function pickGem(rng, opts = {}) {
   let pool = Object.values(GEM_DEFS);
-  if (opts.materials) pool = pool.filter(g => opts.materials.includes(g.material));
+  if (opts.materials) pool = pool.filter(g => opts.materials.some((m) => matchesGemMaterial(g, m)));
   const total = pool.reduce((s, g) => s + g.prob, 0);
   let roll = rng.float(0, total);
   for (const gem of pool) {
