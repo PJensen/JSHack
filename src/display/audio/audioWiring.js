@@ -89,6 +89,10 @@ const _petVocalizationCooldowns = new Map();
 const MAX_HEAR_DIST = 16;
 const MIN_ZOOM_GAIN = 0.65;
 const MAX_ZOOM_GAIN = 1.35;
+const GEM_MIN_VALUE = 0;
+const GEM_MAX_VALUE = 5000;
+const GEM_MIN_DETUNE_CENTS = 0;
+const GEM_MAX_DETUNE_CENTS = 45;
 const PLAYER_NEAR_DEATH_RATIO = 0.25;
 const DUNGEON_OMEN_EVENT_GAP = 18;
 const DUNGEON_OMEN_CHANCE = 12;
@@ -137,6 +141,24 @@ export function computeZoomAudibilityGain(zoomScale, referenceScale) {
   if (!Number.isFinite(zoom) || !Number.isFinite(reference) || zoom <= 0 || reference <= 0) return 1;
   const gain = Math.sqrt(zoom / reference);
   return Math.max(MIN_ZOOM_GAIN, Math.min(MAX_ZOOM_GAIN, gain));
+}
+
+function remapClamped(value, inMin, inMax, outMin, outMax) {
+  const v = Number(value);
+  if (!Number.isFinite(v)) return outMin;
+  const iMin = Number(inMin);
+  const iMax = Number(inMax);
+  const oMin = Number(outMin);
+  const oMax = Number(outMax);
+  if (!Number.isFinite(iMin) || !Number.isFinite(iMax) || !Number.isFinite(oMin) || !Number.isFinite(oMax) || iMax <= iMin) {
+    return oMin;
+  }
+  const t = Math.max(0, Math.min(1, (v - iMin) / (iMax - iMin)));
+  return oMin + (oMax - oMin) * t;
+}
+
+export function gemValueToDropDetuneCents(value, maxGemValue = GEM_MAX_VALUE) {
+  return remapClamped(value, GEM_MIN_VALUE, maxGemValue, GEM_MIN_DETUNE_CENTS, GEM_MAX_DETUNE_CENTS);
 }
 
 export function resolveStatusSoundId(payload) {
@@ -796,8 +818,11 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     } else if (cat === "gem") {
       const info = getItemInfo(itemId);
       const mat = info?.material;
+      const detune = gemValueToDropDetuneCents(info?.value);
       dropId = mat && mat !== "gemstone" ? `item:drop:gem:${mat}` : "item:drop:gem";
       if (!resolve(dropId)) dropId = "item:drop:gem";
+      sfxAt(dropId, at, pp(), { detune }, zg());
+      return;
     } else {
       dropId = "item:drop:generic";
     }
@@ -907,9 +932,10 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     const info = getItemInfo(itemId);
     const mat = info?.material;
     const pos = targetId != null ? getPosition(targetId) : null;
+    const detune = gemValueToDropDetuneCents(info?.value);
     let dropId = mat && mat !== "gemstone" ? `item:drop:gem:${mat}` : "item:drop:gem";
     if (!resolve(dropId)) dropId = "item:drop:gem";
-    sfxAt(dropId, pos, pp(), null, zg());
+    sfxAt(dropId, pos, pp(), { detune }, zg());
   });
 
   world.on('rack:looted', ({ targetId }) => {

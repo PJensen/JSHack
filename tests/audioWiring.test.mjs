@@ -21,6 +21,7 @@ import {
   WEAPON_RACK_DROPPED_SOUND_ID,
   craftingMenuLoopKey,
   computeZoomAudibilityGain,
+  gemValueToDropDetuneCents,
   resolveCraftingResultSoundId,
   resolveAudioPlayKey,
   resolveStatusSoundId,
@@ -90,6 +91,14 @@ Deno.test("audio wiring zoom gain follows camera scale with clamps", () => {
   assertAlmostEquals(computeZoomAudibilityGain(16, 64), 0.65, 1e-10);
   assertAlmostEquals(computeZoomAudibilityGain(256, 64), 1.35, 1e-10);
   assertAlmostEquals(computeZoomAudibilityGain(81, 64), 1.125, 1e-10);
+});
+
+Deno.test("audio wiring maps gem value to subtle drop pitch detune", () => {
+  assertAlmostEquals(gemValueToDropDetuneCents(0), 0, 1e-10);
+  assertAlmostEquals(gemValueToDropDetuneCents(2500), 22.5, 1e-10);
+  assertAlmostEquals(gemValueToDropDetuneCents(5000), 45, 1e-10);
+  assertAlmostEquals(gemValueToDropDetuneCents(999999), 45, 1e-10);
+  assertAlmostEquals(gemValueToDropDetuneCents(-10), 0, 1e-10);
 });
 
 Deno.test("audio wiring accepts all authored generic audio payload keys", () => {

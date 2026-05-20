@@ -188,8 +188,8 @@ export function generateGemShopItem(world, rng) {
  * @returns {number|null}
  */
 export function generateGemDisplayItem(world, rng, opts = {}) {
-    const socketableGems = gems.listGems().filter(g => g.socketable && g.material === 'gemstone');
-    const miscPool = gems.listGems().filter(g => g.material === 'gemstone' && g.value > 0 && g.prob > 0);
+    const socketableGems = gems.listGems().filter(g => g.socketable && gems.isRealGemstone(g));
+    const miscPool = gems.listGems().filter(g => gems.isRealGemstone(g) && g.prob > 0);
     let pool = (rng.next() < 0.4 ? socketableGems : miscPool);
     pool = filterGemPoolByTier(pool, opts.stockTier);
     if (!pool.length) pool = filterGemPoolByTier(miscPool, opts.stockTier);
@@ -285,7 +285,7 @@ export function generateGemShopStock(world, rng) {
     const items = [];
 
     // Socketable gems: pick 3-4 from the socketable pool, pre-identified
-    const socketableGems = gems.listGems().filter(g => g.socketable && g.material === 'gemstone');
+    const socketableGems = gems.listGems().filter(g => g.socketable && gems.isRealGemstone(g));
     const socketCount = rng.int(3, 4);
     // Deterministic shuffle via rng
     const pool = socketableGems.slice();
@@ -303,7 +303,7 @@ export function generateGemShopStock(world, rng) {
     }
 
     // Misc gems: 4-6 common gemstones, also sold pre-identified in the gem shop.
-    const miscPool = gems.listGems().filter(g => g.material === 'gemstone' && g.value > 0 && g.prob > 0);
+    const miscPool = gems.listGems().filter(g => gems.isRealGemstone(g) && g.prob > 0);
     const miscCount = rng.int(4, 6);
     for (let i = 0; i < miscCount; i++) {
         const gem = miscPool[rng.int(0, miscPool.length - 1)];
