@@ -23,6 +23,10 @@ assets/audio/*_orig.*
 *.swp
 *.swo
 
+.claude
+.codex
+.entire
+
 # Ignore Copilot instructions
 .github/**
 !.github/
