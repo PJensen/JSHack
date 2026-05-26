@@ -47,3 +47,7 @@ assets/audio/unused/
 assets/audio/*.zip
 .claude/projects/-home-pjensen-Repos-JSHack/memory/feedback_additive_changes.md
 deno.lock
+src/main/wiring/shopWiring.js
+.codex.bak
+.codex
+.codex

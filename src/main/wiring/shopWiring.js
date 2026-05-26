@@ -18,6 +18,7 @@ import { chebyshevScalar } from "../../rules/utils/distance.js";
 import { identify, isIdentified } from "../../rules/data/identification.js";
 import { requiresIdentification, getUnidentifiedName } from "../../rules/data/itemAppearances.js";
 import { groupDisplayItems } from "../ui/itemGrouping.js";
+import { calculateShopDebt, clearShopDebt, shopDebtRecords } from "../../rules/utils/shopDebt.js";
 
 const INSTALLED = Symbol.for("jshack:main:shopWiring:installed");
 const API_KEY = Symbol.for("jshack:main:shopWiring:api");
@@ -149,6 +150,21 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
               }
             }
           }
+        }
+        const debts = shopDebtRecords(world, pe.id, shopkeeperId);
+        for (let i = 0; i < debts.length; i++) {
+          const debt = debts[i];
+          const amount = Math.max(0, Number(debt?.amount || 0));
+          if (amount <= 0) continue;
+          unpaidItems.push({
+            id: `debt:${i}`,
+            name: debt.name || debt.identity || "Unauthorized use",
+            price: amount,
+            unpaid: true,
+            debt: true,
+            reason: debt.reason,
+          });
+          totalBill += amount;
         }
     }
 
@@ -373,6 +389,22 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     }
   });
 
+  world.on("shop:unauthorized-use", ({ actor, shopkeeperId, amount, reason }) => {
+    const pe = playerEntity(world);
+    if (!pe || actor !== pe.id) return;
+    const charge = Math.max(0, Number(amount || 0) | 0);
+    if (String(reason || "") === "knowledge_theft") {
+      log(`The shopkeeper snaps: "That knowledge is not free. You owe me ${charge} gold."`);
+    } else {
+      log(`The shopkeeper snaps: "That is not free. You owe me ${charge} gold."`);
+    }
+    const sid = Number(shopkeeperId) || 0;
+    if (sid > 0 && activeShopSession.shopkeeperId === sid) {
+      const shop = world.get(sid, ShopInventory);
+      dispatchShopData(sid, shop?.buyMarkup ?? activeShopSession.buyMarkup, shop?.sellDiscount ?? activeShopSession.sellDiscount, activeShopSession.mode);
+    }
+  });
+
   addEventListener("ui:removeFromInvoice", (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
@@ -435,6 +467,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
         unpaidItemIds.push(itemId);
       }
     }
+    totalBill += calculateShopDebt(world, pe.id, sid);
 
     if (totalBill === 0) {
       log("You have no unpaid items.");
@@ -460,6 +493,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
         world.remove(itemId, Unpaid);
       } catch {} // ECS: may not exist
     }
+    clearShopDebt(world, pe.id, sid);
 
     log(`You pay ${totalBill} gold for your purchases. "Thank you, come again!"`);
     activeShopSession.mode = "browse";

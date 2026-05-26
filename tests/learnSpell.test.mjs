@@ -7,6 +7,8 @@ import { Inventory } from '../src/rules/components/Inventory.js';
 import { NamedIdentity } from '../src/rules/components/NamedIdentity.js';
 import { ItemInfo } from '../src/rules/components/ItemInfo.js';
 import { Brain } from '../src/rules/components/Brain.js';
+import { ShopDebtLedger } from "../src/rules/components/ShopDebtLedger.js";
+import { Unpaid } from "../src/rules/components/Unpaid.js";
 import { UseIntent } from '../src/rules/components/Intents/UseIntent.js';
 import { useItemSystem } from '../src/rules/systems/useItemSystem.js';
 import { addToInventory, inventoryContains } from "../src/rules/utils/inventoryFacade.js";
@@ -49,6 +51,40 @@ Deno.test("using a spellbook teaches the spell and consumes the book", () => {
   assert(Array.isArray(brain2.learnedSpellIds) && brain2.learnedSpellIds.includes('lightning'), 'learned lightning');
   assert(!inventoryContains(world, player, book), 'book consumed');
   assert(!world.isAlive(book), 'book entity destroyed');
+});
+
+Deno.test("using an unpaid spellbook teaches the spell, consumes the book, and records shop debt", () => {
+  const world = new World({ seed: 3 });
+  world.setScheduler((w) => scheduler(w));
+
+  const player = createPlayer(world, { name: "Mage" });
+  const shopkeeperId = 9001;
+  const book = makeLightningBook(world);
+  world.add(book, Unpaid, { shopkeeperId, price: 120 });
+  addToInventory(world, player, book);
+
+  const unauthorized = [];
+  world.on("shop:unauthorized-use", (ev) => unauthorized.push(ev));
+
+  world.add(player, UseIntent, { itemId: book });
+  world.tick(1);
+
+  const brain = world.get(player, Brain);
+  assert(Array.isArray(brain.learnedSpellIds) && brain.learnedSpellIds.includes("lightning"), "learned lightning");
+  assert(!inventoryContains(world, player, book), "book consumed");
+  assert(!world.isAlive(book), "book entity destroyed");
+
+  const ledger = world.get(player, ShopDebtLedger);
+  assert(ledger && Array.isArray(ledger.debts), "shop debt ledger should exist on player");
+  assert(ledger.debts.length === 1, "one shop debt should be recorded");
+  assert(ledger.debts[0].amount === 120, "debt amount should equal unpaid price");
+  assert(ledger.debts[0].reason === "knowledge_theft", "debt reason should classify knowledge theft");
+  assert(ledger.debts[0].shopkeeperId === shopkeeperId, "debt should point at owning shopkeeper");
+  assert(ledger.debts[0].itemId === book, "debt should preserve consumed item id");
+
+  assert(unauthorized.length === 1, "unauthorized-use event should be emitted once");
+  assert(unauthorized[0].amount === 120, "unauthorized-use event should include amount");
+  assert(unauthorized[0].reason === "knowledge_theft", "unauthorized-use event should include reason");
 });
 
 Deno.test("storm spellbooks teach blizzard and firestorm", () => {

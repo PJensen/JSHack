@@ -1,6 +1,7 @@
 import { Consumable } from "../../components/Consumable.js";
 import { Equipment, getEquippedSlot } from "../../components/Equipment.js";
 import { MaterialState } from "../../components/MaterialState.js";
+import { Unpaid } from "../../components/Unpaid.js";
 import { findUsePayload } from "../../content/items/usePayloads.js";
 import { interceptUseForWaterDamage } from "../../utils/waterExposure.js";
 
@@ -17,9 +18,25 @@ function normalizeUseHookResult(value) {
       message: value.message,
       consumesTurn: value.consumesTurn,
       detail: value.detail,
+      spellId: value.spellId,
     };
   }
   return { consumed: false };
+}
+
+function shouldCreateShopDebtForUse({ info, identity, hookResult }) {
+  if (!hookResult) return false;
+  if (String(info?.type || "") === "learn" && hookResult.spellId) return true;
+  if (String(identity || "").startsWith("book_") && hookResult.spellId) return true;
+  return false;
+}
+
+function classifyUnauthorizedUse({ info, identity, hookResult }) {
+  if (String(info?.type || "") === "learn" || String(identity || "").startsWith("book_")) {
+    return "knowledge_theft";
+  }
+  if (hookResult?.consumed) return "consumption_theft";
+  return "unauthorized_use";
 }
 
 /**
@@ -143,6 +160,31 @@ export function usePipeline(ctx) {
         consumesTurn: hookResult.consumesTurn === true,
         detail: hookResult.detail,
       });
+    }
+    const unpaid = ctx.query.get(itemId, Unpaid);
+    if (!ctx.cancelled && unpaid && shouldCreateShopDebtForUse({ info, identity, hookResult })) {
+      const amount = Math.max(0, Math.ceil(Number(unpaid.price || 0)));
+      const reason = classifyUnauthorizedUse({ info, identity, hookResult });
+      if (amount > 0) {
+        ctx.mutate.queue({
+          type: "recordShopDebt",
+          actorId: actor,
+          shopkeeperId: unpaid.shopkeeperId | 0,
+          amount,
+          reason,
+          itemId,
+          identity,
+          name: ctx.query.name(itemId),
+        });
+        ctx.io.emit("shop:unauthorized-use", {
+          actor,
+          shopkeeperId: unpaid.shopkeeperId | 0,
+          itemId,
+          identity,
+          amount,
+          reason,
+        });
+      }
     }
     if (!ctx.cancelled && hookResult.consumed) {
       ctx.mutate.consume(itemId, actor);
