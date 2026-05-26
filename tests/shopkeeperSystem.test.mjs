@@ -186,8 +186,10 @@ Deno.test("shopkeeperSystem allows exit when shopkeeper extends credit", () => {
 
   const enforced = [];
   const blocked = [];
+  const speech = [];
   world.on("shop:claim-enforced", (ev) => enforced.push(ev));
   world.on("shop:exit-blocked", (ev) => blocked.push(ev));
+  world.on("npc:dialogue", (ev) => speech.push(ev));
 
   shopkeeperSystem(world);
 
@@ -195,4 +197,6 @@ Deno.test("shopkeeperSystem allows exit when shopkeeper extends credit", () => {
   assert(enforced.length === 1, "credit decision should be emitted");
   assert(enforced[0].decision.kind === "credit_extended", "decision should extend credit");
   assert(blocked.length === 0, "credit should not emit blocked exit");
+  assert(speech.length === 1, "shopkeeper should speak the credit decision");
+  assert(speech[0].actor === 9001, "shopkeeper should be the speaker");
 });

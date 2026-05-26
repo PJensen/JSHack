@@ -351,29 +351,10 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     dispatchShopData(shopkeeperId, shop.buyMarkup ?? 1.0, shop.sellDiscount ?? 0.5, mode);
   });
 
-  world.on("shop:claim-enforced", ({ actor, decision }) => {
-    const pe = playerEntity(world);
-    if (!pe || actor !== pe.id) return;
-    const kind = String(decision?.kind || "");
-    if (kind === "credit_extended") {
-      const bill = Math.max(0, Number(decision?.bill || 0) | 0);
-      log(`The shopkeeper narrows their eyes. "You owe me ${bill} gold. I expect you to settle this."`);
-    }
-  });
-
   // Handle shop exit blocking (triggered when player tries to leave with unpaid items)
   world.on("shop:exit-blocked", ({ actor, shopkeeperId, bill, decision }) => {
     const pe = playerEntity(world);
     if (!pe || actor !== pe.id) return;
-
-    const kind = String(decision?.kind || "");
-    if (kind === "debt_refused") {
-      log(`The shopkeeper blocks your way! "You have had long enough. Pay ${bill} gold."`);
-    } else if (kind === "containment") {
-      log(`The shopkeeper blocks your way! "Not so fast. You owe me ${bill} gold!"`);
-    } else {
-      log(`The shopkeeper blocks your way! "You owe me ${bill} gold!"`);
-    }
 
     // Open shop UI in checkout mode
     activeShopSession = {
@@ -409,12 +390,6 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
   world.on("shop:unauthorized-use", ({ actor, shopkeeperId, amount, reason }) => {
     const pe = playerEntity(world);
     if (!pe || actor !== pe.id) return;
-    const charge = Math.max(0, Number(amount || 0) | 0);
-    if (String(reason || "") === "knowledge_theft") {
-      log(`The shopkeeper snaps: "That knowledge is not free. You owe me ${charge} gold."`);
-    } else {
-      log(`The shopkeeper snaps: "That is not free. You owe me ${charge} gold."`);
-    }
     const sid = Number(shopkeeperId) || 0;
     if (sid > 0 && activeShopSession.shopkeeperId === sid) {
       const shop = world.get(sid, ShopInventory);

@@ -136,3 +136,21 @@ export function evaluateShopExitClaim(world, {
     reasons: Object.freeze(reasons),
   });
 }
+
+export function shopEnforcementLine(decision) {
+  const kind = String(decision?.kind || "");
+  const bill = Math.max(0, Number(decision?.bill || 0) | 0);
+  if (kind === SHOP_ENFORCEMENT_DECISIONS.creditExtended) {
+    return `You owe me ${bill} gold. I expect you to settle this.`;
+  }
+  if (kind === SHOP_ENFORCEMENT_DECISIONS.debtRefused) {
+    return `You have had long enough. Pay ${bill} gold.`;
+  }
+  if (kind === SHOP_ENFORCEMENT_DECISIONS.containment) {
+    return `Not so fast. You owe me ${bill} gold.`;
+  }
+  if (kind === SHOP_ENFORCEMENT_DECISIONS.demandPayment) {
+    return `You owe me ${bill} gold.`;
+  }
+  return "";
+}

@@ -1,5 +1,16 @@
 import { Unpaid } from "../components/Unpaid.js";
 
+function unauthorizedUseLine(reason, amount) {
+  const charge = Math.max(0, Number(amount || 0) | 0);
+  if (String(reason || "") === "knowledge_theft") {
+    return `That knowledge is not free. You owe me ${charge} gold.`;
+  }
+  if (String(reason || "") === "consumption_theft") {
+    return `You drink it, you buy it. That is ${charge} gold.`;
+  }
+  return `That is not free. You owe me ${charge} gold.`;
+}
+
 /**
  * Queue persistent shop debt for value extracted from unpaid merchandise.
  * This is intentionally interaction-context shaped so item verbs share one
@@ -37,6 +48,12 @@ export function queueShopDebtForUnauthorizedUse(ctx, spec = {}) {
     identity,
     amount,
     reason,
+  });
+  ctx.io.emit("npc:dialogue", {
+    actor: record.shopkeeperId,
+    targetId: actorId,
+    text: unauthorizedUseLine(reason, amount),
+    source: "shop:unauthorized-use",
   });
 
   return record;

@@ -65,7 +65,9 @@ Deno.test("quaffing an unpaid potion consumes it and records consumption theft d
   addToInventory(world, actor, potion);
 
   const unauthorized = [];
+  const speech = [];
   world.on("shop:unauthorized-use", (ev) => unauthorized.push(ev));
+  world.on("npc:dialogue", (ev) => speech.push(ev));
 
   world.add(actor, DrinkIntent, { itemId: potion, targetId: 0 });
   drinkSystem(world);
@@ -82,6 +84,9 @@ Deno.test("quaffing an unpaid potion consumes it and records consumption theft d
   assert(unauthorized.length === 1, "unauthorized-use event should be emitted once");
   assert(unauthorized[0].amount === 45, "event should include amount");
   assert(unauthorized[0].reason === "consumption_theft", "event should include reason");
+  assert(speech.length === 1, "shopkeeper should speak potion debt through NPC dialogue");
+  assert(speech[0].actor === shopkeeperId, "shopkeeper should be the speaker");
+  assert(speech[0].text.includes("You drink it, you buy it"), "speech should explain consumption theft debt");
 });
 
 Deno.test("drinking from a stacked potion decrements count", () => {

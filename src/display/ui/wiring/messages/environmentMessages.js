@@ -443,8 +443,7 @@ export function installEnvironmentMessages(ctx) {
     log(`${who} ${who === 'You' ? 'bury your' : 'buries an'} axe into the trunk. The tree groans and falls.`, 'system');
   });
 
-  // NPC / quest events
-  world.on('npc:dialogue', ({ text }) => { log(text, 'info'); });
+  // Quest events. NPC dialogue is presented as world-space speech bubbles.
   world.on('quest:started', ({ title }) => { log(`New quest: "${String(title || 'Quest')}."`, 'system'); });
   world.on('quest:advanced', ({ objective }) => {
     const text = String(objective || '').trim();
@@ -612,13 +611,6 @@ export function installEnvironmentMessages(ctx) {
     if (!pe || (Number(ownerId || 0) | 0) !== pe.id) return;
     const label = String(name || 'your companion');
     log(`${label} is dead. Another loss you\u2019ll carry.`, 'danger');
-  });
-
-  // === Shop exit blocked ===
-  world.on('shop:exit-blocked', ({ actor, bill }) => {
-    if (nameOfEntity(actor) !== 'You') return;
-    const gold = Math.max(0, Number(bill || 0) | 0);
-    log(`"You haven\u2019t paid!" The shopkeeper blocks your exit. (Bill: ${gold} gold)`, 'warning');
   });
 
   // === Deity events ===

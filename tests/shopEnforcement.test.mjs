@@ -3,6 +3,7 @@ import { World } from "../src/lib/ecs-js/index.js";
 import { Alignment, LawChaosAxis, GoodEvilAxis } from "../src/rules/components/Alignment.js";
 import { Inventory } from "../src/rules/components/Inventory.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
+import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { Unpaid } from "../src/rules/components/Unpaid.js";
 import { evaluateShopExitClaim } from "../src/rules/utils/shopEnforcement.js";
 import { addToInventory } from "../src/rules/utils/inventoryFacade.js";
@@ -23,6 +24,7 @@ function addGold(world, actor, amount) {
 
 function addUnpaidItem(world, actor, shopkeeperId, price) {
   const item = world.create();
+  world.add(item, NamedIdentity, { identity: "test_item", name: "Test Item" });
   world.add(item, ItemInfo, { type: "potion", count: 1, value: price });
   world.add(item, Unpaid, { shopkeeperId, price });
   addToInventory(world, actor, item);

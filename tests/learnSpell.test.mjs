@@ -64,7 +64,9 @@ Deno.test("using an unpaid spellbook teaches the spell, consumes the book, and r
   addToInventory(world, player, book);
 
   const unauthorized = [];
+  const speech = [];
   world.on("shop:unauthorized-use", (ev) => unauthorized.push(ev));
+  world.on("npc:dialogue", (ev) => speech.push(ev));
 
   world.add(player, UseIntent, { itemId: book });
   world.tick(1);
@@ -84,6 +86,9 @@ Deno.test("using an unpaid spellbook teaches the spell, consumes the book, and r
   assert(unauthorized.length === 1, "unauthorized-use event should be emitted once");
   assert(unauthorized[0].amount === 120, "unauthorized-use event should include amount");
   assert(unauthorized[0].reason === "knowledge_theft", "unauthorized-use event should include reason");
+  assert(speech.length === 1, "shopkeeper should speak unauthorized use through NPC dialogue");
+  assert(speech[0].actor === shopkeeperId, "shopkeeper should be the speaker");
+  assert(speech[0].text.includes("knowledge is not free"), "speech should explain knowledge theft debt");
 });
 
 Deno.test("storm spellbooks teach blizzard and firestorm", () => {

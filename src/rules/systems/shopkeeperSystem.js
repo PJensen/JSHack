@@ -7,7 +7,7 @@ import { Inventory } from "../components/Inventory.js";
 import { RoomMetadata } from "../components/RoomMetadata.js";
 import { ShopInventory } from "../components/ShopInventory.js";
 import { MoveIntent } from "../components/Intents/MoveIntent.js";
-import { evaluateShopExitClaim } from "../utils/shopEnforcement.js";
+import { evaluateShopExitClaim, shopEnforcementLine } from "../utils/shopEnforcement.js";
 
 /**
  * Check if a position is inside a room
@@ -56,6 +56,17 @@ export function shopkeeperSystem(world) {
           room: currentlyInShop.room,
         };
         try { world.emit('shop:claim-enforced', event); } catch (e) { console.debug('[shopkeeperSystem] emit shop:claim-enforced failed:', e); }
+        const line = shopEnforcementLine(decision);
+        if (line) {
+          try {
+            world.emit("npc:dialogue", {
+              actor: currentlyInShop.shopkeeperId,
+              targetId: playerId,
+              text: line,
+              source: "shop:claim-enforced",
+            });
+          } catch (e) { console.debug('[shopkeeperSystem] emit npc:dialogue failed:', e); }
+        }
       }
 
       if (decision.blocksExit) {
