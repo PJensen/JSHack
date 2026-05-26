@@ -11,6 +11,7 @@ import { Unpaid } from "../src/rules/components/Unpaid.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 import { addToInventory } from "../src/rules/utils/inventoryFacade.js";
 import { recordShopDebt } from "../src/rules/utils/shopDebt.js";
+import { Alignment, LawChaosAxis, GoodEvilAxis } from "../src/rules/components/Alignment.js";
 
 Deno.test("shopkeeperSystem blocks exiting shop with unpaid items and emits invoice bill", () => {
   const world = new World({ seed: 42 });
@@ -151,4 +152,47 @@ Deno.test("shopkeeperSystem blocks exiting shop with unpaid attached debt even w
   assert(blocked.length === 1, "shopkeeper should block exit once");
   assert(blocked[0].shopkeeperId === 9001, "event should include blocking shopkeeper");
   assert(blocked[0].bill === 120, "event should report attached debt total");
+});
+
+Deno.test("shopkeeperSystem allows exit when shopkeeper extends credit", () => {
+  const world = new World({ seed: 42 });
+  const playerId = world.create();
+
+  world.add(playerId, Player, {});
+  world.add(playerId, Position, { x: 2, y: 2 });
+  world.add(playerId, Inventory, { capacity: 20 });
+  world.add(playerId, Alignment, { lawChaos: LawChaosAxis.LAWFUL, goodEvil: GoodEvilAxis.GOOD });
+  world.add(playerId, MoveIntent, { dx: -1, dy: 0 });
+
+  recordShopDebt(world, {
+    actorId: playerId,
+    shopkeeperId: 9001,
+    amount: 20,
+    reason: "knowledge_theft",
+    itemId: 1234,
+    identity: "book_lightning",
+    name: "Spellbook of Lightning",
+  });
+
+  const roomId = world.create();
+  world.add(roomId, RoomMetadata, {
+    roomType: "shop",
+    x: 2,
+    y: 2,
+    w: 3,
+    h: 3,
+    shopkeeperId: 9001,
+  });
+
+  const enforced = [];
+  const blocked = [];
+  world.on("shop:claim-enforced", (ev) => enforced.push(ev));
+  world.on("shop:exit-blocked", (ev) => blocked.push(ev));
+
+  shopkeeperSystem(world);
+
+  assert(world.has(playerId, MoveIntent), "move intent should remain when credit is extended");
+  assert(enforced.length === 1, "credit decision should be emitted");
+  assert(enforced[0].decision.kind === "credit_extended", "decision should extend credit");
+  assert(blocked.length === 0, "credit should not emit blocked exit");
 });

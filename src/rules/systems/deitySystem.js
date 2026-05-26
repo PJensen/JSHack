@@ -867,8 +867,9 @@ function wireWorldEvents(world) {
   });
 
   // ── Steal ─────────────────────────────────────────────────────────────────
-  // Attempted shoplifting — tried to leave with unpaid goods.
-  world.on("shop:exit-blocked", ({ actor }) => {
+  // Attempted shoplifting — tried to leave after a shop claim was enforced.
+  world.on("shop:claim-enforced", ({ actor, decision }) => {
+    if (decision?.kind === "credit_extended") return;
     applyActionToPlayerDeities(world, actor, "steal", {
       magnitude: 0.6,
       target: "shopkeeper",

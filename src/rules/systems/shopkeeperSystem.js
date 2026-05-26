@@ -4,37 +4,16 @@
 import { Position } from "../components/Position.js";
 import { Player } from "../components/Player.js";
 import { Inventory } from "../components/Inventory.js";
-import { Unpaid } from "../components/Unpaid.js";
 import { RoomMetadata } from "../components/RoomMetadata.js";
 import { ShopInventory } from "../components/ShopInventory.js";
 import { MoveIntent } from "../components/Intents/MoveIntent.js";
-import { inventoryItems } from "../utils/inventoryFacade.js";
-import { calculateShopDebt } from "../utils/shopDebt.js";
+import { evaluateShopExitClaim } from "../utils/shopEnforcement.js";
 
 /**
  * Check if a position is inside a room
  */
 function isInRoom(x, y, room) {
   return x >= room.x && x < room.x + room.w && y >= room.y && y < room.y + room.h;
-}
-
-/**
- * Get total unpaid bill for a player from a specific shopkeeper
- */
-function calculateCarriedUnpaidBill(world, playerId, shopkeeperId) {
-  let total = 0;
-  for (const itemId of inventoryItems(world, playerId)) {
-    const unpaid = world.get(itemId, Unpaid);
-    if (unpaid && unpaid.shopkeeperId === shopkeeperId) {
-      total += unpaid.price;
-    }
-  }
-  return total;
-}
-
-function calculateBill(world, playerId, shopkeeperId) {
-  return calculateCarriedUnpaidBill(world, playerId, shopkeeperId)
-    + calculateShopDebt(world, playerId, shopkeeperId);
 }
 
 /**
@@ -63,9 +42,23 @@ export function shopkeeperSystem(world) {
 
     // Leaving a shop?
     if (currentlyInShop && !movingToShop) {
-      const bill = calculateBill(world, playerId, currentlyInShop.shopkeeperId);
+      const decision = evaluateShopExitClaim(world, {
+        actorId: playerId,
+        shopkeeperId: currentlyInShop.shopkeeperId,
+      });
 
-      if (bill > 0) {
+      if (decision.kind !== "allow") {
+        const event = {
+          actor: playerId,
+          shopkeeperId: currentlyInShop.shopkeeperId,
+          bill: decision.bill,
+          decision,
+          room: currentlyInShop.room,
+        };
+        try { world.emit('shop:claim-enforced', event); } catch (e) { console.debug('[shopkeeperSystem] emit shop:claim-enforced failed:', e); }
+      }
+
+      if (decision.blocksExit) {
         // Block exit within the current tick so movementSystem cannot still
         // consume the pending move intent later in the same phase.
         world.removeImmediate(playerId, MoveIntent);
@@ -73,7 +66,8 @@ export function shopkeeperSystem(world) {
           world.emit('shop:exit-blocked', {
             actor: playerId,
             shopkeeperId: currentlyInShop.shopkeeperId,
-            bill,
+            bill: decision.bill,
+            decision,
             room: currentlyInShop.room,
           });
         } catch (e) { console.debug('[shopkeeperSystem] emit shop:exit-blocked failed:', e); }
