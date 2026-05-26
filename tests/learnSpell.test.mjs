@@ -7,11 +7,11 @@ import { Inventory } from '../src/rules/components/Inventory.js';
 import { NamedIdentity } from '../src/rules/components/NamedIdentity.js';
 import { ItemInfo } from '../src/rules/components/ItemInfo.js';
 import { Brain } from '../src/rules/components/Brain.js';
-import { ShopDebtLedger } from "../src/rules/components/ShopDebtLedger.js";
 import { Unpaid } from "../src/rules/components/Unpaid.js";
 import { UseIntent } from '../src/rules/components/Intents/UseIntent.js';
 import { useItemSystem } from '../src/rules/systems/useItemSystem.js';
 import { addToInventory, inventoryContains } from "../src/rules/utils/inventoryFacade.js";
+import { shopDebtRecords } from "../src/rules/utils/shopDebt.js";
 
 function scheduler(world) {
   try { useItemSystem(world); } catch (e) { console.error('use system error', e); }
@@ -74,13 +74,12 @@ Deno.test("using an unpaid spellbook teaches the spell, consumes the book, and r
   assert(!inventoryContains(world, player, book), "book consumed");
   assert(!world.isAlive(book), "book entity destroyed");
 
-  const ledger = world.get(player, ShopDebtLedger);
-  assert(ledger && Array.isArray(ledger.debts), "shop debt ledger should exist on player");
-  assert(ledger.debts.length === 1, "one shop debt should be recorded");
-  assert(ledger.debts[0].amount === 120, "debt amount should equal unpaid price");
-  assert(ledger.debts[0].reason === "knowledge_theft", "debt reason should classify knowledge theft");
-  assert(ledger.debts[0].shopkeeperId === shopkeeperId, "debt should point at owning shopkeeper");
-  assert(ledger.debts[0].itemId === book, "debt should preserve consumed item id");
+  const debts = shopDebtRecords(world, player, shopkeeperId);
+  assert(debts.length === 1, "one shop debt should be recorded");
+  assert(debts[0].amount === 120, "debt amount should equal unpaid price");
+  assert(debts[0].reason === "knowledge_theft", "debt reason should classify knowledge theft");
+  assert(debts[0].shopkeeperId === shopkeeperId, "debt should point at owning shopkeeper");
+  assert(debts[0].itemId === book, "debt should preserve consumed item id");
 
   assert(unauthorized.length === 1, "unauthorized-use event should be emitted once");
   assert(unauthorized[0].amount === 120, "unauthorized-use event should include amount");

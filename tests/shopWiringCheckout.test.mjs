@@ -94,7 +94,7 @@ Deno.test("shop checkout return works while blocked at exit even when not adjace
   }
 });
 
-Deno.test("paying checkout clears shop debt ledger as well as physical unpaid items", () => {
+Deno.test("paying checkout clears attached shop debt as well as physical unpaid items", () => {
   const priorWindow = globalThis.window;
   // @ts-ignore Deno test runtime does not always define window, but wiring uses it.
   globalThis.window = globalThis;
@@ -173,8 +173,8 @@ Deno.test("paying checkout clears shop debt ledger as well as physical unpaid it
     }));
 
     assert(!world.has(itemId, Unpaid), "physical unpaid item should be marked paid");
-    assertEquals(calculateShopDebt(world, playerId, shopkeeperId), 0, "ledger debt should be cleared");
-    assertEquals(world.get(goldId, ItemInfo)?.count, 105, "payment should include physical item and ledger debt");
+    assertEquals(calculateShopDebt(world, playerId, shopkeeperId), 0, "attached debt should be cleared");
+    assertEquals(world.get(goldId, ItemInfo)?.count, 105, "payment should include physical item and attached debt");
     assert(closeEvents.length >= 1, "checkout should close after payment");
     assert(logs.some((msg) => msg.includes("You pay 195 gold")), "payment log should include combined bill");
   } finally {

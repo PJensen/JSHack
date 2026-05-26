@@ -74,7 +74,7 @@ export { CombatPosture, COMBAT_POSTURES } from './CombatPosture.js';
 export { PetState } from './PetState.js';
 export { PetCommandIntent } from './Intents/PetCommandIntent.js';
 export { Unpaid } from './Unpaid.js';
-export { ShopDebtLedger } from './ShopDebtLedger.js';
+export { ShopDebt, SHOP_DEBT_STATUS } from './ShopDebt.js';
 export { RoomMetadata } from './RoomMetadata.js';
 export { HarvestNode } from './HarvestNode.js';
 export { HazardArea } from './HazardArea.js';

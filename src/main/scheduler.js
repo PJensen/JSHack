@@ -88,6 +88,7 @@ import { defineInventoryVirtuals, installVirtuals } from "../rules/utils/invento
 import { defineDerivedStatVirtuals } from "../rules/utils/derivedStats.js";
 import { definePassiveBonusVirtuals } from "../rules/utils/passiveBonuses.js";
 import { defineTownInterpretationVirtuals } from "../rules/utils/townInterpretationVirtuals.js";
+import { defineShopDebtVirtuals } from "../rules/utils/shopDebt.js";
 import { installDialogRuntime } from "../rules/dialogues/runtime.js";
 import { installQuestRuntime } from "../rules/quests/runtime.js";
 import { installStarterFetchQuestHooks } from "../rules/quests/definitions/graveyardWatch.js";
@@ -116,6 +117,7 @@ export function configureWorld(world) {
   defineDerivedStatVirtuals(world);
   definePassiveBonusVirtuals(world);
   defineTownInterpretationVirtuals(world);
+  defineShopDebtVirtuals(world);
   installDialogRuntime(world);
   installQuestRuntime(world);
   installStarterFetchQuestHooks(world);

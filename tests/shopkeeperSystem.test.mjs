@@ -113,7 +113,7 @@ Deno.test("shopkeeperSystem allows exiting shop when player has no unpaid items"
   assert(blockedCount === 0, "no blocked event when invoice is zero");
 });
 
-Deno.test("shopkeeperSystem blocks exiting shop with unpaid ledger debt even when item is gone", () => {
+Deno.test("shopkeeperSystem blocks exiting shop with unpaid attached debt even when item is gone", () => {
   const world = new World({ seed: 42 });
   const playerId = world.create();
 
@@ -147,8 +147,8 @@ Deno.test("shopkeeperSystem blocks exiting shop with unpaid ledger debt even whe
 
   shopkeeperSystem(world);
 
-  assert(!world.has(playerId, MoveIntent), "move intent should be consumed when ledger debt is unpaid");
+  assert(!world.has(playerId, MoveIntent), "move intent should be consumed when attached debt is unpaid");
   assert(blocked.length === 1, "shopkeeper should block exit once");
   assert(blocked[0].shopkeeperId === 9001, "event should include blocking shopkeeper");
-  assert(blocked[0].bill === 120, "event should report ledger debt total");
+  assert(blocked[0].bill === 120, "event should report attached debt total");
 });
