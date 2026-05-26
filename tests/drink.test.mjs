@@ -3,11 +3,14 @@ import { World } from '../src/lib/ecs-js/index.js';
 import { Potion } from '../src/rules/components/Potion.js';
 import { Inventory } from '../src/rules/components/Inventory.js';
 import { ItemInfo } from '../src/rules/components/ItemInfo.js';
+import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { ActiveEffects } from '../src/rules/components/ActiveEffects.js';
 import { Vitality } from '../src/rules/components/Vitality.js';
+import { Unpaid } from "../src/rules/components/Unpaid.js";
 import { DrinkIntent } from '../src/rules/components/Intents/DrinkIntent.js';
 import { drinkSystem } from '../src/rules/systems/drinkSystem.js';
 import { addToInventory, inventoryContains } from "../src/rules/utils/inventoryFacade.js";
+import { shopDebtRecords } from "../src/rules/utils/shopDebt.js";
 
 Deno.test("drinking a single-dose potion applies effect and destroys it", () => {
   const world = new World({ seed: 1 });
@@ -39,6 +42,46 @@ Deno.test("drinking a single-dose potion applies effect and destroys it", () => 
 
   assert(!world.isAlive(potion), 'empty potion should be destroyed');
   assert(!inventoryContains(world, actor, potion), 'potion should be removed from inventory');
+});
+
+Deno.test("quaffing an unpaid potion consumes it and records consumption theft debt", () => {
+  const world = new World({ seed: 2 });
+
+  const actor = world.create();
+  world.add(actor, Vitality, { maxHp: 50, hp: 30 });
+  world.add(actor, Inventory, { items: [], maxWeight: 100 });
+
+  const shopkeeperId = 9001;
+  const potion = world.create();
+  world.add(potion, NamedIdentity, { identity: "potion_healing", name: "Healing Potion" });
+  world.add(potion, Potion, {
+    name: "Healing Potion", route: "oral", doses: 1, channels: [],
+    effects: [{ key: "regeneration", potency: 5, onset: 0, peak: 0, duration: 3, stack: "add" }],
+    toxicity: null,
+  });
+  world.add(potion, ItemInfo, { type: "potion", slot: "", weight: 1, value: 10, description: "", count: 1, bonuses: {}, rarity: 1, rarityName: "common", affixes: [] });
+  world.add(potion, Unpaid, { shopkeeperId, price: 45 });
+
+  addToInventory(world, actor, potion);
+
+  const unauthorized = [];
+  world.on("shop:unauthorized-use", (ev) => unauthorized.push(ev));
+
+  world.add(actor, DrinkIntent, { itemId: potion, targetId: 0 });
+  drinkSystem(world);
+
+  assert(!world.isAlive(potion), "single-dose unpaid potion should still be consumed");
+  assert(!inventoryContains(world, actor, potion), "potion should be removed from inventory");
+
+  const debts = shopDebtRecords(world, actor, shopkeeperId);
+  assert(debts.length === 1, "one shop debt should be recorded");
+  assert(debts[0].amount === 45, "debt amount should equal unpaid price");
+  assert(debts[0].reason === "consumption_theft", "debt reason should classify consumed value");
+  assert(debts[0].identity === "potion_healing", "debt should preserve consumed item identity");
+
+  assert(unauthorized.length === 1, "unauthorized-use event should be emitted once");
+  assert(unauthorized[0].amount === 45, "event should include amount");
+  assert(unauthorized[0].reason === "consumption_theft", "event should include reason");
 });
 
 Deno.test("drinking from a stacked potion decrements count", () => {

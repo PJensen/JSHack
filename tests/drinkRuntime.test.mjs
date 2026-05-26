@@ -3,11 +3,13 @@ import { World } from "../src/lib/ecs-js/index.js";
 import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
 import { Inventory } from "../src/rules/components/Inventory.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
+import { Unpaid } from "../src/rules/components/Unpaid.js";
 import { Potion } from "../src/rules/components/Potion.js";
 import { Vitality } from "../src/rules/components/Vitality.js";
 import { executeInteraction } from "../src/rules/interaction/runtime/actionRuntime.js";
 import { drinkPipeline } from "../src/rules/interaction/verbs/drinkPipeline.js";
 import { addToInventory, inventoryContains } from "../src/rules/utils/inventoryFacade.js";
+import { calculateShopDebt } from "../src/rules/utils/shopDebt.js";
 
 function makePotion(world, init = {}) {
   const itemId = world.create();
@@ -85,6 +87,7 @@ Deno.test("drink payload can cancel before mechanics and roll back transaction",
   const potion = makePotion(world, {
     effects: [{ key: "regen", potency: 1, onset: 0, peak: 0, duration: 2, stack: "add" }],
   });
+  world.add(potion, Unpaid, { shopkeeperId: 9001, price: 30 });
   addToInventory(world, actor, potion);
 
   const result = executeInteraction(world, {
@@ -110,6 +113,7 @@ Deno.test("drink payload can cancel before mechanics and roll back transaction",
   assert(world.isAlive(potion), "cancelled action should not consume potion");
   assert(inventoryContains(world, actor, potion), "item should remain in inventory after cancellation");
   assert(!world.get(actor, ActiveEffects), "no effects should commit on cancellation");
+  assertEquals(calculateShopDebt(world, actor, 9001), 0, "cancelled drink should create no shop debt");
 });
 
 Deno.test("drink payload onDrink can queue mutations via ctx.mutate", () => {

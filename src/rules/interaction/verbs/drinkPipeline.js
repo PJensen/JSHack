@@ -1,6 +1,7 @@
 import { Potion } from "../../components/Potion.js";
 import { Vitality } from "../../components/Vitality.js";
 import { Beatitude, BUC_BLESSED } from "../../components/Beatitude.js";
+import { queueShopDebtForUnauthorizedUse } from "../../utils/shopClaims.js";
 
 /**
  * @param {any} hookOwner
@@ -159,6 +160,12 @@ export function drinkPipeline(ctx) {
   const payload = runPayloadHooks(ctx, { beforeDrink: hooks.beforeDrink }, state);
   if (ctx.cancelled) return { metrics, payload };
 
+  queueShopDebtForUnauthorizedUse(ctx, {
+    actorId: actor,
+    itemId,
+    identity,
+    reason: "consumption_theft",
+  });
   ctx.mutate.consume(itemId, actor);
   metrics.consumed = true;
 
