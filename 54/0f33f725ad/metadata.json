@@ -4,9 +4,7 @@
   "strategy": "manual-commit",
   "branch": "master",
   "checkpoints_count": 1,
-  "files_touched": [
-    "docs/todo/shop-claim-followups.md"
-  ],
+  "files_touched": null,
   "sessions": [
     {
       "metadata": "/54/0f33f725ad/0/metadata.json",
