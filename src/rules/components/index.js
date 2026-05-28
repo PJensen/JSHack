@@ -75,6 +75,7 @@ export { PetState } from './PetState.js';
 export { PetCommandIntent } from './Intents/PetCommandIntent.js';
 export { Unpaid } from './Unpaid.js';
 export { ShopDebt, SHOP_DEBT_STATUS } from './ShopDebt.js';
+export { ShopIncident } from './ShopIncident.js';
 export { RoomMetadata } from './RoomMetadata.js';
 export { HarvestNode } from './HarvestNode.js';
 export { HazardArea } from './HazardArea.js';

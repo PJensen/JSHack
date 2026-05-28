@@ -89,6 +89,7 @@ import { defineDerivedStatVirtuals } from "../rules/utils/derivedStats.js";
 import { definePassiveBonusVirtuals } from "../rules/utils/passiveBonuses.js";
 import { defineTownInterpretationVirtuals } from "../rules/utils/townInterpretationVirtuals.js";
 import { defineShopDebtVirtuals } from "../rules/utils/shopDebt.js";
+import { installShopLawListeners } from "../rules/utils/shopLaw.js";
 import { installDialogRuntime } from "../rules/dialogues/runtime.js";
 import { installQuestRuntime } from "../rules/quests/runtime.js";
 import { installStarterFetchQuestHooks } from "../rules/quests/definitions/graveyardWatch.js";
@@ -145,6 +146,8 @@ export function configureWorld(world) {
   installScoreListener(world);
   // Auto-pickup currency etc. when any actor moves onto a tile (reacts to "moved" event)
   installMoveAutoPickupListener(world);
+  // Shop-law ledger catches value extraction that bypasses ordinary doorway blocking.
+  installShopLawListeners(world);
   // Tile step effects: ice slides, lava scorch, water extinguish (reacts to "moved" event)
   installTileStepEffectListener(world);
   // Material reactions consume semantic reaction events (water splash/dip, etc.).
