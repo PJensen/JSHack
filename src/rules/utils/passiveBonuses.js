@@ -36,6 +36,8 @@ export const PASSIVE_BONUS_DEFAULTS = Object.freeze({
   spellRadiusDerived: 0,
   visionRangeDerived: 0,
   hungerRateDerived: 0,
+  polymorphControlDerived: 0,
+  polymorphPowerDerived: 0,
 });
 
 const PASSIVE_BONUSES_DEFINED = Symbol.for("jshack:passiveBonuses:virtuals:defined");
@@ -74,6 +76,8 @@ const BONUS_KEY_MAP = Object.freeze({
   spellRadius: "spellRadiusDerived",
   visionRange: "visionRangeDerived",
   hungerRate: "hungerRateDerived",
+  polymorphControl: "polymorphControlDerived",
+  polymorphPower: "polymorphPowerDerived",
 });
 
 function createPassiveBonusBag() {

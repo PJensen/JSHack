@@ -69,6 +69,8 @@ export const Equipment = defineComponent('Equipment', {
   spellRadiusDerived: 0,
   visionRangeDerived: 0,
   hungerRateDerived: 0,
+  polymorphControlDerived: 0,
+  polymorphPowerDerived: 0,
   naturalDamageDice: null,
   naturalScript: null
 });

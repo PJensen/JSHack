@@ -45,6 +45,15 @@ defineItem('ring_arcana', {
   weight: 0.05,
 });
 
+defineItem('ring_polymorph_control', {
+  name: 'Ring of Polymorph Control', type: 'ring',
+  glyph: '◌', color: '#d88cff', glow: '#9b56d8', scale: 0.45,
+  material: 'silver', rarity: 4,
+  bonuses: { polymorphControl: 1 },
+  weight: 0.05,
+  description: 'A shifting silver band that steadies the mind when flesh forgets its shape.',
+});
+
 defineItem('ring_fire_resist', {
   name: 'Ring of Fire Resistance', type: 'ring',
   glyph: '◌', color: '#ff9a5c', glow: '#ff6f2e', scale: 0.45,

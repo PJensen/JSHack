@@ -117,6 +117,7 @@ export const LOOT_TABLES = {
       { type: "equip", weight: 12, pool: ["bow_composite"], affixChance: 0 },
       { type: "equip", weight: 12, pool: ["wardkeeper_shield"], affixChance: 0 },
       { type: "equip", weight: 8,  pool: ["ring_conflict"], affixChance: 0 },
+      { type: "equip", weight: 8,  pool: ["ring_polymorph_control"], affixChance: 0 },
       { type: "equip", weight: 10, pool: ["sunsword"], affixChance: 0 },
       { type: "equip", weight: 12, pool: ["serpent_ring"], affixChance: 0 },
       { type: "equip", weight: 12, pool: ["helm_warhelm", "helm_visionary"], affixChance: 0 },
@@ -362,7 +363,7 @@ export const LOOT_TABLES = {
       { type: "equip", weight: 25, pool: ["amulet_guarded", "amulet_vigor"], affixChance: 0.15, affixCountMax: 1 },
       { type: "equip", weight: 15, pool: ["ring_fire_resist", "ring_poison_resist", "ring_cold_resist", "ring_shock_resist", "ring_endurance"], affixChance: 0.10, affixCountMax: 1 },
       { type: "equip", weight: 10, pool: ["pendant_soulkeeper", "pendant_stormward"], affixChance: 0 },
-      { type: "equip", weight: 8,  pool: ["serpent_ring", "ring_of_fury"], affixChance: 0 },
+      { type: "equip", weight: 8,  pool: ["serpent_ring", "ring_of_fury", "ring_polymorph_control"], affixChance: 0 },
     ],
   },
 

@@ -10,7 +10,6 @@ import { DungeonState } from "../../rules/components/DungeonState.js";
 import { Faction } from "../../rules/components/Faction.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 import { Position } from "../../rules/components/Position.js";
-import { Traits } from "../../rules/components/Traits.js";
 import { Vitality } from "../../rules/components/Vitality.js";
 import { setItemCooldown } from "../../rules/utils/itemCooldowns.js";
 import { listAllMonsterIds, getMonster } from "../../rules/data/monsters.js";
@@ -28,6 +27,7 @@ import { inventoryItems, removeFromInventory } from "../../rules/utils/inventory
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
 import { getEffectiveVisionRange, blind } from "../../rules/utils/blind.js";
 import { listApplyTargetsForTool } from "../../rules/content/items/applyPayloads.js";
+import { getPolymorphControl } from "../../rules/utils/polymorphPolicy.js";
 
 const INSTALLED_KEY = Symbol.for('jshack:scrollWandWiring:installed');
 
@@ -142,8 +142,8 @@ export function installScrollWandWiring({ world, targeting, playerEntity }) {
       enemies,
       onConfirm: (enemyId) => {
         let targetIdentity;
-        const traits = world.get(actor, Traits);
-        if (traits?.polymorph_control) {
+        const control = getPolymorphControl(world, actor);
+        if (control.hasControl) {
           const depth = currentDepth();
           const requestId = nextMonsterChoiceRequestId++;
           const fromIdent = world.get(enemyId, NamedIdentity);
