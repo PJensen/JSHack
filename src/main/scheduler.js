@@ -90,6 +90,7 @@ import { defineDerivedStatVirtuals } from "../rules/utils/derivedStats.js";
 import { definePassiveBonusVirtuals } from "../rules/utils/passiveBonuses.js";
 import { defineTownInterpretationVirtuals } from "../rules/utils/townInterpretationVirtuals.js";
 import { defineShopDebtVirtuals } from "../rules/utils/shopDebt.js";
+import { installDispositionOffenseListeners } from "../rules/utils/disposition.js";
 import { installShopLawListeners } from "../rules/utils/shopLaw.js";
 import { installDialogRuntime } from "../rules/dialogues/runtime.js";
 import { installQuestRuntime } from "../rules/quests/runtime.js";
@@ -149,6 +150,8 @@ export function configureWorld(world) {
   installMoveAutoPickupListener(world);
   // Shop-law ledger catches value extraction that bypasses ordinary doorway blocking.
   installShopLawListeners(world);
+  // Social offense memory feeds disposition first; aggro is a tactical output.
+  installDispositionOffenseListeners(world);
   // Tile step effects: ice slides, lava scorch, water extinguish (reacts to "moved" event)
   installTileStepEffectListener(world);
   // Material reactions consume semantic reaction events (water splash/dip, etc.).

@@ -49,6 +49,7 @@ import { resolveWeaponVisualMeta } from '../data/weaponVisuals.js';
 import { resolvePlayerActiveDeity, scoreDeityStanding } from './deitySystem.js';
 import { forEachInRadius } from '../utils/spatialIndex.js';
 import { resolveWeaponFamily } from '../data/weaponFamilies.js';
+import { classifyActorTargetAction } from '../utils/offenseClassifier.js';
 
 const BUMP_ATTACK_INSTALLED = Symbol.for('jshack:combat:bumpAttack:installed');
 
@@ -657,6 +658,21 @@ export function resolveMeleeAttack(world, attacker, defender, options = {}) {
         world.set(source, Stamina, { ...atkStam, stamina: have - staminaCost, regenCooldown: STAMINA_REGEN_COOLDOWN });
     }
     setCombatPosture(world, source, COMBAT_POSTURES.aggressive, { reason: 'attack:melee' });
+
+    if (options.allowNonHostile === true && !areFactionsHostile(af, df)) {
+        const offense = classifyActorTargetAction(world, {
+            actorId: source,
+            targetId: target,
+            actionKind: 'melee_attack',
+        });
+        if (offense.offenseKind !== 'none') {
+            emitSafe(world, 'offense:committed', {
+                actorId: source,
+                victimId: target,
+                offense,
+            });
+        }
+    }
 
     return resolveHitRoll(world, {
         source, target, weaponId, atkEq,

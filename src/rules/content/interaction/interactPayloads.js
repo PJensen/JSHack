@@ -99,6 +99,7 @@ import { SoundEmitter } from "../../components/SoundEmitter.js";
 import {
   applyWaterExposure,
 } from "../../utils/waterExposure.js";
+import { shopDispositionTerms } from "../../utils/disposition.js";
 
 // Maps catalog item IDs → archetypes for harvest yield entity creation.
 const CATALOG_ARCHETYPES = {
@@ -1093,11 +1094,19 @@ export const INTERACT_PAYLOADS = {
       const { world, actor, targetId } = ctx;
       const shop = world.get(targetId, ShopInventory);
       if (shop) {
+        const terms = shopDispositionTerms(world, {
+          actorId: actor,
+          shopkeeperId: targetId,
+          buyMarkup: shop.buyMarkup ?? 1.0,
+          sellDiscount: shop.sellDiscount ?? 0.5,
+        });
         world.emit?.("shop:open", {
           actor,
           targetId,
-          buyMarkup: shop.buyMarkup ?? 1.0,
-          sellDiscount: shop.sellDiscount ?? 0.5,
+          buyMarkup: terms.buyMarkup,
+          sellDiscount: terms.sellDiscount,
+          disposition: terms.disposition,
+          dispositionBand: terms.band,
         });
       }
     },
@@ -1108,11 +1117,19 @@ export const INTERACT_PAYLOADS = {
       const { world, actor, targetId } = ctx;
       const shop = world.get(targetId, ShopInventory);
       if (shop) {
+        const terms = shopDispositionTerms(world, {
+          actorId: actor,
+          shopkeeperId: targetId,
+          buyMarkup: shop.buyMarkup ?? 1.5,
+          sellDiscount: shop.sellDiscount ?? 0.5,
+        });
         world.emit?.("shop:open", {
           actor,
           targetId,
-          buyMarkup: shop.buyMarkup ?? 1.5,
-          sellDiscount: shop.sellDiscount ?? 0.5,
+          buyMarkup: terms.buyMarkup,
+          sellDiscount: terms.sellDiscount,
+          disposition: terms.disposition,
+          dispositionBand: terms.band,
           vendorKind: "gem",
         });
       }
@@ -1124,11 +1141,19 @@ export const INTERACT_PAYLOADS = {
       const { world, actor, targetId } = ctx;
       const shop = world.get(targetId, ShopInventory);
       if (shop) {
+        const terms = shopDispositionTerms(world, {
+          actorId: actor,
+          shopkeeperId: targetId,
+          buyMarkup: shop.buyMarkup ?? 1.2,
+          sellDiscount: shop.sellDiscount ?? 0.5,
+        });
         world.emit?.("shop:open", {
           actor,
           targetId,
-          buyMarkup: shop.buyMarkup ?? 1.2,
-          sellDiscount: shop.sellDiscount ?? 0.5,
+          buyMarkup: terms.buyMarkup,
+          sellDiscount: terms.sellDiscount,
+          disposition: terms.disposition,
+          dispositionBand: terms.band,
           vendorKind: "book",
         });
       }
