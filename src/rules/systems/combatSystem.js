@@ -50,7 +50,6 @@ import { resolvePlayerActiveDeity, scoreDeityStanding } from './deitySystem.js';
 import { forEachInRadius } from '../utils/spatialIndex.js';
 import { resolveWeaponFamily } from '../data/weaponFamilies.js';
 import { classifyActorTargetAction, OFFENSE_ATTRIBUTION } from '../utils/offenseClassifier.js';
-import { statusStrength } from '../utils/statusFacade.js';
 
 const BUMP_ATTACK_INSTALLED = Symbol.for('jshack:combat:bumpAttack:installed');
 
@@ -661,11 +660,12 @@ export function resolveMeleeAttack(world, attacker, defender, options = {}) {
     setCombatPosture(world, source, COMBAT_POSTURES.aggressive, { reason: 'attack:melee' });
 
     if (options.allowNonHostile === true && !areFactionsHostile(af, df)) {
+        const offenseSnapshot = resolveCombatSnapshot(world, source, { mode: 'melee' });
         const offense = classifyActorTargetAction(world, {
             actorId: source,
             targetId: target,
             actionKind: 'melee_attack',
-            attribution: statusStrength(world, source, 'invisible') > 0
+            attribution: Math.max(0, Number(offenseSnapshot?.status?.invisible || 0)) > 0
                 ? OFFENSE_ATTRIBUTION.unknown
                 : OFFENSE_ATTRIBUTION.known,
         });
