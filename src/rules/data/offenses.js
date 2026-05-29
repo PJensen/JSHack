@@ -29,6 +29,12 @@ export const OFFENSE_SOURCES = Object.freeze({
   shopLaw: "shop_law",
 });
 
+export const OFFENSE_ATTRIBUTION = Object.freeze({
+  known: "known",
+  suspected: "suspected",
+  unknown: "unknown",
+});
+
 export const OFFENSE_DEFS = Object.freeze({
   [OFFENSE_KINDS.none]: Object.freeze({
     severity: OFFENSE_SEVERITY.none,
@@ -67,4 +73,3 @@ export const OFFENSE_DEFS = Object.freeze({
     label: "Shop law",
   }),
 });
-

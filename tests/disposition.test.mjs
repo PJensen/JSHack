@@ -1,6 +1,7 @@
 import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";
 import { getParent } from "../src/lib/ecs-js/hierarchy.js";
+import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
 import { AggroState, AGGRO_LEVELS } from "../src/rules/components/AggroState.js";
 import { Disposition } from "../src/rules/components/Disposition.js";
 import { Faction } from "../src/rules/components/Faction.js";
@@ -8,7 +9,7 @@ import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { Position } from "../src/rules/components/Position.js";
 import { ShopInventory } from "../src/rules/components/ShopInventory.js";
 import { Vitality } from "../src/rules/components/Vitality.js";
-import { OFFENSE_KINDS, OFFENSE_SEVERITY } from "../src/rules/data/offenses.js";
+import { OFFENSE_ATTRIBUTION, OFFENSE_KINDS, OFFENSE_SEVERITY } from "../src/rules/data/offenses.js";
 import { AttackDirectionIntent } from "../src/rules/components/Intents/AttackDirectionIntent.js";
 import { attackDirectionSystem } from "../src/rules/systems/attackDirectionSystem.js";
 import { combatSystem } from "../src/rules/systems/combatSystem.js";
@@ -121,4 +122,46 @@ Deno.test("confirmed protected attack emits offense that disposition listeners c
   const disposition = getDispositionRecord(world, shopkeeper, player);
   assert(disposition, "confirmed protected attack should be remembered");
   assertEquals(disposition.score, -18);
+});
+
+Deno.test("unknown-attribution offense does not create disposition", () => {
+  const world = new World({ seed: 4105 });
+  const player = addActor(world, "player", 5, 5, "Player");
+  const shopkeeper = addActor(world, "shopkeeper", 6, 5, "Shopkeeper");
+  const events = [];
+  world.on("offense:unattributed", (ev) => events.push(ev));
+
+  applyOffenseDisposition(world, {
+    actorId: player,
+    victimId: shopkeeper,
+    offense: {
+      offenseKind: OFFENSE_KINDS.assault,
+      severity: OFFENSE_SEVERITY.serious,
+      attribution: OFFENSE_ATTRIBUTION.unknown,
+    },
+    collectWitnesses: false,
+  });
+
+  assertEquals(getDispositionRecord(world, shopkeeper, player), null);
+  assertEquals(events.length, 1);
+});
+
+Deno.test("invisible protected melee attempt is unattributed socially", () => {
+  const world = new World({ seed: 4106 });
+  const player = addActor(world, "player", 5, 5, "Player");
+  const shopkeeper = addActor(world, "shopkeeper", 6, 5, "Shopkeeper");
+  world.add(player, ActiveEffects, {
+    effects: [{ key: "invisible", turnsLeft: 10, potency: 1, stacks: 1 }],
+  });
+  const events = [];
+  world.on("offense:unattributed", (ev) => events.push(ev));
+  installDispositionOffenseListeners(world);
+
+  world.add(player, AttackDirectionIntent, { dx: 1, dy: 0, confirmed: true });
+  attackDirectionSystem(world);
+  combatSystem(world);
+
+  assertEquals(getDispositionRecord(world, shopkeeper, player), null);
+  assertEquals(events.length, 1);
+  assertEquals(events[0].offense.attribution, OFFENSE_ATTRIBUTION.unknown);
 });

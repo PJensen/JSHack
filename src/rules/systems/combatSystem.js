@@ -49,7 +49,8 @@ import { resolveWeaponVisualMeta } from '../data/weaponVisuals.js';
 import { resolvePlayerActiveDeity, scoreDeityStanding } from './deitySystem.js';
 import { forEachInRadius } from '../utils/spatialIndex.js';
 import { resolveWeaponFamily } from '../data/weaponFamilies.js';
-import { classifyActorTargetAction } from '../utils/offenseClassifier.js';
+import { classifyActorTargetAction, OFFENSE_ATTRIBUTION } from '../utils/offenseClassifier.js';
+import { statusStrength } from '../utils/statusFacade.js';
 
 const BUMP_ATTACK_INSTALLED = Symbol.for('jshack:combat:bumpAttack:installed');
 
@@ -664,6 +665,9 @@ export function resolveMeleeAttack(world, attacker, defender, options = {}) {
             actorId: source,
             targetId: target,
             actionKind: 'melee_attack',
+            attribution: statusStrength(world, source, 'invisible') > 0
+                ? OFFENSE_ATTRIBUTION.unknown
+                : OFFENSE_ATTRIBUTION.known,
         });
         if (offense.offenseKind !== 'none') {
             emitSafe(world, 'offense:committed', {

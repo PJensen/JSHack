@@ -4,7 +4,7 @@ import { Disposition, DISPOSITION_BANDS } from "../components/Disposition.js";
 import { Faction } from "../components/Faction.js";
 import { Position } from "../components/Position.js";
 import { Vitality } from "../components/Vitality.js";
-import { OFFENSE_SEVERITY } from "../data/offenses.js";
+import { OFFENSE_ATTRIBUTION, OFFENSE_SEVERITY } from "../data/offenses.js";
 import { shopReputationTerms } from "./reputation.js";
 import { hasLOS } from "../../shared/math/gridLOS.js";
 import { buildBlocksVisionMap, blockedCallback } from "./vision.js";
@@ -161,22 +161,33 @@ export function applyOffenseDisposition(world, spec = {}) {
   if (!(actorId > 0) || !(victimId > 0) || actorId === victimId) return null;
 
   const offense = spec.offense || {};
+  const attribution = String(spec.attribution || offense.attribution || OFFENSE_ATTRIBUTION.known);
   const severity = clampSeverity(spec.severity ?? offense.severity);
   const offenseKind = String(spec.offenseKind || offense.offenseKind || "unknown");
   const turn = Number(spec.turn ?? world?.step ?? 0) | 0;
   const baseDelta = severityDelta(severity);
   if (baseDelta === 0) return null;
+  if (attribution === OFFENSE_ATTRIBUTION.unknown) {
+    const event = Object.freeze({
+      actorId,
+      victimId,
+      offense: Object.freeze({ ...offense, offenseKind, severity, attribution }),
+    });
+    emitSafe(world, "offense:unattributed", event);
+    return event;
+  }
+  const attributionScale = attribution === OFFENSE_ATTRIBUTION.suspected ? 0.5 : 1.0;
 
   const changed = [];
   const victimRec = upsertDisposition(world, victimId, actorId, {
-    delta: baseDelta,
+    delta: Math.ceil(baseDelta * attributionScale),
     severity,
     offenseKind,
     turn,
   });
   if (victimRec) {
     changed.push(victimRec);
-    maybeEscalateAggro(world, victimId, actorId, victimRec, { ...offense, offenseKind, severity });
+    maybeEscalateAggro(world, victimId, actorId, victimRec, { ...offense, offenseKind, severity, attribution });
   }
 
   const explicitWitnesses = Array.isArray(spec.witnessIds) ? spec.witnessIds : null;
@@ -189,7 +200,7 @@ export function applyOffenseDisposition(world, spec = {}) {
     seen.add(witnessId);
     appliedWitnessIds.push(witnessId);
     const witnessRec = upsertDisposition(world, witnessId, actorId, {
-      delta: Math.ceil(baseDelta * 0.5),
+      delta: Math.ceil(baseDelta * 0.5 * attributionScale),
       severity,
       offenseKind,
       turn,
@@ -200,7 +211,7 @@ export function applyOffenseDisposition(world, spec = {}) {
   const event = Object.freeze({
     actorId,
     victimId,
-    offense: Object.freeze({ ...offense, offenseKind, severity }),
+    offense: Object.freeze({ ...offense, offenseKind, severity, attribution }),
     witnessIds: Object.freeze(appliedWitnessIds),
     records: Object.freeze(changed),
   });

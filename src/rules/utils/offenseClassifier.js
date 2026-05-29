@@ -1,6 +1,7 @@
 import { Faction } from "../components/Faction.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import {
+  OFFENSE_ATTRIBUTION,
   OFFENSE_DEFS,
   OFFENSE_KINDS,
   OFFENSE_SEVERITY,
@@ -49,6 +50,7 @@ export function classifyActorTargetAction(world, spec = {}) {
   const targetId = Number(spec.targetId || 0) | 0;
   const actionKind = String(spec.actionKind || "unknown");
   const source = String(spec.source || OFFENSE_SOURCES.intentionalDirect);
+  const attribution = String(spec.attribution || OFFENSE_ATTRIBUTION.known);
   const targetName = targetId > 0 ? nameOf(world, targetId) : "that creature";
   const protectedTarget = targetId > 0 && isProtectedSocialTarget(world, actorId, targetId);
 
@@ -72,6 +74,7 @@ export function classifyActorTargetAction(world, spec = {}) {
     targetId,
     actionKind,
     source,
+    attribution,
     protectedTarget,
     offenseKind,
     offenseLabel: def.label,
@@ -88,6 +91,7 @@ export function classifyShopClaimOffense(spec = {}) {
   const reason = String(spec.reason || spec.claimKind || "");
   const claimKind = String(spec.claimKind || reason || "unauthorized_use");
   const severity = normalizeSeverity(spec.severity);
+  const attribution = String(spec.attribution || OFFENSE_ATTRIBUTION.known);
   let offenseKind = OFFENSE_KINDS.shopLaw;
   if (
     reason.includes("carried") ||
@@ -107,6 +111,7 @@ export function classifyShopClaimOffense(spec = {}) {
   const def = offenseDef(offenseKind);
   return Object.freeze({
     source: OFFENSE_SOURCES.shopLaw,
+    attribution,
     offenseKind,
     offenseLabel: def.label,
     severity,
@@ -116,4 +121,4 @@ export function classifyShopClaimOffense(spec = {}) {
   });
 }
 
-export { OFFENSE_KINDS, OFFENSE_SEVERITY, OFFENSE_SOURCES };
+export { OFFENSE_ATTRIBUTION, OFFENSE_KINDS, OFFENSE_SEVERITY, OFFENSE_SOURCES };
