@@ -1,0 +1,29 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "4b9deaa74b50",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "src/rules/data/offenses.js",
+    "src/rules/systems/combatSystem.js",
+    "src/rules/utils/disposition.js",
+    "src/rules/utils/offenseClassifier.js",
+    "tests/disposition.test.mjs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/4b/9deaa74b50/0/metadata.json",
+      "transcript": "/4b/9deaa74b50/0/full.jsonl",
+      "content_hash": "/4b/9deaa74b50/0/content_hash.txt",
+      "prompt": "/4b/9deaa74b50/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 801823,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 27528320,
+    "output_tokens": 82039,
+    "api_call_count": 216
+  }
+}
