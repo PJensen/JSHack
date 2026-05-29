@@ -71,6 +71,8 @@ export const Equipment = defineComponent('Equipment', {
   hungerRateDerived: 0,
   polymorphControlDerived: 0,
   polymorphPowerDerived: 0,
+  polymorphResistanceDerived: 0,
+  polymorphStabilityDerived: 0,
   naturalDamageDice: null,
   naturalScript: null
 });

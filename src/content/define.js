@@ -362,7 +362,7 @@ export function defineItem(id, def) {
  * @param {boolean} [def.ambush]
  * @param {string|{pattern?:string,context?:string,chance?:number}} [def.sleep]
  * @param {number} [def.polymorphResistance] - 0..1 chance to reject a polymorph attempt before transformation.
- * @param {number} [def.polymorphStability] - body coherence rating, not a percent; reserved for partial/fumble side effects.
+ * @param {number} [def.polymorphStability] - body coherence rating, not a percent: 0 unstable, 1 ordinary, 2 anchored, 3+ exceptional.
  * @param {string} [def.polymorphFailureMode] - "normal"|"resist"|"fumble"|"volatile" policy hint.
  *
  * // Resistances

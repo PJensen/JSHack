@@ -1,6 +1,7 @@
 import { Equipment, NON_AMMO_GEAR_SLOTS } from "../components/Equipment.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
+import { PolymorphExposure } from "../components/PolymorphExposure.js";
 import { PolymorphProfile } from "../components/PolymorphProfile.js";
 import { Traits } from "../components/Traits.js";
 import { getAllMonsters, getMonster } from "../data/monsters.js";
@@ -73,31 +74,60 @@ export function getPolymorphControl(world, actorId) {
  *
  * @param {any} world
  * @param {number} targetId
- * @returns {{ resistanceScore:number, stabilityScore:number, failureMode:string, sources:string[] }}
+ * @returns {{ resistanceScore:number, stabilityScore:number, failureMode:string, exposureBonus:number, sources:string[] }}
  */
 export function getPolymorphResistance(world, targetId) {
   const id = Number(targetId || 0) | 0;
   const sources = [];
   if (!(id > 0) || !world?.isAlive?.(id)) {
-    return Object.freeze({ resistanceScore: 0, stabilityScore: 0, failureMode: "normal", sources });
+    return Object.freeze({ resistanceScore: 0, stabilityScore: 0, failureMode: "normal", exposureBonus: 0, sources });
   }
+
+  let resistanceScore = 0;
+  let stabilityScore = 0;
+  let failureMode = "normal";
 
   const profile = world.get(id, PolymorphProfile);
   if (profile) {
-    const resistanceScore = clamp01(profile.resistance);
-    const stabilityScore = Math.max(0, Number(profile.stability || 0));
-    const failureMode = String(profile.failureMode || "normal");
+    resistanceScore = clamp01(profile.resistance);
+    stabilityScore = Math.max(0, Number(profile.stability || 0));
+    failureMode = String(profile.failureMode || "normal");
     if (resistanceScore > 0 || stabilityScore > 0) addSource(sources, "component:polymorph_profile");
-    return Object.freeze({ resistanceScore, stabilityScore, failureMode, sources: Object.freeze(sources) });
+  } else {
+    const identity = String(world.get(id, NamedIdentity)?.identity || "");
+    const def = identity ? getMonster(identity) : null;
+    resistanceScore = clamp01(def?.polymorphResistance || 0);
+    stabilityScore = Math.max(0, Number(def?.polymorphStability || 0));
+    failureMode = String(def?.polymorphFailureMode || "normal");
+    if (resistanceScore > 0 || stabilityScore > 0) addSource(sources, `monster:${identity}`);
   }
 
-  const identity = String(world.get(id, NamedIdentity)?.identity || "");
-  const def = identity ? getMonster(identity) : null;
-  const resistanceScore = clamp01(def?.polymorphResistance || 0);
-  const stabilityScore = Math.max(0, Number(def?.polymorphStability || 0));
-  const failureMode = String(def?.polymorphFailureMode || "normal");
-  if (resistanceScore > 0 || stabilityScore > 0) addSource(sources, `monster:${identity}`);
-  return Object.freeze({ resistanceScore, stabilityScore, failureMode, sources: Object.freeze(sources) });
+  const passive = getPassiveBonuses(world, id);
+  const passiveResistance = Number(passive?.polymorphResistanceDerived || 0);
+  const passiveStability = Number(passive?.polymorphStabilityDerived || 0);
+  if (passiveResistance > 0) {
+    resistanceScore += passiveResistance;
+    addSource(sources, "passive:polymorph_resistance");
+  }
+  if (passiveStability > 0) {
+    stabilityScore += passiveStability;
+    addSource(sources, "passive:polymorph_stability");
+  }
+
+  const exposure = world.get(id, PolymorphExposure);
+  const exposureBonus = clamp01(exposure?.resistanceBonus || 0);
+  if (exposureBonus > 0) {
+    resistanceScore += exposureBonus;
+    addSource(sources, "component:polymorph_exposure");
+  }
+
+  return Object.freeze({
+    resistanceScore: clamp01(resistanceScore),
+    stabilityScore,
+    failureMode,
+    exposureBonus,
+    sources: Object.freeze(sources),
+  });
 }
 
 function dangerScore(def) {
@@ -117,14 +147,62 @@ function pickFumbledIdentity(world, requestedIdentity) {
   return String(pool[Math.max(0, Math.min(pool.length - 1, idx))]?.id || requestedIdentity);
 }
 
+function failureReasonForResistance(resistance, controlled) {
+  const mode = String(resistance?.failureMode || "normal");
+  const stability = Number(resistance?.stabilityScore || 0);
+  if (mode === "volatile" && stability < 2) return "volatile";
+  if (mode === "fumble" && controlled && stability < 2) return "fumbled";
+  return "resisted";
+}
+
+/**
+ * Record a failed/partial polymorph attempt on a surviving target. This creates
+ * diminishing returns: repeated attempts against the same still-living body
+ * make that body temporarily harder to force.
+ *
+ * @param {any} world
+ * @param {{ targetId?:number, outcome?:string, source?:string }} req
+ * @returns {{ attempts:number, resistanceBonus:number }|null}
+ */
+export function recordPolymorphAttempt(world, req = {}) {
+  const targetId = Number(req.targetId || 0) | 0;
+  if (!(targetId > 0) || !world?.isAlive?.(targetId)) return null;
+  const outcome = String(req.outcome || "failed");
+  const source = String(req.source || "");
+  const increment = outcome === "resisted" ? 0.15
+    : outcome === "volatile" ? 0.12
+      : outcome === "fumbled" ? 0.08
+        : 0.06;
+
+  if (!world.has(targetId, PolymorphExposure)) {
+    world.add(targetId, PolymorphExposure, {
+      attempts: 1,
+      resistanceBonus: increment,
+      maxBonus: 0.5,
+      lastOutcome: outcome,
+      lastSource: source,
+    });
+  } else {
+    world.mutate(targetId, PolymorphExposure, (rec) => {
+      rec.attempts = Math.max(0, Number(rec.attempts || 0) | 0) + 1;
+      const maxBonus = clamp01(rec.maxBonus ?? 0.5);
+      rec.resistanceBonus = Math.min(maxBonus, clamp01(rec.resistanceBonus || 0) + increment);
+      rec.lastOutcome = outcome;
+      rec.lastSource = source;
+    });
+  }
+  const rec = world.get(targetId, PolymorphExposure);
+  return rec ? { attempts: rec.attempts | 0, resistanceBonus: Number(rec.resistanceBonus || 0) } : null;
+}
+
 /**
  * Decide whether a polymorph attempt can proceed, and what final form should be
  * handed to the canonical resolver. This is intentionally pure policy: it does
  * not mutate entities, consume items, or emit UI messages.
  *
  * @param {any} world
- * @param {{ actorId?:number, targetId?:number, requestedIdentity?:string, source?:string, controlled?:boolean }} req
- * @returns {{ success:boolean, targetIdentity:string, requestedIdentity:string, failureReason:""|"invalid"|"resisted"|"fumbled", resisted:boolean, fumbled:boolean, control:ReturnType<typeof getPolymorphControl>, resistance:ReturnType<typeof getPolymorphResistance> }}
+ * @param {{ actorId?:number, targetId?:number, requestedIdentity?:string, source?:string, controlled?:boolean, ignoreTargetResistance?:boolean }} req
+ * @returns {{ success:boolean, targetIdentity:string, requestedIdentity:string, failureReason:""|"invalid"|"resisted"|"fumbled"|"volatile", resisted:boolean, fumbled:boolean, volatile:boolean, control:ReturnType<typeof getPolymorphControl>, resistance:ReturnType<typeof getPolymorphResistance> }}
  */
 export function resolvePolymorphAttempt(world, req = {}) {
   const actorId = Number(req.actorId || 0) | 0;
@@ -141,20 +219,38 @@ export function resolvePolymorphAttempt(world, req = {}) {
       failureReason: "invalid",
       resisted: false,
       fumbled: false,
+      volatile: false,
       control,
       resistance,
     });
   }
 
-  const resistanceChance = clamp01(resistance.resistanceScore - (Number(control.powerScore || 0) * 0.15));
+  const resistanceChance = req.ignoreTargetResistance
+    ? 0
+    : clamp01(resistance.resistanceScore - (Number(control.powerScore || 0) * 0.15));
   if (resistanceChance > 0 && world.rand() < resistanceChance) {
+    const failureReason = failureReasonForResistance(resistance, Boolean(req.controlled));
+    if (failureReason === "fumbled") {
+      return Object.freeze({
+        success: true,
+        targetIdentity: pickFumbledIdentity(world, requestedIdentity),
+        requestedIdentity,
+        failureReason,
+        resisted: false,
+        fumbled: true,
+        volatile: false,
+        control,
+        resistance,
+      });
+    }
     return Object.freeze({
       success: false,
       targetIdentity: requestedIdentity,
       requestedIdentity,
-      failureReason: "resisted",
-      resisted: true,
+      failureReason,
+      resisted: failureReason === "resisted",
       fumbled: false,
+      volatile: failureReason === "volatile",
       control,
       resistance,
     });
@@ -174,6 +270,7 @@ export function resolvePolymorphAttempt(world, req = {}) {
       failureReason: "fumbled",
       resisted: false,
       fumbled: true,
+      volatile: false,
       control,
       resistance,
     });
@@ -186,6 +283,7 @@ export function resolvePolymorphAttempt(world, req = {}) {
     failureReason: "",
     resisted: false,
     fumbled: false,
+    volatile: false,
     control,
     resistance,
   });

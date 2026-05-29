@@ -22,6 +22,9 @@ defineMonster('floating_eye', {
   intelligence: 2,
   visionRange: 6,
   ambush: true,
+  polymorphResistance: 0.25,
+  polymorphStability: 1,
+  polymorphFailureMode: 'fumble',
   hp: 20,
   hpPerLevel: 1.5,
   attack: 1,
@@ -38,6 +41,7 @@ defineMonster('floating_eye', {
     whileLOS: [gazeOnLOS(8)],
     onHit: [mindflayerBlastOnHit(10, 0xdead000e)],
   },
+  specials: ["Psychic form can misdirect polymorph"],
   description: 'A pulsing violet eye that drifts in silence. Gaze into it too long and your mind unravels.',
   lootTable: 'drop:floating_eye',
 });
@@ -52,6 +56,9 @@ defineMonster('mimic', {
   tier: 99,
   intelligence: 6,
   ambush: true,
+  polymorphResistance: 0.35,
+  polymorphStability: 0,
+  polymorphFailureMode: 'fumble',
   hp: 16,
   hpPerLevel: 1.5,
   attack: 3,
@@ -64,7 +71,7 @@ defineMonster('mimic', {
   hooks: {
     onHit: [statusEffectOnHit(30, 0xdead0020, { key: "stun", turnsLeft: 2, potency: 1 }, "proc:stunned")],
   },
-  specials: ["Adhesive grip (stun 30%)"],
+  specials: ["Adhesive grip (stun 30%)", "Malleable form can bend polymorph off target"],
   description: 'A predatory chest-creature that waits for curious hands.',
   lootTable: 'drop:tier1',
 });
@@ -123,6 +130,9 @@ defineMonster('gelatinous_cube', {
     chemical: { toxMult: 0 },
     electric: { ohms: 60 },
   },
+  polymorphFailureMode: 'volatile',
+  polymorphStability: 0,
+  polymorphResistance: 0.2,
   speed: 1,
   hooks: {
     onHit: [
@@ -131,7 +141,7 @@ defineMonster('gelatinous_cube', {
     ],
     onDamaged: [retaliateOnDamaged(2, "proc:gelatinous_cube:acid")],
   },
-  specials: ["Paralyze 30%", "Acid retaliation (2 dmg)", "Poison/shock resistant"],
+  specials: ["Paralyze 30%", "Acid retaliation (2 dmg)", "Poison/shock resistant", "Unstable polymorph reactions"],
   description: 'A translucent mass of quivering jelly that fills the corridor wall to wall. Bones float inside it.',
 });
 

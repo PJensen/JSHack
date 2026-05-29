@@ -16,11 +16,13 @@ export const POLYMORPH_FAILURE_MODES = Object.freeze([
  * attempt before any transformation happens. Example: 0.8 means an 80% resist
  * chance before control/power modifiers.
  *
- * stability: integer-ish body coherence rating, not a percent. Higher values
- * mean the entity's form is more anchored when polymorph effects partially
- * apply. Current policy exposes this score but does not yet spend it; future
- * failure modes can use it to pick between no-op, fumble, partial transform,
- * backlash, or volatile side effects.
+ * stability: integer-ish body coherence rating, not a percent.
+ *   0 = unstable/malleable
+ *   1 = ordinary living body
+ *   2 = anchored supernatural, ancient, or constructed form
+ *   3+ = exceptional plot/boss/warded coherence
+ * Higher values make messy failure less likely and push policy toward clean
+ * resistance rather than accidental forms or volatile side effects.
  *
  * failureMode: preferred style when this profile causes or shapes a failure.
  * "normal" lets policy choose; "resist" favors no transformation; "fumble"

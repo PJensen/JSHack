@@ -12,6 +12,7 @@ import { getPassiveBonuses } from "../src/rules/utils/passiveBonuses.js";
 import {
   getPolymorphControl,
   getPolymorphResistance,
+  recordPolymorphAttempt,
   resolvePolymorphAttempt,
 } from "../src/rules/utils/polymorphPolicy.js";
 
@@ -119,6 +120,35 @@ Deno.test("polymorph profile component overrides monster authoring resistance", 
   assert(resistance.sources.includes("component:polymorph_profile"));
 });
 
+Deno.test("polymorph resistance includes player-facing passive bonuses", () => {
+  const world = new World({ seed: 1 });
+  const actor = makeActor(world);
+  const ward = makeRing(world, { polymorphResistance: 0.3, polymorphStability: 1 });
+  world.get(actor, Equipment).ring1 = ward;
+
+  const passive = getPassiveBonuses(world, actor);
+  const resistance = getPolymorphResistance(world, actor);
+
+  assertEquals(passive.polymorphResistanceDerived, 0.3);
+  assertEquals(passive.polymorphStabilityDerived, 1);
+  assertEquals(resistance.resistanceScore, 0.3);
+  assertEquals(resistance.stabilityScore, 1);
+  assert(resistance.sources.includes("passive:polymorph_resistance"));
+});
+
+Deno.test("polymorph exposure creates diminishing returns after repeated failed attempts", () => {
+  const world = new World({ seed: 1 });
+  const target = makeTarget(world, "rat");
+
+  recordPolymorphAttempt(world, { targetId: target, outcome: "resisted", source: "test" });
+  recordPolymorphAttempt(world, { targetId: target, outcome: "resisted", source: "test" });
+  const resistance = getPolymorphResistance(world, target);
+
+  assertEquals(resistance.exposureBonus, 0.3);
+  assertEquals(resistance.resistanceScore, 0.3);
+  assert(resistance.sources.includes("component:polymorph_exposure"));
+});
+
 Deno.test("polymorph attempt can fail when target resists", () => {
   const world = new World({ seed: 1 });
   const actor = makeActor(world);
@@ -136,6 +166,67 @@ Deno.test("polymorph attempt can fail when target resists", () => {
   assertEquals(attempt.success, false);
   assertEquals(attempt.failureReason, "resisted");
   assertEquals(attempt.resisted, true);
+});
+
+Deno.test("ignoreTargetResistance bypasses defensive polymorph resistance for self-style policy", () => {
+  const world = new World({ seed: 1 });
+  const actor = makeActor(world);
+  const target = makeTarget(world, "dragon");
+  world.rand = () => 0.0;
+
+  const attempt = resolvePolymorphAttempt(world, {
+    actorId: actor,
+    targetId: target,
+    requestedIdentity: "rat",
+    source: "test",
+    controlled: false,
+    ignoreTargetResistance: true,
+  });
+
+  assertEquals(attempt.success, true);
+  assertEquals(attempt.failureReason, "");
+});
+
+Deno.test("fumble failure mode bends resisted controlled attempts into a wrong form", () => {
+  const world = new World({ seed: 1 });
+  const actor = makeActor(world);
+  const ring = makeRing(world);
+  world.get(actor, Equipment).ring1 = ring;
+  const target = makeTarget(world, "floating_eye");
+  const rolls = [0.0, 0.0];
+  world.rand = () => rolls.shift() ?? 0;
+
+  const attempt = resolvePolymorphAttempt(world, {
+    actorId: actor,
+    targetId: target,
+    requestedIdentity: "rat",
+    source: "test",
+    controlled: true,
+  });
+
+  assertEquals(attempt.success, true);
+  assertEquals(attempt.failureReason, "fumbled");
+  assertEquals(attempt.fumbled, true);
+  assert(attempt.targetIdentity !== "rat");
+});
+
+Deno.test("volatile failure mode returns a volatile no-transform result", () => {
+  const world = new World({ seed: 1 });
+  const actor = makeActor(world);
+  const cube = makeTarget(world, "gelatinous_cube");
+  world.rand = () => 0.0;
+
+  const attempt = resolvePolymorphAttempt(world, {
+    actorId: actor,
+    targetId: cube,
+    requestedIdentity: "rat",
+    source: "test",
+    controlled: false,
+  });
+
+  assertEquals(attempt.success, false);
+  assertEquals(attempt.failureReason, "volatile");
+  assertEquals(attempt.volatile, true);
 });
 
 Deno.test("controlled polymorph can fumble high-risk requested forms", () => {

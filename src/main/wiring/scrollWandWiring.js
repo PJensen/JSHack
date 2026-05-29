@@ -27,7 +27,7 @@ import { inventoryItems, removeFromInventory } from "../../rules/utils/inventory
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
 import { getEffectiveVisionRange, blind } from "../../rules/utils/blind.js";
 import { listApplyTargetsForTool } from "../../rules/content/items/applyPayloads.js";
-import { getPolymorphControl, resolvePolymorphAttempt } from "../../rules/utils/polymorphPolicy.js";
+import { getPolymorphControl, recordPolymorphAttempt, resolvePolymorphAttempt } from "../../rules/utils/polymorphPolicy.js";
 
 const INSTALLED_KEY = Symbol.for('jshack:scrollWandWiring:installed');
 
@@ -64,8 +64,13 @@ export function installScrollWandWiring({ world, targeting, playerEntity }) {
     if (!attempt.success) {
       if (attempt.failureReason === 'resisted') {
         world.emit?.('message', { text: `The ${fromName} resists the transformation.`, type: 'system' });
+      } else if (attempt.failureReason === 'volatile') {
+        world.emit?.('message', { text: `The ${fromName}'s shape surges wildly, then snaps back.`, type: 'system' });
       } else {
         world.emit?.('message', { text: 'You cannot picture such a creature. The scroll fizzles.', type: 'system' });
+      }
+      if (attempt.failureReason !== 'invalid') {
+        recordPolymorphAttempt(world, { targetId: enemyId, outcome: attempt.failureReason, source: reason });
       }
       emitSafe(world, 'polymorph:failed', {
         actorId: actor | 0,
@@ -73,6 +78,7 @@ export function installScrollWandWiring({ world, targeting, playerEntity }) {
         requestedIdentity: attempt.requestedIdentity,
         reason: attempt.failureReason,
         source: reason,
+        resistance: attempt.resistance,
       });
       return;
     }

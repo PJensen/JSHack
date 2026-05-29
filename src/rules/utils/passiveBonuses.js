@@ -38,6 +38,8 @@ export const PASSIVE_BONUS_DEFAULTS = Object.freeze({
   hungerRateDerived: 0,
   polymorphControlDerived: 0,
   polymorphPowerDerived: 0,
+  polymorphResistanceDerived: 0,
+  polymorphStabilityDerived: 0,
 });
 
 const PASSIVE_BONUSES_DEFINED = Symbol.for("jshack:passiveBonuses:virtuals:defined");
@@ -78,6 +80,8 @@ const BONUS_KEY_MAP = Object.freeze({
   hungerRate: "hungerRateDerived",
   polymorphControl: "polymorphControlDerived",
   polymorphPower: "polymorphPowerDerived",
+  polymorphResistance: "polymorphResistanceDerived",
+  polymorphStability: "polymorphStabilityDerived",
 });
 
 function createPassiveBonusBag() {

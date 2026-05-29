@@ -609,6 +609,9 @@ defineMonster('cockatrice', {
   minDepth: 4,
   intelligence: 2,
   aggro: 'passive',
+  polymorphResistance: 0.4,
+  polymorphStability: 2,
+  polymorphFailureMode: 'resist',
   hp: 14,
   hpPerLevel: 1,
   attack: 0,
@@ -625,7 +628,7 @@ defineMonster('cockatrice', {
       statusEffectOnHit(40, 0xdead0082, { key: "weakened", turnsLeft: 5, potency: 1 }, "proc:weakened"),
     ],
   },
-  specials: ["Petrifying touch (slow 80%)", "Confuse 60%", "Weaken 40%", "Passive"],
+  specials: ["Petrifying touch (slow 80%)", "Confuse 60%", "Weaken 40%", "Passive", "Stone-anchored polymorph resistance"],
   description: 'A scaly hen-lizard with dead white eyes. Its touch numbs flesh to stone.',
   lootTable: 'drop:cockatrice',
 });

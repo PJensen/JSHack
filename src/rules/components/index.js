@@ -85,6 +85,7 @@ export { DisarmIntent } from './Intents/DisarmIntent.js';
 export { SearchIntent } from './Intents/SearchIntent.js';
 export { SetPostureIntent } from './Intents/SetPostureIntent.js';
 export { Polymorph } from './Polymorph.js';
+export { PolymorphExposure } from './PolymorphExposure.js';
 export { PolymorphProfile } from './PolymorphProfile.js';
 export { Channeling } from './Channeling.js';
 export { Collider } from './Collider.js';
