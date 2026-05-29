@@ -15,13 +15,6 @@ export const POLYMORPH_STABILITY_SCORE = Object.freeze({
   [POLYMORPH_STABILITY.fixed]: 3,
 });
 
-export const POLYMORPH_FAILURE_MODES = Object.freeze([
-  "normal",
-  "resist",
-  "fumble",
-  "volatile",
-]);
-
 /**
  * @param {any} value
  * @returns {string}
@@ -63,25 +56,21 @@ export function polymorphStabilityScore(value) {
  * Higher values make messy failure less likely and push policy toward clean
  * resistance rather than accidental forms or volatile side effects.
  *
- * failureMode: preferred style when this profile causes or shapes a failure.
- * "normal" lets policy choose; "resist" favors no transformation; "fumble"
- * favors a wrong-but-valid form; "volatile" is reserved for side effects.
+ * Failure style is intentionally derived from stability by policy. Future
+ * backlash effects should be authored as separate effect payloads, not as a
+ * second failure-classification axis.
  */
 export const PolymorphProfile = defineComponent(
   "PolymorphProfile",
   {
     resistance: 0,
     stability: POLYMORPH_STABILITY.ordinary,
-    failureMode: "normal",
   },
   {
     validate(rec) {
       if (!rec || typeof rec !== "object") return false;
       rec.resistance = clamp(Number(rec.resistance || 0), 0, 1);
       rec.stability = normalizePolymorphStability(rec.stability);
-      rec.failureMode = POLYMORPH_FAILURE_MODES.includes(String(rec.failureMode || ""))
-        ? String(rec.failureMode)
-        : "normal";
       return true;
     },
   },

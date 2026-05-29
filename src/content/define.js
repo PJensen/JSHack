@@ -364,7 +364,6 @@ export function defineItem(id, def) {
  * @param {string|{pattern?:string,context?:string,chance?:number}} [def.sleep]
  * @param {number} [def.polymorphResistance] - 0..1 chance to reject a polymorph attempt before transformation.
  * @param {string|number} [def.polymorphStability] - serialized body coherence enum: "unstable"|"ordinary"|"anchored"|"fixed". Legacy numbers normalize to that enum.
- * @param {string} [def.polymorphFailureMode] - "normal"|"resist"|"fumble"|"volatile" policy hint.
  *
  * // Resistances
  * @param {object} [def.resistances]
@@ -428,7 +427,6 @@ export function defineMonster(id, def) {
   if (def.ambush != null) monsterDef.ambush = def.ambush;
   if (def.polymorphResistance != null) monsterDef.polymorphResistance = clamp(Number(def.polymorphResistance || 0), 0, 1);
   if (def.polymorphStability != null) monsterDef.polymorphStability = normalizePolymorphStability(def.polymorphStability);
-  if (def.polymorphFailureMode != null) monsterDef.polymorphFailureMode = String(def.polymorphFailureMode || "normal");
   if (typeof def.sleep === 'string') {
     monsterDef.sleep = def.sleep;
   } else if (def.sleep && typeof def.sleep === 'object') {

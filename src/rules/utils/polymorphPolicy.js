@@ -79,7 +79,7 @@ export function getPolymorphControl(world, actorId) {
  *
  * @param {any} world
  * @param {number} targetId
- * @returns {{ resistanceScore:number, stability:string, stabilityScore:number, failureMode:string, exposureBonus:number, sources:string[] }}
+ * @returns {{ resistanceScore:number, stability:string, stabilityScore:number, exposureBonus:number, sources:string[] }}
  */
 export function getPolymorphResistance(world, targetId) {
   const id = Number(targetId || 0) | 0;
@@ -89,7 +89,6 @@ export function getPolymorphResistance(world, targetId) {
       resistanceScore: 0,
       stability: POLYMORPH_STABILITY.ordinary,
       stabilityScore: polymorphStabilityScore(POLYMORPH_STABILITY.ordinary),
-      failureMode: "normal",
       exposureBonus: 0,
       sources,
     });
@@ -97,20 +96,17 @@ export function getPolymorphResistance(world, targetId) {
 
   let resistanceScore = 0;
   let stability = POLYMORPH_STABILITY.ordinary;
-  let failureMode = "normal";
 
   const profile = world.get(id, PolymorphProfile);
   if (profile) {
     resistanceScore = clamp01(profile.resistance);
     stability = normalizePolymorphStability(profile.stability);
-    failureMode = String(profile.failureMode || "normal");
     if (resistanceScore > 0 || stability !== POLYMORPH_STABILITY.ordinary) addSource(sources, "component:polymorph_profile");
   } else {
     const identity = String(world.get(id, NamedIdentity)?.identity || "");
     const def = identity ? getMonster(identity) : null;
     resistanceScore = clamp01(def?.polymorphResistance || 0);
     stability = normalizePolymorphStability(def?.polymorphStability);
-    failureMode = String(def?.polymorphFailureMode || "normal");
     if (resistanceScore > 0 || stability !== POLYMORPH_STABILITY.ordinary) addSource(sources, `monster:${identity}`);
   }
 
@@ -138,7 +134,6 @@ export function getPolymorphResistance(world, targetId) {
     resistanceScore: clamp01(resistanceScore),
     stability,
     stabilityScore: polymorphStabilityScore(stability),
-    failureMode,
     exposureBonus,
     sources: Object.freeze(sources),
   });
@@ -162,11 +157,11 @@ function pickFumbledIdentity(world, requestedIdentity) {
 }
 
 function failureReasonForResistance(resistance, controlled) {
-  const mode = String(resistance?.failureMode || "normal");
   const stability = Number(resistance?.stabilityScore || 0);
+  const unstable = polymorphStabilityScore(POLYMORPH_STABILITY.unstable);
   const anchored = polymorphStabilityScore(POLYMORPH_STABILITY.anchored);
-  if (mode === "volatile" && stability < anchored) return "volatile";
-  if (mode === "fumble" && controlled && stability < anchored) return "fumbled";
+  if (controlled && stability < anchored) return "fumbled";
+  if (!controlled && stability <= unstable) return "volatile";
   return "resisted";
 }
 

@@ -110,21 +110,19 @@ Deno.test("polymorph resistance reads static monster authoring data", () => {
   assertEquals(resistance.resistanceScore, 0.65);
   assertEquals(resistance.stability, POLYMORPH_STABILITY.anchored);
   assertEquals(resistance.stabilityScore, 2);
-  assertEquals(resistance.failureMode, "resist");
   assert(resistance.sources.includes("monster:dragon"));
 });
 
 Deno.test("polymorph profile component overrides monster authoring resistance", () => {
   const world = new World({ seed: 1 });
   const dragon = makeTarget(world, "dragon");
-  world.add(dragon, PolymorphProfile, { resistance: 0.2, stability: POLYMORPH_STABILITY.fixed, failureMode: "fumble" });
+  world.add(dragon, PolymorphProfile, { resistance: 0.2, stability: POLYMORPH_STABILITY.fixed });
 
   const resistance = getPolymorphResistance(world, dragon);
 
   assertEquals(resistance.resistanceScore, 0.2);
   assertEquals(resistance.stability, POLYMORPH_STABILITY.fixed);
   assertEquals(resistance.stabilityScore, 3);
-  assertEquals(resistance.failureMode, "fumble");
   assert(resistance.sources.includes("component:polymorph_profile"));
 });
 
@@ -204,7 +202,7 @@ Deno.test("ignoreTargetResistance bypasses defensive polymorph resistance for se
   assertEquals(attempt.failureReason, "");
 });
 
-Deno.test("fumble failure mode bends resisted controlled attempts into a wrong form", () => {
+Deno.test("unstable and ordinary stability bend resisted controlled attempts into a wrong form", () => {
   const world = new World({ seed: 1 });
   const actor = makeActor(world);
   const ring = makeRing(world);
@@ -227,7 +225,7 @@ Deno.test("fumble failure mode bends resisted controlled attempts into a wrong f
   assert(attempt.targetIdentity !== "rat");
 });
 
-Deno.test("volatile failure mode returns a volatile no-transform result", () => {
+Deno.test("unstable stability returns a volatile no-transform result for uncontrolled attempts", () => {
   const world = new World({ seed: 1 });
   const actor = makeActor(world);
   const cube = makeTarget(world, "gelatinous_cube");
