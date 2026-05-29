@@ -3,21 +3,13 @@
   "checkpoint_id": "d38221c4987c",
   "session_id": "019e751c-3014-7c03-b0c1-0e01e8a8ba1f",
   "strategy": "manual-commit",
-  "created_at": "2026-05-29T20:03:06.376264315Z",
+  "created_at": "2026-05-29T20:03:09.563515961Z",
   "branch": "master",
-  "checkpoints_count": 2,
-  "files_touched": [
-    "src/main/scheduler.js",
-    "src/rules/components/Reputation.js",
-    "src/rules/components/index.js",
-    "src/rules/content/interaction/interactPayloads.js",
-    "src/rules/utils/disposition.js",
-    "src/rules/utils/reputation.js",
-    "tests/reputation.test.mjs"
-  ],
+  "checkpoints_count": 1,
+  "files_touched": [],
   "agent": "Codex",
   "model": "gpt-5.5",
-  "turn_id": "18f30d5ecc9f",
+  "turn_id": "0895fb1f17c4",
   "token_usage": {
     "input_tokens": 715274,
     "cache_creation_tokens": 0,
@@ -27,18 +19,6 @@
   },
   "session_metrics": {
     "turn_count": 11
-  },
-  "initial_attribution": {
-    "calculated_at": "2026-05-29T20:03:06.254051364Z",
-    "agent_lines": 401,
-    "agent_removed": 2,
-    "human_added": 0,
-    "human_modified": 0,
-    "human_removed": 0,
-    "total_committed": 401,
-    "total_lines_changed": 403,
-    "agent_percentage": 100,
-    "metric_version": 2
   },
   "prompt_attributions": [
     {

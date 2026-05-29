@@ -3,16 +3,8 @@
   "checkpoint_id": "d38221c4987c",
   "strategy": "manual-commit",
   "branch": "master",
-  "checkpoints_count": 2,
-  "files_touched": [
-    "src/main/scheduler.js",
-    "src/rules/components/Reputation.js",
-    "src/rules/components/index.js",
-    "src/rules/content/interaction/interactPayloads.js",
-    "src/rules/utils/disposition.js",
-    "src/rules/utils/reputation.js",
-    "tests/reputation.test.mjs"
-  ],
+  "checkpoints_count": 1,
+  "files_touched": null,
   "sessions": [
     {
       "metadata": "/d3/8221c4987c/0/metadata.json",
