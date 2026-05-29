@@ -13,9 +13,10 @@ import { Position } from "../../rules/components/Position.js";
 import { Traits } from "../../rules/components/Traits.js";
 import { Vitality } from "../../rules/components/Vitality.js";
 import { setItemCooldown } from "../../rules/utils/itemCooldowns.js";
-import { listAllMonsterIds, getAllMonsters, getMonster } from "../../rules/data/monsters.js";
+import { listAllMonsterIds, getMonster } from "../../rules/data/monsters.js";
 import { Polymorph } from "../../rules/components/Polymorph.js";
 import { resolvePolymorph } from "../../rules/systems/polymorphSystem.js";
+import { buildPolymorphTargetOptions } from "../polymorph/polymorphChoices.js";
 import { spawnMonsterEntity } from "../../rules/utils/spawnMonsterEntity.js";
 import { pickMonster } from "../../rules/environment/dungeon/tables.js";
 import { createRng } from "../../lib/ecs-js/rng.js";
@@ -39,6 +40,63 @@ const INSTALLED_KEY = Symbol.for('jshack:scrollWandWiring:installed');
 export function installScrollWandWiring({ world, targeting, playerEntity }) {
   if (world[INSTALLED_KEY]) return;
   world[INSTALLED_KEY] = true;
+
+  const pendingControlledPolymorphs = new Map();
+  let nextPolymorphRequestId = 1;
+
+  function currentDepth() {
+    let depth = 1;
+    for (const [, ds] of world.query(DungeonState)) { depth = ds.currentDepth ?? 1; }
+    return Math.max(1, Number(depth || 1) | 0);
+  }
+
+  function applyPolymorphSelection({ actor, enemyId, targetIdentity, depth, trigger = 'scroll', reason = 'scroll_polymorph' }) {
+    if (!getMonster(targetIdentity)) {
+      world.emit?.('message', { text: 'You cannot picture such a creature. The scroll fizzles.', type: 'system' });
+      return;
+    }
+
+    const fromIdent = world.get(enemyId, NamedIdentity);
+    const fromName = fromIdent?.identity ? (getMonster(fromIdent.identity)?.name || fromIdent.identity) : 'creature';
+
+    try {
+      world.add(enemyId, Polymorph, { targetIdentity, depth, trigger, once: true, revealed: false, hookKey: '' });
+    } catch {
+      world.mutate(enemyId, Polymorph, (r) => { r.targetIdentity = targetIdentity; r.depth = depth; r.revealed = false; });
+    }
+
+    const spawnedId = resolvePolymorph(world, { entityId: enemyId, targetIdentity, depth, actorId: actor, trigger, reason });
+    const toName = getMonster(targetIdentity)?.name || targetIdentity;
+    if (spawnedId > 0) {
+      world.emit?.('message', { text: `The ${fromName} shudders and transforms into a ${toName}!`, type: 'system' });
+      const pos = world.get(spawnedId, Position);
+      if (pos) world.emit?.('scroll:polymorph:vfx', { x: pos.x | 0, y: pos.y | 0 });
+    } else {
+      world.emit?.('message', { text: 'The scroll fizzles.', type: 'system' });
+    }
+  }
+
+  addEventListener('ui:polymorphTargetChosen', (ev) => {
+    const detail = /** @type {CustomEvent} */ (ev).detail || {};
+    const requestId = Number(detail.requestId || 0) | 0;
+    const pending = pendingControlledPolymorphs.get(requestId);
+    if (!pending) return;
+    pendingControlledPolymorphs.delete(requestId);
+    window.dispatchEvent(new CustomEvent('ui:closePolymorphChooser'));
+    applyPolymorphSelection({
+      ...pending,
+      targetIdentity: String(detail.monsterId || ''),
+    });
+  });
+
+  addEventListener('ui:polymorphTargetCanceled', (ev) => {
+    const detail = /** @type {CustomEvent} */ (ev).detail || {};
+    const requestId = Number(detail.requestId || 0) | 0;
+    if (!pendingControlledPolymorphs.has(requestId)) return;
+    pendingControlledPolymorphs.delete(requestId);
+    window.dispatchEvent(new CustomEvent('ui:closePolymorphChooser'));
+    world.emit?.('message', { text: 'The scroll fizzles.', type: 'system' });
+  });
 
   // ── Scroll of Genocide ──────────────────────────────────────────────────
   world.on('scroll:genocide', ({ actor }) => {
@@ -72,54 +130,25 @@ export function installScrollWandWiring({ world, targeting, playerEntity }) {
         let targetIdentity;
         const traits = world.get(actor, Traits);
         if (traits?.polymorph_control) {
-          const input = prompt('Polymorph into which creature?');
-          if (!input || !input.trim()) {
-            world.emit?.('message', { text: 'The scroll fizzles.', type: 'system' });
-            return;
-          }
-          const query = input.trim().toLowerCase();
-          let best = null;
-          let bestScore = Infinity;
-          for (const monster of getAllMonsters()) {
-            const name = monster.name.toLowerCase();
-            if (name === query) { best = monster; bestScore = 0; break; }
-            const score = name.startsWith(query) ? 1
-              : name.includes(query) ? 2
-              : query.startsWith(name) ? 3
-              : Infinity;
-            if (score < bestScore) { bestScore = score; best = monster; }
-          }
-          if (!best || bestScore > 4) {
-            world.emit?.('message', { text: 'You cannot picture such a creature. The scroll fizzles.', type: 'system' });
-            return;
-          }
-          targetIdentity = best.id;
+          const depth = currentDepth();
+          const requestId = nextPolymorphRequestId++;
+          const fromIdent = world.get(enemyId, NamedIdentity);
+          const targetName = fromIdent?.identity ? (getMonster(fromIdent.identity)?.name || fromIdent.identity) : 'creature';
+          pendingControlledPolymorphs.set(requestId, { actor, enemyId, depth, trigger: 'scroll', reason: 'scroll_polymorph' });
+          window.dispatchEvent(new CustomEvent('ui:openPolymorphChooser', {
+            detail: {
+              requestId,
+              targetName,
+              choices: buildPolymorphTargetOptions({ currentDepth: depth }),
+            },
+          }));
+          return;
         } else {
           const allIds = listAllMonsterIds();
           targetIdentity = allIds[Math.floor(world.rand() * allIds.length)];
         }
 
-        let depth = 1;
-        for (const [, ds] of world.query(DungeonState)) { depth = ds.currentDepth ?? 1; }
-
-        const fromIdent = world.get(enemyId, NamedIdentity);
-        const fromName = fromIdent?.identity ? (getMonster(fromIdent.identity)?.name || fromIdent.identity) : 'creature';
-
-        try {
-          world.add(enemyId, Polymorph, { targetIdentity, depth, trigger: 'scroll', once: true, revealed: false, hookKey: '' });
-        } catch {
-          world.mutate(enemyId, Polymorph, (r) => { r.targetIdentity = targetIdentity; r.depth = depth; r.revealed = false; });
-        }
-
-        const spawnedId = resolvePolymorph(world, { entityId: enemyId, targetIdentity, depth, actorId: actor, trigger: 'scroll', reason: 'scroll_polymorph' });
-        const toName = getMonster(targetIdentity)?.name || targetIdentity;
-        if (spawnedId > 0) {
-          world.emit?.('message', { text: `The ${fromName} shudders and transforms into a ${toName}!`, type: 'system' });
-          const pos = world.get(spawnedId, Position);
-          if (pos) world.emit?.('scroll:polymorph:vfx', { x: pos.x | 0, y: pos.y | 0 });
-        } else {
-          world.emit?.('message', { text: 'The scroll fizzles.', type: 'system' });
-        }
+        applyPolymorphSelection({ actor, enemyId, targetIdentity, depth: currentDepth(), trigger: 'scroll', reason: 'scroll_polymorph' });
       },
     });
   });
