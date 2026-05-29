@@ -2,7 +2,7 @@
 // App-owned translation from display/input Actions → rules intents on the ECS world.
 // This file is allowed to import rules and the ECS World (per Separation Manifest).
 
-import { MoveIntent, WaitIntent, PrayIntent, DrinkIntent, CastSpellIntent, PickupIntent, DropIntent, EquipIntent, RangedAttackIntent, EngraveIntent, DisarmIntent, SetPostureIntent, Position, ItemInfo, Settings } from "../../rules/components/index.js";
+import { MoveIntent, WaitIntent, PrayIntent, DrinkIntent, CastSpellIntent, PickupIntent, DropIntent, EquipIntent, RangedAttackIntent, AttackDirectionIntent, EngraveIntent, DisarmIntent, SetPostureIntent, Position, ItemInfo, Settings } from "../../rules/components/index.js";
 import { Equipment } from "../../rules/components/Equipment.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 import { Faction } from "../../rules/components/Faction.js";
@@ -24,6 +24,7 @@ import { getSpell } from "../../rules/data/spells.js";
 import { getEffectiveVisionRange } from "../../rules/utils/blind.js";
 import { getEntityFacingConeDegrees, getNormalizedEntityFacing } from "../../rules/utils/facing.js";
 import { updateFOV, isVisible as isTileVisible } from "../../rules/environment/dungeon/exploredMap.js";
+import { classifyAttackDirection } from "../../rules/utils/attackActionPolicy.js";
 
 /**
  * Create a rules dispatcher bound to a world and an actor resolver.
@@ -84,6 +85,29 @@ export function makeRulesDispatcher(world, getActorId, opts = {}) {
       case "rules.move": {
         const { dx = 0, dy = 0 } = action.payload || {};
         world?.add?.(actorId, MoveIntent, { dx, dy });
+        world?.tick?.(1);
+        break;
+      }
+      case "rules.attackDirection": {
+        const { dx = 0, dy = 0, confirmed = false } = action.payload || {};
+        const adx = Number(dx) | 0;
+        const ady = Number(dy) | 0;
+        const plan = classifyAttackDirection(world, { actorId, dx: adx, dy: ady });
+        if (plan.reason === "invalid_direction") {
+          world?.emit?.("attack:direction-failed", { actor: actorId, dx: adx, dy: ady, reason: plan.reason });
+          break;
+        }
+        let ok = confirmed === true;
+        if (plan.requiresConfirm && !ok) {
+          if (typeof window !== "undefined" && typeof window.confirm === "function") {
+            ok = window.confirm(plan.message || "Attack?");
+          }
+          if (!ok) {
+            world?.emit?.("attack:cancelled", { actor: actorId, dx: adx, dy: ady, targetId: plan.targetId || 0, reason: "not_confirmed" });
+            break;
+          }
+        }
+        world?.add?.(actorId, AttackDirectionIntent, { dx: adx, dy: ady, confirmed: ok });
         world?.tick?.(1);
         break;
       }

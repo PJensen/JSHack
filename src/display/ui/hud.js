@@ -118,7 +118,8 @@ export const MOBILE_ACTION_BAR_GRID_AREAS = Object.freeze({
   posture: Object.freeze({ col: '3', row: '1' }),
   pray: Object.freeze({ col: '4', row: '1' }),
   wait: Object.freeze({ col: '5', row: '1' }),
-  shoot: Object.freeze({ col: '6', row: '1' }),
+  attack: Object.freeze({ col: '6', row: '1' }),
+  shoot: Object.freeze({ col: '7', row: '1' }),
 });
 
 const STARTER_PIN_PRIORITY = Object.freeze([
@@ -584,6 +585,18 @@ export function initHUD() {
     try { window.dispatchEvent(new CustomEvent('ui:shootRanged')); } catch (e) { console.debug('[hud] dispatch ui:shootRanged:', e); }
   });
 
+  const attackBtn = document.createElement('button');
+  attackBtn.id = 'btn-melee-attack';
+  attackBtn.textContent = 'Attack';
+  Object.assign(attackBtn.style, {
+    padding: '8px 12px', borderRadius: '6px',
+    border: '1px solid #2d3b52', background: '#101626', color: '#cfe8ff',
+    cursor: 'pointer'
+  });
+  attackBtn.addEventListener('click', () => {
+    try { window.dispatchEvent(new CustomEvent('ui:beginAttackDirection')); } catch (e) { console.debug('[hud] dispatch ui:beginAttackDirection:', e); }
+  });
+
   // Pray button
   const prayBtn = document.createElement('button');
   prayBtn.id = 'btn-pray';
@@ -773,6 +786,7 @@ export function initHUD() {
     cast: '\u2726',           // ✦
     spells: '\u{1F4D6}',      // 📖
     shoot: '\u{1F3F9}',       // 🏹
+    attack: '\u2694',         // ⚔
     zap: '\u26A1',            // ⚡
     pray: '\u{1F64F}',        // 🙏
     door: '\u{1F6AA}',        // 🚪
@@ -906,7 +920,7 @@ export function initHUD() {
     window.dispatchEvent(new CustomEvent('ui:openPetMenu'));
   });
 
-  const commandButtons = [charBtn, bagBtn, petBtn, castBtn, spellSelectBtn, shootBtn, prayBtn, quickInteractBtn, postureBtn, waitBtn];
+  const commandButtons = [charBtn, bagBtn, petBtn, castBtn, spellSelectBtn, attackBtn, shootBtn, prayBtn, quickInteractBtn, postureBtn, waitBtn];
   for (const btn of commandButtons) {
     Object.assign(btn.style, {
       position: 'relative',
@@ -989,6 +1003,7 @@ export function initHUD() {
   setDesktopLabel(petBtn, 'Pet: Following'); setMobileLabel(petBtn, 'Pet');
   setDesktopLabel(castBtn, 'Cast'); setMobileLabel(castBtn, 'Cast');
   setDesktopLabel(spellSelectBtn, 'Spells'); setMobileLabel(spellSelectBtn, 'Spells');
+  setDesktopLabel(attackBtn, 'Attack'); setMobileLabel(attackBtn, 'Attack');
   setDesktopLabel(shootBtn, 'Shoot'); setMobileLabel(shootBtn, 'Shoot');
   setDesktopLabel(prayBtn, 'Pray'); setMobileLabel(prayBtn, 'Pray');
   setDesktopLabel(quickInteractBtn, 'Door'); setMobileLabel(quickInteractBtn, 'Door');
@@ -999,6 +1014,7 @@ export function initHUD() {
   setDesktopIcon(petBtn, ACTION_ICONS.petDefault); setMobileIcon(petBtn, ACTION_ICONS.petDefault);
   setDesktopIcon(castBtn, ACTION_ICONS.cast); setMobileIcon(castBtn, ACTION_ICONS.cast);
   setDesktopIcon(spellSelectBtn, ACTION_ICONS.spells); setMobileIcon(spellSelectBtn, ACTION_ICONS.spells);
+  setDesktopIcon(attackBtn, ACTION_ICONS.attack); setMobileIcon(attackBtn, ACTION_ICONS.attack);
   setDesktopIcon(shootBtn, ACTION_ICONS.shoot); setMobileIcon(shootBtn, ACTION_ICONS.shoot);
   setDesktopIcon(prayBtn, ACTION_ICONS.pray); setMobileIcon(prayBtn, ACTION_ICONS.pray);
   setDesktopIcon(quickInteractBtn, ACTION_ICONS.door); setMobileIcon(quickInteractBtn, ACTION_ICONS.door);
@@ -1009,6 +1025,7 @@ export function initHUD() {
   setBarLabel(petBtn, 'Pet');
   setBarLabel(castBtn, 'Cast');
   setBarLabel(spellSelectBtn, 'Spells');
+  setBarLabel(attackBtn, 'Attack');
   setBarLabel(shootBtn, 'Shoot');
   setBarLabel(prayBtn, 'Pray');
   setBarLabel(quickInteractBtn, 'Door');
@@ -1019,6 +1036,7 @@ export function initHUD() {
   petBtn.dataset.keyHint = 'p';
   castBtn.dataset.keyHint = 'f';
   spellSelectBtn.dataset.keyHint = 'S';
+  attackBtn.dataset.keyHint = 'A';
   shootBtn.dataset.keyHint = 'r';
   prayBtn.dataset.keyHint = 'P';
   quickInteractBtn.dataset.keyHint = 'o';
@@ -1073,14 +1091,14 @@ export function initHUD() {
 
     Object.assign(bar.style, {
       display: 'grid',
-      gridTemplateColumns: 'repeat(6, minmax(0, 1fr))',
+      gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
       gridTemplateRows: '44px',
       alignItems: 'stretch',
       justifyContent: 'center',
       gap: '6px',
       left: isMobile ? '8px' : '50%',
       right: isMobile ? '8px' : '',
-      width: isMobile ? '' : 'min(420px, calc(100vw - 16px))',
+      width: isMobile ? '' : 'min(490px, calc(100vw - 16px))',
       transform: isMobile ? '' : 'translateX(-50%)',
     });
     for (const btn of commandButtons) {
@@ -1102,6 +1120,8 @@ export function initHUD() {
     prayBtn.style.gridRow = area.pray.row;
     waitBtn.style.gridColumn = area.wait.col;
     waitBtn.style.gridRow = area.wait.row;
+    attackBtn.style.gridColumn = area.attack.col;
+    attackBtn.style.gridRow = area.attack.row;
     shootBtn.style.gridColumn = area.shoot.col;
     shootBtn.style.gridRow = area.shoot.row;
     refreshCommandLabels();
@@ -1121,6 +1141,12 @@ export function initHUD() {
     petBtn.style.visibility = exists ? 'visible' : 'hidden';
     petBtn.style.pointerEvents = exists ? 'auto' : 'none';
     petBtn.setAttribute('aria-hidden', exists ? 'false' : 'true');
+  });
+  window.addEventListener('ui:attackDirectionMode', (ev) => {
+    const e = /** @type {CustomEvent} */ (ev);
+    const active = e?.detail?.active === true;
+    attackBtn.style.borderColor = active ? '#f2c94c' : '#2d3b52';
+    attackBtn.style.background = active ? '#2a2310' : '#101626';
   });
   // Update button based on pet state
   window.addEventListener('ui:updatePetButton', (ev) => {
@@ -1636,6 +1662,7 @@ export function initHUD() {
   bar.appendChild(petBtn);
   bar.appendChild(castBtn);
   bar.appendChild(spellSelectBtn);
+  bar.appendChild(attackBtn);
   bar.appendChild(quickInteractBtn);
   bar.appendChild(postureBtn);
   bar.appendChild(pinSlots.el);

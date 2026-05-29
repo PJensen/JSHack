@@ -19,6 +19,14 @@ const JOYSTICK_MAX_RADIUS_PX = 46;
 const SWIPE_MIN_DIST_PX = 50;
 const SWIPE_MAX_MS = 400;
 
+function directionFromKey(key, code) {
+  if (code === "ArrowLeft" || key === "a" || key === "h") return { dx: -1, dy: 0 };
+  if (code === "ArrowRight" || key === "d" || key === "l") return { dx: 1, dy: 0 };
+  if (code === "ArrowUp" || key === "w" || key === "k") return { dx: 0, dy: -1 };
+  if (code === "ArrowDown" || key === "s" || key === "j") return { dx: 0, dy: 1 };
+  return null;
+}
+
 export class InputManager {
   constructor(targetEl, options = {}) {
     this.target = targetEl || window;
@@ -58,11 +66,13 @@ export class InputManager {
     this._repeatPoint = null;
 
     this._cheatBuffer = "";
+    this._attackDirectionPending = false;
     this._onKeyDown = (e) => this._handleKeyDown(e);
     this._onPointerDown = (e) => this._handlePointerDown(e);
     this._onPointerMove = (e) => this._handlePointerMove(e);
     this._onPointerUp = (e) => this._handlePointerUp(e);
     this._onPointerCancel = (e) => this._handlePointerCancel(e);
+    this._onAttackDirectionRequest = () => this._beginAttackDirection();
     this._onSettingsChanged = (e) => {
       const { inputMode, walkInterval } = /** @type {any} */ (e).detail || {};
       if (inputMode === 'walk' || inputMode === 'gesture' || inputMode === 'joystick') this._mode = inputMode;
@@ -125,6 +135,7 @@ export class InputManager {
 
   _bind() {
     this.target.addEventListener("keydown", this._onKeyDown);
+    this.target.addEventListener("ui:beginAttackDirection", this._onAttackDirectionRequest);
     this.target.addEventListener("ui:inputSettingsChanged", this._onSettingsChanged);
     const el = this._canvas || this.target;
     el.addEventListener("pointerdown", this._onPointerDown, { passive: false });
@@ -135,6 +146,7 @@ export class InputManager {
 
   _unbind() {
     this.target.removeEventListener("keydown", this._onKeyDown);
+    this.target.removeEventListener("ui:beginAttackDirection", this._onAttackDirectionRequest);
     this.target.removeEventListener("ui:inputSettingsChanged", this._onSettingsChanged);
     const el = this._canvas || this.target;
     el.removeEventListener("pointerdown", this._onPointerDown);
@@ -152,6 +164,21 @@ export class InputManager {
     const tag = String(target?.tagName || "").toLowerCase();
     const isTextEntry = !!target?.isContentEditable || tag === "input" || tag === "textarea" || tag === "select";
     if (isTextEntry) return;
+
+    const keyDir = directionFromKey(key, code);
+    if (this._attackDirectionPending && keyDir) {
+      e.preventDefault();
+      this._attackDirectionPending = false;
+      this._emitUi("ui:attackDirectionMode", { active: false });
+      this._emit(makeAction(Actions.AttackDirection, keyDir));
+      return;
+    }
+    if (this._attackDirectionPending && (key === "Escape" || lowerKey === "escape")) {
+      e.preventDefault();
+      this._attackDirectionPending = false;
+      this._emitUi("ui:attackDirectionMode", { active: false, cancelled: true });
+      return;
+    }
 
     // Cheat code detection (IDDQD → god mode)
     if (lowerKey && lowerKey.length === 1) {
@@ -219,6 +246,12 @@ export class InputManager {
     if (key === ".") {
       e.preventDefault();
       this._emit(makeAction(Actions.Search));
+      return;
+    }
+    // Explicit melee attack: Shift+A, then a cardinal direction.
+    if (key === "A") {
+      e.preventDefault();
+      this._beginAttackDirection();
       return;
     }
     // Wait intent: Shift+. ('>')
@@ -705,10 +738,10 @@ export class InputManager {
     const dx = point.x - centerX;
     const dy = point.y - centerY;
     if (Math.abs(dx) > Math.abs(dy)) {
-      this._emit(makeAction(Actions.Move, { dx: dx > 0 ? 1 : -1, dy: 0 }));
+      this._emitDirectionalAction({ dx: dx > 0 ? 1 : -1, dy: 0 });
       return;
     }
-    this._emit(makeAction(Actions.Move, { dx: 0, dy: dy > 0 ? 1 : -1 }));
+    this._emitDirectionalAction({ dx: 0, dy: dy > 0 ? 1 : -1 });
   }
 
   _emitMoveFromJoystick() {
@@ -717,10 +750,26 @@ export class InputManager {
     const mag = Math.hypot(dx, dy);
     if (!(mag >= JOYSTICK_DEADZONE_PX)) return;
     if (Math.abs(dx) > Math.abs(dy)) {
-      this._emit(makeAction(Actions.Move, { dx: dx > 0 ? 1 : -1, dy: 0 }));
+      this._emitDirectionalAction({ dx: dx > 0 ? 1 : -1, dy: 0 });
       return;
     }
-    this._emit(makeAction(Actions.Move, { dx: 0, dy: dy > 0 ? 1 : -1 }));
+    this._emitDirectionalAction({ dx: 0, dy: dy > 0 ? 1 : -1 });
+  }
+
+  _beginAttackDirection() {
+    this._attackDirectionPending = true;
+    this._cancelWalkRepeat();
+    this._emitUi("ui:attackDirectionMode", { active: true });
+  }
+
+  _emitDirectionalAction(dir) {
+    if (this._attackDirectionPending) {
+      this._attackDirectionPending = false;
+      this._emitUi("ui:attackDirectionMode", { active: false });
+      this._emit(makeAction(Actions.AttackDirection, dir));
+      return;
+    }
+    this._emit(makeAction(Actions.Move, dir));
   }
 
   _buildJoystickUiPayload() {

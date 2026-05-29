@@ -12,6 +12,7 @@ import { FoodDecay } from "../../rules/components/FoodDecay.js";
 import { Inventory } from "../../rules/components/Inventory.js";
 import { InteractIntent } from "../../rules/components/Intents/InteractIntent.js";
 import { MeleeAttackIntent } from "../../rules/components/Intents/MeleeAttackIntent.js";
+import { AttackDirectionIntent } from "../../rules/components/Intents/AttackDirectionIntent.js";
 import { Interactable } from "../../rules/components/Interactable.js";
 import { Mana } from "../../rules/components/Mana.js";
 import { CombatLog as MessageLog } from "../../rules/components/MessageLog.js";
@@ -56,6 +57,7 @@ const KNOWN_COMPONENTS = Object.freeze([
   FoodDecay,
   InteractIntent,
   MeleeAttackIntent,
+  AttackDirectionIntent,
   Mana,
   MessageLog,
   Owner,

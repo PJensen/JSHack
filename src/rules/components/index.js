@@ -52,6 +52,7 @@ export { WaitIntent } from './Intents/WaitIntent.js';
 export { PrayIntent } from './Intents/PrayIntent.js';
 export { CastSpellIntent } from './Intents/CastSpellIntent.js';
 export { AttackIntent } from './Intents/AttackIntent.js';
+export { AttackDirectionIntent } from './Intents/AttackDirectionIntent.js';
 export { EquipIntent } from './Intents/EquipIntent.js';
 export { Stamina } from './Stamina.js';
 export { Status } from './Status.js';

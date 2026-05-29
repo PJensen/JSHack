@@ -1,5 +1,6 @@
 import { defineComponent } from "../../../lib/ecs-js/index.js";
 
 export const AttackIntent = defineComponent('AttackIntent', {
-  targetId: 0
+  targetId: 0,
+  allowNonHostile: false,
 });

@@ -236,6 +236,50 @@ Deno.test("InputManager: keyboard r and z both emit ranged action", () => {
   }
 });
 
+Deno.test("InputManager: Shift+A arms cardinal attack direction", () => {
+  const target = new FakeEventTarget();
+  const canvas = new FakeCanvas({ left: 0, top: 0, width: 220, height: 180 });
+  const mgr = new InputManager(target, { canvas, touchFeedback: false });
+  const actions = [];
+  const modes = [];
+  const off = mgr.onAction((a) => actions.push(a));
+  target.addEventListener("ui:attackDirectionMode", (e) => modes.push(e.detail));
+  try {
+    const evA = target.emit("keydown", { key: "A", code: "KeyA" });
+    const evRight = target.emit("keydown", { key: "l", code: "KeyL" });
+
+    assertEquals(evA.defaultPrevented, true);
+    assertEquals(evRight.defaultPrevented, true);
+    assertEquals(actions.length, 1);
+    assertEquals(actions[0]?.type, Actions.AttackDirection);
+    assertEquals(actions[0]?.payload, { dx: 1, dy: 0 });
+    assertEquals(modes.map((m) => m.active), [true, false]);
+  } finally {
+    off();
+    mgr.dispose();
+  }
+});
+
+Deno.test("InputManager: attack direction mode converts next touch direction to attack", () => {
+  const target = new FakeEventTarget();
+  const canvas = new FakeCanvas({ left: 0, top: 0, width: 200, height: 200 });
+  const mgr = new InputManager(target, { canvas, touchFeedback: false });
+  const actions = [];
+  const off = mgr.onAction((a) => actions.push(a));
+  try {
+    target.dispatchEvent(new CustomEvent("ui:beginAttackDirection"));
+    emitPointer(canvas, "pointerdown", 100, 20);
+    emitPointer(canvas, "pointerup", 100, 20);
+
+    assertEquals(actions.length, 1);
+    assertEquals(actions[0]?.type, Actions.AttackDirection);
+    assertEquals(actions[0]?.payload, { dx: 0, dy: -1 });
+  } finally {
+    off();
+    mgr.dispose();
+  }
+});
+
 Deno.test("InputManager: keyboard c emits open character action", () => {
   const target = new FakeEventTarget();
   const canvas = new FakeCanvas({ left: 0, top: 0, width: 220, height: 180 });

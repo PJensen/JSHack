@@ -10,6 +10,7 @@ export const Sinks = Object.freeze({
 export const Actions = Object.freeze({
   // Rules-directed intents
   Move: "rules.move", // payload: { dx:number, dy:number }
+  AttackDirection: "rules.attackDirection", // payload: { dx:number, dy:number, confirmed?:boolean }
   Wait: "rules.wait", // payload: {}
   Search: "rules.search", // payload: {}
   CyclePosture: "rules.cyclePosture", // payload: {}
@@ -19,6 +20,7 @@ export const Actions = Object.freeze({
   CastActiveSpell: "rules.castActiveSpell", // payload: { spellId?:number, targetId?:number, x?:number, y?:number }
   EquipItem: "rules.equipItem", // payload: { itemId:number }
   ShootRanged: "rules.shootRanged", // payload: {}
+  BeginAttackDirection: "display.beginAttackDirection", // payload: {}
   Engrave: "rules.engrave", // payload: { text:string }
 
   // Display-directed UI
@@ -45,6 +47,7 @@ export const Actions = Object.freeze({
 export const defaultActionSinks = Object.freeze({
   // Rules-directed intents
   [Actions.Move]: Sinks.rules,
+  [Actions.AttackDirection]: Sinks.rules,
   [Actions.Wait]: Sinks.rules,
   [Actions.Search]: Sinks.rules,
   [Actions.CyclePosture]: Sinks.rules,
@@ -63,6 +66,7 @@ export const defaultActionSinks = Object.freeze({
   [Actions.OpenEquipment]: Sinks.display,
   [Actions.OpenMessageLog]: Sinks.display,
   [Actions.OpenSpellPicker]: Sinks.display,
+  [Actions.BeginAttackDirection]: Sinks.display,
   [Actions.RotatePetState]: Sinks.display,
   [Actions.Zoom]: Sinks.display,
   [Actions.OpenPickupChooser]: Sinks.display,

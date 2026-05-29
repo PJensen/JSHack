@@ -978,6 +978,9 @@ const inputDisposers = [];
       case "display.openSpellPicker":
         window.dispatchEvent(new CustomEvent("ui:openSpellPicker"));
         break;
+      case "display.beginAttackDirection":
+        window.dispatchEvent(new CustomEvent("ui:beginAttackDirection"));
+        break;
       case "display.rotatePetState":
         window.dispatchEvent(new CustomEvent("ui:rotatePetState"));
         break;

@@ -609,7 +609,7 @@ function resolveHitRoll(world, {
  * Resolve one main-hand melee attack attempt.
  * @returns {boolean} true if the attack was attempted (past range/faction/stamina gates)
  */
-export function resolveMeleeAttack(world, attacker, defender) {
+export function resolveMeleeAttack(world, attacker, defender, options = {}) {
     const source = Number(attacker || 0) | 0;
     const target = Number(defender || 0) | 0;
     if (!(source > 0) || !(target > 0)) return false;
@@ -632,7 +632,7 @@ export function resolveMeleeAttack(world, attacker, defender) {
     // Faction hostility gate
     const af = world.get(source, Faction)?.key || '';
     const df = world.get(target, Faction)?.key || '';
-    if (!areFactionsHostile(af, df)) return false;
+    if (!areFactionsHostile(af, df) && options.allowNonHostile !== true) return false;
 
     const atkEq = world.get(source, Equipment);
     ensureEquippedAffixTopology(world, source);
@@ -725,7 +725,9 @@ function resolveOffhandAttack(world, attacker, defender) {
 export function combatSystem(world) {
     for (const [attacker, intent] of world.query(AttackIntent)) {
         try {
-            const attempted = resolveMeleeAttack(world, attacker, intent.targetId | 0);
+            const attempted = resolveMeleeAttack(world, attacker, intent.targetId | 0, {
+                allowNonHostile: intent.allowNonHostile === true,
+            });
             if (attempted) resolveOffhandAttack(world, attacker, intent.targetId | 0);
         } catch (e) { console.error('[combatSystem] resolveMeleeAttack failed:', e); }
         try { world.remove(attacker, AttackIntent); } catch {} // ECS: may not exist

@@ -12,6 +12,7 @@ import { useItemSystem } from "../rules/systems/useItemSystem.js";
 import { applySystem } from "../rules/systems/applySystem.js";
 import { throwSystem } from "../rules/systems/throwSystem.js";
 import { rangedAttackSystem } from "../rules/systems/rangedAttackSystem.js";
+import { attackDirectionSystem } from "../rules/systems/attackDirectionSystem.js";
 import { interactionSystem } from "../rules/systems/interactionSystem.js";
 import { effectSystem } from "../rules/systems/effectSystem.js";
 import { shieldGuardSystem } from "../rules/systems/shieldGuardSystem.js";
@@ -230,6 +231,7 @@ export function configureWorld(world) {
   });
   registerSystem(throwSystem, 'intents', { after: [movementSystem] });
   registerSystem(rangedAttackSystem, 'intents', { after: [movementSystem] });
+  registerSystem(attackDirectionSystem, 'intents', { after: [movementSystem], before: [combatSystem] });
   registerSystem(channelingSystem, 'intents', { after: [movementSystem] });   // countdown before castSpellSystem fires
   registerSystem(castSpellSystem, 'intents', { after: [movementSystem, channelingSystem] });
   // interactionSystem must run AFTER movementSystem: bump-to-interact adds
