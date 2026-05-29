@@ -101,6 +101,11 @@ function isSocialWitness(world, id) {
   return !vit || Number(vit.hp || 0) > 0;
 }
 
+function isSocialSubject(world, id) {
+  const fac = String(world.get(id, Faction)?.key || "").trim().toLowerCase();
+  return SOCIAL_WITNESS_FACTIONS.has(fac);
+}
+
 function collectWitnesses(world, actorId, victimId) {
   const actor = normId(actorId);
   const victim = normId(victimId);
@@ -125,7 +130,16 @@ function maybeEscalateAggro(world, subjectId, objectId, rec, offense) {
   }
 
   const pos = world.get(objectId, Position);
-  const aggro = world.get(subjectId, AggroState);
+  let aggro = world.get(subjectId, AggroState);
+  if (!aggro && isSocialSubject(world, subjectId)) {
+    try {
+      world.add(subjectId, AggroState, {
+        alertLevel: AGGRO_LEVELS.unaware,
+        searchTurnsLeft: 0,
+      });
+      aggro = world.get(subjectId, AggroState);
+    } catch {}
+  }
   if (aggro && pos) {
     aggro.alertLevel = AGGRO_LEVELS.hunting;
     aggro.lastKnownX = pos.x | 0;

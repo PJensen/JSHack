@@ -26,6 +26,7 @@ import { castSpellSystem } from "../rules/systems/castSpellSystem.js";
 import { aiChaseSystem, installAggroFromDamageListener, installAggroFromStealthOffenseListener } from "../rules/systems/aiChaseSystem.js";
 import { aiPolicySystem } from "../rules/systems/aiPolicySystem.js";
 import { aiTownfolkSystem, installTownfolkDoorListener, installBellListener } from "../rules/systems/aiTownfolkSystem.js";
+import { socialAggroSystem } from "../rules/systems/socialAggroSystem.js";
 import { aiScurrySystem } from "../rules/systems/aiScurrySystem.js";
 import { aiFarmAnimalSystem } from "../rules/systems/aiFarmAnimalSystem.js";
 import { aiWeaponPickupSystem } from "../rules/systems/aiWeaponPickupSystem.js";
@@ -194,6 +195,7 @@ export function configureWorld(world) {
   registerSystem(aiScurrySystem, 'ai');
   registerSystem(aiFarmAnimalSystem, 'ai');
   registerSystem(aiTownfolkSystem, 'ai');
+  registerSystem(socialAggroSystem, 'ai');
   registerSystem(aiChaseSystem, 'ai');
   // Policy override: neural net replaces/improves intents for intel ≥ 7 monsters.
   // Runs after chase so alert state and whileLOS hooks are already resolved.
