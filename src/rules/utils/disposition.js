@@ -5,6 +5,7 @@ import { Faction } from "../components/Faction.js";
 import { Position } from "../components/Position.js";
 import { Vitality } from "../components/Vitality.js";
 import { OFFENSE_SEVERITY } from "../data/offenses.js";
+import { shopReputationTerms } from "./reputation.js";
 import { hasLOS } from "../../shared/math/gridLOS.js";
 import { buildBlocksVisionMap, blockedCallback } from "./vision.js";
 import { forEachInRadius } from "./spatialIndex.js";
@@ -166,11 +167,13 @@ export function applyOffenseDisposition(world, spec = {}) {
 
   const explicitWitnesses = Array.isArray(spec.witnessIds) ? spec.witnessIds : null;
   const witnessIds = explicitWitnesses || (spec.collectWitnesses === false ? [] : collectWitnesses(world, actorId, victimId));
+  const appliedWitnessIds = [];
   const seen = new Set([victimId]);
   for (const rawWitnessId of witnessIds) {
     const witnessId = normId(rawWitnessId);
     if (!(witnessId > 0) || witnessId === actorId || seen.has(witnessId)) continue;
     seen.add(witnessId);
+    appliedWitnessIds.push(witnessId);
     const witnessRec = upsertDisposition(world, witnessId, actorId, {
       delta: Math.ceil(baseDelta * 0.5),
       severity,
@@ -184,6 +187,7 @@ export function applyOffenseDisposition(world, spec = {}) {
     actorId,
     victimId,
     offense: Object.freeze({ ...offense, offenseKind, severity }),
+    witnessIds: Object.freeze(appliedWitnessIds),
     records: Object.freeze(changed),
   });
   emitSafe(world, "disposition:changed", event);
@@ -197,6 +201,7 @@ export function shopDispositionTerms(world, spec = {}) {
   const sellDiscount = Number(spec.sellDiscount ?? 0.5);
   const rec = getDispositionRecord(world, shopkeeperId, actorId);
   const band = rec?.band || DISPOSITION_BANDS.neutral;
+  const reputationTerms = shopReputationTerms(world, { actorId, buyMarkup: 1.0, sellDiscount: 1.0 });
 
   let buyMultiplier = 1.0;
   let sellMultiplier = 1.0;
@@ -215,10 +220,13 @@ export function shopDispositionTerms(world, spec = {}) {
   }
 
   return Object.freeze({
-    buyMarkup: Math.max(0.1, buyMarkup * buyMultiplier),
-    sellDiscount: Math.max(0, Math.min(1, sellDiscount * sellMultiplier)),
+    buyMarkup: Math.max(0.1, buyMarkup * buyMultiplier * reputationTerms.buyMarkup),
+    sellDiscount: Math.max(0, Math.min(1, sellDiscount * sellMultiplier * reputationTerms.sellDiscount)),
     disposition: rec,
     band,
+    reputationBand: reputationTerms.band,
+    shopkeeperReputation: reputationTerms.shopkeeperReputation,
+    townReputation: reputationTerms.townReputation,
   });
 }
 

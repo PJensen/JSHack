@@ -79,6 +79,7 @@ export { ShopClaim, SHOP_CLAIM_CONFIDENCE, SHOP_CLAIM_STATUS } from './ShopClaim
 export { ShopDebt, SHOP_DEBT_STATUS } from './ShopDebt.js';
 export { ShopIncident } from './ShopIncident.js';
 export { Disposition, DISPOSITION_BANDS } from './Disposition.js';
+export { Reputation, REPUTATION_BANDS } from './Reputation.js';
 export { RoomMetadata } from './RoomMetadata.js';
 export { HarvestNode } from './HarvestNode.js';
 export { HazardArea } from './HazardArea.js';

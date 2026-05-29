@@ -91,6 +91,7 @@ import { definePassiveBonusVirtuals } from "../rules/utils/passiveBonuses.js";
 import { defineTownInterpretationVirtuals } from "../rules/utils/townInterpretationVirtuals.js";
 import { defineShopDebtVirtuals } from "../rules/utils/shopDebt.js";
 import { installDispositionOffenseListeners } from "../rules/utils/disposition.js";
+import { installReputationOffenseListeners } from "../rules/utils/reputation.js";
 import { installShopLawListeners } from "../rules/utils/shopLaw.js";
 import { installDialogRuntime } from "../rules/dialogues/runtime.js";
 import { installQuestRuntime } from "../rules/quests/runtime.js";
@@ -152,6 +153,8 @@ export function configureWorld(world) {
   installShopLawListeners(world);
   // Social offense memory feeds disposition first; aggro is a tactical output.
   installDispositionOffenseListeners(world);
+  // Public reputation is downstream of witnessed or ledgered disposition changes.
+  installReputationOffenseListeners(world);
   // Tile step effects: ice slides, lava scorch, water extinguish (reacts to "moved" event)
   installTileStepEffectListener(world);
   // Material reactions consume semantic reaction events (water splash/dip, etc.).

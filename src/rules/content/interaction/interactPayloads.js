@@ -1107,6 +1107,7 @@ export const INTERACT_PAYLOADS = {
           sellDiscount: terms.sellDiscount,
           disposition: terms.disposition,
           dispositionBand: terms.band,
+          reputationBand: terms.reputationBand,
         });
       }
     },
@@ -1130,6 +1131,7 @@ export const INTERACT_PAYLOADS = {
           sellDiscount: terms.sellDiscount,
           disposition: terms.disposition,
           dispositionBand: terms.band,
+          reputationBand: terms.reputationBand,
           vendorKind: "gem",
         });
       }
@@ -1154,6 +1156,7 @@ export const INTERACT_PAYLOADS = {
           sellDiscount: terms.sellDiscount,
           disposition: terms.disposition,
           dispositionBand: terms.band,
+          reputationBand: terms.reputationBand,
           vendorKind: "book",
         });
       }
