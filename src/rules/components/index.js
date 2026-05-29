@@ -74,6 +74,7 @@ export { CombatPosture, COMBAT_POSTURES } from './CombatPosture.js';
 export { PetState } from './PetState.js';
 export { PetCommandIntent } from './Intents/PetCommandIntent.js';
 export { Unpaid } from './Unpaid.js';
+export { ShopClaim, SHOP_CLAIM_CONFIDENCE, SHOP_CLAIM_STATUS } from './ShopClaim.js';
 export { ShopDebt, SHOP_DEBT_STATUS } from './ShopDebt.js';
 export { ShopIncident } from './ShopIncident.js';
 export { RoomMetadata } from './RoomMetadata.js';

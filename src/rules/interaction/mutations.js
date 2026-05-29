@@ -38,6 +38,7 @@ import { Traits } from "../components/Traits.js";
 import { getHungerLevel } from "../data/food.js";
 import { effectiveMaxHp } from "../utils/passiveBonuses.js";
 import { emitSafe } from "../utils/emitSafe.js";
+import { recordShopClaim } from "../utils/shopClaims.js";
 import { recordShopDebt } from "../utils/shopDebt.js";
 
 /**
@@ -402,6 +403,26 @@ export function applyMutation(world, op, resolvers = {}) {
       }
       break;
     }
+    case "recordShopClaim": {
+      recordShopClaim(world, {
+        actorId: op.actorId,
+        shopkeeperId: op.shopkeeperId,
+        amount: op.amount,
+        reason: op.reason,
+        claimKind: op.claimKind,
+        valueKind: op.valueKind,
+        evidence: op.evidence,
+        confidence: op.confidence,
+        createsDebt: op.createsDebt,
+        recordIncident: op.recordIncident,
+        severity: op.severity,
+        itemId: op.itemId,
+        identity: op.identity,
+        name: op.name,
+        turn: op.turn,
+      });
+      break;
+    }
     case "consume": {
       if (!inventoryContains(world, op.inventoryOwnerId, op.entityId)) return;
 
@@ -537,6 +558,7 @@ export function applyMutation(world, op, resolvers = {}) {
  * @typedef {{ type: 'spawnMonster', monsterId: string, x: number, y: number, name?: string, faction?: string, maxHp?: number, accuracyDerived?: number, damagePowerDerived?: number, evadeDerived?: number, naturalDamageDice?: string, sizeClass?: string, massKg?: number, resistances?: Record<string, unknown>, speed?: number, tauntMessage?: string, emitEvent?: boolean, equipment?: Record<string, unknown>|null, wielding?: Array<unknown>, equipped?: Array<unknown>, inventory?: Array<unknown> }} SpawnMonsterOp
  * @typedef {{ type: 'learnSpell', entityId: number, spellId: string }} LearnSpellOp
  * @typedef {{ type: 'recordShopDebt', actorId: number, shopkeeperId: number, amount: number, reason: string, itemId: number, identity?: string, name?: string, turn?: number }} RecordShopDebtOp
+ * @typedef {{ type: 'recordShopClaim', actorId: number, shopkeeperId: number, amount?: number, reason?: string, claimKind?: string, valueKind?: string, evidence?: string, confidence?: string, createsDebt?: boolean, recordIncident?: boolean, severity?: number, itemId?: number, identity?: string, name?: string, turn?: number }} RecordShopClaimOp
  * @typedef {{ type: 'consume', entityId: number, inventoryOwnerId: number }} ConsumeOp
  * @typedef {{ type: 'dropFromInventory', entityId: number, inventoryOwnerId: number, x: number, y: number, emitEvent?: boolean }} DropFromInventoryOp
  * @typedef {{ type: 'nutrition', entityId: number, nutrition: number }} NutritionOp
@@ -545,7 +567,7 @@ export function applyMutation(world, op, resolvers = {}) {
  * @typedef {{ type: 'spawnHazard', spec: Record<string, unknown> }} SpawnHazardOp
  * @typedef {{ type: 'destroy', entityId: number }} DestroyOp
  * @typedef {{ type: 'setItemCooldown', entityId: number, turns: number }} SetItemCooldownOp
- * @typedef {DamageOp | HealOp | PushEffectOp | UpsertTimedEffectOp | AppendDamageChannelsOp | PatchItemInfoOp | AttachEnchantmentOp | SetBeatitudeOp | RemoveTimedEffectsByKeyOp | SetMaterialOp | SpawnItemOp | SpawnMonsterOp | LearnSpellOp | RecordShopDebtOp | ConsumeOp | DropFromInventoryOp | NutritionOp | AddCorpseAdaptationOp | RevealLoadedMapOp | SpawnHazardOp | DestroyOp | SetItemCooldownOp} MutationOp
+ * @typedef {DamageOp | HealOp | PushEffectOp | UpsertTimedEffectOp | AppendDamageChannelsOp | PatchItemInfoOp | AttachEnchantmentOp | SetBeatitudeOp | RemoveTimedEffectsByKeyOp | SetMaterialOp | SpawnItemOp | SpawnMonsterOp | LearnSpellOp | RecordShopDebtOp | RecordShopClaimOp | ConsumeOp | DropFromInventoryOp | NutritionOp | AddCorpseAdaptationOp | RevealLoadedMapOp | SpawnHazardOp | DestroyOp | SetItemCooldownOp} MutationOp
  */
 
 export class ActionTransaction {
