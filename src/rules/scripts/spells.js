@@ -29,7 +29,7 @@ import { combatSeed, hashString32, mulberry32, rollDice, pct } from "../utils/rn
 import { statusStrength } from "../utils/statusFacade.js";
 import { upsertTimedEffect } from "../utils/effectSemantics.js";
 import { emitSafe } from "../utils/emitSafe.js";
-import { ensureActiveEffects } from "../utils/effects.js";
+import { applyStatusEffect, ensureActiveEffects } from "../utils/effects.js";
 import { areFactionsHostile } from "../utils/factionHostility.js";
 import { chebyshev, chebyshevScalar } from "../utils/distance.js";
 import { buildSpellDamageSpec, createSpellDamageContext, emitSpellMiss, getSpellHitChancePct, getSpellIntelligenceBonus, rollSpellHit, scaleSpellDamage } from "../utils/spellDamage.js";
@@ -64,6 +64,8 @@ import {
 import { Web } from "../archetypes/RoomFeatures.js";
 import { spawnWeb } from "../utils/spawnWeb.js";
 import { ALL_DIRS } from "../utils/directions.js";
+import { forEachInRadius } from "../utils/spatialIndex.js";
+import { resolveScrollEffectDuration } from "../utils/scrollReading.js";
 
 /** @returns {any|null} */
 function _getWeather(world) {
@@ -1778,6 +1780,45 @@ REGISTRY["bat_shriek"] = function batShriekScript(world, actor, spell, _intent) 
     radius,
     affectedIds,
     alertedIds,
+  });
+};
+
+REGISTRY["mass_delirium"] = function massDeliriumScript(world, actor, spell, _intent) {
+  const apos = /** @type any */ (world.get(actor, Position));
+  if (!apos) return;
+  const radius = Math.max(1, Number(spell?.radius || 32) | 0);
+  const duration = resolveScrollEffectDuration(world, actor, {
+    baseTurns: Number(spell?.baseTurns || 50) | 0,
+    minTurns: 50,
+    maxTurns: 240,
+  });
+  const affectedIds = [];
+
+  forEachInRadius(world, apos.x | 0, apos.y | 0, radius, (id) => {
+    const target = Number(id || 0) | 0;
+    if (!(target > 0) || target === actor) return;
+    const vit = world.get(target, Vitality);
+    if (!vit || (vit.hp | 0) <= 0) return;
+    applyStatusEffect(world, target, {
+      key: "confused",
+      turnsLeft: duration.turns,
+      maxTurns: duration.turns,
+      potency: 1,
+      stacks: 1,
+      startedAtTurn: world.step | 0,
+      sourceId: actor,
+      sourceKind: "scroll",
+      sourceKey: "scroll_mass_delirium",
+    });
+    affectedIds.push(target);
+  });
+
+  emitSafe(world, "spell:mass_delirium", {
+    actor,
+    at: { x: apos.x | 0, y: apos.y | 0 },
+    radius,
+    duration: duration.turns,
+    affectedIds,
   });
 };
 

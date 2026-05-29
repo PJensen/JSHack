@@ -7,7 +7,6 @@ import { requiresIdentification } from "./itemAppearances.js";
 import { isIdentified } from "./identification.js";
 import { Beatitude } from "../components/Beatitude.js";
 import { CreatureType } from "../components/CreatureType.js";
-import { Traits } from "../components/Traits.js";
 import { Equipment, GEAR_SLOTS } from "../components/Equipment.js";
 import { ItemCooldown } from "../components/ItemCooldown.js";
 import { Vitality } from "../components/Vitality.js";
@@ -16,6 +15,10 @@ import { Mana } from "../components/Mana.js";
 import { createStatusEvent } from "../../shared/events/statusEvent.js";
 import { getPassiveBonuses } from "../utils/passiveBonuses.js";
 import { markWet } from "../utils/wetTileMap.js";
+import {
+  emitScrollReadFailure,
+  getScrollReadingQualityFromContext,
+} from "../utils/scrollReading.js";
 
 /**
  * @param {string} identity
@@ -46,14 +49,32 @@ export function createCastSpellFromIdentityHook(opts) {
     if (typeof ctx?.rules?.runSpell !== "function") return { consumed: false };
     const actor = Number(state?.actor || ctx.actor || 0) | 0;
 
-    // Reading a scroll while blinded wastes it — unless you have third_eye
-    const blindStr = ctx.query?.statusStrength?.(actor, "blinded") ?? 0;
-    if (blindStr > 0) {
-      const traits = ctx.query.get(actor, Traits);
-      if (!traits?.third_eye) {
-        ctx.io.emit("scroll:wasted_blind", { actor, itemId: state?.itemId || 0 });
-        return { consumed: true }; // scroll is consumed but does nothing
-      }
+    const quality = getScrollReadingQualityFromContext(ctx, actor);
+    if (!quality.canRead) {
+      emitScrollReadFailure(ctx.io, actor, Number(state?.itemId || 0) | 0, quality);
+      return { consumed: true }; // scroll is consumed but does nothing
+    }
+    if (quality.fumbleChance > 0 && ctx.helpers?.chance?.(quality.fumbleChance)) {
+      const itemId = Number(state?.itemId || 0) | 0;
+      const duration = 150;
+      ctx.mutate?.pushEffect?.(actor, {
+        key: "confused",
+        turnsLeft: duration,
+        maxTurns: duration,
+        potency: 1,
+        stacks: 1,
+        sourceId: itemId,
+        sourceKind: "scroll",
+        sourceKey: String(state?.identity || ""),
+      });
+      ctx.io.emit("scroll:fumbled", {
+        actor,
+        itemId,
+        identity: String(state?.identity || ""),
+        effectKey: "confused",
+        duration,
+      });
+      return { consumed: true };
     }
 
     const spellId = spellIdFromIdentity(state?.identity || "", identityPrefix);

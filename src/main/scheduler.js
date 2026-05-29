@@ -30,6 +30,7 @@ import { socialAggroSystem } from "../rules/systems/socialAggroSystem.js";
 import { aiScurrySystem } from "../rules/systems/aiScurrySystem.js";
 import { aiFarmAnimalSystem } from "../rules/systems/aiFarmAnimalSystem.js";
 import { aiWeaponPickupSystem } from "../rules/systems/aiWeaponPickupSystem.js";
+import { aiScrollPickupSystem, aiScrollUseSystem } from "../rules/systems/aiScrollSystem.js";
 import { aiCorpseEatSystem } from "../rules/systems/aiCorpseEatSystem.js";
 import { aiFlyingSystem } from "../rules/systems/aiFlyingSystem.js";
 import { jumpScareSystem } from "../rules/systems/jumpScareSystem.js";
@@ -202,6 +203,8 @@ export function configureWorld(world) {
   registerSystem(aiPolicySystem, 'ai');
   // Weapon pickup after chase so the monster's hunt state is settled first.
   registerSystem(aiWeaponPickupSystem, 'ai');
+  registerSystem(aiScrollPickupSystem, 'ai');
+  registerSystem(aiScrollUseSystem, 'ai');
   // Corpse eating after weapon pickup — idle scavengers and tactical devourers.
   registerSystem(aiCorpseEatSystem, 'ai');
   registerSystem(summonedBehaviorSystem, 'ai');

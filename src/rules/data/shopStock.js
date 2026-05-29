@@ -268,6 +268,7 @@ export function generateBookShopItem(world, rng) {
         { id: "scroll_fire", weight: 10 },
         { id: "scroll_remove_curse", weight: 6 },
         { id: "scroll_summon_skeleton", weight: 6 },
+        { id: "scroll_mass_delirium", weight: 2 },
     ]);
     if (!pick?.id) return null;
     const itemId = createItemById(world, pick.id);

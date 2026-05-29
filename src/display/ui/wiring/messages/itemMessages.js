@@ -331,6 +331,21 @@ export function installItemMessages(ctx) {
     if (nameOfEntity(actor) !== 'You') return;
     log('Reality lurches. You blink and find yourself somewhere else entirely.', 'system');
   });
+  world.on('scroll:mass_delirium', ({ actor }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log('The scroll unfolds into impossible script. Delirium ripples through the air.', 'legendary');
+  });
+  world.on('scroll:fumbled', ({ actor, duration }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    log(`You lose the thread of the scroll. The words keep crawling behind your eyes. (${duration | 0} turns)`, 'danger');
+  });
+  world.on('scroll:read-failed', ({ actor, reason }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    if (reason === 'low_vision') log('You cannot make out enough of the scroll to read it.', 'warning');
+  });
+  world.on('monster:read-scroll', ({ monsterName }) => {
+    log(`The ${monsterName || 'monster'} reads a scroll!`, 'warning');
+  });
 
   // === Apply events ===
   world.on('item:applied', ({ targetId, result }) => {

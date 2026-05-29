@@ -92,6 +92,22 @@ export const SPELL_DEFS = {
       { kind: 'movement', mode: 'knockback', note: 'Pushes targets away from caster' },
     ],
   },
+  mass_delirium: {
+    id: 'mass_delirium',
+    name: 'Mass Delirium',
+    symbol: '\u2234',       // ∴
+    schools: ['trickery', 'illusion', 'mind'],
+    manaCost: 0,
+    minIntelligence: 0,
+    script: 'mass_delirium',
+    targeting: 'self',
+    radius: 32,
+    description: 'Unspool a field of impossible syntax that leaves nearby minds stumbling over themselves.',
+    effects: [
+      { kind: 'status', status: 'confused', duration: '50 turns; reader condition affects fumble risk, not power' },
+      { kind: 'utility', note: 'Wide self-centered area; affects living creatures without changing faction loyalty' },
+    ],
+  },
   blink: {
     id: 'blink',
     name: 'Blink',

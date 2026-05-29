@@ -275,6 +275,7 @@ export const LOOT_TABLES = {
       { type: "item",      weight: 5,  itemId: "scroll_polymorph" },
       { type: "item",      weight: 3,  itemId: "scroll_genocide" },
       { type: "item",      weight: 5,  itemId: "scroll_taming" },
+      { type: "item",      weight: 3,  itemId: "scroll_mass_delirium" },
     ],
   },
 

@@ -16,6 +16,40 @@ import {
   normalizeEnchantSlot,
 } from '../../rules/content/enchanting/enchantCatalog.js';
 import { affixSupportsSlot } from '../../rules/data/affixes.js';
+import { getSpell } from '../../rules/data/spells.js';
+import {
+  emitScrollReadFailure,
+  getScrollReadingQualityFromContext,
+} from '../../rules/utils/scrollReading.js';
+
+function createReadableScrollHook(onRead, opts = {}) {
+  return (ctx, state) => {
+    const actor = Number(state?.actor || ctx.actor || 0) | 0;
+    const itemId = Number(state?.itemId || ctx.primary || 0) | 0;
+    const quality = getScrollReadingQualityFromContext(ctx, actor);
+    if (!quality.canRead) {
+      emitScrollReadFailure(ctx.io, actor, itemId, quality);
+      return { consumed: true };
+    }
+    const fumbleChance = Number(opts.fumbleChance ?? quality.fumbleChance ?? 0);
+    if (fumbleChance > 0 && ctx.helpers.chance(fumbleChance)) {
+      const duration = Math.max(120, Number(opts.fumbleTurns || 150) | 0);
+      ctx.mutate.pushEffect(actor, {
+        key: 'confused',
+        turnsLeft: duration,
+        maxTurns: duration,
+        potency: 1,
+        stacks: 1,
+        sourceId: itemId,
+        sourceKind: 'scroll',
+        sourceKey: String(state?.identity || ''),
+      });
+      ctx.io.emit('scroll:fumbled', { actor, itemId, identity: String(state?.identity || ''), effectKey: 'confused', duration });
+      return { consumed: true };
+    }
+    return onRead(ctx, state, quality);
+  };
+}
 
 function resolveApplyTargetName(ctx, state, fallback) {
   return String(ctx?.query?.name?.(state?.targetId) || state?.targetInfo?.name || fallback || 'item');
@@ -116,7 +150,7 @@ defineItem('scroll_taming', {
   name: 'Scroll of Taming', type: 'scroll', material: 'paper', rarity: 'rare', weight: 0.1,
   description: 'Soft whispers curl from the parchment. A creature that hears them becomes your devoted ally.',
   hooks: {
-    on_use: (ctx, state) => { const actor = Number(state?.actor || ctx.actor || 0) | 0; ctx.io.emit('scroll:taming', { actor }); return { consumed: true }; },
+    on_use: createReadableScrollHook((ctx, state) => { const actor = Number(state?.actor || ctx.actor || 0) | 0; ctx.io.emit('scroll:taming', { actor }); return { consumed: true }; }),
   },
 });
 
@@ -194,7 +228,7 @@ defineItem('scroll_amnesia', {
   name: 'Scroll of Amnesia', type: 'scroll', material: 'paper', rarity: 'common', value: 5, weight: 0.1,
   description: 'The words burn away everything you know. Total oblivion.',
   hooks: {
-    on_use: (ctx, state) => {
+    on_use: createReadableScrollHook((ctx, state) => {
       const actor = Number(state?.actor || ctx.actor || 0) | 0;
       const brain = ctx.query.brain(actor);
       const forgottenSpells = [];
@@ -205,7 +239,7 @@ defineItem('scroll_amnesia', {
       }
       ctx.io.emit('scroll:amnesia', { actor, forgottenSpells, total: true });
       return { consumed: true };
-    },
+    }),
   },
 });
 
@@ -213,39 +247,55 @@ defineItem('scroll_fire', {
   name: 'Scroll of Fire', type: 'scroll', material: 'paper', rarity: 'common', value: 5, weight: 0.1,
   description: 'The scroll erupts in flames as you read it!',
   hooks: {
-    on_use: (ctx, state) => { const actor = Number(state?.actor || ctx.actor || 0) | 0; const damage = ctx.helpers.roll('2d6'); ctx.helpers.damage(actor, damage, 'scroll_fire'); ctx.io.emit('scroll:fire', { actor, damage }); return { consumed: true }; },
+    on_use: createReadableScrollHook((ctx, state) => { const actor = Number(state?.actor || ctx.actor || 0) | 0; const damage = ctx.helpers.roll('2d6'); ctx.helpers.damage(actor, damage, 'scroll_fire'); ctx.io.emit('scroll:fire', { actor, damage }); return { consumed: true }; }),
   },
 });
 
 defineItem('scroll_aggravation', {
   name: 'Scroll of Aggravation', type: 'scroll', material: 'paper', rarity: 'common', value: 5, weight: 0.1,
   description: 'A terrible shriek fills the dungeon!',
-  hooks: { on_use: (ctx, state) => { const actor = Number(state?.actor || ctx.actor || 0) | 0; ctx.io.emit('scroll:aggravation', { actor }); return { consumed: true }; } },
+  hooks: { on_use: createReadableScrollHook((ctx, state) => { const actor = Number(state?.actor || ctx.actor || 0) | 0; ctx.io.emit('scroll:aggravation', { actor }); return { consumed: true }; }) },
 });
 
 defineItem('scroll_genocide', {
   name: 'Scroll of Genocide', type: 'scroll', material: 'paper', rarity: 'epic', value: 200, weight: 0.1,
   description: 'The parchment hums with finality. Name a creature, and it shall cease to exist.',
-  hooks: { on_use: (ctx, state) => { const actor = Number(state?.actor || ctx.actor || 0) | 0; ctx.io.emit('scroll:genocide', { actor }); return { consumed: true }; } },
+  hooks: { on_use: createReadableScrollHook((ctx, state) => { const actor = Number(state?.actor || ctx.actor || 0) | 0; ctx.io.emit('scroll:genocide', { actor }); return { consumed: true }; }) },
 });
 
 defineItem('scroll_teleportation', {
   name: 'Scroll of Teleportation', type: 'scroll', material: 'paper', rarity: 'common', value: 15, weight: 0.1,
   description: 'Reality lurches. You blink and find yourself somewhere else entirely.',
-  hooks: { on_use: (ctx, state) => { const actor = Number(state?.actor || ctx.actor || 0) | 0; ctx.io.emit('scroll:teleportation', { actor }); return { consumed: true }; } },
+  hooks: { on_use: createReadableScrollHook((ctx, state) => { const actor = Number(state?.actor || ctx.actor || 0) | 0; ctx.io.emit('scroll:teleportation', { actor }); return { consumed: true }; }) },
 });
 
 defineItem('scroll_polymorph', {
   name: 'Scroll of Polymorph', type: 'scroll', material: 'paper', rarity: 'epic', value: 80, weight: 0.1,
   description: 'The words twist reality itself. Name a creature and watch the nearest foe reshape.',
-  hooks: { on_use: (ctx, state) => { const actor = Number(state?.actor || ctx.actor || 0) | 0; ctx.io.emit('scroll:polymorph', { actor }); return { consumed: true }; } },
+  hooks: { on_use: createReadableScrollHook((ctx, state) => { const actor = Number(state?.actor || ctx.actor || 0) | 0; ctx.io.emit('scroll:polymorph', { actor }); return { consumed: true }; }) },
+});
+
+defineItem('scroll_mass_delirium', {
+  name: 'Scroll of Mass Delirium', type: 'scroll', material: 'paper', rarity: 'epic', value: 160, weight: 0.1,
+  description: 'Impossible script blooms into a vast delirious field. Misread it and the words stay in your head for a very long time.',
+  hooks: {
+    on_use: createReadableScrollHook((ctx, state) => {
+      const actor = Number(state?.actor || ctx.actor || 0) | 0;
+      const spell = getSpell('mass_delirium');
+      if (!spell || typeof ctx?.rules?.runSpell !== 'function') return { consumed: false };
+      ctx.rules.runSpell(actor, spell, {});
+      ctx.io.emit('castSpell', { actor, spellId: spell.id, targetId: actor, source: 'scroll' });
+      ctx.io.emit('scroll:mass_delirium', { actor });
+      return { consumed: true, spellId: spell.id };
+    }, { fumbleTurns: 150 }),
+  },
 });
 
 defineItem('scroll_cursing', {
   name: 'Scroll of Cursing', type: 'scroll', material: 'paper', rarity: 'magic', value: 5, weight: 0.1,
   description: 'Dark words slither off the page and weld your gear to your body.',
   hooks: {
-    on_use: (ctx, state) => {
+    on_use: createReadableScrollHook((ctx, state) => {
       const actor = Number(state?.actor || ctx.actor || 0) | 0;
       const equip = ctx.query.get(actor, Equipment);
       let cursed = 0;
@@ -262,20 +312,20 @@ defineItem('scroll_cursing', {
       }
       ctx.io.emit('scroll:cursing', { actor, count: cursed });
       return { consumed: true };
-    },
+    }),
   },
 });
 
 defineItem('scroll_summoning', {
   name: 'Scroll of Summoning', type: 'scroll', material: 'paper', rarity: 'magic', value: 5, weight: 0.1,
   description: 'The words screech and claw shapes pour from the parchment.',
-  hooks: { on_use: (ctx, state) => { const actor = Number(state?.actor || ctx.actor || 0) | 0; ctx.io.emit('scroll:summoning', { actor }); return { consumed: true }; } },
+  hooks: { on_use: createReadableScrollHook((ctx, state) => { const actor = Number(state?.actor || ctx.actor || 0) | 0; ctx.io.emit('scroll:summoning', { actor }); return { consumed: true }; }) },
 });
 
 defineItem('scroll_decay', {
   name: 'Scroll of Decay', type: 'scroll', material: 'paper', rarity: 'common', value: 5, weight: 0.1,
   description: 'The scroll crumbles and a wave of rot spreads through your pack.',
-  hooks: { on_use: (ctx, state) => { const actor = Number(state?.actor || ctx.actor || 0) | 0; ctx.io.emit('scroll:decay', { actor }); return { consumed: true }; } },
+  hooks: { on_use: createReadableScrollHook((ctx, state) => { const actor = Number(state?.actor || ctx.actor || 0) | 0; ctx.io.emit('scroll:decay', { actor }); return { consumed: true }; }) },
 });
 
 // ── Hearthstone (tool) ────────────────────────────────────────────────
