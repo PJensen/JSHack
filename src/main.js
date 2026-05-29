@@ -466,6 +466,15 @@ const _sharedRulesDispatcher = makeRulesDispatcher(world, () => (playerEntity(wo
   onAction: () => { _messageMoreRef?.beginBatch(); },
 });
 
+window.addEventListener('ui:confirmActionAccepted', (ev) => {
+  if (isSimUiBlocked()) return;
+  /** @type {CustomEvent} */ // @ts-ignore
+  const e = ev;
+  const action = e?.detail?.action;
+  if (!action || typeof action.type !== 'string') return;
+  _sharedRulesDispatcher(action);
+});
+
 // Shim: targeting state accessors for code that still reads old variables directly.
 // These are getters/setters that delegate to the targeting controller (created later).
 // This avoids a flag-day rewrite of every reference in the render() function.

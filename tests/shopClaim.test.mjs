@@ -43,12 +43,17 @@ Deno.test("shop claim creates the durable claim plus debt and incident projectio
   assertEquals(comp.debtId, claim.debt.id);
   assertEquals(comp.incidentId, claim.incident.id);
   assertEquals(getParent(world, claim.id), shopkeeper);
+  assertEquals(claim.offense.offenseKind, "fraud");
+  assertEquals(claim.offense.source, "shop_law");
+  assertEquals(claim.incident.offense.offenseKind, "fraud");
 
   assertEquals(shopClaimRecords(world, shopkeeper).length, 1);
   assertEquals(shopIncidentRecords(world, shopkeeper).length, 1);
   assertEquals(claims.length, 1);
+  assertEquals(claims[0].offense.offenseKind, "fraud");
   assertEquals(debts.length, 1);
   assertEquals(incidents.length, 1);
+  assertEquals(incidents[0].offense.offenseKind, "fraud");
 });
 
 Deno.test("shop claim can record suspicion without forcing payable debt", () => {

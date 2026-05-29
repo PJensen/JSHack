@@ -80,18 +80,25 @@ Deno.test("attack direction must be cardinal", () => {
   assert(threw, "diagonal attack directions should be rejected by the component validator");
 });
 
-Deno.test("rulesDispatch attackDirection cancels protected target without confirmation", () => {
+Deno.test("rulesDispatch attackDirection prompts for protected target confirmation", () => {
   const world = new World({ seed: 5 });
   const player = addActor(world, "player", 5, 5, "Player");
   addActor(world, "townfolk", 6, 5, "Villager");
   let tickCount = 0;
   world.tick = () => { tickCount += 1; };
+  let prompt = null;
+  const onPrompt = (ev) => { prompt = ev.detail; };
+  globalThis.addEventListener("ui:confirmAction", onPrompt, { once: true });
 
   const dispatch = makeRulesDispatcher(world, () => player);
   dispatch({ type: "rules.attackDirection", payload: { dx: 1, dy: 0 } });
 
   assertEquals(world.has(player, AttackDirectionIntent), false);
   assertEquals(tickCount, 0);
+  assert(prompt, "protected attack should request a UI confirmation");
+  assertEquals(prompt.action.type, "rules.attackDirection");
+  assertEquals(prompt.action.payload.confirmed, true);
+  assertEquals(prompt.offense.offenseKind, "assault");
 });
 
 Deno.test("rulesDispatch attackDirection accepts explicit confirmation", () => {

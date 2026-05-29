@@ -19,7 +19,14 @@ export function attackDirectionSystem(world) {
     }
 
     if (plan.requiresConfirm && intent.confirmed !== true) {
-      emitSafe(world, "attack:confirm-required", { actor, dx, dy, targetId: plan.targetId, message: plan.message });
+      emitSafe(world, "attack:confirm-required", {
+        actor,
+        dx,
+        dy,
+        targetId: plan.targetId,
+        message: plan.message,
+        offense: plan.offense || null,
+      });
       continue;
     }
 

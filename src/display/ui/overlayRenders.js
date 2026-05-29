@@ -1133,6 +1133,100 @@ export function renderActionChooser(panel, data) {
 }
 
 // ---------------------------------------------------------------------------
+// Confirm action — used when the rules dispatcher needs explicit consent for
+// a direct hostile action against a protected/social target.
+// ---------------------------------------------------------------------------
+
+/**
+ * @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel
+ * @param {{ title?: string, message?: string, confirmLabel?: string, cancelLabel?: string, action?: object, offense?: { offenseLabel?: string, severityName?: string } }} data
+ */
+export function renderConfirmAction(panel, data) {
+  const el = /** @type {HTMLDivElement} */ (/** @type {any} */ (panel)._inner);
+  el.innerHTML = '';
+
+  const title = document.createElement('div');
+  title.textContent = String(data?.title || 'Confirm action');
+  Object.assign(title.style, {
+    fontWeight: 'bold',
+    marginBottom: '8px',
+    color: '#ffcf7a',
+  });
+  el.appendChild(title);
+
+  const message = document.createElement('div');
+  message.textContent = String(data?.message || 'Proceed?');
+  Object.assign(message.style, {
+    fontSize: '13px',
+    lineHeight: '1.35',
+    marginBottom: '10px',
+    color: '#d8e8ff',
+  });
+  el.appendChild(message);
+
+  const offense = data?.offense || null;
+  if (offense) {
+    const meta = document.createElement('div');
+    const label = String(offense.offenseLabel || 'Offense');
+    const severity = String(offense.severityName || '').replaceAll('_', ' ');
+    meta.textContent = severity ? `${label} · ${severity}` : label;
+    Object.assign(meta.style, {
+      fontSize: '12px',
+      color: '#ff9f9f',
+      marginBottom: '12px',
+    });
+    el.appendChild(meta);
+  }
+
+  const row = document.createElement('div');
+  Object.assign(row.style, {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '8px',
+  });
+
+  const cancel = document.createElement('button');
+  cancel.textContent = String(data?.cancelLabel || 'Cancel');
+  decorateButton(cancel);
+  cancel.style.minHeight = '40px';
+  cancel.addEventListener('click', () => {
+    window.dispatchEvent(new CustomEvent('ui:confirmActionCancelled', { detail: data || {} }));
+    hide(panel);
+  });
+  row.appendChild(cancel);
+
+  const confirm = document.createElement('button');
+  confirm.textContent = String(data?.confirmLabel || 'Confirm');
+  decorateButton(confirm);
+  confirm.style.minHeight = '40px';
+  confirm.style.borderColor = '#a85858';
+  confirm.style.background = '#3a1518';
+  confirm.addEventListener('click', () => {
+    const action = data?.action || null;
+    if (action) {
+      window.dispatchEvent(new CustomEvent('ui:confirmActionAccepted', { detail: { action } }));
+    }
+    hide(panel);
+  });
+  row.appendChild(confirm);
+
+  el.appendChild(row);
+
+  const hint = document.createElement('div');
+  hint.style.marginTop = '8px';
+  hint.style.opacity = '0.85';
+  hint.style.fontSize = '12px';
+  hint.textContent = 'Enter=Confirm · Esc=Cancel';
+  el.appendChild(hint);
+
+  installKeyHandler(panel, (e) => {
+    if (panel.style.display !== 'block') return;
+    if (e.key === 'Enter') { confirm.click(); e.preventDefault(); }
+    else if (e.key === 'Escape') { cancel.click(); e.preventDefault(); }
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Dip item chooser — select which inventory item to dip into a fountain
 // ---------------------------------------------------------------------------
 

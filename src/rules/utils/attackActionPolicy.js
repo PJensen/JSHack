@@ -1,29 +1,17 @@
 import { Faction } from "../components/Faction.js";
 import { Flying } from "../components/Flying.js";
-import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Position } from "../components/Position.js";
 import { Vitality } from "../components/Vitality.js";
 import { getLivingEntityAt } from "./tileQueryCache.js";
+import { classifyActorTargetAction, isProtectedSocialTarget } from "./offenseClassifier.js";
 import { areFactionsHostile } from "./factionHostility.js";
-
-const PROTECTED_NON_HOSTILE_FACTIONS = new Set(["shopkeeper", "townfolk", "neutral"]);
 
 function isCardinal(dx, dy) {
   return Number.isInteger(dx) && Number.isInteger(dy) && Math.abs(dx) + Math.abs(dy) === 1;
 }
 
-function nameOf(world, id) {
-  const ni = world.get(id, NamedIdentity);
-  return String(ni?.name || ni?.identity || "that creature");
-}
-
 export function isProtectedNonHostileTarget(world, actorId, targetId) {
-  const actorFaction = world.get(actorId, Faction)?.key || "";
-  const targetFaction = world.get(targetId, Faction)?.key || "";
-  const protectedTarget = PROTECTED_NON_HOSTILE_FACTIONS.has(String(targetFaction || "").trim().toLowerCase());
-  if (!protectedTarget) return false;
-  if (!actorFaction) return true;
-  return !areFactionsHostile(actorFaction, targetFaction);
+  return isProtectedSocialTarget(world, actorId, targetId);
 }
 
 export function classifyAttackDirection(world, spec = {}) {
@@ -53,11 +41,15 @@ export function classifyAttackDirection(world, spec = {}) {
     return Object.freeze({ ok: false, reason: "target_flying", targetId, targetX, targetY, requiresConfirm: false });
   }
 
-  const actorFaction = world.get(actorId, Faction)?.key || "";
-  const targetFaction = world.get(targetId, Faction)?.key || "";
   const protectedNonHostile = isProtectedNonHostileTarget(world, actorId, targetId);
+  const actorFaction = String(world.get(actorId, Faction)?.key || "");
+  const targetFaction = String(world.get(targetId, Faction)?.key || "");
   const hostile = protectedNonHostile ? false : areFactionsHostile(actorFaction, targetFaction);
-  const targetName = nameOf(world, targetId);
+  const offense = classifyActorTargetAction(world, {
+    actorId,
+    targetId,
+    actionKind: "melee_attack",
+  });
 
   return Object.freeze({
     ok: true,
@@ -67,7 +59,8 @@ export function classifyAttackDirection(world, spec = {}) {
     targetY,
     hostile,
     protectedNonHostile,
-    requiresConfirm: protectedNonHostile,
-    message: `Attack ${targetName}?`,
+    offense,
+    requiresConfirm: offense.requiresConfirm,
+    message: offense.message,
   });
 }

@@ -97,15 +97,29 @@ export function makeRulesDispatcher(world, getActorId, opts = {}) {
           world?.emit?.("attack:direction-failed", { actor: actorId, dx: adx, dy: ady, reason: plan.reason });
           break;
         }
-        let ok = confirmed === true;
+        const ok = confirmed === true;
         if (plan.requiresConfirm && !ok) {
-          if (typeof window !== "undefined" && typeof window.confirm === "function") {
-            ok = window.confirm(plan.message || "Attack?");
-          }
-          if (!ok) {
-            world?.emit?.("attack:cancelled", { actor: actorId, dx: adx, dy: ady, targetId: plan.targetId || 0, reason: "not_confirmed" });
-            break;
-          }
+          const confirmedAction = {
+            type: "rules.attackDirection",
+            payload: { dx: adx, dy: ady, confirmed: true },
+          };
+          dispatchUiEvent("ui:confirmAction", {
+            title: "Confirm attack",
+            message: plan.message || "Attack?",
+            confirmLabel: "Attack",
+            cancelLabel: "Cancel",
+            action: confirmedAction,
+            offense: plan.offense || null,
+            targetId: plan.targetId || 0,
+          });
+          world?.emit?.("attack:confirmation-requested", {
+            actor: actorId,
+            dx: adx,
+            dy: ady,
+            targetId: plan.targetId || 0,
+            offense: plan.offense || null,
+          });
+          break;
         }
         world?.add?.(actorId, AttackDirectionIntent, { dx: adx, dy: ady, confirmed: ok });
         world?.tick?.(1);

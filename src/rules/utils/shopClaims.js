@@ -5,6 +5,7 @@ import { ShopClaim, SHOP_CLAIM_CONFIDENCE, SHOP_CLAIM_STATUS } from "../componen
 import { ShopIncident } from "../components/ShopIncident.js";
 import { Unpaid } from "../components/Unpaid.js";
 import { emitSafe } from "./emitSafe.js";
+import { classifyShopClaimOffense } from "./offenseClassifier.js";
 import { recordShopDebt } from "./shopDebt.js";
 
 function normId(value) {
@@ -91,6 +92,14 @@ export function recordShopIncident(world, spec = {}) {
 
   const amount = Math.max(0, Math.ceil(Number(spec.amount || 0)));
   const reason = String(spec.reason || "carried_out");
+  const severity = Number.isFinite(spec.severity)
+    ? Math.max(0, Number(spec.severity) | 0)
+    : inferSeverity(amount, reason, normalizeConfidence(spec.confidence));
+  const offense = classifyShopClaimOffense({
+    reason,
+    claimKind: spec.claimKind || reason,
+    severity,
+  });
   const incident = {
     shopkeeperId,
     actorId,
@@ -98,9 +107,7 @@ export function recordShopIncident(world, spec = {}) {
     amount,
     reason,
     evidence: String(spec.evidence || "ledger"),
-    severity: Number.isFinite(spec.severity)
-      ? Math.max(0, Number(spec.severity) | 0)
-      : inferSeverity(amount, reason, normalizeConfidence(spec.confidence)),
+    severity,
     createdTurn: normTurn(world, spec.turn),
     resolved: spec.resolved === true,
   };
@@ -109,7 +116,7 @@ export function recordShopIncident(world, spec = {}) {
   world.add(incidentId, ShopIncident, incident);
   attach(world, incidentId, shopkeeperId);
 
-  const rec = Object.freeze({ id: incidentId | 0, ...incident });
+  const rec = Object.freeze({ id: incidentId | 0, ...incident, offense });
   emitSafe(world, "shop:incident-recorded", rec);
   return rec;
 }
@@ -167,6 +174,7 @@ export function recordShopClaim(world, spec = {}) {
   const createdTurn = normTurn(world, spec.turn);
   const identity = String(spec.identity ?? (itemId > 0 ? itemIdentity(world, itemId) : ""));
   const name = String(spec.name ?? (itemId > 0 ? itemName(world, itemId) : ""));
+  const offense = classifyShopClaimOffense({ reason, claimKind, severity });
 
   const createsDebt = spec.createsDebt !== false && amount > 0;
   const debt = createsDebt
@@ -192,6 +200,7 @@ export function recordShopClaim(world, spec = {}) {
       reason: incidentReasonForClaim(claimKind, reason),
       evidence,
       severity,
+      claimKind,
       confidence,
       turn: createdTurn,
     })
@@ -237,6 +246,7 @@ export function recordShopClaim(world, spec = {}) {
     evidence,
     confidence,
     severity,
+    offense,
     debt,
     incident,
     response,

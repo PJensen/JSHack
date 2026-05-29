@@ -38,7 +38,7 @@ import {
   renderCharacterSheet, renderEquipment, renderSpellPicker, renderMessageLog,
   renderAltarOfferChooser, renderActionChooser, renderDipChooser, renderPickupChooser, renderUseChooser,
   renderThrowChooser, renderApplyToolChooser, renderApplyTargetChooser, renderSlotChooser,
-  renderShop, renderChest, renderBookReader, renderDeathLog, renderRack,
+  renderShop, renderChest, renderBookReader, renderDeathLog, renderRack, renderConfirmAction,
 } from './overlayRenders.js';
 
 export function initOverlays() {
@@ -63,6 +63,7 @@ export function initOverlays() {
   const rack = ensurePanel('rack');
   const altar = ensurePanel('altar');
   const actionChooser = ensurePanel('actionChooser');
+  const confirmAction = ensurePanel('confirmAction');
   const dipChooser = ensurePanel('dipChooser');
   const slotChooser = ensurePanel('slotChooser');
   const groundTip = ensureGroundTooltip(root);
@@ -547,6 +548,15 @@ export function initOverlays() {
     if (!detail) return;
     renderActionChooser(actionChooser, detail);
     show(actionChooser);
+  });
+
+  window.addEventListener('ui:confirmAction', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const detail = e?.detail;
+    if (!detail) return;
+    renderConfirmAction(confirmAction, detail);
+    show(confirmAction);
   });
 
   // Fountain dip item chooser
