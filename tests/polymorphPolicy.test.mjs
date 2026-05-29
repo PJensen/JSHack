@@ -4,7 +4,12 @@ import { World } from "../src/lib/ecs-js/index.js";
 import { Equipment } from "../src/rules/components/Equipment.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
-import { PolymorphProfile } from "../src/rules/components/PolymorphProfile.js";
+import {
+  PolymorphProfile,
+  POLYMORPH_STABILITY,
+  normalizePolymorphStability,
+  polymorphStabilityScore,
+} from "../src/rules/components/PolymorphProfile.js";
 import { Traits } from "../src/rules/components/Traits.js";
 import { getCatalogItem } from "../src/rules/data/itemCatalog.js";
 import { getMonster } from "../src/rules/data/monsters.js";
@@ -101,7 +106,9 @@ Deno.test("polymorph resistance reads static monster authoring data", () => {
   const resistance = getPolymorphResistance(world, dragon);
 
   assertEquals(getMonster("dragon")?.polymorphResistance, 0.65);
+  assertEquals(getMonster("dragon")?.polymorphStability, POLYMORPH_STABILITY.anchored);
   assertEquals(resistance.resistanceScore, 0.65);
+  assertEquals(resistance.stability, POLYMORPH_STABILITY.anchored);
   assertEquals(resistance.stabilityScore, 2);
   assertEquals(resistance.failureMode, "resist");
   assert(resistance.sources.includes("monster:dragon"));
@@ -110,14 +117,23 @@ Deno.test("polymorph resistance reads static monster authoring data", () => {
 Deno.test("polymorph profile component overrides monster authoring resistance", () => {
   const world = new World({ seed: 1 });
   const dragon = makeTarget(world, "dragon");
-  world.add(dragon, PolymorphProfile, { resistance: 0.2, stability: 3, failureMode: "fumble" });
+  world.add(dragon, PolymorphProfile, { resistance: 0.2, stability: POLYMORPH_STABILITY.fixed, failureMode: "fumble" });
 
   const resistance = getPolymorphResistance(world, dragon);
 
   assertEquals(resistance.resistanceScore, 0.2);
+  assertEquals(resistance.stability, POLYMORPH_STABILITY.fixed);
   assertEquals(resistance.stabilityScore, 3);
   assertEquals(resistance.failureMode, "fumble");
   assert(resistance.sources.includes("component:polymorph_profile"));
+});
+
+Deno.test("polymorph stability enum normalizes legacy numeric values", () => {
+  assertEquals(normalizePolymorphStability(0), POLYMORPH_STABILITY.unstable);
+  assertEquals(normalizePolymorphStability(1), POLYMORPH_STABILITY.ordinary);
+  assertEquals(normalizePolymorphStability(2), POLYMORPH_STABILITY.anchored);
+  assertEquals(normalizePolymorphStability(3), POLYMORPH_STABILITY.fixed);
+  assertEquals(polymorphStabilityScore(POLYMORPH_STABILITY.fixed), 3);
 });
 
 Deno.test("polymorph resistance includes player-facing passive bonuses", () => {
@@ -132,7 +148,8 @@ Deno.test("polymorph resistance includes player-facing passive bonuses", () => {
   assertEquals(passive.polymorphResistanceDerived, 0.3);
   assertEquals(passive.polymorphStabilityDerived, 1);
   assertEquals(resistance.resistanceScore, 0.3);
-  assertEquals(resistance.stabilityScore, 1);
+  assertEquals(resistance.stability, POLYMORPH_STABILITY.anchored);
+  assertEquals(resistance.stabilityScore, 2);
   assert(resistance.sources.includes("passive:polymorph_resistance"));
 });
 

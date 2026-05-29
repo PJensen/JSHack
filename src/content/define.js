@@ -11,6 +11,7 @@ import { inferItemCategory, resolveRarity, SHELF_LIFE } from './helpers.js';
 import { resolveWeaponFamily } from '../rules/data/weaponFamilies.js';
 import { resolveWeaponVisualMeta, isWeaponCatalogItem } from '../rules/data/weaponVisuals.js';
 import { clamp } from '../shared/math/math.js';
+import { normalizePolymorphStability } from '../rules/components/PolymorphProfile.js';
 
 // ── Hook names the DSL recognises, mapped to catalog hook keys ──────
 const ITEM_HOOK_MAP = {
@@ -362,7 +363,7 @@ export function defineItem(id, def) {
  * @param {boolean} [def.ambush]
  * @param {string|{pattern?:string,context?:string,chance?:number}} [def.sleep]
  * @param {number} [def.polymorphResistance] - 0..1 chance to reject a polymorph attempt before transformation.
- * @param {number} [def.polymorphStability] - body coherence rating, not a percent: 0 unstable, 1 ordinary, 2 anchored, 3+ exceptional.
+ * @param {string|number} [def.polymorphStability] - serialized body coherence enum: "unstable"|"ordinary"|"anchored"|"fixed". Legacy numbers normalize to that enum.
  * @param {string} [def.polymorphFailureMode] - "normal"|"resist"|"fumble"|"volatile" policy hint.
  *
  * // Resistances
@@ -426,7 +427,7 @@ export function defineMonster(id, def) {
   if (def.retreatHpPct != null) monsterDef.retreatHpPct = def.retreatHpPct;
   if (def.ambush != null) monsterDef.ambush = def.ambush;
   if (def.polymorphResistance != null) monsterDef.polymorphResistance = clamp(Number(def.polymorphResistance || 0), 0, 1);
-  if (def.polymorphStability != null) monsterDef.polymorphStability = Math.max(0, Number(def.polymorphStability || 0));
+  if (def.polymorphStability != null) monsterDef.polymorphStability = normalizePolymorphStability(def.polymorphStability);
   if (def.polymorphFailureMode != null) monsterDef.polymorphFailureMode = String(def.polymorphFailureMode || "normal");
   if (typeof def.sleep === 'string') {
     monsterDef.sleep = def.sleep;
