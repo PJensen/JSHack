@@ -1,0 +1,40 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "cef533f6367d",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "src/display/input/InputManager.js",
+    "src/display/input/actions.js",
+    "src/display/ui/hud.js",
+    "src/main.js",
+    "src/main/input/rulesDispatch.js",
+    "src/main/scheduler.js",
+    "src/main/wiring/savegameSerializationRegistry.js",
+    "src/rules/components/Intents/AttackDirectionIntent.js",
+    "src/rules/components/Intents/AttackIntent.js",
+    "src/rules/components/index.js",
+    "src/rules/systems/attackDirectionSystem.js",
+    "src/rules/systems/combatSystem.js",
+    "src/rules/systems/intentValidationSystem.js",
+    "src/rules/utils/attackActionPolicy.js",
+    "tests/attackDirection.test.mjs",
+    "tests/inputManagerGestures.test.mjs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/ce/f533f6367d/0/metadata.json",
+      "transcript": "/ce/f533f6367d/0/full.jsonl",
+      "content_hash": "/ce/f533f6367d/0/content_hash.txt",
+      "prompt": "/ce/f533f6367d/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 355616,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 15125888,
+    "output_tokens": 36076,
+    "api_call_count": 105
+  }
+}
