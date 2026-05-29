@@ -27,7 +27,7 @@ import { inventoryItems, removeFromInventory } from "../../rules/utils/inventory
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
 import { getEffectiveVisionRange, blind } from "../../rules/utils/blind.js";
 import { listApplyTargetsForTool } from "../../rules/content/items/applyPayloads.js";
-import { getPolymorphControl } from "../../rules/utils/polymorphPolicy.js";
+import { getPolymorphControl, resolvePolymorphAttempt } from "../../rules/utils/polymorphPolicy.js";
 
 const INSTALLED_KEY = Symbol.for('jshack:scrollWandWiring:installed');
 
@@ -51,13 +51,41 @@ export function installScrollWandWiring({ world, targeting, playerEntity }) {
   }
 
   function applyPolymorphSelection({ actor, enemyId, targetIdentity, depth, trigger = 'scroll', reason = 'scroll_polymorph' }) {
+    const fromIdent = world.get(enemyId, NamedIdentity);
+    const fromName = fromIdent?.identity ? (getMonster(fromIdent.identity)?.name || fromIdent.identity) : 'creature';
+    const attempt = resolvePolymorphAttempt(world, {
+      actorId: actor,
+      targetId: enemyId,
+      requestedIdentity: targetIdentity,
+      source: reason,
+      controlled: trigger === 'scroll' && getPolymorphControl(world, actor).hasControl,
+    });
+
+    if (!attempt.success) {
+      if (attempt.failureReason === 'resisted') {
+        world.emit?.('message', { text: `The ${fromName} resists the transformation.`, type: 'system' });
+      } else {
+        world.emit?.('message', { text: 'You cannot picture such a creature. The scroll fizzles.', type: 'system' });
+      }
+      emitSafe(world, 'polymorph:failed', {
+        actorId: actor | 0,
+        entityId: enemyId | 0,
+        requestedIdentity: attempt.requestedIdentity,
+        reason: attempt.failureReason,
+        source: reason,
+      });
+      return;
+    }
+
+    if (attempt.fumbled) {
+      world.emit?.('message', { text: 'Your control slips; the shape answers imperfectly.', type: 'system' });
+    }
+
+    targetIdentity = attempt.targetIdentity;
     if (!getMonster(targetIdentity)) {
       world.emit?.('message', { text: 'You cannot picture such a creature. The scroll fizzles.', type: 'system' });
       return;
     }
-
-    const fromIdent = world.get(enemyId, NamedIdentity);
-    const fromName = fromIdent?.identity ? (getMonster(fromIdent.identity)?.name || fromIdent.identity) : 'creature';
 
     try {
       world.add(enemyId, Polymorph, { targetIdentity, depth, trigger, once: true, revealed: false, hookKey: '' });

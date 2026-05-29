@@ -575,6 +575,9 @@ defineMonster('dragon', {
   canFly: true,
   intelligence: 8,
   retreatHpPct: 0.15,
+  polymorphResistance: 0.65,
+  polymorphStability: 2,
+  polymorphFailureMode: 'resist',
   hp: 40,
   hpPerLevel: 5,
   attack: 8,
@@ -591,7 +594,7 @@ defineMonster('dragon', {
   hooks: {
     onHit: [statusEffectOnHit(20, 0xdead0004, { key: "burn", turnsLeft: 5, potency: 4 }, "proc:burning")],
   },
-  specials: ["Burn 20%"],
+  specials: ["Burn 20%", "Resists polymorph"],
   description: 'Scales like hammered bronze. The apex predator of the deep.',
   lootTable: 'drop:dragon',
 });

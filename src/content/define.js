@@ -10,6 +10,7 @@ import { createWorldFacade } from './worldFacade.js';
 import { inferItemCategory, resolveRarity, SHELF_LIFE } from './helpers.js';
 import { resolveWeaponFamily } from '../rules/data/weaponFamilies.js';
 import { resolveWeaponVisualMeta, isWeaponCatalogItem } from '../rules/data/weaponVisuals.js';
+import { clamp } from '../shared/math/math.js';
 
 // ── Hook names the DSL recognises, mapped to catalog hook keys ──────
 const ITEM_HOOK_MAP = {
@@ -360,6 +361,9 @@ export function defineItem(id, def) {
  * @param {number} [def.retreatHpPct]
  * @param {boolean} [def.ambush]
  * @param {string|{pattern?:string,context?:string,chance?:number}} [def.sleep]
+ * @param {number} [def.polymorphResistance] - 0..1 chance to reject a polymorph attempt before transformation.
+ * @param {number} [def.polymorphStability] - body coherence rating, not a percent; reserved for partial/fumble side effects.
+ * @param {string} [def.polymorphFailureMode] - "normal"|"resist"|"fumble"|"volatile" policy hint.
  *
  * // Resistances
  * @param {object} [def.resistances]
@@ -421,6 +425,9 @@ export function defineMonster(id, def) {
   if (def.packRadius != null) monsterDef.packRadius = def.packRadius;
   if (def.retreatHpPct != null) monsterDef.retreatHpPct = def.retreatHpPct;
   if (def.ambush != null) monsterDef.ambush = def.ambush;
+  if (def.polymorphResistance != null) monsterDef.polymorphResistance = clamp(Number(def.polymorphResistance || 0), 0, 1);
+  if (def.polymorphStability != null) monsterDef.polymorphStability = Math.max(0, Number(def.polymorphStability || 0));
+  if (def.polymorphFailureMode != null) monsterDef.polymorphFailureMode = String(def.polymorphFailureMode || "normal");
   if (typeof def.sleep === 'string') {
     monsterDef.sleep = def.sleep;
   } else if (def.sleep && typeof def.sleep === 'object') {

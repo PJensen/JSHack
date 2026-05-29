@@ -4,10 +4,16 @@ import { World } from "../src/lib/ecs-js/index.js";
 import { Equipment } from "../src/rules/components/Equipment.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
+import { PolymorphProfile } from "../src/rules/components/PolymorphProfile.js";
 import { Traits } from "../src/rules/components/Traits.js";
 import { getCatalogItem } from "../src/rules/data/itemCatalog.js";
+import { getMonster } from "../src/rules/data/monsters.js";
 import { getPassiveBonuses } from "../src/rules/utils/passiveBonuses.js";
-import { getPolymorphControl } from "../src/rules/utils/polymorphPolicy.js";
+import {
+  getPolymorphControl,
+  getPolymorphResistance,
+  resolvePolymorphAttempt,
+} from "../src/rules/utils/polymorphPolicy.js";
 
 function makeActor(world) {
   const actor = world.create();
@@ -31,6 +37,12 @@ function makeRing(world, bonuses = { polymorphControl: 1 }) {
     affixes: [],
   });
   return ring;
+}
+
+function makeTarget(world, identity = "rat") {
+  const target = world.create();
+  world.add(target, NamedIdentity, { name: identity, identity });
+  return target;
 }
 
 Deno.test("polymorph policy: no trait or equipment means no control", () => {
@@ -81,3 +93,70 @@ Deno.test("ring of polymorph control content defines the passive control bonus",
   assertEquals(ring.bonuses?.polymorphControl, 1);
 });
 
+Deno.test("polymorph resistance reads static monster authoring data", () => {
+  const world = new World({ seed: 1 });
+  const dragon = makeTarget(world, "dragon");
+
+  const resistance = getPolymorphResistance(world, dragon);
+
+  assertEquals(getMonster("dragon")?.polymorphResistance, 0.65);
+  assertEquals(resistance.resistanceScore, 0.65);
+  assertEquals(resistance.stabilityScore, 2);
+  assertEquals(resistance.failureMode, "resist");
+  assert(resistance.sources.includes("monster:dragon"));
+});
+
+Deno.test("polymorph profile component overrides monster authoring resistance", () => {
+  const world = new World({ seed: 1 });
+  const dragon = makeTarget(world, "dragon");
+  world.add(dragon, PolymorphProfile, { resistance: 0.2, stability: 3, failureMode: "fumble" });
+
+  const resistance = getPolymorphResistance(world, dragon);
+
+  assertEquals(resistance.resistanceScore, 0.2);
+  assertEquals(resistance.stabilityScore, 3);
+  assertEquals(resistance.failureMode, "fumble");
+  assert(resistance.sources.includes("component:polymorph_profile"));
+});
+
+Deno.test("polymorph attempt can fail when target resists", () => {
+  const world = new World({ seed: 1 });
+  const actor = makeActor(world);
+  const dragon = makeTarget(world, "dragon");
+  world.rand = () => 0.1;
+
+  const attempt = resolvePolymorphAttempt(world, {
+    actorId: actor,
+    targetId: dragon,
+    requestedIdentity: "rat",
+    source: "test",
+    controlled: false,
+  });
+
+  assertEquals(attempt.success, false);
+  assertEquals(attempt.failureReason, "resisted");
+  assertEquals(attempt.resisted, true);
+});
+
+Deno.test("controlled polymorph can fumble high-risk requested forms", () => {
+  const world = new World({ seed: 1 });
+  const actor = makeActor(world);
+  const ring = makeRing(world);
+  world.get(actor, Equipment).ring1 = ring;
+  const target = makeTarget(world, "rat");
+  const rolls = [0.0, 0.0];
+  world.rand = () => rolls.shift() ?? 0;
+
+  const attempt = resolvePolymorphAttempt(world, {
+    actorId: actor,
+    targetId: target,
+    requestedIdentity: "dragon",
+    source: "test",
+    controlled: true,
+  });
+
+  assertEquals(attempt.success, true);
+  assertEquals(attempt.failureReason, "fumbled");
+  assertEquals(attempt.fumbled, true);
+  assert(attempt.targetIdentity !== "dragon", "fumbled control should choose a different form");
+});

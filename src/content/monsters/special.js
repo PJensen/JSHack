@@ -79,6 +79,9 @@ defineMonster('stone_taunter', {
   tier: 99,
   intelligence: 2,
   ambush: true,
+  polymorphResistance: 0.8,
+  polymorphStability: 2,
+  polymorphFailureMode: 'resist',
   hp: 45,
   hpPerLevel: 0,
   attack: 2,
@@ -94,7 +97,7 @@ defineMonster('stone_taunter', {
   },
   speed: 2,
   hooks: null,
-  specials: [],
+  specials: ["Strongly resists polymorph"],
   description: 'An animated stone idol that heckles anything that breathes.',
 });
 
