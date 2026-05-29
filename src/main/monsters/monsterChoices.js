@@ -1,6 +1,6 @@
 import { getAllMonsters } from "../../rules/data/monsters.js";
 
-const FEATURED_TARGETS = Object.freeze([
+const POLYMORPH_FEATURED_TARGETS = Object.freeze([
   { id: "rat", role: "Safe control", note: "Small, fragile, low threat." },
   { id: "bat", role: "Safe control", note: "Fragile flyer, easy to finish." },
   { id: "lichen", role: "Safe control", note: "Nearly harmless body." },
@@ -44,16 +44,17 @@ function sortByName(a, b) {
 }
 
 /**
- * Build display-safe polymorph target choices. This is intentionally a main-layer
- * DTO boundary: display renders these rows, while future legality/policy work can
- * alter which rows are enabled and why without importing rules into display.
+ * Build display-safe monster choices. This is intentionally a main-layer DTO
+ * boundary: display renders rows, while future legality/policy work can alter
+ * which rows are enabled and why without importing rules into display.
  *
- * @param {{ currentDepth?: number }} [opts]
+ * @param {{ currentDepth?: number, featuredTargets?: Array<{id:string,role?:string,note?:string}> }} [opts]
  * @returns {Array<{id:string,name:string,role:string,note:string,tier:number,sizeClass:string,danger:string,tags:string[],featured:boolean,enabled:boolean}>}
  */
-export function buildPolymorphTargetOptions(opts = {}) {
+export function buildMonsterChoiceOptions(opts = {}) {
   const currentDepth = Math.max(1, Number(opts.currentDepth || 1) | 0);
-  const featuredById = new Map(FEATURED_TARGETS.map((entry, index) => [entry.id, { ...entry, index }]));
+  const featuredTargets = Array.isArray(opts.featuredTargets) ? opts.featuredTargets : [];
+  const featuredById = new Map(featuredTargets.map((entry, index) => [entry.id, { ...entry, index }]));
   const rows = [];
 
   for (const def of getAllMonsters()) {
@@ -86,5 +87,13 @@ export function buildPolymorphTargetOptions(opts = {}) {
   });
 
   return rows.map(({ _featuredIndex, ...row }) => row);
+}
+
+/** @param {{ currentDepth?: number }} [opts] */
+export function buildPolymorphTargetOptions(opts = {}) {
+  return buildMonsterChoiceOptions({
+    ...opts,
+    featuredTargets: POLYMORPH_FEATURED_TARGETS,
+  });
 }
 

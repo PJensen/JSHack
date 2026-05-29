@@ -9,7 +9,7 @@ import { renderAnvil } from './anvilOverlay.js';
 import { renderEnchantingBench } from './enchantingBenchOverlay.js';
 import { renderCookingFire } from './cookingFireOverlay.js';
 import { renderDialog } from './dialogOverlay.js';
-import { renderPolymorphChooser } from './polymorphChooserOverlay.js';
+import { renderMonsterChooser } from './monsterChooserOverlay.js';
 import { playDeathJingle } from '../fx/deathJingle.js';
 import { readInputMode } from '../input/inputSettings.js';
 import { getInventoryDefaultAction } from './inventoryUtils.js';
@@ -57,7 +57,7 @@ export function initOverlays() {
   const alchemy = ensurePanel('alchemy');
   const cooking = ensurePanel('cooking');
   const dialog = ensurePanel('dialog');
-  const polymorph = ensurePanel('polymorph');
+  const monsterChooser = ensurePanel('monsterChooser');
   const shop = ensurePanel('shop');
   const chest = ensurePanel('chest');
   const rack = ensurePanel('rack');
@@ -606,7 +606,7 @@ export function initOverlays() {
     hide(spells);
     hide(alchemy);
     hide(cooking);
-    hide(polymorph);
+    hide(monsterChooser);
     hide(shop);
     hide(chest);
     hide(rack);
@@ -641,7 +641,7 @@ export function initOverlays() {
     hide(dialog);
   });
 
-  window.addEventListener('ui:openPolymorphChooser', (ev) => {
+  window.addEventListener('ui:openMonsterChooser', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
     hide(inv);
@@ -659,11 +659,11 @@ export function initOverlays() {
     hide(chest);
     hide(rack);
     hide(altar);
-    renderPolymorphChooser(polymorph, e?.detail || {});
-    show(polymorph);
+    renderMonsterChooser(monsterChooser, e?.detail || {});
+    show(monsterChooser);
   });
-  window.addEventListener('ui:closePolymorphChooser', () => {
-    hide(polymorph);
+  window.addEventListener('ui:closeMonsterChooser', () => {
+    hide(monsterChooser);
   });
 
   // Apply-tool chooser (two-step: pick tool, then pick target)

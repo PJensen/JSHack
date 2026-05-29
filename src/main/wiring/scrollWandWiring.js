@@ -16,7 +16,7 @@ import { setItemCooldown } from "../../rules/utils/itemCooldowns.js";
 import { listAllMonsterIds, getMonster } from "../../rules/data/monsters.js";
 import { Polymorph } from "../../rules/components/Polymorph.js";
 import { resolvePolymorph } from "../../rules/systems/polymorphSystem.js";
-import { buildPolymorphTargetOptions } from "../polymorph/polymorphChoices.js";
+import { buildMonsterChoiceOptions, buildPolymorphTargetOptions } from "../monsters/monsterChoices.js";
 import { spawnMonsterEntity } from "../../rules/utils/spawnMonsterEntity.js";
 import { pickMonster } from "../../rules/environment/dungeon/tables.js";
 import { createRng } from "../../lib/ecs-js/rng.js";
@@ -41,8 +41,8 @@ export function installScrollWandWiring({ world, targeting, playerEntity }) {
   if (world[INSTALLED_KEY]) return;
   world[INSTALLED_KEY] = true;
 
-  const pendingControlledPolymorphs = new Map();
-  let nextPolymorphRequestId = 1;
+  const pendingMonsterChoices = new Map();
+  let nextMonsterChoiceRequestId = 1;
 
   function currentDepth() {
     let depth = 1;
@@ -76,36 +76,50 @@ export function installScrollWandWiring({ world, targeting, playerEntity }) {
     }
   }
 
-  addEventListener('ui:polymorphTargetChosen', (ev) => {
+  addEventListener('ui:monsterChosen', (ev) => {
     const detail = /** @type {CustomEvent} */ (ev).detail || {};
     const requestId = Number(detail.requestId || 0) | 0;
-    const pending = pendingControlledPolymorphs.get(requestId);
+    const pending = pendingMonsterChoices.get(requestId);
     if (!pending) return;
-    pendingControlledPolymorphs.delete(requestId);
-    window.dispatchEvent(new CustomEvent('ui:closePolymorphChooser'));
-    applyPolymorphSelection({
-      ...pending,
-      targetIdentity: String(detail.monsterId || ''),
-    });
+    pendingMonsterChoices.delete(requestId);
+    window.dispatchEvent(new CustomEvent('ui:closeMonsterChooser'));
+    const monsterId = String(detail.monsterId || '');
+    if (pending.kind === 'genocide') {
+      world.emit?.('scroll:genocide:request', { actor: pending.actor, query: monsterId });
+      return;
+    }
+    if (pending.kind === 'polymorph') {
+      applyPolymorphSelection({
+        ...pending,
+        targetIdentity: monsterId,
+      });
+    }
   });
 
-  addEventListener('ui:polymorphTargetCanceled', (ev) => {
+  addEventListener('ui:monsterChooserCanceled', (ev) => {
     const detail = /** @type {CustomEvent} */ (ev).detail || {};
     const requestId = Number(detail.requestId || 0) | 0;
-    if (!pendingControlledPolymorphs.has(requestId)) return;
-    pendingControlledPolymorphs.delete(requestId);
-    window.dispatchEvent(new CustomEvent('ui:closePolymorphChooser'));
-    world.emit?.('message', { text: 'The scroll fizzles.', type: 'system' });
+    const pending = pendingMonsterChoices.get(requestId);
+    if (!pending) return;
+    pendingMonsterChoices.delete(requestId);
+    window.dispatchEvent(new CustomEvent('ui:closeMonsterChooser'));
+    const text = pending.kind === 'genocide' ? 'The scroll crumbles to dust, unused.' : 'The scroll fizzles.';
+    world.emit?.('message', { text, type: 'system' });
   });
 
   // ── Scroll of Genocide ──────────────────────────────────────────────────
   world.on('scroll:genocide', ({ actor }) => {
-    const input = prompt('Which monster do you want to genocide?');
-    if (!input || !input.trim()) {
-      world.emit?.('message', { text: 'The scroll crumbles to dust, unused.', type: 'system' });
-      return;
-    }
-    world.emit?.('scroll:genocide:request', { actor, query: input.trim() });
+    const requestId = nextMonsterChoiceRequestId++;
+    pendingMonsterChoices.set(requestId, { kind: 'genocide', actor });
+    window.dispatchEvent(new CustomEvent('ui:openMonsterChooser', {
+      detail: {
+        requestId,
+        title: 'Scroll of Genocide',
+        subtitle: 'Choose one species to erase from this run.',
+        searchPlaceholder: 'Search species',
+        choices: buildMonsterChoiceOptions({ currentDepth: currentDepth() }),
+      },
+    }));
   });
 
   // ── Scroll of Polymorph ─────────────────────────────────────────────────
@@ -131,14 +145,16 @@ export function installScrollWandWiring({ world, targeting, playerEntity }) {
         const traits = world.get(actor, Traits);
         if (traits?.polymorph_control) {
           const depth = currentDepth();
-          const requestId = nextPolymorphRequestId++;
+          const requestId = nextMonsterChoiceRequestId++;
           const fromIdent = world.get(enemyId, NamedIdentity);
           const targetName = fromIdent?.identity ? (getMonster(fromIdent.identity)?.name || fromIdent.identity) : 'creature';
-          pendingControlledPolymorphs.set(requestId, { actor, enemyId, depth, trigger: 'scroll', reason: 'scroll_polymorph' });
-          window.dispatchEvent(new CustomEvent('ui:openPolymorphChooser', {
+          pendingMonsterChoices.set(requestId, { kind: 'polymorph', actor, enemyId, depth, trigger: 'scroll', reason: 'scroll_polymorph' });
+          window.dispatchEvent(new CustomEvent('ui:openMonsterChooser', {
             detail: {
               requestId,
-              targetName,
+              title: 'Polymorph Control',
+              subtitle: `Target: ${targetName}`,
+              searchPlaceholder: 'Search forms',
               choices: buildPolymorphTargetOptions({ currentDepth: depth }),
             },
           }));

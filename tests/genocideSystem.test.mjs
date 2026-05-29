@@ -64,3 +64,20 @@ Deno.test("genocide request only kills the chosen monster type and disables its 
     clearGenocides();
   }
 });
+
+Deno.test("genocide request accepts exact monster ids from chooser", () => {
+  clearGenocides();
+  try {
+    const world = new World({ seed: 0xC0FFEE });
+    installGenocideListener(world);
+
+    const actor = world.create();
+    world.add(actor, Position, { x: 0, y: 0 });
+
+    world.emit("scroll:genocide:request", { actor, query: "rust_monster" });
+
+    assert(isGenocided("rust_monster"));
+  } finally {
+    clearGenocides();
+  }
+});

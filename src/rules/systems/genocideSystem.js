@@ -33,6 +33,7 @@ function resolveGenocideTarget(query) {
   let best = null;
   let bestScore = Infinity;
   for (const monster of getAllMonsters()) {
+    if (String(monster.id || "").toLowerCase() === normalized) return monster;
     const name = monster.name.toLowerCase();
     if (name === normalized) {
       best = monster;

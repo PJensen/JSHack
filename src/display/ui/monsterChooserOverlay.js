@@ -39,12 +39,12 @@ function makeBadge(text, color) {
 }
 
 /**
- * @param {HTMLDivElement & {_inner?:HTMLDivElement,_polymorphDetach?:()=>void}} panel
- * @param {{ requestId?:number, targetName?:string, choices?:any[] }} state
+ * @param {HTMLDivElement & {_inner?:HTMLDivElement,_monsterChooserDetach?:()=>void}} panel
+ * @param {{ requestId?:number, title?:string, subtitle?:string, searchPlaceholder?:string, choices?:any[] }} state
  */
-export function renderPolymorphChooser(panel, state = {}) {
+export function renderMonsterChooser(panel, state = {}) {
   const el = /** @type {HTMLDivElement} */ (/** @type {any} */ (panel)._inner);
-  if (typeof panel._polymorphDetach === "function") panel._polymorphDetach();
+  if (typeof panel._monsterChooserDetach === "function") panel._monsterChooserDetach();
   el.innerHTML = "";
 
   Object.assign(el.style, {
@@ -59,7 +59,7 @@ export function renderPolymorphChooser(panel, state = {}) {
   const rows = [];
 
   const title = document.createElement("div");
-  title.textContent = "Polymorph Control";
+  title.textContent = String(state?.title || "Choose Creature");
   Object.assign(title.style, {
     color: "#e4d7ff",
     fontSize: "18px",
@@ -68,18 +68,21 @@ export function renderPolymorphChooser(panel, state = {}) {
   });
   el.appendChild(title);
 
-  const subtitle = document.createElement("div");
-  subtitle.textContent = `Target: ${String(state?.targetName || "creature")}`;
-  Object.assign(subtitle.style, {
-    color: "#aebbd0",
-    fontSize: "12px",
-    marginBottom: "10px",
-  });
-  el.appendChild(subtitle);
+  const subtitleText = String(state?.subtitle || "");
+  if (subtitleText) {
+    const subtitle = document.createElement("div");
+    subtitle.textContent = subtitleText;
+    Object.assign(subtitle.style, {
+      color: "#aebbd0",
+      fontSize: "12px",
+      marginBottom: "10px",
+    });
+    el.appendChild(subtitle);
+  }
 
   const search = document.createElement("input");
   search.type = "search";
-  search.placeholder = "Search creatures";
+  search.placeholder = String(state?.searchPlaceholder || "Search creatures");
   search.autocomplete = "off";
   Object.assign(search.style, {
     width: "100%",
@@ -122,14 +125,14 @@ export function renderPolymorphChooser(panel, state = {}) {
     cursor: "pointer",
   });
   cancel.addEventListener("click", () => {
-    window.dispatchEvent(new CustomEvent("ui:polymorphTargetCanceled", { detail: { requestId } }));
+    window.dispatchEvent(new CustomEvent("ui:monsterChooserCanceled", { detail: { requestId } }));
   });
   footer.appendChild(cancel);
   el.appendChild(footer);
 
   function choose(choice) {
     if (!choice?.enabled) return;
-    window.dispatchEvent(new CustomEvent("ui:polymorphTargetChosen", {
+    window.dispatchEvent(new CustomEvent("ui:monsterChosen", {
       detail: { requestId, monsterId: String(choice.id || "") },
     }));
   }
@@ -239,21 +242,21 @@ export function renderPolymorphChooser(panel, state = {}) {
       if (choice) choose(choice);
       ev.preventDefault();
     } else if (ev.key === "Escape") {
-      window.dispatchEvent(new CustomEvent("ui:polymorphTargetCanceled", { detail: { requestId } }));
+      window.dispatchEvent(new CustomEvent("ui:monsterChooserCanceled", { detail: { requestId } }));
       ev.preventDefault();
     }
   };
 
   const observer = new MutationObserver(() => {
     if (panel.style.display === "none") {
-      if (typeof panel._polymorphDetach === "function") panel._polymorphDetach();
+      if (typeof panel._monsterChooserDetach === "function") panel._monsterChooserDetach();
     }
   });
 
-  panel._polymorphDetach = () => {
+  panel._monsterChooserDetach = () => {
     window.removeEventListener("keydown", keyHandler);
     observer.disconnect();
-    panel._polymorphDetach = null;
+    panel._monsterChooserDetach = null;
   };
   window.addEventListener("keydown", keyHandler);
   observer.observe(panel, { attributes: true, attributeFilter: ["style"] });
