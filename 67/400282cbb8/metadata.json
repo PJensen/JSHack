@@ -1,0 +1,35 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "67400282cbb8",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "src/content/define.js",
+    "src/content/monsters/animals.js",
+    "src/content/monsters/special.js",
+    "src/main/wiring/scrollWandWiring.js",
+    "src/rules/components/Equipment.js",
+    "src/rules/components/PolymorphExposure.js",
+    "src/rules/components/PolymorphProfile.js",
+    "src/rules/components/index.js",
+    "src/rules/utils/passiveBonuses.js",
+    "src/rules/utils/polymorphPolicy.js",
+    "tests/polymorphPolicy.test.mjs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/67/400282cbb8/0/metadata.json",
+      "transcript": "/67/400282cbb8/0/full.jsonl",
+      "content_hash": "/67/400282cbb8/0/content_hash.txt",
+      "prompt": "/67/400282cbb8/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 37687,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 2150016,
+    "output_tokens": 9054,
+    "api_call_count": 11
+  }
+}
