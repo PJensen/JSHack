@@ -2,8 +2,11 @@ import { AggroState } from "../components/AggroState.js";
 import { Faction } from "../components/Faction.js";
 import {
   addThreat,
+  clearThreatFromSource,
   decayThreat,
   forceThreatTarget,
+  getThreatGenerationMultiplier,
+  reduceThreatFromSource,
   resolveThreatTarget,
   THREAT_SOFT_TAUNT_BURST,
 } from "../utils/threat.js";
@@ -19,7 +22,8 @@ export function installThreatListeners(world) {
     const actor = Number(source || 0) | 0;
     const value = Math.max(0, Number(amount || 0) | 0);
     if (!(owner > 0) || !(actor > 0) || value <= 0) return;
-    addThreat(world, owner, actor, value, { kind: String(cause || "damage") });
+    const mult = getThreatGenerationMultiplier(world, actor);
+    addThreat(world, owner, actor, Math.max(1, Math.floor((value * mult) + 1e-6)), { kind: String(cause || "damage") });
     resolveThreatTarget(world, owner, { reason: "damage" });
   });
 
@@ -48,6 +52,31 @@ export function installThreatListeners(world) {
       reason: "taunt",
       kind: "taunt",
     });
+  });
+
+  world.on("spell:smoke_bomb", ({ actor }) => {
+    const source = Number(actor || 0) | 0;
+    if (!(source > 0)) return;
+    clearThreatFromSource(world, source, { reason: "smoke_bomb" });
+  });
+
+  world.on("spell:blink", ({ actor }) => {
+    const source = Number(actor || 0) | 0;
+    if (!(source > 0)) return;
+    reduceThreatFromSource(world, source, { percent: 0.5, amount: 2, reason: "blink" });
+  });
+
+  world.on("spell:shadow_veil", ({ actor }) => {
+    const source = Number(actor || 0) | 0;
+    if (!(source > 0)) return;
+    reduceThreatFromSource(world, source, { percent: 0.75, amount: 4, reason: "shadow_veil" });
+  });
+
+  world.on("threat:drop-source", ({ sourceId, actor, percent, amount, reason, clear }) => {
+    const source = Number(sourceId || actor || 0) | 0;
+    if (!(source > 0)) return;
+    if (clear) clearThreatFromSource(world, source, { reason: String(reason || "threat_drop") });
+    else reduceThreatFromSource(world, source, { percent, amount, reason: String(reason || "threat_drop") });
   });
 }
 

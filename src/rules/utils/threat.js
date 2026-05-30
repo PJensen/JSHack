@@ -1,6 +1,8 @@
-import { attach } from "../../lib/ecs-js/hierarchy.js";
+import { attach, detach } from "../../lib/ecs-js/hierarchy.js";
 import { ThreatEntry } from "../components/ThreatEntry.js";
 import { AggroState } from "../components/AggroState.js";
+import { Equipment, NON_AMMO_GEAR_SLOTS } from "../components/Equipment.js";
+import { ItemInfo } from "../components/ItemInfo.js";
 import { Position } from "../components/Position.js";
 import { childrenWith } from "./topology.js";
 import { setAggroTarget } from "./aggroTarget.js";
@@ -10,6 +12,8 @@ export const THREAT_SWITCH_MELEE_MULT = 1.10;
 export const THREAT_SWITCH_RANGED_MULT = 1.30;
 export const THREAT_TAUNT_MARGIN = 5;
 export const THREAT_SOFT_TAUNT_BURST = 6;
+export const THREAT_MIN_GENERATION_MULT = 0.25;
+export const THREAT_MAX_GENERATION_MULT = 2.5;
 
 function readTurn(world) {
   return Math.max(0, Number(world?.step || 0) | 0);
@@ -18,6 +22,14 @@ function readTurn(world) {
 function normalizeId(value) {
   const id = Number(value || 0) | 0;
   return id > 0 ? id : 0;
+}
+
+function destroyThreatEntry(world, entryId) {
+  const id = normalizeId(entryId);
+  if (!id || !world?.isAlive?.(id)) return false;
+  try { detach(world, id, { remove: true }); } catch {}
+  world.destroy(id);
+  return true;
 }
 
 export function getThreatEntries(world, ownerId) {
@@ -94,6 +106,89 @@ export function addThreat(world, ownerId, sourceId, amount, opts = {}) {
   return found;
 }
 
+export function reduceThreat(world, ownerId, sourceId, amount, opts = {}) {
+  const found = findThreatEntry(world, ownerId, sourceId);
+  if (!found) return 0;
+  const entry = found[1];
+  const before = Math.max(0, Number(entry.value || 0) | 0);
+  const flat = Math.max(0, Number(amount || 0) | 0);
+  const pct = Math.max(0, Math.min(1, Number(opts.percent || opts.pct || 0)));
+  const next = Math.max(0, Math.floor((before - flat) * (1 - pct)));
+  entry.value = next;
+  entry.lastTurnTouched = readTurn(world);
+  if (next <= 0) {
+    destroyThreatEntry(world, found[0]);
+  }
+  return before - next;
+}
+
+export function clearThreatFromSource(world, sourceId, opts = {}) {
+  const source = normalizeId(sourceId);
+  if (!source) return 0;
+  let changed = 0;
+  for (const [ownerId, aggro] of world.query(AggroState)) {
+    const found = findThreatEntry(world, ownerId, source);
+    if (!found) continue;
+    const before = Math.max(0, Number(found[1].value || 0) | 0);
+    if (opts.destroy === false) found[1].value = 0;
+    destroyThreatEntry(world, found[0]);
+    changed += before;
+    if ((Number(aggro.targetId || 0) | 0) === source) {
+      setAggroTarget(world, ownerId, aggro, 0, String(opts.reason || "threat_drop"));
+    }
+    if ((Number(aggro.highestThreatId || 0) | 0) === source) aggro.highestThreatId = 0;
+    if ((Number(aggro.forcedTargetId || 0) | 0) === source) {
+      aggro.forcedTargetId = 0;
+      aggro.forcedUntilTurn = 0;
+    }
+  }
+  return changed;
+}
+
+export function reduceThreatFromSource(world, sourceId, opts = {}) {
+  const source = normalizeId(sourceId);
+  if (!source) return 0;
+  let changed = 0;
+  for (const [ownerId] of world.query(AggroState)) {
+    changed += reduceThreat(world, ownerId, source, opts.amount || 0, opts);
+    resolveThreatTarget(world, ownerId, { reason: String(opts.reason || "threat_drop") });
+  }
+  return changed;
+}
+
+export function getThreatGenerationMultiplier(world, sourceId) {
+  const source = normalizeId(sourceId);
+  if (!source || !world?.isAlive?.(source)) return 1;
+  let mult = 1;
+  const eq = world.get(source, Equipment);
+  if (!eq) return mult;
+
+  for (const slot of NON_AMMO_GEAR_SLOTS) {
+    const itemId = normalizeId(eq[slot]);
+    if (!itemId || !world.isAlive(itemId)) continue;
+    const info = world.get(itemId, ItemInfo);
+    if (!info) continue;
+    const bonuses = info.bonuses && typeof info.bonuses === "object" ? info.bonuses : {};
+    if (Number.isFinite(Number(bonuses.threatGenerationMult))) {
+      mult *= Number(bonuses.threatGenerationMult);
+    }
+    if (Number.isFinite(Number(bonuses.threatMult))) {
+      mult *= Number(bonuses.threatMult);
+    }
+    if (Number.isFinite(Number(bonuses.threatReduction))) {
+      mult *= Math.max(0, 1 - Number(bonuses.threatReduction));
+    }
+    const tags = Array.isArray(info.tags) ? info.tags : [];
+    for (let i = 0; i < tags.length; i++) {
+      const tag = String(tags[i] || "").trim().toLowerCase();
+      if (tag === "subtle" || tag === "silent" || tag === "threat_reduction") mult *= 0.75;
+      else if (tag === "menacing" || tag === "threat_boost") mult *= 1.25;
+    }
+  }
+
+  return Math.max(THREAT_MIN_GENERATION_MULT, Math.min(THREAT_MAX_GENERATION_MULT, mult));
+}
+
 export function forceThreatTarget(world, ownerId, sourceId, turns, opts = {}) {
   const owner = normalizeId(ownerId);
   const source = normalizeId(sourceId);
@@ -132,7 +227,7 @@ export function decayThreat(world, ownerId) {
   for (const [entryId, entry] of getThreatEntries(world, owner)) {
     const sourceId = normalizeId(entry.sourceId);
     if (!sourceId || !world.isAlive(sourceId)) {
-      world.destroy(entryId);
+      destroyThreatEntry(world, entryId);
       removed++;
       continue;
     }
@@ -144,7 +239,7 @@ export function decayThreat(world, ownerId) {
     if (String(aggro.alertLevel || "") !== "hunting") decay += 3;
     entry.value = Math.max(0, (Number(entry.value || 0) | 0) - decay);
     if (entry.value <= 0) {
-      world.destroy(entryId);
+      destroyThreatEntry(world, entryId);
       removed++;
     }
   }

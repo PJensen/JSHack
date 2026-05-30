@@ -9,6 +9,8 @@ import { Vitality } from "../src/rules/components/Vitality.js";
 import { AggroState, AGGRO_LEVELS } from "../src/rules/components/AggroState.js";
 import { ThreatEntry } from "../src/rules/components/ThreatEntry.js";
 import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
+import { Equipment } from "../src/rules/components/Equipment.js";
+import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 import { MoveIntent } from "../src/rules/components/Intents/MoveIntent.js";
 import { dealDamage } from "../src/rules/utils/dealDamage.js";
 import { addThreat, getThreatValue, forceThreatTarget, resolveThreatTarget } from "../src/rules/utils/threat.js";
@@ -42,6 +44,41 @@ function threatEntryCount(world, ownerId) {
     if (world.has(childId, ThreatEntry)) count++;
   }
   return count;
+}
+
+function addEquipment(world, actorId) {
+  world.add(actorId, Equipment, {
+    weapon: null,
+    armor: null,
+    head: null,
+    neck: null,
+    belt: null,
+    gloves: null,
+    offhand: null,
+    ring1: null,
+    ring2: null,
+    legs: null,
+    ammo: null,
+    ranged: null,
+    feet: null,
+  });
+}
+
+function equipTaggedRing(world, actorId, tags = [], bonuses = {}) {
+  if (!world.has(actorId, Equipment)) addEquipment(world, actorId);
+  const ring = world.create();
+  world.add(ring, ItemInfo, {
+    type: "ring",
+    slot: "ring",
+    weight: 0,
+    value: 1,
+    description: "",
+    count: 1,
+    bonuses,
+    tags,
+  });
+  world.get(actorId, Equipment).ring1 = ring;
+  return ring;
 }
 
 Deno.test("damage threat creates a child entry and can pull aggro in melee range", () => {
@@ -147,4 +184,56 @@ Deno.test("taunt area emits threat and existing steering remains compatible", ()
   tauntSteeringSystem(world);
   assertEquals(world.get(enemy, MoveIntent).dx, 1);
   assertEquals(world.get(enemy, AggroState).targetId, pet);
+});
+
+Deno.test("smoke bomb clears caster threat from enemies", () => {
+  const world = new World({ seed: 7 });
+  installThreatListeners(world);
+  const enemy = addEnemy(world);
+  const player = addActor(world, 6, 5, "player", { player: true });
+  const pet = addActor(world, 5, 6, "pet", { pet: true });
+
+  addThreat(world, enemy, player, 12, { kind: "damage" });
+  addThreat(world, enemy, pet, 5, { kind: "damage" });
+  resolveThreatTarget(world, enemy, { reason: "damage" });
+  assertEquals(world.get(enemy, AggroState).targetId, player);
+
+  world.emit("spell:smoke_bomb", { actor: player, affected: 1 });
+
+  assertEquals(getThreatValue(world, enemy, player), 0);
+  assertEquals(world.get(enemy, AggroState).targetId, 0);
+  resolveThreatTarget(world, enemy, { reason: "threat" });
+  assertEquals(world.get(enemy, AggroState).targetId, pet);
+});
+
+Deno.test("blink and shadow veil reduce caster threat without clearing other sources", () => {
+  const world = new World({ seed: 8 });
+  installThreatListeners(world);
+  const enemy = addEnemy(world);
+  const player = addActor(world, 10, 5, "player", { player: true });
+  const pet = addActor(world, 5, 6, "pet", { pet: true });
+
+  addThreat(world, enemy, player, 20, { kind: "damage" });
+  addThreat(world, enemy, pet, 4, { kind: "damage" });
+
+  world.emit("spell:blink", { actor: player });
+  assertEquals(getThreatValue(world, enemy, player), 9);
+  assertEquals(getThreatValue(world, enemy, pet), 4);
+
+  world.emit("spell:shadow_veil", { actor: player });
+  assertEquals(getThreatValue(world, enemy, player), 1);
+  assertEquals(getThreatValue(world, enemy, pet), 4);
+});
+
+Deno.test("equipped subtle gear reduces damage threat acquisition", () => {
+  const world = new World({ seed: 9 });
+  installThreatListeners(world);
+  const enemy = addEnemy(world);
+  const player = addActor(world, 6, 5, "player", { player: true });
+  addEquipment(world, player);
+  equipTaggedRing(world, player, ["subtle"], { threatReduction: 0.2 });
+
+  dealDamage(world, { target: enemy, source: player, amount: 10, type: "physical", bypassResist: true });
+
+  assertEquals(getThreatValue(world, enemy, player), 6);
 });
