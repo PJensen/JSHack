@@ -1,6 +1,7 @@
 import { AggroState } from "../components/AggroState.js";
 import { Faction } from "../components/Faction.js";
 import { Vitality } from "../components/Vitality.js";
+import { SPELL_DEFS } from "../data/spells.js";
 import { areFactionsHostile } from "../utils/factionHostility.js";
 import {
   addThreat,
@@ -14,14 +15,6 @@ import {
 } from "../utils/threat.js";
 
 const THREAT_LISTENERS_INSTALLED = Symbol.for("jshack:threat:listeners:installed");
-const CONTROL_SPELL_THREAT = Object.freeze({
-  blind: 3,
-  entangle: 5,
-  mark_of_death: 4,
-  web_spit: 3,
-  mass_delirium: 3,
-  war_cry: 3,
-});
 
 function factionsHostile(world, sourceId, targetId) {
   const sourceFaction = String(world.get(sourceId, Faction)?.key || "");
@@ -58,6 +51,48 @@ function addFlatThreatToTargets(world, targetIds, sourceId, amount, kind, reason
   return added;
 }
 
+function normalizeSpellId(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  return raw.startsWith("spell:") ? raw.slice(6) : raw;
+}
+
+function readSpellThreatSpec(spellId) {
+  const id = normalizeSpellId(spellId);
+  const spec = id ? SPELL_DEFS[id]?.threat : null;
+  return spec && typeof spec === "object" ? spec : null;
+}
+
+function payloadField(payload, field, fallback = undefined) {
+  const key = String(field || "");
+  if (!key) return fallback;
+  return payload && Object.prototype.hasOwnProperty.call(payload, key) ? payload[key] : fallback;
+}
+
+function applySpellThreat(world, eventName, payload = {}) {
+  const spellId = normalizeSpellId(payload.spellId || eventName);
+  const spec = readSpellThreatSpec(spellId);
+  if (!spec) return 0;
+  if (payload.fizzle || payload.missed) return 0;
+  const requiredField = String(spec.requiresField || "");
+  if (requiredField && !payloadField(payload, requiredField, false)) return 0;
+
+  const actor = Number(payload.actor || payload.source || 0) | 0;
+  if (!(actor > 0)) return 0;
+
+  const amount = Math.max(0, Number(spec.flatThreat || 0) | 0);
+  if (amount <= 0) return 0;
+  const kind = String(spec.threatKind || "spell");
+  const reason = `spell:${spellId}`;
+  const targetField = String(spec.targetField || "targetId");
+  const targetsField = String(spec.targetsField || "");
+
+  if (targetsField) {
+    return addFlatThreatToTargets(world, payloadField(payload, targetsField, []), actor, amount, kind, reason);
+  }
+  return addFlatThreat(world, payloadField(payload, targetField, 0), actor, amount, kind, reason) ? 1 : 0;
+}
+
 export function installThreatListeners(world) {
   if (!world || world[THREAT_LISTENERS_INSTALLED]) return;
   world[THREAT_LISTENERS_INSTALLED] = true;
@@ -84,31 +119,12 @@ export function installThreatListeners(world) {
     addFlatThreat(world, target, attacker, 1, "ranged_miss", "ranged_miss");
   });
 
-  world.on("spell:blind", ({ actor, targetId, fizzle }) => {
-    if (fizzle) return;
-    addFlatThreat(world, targetId, actor, CONTROL_SPELL_THREAT.blind, "spell_control", "spell:blind");
-  });
-
-  world.on("spell:entangle", ({ actor, targetId }) => {
-    addFlatThreat(world, targetId, actor, CONTROL_SPELL_THREAT.entangle, "spell_control", "spell:entangle");
-  });
-
-  world.on("spell:mark_of_death", ({ actor, targetId }) => {
-    addFlatThreat(world, targetId, actor, CONTROL_SPELL_THREAT.mark_of_death, "spell_control", "spell:mark_of_death");
-  });
-
-  world.on("spell:web_spit", ({ actor, targetId, slowed }) => {
-    if (!slowed) return;
-    addFlatThreat(world, targetId, actor, CONTROL_SPELL_THREAT.web_spit, "spell_control", "spell:web_spit");
-  });
-
-  world.on("spell:mass_delirium", ({ actor, affectedIds }) => {
-    addFlatThreatToTargets(world, affectedIds, actor, CONTROL_SPELL_THREAT.mass_delirium, "spell_control", "spell:mass_delirium");
-  });
-
-  world.on("spell:war_cry", ({ actor, affectedIds }) => {
-    addFlatThreatToTargets(world, affectedIds, actor, CONTROL_SPELL_THREAT.war_cry, "spell_control", "spell:war_cry");
-  });
+  world.on("spell:blind", (payload) => applySpellThreat(world, "blind", payload));
+  world.on("spell:entangle", (payload) => applySpellThreat(world, "entangle", payload));
+  world.on("spell:mark_of_death", (payload) => applySpellThreat(world, "mark_of_death", payload));
+  world.on("spell:web_spit", (payload) => applySpellThreat(world, "web_spit", payload));
+  world.on("spell:mass_delirium", (payload) => applySpellThreat(world, "mass_delirium", payload));
+  world.on("spell:war_cry", (payload) => applySpellThreat(world, "war_cry", payload));
 
   world.on("taunt:applied", ({ targetId, sourceId, turnsLeft, potency, reason }) => {
     const owner = Number(targetId || 0) | 0;

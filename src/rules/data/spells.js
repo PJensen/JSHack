@@ -37,6 +37,7 @@
  * @property {string[]} [schools]           // spell schools, e.g. ['destruction'], ['destruction','trickery']
  * @property {boolean}  [clearMindedCasting] // true = resolves normally even when caster is confused
  * @property {number}   [cooldown]           // turns before the spell can be cast again (0 or omitted = no cooldown)
+ * @property {{ flatThreat?: number, threatMult?: number, threatKind?: string, targetField?: string, targetsField?: string, requiresField?: string }} [threat]
  */
 
 /** @type {Record<string, SpellDef>} */
@@ -102,6 +103,7 @@ export const SPELL_DEFS = {
     script: 'mass_delirium',
     targeting: 'self',
     radius: 32,
+    threat: { flatThreat: 3, threatKind: "spell_control", targetsField: "affectedIds" },
     description: 'Unspool a field of impossible syntax that leaves nearby minds stumbling over themselves.',
     effects: [
       { kind: 'status', status: 'confused', duration: '50 turns; reader condition affects fumble risk, not power' },
@@ -428,6 +430,7 @@ export const SPELL_DEFS = {
     slowPotency: 1,
     script: 'web_spit',
     targeting: 'enemy',
+    threat: { flatThreat: 3, threatKind: "spell_control", targetField: "targetId", requiresField: "slowed" },
     description: 'Hurls sticky silk that webs the tile and slows the struck target.',
     effects: [
       { kind: 'utility', note: 'Spawns a web tile at the target location' },
@@ -739,6 +742,7 @@ export const SPELL_DEFS = {
     script: 'blind',
     targeting: 'enemy',
     selfTargetable: true,
+    threat: { flatThreat: 3, threatKind: "spell_control", targetField: "targetId" },
     description: 'Snuff the target\'s sight instantly, plunging them into darkness before their vision slowly recovers.',
     effects: [
       { kind: 'status', status: 'blinded', duration: 'instant blackout, 16 ticks hold, 4 ticks recovery' },
@@ -787,6 +791,7 @@ export const SPELL_DEFS = {
     range: 7,
     script: 'entangle',
     targeting: 'enemy',
+    threat: { flatThreat: 5, threatKind: "spell_control", targetField: "targetId" },
     description: 'Grasping vines erupt from the earth and bind the target in place.',
     effects: [
       { kind: 'status', status: 'stunned', duration: '3 turns' },
@@ -856,6 +861,7 @@ export const SPELL_DEFS = {
     script: 'war_cry',
     targeting: 'self',
     radius: 3,
+    threat: { flatThreat: 3, threatKind: "spell_control", targetsField: "affectedIds" },
     description: 'A thundering bellow that rattles the nerve of every creature close enough to hear it.',
     effects: [
       { kind: 'status', status: 'weakened', duration: '6 turns to nearby hostiles' },
@@ -1189,6 +1195,7 @@ export const SPELL_DEFS = {
     cooldown: 12,
     script: 'mark_of_death',
     targeting: 'enemy',
+    threat: { flatThreat: 4, threatKind: "spell_control", targetField: "targetId" },
     description: 'Brand a foe with a skull sigil. All damage they receive is amplified.',
     effects: [
       { kind: 'status', status: 'marked', duration: '8 turns' },

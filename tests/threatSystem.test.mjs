@@ -13,6 +13,7 @@ import { Equipment } from "../src/rules/components/Equipment.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 import { MoveIntent } from "../src/rules/components/Intents/MoveIntent.js";
 import { dealDamage } from "../src/rules/utils/dealDamage.js";
+import { SPELL_DEFS } from "../src/rules/data/spells.js";
 import { addThreat, getThreatValue, forceThreatTarget, resolveThreatTarget } from "../src/rules/utils/threat.js";
 import { threatSystem, installThreatListeners } from "../src/rules/systems/threatSystem.js";
 import { installTauntListener, tauntSteeringSystem } from "../src/rules/systems/tauntSystem.js";
@@ -280,4 +281,20 @@ Deno.test("area control spell threat applies per affected hostile target", () =>
   assertEquals(getThreatValue(world, first, player), 3);
   assertEquals(getThreatValue(world, second, player), 3);
   assertEquals(getThreatValue(world, ally, player), 0);
+});
+
+Deno.test("spell threat is driven by spell metadata", () => {
+  const world = new World({ seed: 13 });
+  installThreatListeners(world);
+  const enemy = addEnemy(world, 8, 5);
+  const player = addActor(world, 5, 5, "player", { player: true });
+  const original = SPELL_DEFS.blind.threat;
+  SPELL_DEFS.blind.threat = { ...original, flatThreat: 7 };
+
+  try {
+    world.emit("spell:blind", { actor: player, targetId: enemy });
+    assertEquals(getThreatValue(world, enemy, player), 7);
+  } finally {
+    SPELL_DEFS.blind.threat = original;
+  }
 });
