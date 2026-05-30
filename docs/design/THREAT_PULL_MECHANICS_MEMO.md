@@ -67,6 +67,10 @@ Initial pull rules:
 Start with a small useful set:
 
 - Damage dealt: `threat += damage`.
+- Ranged damage: same base damage threat, but target switching uses the ranged
+  `130%` pull threshold while the challenger is outside melee. This makes opening
+  shots dangerous without making every arrow magically louder than melee damage.
+- Spell damage: same base damage threat unless spell data says otherwise.
 - Taunt: force target for duration and set taunter threat to current top threat plus
   a margin.
 - Pet protect/body-block: pet near owner and enemy targeting owner adds small
@@ -99,6 +103,83 @@ Threat acquisition can be modified by equipment and future status effects:
   `threatReduction` can tune acquisition without special-case item IDs.
 - Future skills can transfer threat from player to pet/summon by reducing one
   source entry and adding to another.
+
+## Ranged Threat
+
+Ranged combat should be explicit in the threat model because it changes both pull
+timing and counterplay.
+
+Recommended baseline:
+
+- Successful ranged hits generate threat from applied damage through the canonical
+  damage pipeline.
+- Misses should not generate damage threat, but later may emit noise or suspicion
+  threat if the shot is seen or heard.
+- Ranged challengers use the higher pull threshold while outside melee range.
+- Ranged openers are an overpull risk: the player can build threat before a pet has
+  reached body-block or guard range.
+- Ranged attacks from pets and summons should generate ordinary source threat for
+  the pet/summon, not for the owner, unless a future command explicitly redirects
+  or transfers threat.
+- Ammo, bows, and ranged gear may tune `threatGenerationMult` or carry tags such
+  as `silent`, `subtle`, or `menacing`.
+- Suppressed/silent ranged weapons should reduce acquisition, not bypass threat
+  entirely if the target is hit and understands the source.
+
+Open implementation question: whether a non-damaging ranged debuff should generate
+flat threat, spell-like threat, or only alert/suspicion.
+
+## Caster Threat
+
+Casters need the same treatment as ranged attackers, with spell data allowed to
+express intent.
+
+Recommended baseline:
+
+- Hostile spell damage generates threat from applied damage.
+- Non-damaging hostile spells should generate flat threat by effect class:
+  control, forced movement, reveal, silence, summon, and terrain denial are not
+  zero-threat actions.
+- Area spells should add threat per affected enemy rather than only to the primary
+  target.
+- Channeled spells should generate threat as effects land, not at channel start,
+  unless the channel itself is a visible taunt/noise action.
+- Summons should normally own their own threat. Future gear or skills can transfer
+  part of summon threat to the caster if that becomes tactically useful.
+- Healing and shielding allies should become caster threat later, probably scaled
+  by nearby hostile awareness and relationship to the protected target.
+- Spell definitions can eventually carry threat metadata such as:
+  `threatMult`, `flatThreat`, `threatKind`, `threatRadius`, or `sourceAttribution`.
+
+Important distinction: visibility and attribution affect who gets threat. If the
+caster is invisible or unseen, the action may create alert/search behavior without
+precisely assigning source threat unless witnesses can attribute the cast.
+
+## Hostile NPCs And Social Aggro
+
+NPC hostility should use the same threat topology once an NPC has crossed from
+social disposition into tactical combat.
+
+Recommended baseline:
+
+- Social systems decide whether an NPC becomes hostile; threat decides who that
+  hostile NPC attacks moment to moment.
+- When social aggro starts, seed an initial `ThreatEntry` for the offender instead
+  of only setting `AggroState.targetId`.
+- Shopkeepers, guards, and townfolk should keep their social memory separately
+  from combat threat. Smoke bomb or blink may drop tactical threat, but it should
+  not erase debt, reputation, trespass, or witness memory.
+- Hostile NPCs can still be taunted, body-blocked, or peeled by pets if their
+  faction rules allow combat targeting.
+- Civilian or law-bound NPCs may have policy constraints layered above threat:
+  guards protect townspeople, shopkeepers defend exits/stock, and panicked NPCs may
+  flee even when they have threat.
+- If an NPC cannot currently see or attribute the player, it should search or call
+  for help rather than perfectly track the source through reducers.
+
+Future question: some social enemies may deserve "legal target locks" that resist
+ordinary pet taunts until a guard/pet physically intervenes. That should be a
+policy layer, not special threat-table shape.
 
 ## Decay
 
