@@ -1,3 +1,0 @@
-giving you broad authority to follow the thread mechanics design memo.
-
-`THREAT_PULL_MECHANICS_MEMO.md`
