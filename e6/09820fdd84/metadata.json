@@ -1,0 +1,31 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "e609820fdd84",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "src/bridge/schema/worldView.js",
+    "src/display/fx/aggroFxController.js",
+    "src/rules/components/AggroState.js",
+    "src/rules/systems/petBehaviorSystem.js",
+    "src/rules/systems/tauntSystem.js",
+    "src/rules/utils/aggroTarget.js",
+    "tests/aggroTargetVisualEvents.test.mjs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/e6/09820fdd84/0/metadata.json",
+      "transcript": "/e6/09820fdd84/0/full.jsonl",
+      "content_hash": "/e6/09820fdd84/0/content_hash.txt",
+      "prompt": "/e6/09820fdd84/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 55192,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 2249856,
+    "output_tokens": 6664,
+    "api_call_count": 15
+  }
+}
