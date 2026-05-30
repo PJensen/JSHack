@@ -12,6 +12,7 @@ import { createBumpFxController } from "../fx/bumpFxController.js";
 import { createRecoilFxController } from "../fx/recoilFxController.js";
 import { createHitstopController } from "../fx/hitstopController.js";
 import { createMeleeSlashFxController } from "../fx/meleeSlashFx.js";
+import { createAggroFxController } from "../fx/aggroFxController.js";
 import { createDeathEssenceFxController } from "../fx/deathEssenceFxController.js";
 import { startShake } from "../camera/shake.js";
 import { startZoomPunch } from "../camera/zoomPunch.js";
@@ -125,6 +126,9 @@ export function setupDisplayRuntime({
   const meleeSlashFx = createMeleeSlashFxController();
   meleeSlashFx.installListeners({ world, getPosition, isPlayer });
 
+  const aggroFx = createAggroFxController({ world, getPosition, isPet });
+  aggroFx.installListeners();
+
   const recoilFx = createRecoilFxController();
   recoilFx.installListeners({ world, getPosition, isPlayer });
 
@@ -187,5 +191,5 @@ export function setupDisplayRuntime({
   const worldAmbientFx = createWorldAmbientController();
   const biomeAmbientFx = createBiomeAmbientController();
 
-  return { statusEmitterFx, statusPresentationDelayFx, boltFx, delayedDeathFx, projectileFx, spellAreaFx, cloudFx, surfaceAreaFx, spiritWispFx, bumpFx, meleeSlashFx, recoilFx, hitstopFx, deathEssenceFx, deathVfx, fountainAmbientFx, localEmitterAmbientFx, worldAmbientFx, biomeAmbientFx, ftext, goreTick };
+  return { statusEmitterFx, statusPresentationDelayFx, boltFx, delayedDeathFx, projectileFx, spellAreaFx, cloudFx, surfaceAreaFx, spiritWispFx, bumpFx, meleeSlashFx, aggroFx, recoilFx, hitstopFx, deathEssenceFx, deathVfx, fountainAmbientFx, localEmitterAmbientFx, worldAmbientFx, biomeAmbientFx, ftext, goreTick };
 }

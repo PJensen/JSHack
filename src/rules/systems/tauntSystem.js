@@ -1,4 +1,5 @@
 import { ActiveEffects } from "../components/ActiveEffects.js";
+import { AggroState } from "../components/AggroState.js";
 import { Faction } from "../components/Faction.js";
 import { MoveIntent } from "../components/Intents/MoveIntent.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
@@ -6,6 +7,7 @@ import { Position } from "../components/Position.js";
 import { forEachInRadius } from "../utils/spatialIndex.js";
 import { createStatusEvent } from "../../shared/events/statusEvent.js";
 import { ensureActiveEffects } from "../utils/effects.js";
+import { setAggroTarget } from "../utils/aggroTarget.js";
 
 const TAUNT_INSTALLED_KEY = Symbol.for("jshack:taunt:installed");
 const TAUNT_EFFECT_KEYS = Object.freeze(new Set(["taunt", "taunted"]));
@@ -219,6 +221,9 @@ export function tauntSteeringSystem(world) {
 
     const step = cardinalStepToward(pos, sourcePos);
     if (!step) continue;
+
+    const aggro = world.get(id, AggroState);
+    if (aggro) setAggroTarget(world, id, aggro, sourceId, "taunt");
 
     intent.dx = step.dx;
     intent.dy = step.dy;

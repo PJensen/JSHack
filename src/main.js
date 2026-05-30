@@ -2809,6 +2809,7 @@ const {
   spiritWispFx,
   bumpFx,
   meleeSlashFx,
+  aggroFx,
   recoilFx,
   hitstopFx,
   deathEssenceFx,
@@ -5164,6 +5165,7 @@ function render(worldView) {
     spiritWispFx,
     deathEssenceFx,
     meleeSlashFx,
+    aggroFx,
     fx,
     PERF,
   });
@@ -5336,7 +5338,7 @@ function frame(now) {
   updateShake(cam, dtSec);
   updateZoomPunch(cam, dtSec);
   // Combat VFX use hitstop-scaled dt so swings, bumps, gore all freeze in unison
-  tickDisplayEffects({ dtSec: displayDt, boltFx, spellAreaFx, projectileFx, throwFx, pickupFx, cloudFx, spiritWispFx, deathEssenceFx, meleeSlashFx, ftext, goreTick });
+  tickDisplayEffects({ dtSec: displayDt, boltFx, spellAreaFx, projectileFx, throwFx, pickupFx, cloudFx, spiritWispFx, deathEssenceFx, meleeSlashFx, aggroFx, ftext, goreTick });
   delayedDeathFx.tick(displayDt);
   flyingFx.tick(displayDt);
   slideFx.tick(displayDt);

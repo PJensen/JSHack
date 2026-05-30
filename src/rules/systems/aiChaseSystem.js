@@ -28,7 +28,6 @@
 import { Position }     from "../components/Position.js";
 import { Collider } from "../components/Collider.js";
 import { Faction }      from "../components/Faction.js";
-import { Player }       from "../components/Player.js";
 import { Equipment }    from "../components/Equipment.js";
 import { ItemInfo }     from "../components/ItemInfo.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
@@ -62,6 +61,7 @@ import { hasOverworldAerialLOS } from "../utils/flyingEligibility.js";
 import { getTile, isFlyable, isWalkable } from "../environment/dungeon/tileMap.js";
 import { TILE_STAIR_DOWN, TILE_STAIR_UP } from "../environment/dungeon/constants.js";
 import { getEffectiveVisionRange } from "../utils/blind.js";
+import { setAggroTarget } from "../utils/aggroTarget.js";
 import { chebyshevScalar } from "../utils/distance.js";
 import { CARDINAL_DIRS } from "../utils/directions.js";
 import { CentipedeSegment } from "../components/CentipedeSegment.js";
@@ -341,6 +341,7 @@ export function installAggroFromDamageListener(world) {
     }
 
     aggro.alertLevel      = AGGRO_LEVELS.alerted;
+    aggro.targetId        = 0;
     aggro.searchTurnsLeft = SEARCH_TURNS_ALERTED;
 
     const tPos = world.get(target, Position);
@@ -463,6 +464,7 @@ export function aiChaseSystem(world) {
     if (invisibleTarget && !adjacentToTarget) {
       if (aggro.alertLevel !== AGGRO_LEVELS.unaware) {
         aggro.alertLevel = AGGRO_LEVELS.unaware;
+        setAggroTarget(world, id, aggro, 0, "lost");
         aggro.searchTurnsLeft = 0;
         aggro.retreating = false;
       }
@@ -578,6 +580,7 @@ export function aiChaseSystem(world) {
             aggro.lastKnownY += aggro.lastKnownMoveDy * 3;
           }
           aggro.alertLevel      = AGGRO_LEVELS.alerted;
+          setAggroTarget(world, id, aggro, 0, "lost");
           aggro.searchTurnsLeft = SEARCH_TURNS_ALERTED;
           break;
         }
@@ -585,6 +588,7 @@ export function aiChaseSystem(world) {
           aggro.searchTurnsLeft--;
           if (aggro.searchTurnsLeft <= 0) {
             aggro.alertLevel      = AGGRO_LEVELS.curious;
+            setAggroTarget(world, id, aggro, 0, "lost");
             aggro.searchTurnsLeft = SEARCH_TURNS_CURIOUS;
           }
           break;
@@ -592,6 +596,7 @@ export function aiChaseSystem(world) {
           aggro.searchTurnsLeft--;
           if (aggro.searchTurnsLeft <= 0) {
             aggro.alertLevel      = AGGRO_LEVELS.unaware;
+            setAggroTarget(world, id, aggro, 0, "lost");
             aggro.searchTurnsLeft = 0;
             aggro.retreating      = false; // clear retreat flag on de-aggro
           }
@@ -599,6 +604,34 @@ export function aiChaseSystem(world) {
         default:
           break; // unaware — do nothing
       }
+    }
+
+    // ── Choose movement target ──────────────────────────────────────
+    let targetX, targetY;
+    let conflictRivalId = 0; // entity id of rival when conflict-redirected
+    if (aggro.alertLevel === AGGRO_LEVELS.hunting && conflictActive && canSee) {
+      const rival = findNearestRival(world, id, pos.x | 0, pos.y | 0, sightRange, ensureBlockedMap());
+      if (rival) {
+        targetX = rival.x;
+        targetY = rival.y;
+        conflictRivalId = rival.id;
+      } else {
+        // No rival in sight — fall back to normal player targeting
+        targetX = playerPos.x | 0;
+        targetY = playerPos.y | 0;
+      }
+    } else if (aggro.alertLevel === AGGRO_LEVELS.hunting) {
+      targetX = playerPos.x | 0;
+      targetY = playerPos.y | 0;
+    } else {
+      targetX = aggro.lastKnownX;
+      targetY = aggro.lastKnownY;
+    }
+
+    if (aggro.alertLevel === AGGRO_LEVELS.hunting) {
+      setAggroTarget(world, id, aggro, conflictRivalId || playerId, conflictRivalId ? "conflict" : "sight");
+    } else {
+      setAggroTarget(world, id, aggro, 0, "lost");
     }
 
     if (aggro.alertLevel === AGGRO_LEVELS.unaware) return;
@@ -622,28 +655,6 @@ export function aiChaseSystem(world) {
     if (def?.ambush && aggro.alertLevel === AGGRO_LEVELS.hunting) {
       if (chebyshevScalar(pos.x, pos.y, playerPos.x, playerPos.y) > 1) return; // hold position — don't move yet
       // Player is adjacent; fall through to normal attack/move logic.
-    }
-
-    // ── Choose movement target ──────────────────────────────────────
-    let targetX, targetY;
-    let conflictRivalId = 0; // entity id of rival when conflict-redirected
-    if (aggro.alertLevel === AGGRO_LEVELS.hunting && conflictActive && canSee) {
-      const rival = findNearestRival(world, id, pos.x | 0, pos.y | 0, sightRange, ensureBlockedMap());
-      if (rival) {
-        targetX = rival.x;
-        targetY = rival.y;
-        conflictRivalId = rival.id;
-      } else {
-        // No rival in sight — fall back to normal player targeting
-        targetX = playerPos.x | 0;
-        targetY = playerPos.y | 0;
-      }
-    } else if (aggro.alertLevel === AGGRO_LEVELS.hunting) {
-      targetX = playerPos.x | 0;
-      targetY = playerPos.y | 0;
-    } else {
-      targetX = aggro.lastKnownX;
-      targetY = aggro.lastKnownY;
     }
 
     const dxt = targetX - (pos.x | 0);
