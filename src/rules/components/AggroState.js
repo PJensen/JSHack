@@ -19,6 +19,11 @@ export const SEARCH_TURNS_CURIOUS       = 6;    // turns curious → unaware dow
  * lastKnownX/Y: last recorded position of the target (updated each hunting tick).
  * targetId: current live aggro target while hunting; 0 means no selected target.
  * targetReason: why targetId was selected (sight, conflict, taunt, etc.).
+ * highestThreatId: source with the highest current ThreatEntry value.
+ * forcedTargetId / forcedUntilTurn: hard taunt lock.
+ * threatLockUntilTurn: soft switch lock to prevent threshold chatter.
+ * lastTargetSwitchTurn: turn of the last target change.
+ * threatState: display/debug summary ("none", "stable", "unstable", "locked").
  * lastKnownMoveDx/Dy: last observed movement direction of the target.
  *   Used by intel ≥ 8 monsters to anticipate escape routes on LOS break.
  * searchTurnsLeft: countdown before downgrading to the next lower tier.
@@ -33,6 +38,12 @@ export const AggroState = defineComponent("AggroState", {
   alertLevel:        AGGRO_LEVELS.unaware,
   targetId:          0,
   targetReason:      "",
+  highestThreatId:   0,
+  forcedTargetId:    0,
+  forcedUntilTurn:   0,
+  threatLockUntilTurn: 0,
+  lastTargetSwitchTurn: 0,
+  threatState:       "none",
   lastKnownX:        0,
   lastKnownY:        0,
   lastKnownMoveDx:   0,

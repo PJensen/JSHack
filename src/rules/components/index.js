@@ -93,6 +93,7 @@ export { PolymorphProfile } from './PolymorphProfile.js';
 export { Channeling } from './Channeling.js';
 export { Collider } from './Collider.js';
 export { AggroState, AGGRO_LEVELS, SEARCH_TURNS_HUNTING_GRACE, SEARCH_TURNS_ALERTED, SEARCH_TURNS_CURIOUS } from './AggroState.js';
+export { ThreatEntry } from './ThreatEntry.js';
 export { Faction } from './Faction.js';
 export { Lifespan } from './Lifespan.js';
 export { Interactable } from './Interactable.js';

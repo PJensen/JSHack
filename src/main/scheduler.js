@@ -41,6 +41,7 @@ import { sleepScheduleSystem } from "../rules/systems/sleepScheduleSystem.js";
 import { encumbranceSystem } from "../rules/systems/encumbranceSystem.js";
 import { weightDerivationSystem } from "../rules/systems/weightDerivationSystem.js";
 import { installTauntListener, tauntSteeringSystem } from "../rules/systems/tauntSystem.js";
+import { installThreatListeners, threatSystem } from "../rules/systems/threatSystem.js";
 import { petCommandSystem } from "../rules/systems/petCommandSystem.js";
 import { petBehaviorSystem } from "../rules/systems/petBehaviorSystem.js";
 import { summonedBehaviorSystem } from "../rules/systems/summonedBehaviorSystem.js";
@@ -147,6 +148,8 @@ export function configureWorld(world) {
   installDeathImpactTracker(world);
   // Install taunt listeners once per world
   installTauntListener(world);
+  // Install threat listeners once per world
+  installThreatListeners(world);
   // Award monster maxHp to player score on kill
   installScoreListener(world);
   // Auto-pickup currency etc. when any actor moves onto a tile (reacts to "moved" event)
@@ -270,6 +273,7 @@ export function configureWorld(world) {
   registerSystem(effectSystem, 'effects');
   // Keep shield guard/break icon state synced to equipped offhand shields.
   registerSystem(shieldGuardSystem, 'effects');
+  registerSystem(threatSystem, 'effects', { after: [shieldGuardSystem] });
   registerSystem(materialReactionSystem, 'effects');
   registerSystem(hungerSystem, 'effects');
   // Food decay ticks after hunger (rot inventory food each turn)

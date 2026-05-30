@@ -47,7 +47,7 @@ function isActiveTaunt(effect) {
  */
 function upsertTauntEffect(world, targetId, spec) {
   const ae = ensureActiveEffects(world, targetId);
-  if (!ae) return false;
+  if (!ae) return { applied: false, created: false };
 
   const sourceId = Number(spec.sourceId || 0) | 0;
   const turnsLeft = Math.max(1, Number(spec.turnsLeft || 0) | 0);
@@ -63,7 +63,7 @@ function upsertTauntEffect(world, targetId, spec) {
     effect.stacks = 1;
     effect.sourceId = sourceId;
     if ((Number(effect.onsetLeft || 0) | 0) > 0) effect.onsetLeft = 0;
-    return false;
+    return { applied: true, created: false };
   }
 
   ae.effects.push({
@@ -73,7 +73,7 @@ function upsertTauntEffect(world, targetId, spec) {
     stacks: 1,
     sourceId,
   });
-  return true;
+  return { applied: true, created: true };
 }
 
 /**
@@ -132,16 +132,27 @@ function applyTauntArea(world, payload) {
     if ((id | 0) === sourceId) return;
     const faction = world.get(id, Faction);
     if (targetFaction && String(faction?.key || "") !== targetFaction) return;
-    if (!upsertTauntEffect(world, id, { sourceId, turnsLeft, potency })) return;
-    try {
-      world.emit?.("status", createStatusEvent({
-        id,
-        kind: "taunt",
-        effect: "taunt",
-        source: sourceId,
-        at: { x: pos.x | 0, y: pos.y | 0 },
-      }));
-    } catch (e) { console.debug('[tauntSystem] emit status failed:', e); }
+    const result = upsertTauntEffect(world, id, { sourceId, turnsLeft, potency });
+    if (!result.applied) return;
+    world.emit?.("taunt:applied", {
+      targetId: id,
+      sourceId,
+      turnsLeft,
+      potency,
+      reason: String(payload?.reason || "taunt"),
+      at: { x: pos.x | 0, y: pos.y | 0 },
+    });
+    if (result.created) {
+      try {
+        world.emit?.("status", createStatusEvent({
+          id,
+          kind: "taunt",
+          effect: "taunt",
+          source: sourceId,
+          at: { x: pos.x | 0, y: pos.y | 0 },
+        }));
+      } catch (e) { console.debug('[tauntSystem] emit status failed:', e); }
+    }
   });
 }
 

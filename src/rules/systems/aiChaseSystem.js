@@ -62,6 +62,7 @@ import { getTile, isFlyable, isWalkable } from "../environment/dungeon/tileMap.j
 import { TILE_STAIR_DOWN, TILE_STAIR_UP } from "../environment/dungeon/constants.js";
 import { getEffectiveVisionRange } from "../utils/blind.js";
 import { setAggroTarget } from "../utils/aggroTarget.js";
+import { resolveThreatTarget } from "../utils/threat.js";
 import { chebyshevScalar } from "../utils/distance.js";
 import { CARDINAL_DIRS } from "../utils/directions.js";
 import { CentipedeSegment } from "../components/CentipedeSegment.js";
@@ -608,6 +609,7 @@ export function aiChaseSystem(world) {
 
     // ── Choose movement target ──────────────────────────────────────
     let targetX, targetY;
+    let selectedTargetId = playerId;
     let conflictRivalId = 0; // entity id of rival when conflict-redirected
     if (aggro.alertLevel === AGGRO_LEVELS.hunting && conflictActive && canSee) {
       const rival = findNearestRival(world, id, pos.x | 0, pos.y | 0, sightRange, ensureBlockedMap());
@@ -615,21 +617,26 @@ export function aiChaseSystem(world) {
         targetX = rival.x;
         targetY = rival.y;
         conflictRivalId = rival.id;
+        selectedTargetId = rival.id;
       } else {
         // No rival in sight — fall back to normal player targeting
         targetX = playerPos.x | 0;
         targetY = playerPos.y | 0;
+        selectedTargetId = playerId;
       }
     } else if (aggro.alertLevel === AGGRO_LEVELS.hunting) {
-      targetX = playerPos.x | 0;
-      targetY = playerPos.y | 0;
+      const threatTargetId = resolveThreatTarget(world, id, { reason: aggro.targetReason || "threat" }) | 0;
+      selectedTargetId = threatTargetId > 0 && world.isAlive(threatTargetId) ? threatTargetId : playerId;
+      const selectedPos = world.get(selectedTargetId, Position) || playerPos;
+      targetX = selectedPos.x | 0;
+      targetY = selectedPos.y | 0;
     } else {
       targetX = aggro.lastKnownX;
       targetY = aggro.lastKnownY;
     }
 
     if (aggro.alertLevel === AGGRO_LEVELS.hunting) {
-      setAggroTarget(world, id, aggro, conflictRivalId || playerId, conflictRivalId ? "conflict" : "sight");
+      setAggroTarget(world, id, aggro, conflictRivalId || selectedTargetId, conflictRivalId ? "conflict" : (selectedTargetId === playerId ? "sight" : (aggro.targetReason || "threat")));
     } else {
       setAggroTarget(world, id, aggro, 0, "lost");
     }
@@ -672,7 +679,7 @@ export function aiChaseSystem(world) {
     }
 
     // ── Ranged attack: prefer shooting when hunting and in LOS ──────
-    const rangedTargetId = conflictRivalId || playerId;
+    const rangedTargetId = conflictRivalId || selectedTargetId;
     const canSeeRangedTarget = conflictRivalId ? true : canSee; // rival already LOS-checked
     const isKiter = resolveIsKiter(world, id, brain);
     // Kiters (ranged weapon or spells) may shoot even while retreating — their movement
