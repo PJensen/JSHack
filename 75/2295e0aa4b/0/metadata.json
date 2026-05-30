@@ -3,29 +3,23 @@
   "checkpoint_id": "752295e0aa4b",
   "session_id": "019e7948-3446-7383-8f76-c59bc0b14a9d",
   "strategy": "manual-commit",
-  "created_at": "2026-05-30T14:55:37.821089244Z",
+  "created_at": "2026-05-30T14:55:47.204421691Z",
   "branch": "master",
-  "checkpoints_count": 1,
+  "checkpoints_count": 0,
   "files_touched": [
+    "VERSION",
     "src/rules/utils/threat.js"
   ],
   "agent": "Codex",
   "model": "gpt-5.5",
-  "turn_id": "e9f89d9761fa",
-  "checkpoint_transcript_start": 139,
-  "transcript_lines_at_start": 139,
-  "token_usage": {
-    "input_tokens": 93434,
-    "cache_creation_tokens": 0,
-    "cache_read_tokens": 540928,
-    "output_tokens": 2122,
-    "api_call_count": 6
-  },
+  "turn_id": "03c4d02fb8de",
+  "checkpoint_transcript_start": 190,
+  "transcript_lines_at_start": 190,
   "session_metrics": {
     "turn_count": 1
   },
   "initial_attribution": {
-    "calculated_at": "2026-05-30T14:55:37.788609097Z",
+    "calculated_at": "2026-05-30T14:55:47.172403123Z",
     "agent_lines": 1,
     "agent_removed": 1,
     "human_added": 0,

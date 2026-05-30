@@ -3,8 +3,9 @@
   "checkpoint_id": "752295e0aa4b",
   "strategy": "manual-commit",
   "branch": "master",
-  "checkpoints_count": 1,
+  "checkpoints_count": 0,
   "files_touched": [
+    "VERSION",
     "src/rules/utils/threat.js"
   ],
   "sessions": [
@@ -14,12 +15,5 @@
       "content_hash": "/75/2295e0aa4b/0/content_hash.txt",
       "prompt": "/75/2295e0aa4b/0/prompt.txt"
     }
-  ],
-  "token_usage": {
-    "input_tokens": 93434,
-    "cache_creation_tokens": 0,
-    "cache_read_tokens": 540928,
-    "output_tokens": 2122,
-    "api_call_count": 6
-  }
+  ]
 }
