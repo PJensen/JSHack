@@ -237,3 +237,47 @@ Deno.test("equipped subtle gear reduces damage threat acquisition", () => {
 
   assertEquals(getThreatValue(world, enemy, player), 6);
 });
+
+Deno.test("ranged misses add small suspicion threat to the intended target", () => {
+  const world = new World({ seed: 10 });
+  installThreatListeners(world);
+  const enemy = addEnemy(world, 10, 5);
+  const player = addActor(world, 5, 5, "player", { player: true });
+
+  world.emit("ranged:missed-target", { attacker: player, target: enemy });
+
+  assertEquals(getThreatValue(world, enemy, player), 1);
+  assertEquals(world.get(enemy, AggroState).targetId, player);
+  assertEquals(world.get(enemy, AggroState).targetReason, "ranged_miss");
+});
+
+Deno.test("non-damage control spell events add flat caster threat", () => {
+  const world = new World({ seed: 11 });
+  installThreatListeners(world);
+  const enemy = addEnemy(world, 8, 5);
+  const player = addActor(world, 5, 5, "player", { player: true });
+
+  world.emit("spell:blind", { actor: player, targetId: enemy });
+  assertEquals(getThreatValue(world, enemy, player), 3);
+
+  world.emit("spell:entangle", { actor: player, targetId: enemy });
+  assertEquals(getThreatValue(world, enemy, player), 8);
+
+  world.emit("spell:mark_of_death", { actor: player, targetId: enemy });
+  assertEquals(getThreatValue(world, enemy, player), 12);
+});
+
+Deno.test("area control spell threat applies per affected hostile target", () => {
+  const world = new World({ seed: 12 });
+  installThreatListeners(world);
+  const first = addEnemy(world, 8, 5);
+  const second = addEnemy(world, 9, 5);
+  const player = addActor(world, 5, 5, "player", { player: true });
+  const ally = addActor(world, 6, 5, "player");
+
+  world.emit("spell:mass_delirium", { actor: player, affectedIds: [first, second, ally] });
+
+  assertEquals(getThreatValue(world, first, player), 3);
+  assertEquals(getThreatValue(world, second, player), 3);
+  assertEquals(getThreatValue(world, ally, player), 0);
+});

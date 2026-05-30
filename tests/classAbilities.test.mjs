@@ -100,6 +100,7 @@ Deno.test("war_cry emits event with affected count", () => {
 
   assertEquals(events.length, 1);
   assertEquals(events[0].affected, 2);
+  assertEquals(events[0].affectedIds.length, 2);
 });
 
 // ─── Cleave ─────────────────────────────────────────────────────────────────

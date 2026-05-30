@@ -3709,6 +3709,7 @@ REGISTRY['war_cry'] = function warCryScript(world, actor, spell, _intent) {
   const WEAKEN_TURNS = 6;
 
   let affected = 0;
+  const affectedIds = [];
   for (const [id, pos] of world.query(Position)) {
     if (id === actor) continue;
     const fac = /** @type any */ (world.get(id, Faction));
@@ -3726,6 +3727,7 @@ REGISTRY['war_cry'] = function warCryScript(world, actor, spell, _intent) {
         key: 'weaken', turnsLeft: WEAKEN_TURNS, potency: 1, stacks: 1, sourceId: actor,
       });
     }
+    affectedIds.push(id | 0);
     // Reset aggro to alerted (they heard you, but lost focus)
     const aggro = world.get(id, AggroState);
     if (aggro && aggro.alertLevel === AGGRO_LEVELS.hunting) {
@@ -3735,7 +3737,7 @@ REGISTRY['war_cry'] = function warCryScript(world, actor, spell, _intent) {
     affected++;
   }
 
-  emitSafe(world, 'spell:war_cry', { actor, at: { x: apos.x, y: apos.y }, affected });
+  emitSafe(world, 'spell:war_cry', { actor, at: { x: apos.x, y: apos.y }, affected, affectedIds });
 };
 
 REGISTRY['cleave'] = function cleaveScript(world, actor, spell, _intent) {

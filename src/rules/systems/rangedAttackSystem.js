@@ -241,6 +241,7 @@ export function rangedAttackSystem(world) {
         rng: r,
       });
       world.emit?.('status', createStatusEvent({ id: defender, kind: 'miss', source: attacker }));
+      world.emit?.('ranged:missed-target', { attacker, target: defender });
       const missTo = computeMissEndpoint(world, apos, dpos, {
         sourceId: attacker,
         targetId: defender,
