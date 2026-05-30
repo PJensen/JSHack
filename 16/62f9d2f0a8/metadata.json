@@ -1,0 +1,25 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "1662f9d2f0a8",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "docs/design/THREAT_PULL_MECHANICS_MEMO.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/16/62f9d2f0a8/0/metadata.json",
+      "transcript": "/16/62f9d2f0a8/0/full.jsonl",
+      "content_hash": "/16/62f9d2f0a8/0/content_hash.txt",
+      "prompt": "/16/62f9d2f0a8/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 29992,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 772992,
+    "output_tokens": 2965,
+    "api_call_count": 5
+  }
+}
