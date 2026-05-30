@@ -174,7 +174,7 @@ export function resolveThreatTarget(world, ownerId, opts = {}) {
         if (!sourceId || sourceId === previousForcedTarget || !world.isAlive(sourceId)) continue;
         bestOther = Math.max(bestOther, Number(entry.value || 0) | 0);
       }
-      forcedEntry[1].value = Math.min(Number(forcedEntry[1].value || 0) | 0, Math.max(0, bestOther - 1));
+      forcedEntry[1].value = Math.min(Number(forcedEntry[1].value || 0) | 0, Math.max(0, Math.ceil(bestOther * 0.5)));
       forcedEntry[1].forcedUntilTurn = 0;
     }
     aggro.forcedTargetId = 0;
