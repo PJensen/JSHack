@@ -63,7 +63,7 @@ function upsertTauntEffect(world, targetId, spec) {
     effect.stacks = 1;
     effect.sourceId = sourceId;
     if ((Number(effect.onsetLeft || 0) | 0) > 0) effect.onsetLeft = 0;
-    return true;
+    return false;
   }
 
   ae.effects.push({

@@ -14,9 +14,13 @@ export function classifyAggroTarget(world, targetId) {
 export function setAggroTarget(world, sourceId, aggro, targetId, reason = "selected") {
   const nextTargetId = Number(targetId || 0) | 0;
   const prevTargetId = Number(aggro?.targetId || 0) | 0;
-  if (!aggro || prevTargetId === nextTargetId) return;
+  const nextReason = String(reason || "selected");
+  const prevReason = String(aggro?.targetReason || "");
+  if (!aggro) return;
+  if (prevTargetId === nextTargetId && prevReason === nextReason) return;
 
   aggro.targetId = nextTargetId;
+  aggro.targetReason = nextTargetId > 0 ? nextReason : "";
   if (!(nextTargetId > 0)) return;
 
   const sourcePos = world.get(sourceId, Position);
@@ -25,7 +29,7 @@ export function setAggroTarget(world, sourceId, aggro, targetId, reason = "selec
     sourceId,
     targetId: nextTargetId,
     previousTargetId: prevTargetId,
-    reason,
+    reason: nextReason,
     sourceFaction: String(world.get(sourceId, Faction)?.key || ""),
     targetFaction: String(world.get(nextTargetId, Faction)?.key || ""),
     targetKind: classifyAggroTarget(world, nextTargetId),

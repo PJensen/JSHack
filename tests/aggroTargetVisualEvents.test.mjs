@@ -7,6 +7,8 @@ import { Player } from "../src/rules/components/Player.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { Faction } from "../src/rules/components/Faction.js";
 import { Vitality } from "../src/rules/components/Vitality.js";
+import { Pet } from "../src/rules/components/Pet.js";
+import { PetState } from "../src/rules/components/PetState.js";
 import { Brain } from "../src/rules/components/Brain.js";
 import { Equipment } from "../src/rules/components/Equipment.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
@@ -14,7 +16,8 @@ import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
 import { AggroState, AGGRO_LEVELS } from "../src/rules/components/AggroState.js";
 import { MoveIntent } from "../src/rules/components/Intents/MoveIntent.js";
 import { aiChaseSystem } from "../src/rules/systems/aiChaseSystem.js";
-import { tauntSteeringSystem } from "../src/rules/systems/tauntSystem.js";
+import { petBehaviorSystem } from "../src/rules/systems/petBehaviorSystem.js";
+import { installTauntListener, tauntSteeringSystem } from "../src/rules/systems/tauntSystem.js";
 
 function addBaseEquipment(world, id, overrides = {}) {
   world.add(id, Equipment, {
@@ -124,4 +127,44 @@ Deno.test("taunt steering shifts aggro target visuals to the taunter", () => {
   assertEquals(events[0].targetKind, "ally");
   assertEquals(events[0].reason, "taunt");
   assertEquals(world.get(enemy, AggroState).targetId, pet);
+});
+
+Deno.test("guarding pet applies protective taunt when an enemy threatens its owner", () => {
+  const { world, player } = makeWorld();
+  installTauntListener(world);
+
+  const pet = world.create();
+  world.add(pet, Pet);
+  world.add(pet, Position, { x: 6, y: 5 });
+  world.add(pet, Faction, { key: "pet" });
+  world.add(pet, Vitality, { hp: 20, maxHp: 20 });
+  world.add(pet, PetState, {
+    state: "guarding",
+    targetX: 6,
+    targetY: 5,
+    targetItemId: 0,
+    stateEnteredTurn: 0,
+    lastPlayerX: 5,
+    lastPlayerY: 5,
+    commandCooldown: 0,
+    rangedCooldown: 0,
+  });
+
+  const enemy = addEnemy(world, 7, 5);
+  world.mutate(enemy, AggroState, (aggro) => {
+    aggro.alertLevel = AGGRO_LEVELS.hunting;
+    aggro.targetId = player;
+    aggro.targetReason = "sight";
+  });
+
+  petBehaviorSystem(world);
+
+  const taunt = world.get(enemy, ActiveEffects)?.effects?.find((effect) => effect.key === "taunt");
+  assertEquals(taunt?.sourceId, pet);
+
+  world.add(enemy, MoveIntent, { dx: -1, dy: 0 });
+  tauntSteeringSystem(world);
+
+  assertEquals(world.get(enemy, AggroState).targetId, pet);
+  assertEquals(world.get(enemy, AggroState).targetReason, "taunt");
 });

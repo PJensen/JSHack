@@ -54,6 +54,7 @@ export function createAggroFxController({ world, getPosition, isPet }) {
         targetPos: ev?.targetPos || null,
         color: colorForFaction(ev?.sourceFaction, targetKind),
         targetKind,
+        reason: String(ev?.reason || ""),
         age: 0,
         ttl: targetKind === "npc" ? TETHER_TTL : 0.72,
       });
@@ -114,8 +115,9 @@ export function createAggroFxController({ world, getPosition, isPet }) {
       const npc = fx.targetKind === "npc";
       const player = fx.targetKind === "player";
       const ally = fx.targetKind === "ally";
-      const alpha = (player ? 0.28 : ally ? 0.22 : 0.12) * fade;
-      const width = player ? 0.028 : ally ? 0.024 : 0.018;
+      const taunt = fx.reason === "taunt";
+      const alpha = (taunt ? 0.30 : player ? 0.28 : ally ? 0.22 : 0.12) * fade;
+      const width = taunt ? 0.030 : player ? 0.028 : ally ? 0.024 : 0.018;
 
       ctx.setLineDash(npc ? [0.10, 0.12] : [0.16, 0.09]);
       ctx.lineDashOffset = -(time * 0.35 + fx.sourceId * 0.017);
@@ -183,21 +185,22 @@ export function createAggroFxController({ world, getPosition, isPet }) {
     const targetId = Number(e.aggroTargetId || 0) | 0;
     const targetsPlayer = playerId > 0 && targetId === playerId;
     const targetsAlly = targetEntity?.isPet === true;
+    const taunted = String(e.aggroTargetReason || "") === "taunt";
     const rgb = targetsPlayer ? [255, 72, 28] : targetsAlly ? [255, 184, 62] : [178, 88, 76];
     const pulse = 0.5 + 0.5 * Math.sin(time * (targetsPlayer ? 7.2 : 4.4) + (e.id | 0) * 0.71);
     const hasTarget = targetId > 0;
     const alpha = level === "hunting"
       ? (targetsPlayer ? 0.34 : targetsAlly ? 0.24 : hasTarget ? 0.14 : 0.10)
       : 0.12;
-    const rx = (targetsPlayer ? 0.39 : 0.34) + pulse * 0.012;
-    const ry = (targetsPlayer ? 0.24 : 0.20) + pulse * 0.008;
+    const rx = (targetsPlayer ? 0.39 : taunted ? 0.37 : 0.34) + pulse * 0.012;
+    const ry = (targetsPlayer ? 0.24 : taunted ? 0.22 : 0.20) + pulse * 0.008;
 
     ctx.save();
     ctx.globalCompositeOperation = "source-over";
     ctx.setLineDash(level === "alerted" ? [0.11, 0.08] : []);
     ctx.lineDashOffset = -time * 0.25;
     ctx.strokeStyle = alphaColor(rgb, alpha);
-    ctx.lineWidth = targetsPlayer ? 0.026 : 0.018;
+    ctx.lineWidth = targetsPlayer ? 0.026 : taunted ? 0.022 : 0.018;
     for (const [a0, a1] of [[0.10, 0.32], [0.68, 0.90], [1.10, 1.32], [1.68, 1.90]]) {
       ctx.beginPath();
       ctx.ellipse(x, y + 0.08, rx, ry, 0, a0 * Math.PI, a1 * Math.PI);

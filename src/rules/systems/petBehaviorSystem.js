@@ -16,6 +16,7 @@ import {
 import { Consumable } from "../components/Consumable.js";
 import { FoodDecay } from "../components/FoodDecay.js";
 import { ActiveEffects } from "../components/ActiveEffects.js";
+import { AggroState } from "../components/AggroState.js";
 import { MoveIntent } from "../components/Intents/MoveIntent.js";
 import { PickupIntent } from "../components/Intents/PickupIntent.js";
 import { Vitality } from "../components/Vitality.js";
@@ -61,6 +62,8 @@ const FLEE_CORPSE_SEARCH_RADIUS = 8;
 const FLEE_CORPSE_THREAT_RADIUS = 2;
 const FELINE_LAVA_MISSTEP_CHANCE = 0.05;
 const PET_ABILITY_SIGHT_RANGE = 8;
+const PET_PROTECT_RADIUS = 3;
+const PET_PROTECT_TAUNT_TURNS = 2;
 
 const PET_SEEN_KEY = Symbol.for("jshack:pet:seenEnemies");
 
@@ -127,6 +130,40 @@ function tryPetAbilityHooks(world, petId, petPos, targetId, targetPos) {
   return false;
 }
 
+function maybePetProtectOwner(world, petId, petState, petPos, playerId, playerPos) {
+  const state = String(petState?.state || "");
+  if (state !== "guarding" && state !== "aggressive") return;
+
+  const petFaction = world.get(petId, Faction)?.key || "pet";
+  let shouldTaunt = false;
+
+  for (const [enemyId, fac, enemyPos, vit] of queryFactionActors(world)) {
+    if (!vit || (vit.hp | 0) <= 0) continue;
+    if (!areFactionsHostile(petFaction, fac?.key)) continue;
+    if (chebyshevScalar(enemyPos.x, enemyPos.y, petPos.x, petPos.y) > PET_PROTECT_RADIUS) continue;
+
+    const aggro = world.get(enemyId, AggroState);
+    const targetsOwner = (Number(aggro?.targetId || 0) | 0) === playerId;
+    const menacingOwner = chebyshevScalar(enemyPos.x, enemyPos.y, playerPos.x, playerPos.y) <= 2;
+    if (!targetsOwner && !menacingOwner) continue;
+
+    shouldTaunt = true;
+    break;
+  }
+
+  if (!shouldTaunt) return;
+  world.emit?.("taunt:apply-area", {
+    sourceId: petId,
+    x: petPos.x | 0,
+    y: petPos.y | 0,
+    radius: PET_PROTECT_RADIUS,
+    turnsLeft: PET_PROTECT_TAUNT_TURNS,
+    potency: state === "guarding" ? 2 : 1,
+    targetFaction: "enemy",
+    reason: "pet_protect",
+  });
+}
+
 /**
  * petBehaviorSystem - state-aware pet AI
  * Replaces petFollowSystem with comprehensive state machine behavior
@@ -185,6 +222,7 @@ export function petBehaviorSystem(world) {
 
     // Check for automatic state transitions
     checkAutoTransitions(world, id, petState, pos, playerPos);
+    maybePetProtectOwner(world, id, petState, pos, playerId, playerPos);
 
     // Execute behavior based on current state
     switch (petState.state) {
