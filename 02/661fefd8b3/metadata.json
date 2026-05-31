@@ -1,0 +1,28 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "02661fefd8b3",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "src/display/audio/audioWiring.js",
+    "src/rules/environment/dungeon/populate.js",
+    "src/rules/quests/definitions/ratInfestation.js",
+    "tests/ratInfestationQuestSpawn.test.mjs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/02/661fefd8b3/0/metadata.json",
+      "transcript": "/02/661fefd8b3/0/full.jsonl",
+      "content_hash": "/02/661fefd8b3/0/content_hash.txt",
+      "prompt": "/02/661fefd8b3/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 339588,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 5473024,
+    "output_tokens": 17878,
+    "api_call_count": 54
+  }
+}
