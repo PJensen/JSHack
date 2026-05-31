@@ -1,0 +1,25 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "ca5144a00d44",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "docs/design/THREAT_ATTRIBUTION_UNSEEN_CASTERS.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/ca/5144a00d44/0/metadata.json",
+      "transcript": "/ca/5144a00d44/0/full.jsonl",
+      "content_hash": "/ca/5144a00d44/0/content_hash.txt",
+      "prompt": "/ca/5144a00d44/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 46529,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 209536,
+    "output_tokens": 4383,
+    "api_call_count": 7
+  }
+}
