@@ -1,12 +1,14 @@
 import { NamedIdentity } from "../../components/NamedIdentity.js";
 import { Position } from "../../components/Position.js";
 import { QuestVars } from "../../components/QuestVars.js";
+import { DungeonState } from "../../components/DungeonState.js";
 import { getMonster } from "../../data/monsters.js";
 import { createItemById } from "../../utils/itemFactory.js";
 import { addToInventory } from "../../utils/inventoryFacade.js";
 import { spawnMonsterEntity } from "../../utils/spawnMonsterEntity.js";
 import { emitSafe } from "../../utils/emitSafe.js";
-import { firstPlayerId } from "../../utils/worldAccess.js";
+import { attachEntityToCurrentFloor } from "../../utils/floorEntities.js";
+import { currentDepth, firstPlayerId } from "../../utils/worldAccess.js";
 import { isWalkable } from "../../environment/dungeon/tileMap.js";
 import { emit, incVar, setVar } from "../actions.js";
 import { registerQuest } from "../registry.js";
@@ -16,6 +18,7 @@ export const RAT_INFESTATION_QUEST_ID = "starter.rat_infestation";
 export const REQUIRED_RAT_KILLS = 5;
 const REWARD_GOLD = 75;
 const REWARD_ITEM_IDS = Object.freeze(["bow_mirror"]);
+const DUNGEON_RAT_INFESTATION_COUNT = 10;
 
 const RAT_HOOKS_KEY = Symbol.for("jshack:quests:ratInfestation:installed");
 
@@ -42,6 +45,99 @@ function ratProgressPayload(ctx) {
   };
 }
 
+function currentDownStairPos(world) {
+  for (const [, pos, ni] of world.query(Position, NamedIdentity)) {
+    if (String(ni?.identity || "") !== "stair_down") continue;
+    return { x: pos.x | 0, y: pos.y | 0 };
+  }
+  for (const [, ds] of world.query(DungeonState)) {
+    if (!Array.isArray(ds?.downStairPositions) || ds.downStairPositions.length <= 0) break;
+    const first = ds.downStairPositions[0];
+    return { x: Number(first?.x || 0) | 0, y: Number(first?.y || 0) | 0 };
+  }
+  return null;
+}
+
+function occupiedPositions(world) {
+  const occupied = new Set();
+  for (const [, pos] of world.query(Position)) {
+    occupied.add(`${pos.x | 0},${pos.y | 0}`);
+  }
+  return occupied;
+}
+
+function ratCount(world) {
+  let count = 0;
+  for (const [, ni] of world.query(NamedIdentity, Position)) {
+    if (String(ni?.identity || "") === "rat") count++;
+  }
+  return count;
+}
+
+function questWantsDungeonRats(world, playerId) {
+  const quest = getQuestRecord(world, RAT_INFESTATION_QUEST_ID, playerId);
+  if (!quest) return false;
+  if (String(quest.state?.status || "active") !== "active") return false;
+  if (String(quest.state?.node || "") !== "hunt") return false;
+  const vars = quest.vars?.data || {};
+  if (vars.accepted !== true) return false;
+  return Number(vars.killCount || 0) < REQUIRED_RAT_KILLS;
+}
+
+function spawnRatAt(world, x, y) {
+  const def = getMonster("rat");
+  if (!def) return 0;
+  const id = spawnMonsterEntity(world, {
+    x,
+    y,
+    name: def.name,
+    identity: def.id,
+    maxHp: def.baseHp,
+    faction: "enemy",
+    naturalDamageDice: def.damageDice,
+    sizeClass: def.sizeClass,
+    massKg: def.massKg,
+    resistances: def.resistances,
+    speed: def.speed,
+  });
+  if (id > 0) attachEntityToCurrentFloor(world, id);
+  return id;
+}
+
+export function ensureRatInfestationQuestRats(world) {
+  if (currentDepth(world, 0) !== 1) return 0;
+
+  const playerId = firstPlayerId(world);
+  if (!(playerId > 0)) return 0;
+  if (!questWantsDungeonRats(world, playerId)) return 0;
+
+  const existing = ratCount(world);
+  if (existing >= DUNGEON_RAT_INFESTATION_COUNT) return 0;
+
+  const anchor = currentDownStairPos(world) || world.get(playerId, Position);
+  if (!anchor) return 0;
+
+  const occupied = occupiedPositions(world);
+  let spawned = 0;
+  for (let radius = 1; radius <= 10 && existing + spawned < DUNGEON_RAT_INFESTATION_COUNT; radius++) {
+    for (let dy = -radius; dy <= radius && existing + spawned < DUNGEON_RAT_INFESTATION_COUNT; dy++) {
+      for (let dx = -radius; dx <= radius && existing + spawned < DUNGEON_RAT_INFESTATION_COUNT; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) continue;
+        const x = (anchor.x | 0) + dx;
+        const y = (anchor.y | 0) + dy;
+        const key = `${x},${y}`;
+        if (occupied.has(key)) continue;
+        if (!isWalkable(x, y)) continue;
+        const id = spawnRatAt(world, x, y);
+        if (!(id > 0)) continue;
+        occupied.add(key);
+        spawned++;
+      }
+    }
+  }
+  return spawned;
+}
+
 export function installRatQuestHooks(world) {
   if (world[RAT_HOOKS_KEY]) return;
   world[RAT_HOOKS_KEY] = true;
@@ -60,6 +156,10 @@ export function installRatQuestHooks(world) {
     if (String(quest.state?.node || "") !== "hunt") return;
 
     world.emit("rat:killed", { playerId, victimId });
+  });
+  world.on("dungeon:transitioned", ({ depth }) => {
+    if ((Number(depth || 0) | 0) !== 1) return;
+    ensureRatInfestationQuestRats(world);
   });
 }
 
@@ -159,6 +259,7 @@ export const RatInfestationQuest = registerQuest({
                     text: "there's one! Kill it!",
                   });
                 }
+                ensureRatInfestationQuestRats(ctx.world);
               },
               emit("quest:started", (ctx) => ({
                 questId: RAT_INFESTATION_QUEST_ID,

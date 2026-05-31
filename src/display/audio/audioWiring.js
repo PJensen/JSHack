@@ -959,9 +959,9 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     sfx("deity:omen");
   });
 
-  world.on('deity:omen', () => {
-    sfx("deity:omen");
-  });
+  // deity:omen is intentionally silent for now. Wrath/anger can emit
+  // frequently after severe offenses; add a distinct rate-limited angry-god
+  // cue before restoring audio here.
 
   world.on('hazard:spawned', (payload) => {
     maybePlayDungeonOmen(payload);
