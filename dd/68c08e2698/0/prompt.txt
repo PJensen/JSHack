@@ -33,3 +33,11 @@ This cannot be the best way we can query for stairs.
 that is disgusting -- ecs-js supports tags. are you seriously saying that we have to move through all named identities to find stairs?! that is insanity.
 
 note: a tag is a component with no props in ecs-js -- read up
+
+---
+
+in fact: I want you to find as many of this entire class of issues -- it strikes me as a profound waste that you would iterate entire collections when looking for something so simple.
+
+additionally, we should absolutely namespace these under a tags folder
+
+note: you know stair-up and stair-down are the same thing depening on which direction you are traveling right?
