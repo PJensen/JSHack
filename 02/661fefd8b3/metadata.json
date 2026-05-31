@@ -4,10 +4,7 @@
   "strategy": "manual-commit",
   "branch": "master",
   "checkpoints_count": 1,
-  "files_touched": [
-    "src/rules/quests/definitions/ratInfestation.js",
-    "tests/ratInfestationQuestSpawn.test.mjs"
-  ],
+  "files_touched": null,
   "sessions": [
     {
       "metadata": "/02/661fefd8b3/0/metadata.json",
