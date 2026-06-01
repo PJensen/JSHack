@@ -1,9 +1,11 @@
 {
   "cli_version": "0.6.3",
   "checkpoint_id": "3a60dc863908",
+  "session_id": "019e8356-1b4a-74b2-b6d8-f756d0fb9982",
   "strategy": "manual-commit",
+  "created_at": "2026-06-01T13:37:42.00531813Z",
   "branch": "master",
-  "checkpoints_count": 2,
+  "checkpoints_count": 1,
   "files_touched": [
     "src/content/abilityHandler.js",
     "src/content/worldFacade.js",
@@ -65,25 +67,44 @@
     "src/rules/utils/shopClaims.js",
     "tools/event-bus-explorer.mjs"
   ],
-  "sessions": [
-    {
-      "metadata": "/3a/60dc863908/0/metadata.json",
-      "transcript": "/3a/60dc863908/0/full.jsonl",
-      "content_hash": "/3a/60dc863908/0/content_hash.txt",
-      "prompt": "/3a/60dc863908/0/prompt.txt"
-    },
-    {
-      "metadata": "/3a/60dc863908/1/metadata.json",
-      "transcript": "/3a/60dc863908/1/full.jsonl",
-      "content_hash": "/3a/60dc863908/1/content_hash.txt",
-      "prompt": "/3a/60dc863908/1/prompt.txt"
-    }
-  ],
+  "agent": "Codex",
+  "model": "gpt-5.5",
+  "turn_id": "b8b36d3b8e91",
+  "checkpoint_transcript_start": 251,
+  "transcript_lines_at_start": 251,
   "token_usage": {
-    "input_tokens": 218211,
+    "input_tokens": 123335,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 5508736,
-    "output_tokens": 11102,
-    "api_call_count": 51
-  }
+    "cache_read_tokens": 4013568,
+    "output_tokens": 4911,
+    "api_call_count": 28
+  },
+  "session_metrics": {
+    "turn_count": 5
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-01T13:37:41.948505378Z",
+    "agent_lines": 406,
+    "agent_removed": 490,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 406,
+    "total_lines_changed": 896,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 865,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".github/agents/Dungeon Generation and BSP Expert.agent.md": 582,
+        ".github/agents/VFX Agent.agent.md": 283
+      }
+    }
+  ]
 }
