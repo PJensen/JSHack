@@ -10,12 +10,19 @@ import { Mana } from '../src/rules/components/Mana.js';
 import { Stamina } from '../src/rules/components/Stamina.js';
 import { Faction } from '../src/rules/components/Faction.js';
 import { ActiveEffects } from '../src/rules/components/ActiveEffects.js';
-import { trapSystem } from '../src/rules/systems/trapSystem.js';
+import { trapSystem, installTrapStepListener } from '../src/rules/systems/trapSystem.js';
+import { movementSystem } from '../src/rules/systems/movementSystem.js';
+import { MoveIntent } from '../src/rules/components/Intents/MoveIntent.js';
 import { clearAll, loadChunk } from '../src/rules/environment/dungeon/tileMap.js';
 import { CHUNK_SIZE, TILE_FLOOR, TILE_WALL } from '../src/rules/environment/dungeon/constants.js';
 import { setTile } from '../src/rules/environment/dungeon/tileMap.js';
 // Side-effect import: registers trap_spike script
 import '../src/rules/scripts/traps.js';
+
+function stepOntoTrap(world, actor, x, y) {
+  installTrapStepListener(world);
+  world.emit("moved", { id: actor, from: { x, y: y + 1 }, to: { x, y } });
+}
 
 Deno.test("spike trap deals damage and disarms on trigger", () => {
   const world = new World({ seed: 1 });
@@ -29,6 +36,7 @@ Deno.test("spike trap deals damage and disarms on trigger", () => {
   world.add(trap, Position, { x: 3, y: 3 });
   world.add(trap, Trap, { type: 'spike', armed: true, revealed: false, script: 'trap_spike', params: { percent: 0.25 } });
 
+  stepOntoTrap(world, player, 3, 3);
   trapSystem(world);
 
   const vit = world.get(player, Vitality);
@@ -51,6 +59,7 @@ Deno.test("disarmed trap does not deal damage", () => {
   world.add(trap, Position, { x: 3, y: 3 });
   world.add(trap, Trap, { type: 'spike', armed: false, revealed: true, script: 'trap_spike', params: { percent: 0.25 } });
 
+  stepOntoTrap(world, player, 3, 3);
   trapSystem(world);
   const vit = world.get(player, Vitality);
   assert(vit.hp === 75, `disarmed trap should not deal damage, hp=${vit.hp}`);
@@ -68,6 +77,7 @@ Deno.test("trap on different tile does not trigger", () => {
   world.add(farTrap, Position, { x: 10, y: 10 });
   world.add(farTrap, Trap, { type: 'spike', armed: true, revealed: false, script: 'trap_spike', params: { percent: 0.5 } });
 
+  stepOntoTrap(world, player, 3, 3);
   trapSystem(world);
   const vit = world.get(player, Vitality);
   assert(vit.hp === 75, `far trap should not trigger, hp=${vit.hp}`);
@@ -95,6 +105,7 @@ Deno.test("monster on spike trap does NOT trigger it", () => {
   world.add(trap, Position, { x: 5, y: 5 });
   world.add(trap, Trap, { type: 'spike', armed: true, revealed: false, script: 'trap_spike', params: { percent: 0.5 } });
 
+  stepOntoTrap(world, monster, 5, 5);
   trapSystem(world);
 
   const vit = world.get(monster, Vitality);
@@ -119,6 +130,7 @@ Deno.test("trap:triggered event is emitted with victim info", () => {
   let emitted = null;
   world.on('trap:triggered', (evt) => { emitted = evt; });
 
+  stepOntoTrap(world, player, 2, 2);
   trapSystem(world);
 
   assert(emitted !== null, 'trap:triggered event should be emitted');
@@ -145,6 +157,7 @@ Deno.test("trap only triggers once even with multiple entities nearby", () => {
   world.add(trap, Position, { x: 4, y: 4 });
   world.add(trap, Trap, { type: 'spike', armed: true, revealed: false, script: 'trap_spike', params: { percent: 0.25 }, difficulty: 16 });
 
+  stepOntoTrap(world, player, 4, 4);
   trapSystem(world);
 
   // Player triggers the trap, monster is untouched
@@ -171,6 +184,7 @@ Deno.test("high dex victim avoids trap (no damage, trap stays armed)", () => {
   world.add(trap, Position, { x: 3, y: 3 });
   world.add(trap, Trap, { type: 'spike', armed: true, revealed: false, script: 'trap_spike', params: { percent: 0.25 }, difficulty: 1 });
 
+  stepOntoTrap(world, player, 3, 3);
   trapSystem(world);
 
   const vit = world.get(player, Vitality);
@@ -194,6 +208,7 @@ Deno.test("zero dex victim does NOT avoid high-DC trap", () => {
   world.add(trap, Position, { x: 3, y: 3 });
   world.add(trap, Trap, { type: 'spike', armed: true, revealed: false, script: 'trap_spike', params: { percent: 0.25 }, difficulty: 21 });
 
+  stepOntoTrap(world, player, 3, 3);
   trapSystem(world);
 
   const vit = world.get(player, Vitality);
@@ -219,6 +234,7 @@ Deno.test("trap:avoided event emitted on avoidance", () => {
   let emitted = null;
   world.on('trap:avoided', (evt) => { emitted = evt; });
 
+  stepOntoTrap(world, player, 3, 3);
   trapSystem(world);
 
   assert(emitted !== null, 'trap:avoided event should be emitted');
@@ -252,6 +268,7 @@ Deno.test("pit trap emits fall event and applies minor damage", () => {
     let fallEvent = null;
     world.on('trap:pit:fall', (ev) => { fallEvent = ev; });
 
+    stepOntoTrap(world, player, 10, 10);
     trapSystem(world);
 
     const vit = world.get(player, Vitality);
@@ -289,6 +306,7 @@ Deno.test("siphon trap drains hp and heals nearest hostile", () => {
     difficulty: 21,
   });
 
+  stepOntoTrap(world, player, 5, 5);
   trapSystem(world);
 
   assert(world.get(player, Vitality).hp < 100, "siphon trap should drain target hp");
@@ -314,6 +332,7 @@ Deno.test("siphon trap can drain mana and stamina pools individually", () => {
     params: { resource: "mana", percent: 0.2, healNearestEnemy: false },
     difficulty: 21,
   });
+  stepOntoTrap(world, actor, 2, 2);
   trapSystem(world);
   assert(world.get(actor, Mana).mana < 50, "mana siphon should reduce mana");
 
@@ -328,6 +347,7 @@ Deno.test("siphon trap can drain mana and stamina pools individually", () => {
     params: { resource: "stamina", percent: 0.2, healNearestEnemy: false },
     difficulty: 21,
   });
+  stepOntoTrap(world, actor, 3, 3);
   trapSystem(world);
   assert(world.get(actor, Stamina).stamina < 100, "stamina siphon should reduce stamina");
 });
@@ -352,6 +372,7 @@ Deno.test("drain trap drains both mana and stamina simultaneously", () => {
     difficulty: 21,
   });
 
+  stepOntoTrap(world, player, 4, 4);
   trapSystem(world);
 
   assert(world.get(player, Mana).mana < 50, "drain trap should reduce mana");
@@ -377,6 +398,7 @@ Deno.test("rust trap applies weakened anti-gear effect", () => {
     difficulty: 21,
   });
 
+  stepOntoTrap(world, player, 7, 7);
   trapSystem(world);
   const ae = world.get(player, ActiveEffects);
   const weakened = Array.isArray(ae?.effects)
@@ -408,6 +430,7 @@ Deno.test("swarm trap spawns multiple creatures around the trigger", () => {
       difficulty: 21,
     });
 
+    stepOntoTrap(world, player, 12, 12);
     trapSystem(world);
     let spiders = 0;
     for (const [id, pos, vit] of world.query(Position, Vitality)) {
@@ -448,8 +471,10 @@ Deno.test("arrow trap fires from nearest wall and resets after player trigger", 
     world.on("ranged:shot", (ev) => shots.push(ev));
     world.on("damaged", (ev) => damaged.push(ev));
 
+    stepOntoTrap(world, player, 10, 10);
     trapSystem(world);
     world.step = 1;
+    stepOntoTrap(world, player, 10, 10);
     trapSystem(world);
 
     assert(world.get(player, Vitality).hp === 84, `arrow trap should fire twice, hp=${world.get(player, Vitality).hp}`);
@@ -491,13 +516,63 @@ Deno.test("arrow trap can be triggered by lured monsters and remains reusable", 
       difficulty: 14,
     });
 
+    stepOntoTrap(world, monster, 8, 8);
     trapSystem(world);
     world.step = 1;
+    stepOntoTrap(world, monster, 8, 8);
     trapSystem(world);
 
     assert(world.get(monster, Vitality).hp === 18, `monster should take repeat arrow trap damage, hp=${world.get(monster, Vitality).hp}`);
     assert(world.get(player, Vitality).hp === 100, "nearby player should not be hit when monster is on the plate");
     assert(world.get(trap, Trap).params.resetAtStep === 2, "arrow trap should keep scheduling future lure plays");
+  } finally {
+    clearAll();
+  }
+});
+
+Deno.test("arrow trap rearming does not fire when actor walks off the plate", () => {
+  clearAll();
+  try {
+    loadChunk(0, 0, new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR));
+    setTile(10, 9, TILE_WALL);
+    const world = new World({ seed: 11 });
+    installTrapStepListener(world);
+    world.setScheduler((w) => {
+      movementSystem(w);
+      trapSystem(w);
+    });
+
+    const player = world.create();
+    world.add(player, Player);
+    world.add(player, Position, { x: 10, y: 11 });
+    world.add(player, Vitality, { maxHp: 100, hp: 100 });
+
+    const trap = world.create();
+    world.add(trap, Position, { x: 10, y: 10 });
+    world.add(trap, Trap, {
+      type: "arrow",
+      armed: true,
+      revealed: false,
+      script: "trap_arrow",
+      params: { damage: 7, resetsEvery: 1, maxWallDistance: 8 },
+      difficulty: 21,
+    });
+
+    const shots = [];
+    world.on("ranged:shot", (ev) => shots.push(ev));
+
+    world.add(player, MoveIntent, { dx: 0, dy: -1 });
+    world.tick(1);
+    assert(world.get(player, Vitality).hp === 93, "arrow trap should fire when stepping onto the plate");
+    assert(shots.length === 1, `expected first shot only, got ${shots.length}`);
+
+    world.add(player, MoveIntent, { dx: 1, dy: 0 });
+    world.tick(1);
+    assert(world.get(player, Vitality).hp === 93, "arrow trap must not fire after actor walks off the plate");
+    assert(shots.length === 1, `walking off should not create a second shot, got ${shots.length}`);
+
+    const t = world.get(trap, Trap);
+    assert(t.armed === true, "trap should be rearmed for a later actor after the departure tick");
   } finally {
     clearAll();
   }
