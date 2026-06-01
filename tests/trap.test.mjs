@@ -12,7 +12,8 @@ import { Faction } from '../src/rules/components/Faction.js';
 import { ActiveEffects } from '../src/rules/components/ActiveEffects.js';
 import { trapSystem } from '../src/rules/systems/trapSystem.js';
 import { clearAll, loadChunk } from '../src/rules/environment/dungeon/tileMap.js';
-import { CHUNK_SIZE, TILE_FLOOR } from '../src/rules/environment/dungeon/constants.js';
+import { CHUNK_SIZE, TILE_FLOOR, TILE_WALL } from '../src/rules/environment/dungeon/constants.js';
+import { setTile } from '../src/rules/environment/dungeon/tileMap.js';
 // Side-effect import: registers trap_spike script
 import '../src/rules/scripts/traps.js';
 
@@ -415,6 +416,88 @@ Deno.test("swarm trap spawns multiple creatures around the trigger", () => {
       spiders++;
     }
     assert(spiders >= 3, `swarm trap should spawn several monsters, got ${spiders}`);
+  } finally {
+    clearAll();
+  }
+});
+
+Deno.test("arrow trap fires from nearest wall and resets after player trigger", () => {
+  clearAll();
+  try {
+    loadChunk(0, 0, new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR));
+    setTile(10, 9, TILE_WALL);
+    const world = new World({ seed: 9 });
+    const player = world.create();
+    world.add(player, Player);
+    world.add(player, Position, { x: 10, y: 10 });
+    world.add(player, Vitality, { maxHp: 100, hp: 100 });
+
+    const trap = world.create();
+    world.add(trap, Position, { x: 10, y: 10 });
+    world.add(trap, Trap, {
+      type: "arrow",
+      armed: true,
+      revealed: false,
+      script: "trap_arrow",
+      params: { damage: 8, resetsEvery: 1, maxWallDistance: 8 },
+      difficulty: 21,
+    });
+
+    const shots = [];
+    const damaged = [];
+    world.on("ranged:shot", (ev) => shots.push(ev));
+    world.on("damaged", (ev) => damaged.push(ev));
+
+    trapSystem(world);
+    world.step = 1;
+    trapSystem(world);
+
+    assert(world.get(player, Vitality).hp === 84, `arrow trap should fire twice, hp=${world.get(player, Vitality).hp}`);
+    const t = world.get(trap, Trap);
+    assert(t.armed === false, "arrow trap should schedule its next reset after triggering");
+    assert(t.params.resetAtStep === 2, `arrow trap should reset one turn later, resetAtStep=${t.params.resetAtStep}`);
+    assert(t.revealed === true, "arrow trap should be revealed after triggering");
+    assert(shots.length === 2, `arrow trap should emit projectile shots, got ${shots.length}`);
+    assert(shots[0].from.x === 10 && shots[0].from.y === 9, `expected shot from wall at (10,9), got (${shots[0].from.x},${shots[0].from.y})`);
+    assert(damaged.every((ev) => ev.projectileKind === "arrow"), "arrow trap damage should carry arrow projectile metadata");
+  } finally {
+    clearAll();
+  }
+});
+
+Deno.test("arrow trap can be triggered by lured monsters and remains reusable", () => {
+  clearAll();
+  try {
+    loadChunk(0, 0, new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR));
+    setTile(8, 7, TILE_WALL);
+    const world = new World({ seed: 10 });
+    const player = world.create();
+    world.add(player, Player);
+    world.add(player, Position, { x: 10, y: 10 });
+    world.add(player, Vitality, { maxHp: 100, hp: 100 });
+
+    const monster = world.create();
+    world.add(monster, Position, { x: 8, y: 8 });
+    world.add(monster, Vitality, { maxHp: 30, hp: 30 });
+
+    const trap = world.create();
+    world.add(trap, Position, { x: 8, y: 8 });
+    world.add(trap, Trap, {
+      type: "arrow",
+      armed: true,
+      revealed: false,
+      script: "trap_arrow",
+      params: { damage: 6, resetsEvery: 1, maxWallDistance: 8 },
+      difficulty: 14,
+    });
+
+    trapSystem(world);
+    world.step = 1;
+    trapSystem(world);
+
+    assert(world.get(monster, Vitality).hp === 18, `monster should take repeat arrow trap damage, hp=${world.get(monster, Vitality).hp}`);
+    assert(world.get(player, Vitality).hp === 100, "nearby player should not be hit when monster is on the plate");
+    assert(world.get(trap, Trap).params.resetAtStep === 2, "arrow trap should keep scheduling future lure plays");
   } finally {
     clearAll();
   }

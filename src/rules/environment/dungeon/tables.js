@@ -116,30 +116,34 @@ export function pickItem(rng, depth) {
  */
 export function pickTrap(rng, depth) {
   const roll = rng.next();
-  // Swarm traps: 16% chance, count scales with depth.
-  if (roll < 0.16) {
+  // Arrow traps: 12% chance. Reusable, lure-friendly pressure plates.
+  if (roll < 0.12) {
+    return { type: "arrow", script: "trap_arrow", params: { dice: "1d8", resetsEvery: 1, maxWallDistance: 12 } };
+  }
+  // Swarm traps: 14% chance, count scales with depth.
+  if (roll < 0.26) {
     const count = Math.min(8, 5 + Math.floor(depth / 5));
     return { type: "swarm", script: "trap_swarm", params: { monsterId: "spider", count } };
   }
-  // Snake traps: 14% chance, count scales with depth.
-  if (roll < 0.30) {
+  // Snake traps: 12% chance, count scales with depth.
+  if (roll < 0.38) {
     const count = Math.min(6, 3 + Math.floor(depth / 4));
     return { type: 'snake', script: 'trap_snake', params: { count } };
   }
-  // Pit traps: 18% chance.
-  if (roll < 0.48) {
+  // Pit traps: 16% chance.
+  if (roll < 0.54) {
     return { type: "pit", script: "trap_pit", params: { dropDepth: 1, percent: 0.08 } };
   }
-  // Siphon traps: 16% chance.
-  if (roll < 0.64) {
+  // Siphon traps: 14% chance.
+  if (roll < 0.68) {
     const resource = depth >= 6 ? (rng.next() < 0.5 ? "mana" : "stamina") : "hp";
     return { type: "siphon", script: "trap_siphon", params: { resource, percent: 0.15, healNearestEnemy: true } };
   }
-  // Rust traps: 12% chance.
-  if (roll < 0.76) {
+  // Rust traps: 10% chance.
+  if (roll < 0.78) {
     return { type: "rust", script: "trap_rust", params: { stat: "armor", amount: 2, duration: 20 } };
   }
-  // Shock traps: 12% chance.
+  // Shock traps: 10% chance.
   if (roll < 0.88) {
     return { type: 'shock', script: 'trap_shock', params: { percent: 0.15 } };
   }

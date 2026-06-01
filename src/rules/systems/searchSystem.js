@@ -44,7 +44,7 @@ function trapResolver(world, actorId, pos, radius) {
     try { world.set(tid, Trap, { ...trap, revealed: true }); } catch {}
     found = true;
 
-    const trapNames = { spike: 'spike trap', snake: 'snake trap', shock: 'shock trap' };
+    const trapNames = { spike: 'spike trap', snake: 'snake trap', shock: 'shock trap', arrow: 'arrow trap' };
     const name = trapNames[trap.type] || 'trap';
     messages.push(`*** a hidden ${name} is revealed! ***`);
 

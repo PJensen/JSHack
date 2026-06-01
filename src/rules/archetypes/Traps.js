@@ -108,3 +108,18 @@ export const SwarmTrap = defineArchetype(
     })],
     [NamedIdentity, () => ({ name: "Swarm Trap", identity: "trap_swarm" })],
 );
+
+// Arrow trap — reusable pressure plate aimed from a nearby cardinal wall
+export const ArrowTrap = defineArchetype(
+    "ArrowTrap",
+    [Position, (p) => ({ x: p.x ?? 0, y: p.y ?? 0 })],
+    [Trap, (p) => ({
+        type: "arrow",
+        script: "trap_arrow",
+        params: p.trapParams ?? { dice: "1d8", resetsEvery: 1 },
+        revealed: false,
+        armed: true,
+        difficulty: p.difficulty ?? 14,
+    })],
+    [NamedIdentity, () => ({ name: "Arrow Trap", identity: "trap_arrow" })],
+);

@@ -7,7 +7,7 @@ import { getMonster } from "../data/monsters.js";
 import { dealDamage } from "../utils/dealDamage.js";
 import { attach } from "../../lib/ecs-js/hierarchy.js";
 import { findNearestValidTileAround } from "../utils/queries.js";
-import { combatSeed, mulberry32, rngInt } from "../utils/rng.js";
+import { combatSeed, mulberry32, rngInt, rollDice } from "../utils/rng.js";
 import { Mana } from "../components/Mana.js";
 import { Stamina } from "../components/Stamina.js";
 import { Faction } from "../components/Faction.js";
@@ -18,6 +18,13 @@ import { spawnHazard } from "../utils/hazardSpawn.js";
 import { HazardArea } from "../components/HazardArea.js";
 import { forEachInRadius } from "../utils/spatialIndex.js";
 import { clamp01Or, clampInt } from "../utils/numberCoerce.js";
+import { computeImpactVectorXY, computeProjectileDelay } from "../utils/projectileKinematics.js";
+import { getTile } from "../environment/dungeon/tileMap.js";
+import { TILE_WALL } from "../environment/dungeon/constants.js";
+
+const ARROW_TRAP_PROJECTILE_SPEED = 22;
+const ARROW_TRAP_PROJECTILE_MIN_DURATION = 0.06;
+const ARROW_TRAP_PROJECTILE_MAX_DURATION = 0.35;
 
 function pushTimedEffect(world, target, effect) {
   if (!(target > 0) || !effect || typeof effect !== "object") return;
@@ -56,6 +63,28 @@ function findNearestHostile(world, anchor, victimId, maxDistance = 6) {
     }
   }
   return bestId;
+}
+
+function findArrowTrapOrigin(trapX, trapY, maxDistance = 12) {
+  const dirs = [
+    { dx: 0, dy: -1 },
+    { dx: 1, dy: 0 },
+    { dx: 0, dy: 1 },
+    { dx: -1, dy: 0 },
+  ];
+  let best = null;
+  for (const dir of dirs) {
+    for (let dist = 1; dist <= maxDistance; dist++) {
+      const x = trapX + dir.dx * dist;
+      const y = trapY + dir.dy * dist;
+      if (getTile(x, y) === TILE_WALL) {
+        if (!best || dist < best.dist) best = { x, y, dist };
+        break;
+      }
+    }
+  }
+  if (best) return { x: best.x, y: best.y };
+  return { x: trapX, y: trapY - 1 };
 }
 
 
@@ -367,6 +396,59 @@ registerScript("trap_swarm", {
       monsterId,
       count: spawned,
       at: { x: trapPos.x | 0, y: trapPos.y | 0 },
+    });
+  },
+});
+
+// Arrow trap: reusable pressure plate that fires from the nearest cardinal wall.
+// Params: { dice?: string, damage?: number, type?: string, maxWallDistance?: number }
+registerScript("trap_arrow", {
+  [ScriptVerb.TrapTrigger]: (world, ctx) => {
+    const trapId = Number(ctx?.trapId || 0) | 0;
+    const target = Number(ctx?.targetId || 0) | 0;
+    if (!(trapId > 0) || !(target > 0) || !world.isAlive(target)) return;
+    const trapPos = world.get(trapId, Position);
+    const targetPos = world.get(target, Position);
+    if (!trapPos || !targetPos) return;
+
+    const tx = trapPos.x | 0;
+    const ty = trapPos.y | 0;
+    const maxWallDistance = clampInt(ctx?.params?.maxWallDistance, 12, 1);
+    const from = findArrowTrapOrigin(tx, ty, maxWallDistance);
+    const seed = combatSeed(world.seed, world.step, trapId, target, 0xA770);
+    const rng = mulberry32(seed);
+    const dice = String(ctx?.params?.dice || "").trim();
+    const fallbackDamage = clampInt(ctx?.params?.damage, 8, 1);
+    const amount = dice ? Math.max(1, rollDice(dice, rng)) : fallbackDamage;
+    const damageType = String(ctx?.params?.type || "pierce").toLowerCase();
+    const projectileDelay = computeProjectileDelay(
+      from,
+      { x: tx, y: ty },
+      ARROW_TRAP_PROJECTILE_SPEED,
+      ARROW_TRAP_PROJECTILE_MIN_DURATION,
+      ARROW_TRAP_PROJECTILE_MAX_DURATION,
+    );
+
+    world.emit?.("ranged:shot", {
+      attacker: trapId,
+      target,
+      hit: true,
+      damage: amount,
+      style: "plain",
+      projectileSpeed: ARROW_TRAP_PROJECTILE_SPEED,
+      from,
+      to: { x: tx, y: ty },
+    });
+    dealDamage(world, {
+      target,
+      amount,
+      source: trapId,
+      type: damageType,
+      cause: "an arrow trap",
+      at: { x: targetPos.x | 0, y: targetPos.y | 0 },
+      projectileDelay,
+      impactVector: computeImpactVectorXY(from.x, from.y, tx, ty),
+      projectileKind: "arrow",
     });
   },
 });

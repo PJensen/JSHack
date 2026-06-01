@@ -491,6 +491,7 @@ export function installEnvironmentMessages(ctx) {
       siphon: 'A chill pulls at your soul \u2014 you wrench free before it takes hold!',
       rust: 'Orange dust puffs from a hidden plate \u2014 you shield your gear just in time!',
       swarm: 'Insects boil from a cracked tile \u2014 you stomp backward before they reach you!',
+      arrow: 'A bowstring snaps in the wall \u2014 you dive under the shot!',
     };
     if (_playerHas('blinded')) log('Something feels wrong underfoot \u2014 you throw yourself sideways on instinct!', 'info');
     else log(trapFlav[type] || 'You spot the trap and nimbly dodge it!', 'info');
@@ -504,11 +505,12 @@ export function installEnvironmentMessages(ctx) {
       siphon: 'You crack the sigil stone. The siphon goes dark.',
       rust: 'You scrape the corrosive powder into a harmless pile.',
       swarm: 'You crush the nest before anything hatches.',
+      arrow: 'You jam the pressure plate and wedge the wall slit shut.',
     };
     log(trapFlav[trapType] || 'You carefully disarm the trap.', 'info');
   });
   world.on('trap:disarm:failed', ({ actor, trapType }) => {
-    const trapNames = { spike: "Spike Trap", snake: "Snake Trap", shock: "Shock Trap", pit: "Pit Trap", siphon: "Siphon Trap", rust: "Rust Trap", swarm: "Swarm Trap" };
+    const trapNames = { spike: "Spike Trap", snake: "Snake Trap", shock: "Shock Trap", pit: "Pit Trap", siphon: "Siphon Trap", rust: "Rust Trap", swarm: "Swarm Trap", arrow: "Arrow Trap" };
     log(`Your fingers slip on the ${trapNames[trapType] || 'trap'} mechanism \u2014 CLICK! It triggers!`, 'danger');
   });
   world.on('trap:pit:fall', ({ targetId }) => {

@@ -412,6 +412,7 @@ export const basePalette = {
   trap_siphon: { glyph: "^", fg: "#8a7dff", glow: "#5345bb" },
   trap_rust: { glyph: "^", fg: "#c7793d", glow: "#864824" },
   trap_swarm: { glyph: "^", fg: "#8dbb55", glow: "#527a2d" },
+  trap_arrow: { glyph: "^", fg: "#d6c48a", glow: "#8a7134" },
   // Tier 0 (snake — spawned by snake traps)
   snake:    { glyph: "S", fg: "#55aa44", glow: "#338822" },
 

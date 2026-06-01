@@ -14,8 +14,41 @@ import { chebyshevScalar } from "../utils/distance.js";
 // and any monster that blunders onto one triggers it in full view.
 const TRAP_ARM_RADIUS = 12;
 
+function resetEveryTurns(t) {
+  const raw = Number(t?.params?.resetsEvery || 0);
+  return Number.isFinite(raw) && raw > 0 ? Math.max(1, raw | 0) : 0;
+}
+
+function triggeredTrapState(t, world) {
+  const resetsEvery = resetEveryTurns(t);
+  if (resetsEvery <= 0) return { ...t, revealed: true, armed: false };
+  return {
+    ...t,
+    revealed: true,
+    armed: false,
+    params: {
+      ...(t.params || {}),
+      resetAtStep: (Number(world.step || 0) | 0) + resetsEvery,
+    },
+  };
+}
+
+function rearmDueTraps(world) {
+  const now = Number(world.step || 0) | 0;
+  for (const [tid, , t] of world.query(Position, Trap)) {
+    if (!t || t.armed) continue;
+    const resetAtStep = Number(t?.params?.resetAtStep || 0) | 0;
+    if (resetAtStep <= 0 || now < resetAtStep) continue;
+    const params = { ...(t.params || {}) };
+    delete params.resetAtStep;
+    try { world.set(tid, Trap, { ...t, armed: true, params }); } catch {}
+  }
+}
+
 /** @param {import('../../lib/ecs-js/index.js').World} world */
 export function trapSystem(world) {
+  rearmDueTraps(world);
+
   // Locate the player — needed for the activation-radius gate.
   let playerX = 0, playerY = 0, playerId = 0;
   for (const [id, pos] of world.query(Position, Player)) {
@@ -51,11 +84,12 @@ export function trapSystem(world) {
     // Player gets dex-based avoidance check below.
     if (!isPlayerVictim) {
       // Reveal, emit, trigger.
-      try { world.set(tid, Trap, { ...t, revealed: true, armed: false }); } catch {}
+      try { world.set(tid, Trap, triggeredTrapState(t, world)); } catch {}
       world.emit('trap:triggered', { trapId: tid, victimId, type: t.type });
       const fallbackScripts = {
         spike: "trap_spike", snake: "trap_snake", shock: "trap_shock",
         pit: "trap_pit", siphon: "trap_siphon", rust: "trap_rust", swarm: "trap_swarm",
+        arrow: "trap_arrow",
       };
       const scriptKey = t.script || fallbackScripts[t.type] || "";
       if (scriptKey) {
@@ -101,6 +135,7 @@ export function trapSystem(world) {
         siphon: "Siphon Trap",
         rust: "Rust Trap",
         swarm: "Swarm Trap",
+        arrow: "Arrow Trap",
       };
       const name = trapNames[t.type] || 'Trap';
       const identity = 'trap_' + (t.type || 'spike');
@@ -119,6 +154,7 @@ export function trapSystem(world) {
       siphon: "trap_siphon",
       rust: "trap_rust",
       swarm: "trap_swarm",
+      arrow: "trap_arrow",
     };
     const scriptKey = t.script || fallbackScripts[t.type] || "";
     if (scriptKey) {
@@ -130,7 +166,7 @@ export function trapSystem(world) {
       });
     }
 
-    // Reveal and disarm
-    try { world.set(tid, Trap, { ...t, revealed: true, armed: false }); } catch {} // ECS: component may not exist
+    // Reveal and disarm, optionally scheduling a generic reset.
+    try { world.set(tid, Trap, triggeredTrapState(t, world)); } catch {} // ECS: component may not exist
   }
 }
