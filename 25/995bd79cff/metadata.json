@@ -1,0 +1,34 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "25995bd79cff",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "src/display/palette/base.js",
+    "src/display/ui/wiring/messages/environmentMessages.js",
+    "src/rules/archetypes/Traps.js",
+    "src/rules/environment/dungeon/populate.js",
+    "src/rules/environment/dungeon/tables.js",
+    "src/rules/scripts/traps.js",
+    "src/rules/systems/searchSystem.js",
+    "src/rules/systems/trapSystem.js",
+    "tests/displayGlyphCoverage.test.mjs",
+    "tests/trap.test.mjs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/25/995bd79cff/0/metadata.json",
+      "transcript": "/25/995bd79cff/0/full.jsonl",
+      "content_hash": "/25/995bd79cff/0/content_hash.txt",
+      "prompt": "/25/995bd79cff/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 128606,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 2547456,
+    "output_tokens": 12319,
+    "api_call_count": 34
+  }
+}
