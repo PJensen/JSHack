@@ -1,0 +1,25 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "6bc956ead962",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "tools/event-bus-explorer.mjs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/6b/c956ead962/0/metadata.json",
+      "transcript": "/6b/c956ead962/0/full.jsonl",
+      "content_hash": "/6b/c956ead962/0/content_hash.txt",
+      "prompt": "/6b/c956ead962/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 167338,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1258624,
+    "output_tokens": 12870,
+    "api_call_count": 23
+  }
+}
