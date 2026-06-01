@@ -4,7 +4,6 @@
 
 import { ItemInfo } from "../components/ItemInfo.js";
 import { addToInventory } from "../utils/inventoryFacade.js";
-import { emitSafe } from "../utils/emitSafe.js";
 import { xyKey } from "../utils/gridKey.js";
 import { queryAllPositions, queryPlayerPosInv } from "../utils/queries.js";
 
@@ -31,7 +30,7 @@ export function autoPickupSystem(world) {
       const takeCount = info.count || 1;
       addToInventory(world, actor, itemId);
 
-      emitSafe(world, 'item:pickup', { actor, itemId, count: takeCount, itemX: pos.x, itemY: pos.y });
+      world.emit('item:pickup', { actor, itemId, count: takeCount, itemX: pos.x, itemY: pos.y });
     }
   }
 }

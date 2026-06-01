@@ -11,7 +11,6 @@ import { Vitality } from '../rules/components/Vitality.js';
 import { ActiveEffects } from '../rules/components/ActiveEffects.js';
 import { ScriptState } from '../rules/components/ScriptState.js';
 import { forEachInRadius } from '../rules/utils/spatialIndex.js';
-import { emitSafe } from '../rules/utils/emitSafe.js';
 import { rollDice } from '../rules/utils/rng.js';
 import { getMonster, monsterHasTag } from '../rules/data/monsters.js';
 import { setItemCooldown, getItemCooldownRemaining, isItemOnCooldown } from '../rules/utils/itemCooldowns.js';
@@ -48,7 +47,7 @@ export function createWorldFacade(world, actor, itemId) {
       if (!vit) return;
       const dmg = Math.max(0, amount | 0);
       world.mutate(entityId, Vitality, v => { v.hp = Math.max(0, v.hp - dmg); });
-      emitSafe(world, 'damaged', { target: entityId, amount: dmg, source: actor, cause: 'script', type: _source || 'script' });
+      world.emit('damaged', { target: entityId, amount: dmg, source: actor, cause: 'script', type: _source || 'script' });
     },
     addEffect(entityId, effect) {
       const ae = world.get(entityId, ActiveEffects);
@@ -76,8 +75,8 @@ export function createWorldFacade(world, actor, itemId) {
     spawnItem() { return null; },
     spawnMonster() { return null; },
     hazardSpawn() {},
-    emit(event, payload) { emitSafe(world, event, payload); },
-    message(text, type) { emitSafe(world, 'log:message', { text, type: type || 'system' }); },
+    emit(event, payload) { world.emit(event, payload); },
+    message(text, type) { world.emit('log:message', { text, type: type || 'system' }); },
   };
 
   return {
@@ -86,7 +85,7 @@ export function createWorldFacade(world, actor, itemId) {
     target: 0,
     query,
     helpers,
-    io: { emit: (e, p) => emitSafe(world, e, p) },
+    io: { emit: (e, p) => world.emit(e, p) },
 
     // ── Extended APIs for ScriptCtx ──────────────────────────────
     _ScriptState: ScriptState,

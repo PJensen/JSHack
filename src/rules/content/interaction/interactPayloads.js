@@ -86,7 +86,6 @@ import { GroundStackOrder } from "../../components/GroundStackOrder.js";
 import { HazardArea } from "../../components/HazardArea.js";
 import { HydraulicsLink } from "../../components/HydraulicsLink.js";
 import { setPortcullisRaised, setLinkedPortcullisState } from "../../utils/hydraulicsUtils.js";
-import { emitSafe } from "../../utils/emitSafe.js";
 import { isWalkable, forEachLoadedTile, setTile, getTile } from "../../environment/dungeon/tileMap.js";
 import { TILE_SHALLOW_WATER, TILE_FLOOR } from "../../environment/dungeon/constants.js";
 import { ActiveEffects } from "../../components/ActiveEffects.js";
@@ -744,7 +743,7 @@ export const INTERACT_PAYLOADS = {
           y: Number(finalPos?.y ?? py) | 0,
         };
         const info = world.get(finalId, ItemInfo);
-        emitSafe(world, "item:dropped", {
+        world.emit("item:dropped", {
           actor,
           itemId: finalId,
           count: Math.max(1, Number(placed.movedCount || info?.count || 1) | 0),
@@ -1394,7 +1393,7 @@ export const INTERACT_PAYLOADS = {
           if (candidates.length > 0) {
             const to = candidates[Math.floor(r() * candidates.length)];
             world.set(actor, Position, { x: to.x, y: to.y });
-            emitSafe(world, "moved", { id: actor, from, to });
+            world.emit("moved", { id: actor, from, to });
             world.emit?.("fountain:drink", {
               actor, targetId, effect: "teleport", from, to,
             });

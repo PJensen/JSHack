@@ -21,7 +21,6 @@ import { spawnHazard } from "../../utils/hazardSpawn.js";
 import { findNearestValidTileAround } from "../../utils/queries.js";
 import { worldChance } from "../../utils/rng.js";
 import { chebyshev, manhattan } from "../../utils/distance.js";
-import { emitSafe } from "../../utils/emitSafe.js";
 import { spellCost, spellCostResource } from "../../data/spells.js";
 import { isAiOnCooldown, startAiCooldown } from "../../utils/aiCooldowns.js";
 
@@ -197,7 +196,7 @@ export class SeenCallbackContext {
 
   /** @param {string} eventName @param {any} payload */
   emit(eventName, payload) {
-    emitSafe(this.world, eventName, payload);
+    this.world.emit(eventName, payload);
   }
 }
 
@@ -377,7 +376,7 @@ export function fireBreathLineOnLOS(opts = {}) {
           hazard.cause = "monster:firebreath";
           hazard.sourceId = ctx.actor | 0;
           hazard.sourceKind = actorIdentity;
-          emitSafe(ctx.world, "hazard:spawned", {
+          ctx.world.emit("hazard:spawned", {
             hazardId: existing,
             kind: "fire",
             medium: String(hazard.medium || "floor").toLowerCase() === "floor" ? "floor" : "air",

@@ -4,7 +4,6 @@ import { Position } from "../components/Position.js";
 import { ThrowIntent } from "../components/Intents/ThrowIntent.js";
 import { executeInteraction } from "../interaction/runtime/actionRuntime.js";
 import { throwPipeline } from "../interaction/verbs/throwPipeline.js";
-import { emitSafe } from "../utils/emitSafe.js";
 import { chebyshevScalar } from "../utils/distance.js";
 /** @typedef {import('../../lib/ecs-js/index.js').World} World */
 
@@ -192,7 +191,7 @@ export function throwSystem(world) {
 
     if (result?.canceled && typeof result.reason === "string" && !result.reason.startsWith("THROW_GATE_")) {
       const detail = result?.detail && typeof result.detail === "object" ? result.detail : {};
-      emitSafe(world, "item:throw-cancelled", {
+      world.emit("item:throw-cancelled", {
         actor,
         itemId,
         targetId,
@@ -202,7 +201,7 @@ export function throwSystem(world) {
       });
     }
 
-    emitSafe(world, "interaction:result", result);
+    world.emit("interaction:result", result);
     try { world.remove(actor, ThrowIntent); } catch {} // ECS: may not exist
   }
 }

@@ -33,7 +33,6 @@ import { DungeonState } from "../components/DungeonState.js";
 import { isFacingTurnCostEnabled, normalizeFacingVector } from "../utils/facing.js";
 import { markMovedThisTurn } from "../utils/posture.js";
 import { ALL_DIRS } from "../utils/directions.js";
-import { emitSafe } from "../utils/emitSafe.js";
 import { xyKey } from "../utils/gridKey.js";
 
 const NOCLIP_SYM = Symbol.for("jshack:debug:noclip");
@@ -119,7 +118,7 @@ export function installMoveAutoPickupListener(world) {
         if (ignoreCapacity || hasCapacityForItem(world, actor, itemId)) {
           addToInventory(world, actor, itemId);
         }
-        emitSafe(world, "item:pickup", { actor, itemId, count, itemX: to.x, itemY: to.y });
+        world.emit("item:pickup", { actor, itemId, count, itemX: to.x, itemY: to.y });
       });
     } catch (e) {
       console.debug("[movementSystem] auto-pickup failed:", e);
@@ -166,7 +165,7 @@ export function movementSystem(world) {
           const r = mulberry32(combatSeed(world.seed, world.step, actor, posSalt, 0xC0F00D11));
           const idx = (r() * options.length) | 0;
           ({ dx: mdx, dy: mdy } = options[idx]);
-          emitSafe(world, "status:confused-misstep", {
+          world.emit("status:confused-misstep", {
             actor,
             from: { dx: intendedDx, dy: intendedDy },
             to: { dx: mdx, dy: mdy },

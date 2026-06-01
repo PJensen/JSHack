@@ -18,7 +18,6 @@ import { Equipment, GEAR_SLOTS } from "../components/Equipment.js";
 import { inventoryItems } from "../utils/inventoryFacade.js";
 import { resolveCanonicalStats } from "../utils/canonicalStats.js";
 import { applyMaterialTransform } from "../utils/materialTransforms.js";
-import { emitSafe } from "../utils/emitSafe.js";
 
 const INSTALLED_KEY = Symbol.for("jshack:itemDestruction:installed");
 const DESTRUCTION_CHANCE = 1 / 3;
@@ -136,7 +135,7 @@ export function installItemDestructionListener(world) {
 
         applyMaterialTransform(world, itemId, rule.transform);
 
-        emitSafe(world, "item:destroyed:element", {
+        world.emit("item:destroyed:element", {
           target,
           itemId,
           itemName: name,

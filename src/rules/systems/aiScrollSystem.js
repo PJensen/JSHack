@@ -14,7 +14,6 @@ import { addToInventory, forEachItem } from "../utils/inventoryFacade.js";
 import { forEachInRadius } from "../utils/spatialIndex.js";
 import { canActThisTurn } from "../utils/speedGate.js";
 import { getScrollReadingQuality } from "../utils/scrollReading.js";
-import { emitSafe } from "../utils/emitSafe.js";
 
 const ACTIVE_RADIUS = 32;
 const SCAN_RADIUS = 1;
@@ -75,8 +74,8 @@ export function aiScrollPickupSystem(world) {
     if (!(scrollId > 0)) return;
     if (!addToInventory(world, id, scrollId, { silent: true })) return;
 
-    emitSafe(world, "pickup", { id, itemId: scrollId, at: { x: pos.x | 0, y: pos.y | 0 } });
-    emitSafe(world, "message", { text: `The ${def.name} snatches up a scroll!`, kind: "warning" });
+    world.emit("pickup", { id, itemId: scrollId, at: { x: pos.x | 0, y: pos.y | 0 } });
+    world.emit("message", { text: `The ${def.name} snatches up a scroll!`, kind: "warning" });
   });
 }
 
@@ -103,6 +102,6 @@ export function aiScrollUseSystem(world) {
     if (!(scrollId > 0)) return;
 
     world.add(id, UseIntent, { itemId: scrollId, targetId: id });
-    emitSafe(world, "monster:read-scroll", { monsterId: id, monsterName: def.name, itemId: scrollId });
+    world.emit("monster:read-scroll", { monsterId: id, monsterName: def.name, itemId: scrollId });
   });
 }

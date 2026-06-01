@@ -7,7 +7,6 @@ import { rngInt, rollDice } from "../../utils/rng.js";
 import { createCombatStatFacade } from "../../utils/resolveCombatSnapshot.js";
 import { createStatusFacade } from "../../utils/statusFacade.js";
 import { upsertTimedEffect } from "../../utils/effectSemantics.js";
-import { emitSafe } from "../../utils/emitSafe.js";
 
 // ── ProjectileImpactCallbackContext ────────────────────────────────
 
@@ -150,7 +149,7 @@ export class ProjectileImpactCallbackContext {
 
   /** @param {string} eventName @param {any} payload */
   emit(eventName, payload) {
-    emitSafe(this.world, eventName, payload);
+    this.world.emit(eventName, payload);
   }
 
   /**

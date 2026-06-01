@@ -9,7 +9,6 @@ import { SoundEmitter } from "../../components/SoundEmitter.js";
 import { Wounds } from "../../components/Wounds.js";
 import { Position } from "../../components/Position.js";
 import { spawnHazard } from "../../utils/hazardSpawn.js";
-import { emitSafe } from "../../utils/emitSafe.js";
 
 /**
  * Context passed to monster death hook callbacks.
@@ -54,7 +53,7 @@ export class DeathCallbackContext {
 
   /** @param {string} eventName @param {any} payload */
   emit(eventName, payload) {
-    emitSafe(this.world, eventName, payload);
+    this.world.emit(eventName, payload);
   }
 
   /**
@@ -124,7 +123,7 @@ export function spawnFirePuffOnDeath(params = {}) {
       identity: String(cfg.identity || "flame_puff"),
       name: String(cfg.name || "Flame Puff"),
     });
-    emitSafe(ctx.world, "monster:death:fire_puff", {
+    ctx.world.emit("monster:death:fire_puff", {
       id: ctx.deadId | 0,
       at: { x, y },
     });
@@ -171,7 +170,7 @@ export function gasSporeExplodeOnDeath(params = {}) {
         distanceMetric: "euclidean",
       },
     });
-    emitSafe(ctx.world, "monster:death:gas_spore", {
+    ctx.world.emit("monster:death:gas_spore", {
       id: sourceId,
       at: { x, y },
       radius,
@@ -241,7 +240,7 @@ function promoteToHead(world, newHeadId, killerId) {
     try { world.add(newHeadId, Wounds, { list: [] }); } catch {}
   }
 
-  emitSafe(world, "centipede:split", { newHeadId });
+  world.emit("centipede:split", { newHeadId });
 }
 
 /**

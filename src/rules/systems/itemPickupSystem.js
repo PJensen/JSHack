@@ -13,7 +13,6 @@ import {
     splitItemStack,
     transferItem,
 } from "../utils/inventoryFacade.js";
-import { emitSafe } from "../utils/emitSafe.js";
 import { isChestIdentity } from "../../shared/chests.js";
 
 
@@ -36,7 +35,7 @@ export function itemPickupSystem(world) {
 
         // capacity gate (counts unique identity stacks)
         if (!hasCapacityForItem(world, actor, itemId)) {
-            emitSafe(world, 'item:pickup-denied', { actor, itemId, reason: 'capacity' });
+            world.emit('item:pickup-denied', { actor, itemId, reason: 'capacity' });
             world.remove(actor, PickupIntent);
             continue;
         }
@@ -64,7 +63,7 @@ export function itemPickupSystem(world) {
                     continue;
                 }
                 addToInventory(world, actor, copy);
-                emitSafe(world, 'item:pickup', {
+                world.emit('item:pickup', {
                     actor,
                     itemId: copy,
                     count: takeCount,
@@ -74,7 +73,7 @@ export function itemPickupSystem(world) {
                 });
             } else {
                 transferItem(world, itemId, sourceChestId, actor);
-                emitSafe(world, 'item:pickup', {
+                world.emit('item:pickup', {
                     actor,
                     itemId,
                     count: takeCount,
@@ -88,7 +87,7 @@ export function itemPickupSystem(world) {
             const dy = Math.abs((itemPos.y | 0) - (pos.y | 0));
             const dist = Math.max(dx, dy); // Chebyshev distance
             if (dist > maxRange) {
-                emitSafe(world, 'item:pickup-denied', { actor, itemId, reason: 'range', need: maxRange, at: { x: pos.x, y: pos.y }, itemAt: { x: itemPos.x, y: itemPos.y } });
+                world.emit('item:pickup-denied', { actor, itemId, reason: 'range', need: maxRange, at: { x: pos.x, y: pos.y }, itemAt: { x: itemPos.x, y: itemPos.y } });
                 world.remove(actor, PickupIntent);
                 continue;
             }
@@ -104,11 +103,11 @@ export function itemPickupSystem(world) {
                     continue;
                 }
                 addToInventory(world, actor, copy);
-                emitSafe(world, 'item:pickup', { actor, itemId: copy, count: takeCount, itemX: ix, itemY: iy });
+                world.emit('item:pickup', { actor, itemId: copy, count: takeCount, itemX: ix, itemY: iy });
             } else {
                 // whole stack — just attach to inventory (entity persists as-is)
                 addToInventory(world, actor, itemId);
-                emitSafe(world, 'item:pickup', { actor, itemId, count: takeCount, itemX: ix, itemY: iy });
+                world.emit('item:pickup', { actor, itemId, count: takeCount, itemX: ix, itemY: iy });
             }
         }
 
@@ -131,7 +130,7 @@ export function autoPickupPostMoveSystem(world) {
             if (!info || !info.type || !kinds.includes(info.type)) return;
             const takeCount = info.count || 1;
             addToInventory(world, id, itemId);
-            emitSafe(world, 'item:pickup', { actor: id, itemId, count: takeCount, itemX: pos.x, itemY: pos.y });
+            world.emit('item:pickup', { actor: id, itemId, count: takeCount, itemX: pos.x, itemY: pos.y });
         });
     }
 }

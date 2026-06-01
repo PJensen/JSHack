@@ -37,7 +37,6 @@ import { setItemCooldown } from "../utils/itemCooldowns.js";
 import { Traits } from "../components/Traits.js";
 import { getHungerLevel } from "../data/food.js";
 import { effectiveMaxHp } from "../utils/passiveBonuses.js";
-import { emitSafe } from "../utils/emitSafe.js";
 import { recordShopClaim } from "../utils/shopClaims.js";
 import { recordShopDebt } from "../utils/shopDebt.js";
 
@@ -291,7 +290,7 @@ export function applyMutation(world, op, resolvers = {}) {
       }
 
       if (op.emitEvent !== false) {
-        emitSafe(world, "spawned", {
+        world.emit("spawned", {
           id: created,
           kind: "item",
           at: { x: spawnX, y: spawnY },
@@ -354,7 +353,7 @@ export function applyMutation(world, op, resolvers = {}) {
       });
 
       if (op.emitEvent !== false) {
-        emitSafe(world, "spawned", {
+        world.emit("spawned", {
           id: spawned,
           kind: "monster",
           at: { x: spawnX, y: spawnY },
@@ -363,7 +362,7 @@ export function applyMutation(world, op, resolvers = {}) {
 
       const tauntMessage = String(op.tauntMessage || "");
       if (tauntMessage) {
-        emitSafe(world, "message", { text: tauntMessage, type: "warning" });
+        world.emit("message", { text: tauntMessage, type: "warning" });
       }
       break;
     }
@@ -392,7 +391,7 @@ export function applyMutation(world, op, resolvers = {}) {
         turn: op.turn,
       });
       if (debt) {
-        emitSafe(world, "shop:debt-created", {
+        world.emit("shop:debt-created", {
           debtorId: op.actorId | 0,
           shopkeeperId: op.shopkeeperId | 0,
           amount: debt.amount,
@@ -459,7 +458,7 @@ export function applyMutation(world, op, resolvers = {}) {
       if (op.emitEvent !== false) {
         const info = /** @type any */ (world.get(op.entityId, ItemInfo));
         const count = Math.max(1, Number(info?.count || 1) | 0);
-        emitSafe(world, "item:dropped", {
+        world.emit("item:dropped", {
           actor: op.inventoryOwnerId | 0,
           itemId: op.entityId | 0,
           count,
@@ -479,7 +478,7 @@ export function applyMutation(world, op, resolvers = {}) {
         const ae = ensureActiveEffects(world, op.entityId);
         if (ae) {
           ae.effects.push({ key: 'stun', turnsLeft: 2, potency: 1, stacks: 1 });
-          emitSafe(world, 'hunger:choke', { id: op.entityId });
+          world.emit('hunger:choke', { id: op.entityId });
         }
       }
       const newHunger = Number(hc.hunger || 0) - nutrition;

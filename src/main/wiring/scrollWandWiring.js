@@ -22,7 +22,6 @@ import { createRng } from "../../lib/ecs-js/rng.js";
 import { findNearestValidTileAround } from "../../rules/utils/queries.js";
 import { chebyshevScalar } from "../../rules/utils/distance.js";
 import { isWalkable, forEachLoadedTile } from "../../rules/environment/dungeon/tileMap.js";
-import { emitSafe } from "../../rules/utils/emitSafe.js";
 import { inventoryItems, removeFromInventory } from "../../rules/utils/inventoryFacade.js";
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
 import { getEffectiveVisionRange, blind } from "../../rules/utils/blind.js";
@@ -72,7 +71,7 @@ export function installScrollWandWiring({ world, targeting, playerEntity }) {
       if (attempt.failureReason !== 'invalid') {
         recordPolymorphAttempt(world, { targetId: enemyId, outcome: attempt.failureReason, source: reason });
       }
-      emitSafe(world, 'polymorph:failed', {
+      world.emit('polymorph:failed', {
         actorId: actor | 0,
         entityId: enemyId | 0,
         requestedIdentity: attempt.requestedIdentity,
@@ -304,8 +303,8 @@ export function installScrollWandWiring({ world, targeting, playerEntity }) {
     }
     const to = candidates[Math.floor(world.rand() * candidates.length)];
     world.set(actor, Position, { x: to.x, y: to.y });
-    emitSafe(world, 'moved', { id: actor, from, to });
-    emitSafe(world, 'teleported', { id: actor, from, to, source: 'scroll:teleportation' });
+    world.emit('moved', { id: actor, from, to });
+    world.emit('teleported', { id: actor, from, to, source: 'scroll:teleportation' });
   });
 
   // ── Scroll of Summoning ─────────────────────────────────────────────────

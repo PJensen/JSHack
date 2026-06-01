@@ -12,7 +12,6 @@ import { Position } from '../rules/components/Position.js';
 import { getAbility } from './registry.js';
 import { ScriptCtx } from './scriptCtx.js';
 import { createWorldFacade } from './worldFacade.js';
-import { emitSafe } from '../rules/utils/emitSafe.js';
 import { isItemOnCooldown, getItemCooldownRemaining } from '../rules/utils/itemCooldowns.js';
 
 const _installed = Symbol.for('jshack:content:abilityHandler:installed');
@@ -40,7 +39,7 @@ export function installContentAbilityHandler({ world, targeting, playerEntity, s
     if (spec.cooldown > 0 && isItemOnCooldown(world, itemId)) {
       const remaining = getItemCooldownRemaining(world, itemId);
       const name = world.get(itemId, NamedIdentity)?.name || 'Item';
-      emitSafe(world, 'message', { text: `${name} is still cooling down (${remaining} turns).`, type: 'warning' });
+      world.emit('message', { text: `${name} is still cooling down (${remaining} turns).`, type: 'warning' });
       return;
     }
 
@@ -60,7 +59,7 @@ export function installContentAbilityHandler({ world, targeting, playerEntity, s
 
       const enemies = scanVisibleEnemies(world, px, py, range, { playerId: pe.id });
       if (enemies.length === 0) {
-        emitSafe(world, 'message', { text: 'No visible enemies in range.', type: 'system' });
+        world.emit('message', { text: 'No visible enemies in range.', type: 'system' });
         return;
       }
 

@@ -20,7 +20,6 @@ import { getDecayStage } from "../data/food.js";
 import { forEachInRadius } from "../utils/spatialIndex.js";
 import { chebyshevScalar } from "../utils/distance.js";
 import { canActThisTurn } from "../utils/speedGate.js";
-import { emitSafe } from "../utils/emitSafe.js";
 import { isAiOnCooldown, startAiCooldown } from "../utils/aiCooldowns.js";
 
 const ACTIVE_RADIUS = 24;
@@ -62,7 +61,7 @@ function applyScavenge(world, id, vit, nutrition) {
   const heal = Math.max(1, Math.floor(nutrition / 100));
   const actual = Math.min((vit.maxHp | 0) - (vit.hp | 0), heal);
   if (actual > 0) vit.hp += actual;
-  emitSafe(world, "healed", { id, amount: actual });
+  world.emit("healed", { id, amount: actual });
   return { healAmount: actual };
 }
 
@@ -71,7 +70,7 @@ function applyDevour(world, id, vit, nutrition) {
   const cap = Math.floor((vit.maxHp | 0) * 1.5);
   const actual = Math.min(cap - (vit.hp | 0), gain);
   if (actual > 0) vit.hp += actual;
-  emitSafe(world, "healed", { id, amount: actual });
+  world.emit("healed", { id, amount: actual });
   return { healAmount: actual };
 }
 
@@ -149,7 +148,7 @@ export function aiCorpseEatSystem(world) {
     try { world.destroy(corpseId); } catch {}
     markUsed(world, id, config.cooldownTurns ?? COOLDOWN_DEFAULT);
 
-    emitSafe(world, "monster:corpse-eat", {
+    world.emit("monster:corpse-eat", {
       monsterId: id,
       monsterName: def.name,
       behavior,

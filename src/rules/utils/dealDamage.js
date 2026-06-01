@@ -23,7 +23,6 @@ import { NamedIdentity } from "../components/NamedIdentity.js";
 import { statusStrength } from "./statusFacade.js";
 import { Physiology } from "../components/Physiology.js";
 import { getMonster } from "../data/monsters.js";
-import { emitSafe } from "./emitSafe.js";
 import { resolveWeaponFamily } from "../data/weaponFamilies.js";
 
 function resolveEventWeaponFamily(world, weaponId) {
@@ -285,9 +284,9 @@ export function dealDamage(world, spec) {
   const critical = !!spec.critical;
 
   if (spec.missed) {
-    emitSafe(world, 'status', createStatusEvent({ id: target, kind: 'miss', source }));
+    world.emit('status', createStatusEvent({ id: target, kind: 'miss', source }));
     if (String(spec.spellId || cause).startsWith('spell') || String(cause).startsWith('spell:')) {
-      emitSafe(world, 'spell:miss', {
+      world.emit('spell:miss', {
         actor: source,
         source,
         targetId: target,
@@ -302,11 +301,11 @@ export function dealDamage(world, spec) {
 
   // Step 2: Invulnerability / stasis gate
   if (!spec.bypassInvuln && isEntityInvulnerable(world, target)) {
-    emitSafe(world, 'status', createStatusEvent({ id: target, kind: 'immune', source }));
+    world.emit('status', createStatusEvent({ id: target, kind: 'immune', source }));
     return { ...ZERO_RESULT, rawAmount, reason: 'invulnerable' };
   }
   if (statusStrength(world, target, "stasis") > 0) {
-    emitSafe(world, 'status', createStatusEvent({ id: target, kind: 'immune', source }));
+    world.emit('status', createStatusEvent({ id: target, kind: 'immune', source }));
     return { ...ZERO_RESULT, rawAmount, reason: 'stasis' };
   }
 
@@ -341,7 +340,7 @@ export function dealDamage(world, spec) {
         finalAmount = Math.max(1, Math.floor(finalAmount * shieldArcMult));
         const targetEquipment = world.get(target, Equipment);
         const shieldId = Number(targetEquipment?.offhand || 0) | 0;
-        emitSafe(world, "shield:guarded", {
+        world.emit("shield:guarded", {
           id: target,
           source,
           shieldId,
@@ -354,7 +353,7 @@ export function dealDamage(world, spec) {
   }
 
   if (finalAmount <= 0) {
-    emitSafe(world, 'status', createStatusEvent({ id: target, kind: 'resist', source }));
+    world.emit('status', createStatusEvent({ id: target, kind: 'resist', source }));
     return { ...ZERO_RESULT, rawAmount, reason: 'resisted' };
   }
 
@@ -379,7 +378,7 @@ export function dealDamage(world, spec) {
   // Step 5: Emit 'damaged'
   const _phys = world.get(target, Physiology);
   const eventWeaponFamily = resolveEventWeaponFamily(world, Number(spec.weaponId || 0) | 0);
-  emitSafe(world, 'damaged', {
+  world.emit('damaged', {
     target,
     amount: finalAmount,
     hpBefore,
@@ -458,12 +457,12 @@ export function dealDamage(world, spec) {
       if (lichAe && Array.isArray(lichAe.effects)) {
         lichAe.effects = lichAe.effects.filter(e => e.key !== "lichdom_echo");
       }
-      emitSafe(world, 'lichdom_echo:saved', { id: target, source });
+      world.emit('lichdom_echo:saved', { id: target, source });
     }
   }
 
   if (killed) {
-    emitSafe(world, 'died', {
+    world.emit('died', {
       id: target, killer: source, cause,
       weaponId: Number(spec.weaponId || 0) | 0,
       weaponFamily: eventWeaponFamily,
@@ -516,7 +515,7 @@ export function dealDamage(world, spec) {
           const healAmt = 5 * furyPot;
           const before = sourceVit.hp | 0;
           sourceVit.hp = Math.min(sourceVit.maxHp | 0, before + healAmt);
-          emitSafe(world, 'battle_fury:heal', { id: source, amount: sourceVit.hp - before });
+          world.emit('battle_fury:heal', { id: source, amount: sourceVit.hp - before });
         }
       }
     }

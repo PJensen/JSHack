@@ -1,6 +1,5 @@
 import { Beatitude } from "../components/Beatitude.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
-import { emitSafe } from "./emitSafe.js";
 
 /**
  * True if the item is currently cursed (welded to its carrier).
@@ -31,7 +30,7 @@ export function isItemCursed(world, itemId) {
  */
 export function blockIfCursed(world, actor, itemId) {
   if (!isItemCursed(world, itemId)) return false;
-  emitSafe(world, 'item:welded', {
+  world.emit('item:welded', {
     actor,
     itemId,
     slot: null,

@@ -40,7 +40,6 @@ import { getPositionalAttackBonus, hasOffhandShield } from '../utils/combatPosit
 import { setCombatPosture } from '../utils/posture.js';
 import { runWeaponContentHook } from '../../content/weaponHookBridge.js';
 import { upsertTimedEffect } from '../utils/effectSemantics.js';
-import { emitSafe } from '../utils/emitSafe.js';
 import { ensureActiveEffects } from '../utils/effects.js';
 import { computeImpactVector } from '../utils/projectileKinematics.js';
 import { getAffixElementTint } from '../data/affixes.js';
@@ -244,7 +243,7 @@ function applyDamageTextureEffects(world, {
             sourceId: attacker,
             startedAtTurn: world.step,
         });
-        emitSafe(world, 'combat:status:stagger', { attacker, defender, critical: !!critical });
+        world.emit('combat:status:stagger', { attacker, defender, critical: !!critical });
     }
 }
 
@@ -327,7 +326,7 @@ function resolveHitRoll(world, {
     const actionTags = Array.isArray(tags) ? [...tags, `relation:${positional.relation}`] : [`relation:${positional.relation}`];
     const attackPos = world.get(source, Position);
     const weaponFamily = resolveEventWeaponFamily(world, weaponId);
-    emitSafe(world, 'combat:melee:attack', {
+    world.emit('combat:melee:attack', {
         attacker: source,
         defender: target,
         weaponId: weaponId || 0,
@@ -361,7 +360,7 @@ function resolveHitRoll(world, {
         const dodgeRoll = r();
         if (dodgeRoll < dodgeChance) {
             const dpos = world.get(target, Position);
-            emitSafe(world, 'combat:dodge', {
+            world.emit('combat:dodge', {
                 defender: target,
                 attacker: source,
                 weaponId: weaponId || 0,
@@ -396,7 +395,7 @@ function resolveHitRoll(world, {
                 const parryRoll = r();
                 if (parryRoll < parryChance) {
                     const dpos = world.get(target, Position);
-                    emitSafe(world, 'combat:parry', {
+                    world.emit('combat:parry', {
                         defender: target,
                         attacker: source,
                         weaponId: defWeaponId,
@@ -453,7 +452,7 @@ function resolveHitRoll(world, {
                         target, amount: 3, source,
                         type: 'holy', cause: 'holy_smite',
                     });
-                    emitSafe(world, 'combat:holy_smite', {
+                    world.emit('combat:holy_smite', {
                         attacker: source, defender: target, weaponId, damage: 3,
                     });
                 }
@@ -483,7 +482,7 @@ function resolveHitRoll(world, {
         const preShrDmg = dmg;
         dmg = Math.max(1, Math.floor(dmg * shrineScaling.mult));
         if (dmg !== preShrDmg && shrineScaling.label) {
-            emitSafe(world, 'shrine:combat:scaling', {
+            world.emit('shrine:combat:scaling', {
                 attacker: source,
                 target,
                 label: shrineScaling.label,
@@ -670,7 +669,7 @@ export function resolveMeleeAttack(world, attacker, defender, options = {}) {
                 : OFFENSE_ATTRIBUTION.known,
         });
         if (offense.offenseKind !== 'none') {
-            emitSafe(world, 'offense:committed', {
+            world.emit('offense:committed', {
                 actorId: source,
                 victimId: target,
                 offense,

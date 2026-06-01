@@ -14,7 +14,6 @@ import { dealDamage } from '../utils/dealDamage.js';
 import { getPassiveBonuses, effectiveMaxHp } from '../utils/passiveBonuses.js';
 import { Traits } from '../components/Traits.js';
 import { statusStrength } from '../utils/statusFacade.js';
-import { emitSafe } from '../utils/emitSafe.js';
 
 const STARVING_DAMAGE_INTERVAL = Math.max(1, Math.floor(TURNS_PER_DAY / 8));
 const WASTING_DAMAGE_INTERVAL = Math.max(1, Math.floor(TURNS_PER_DAY / 16));
@@ -68,7 +67,7 @@ export function hungerSystem(world) {
         const before = vit.hp;
         vit.hp = Math.min(effectiveMaxHp(world, id, vit), vit.hp + 1);
         if (vit.hp > before) {
-          emitSafe(world, 'healed', { id, amount: 1 });
+          world.emit('healed', { id, amount: 1 });
         }
       }
     }
@@ -97,7 +96,7 @@ export function hungerSystem(world) {
     } catch { /* deferred during tick; will flush post-tick */ }
 
     // 4) Emit event for UI/bridge
-    emitSafe(world, 'hunger:changed', {
+    world.emit('hunger:changed', {
       id, hunger: hc.hunger, satiation: hc.satiation, level,
     });
   }

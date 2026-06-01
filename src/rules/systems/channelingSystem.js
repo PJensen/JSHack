@@ -16,7 +16,6 @@ import { MANA_REGEN_COOLDOWN, STAMINA_REGEN_COOLDOWN } from "../data/regenConsta
 import { runSpellScript } from "../scripts/spells.js";
 import { effectiveMaxMana, effectiveMaxStamina } from "../utils/passiveBonuses.js";
 import { getChannelInterruptionReason } from "../utils/channelInterruptionPolicy.js";
-import { emitSafe } from "../utils/emitSafe.js";
 import { hasLOS } from "../../shared/math/gridLOS.js";
 import { buildBlocksVisionMap, blockedCallback } from "../utils/vision.js";
 import { spellCostPerTick, spellCostResource } from "../data/spells.js";
@@ -46,7 +45,7 @@ export function installDrainLifeDamageInterruptListener(world) {
       ae.effects = ae.effects.filter((e) => String(e?.key || "").toLowerCase() !== "drain_life_channel");
     }
 
-    emitSafe(world, "spell:drain_life:break", {
+    world.emit("spell:drain_life:break", {
       actor,
       targetId: Number(source || 0) | 0,
       spellId: "drain_life",
@@ -55,7 +54,7 @@ export function installDrainLifeDamageInterruptListener(world) {
       cause: String(cause || ""),
     });
 
-    emitSafe(world, "channeling:cancelled", {
+    world.emit("channeling:cancelled", {
       actor,
       spellId: "drain_life",
       reason: "damage_interrupt",
@@ -71,14 +70,14 @@ export function channelingSystem(world) {
     const vit = world.get(id, Vitality);
     if (vit && (vit.hp | 0) <= 0) {
       try { world.remove(id, Channeling); } catch {}
-      emitSafe(world, 'channeling:cancelled', { actor: id, spellId: ch.spellId, reason: 'dead' });
+      world.emit('channeling:cancelled', { actor: id, spellId: ch.spellId, reason: 'dead' });
       continue;
     }
 
     const interruption = getChannelInterruptionReason(world, id);
     if (interruption) {
       try { world.remove(id, Channeling); } catch {}
-      emitSafe(world, 'channeling:cancelled', {
+      world.emit('channeling:cancelled', {
         actor: id,
         spellId: ch.spellId,
         reason: interruption,
@@ -91,7 +90,7 @@ export function channelingSystem(world) {
       const cPos = world.get(id, Position);
       if (cPos && ((cPos.x | 0) !== (ch.anchorX | 0) || (cPos.y | 0) !== (ch.anchorY | 0))) {
         try { world.remove(id, Channeling); } catch {}
-        emitSafe(world, 'channeling:cancelled', {
+        world.emit('channeling:cancelled', {
           actor: id,
           spellId: ch.spellId,
           reason: 'caster_moved',
@@ -108,7 +107,7 @@ export function channelingSystem(world) {
         if (!_isBlocked) _isBlocked = blockedCallback(buildBlocksVisionMap(world));
         if (!hasLOS(cPos.x | 0, cPos.y | 0, tPos.x | 0, tPos.y | 0, _isBlocked)) {
           try { world.remove(id, Channeling); } catch {}
-          emitSafe(world, 'channeling:cancelled', {
+          world.emit('channeling:cancelled', {
             actor: id,
             spellId: ch.spellId,
             reason: 'los_break',
@@ -122,7 +121,7 @@ export function channelingSystem(world) {
       const spell = getSpell(String(ch.spellId || ""));
       if (!spell) {
         try { world.remove(id, Channeling); } catch {}
-        emitSafe(world, "channeling:cancelled", { actor: id, spellId: ch.spellId, reason: "invalid_spell" });
+        world.emit("channeling:cancelled", { actor: id, spellId: ch.spellId, reason: "invalid_spell" });
         continue;
       }
 
@@ -147,14 +146,14 @@ export function channelingSystem(world) {
       const minLife = resource === "life" ? 1 : 0;
       if (have - perTick < minLife) {
         try { world.remove(id, Channeling); } catch {}
-        emitSafe(world, "spell:oom", {
+        world.emit("spell:oom", {
           actor: id,
           spellId: spell.id,
           need: perTick + minLife,
           have,
           costKind: resource === "stamina" ? "stamina" : resource === "life" ? "life" : "mana",
         });
-        emitSafe(world, "channeling:cancelled", { actor: id, spellId: spell.id, reason: "oom" });
+        world.emit("channeling:cancelled", { actor: id, spellId: spell.id, reason: "oom" });
         continue;
       }
 
@@ -178,7 +177,7 @@ export function channelingSystem(world) {
         });
       } catch {}
 
-      emitSafe(world, "channeling:tick", {
+      world.emit("channeling:tick", {
         actor: id,
         spellId: spell.id,
         mode: "sustain",
@@ -201,7 +200,7 @@ export function channelingSystem(world) {
       if (itemAction) {
         try { world.remove(id, Channeling); } catch {}
         itemAction.onComplete(world, id, ch);
-        emitSafe(world, 'channeling:complete', { actor: id, spellId: ch.spellId || ch.itemActionId, mode: 'item_use' });
+        world.emit('channeling:complete', { actor: id, spellId: ch.spellId || ch.itemActionId, mode: 'item_use' });
         continue;
       }
 
@@ -216,10 +215,10 @@ export function channelingSystem(world) {
 
       try { world.remove(id, Channeling); } catch {}
       try { world.add(id, CastSpellIntent, castData); } catch {}
-      emitSafe(world, 'channeling:complete', { actor: id, spellId: ch.spellId });
+      world.emit('channeling:complete', { actor: id, spellId: ch.spellId });
     } else {
       // Still channeling — emit progress for UI
-      emitSafe(world, 'channeling:tick', {
+      world.emit('channeling:tick', {
         actor: id,
         spellId: ch.spellId,
         mode: 'cast',

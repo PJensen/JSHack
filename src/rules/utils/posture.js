@@ -1,5 +1,4 @@
 import { CombatPosture, COMBAT_POSTURES } from "../components/CombatPosture.js";
-import { emitSafe } from "./emitSafe.js";
 import { hasEquippedShield, refreshShieldGuard } from "./shieldGuard.js";
 
 function normalizePosture(stance) {
@@ -48,7 +47,7 @@ export function setCombatPosture(world, entityId, stance, options = {}) {
       });
     } catch {}
     if (emit) {
-      emitSafe(world, "combat:posture", { id, stance: next, reason, hasShield: hasEquippedShield(world, id) });
+      world.emit("combat:posture", { id, stance: next, reason, hasShield: hasEquippedShield(world, id) });
     }
     refreshShieldGuard(world, id);
     return world.get(id, CombatPosture) || null;
@@ -58,7 +57,7 @@ export function setCombatPosture(world, entityId, stance, options = {}) {
   cur.stance = next;
   if (prev !== next) cur.lastChangedStep = Number(world.step || 0) | 0;
   if (emit && prev !== next) {
-    emitSafe(world, "combat:posture", { id, stance: next, previous: prev, reason, hasShield: hasEquippedShield(world, id) });
+    world.emit("combat:posture", { id, stance: next, previous: prev, reason, hasShield: hasEquippedShield(world, id) });
   }
   if (prev !== next) refreshShieldGuard(world, id);
   return cur;

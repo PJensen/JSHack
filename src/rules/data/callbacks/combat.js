@@ -19,7 +19,6 @@ import { applyStatusEffect, isInvulnerabilityEffectKey } from "../../utils/effec
 import { findNearestValidTileAround } from "../../utils/queries.js";
 import { inventoryItems, addToInventory, removeFromInventory } from "../../utils/inventoryFacade.js";
 import { dealDamage } from "../../utils/dealDamage.js";
-import { emitSafe } from "../../utils/emitSafe.js";
 import { currentDepth } from "../../utils/worldAccess.js";
 import {
   applyCorrosionStack,
@@ -103,7 +102,7 @@ export class CombatCallbackContext {
 
   /** @param {string} eventName @param {any} payload */
   emit(eventName, payload) {
-    emitSafe(this.world, eventName, payload);
+    this.world.emit(eventName, payload);
   }
 
   /**

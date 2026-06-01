@@ -15,7 +15,6 @@ import { Vitality } from "../components/Vitality.js";
 import { Brain } from "../components/Brain.js";
 import { Trap } from "../components/Trap.js";
 import { SecretDoor } from "../components/SecretDoor.js";
-import { emitSafe } from "../utils/emitSafe.js";
 import { setTile, getTile } from "../environment/dungeon/tileMap.js";
 import { TILE_DOOR, TILE_WALL } from "../environment/dungeon/constants.js";
 import { invalidateTileQueryCache } from "../utils/tileQueryCache.js";
@@ -49,7 +48,7 @@ function trapResolver(world, actorId, pos, radius) {
     const name = trapNames[trap.type] || 'trap';
     messages.push(`*** a hidden ${name} is revealed! ***`);
 
-    emitSafe(world, 'search:revealed', { actorId, entityId: tid, kind: 'trap', at: { x: trapPos.x, y: trapPos.y } });
+    world.emit('search:revealed', { actorId, entityId: tid, kind: 'trap', at: { x: trapPos.x, y: trapPos.y } });
   }
 
   return { found, messages };
@@ -89,7 +88,7 @@ function secretDoorResolver(world, actorId, pos, _radius) {
       invalidateTileQueryCache(world);
       found = true;
       messages.push("*** you find a hidden door ***");
-      emitSafe(world, "search:revealed", {
+      world.emit("search:revealed", {
         actorId,
         entityId: doorId,
         kind: "secret_door",
@@ -99,7 +98,7 @@ function secretDoorResolver(world, actorId, pos, _radius) {
       found = true;
       const hint = SECRET_HINTS[String(secret.hintKind || "hollow")] || SECRET_HINTS.hollow;
       messages.push(`*** ${hint} ***`);
-      emitSafe(world, "search:hint", {
+      world.emit("search:hint", {
         actorId,
         entityId: doorId,
         kind: "secret_door",
@@ -148,10 +147,10 @@ export function searchSystem(world) {
     const radius = brain ? (brain.visionRange | 0) : 6;
 
     // Emit the radial pulse VFX event (display layer listens)
-    emitSafe(world, 'search:pulse', { actorId, at: { x: pos.x, y: pos.y }, radius });
+    world.emit('search:pulse', { actorId, at: { x: pos.x, y: pos.y }, radius });
 
     // Announce the search
-    emitSafe(world, 'message', { text: '*** you search the area ***', type: 'system' });
+    world.emit('message', { text: '*** you search the area ***', type: 'system' });
 
     // Run each resolver and collect results
     let anyFound = false;
@@ -168,12 +167,12 @@ export function searchSystem(world) {
 
     // Emit reveal messages
     for (const msg of revealMessages) {
-      emitSafe(world, 'message', { text: msg, type: 'system' });
+      world.emit('message', { text: msg, type: 'system' });
     }
 
     // If nothing was found, say so
     if (!anyFound) {
-      emitSafe(world, 'message', { text: '*** you find nothing ***', type: 'system' });
+      world.emit('message', { text: '*** you find nothing ***', type: 'system' });
     }
   }
 }

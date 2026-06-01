@@ -15,7 +15,6 @@ import { dealDamage } from "../../utils/dealDamage.js";
 import { upsertTimedEffect } from "../../utils/effectSemantics.js";
 import { ensureActiveEffects } from "../../utils/effects.js";
 import { effectiveMaxHp } from "../../utils/passiveBonuses.js";
-import { emitSafe } from "../../utils/emitSafe.js";
 
 // -- EatCallbackContext --
 
@@ -257,7 +256,7 @@ export class EatCallbackContext {
     this._mutations.length = 0;
     for (let i = 0; i < this._postCommitEvents.length; i++) {
       const entry = this._postCommitEvents[i];
-      emitSafe(this.world, entry.eventName, entry.payload);
+      this.world.emit(entry.eventName, entry.payload);
     }
     this._postCommitEvents.length = 0;
     return applied;

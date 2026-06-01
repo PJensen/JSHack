@@ -3,7 +3,6 @@ import { buildCatalogItem } from "../data/itemCatalogLoader.js";
 import { getMonster } from "../data/monsters.js";
 import { createEntityProxy } from "../interaction/entityProxy.js";
 import { ActionTransaction } from "../interaction/mutations.js";
-import { emitSafe } from "./emitSafe.js";
 
 /**
  * Base helpers shared by first-class action contexts.
@@ -116,7 +115,7 @@ export class RuleActionContext {
    * @param {Record<string, any>} payload
    */
   emit(eventName, payload) {
-    emitSafe(this.world, eventName, payload);
+    this.world.emit(eventName, payload);
   }
 
   /**

@@ -15,7 +15,6 @@ import { CreatureType, CREATURE_TYPES } from "../components/CreatureType.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { Vitality } from "../components/Vitality.js";
 import { ActiveEffects } from "../components/ActiveEffects.js";
-import { emitSafe } from "../utils/emitSafe.js";
 import { blind, getEffectiveVisionRange } from "../utils/blind.js";
 import { statusStrength } from "../utils/statusFacade.js";
 import { upsertTimedEffect } from "../utils/effectSemantics.js";
@@ -39,7 +38,7 @@ export const COMBAT_INTERACTION_RULES = [
     },
     apply(world, ctx) {
       ctx.damage += 2;
-      emitSafe(world, "combat:blessed_strike", {
+      world.emit("combat:blessed_strike", {
         attacker: ctx.attacker, defender: ctx.defender,
         weaponId: ctx.weaponId, creatureType: CREATURE_TYPES.undead, bonusDmg: 2,
       });
@@ -63,11 +62,11 @@ export const COMBAT_INTERACTION_RULES = [
       const hpPct = vit ? (vit.hp / vit.maxHp) : 1;
       if (hpPct < 0.15) {
         ctx.damage = Math.max(ctx.damage, (vit?.hp || 0) + 1);
-        emitSafe(world, "combat:banish", {
+        world.emit("combat:banish", {
           attacker: ctx.attacker, defender: ctx.defender, weaponId: ctx.weaponId,
         });
       }
-      emitSafe(world, "combat:blessed_strike", {
+      world.emit("combat:blessed_strike", {
         attacker: ctx.attacker, defender: ctx.defender,
         weaponId: ctx.weaponId, creatureType: CREATURE_TYPES.demon, bonusDmg: 2,
       });
@@ -87,7 +86,7 @@ export const COMBAT_INTERACTION_RULES = [
     },
     apply(world, ctx) {
       ctx.damage += 4;
-      emitSafe(world, "combat:holy_strike", {
+      world.emit("combat:holy_strike", {
         attacker: ctx.attacker, defender: ctx.defender,
         weaponId: ctx.weaponId, creatureType: CREATURE_TYPES.undead, bonusDmg: 4,
       });
@@ -107,7 +106,7 @@ export const COMBAT_INTERACTION_RULES = [
       const curVision = getEffectiveVisionRange(world, ctx.defender);
       const rampOut = (world.rand() < 0.5) ? 2 : 3;
       blind(world, ctx.defender, Math.max(1, curVision - 2), 0, 0, rampOut, undefined, { stack: true });
-      emitSafe(world, "combat:sunblind", {
+      world.emit("combat:sunblind", {
         attacker: ctx.attacker, defender: ctx.defender, weaponId: ctx.weaponId,
       });
     },
@@ -123,7 +122,7 @@ export const COMBAT_INTERACTION_RULES = [
     },
     apply(world, ctx) {
       ctx.damage = Math.floor(ctx.damage * 2);
-      emitSafe(world, "combat:shatter", {
+      world.emit("combat:shatter", {
         attacker: ctx.attacker, defender: ctx.defender,
         damageType: "blunt", mult: 2,
       });
@@ -140,7 +139,7 @@ export const COMBAT_INTERACTION_RULES = [
     },
     apply(world, ctx) {
       ctx.damage = Math.floor(ctx.damage * 1.5);
-      emitSafe(world, "combat:shatter", {
+      world.emit("combat:shatter", {
         attacker: ctx.attacker, defender: ctx.defender,
         damageType: "pierce", mult: 1.5,
       });
@@ -163,7 +162,7 @@ export const COMBAT_INTERACTION_RULES = [
         const ae = ensureActiveEffects(world, ctx.defender);
         if (ae) {
           upsertTimedEffect(ae.effects, { key: "burn", turnsLeft: 3, potency: 1, stacks: 1 });
-          emitSafe(world, "combat:torch_ignite", {
+          world.emit("combat:torch_ignite", {
             attacker: ctx.attacker, defender: ctx.defender, weaponId: ctx.weaponId,
           });
         }

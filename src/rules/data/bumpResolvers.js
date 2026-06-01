@@ -31,7 +31,6 @@ import { findTileReaction } from "./tileReactions.js";
 import { getTile, setTile, isLoaded, isWalkable } from "../environment/dungeon/tileMap.js";
 import { TILE_VOID } from "../environment/dungeon/constants.js";
 import { STAMINA_REGEN_COOLDOWN } from "./regenConstants.js";
-import { emitSafe } from "../utils/emitSafe.js";
 import { hasActiveDialogSession } from "../dialogues/runtime.js";
 
 /**
@@ -116,7 +115,7 @@ const hostileMelee = {
   },
   resolve(world, actor, ctx) {
     if (world.has(actor, AttackIntent)) return;
-    emitSafe(world, "combat:telegraph", {
+    world.emit("combat:telegraph", {
       actor,
       target: ctx.target,
       mode: "melee",
@@ -124,7 +123,7 @@ const hostileMelee = {
     });
     // Emit out-of-reach when target is flying and attacker is grounded
     if (world.has(ctx.target, Flying) && !world.has(actor, Flying)) {
-      emitSafe(world, "combat:target-flying", { attacker: actor, target: ctx.target });
+      world.emit("combat:target-flying", { attacker: actor, target: ctx.target });
       return;
     }
     let handled = 0;
@@ -163,8 +162,8 @@ const petSwap = {
     world.set(ctx.target, Position, aFrom);
     world.set(actor, Position, pFrom);
 
-    emitSafe(world, "moved", { id: ctx.target, from: pFrom, to: aFrom });
-    emitSafe(world, "moved", { id: actor, from: aFrom, to: pFrom });
+    world.emit("moved", { id: ctx.target, from: pFrom, to: aFrom });
+    world.emit("moved", { id: actor, from: aFrom, to: pFrom });
   },
 };
 
@@ -180,7 +179,7 @@ const npcInteract = {
            && world.has(ctx.target, Interactable);
   },
   resolve(world, actor, ctx) {
-    emitSafe(world, "bump:interact", { actor, target: ctx.target });
+    world.emit("bump:interact", { actor, target: ctx.target });
   },
 };
 
@@ -221,7 +220,7 @@ const objectInteract = {
   },
   resolve(world, actor, ctx) {
     const interactId = ctx.tiles.interactableByCell.get(`${ctx.nx},${ctx.ny}`);
-    emitSafe(world, "bump:interact", { actor, target: interactId });
+    world.emit("bump:interact", { actor, target: interactId });
   },
 };
 
@@ -242,15 +241,15 @@ const pushEntity = {
     const destKey = `${destX},${destY}`;
 
     if (!isWalkable(destX, destY) || ctx.tiles.blockedByCell.has(destKey)) {
-      emitSafe(world, "entity:push-blocked", { actor, target: targetId });
+      world.emit("entity:push-blocked", { actor, target: targetId });
       return;
     }
 
     const from = { x: ctx.nx, y: ctx.ny };
     const to = { x: destX, y: destY };
     world.set(targetId, Position, to);
-    emitSafe(world, "entity:pushed", { actor, target: targetId, from, to });
-    emitSafe(world, "moved", { id: targetId, from, to });
+    world.emit("entity:pushed", { actor, target: targetId, from, to });
+    world.emit("moved", { id: targetId, from, to });
   },
 };
 
@@ -290,7 +289,7 @@ const tileReaction = {
     const stam = world.get(actor, Stamina);
     const cost = Number(wInfo[reaction.costField] ?? reaction.costDefault);
     if (!stam || Number(stam.stamina ?? 0) < cost) {
-      emitSafe(world, "attack:insufficient-stamina", {
+      world.emit("attack:insufficient-stamina", {
         attacker: actor,
         need: cost,
         have: Number(stam?.stamina ?? 0),
@@ -314,7 +313,7 @@ const tileReaction = {
       }
     }
 
-    emitSafe(world, reaction.event, { actor, x: ctx.nx, y: ctx.ny });
+    world.emit(reaction.event, { actor, x: ctx.nx, y: ctx.ny });
   },
 };
 

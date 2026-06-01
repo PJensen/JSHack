@@ -22,7 +22,6 @@ import { computeEnvelopeValue } from '../utils/blind.js';
 import { chebyshev } from '../utils/distance.js';
 import { hasSpellLineOfSight } from '../utils/spellTargeting.js';
 import { buildBlocksVisionMap, blockedCallback } from '../utils/vision.js';
-import { emitSafe } from '../utils/emitSafe.js';
 import { forEachInRadius } from '../utils/spatialIndex.js';
 
 /** @type {Record<string, { operation:string, statuses:string[] }>} */
@@ -88,7 +87,7 @@ function applyEffectOperation(world, id, vit, operation, potency, stacks, key) {
         const before = vit.hp;
         vit.hp = Math.min(effectiveMaxHp(world, id, vit), vit.hp + amount);
         const delta = vit.hp - before;
-        if (delta > 0) { emitSafe(world, 'healed', { id, amount: delta }); }
+        if (delta > 0) { world.emit('healed', { id, amount: delta }); }
         return;
     }
 
@@ -101,7 +100,7 @@ function applyEffectOperation(world, id, vit, operation, potency, stacks, key) {
         const before = stam.stamina;
         stam.stamina = Math.min(cap, stam.stamina + amount);
         const delta = stam.stamina - before;
-        if (delta > 0) { emitSafe(world, 'stamina_restored', { id, amount: delta }); }
+        if (delta > 0) { world.emit('stamina_restored', { id, amount: delta }); }
     }
 
     if (operation === 'mana_restore') {
@@ -113,7 +112,7 @@ function applyEffectOperation(world, id, vit, operation, potency, stacks, key) {
         const before = mana.mana;
         mana.mana = Math.min(cap, mana.mana + amount);
         const delta = mana.mana - before;
-        if (delta > 0) { emitSafe(world, 'mana_restored', { id, amount: delta }); }
+        if (delta > 0) { world.emit('mana_restored', { id, amount: delta }); }
     }
 }
 
@@ -177,7 +176,7 @@ function tickDrainLifeChannel(world, casterId, effect) {
         const anchorX = Number(channel.anchorX) | 0;
         const anchorY = Number(channel.anchorY) | 0;
         if ((casterPos.x | 0) !== anchorX || (casterPos.y | 0) !== anchorY) {
-            emitSafe(world, 'spell:drain_life:break', {
+            world.emit('spell:drain_life:break', {
                 actor: casterId,
                 targetId,
                 spellId: effect?.spellId,
@@ -188,7 +187,7 @@ function tickDrainLifeChannel(world, casterId, effect) {
     }
 
     if (channel.breakOnOutOfRange && chebyshev(casterPos, targetPos) > range) {
-        emitSafe(world, 'spell:drain_life:break', {
+        world.emit('spell:drain_life:break', {
             actor: casterId,
             targetId,
             spellId: effect?.spellId,
@@ -205,7 +204,7 @@ function tickDrainLifeChannel(world, casterId, effect) {
         range,
         isBlocked,
     })) {
-        emitSafe(world, 'spell:drain_life:break', {
+        world.emit('spell:drain_life:break', {
             actor: casterId,
             targetId,
             spellId: effect?.spellId,
@@ -244,7 +243,7 @@ function tickDrainLifeChannel(world, casterId, effect) {
         casterVit.hp = Math.min(maxHp, (casterVit.hp | 0) + healAmount);
         const appliedHeal = Math.max(0, (casterVit.hp | 0) - before);
 
-        emitSafe(world, 'spell:drain_life:tick', {
+        world.emit('spell:drain_life:tick', {
             actor: casterId,
             targetId,
             spellId: effect?.spellId,
@@ -256,7 +255,7 @@ function tickDrainLifeChannel(world, casterId, effect) {
     }
 
     if (!result?.applied) {
-        emitSafe(world, 'spell:drain_life:break', {
+        world.emit('spell:drain_life:break', {
             actor: casterId,
             targetId,
             spellId: effect?.spellId,
@@ -280,12 +279,12 @@ function stopDrainLifeChannel(world, casterId, effect, reason = 'ended') {
     if (String(ch?.spellId || '') !== String(effect?.spellId || 'drain_life')) return;
     try { world.remove(casterId, Channeling); } catch {}
     if (reason === 'duration_complete') {
-        emitSafe(world, 'channeling:complete', {
+        world.emit('channeling:complete', {
             actor: casterId,
             spellId: String(effect?.spellId || 'drain_life'),
         });
     } else {
-        emitSafe(world, 'channeling:cancelled', {
+        world.emit('channeling:cancelled', {
             actor: casterId,
             spellId: String(effect?.spellId || 'drain_life'),
             reason,
@@ -517,7 +516,7 @@ function _processSwarmJumps(world, jumps) {
         }
 
         const tpos = world.get(bestId, Position);
-        emitSafe(world, 'spell:plague_swarm:jump', {
+        world.emit('spell:plague_swarm:jump', {
             sourceId,
             targetId: bestId,
             from: { x: spos.x, y: spos.y },

@@ -18,7 +18,7 @@ defineUseAction("fishing_rod", {
       return isFishableTile(getTile(x, y)) ? null : "Fishing must target water.";
     },
     onConfirm(world, actorId, itemId, x, y) {
-      emitSafe(world, "fishing:cast:request", { actor: actorId, itemId, x, y });
+      world.emit("fishing:cast:request", { actor: actorId, itemId, x, y });
     },
   },
   onComplete(world, actorId, channel) {

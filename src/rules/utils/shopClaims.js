@@ -4,7 +4,6 @@ import { NamedIdentity } from "../components/NamedIdentity.js";
 import { ShopClaim, SHOP_CLAIM_CONFIDENCE, SHOP_CLAIM_STATUS } from "../components/ShopClaim.js";
 import { ShopIncident } from "../components/ShopIncident.js";
 import { Unpaid } from "../components/Unpaid.js";
-import { emitSafe } from "./emitSafe.js";
 import { classifyShopClaimOffense } from "./offenseClassifier.js";
 import { recordShopDebt } from "./shopDebt.js";
 
@@ -117,7 +116,7 @@ export function recordShopIncident(world, spec = {}) {
   attach(world, incidentId, shopkeeperId);
 
   const rec = Object.freeze({ id: incidentId | 0, ...incident, offense });
-  emitSafe(world, "shop:incident-recorded", rec);
+  world.emit("shop:incident-recorded", rec);
   return rec;
 }
 
@@ -252,9 +251,9 @@ export function recordShopClaim(world, spec = {}) {
     response,
   });
 
-  emitSafe(world, "shop:claim-recorded", event);
+  world.emit("shop:claim-recorded", event);
   if (debt) {
-    emitSafe(world, "shop:debt-created", {
+    world.emit("shop:debt-created", {
       debtorId: actorId,
       shopkeeperId,
       amount: debt.amount,
@@ -264,9 +263,9 @@ export function recordShopClaim(world, spec = {}) {
       claimId: claimId | 0,
     });
   }
-  if (response.escaped) emitSafe(world, "shop:theft-escaped", event);
-  if (response.pursuit) emitSafe(world, "shop:pursuit-requested", event);
-  if (response.alarm) emitSafe(world, "shop:alarm", event);
+  if (response.escaped) world.emit("shop:theft-escaped", event);
+  if (response.pursuit) world.emit("shop:pursuit-requested", event);
+  if (response.alarm) world.emit("shop:alarm", event);
   return event;
 }
 

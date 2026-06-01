@@ -2,7 +2,6 @@ import { buildCatalogItem } from "../../data/itemCatalogLoader.js";
 import { DungeonState } from "../../components/DungeonState.js";
 import { NamedIdentity } from "../../components/NamedIdentity.js";
 import { Position } from "../../components/Position.js";
-import { emitSafe } from "../../utils/emitSafe.js";
 import { consumeInventoryIdentity, inventoryHasIdentity } from "../../utils/townEconomy.js";
 import { attachEntityToCurrentFloor } from "../../utils/floorEntities.js";
 import { addToInventory } from "../../utils/inventoryFacade.js";

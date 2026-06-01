@@ -1,7 +1,6 @@
 import { ApplyIntent } from "../components/Intents/ApplyIntent.js";
 import { executeInteraction } from "../interaction/runtime/actionRuntime.js";
 import { applyPipeline } from "../interaction/verbs/applyPipeline.js";
-import { emitSafe } from "../utils/emitSafe.js";
 /** @typedef {import('../../lib/ecs-js/index.js').World} World */
 
 /**
@@ -45,7 +44,7 @@ export function applySystem(world) {
 
     if (result?.canceled && typeof result.reason === "string" && !result.reason.startsWith("APPLY_GATE_")) {
       const detail = result?.detail && typeof result.detail === "object" ? result.detail : {};
-      emitSafe(world, "item:apply-cancelled", {
+      world.emit("item:apply-cancelled", {
         actor,
         toolId,
         targetId,
@@ -55,7 +54,7 @@ export function applySystem(world) {
       });
     }
 
-    emitSafe(world, "interaction:result", result);
+    world.emit("interaction:result", result);
     try { world.remove(actor, ApplyIntent); } catch {} // ECS: may not exist
   }
 }

@@ -11,7 +11,6 @@ import { getMonster } from "../../data/monsters.js";
 import { createRng } from "../../utils/rng.js";
 import { spawnMonsterEntity } from "../../utils/spawnMonsterEntity.js";
 import { inventoryHasIdentity } from "../../utils/townEconomy.js";
-import { emitSafe } from "../../utils/emitSafe.js";
 import { addToInventory } from "../../utils/inventoryFacade.js";
 import { emit, setVar } from "../actions.js";
 import { registerQuest } from "../registry.js";
@@ -224,7 +223,7 @@ function createRelicDrop(world, spec, at) {
   world.add(relicId, Position, { x: Number(at?.x || 0) | 0, y: Number(at?.y || 0) | 0 });
   world.add(relicId, RunObjectiveTarget, { questId: RUN_CONTRACT_QUEST_ID, role: "relic" });
   attachEntityToCurrentFloor(world, relicId);
-  emitSafe(world, "item:dropped", {
+  world.emit("item:dropped", {
     itemId: relicId,
     count: 1,
     at: { x: Number(at?.x || 0) | 0, y: Number(at?.y || 0) | 0 },
@@ -270,7 +269,7 @@ function createBoss(world, spec) {
   if (!(bossId > 0)) return 0;
   world.add(bossId, RunObjectiveTarget, { questId: RUN_CONTRACT_QUEST_ID, role: "boss" });
   attachEntityToCurrentFloor(world, bossId);
-  emitSafe(world, "spawned", {
+  world.emit("spawned", {
     id: bossId,
     at: { x: at.x | 0, y: at.y | 0 },
     kind: "run-contract-boss",
@@ -427,7 +426,7 @@ export const RunContractQuest = registerQuest({
                 const pos = ctx.world.get(Number(ctx.bind.player || 0) | 0, Position);
                 if (!pos) return;
                 ctx.world.add(goldId, Position, { x: pos.x | 0, y: pos.y | 0 });
-                emitSafe(ctx.world, "item:dropped", { itemId: goldId, count: reward, at: { x: pos.x | 0, y: pos.y | 0 } });
+                ctx.world.emit("item:dropped", { itemId: goldId, count: reward, at: { x: pos.x | 0, y: pos.y | 0 } });
               },
               emit("quest:completed", (ctx) => ({
                 questId: RUN_CONTRACT_QUEST_ID,

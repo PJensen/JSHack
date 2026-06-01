@@ -16,7 +16,6 @@ import { areFactionsHostile } from "../utils/factionHostility.js";
 import { spawnMonsterEntity } from "../utils/spawnMonsterEntity.js";
 import { spawnHazard } from "../utils/hazardSpawn.js";
 import { HazardArea } from "../components/HazardArea.js";
-import { emitSafe } from "../utils/emitSafe.js";
 import { forEachInRadius } from "../utils/spatialIndex.js";
 import { clamp01Or, clampInt } from "../utils/numberCoerce.js";
 
@@ -424,7 +423,7 @@ registerScript("trap_gas", {
         radius: 1, tickDamage: 3, damageType: 'fire',
         turnsLeft: 4, sourceId: 0,
       });
-      emitSafe(world, 'trap:gas_explosion', { trapId, at: { x: tx, y: ty }, radius: EXPLOSION_RADIUS });
+      world.emit('trap:gas_explosion', { trapId, at: { x: tx, y: ty }, radius: EXPLOSION_RADIUS });
     } else {
       // Normal gas: spawn a poison gas cloud
       spawnHazard(world, {
@@ -433,7 +432,7 @@ registerScript("trap_gas", {
         radius: 2, tickDamage: 2, damageType: 'poison',
         turnsLeft: 8, sourceId: 0,
       });
-      emitSafe(world, 'trap:gas', { trapId, at: { x: tx, y: ty } });
+      world.emit('trap:gas', { trapId, at: { x: tx, y: ty } });
     }
   },
 });

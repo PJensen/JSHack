@@ -7,7 +7,6 @@ import { Equipment, getEquippedSlot } from "../../components/Equipment.js";
 import { HarvestNode } from "../../components/HarvestNode.js";
 import { Position } from "../../components/Position.js";
 import { WeatherState } from "../../components/WeatherState.js";
-import { emitSafe } from "../../utils/emitSafe.js";
 import { addToInventory } from "../../utils/inventoryFacade.js";
 import { resolveLootTable, materializeDrop } from "../../data/lootResolver.js";
 import { LOOT_TABLES } from "../../data/lootTables.js";
@@ -204,7 +203,7 @@ function requestFishingCast(world, actor, itemId, opts = {}) {
   const turns = Math.max(1, Number(opts?.turns || 12) | 0);
   const eq = world.get(actor, Equipment);
   if (!getEquippedSlot(eq, itemId)) {
-    emitSafe(world, "item:use-cancelled", {
+    world.emit("item:use-cancelled", {
       actor,
       itemId,
       code: "FISHING_ROD_NOT_EQUIPPED",
@@ -214,7 +213,7 @@ function requestFishingCast(world, actor, itemId, opts = {}) {
     return false;
   }
   if (world.has(actor, Channeling)) {
-    emitSafe(world, "item:use-cancelled", {
+    world.emit("item:use-cancelled", {
       actor,
       itemId,
       code: "FISHING_ALREADY_CHANNELING",
@@ -226,7 +225,7 @@ function requestFishingCast(world, actor, itemId, opts = {}) {
 
   const water = findFishingWater(world, actor, opts?.intent || opts);
   if (!water) {
-    emitSafe(world, "item:use-cancelled", {
+    world.emit("item:use-cancelled", {
       actor,
       itemId,
       code: "FISHING_NO_WATER",
@@ -253,8 +252,8 @@ function requestFishingCast(world, actor, itemId, opts = {}) {
       anchorY: pos ? (pos.y | 0) : null,
     });
   } catch {}
-  emitSafe(world, "channeling:start", { actor, spellId: "fishing", castTime: turns, mode: "fish", itemId, x: water.x, y: water.y });
-  emitSafe(world, "fishing:cast", { actor, itemId, x: water.x, y: water.y, turns, spotId });
+  world.emit("channeling:start", { actor, spellId: "fishing", castTime: turns, mode: "fish", itemId, x: water.x, y: water.y });
+  world.emit("fishing:cast", { actor, itemId, x: water.x, y: water.y, turns, spotId });
   return true;
 }
 
@@ -297,7 +296,7 @@ function resolveFishingChannel(world, actor, ch) {
       n.fishingPressure = Math.min(8, Math.max(Number(n.fishingPressure || 0) | 0, pressureBefore) + 1);
       n.overfished = n.fishingPressure >= FISHING_SPOT_OVERFISHED_PRESSURE;
     });
-    emitSafe(world, "fishing:spot:exhausted", {
+    world.emit("fishing:spot:exhausted", {
       actor,
       targetId,
       x: ch.x,
@@ -307,7 +306,7 @@ function resolveFishingChannel(world, actor, ch) {
     });
   }
   const pressureAfter = addFishingPressure(world, ch.x, ch.y);
-  emitSafe(world, "fishing:caught", {
+  world.emit("fishing:caught", {
     actor,
     itemId,
     caughtId: caught || 0,
@@ -337,7 +336,7 @@ export const FISHING_TARGETING = {
     return `Choose water for Fishing (range ${range}). Tap a water tile or use arrow keys + Enter. Esc to cancel.`;
   },
   onConfirm(world, actorId, itemId, x, y) {
-    emitSafe(world, 'fishing:cast:request', { actor: actorId, itemId, turns: 12, x, y });
+    world.emit('fishing:cast:request', { actor: actorId, itemId, turns: 12, x, y });
   },
 };
 

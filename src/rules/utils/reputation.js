@@ -2,7 +2,6 @@ import { attach, children } from "../../lib/ecs-js/hierarchy.js";
 import { Faction } from "../components/Faction.js";
 import { Reputation, REPUTATION_BANDS } from "../components/Reputation.js";
 import { OFFENSE_SEVERITY, OFFENSE_SOURCES } from "../data/offenses.js";
-import { emitSafe } from "./emitSafe.js";
 
 const INSTALLED = Symbol.for("jshack:reputation:offense-listeners:installed");
 
@@ -158,7 +157,7 @@ export function applyOffenseReputation(world, spec = {}) {
     witnessIds: Object.freeze(witnessIds),
     records: Object.freeze(records),
   });
-  emitSafe(world, "reputation:changed", event);
+  world.emit("reputation:changed", event);
   return event;
 }
 

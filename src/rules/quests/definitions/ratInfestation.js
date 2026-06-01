@@ -6,7 +6,6 @@ import { getMonster } from "../../data/monsters.js";
 import { createItemById } from "../../utils/itemFactory.js";
 import { addToInventory } from "../../utils/inventoryFacade.js";
 import { spawnMonsterEntity } from "../../utils/spawnMonsterEntity.js";
-import { emitSafe } from "../../utils/emitSafe.js";
 import { attachEntityToCurrentFloor } from "../../utils/floorEntities.js";
 import { currentDepth, firstPlayerId } from "../../utils/worldAccess.js";
 import { isWalkable } from "../../environment/dungeon/tileMap.js";
@@ -208,17 +207,17 @@ export const RatInfestationQuest = registerQuest({
                 const bowId = createItemById(ctx.world, "bow_short");
                 if (bowId > 0) {
                   ctx.world.add(bowId, Position, { x, y });
-                  emitSafe(ctx.world, "item:dropped", { itemId: bowId, count: 1, at: { x, y } });
+                  ctx.world.emit("item:dropped", { itemId: bowId, count: 1, at: { x, y } });
                 }
 
                 const arrowsId = createItemById(ctx.world, "ammo_arrows", { count: 20 });
                 if (arrowsId > 0) {
                   ctx.world.add(arrowsId, Position, { x, y });
-                  emitSafe(ctx.world, "item:dropped", { itemId: arrowsId, count: 20, at: { x, y } });
+                  ctx.world.emit("item:dropped", { itemId: arrowsId, count: 20, at: { x, y } });
                 }
 
                 // Beat 1: hand over the gear
-                emitSafe(ctx.world, "npc:dialogue", {
+                ctx.world.emit("npc:dialogue", {
                   actor: giverId,
                   targetId: Number(ctx.bind.player || 0) | 0,
                   text: "take this — there are bats down there too.",
@@ -253,7 +252,7 @@ export const RatInfestationQuest = registerQuest({
 
                 // Beat 2: react to the rat
                 if (Number.isFinite(x) && Number.isFinite(y)) {
-                  emitSafe(ctx.world, "npc:dialogue", {
+                  ctx.world.emit("npc:dialogue", {
                     actor: giverId,
                     targetId: Number(ctx.bind.player || 0) | 0,
                     text: "there's one! Kill it!",
@@ -338,7 +337,7 @@ export const RatInfestationQuest = registerQuest({
                 const stewId = createItemById(ctx.world, "food_stew");
                 if (stewId > 0) {
                   ctx.world.add(stewId, Position, { x, y });
-                  emitSafe(ctx.world, 'item:dropped', { itemId: stewId, count: 1, at: { x, y } });
+                  ctx.world.emit('item:dropped', { itemId: stewId, count: 1, at: { x, y } });
                 }
               },
               emit("quest:completed", (ctx) => ({

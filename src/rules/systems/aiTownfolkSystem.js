@@ -14,7 +14,6 @@ import { DoorState } from "../components/DoorState.js";
 import { Collider } from "../components/Collider.js";
 import { Interactable } from "../components/Interactable.js";
 import { HarvestNode } from "../components/HarvestNode.js";
-import { emitSafe } from "../utils/emitSafe.js";
 import { GrowthStage } from "../components/GrowthStage.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Inventory } from "../components/Inventory.js";
@@ -275,7 +274,7 @@ function assignBellRun(world, actorId, monsterId) {
   job.routineKind = "ring_town_bell";
   job.workTurns = 0;
   job.stuckTurns = 0;
-  emitSafe(world, "town:breach:sighted", { witnessId: actorId, monsterId, bellId: bell.id, at: { x: bell.x | 0, y: bell.y | 0 } });
+  world.emit("town:breach:sighted", { witnessId: actorId, monsterId, bellId: bell.id, at: { x: bell.x | 0, y: bell.y | 0 } });
   return true;
 }
 
@@ -306,7 +305,7 @@ function handleBellRun(world, id, pos, job) {
   job.targetX = bell.x | 0;
   job.targetY = bell.y | 0;
   if (nearPoint(pos, bell.x, bell.y, 1)) {
-    emitSafe(world, "bell:rung", { actor: id, targetId: bell.id, reason: "monster_sighted" });
+    world.emit("bell:rung", { actor: id, targetId: bell.id, reason: "monster_sighted" });
     return;
   }
   const moved = stepToward(world, id, pos, bell.x, bell.y);
@@ -1000,7 +999,7 @@ function handleWorking(world, id, pos, job) {
   switch (job.workSiteKind) {
     case "chop": {
       if (!actorHasIdentity(world, id, ROLE_TO_TOOL_ID.woodcutter)) {
-        emitSafe(world, "townfolk:needs_tool", { actor: id, tool: ROLE_TO_TOOL_ID.woodcutter });
+        world.emit("townfolk:needs_tool", { actor: id, tool: ROLE_TO_TOOL_ID.woodcutter });
         setIdle(job, world);
         return;
       }
@@ -1014,11 +1013,11 @@ function handleWorking(world, id, pos, job) {
         depleteNode(world, treeId);
         const col = world.get(treeId, Collider);
         if (col) world.set(treeId, Collider, { solid: false, blocksSight: false });
-        emitSafe(world, "townfolk:chopped", { actor: id, x: pos.x, y: pos.y });
+        world.emit("townfolk:chopped", { actor: id, x: pos.x, y: pos.y });
         carryCreated(world, id, "material_lumber");
         carryCreated(world, id, "fuel_firewood");
         setCarry(job, "wood", 2);
-        emitSafe(world, "townfolk:carrying", { actor: id, resource: "wood" });
+        world.emit("townfolk:carrying", { actor: id, resource: "wood" });
         setReturning(job);
         return;
       }
@@ -1047,10 +1046,10 @@ function handleWorking(world, id, pos, job) {
           hn.needsPlanting = false;
           hn.regrowCountdown = hn.regrowTurns;
           if (seedId) consumeInventoryIdentity(world, id, seedId, 1);
-          emitSafe(world, "townfolk:planted", { actor: id, x: pos.x, y: pos.y });
+          world.emit("townfolk:planted", { actor: id, x: pos.x, y: pos.y });
         }
         job.carryCount++;
-        emitSafe(world, "townfolk:harvested", { actor: id, x: pos.x, y: pos.y });
+        world.emit("townfolk:harvested", { actor: id, x: pos.x, y: pos.y });
         // Look for more if not full
         if (job.carryMax > 0 && job.carryCount < job.carryMax) {
           const next = findReadyNode(world, job.workX, job.workY, 15,
@@ -1065,7 +1064,7 @@ function handleWorking(world, id, pos, job) {
         }
       }
       setCarry(job, "crops", Math.max(1, job.carryCount));
-      emitSafe(world, "townfolk:carrying", { actor: id, resource: "crops" });
+      world.emit("townfolk:carrying", { actor: id, resource: "crops" });
       setReturning(job);
       return;
     }
@@ -1078,7 +1077,7 @@ function handleWorking(world, id, pos, job) {
           n.needsPlanting = false;
           n.regrowCountdown = n.regrowTurns;
           planted = true;
-          emitSafe(world, "townfolk:planted", { actor: id, x: pos.x, y: pos.y });
+          world.emit("townfolk:planted", { actor: id, x: pos.x, y: pos.y });
         }
       });
       // Look for more to plant
@@ -1095,7 +1094,7 @@ function handleWorking(world, id, pos, job) {
     }
     case "mine": {
       if (!actorHasIdentity(world, id, ROLE_TO_TOOL_ID.miner)) {
-        emitSafe(world, "townfolk:needs_tool", { actor: id, tool: ROLE_TO_TOOL_ID.miner });
+        world.emit("townfolk:needs_tool", { actor: id, tool: ROLE_TO_TOOL_ID.miner });
         setIdle(job, world);
         return;
       }
@@ -1112,9 +1111,9 @@ function handleWorking(world, id, pos, job) {
       });
       if (oreId) depleteNode(world, oreId);
       carryCreated(world, id, oreItemId);
-      emitSafe(world, "townfolk:mined", { actor: id, x: pos.x, y: pos.y });
+      world.emit("townfolk:mined", { actor: id, x: pos.x, y: pos.y });
       setCarry(job, "ore");
-      emitSafe(world, "townfolk:carrying", { actor: id, resource: "ore" });
+      world.emit("townfolk:carrying", { actor: id, resource: "ore" });
       setReturning(job);
       return;
     }
@@ -1124,7 +1123,7 @@ function handleWorking(world, id, pos, job) {
         consumeInventoryIdentity(world, storage.lumber, "material_lumber", 1)
         || consumeInventoryIdentity(world, storage.smithy, "material_lumber", 1);
       if (!lumberSpent) {
-        emitSafe(world, "townfolk:needs_lumber", { actor: id, x: job.targetX, y: job.targetY });
+        world.emit("townfolk:needs_lumber", { actor: id, x: job.targetX, y: job.targetY });
         setIdle(job, world);
         return;
       }
@@ -1135,7 +1134,7 @@ function handleWorking(world, id, pos, job) {
         if (ds && ds.destroyedTiles) {
           delete ds.destroyedTiles[destroyedTileKey(job.targetX, job.targetY)];
         }
-        emitSafe(world, "townfolk:repaired", { actor: id, x: job.targetX, y: job.targetY });
+        world.emit("townfolk:repaired", { actor: id, x: job.targetX, y: job.targetY });
       }
       setReturning(job);
       return;
@@ -1154,7 +1153,7 @@ function handleWorking(world, id, pos, job) {
       if (herbId) depleteNode(world, herbId);
       carryCreated(world, id, HERB_ITEM_IDS[herbKind] || "food_wild_herbs");
       job.carryCount++;
-      emitSafe(world, "townfolk:gathered_herbs", { actor: id, x: pos.x, y: pos.y });
+      world.emit("townfolk:gathered_herbs", { actor: id, x: pos.x, y: pos.y });
       if (job.carryMax > 0 && job.carryCount < job.carryMax) {
         const next = findReadyNode(world, job.workX, job.workY, WORK_RANGE,
           (n) => n.kind === "herbs" || n.kind === "thorn_bramble" || n.kind === "venom_fern" || n.kind === "moonleaf" || n.kind === "ember_root");
@@ -1167,7 +1166,7 @@ function handleWorking(world, id, pos, job) {
         }
       }
       setCarry(job, "herbs", Math.max(1, job.carryCount));
-      emitSafe(world, "townfolk:carrying", { actor: id, resource: "herbs" });
+      world.emit("townfolk:carrying", { actor: id, resource: "herbs" });
       setReturning(job);
       return;
     }
@@ -1179,7 +1178,7 @@ function handleWorking(world, id, pos, job) {
         consumeInventoryIdentity(world, storage.mill, "food_wheat", 1);
         createInventoryItem(world, storage.mill, "food_flour");
         activateWorkstation(world, "millstone", "working");
-        emitSafe(world, "townfolk:milled", { actor: id, x: pos.x, y: pos.y });
+        world.emit("townfolk:milled", { actor: id, x: pos.x, y: pos.y });
       }
       job.carrying = "";
       job.carryCount = 0;
@@ -1194,11 +1193,11 @@ function handleWorking(world, id, pos, job) {
         consumeInventoryIdentity(world, storage.smithy, "ore_coal", 1);
         createInventoryItem(world, storage.smithy, "material_iron");
         activateWorkstation(world, "furnace", "lit", 5);
-        emitSafe(world, "townfolk:smelted", { actor: id, x: pos.x, y: pos.y, itemId: "material_iron" });
+        world.emit("townfolk:smelted", { actor: id, x: pos.x, y: pos.y, itemId: "material_iron" });
       }
       const craft = chooseSmithCraft(world, storage);
       if (!craft || !(storage.smithy > 0)) {
-        emitSafe(world, "townfolk:inspected", { actor: id, x: pos.x, y: pos.y });
+        world.emit("townfolk:inspected", { actor: id, x: pos.x, y: pos.y });
         setReturning(job);
         return;
       }
@@ -1206,7 +1205,7 @@ function handleWorking(world, id, pos, job) {
       consumeInventoryIdentity(world, storage.smithy, "material_lumber", craft.lumber);
       createInventoryItem(world, storage.smithy, craft.itemId);
       activateWorkstation(world, "anvil", "working");
-      emitSafe(world, "townfolk:forged", { actor: id, x: pos.x, y: pos.y, itemId: craft.itemId });
+      world.emit("townfolk:forged", { actor: id, x: pos.x, y: pos.y, itemId: craft.itemId });
       setReturning(job);
       return;
     }
@@ -1215,7 +1214,7 @@ function handleWorking(world, id, pos, job) {
       const tavern = storage.tavern;
       const stock = tavern > 0 ? countInventoryByIdentity(world, tavern) : {};
       if (!(tavern > 0) || (stock.food_flour || 0) <= 0 || (stock.water_bucket || 0) <= 0 || (stock.fuel_firewood || 0) <= 0 || (stock.tool_kitchen_knife || 0) <= 0) {
-        emitSafe(world, "townfolk:poured", { actor: id, x: pos.x, y: pos.y });
+        world.emit("townfolk:poured", { actor: id, x: pos.x, y: pos.y });
         setReturning(job);
         return;
       }
@@ -1223,22 +1222,22 @@ function handleWorking(world, id, pos, job) {
       consumeInventoryIdentity(world, tavern, "fuel_firewood", 1);
       createInventoryItem(world, tavern, "food_stew");
       activateWorkstation(world, "cooking_fire", "lit", 4);
-      emitSafe(world, "townfolk:cooked", { actor: id, x: pos.x, y: pos.y, itemId: "food_stew" });
+      world.emit("townfolk:cooked", { actor: id, x: pos.x, y: pos.y, itemId: "food_stew" });
       setReturning(job);
       return;
     }
     case "fetch_water": {
       carryCreated(world, id, "water_bucket");
       setCarry(job, "water");
-      emitSafe(world, "townfolk:carrying", { actor: id, resource: "water" });
+      world.emit("townfolk:carrying", { actor: id, resource: "water" });
       setReturning(job);
       return;
     }
     case "fish": {
       carryCreated(world, id, "food_raw_fish");
       setCarry(job, "fish");
-      emitSafe(world, "townfolk:fished", { actor: id, x: pos.x, y: pos.y, itemId: "food_raw_fish" });
-      emitSafe(world, "townfolk:carrying", { actor: id, resource: "fish" });
+      world.emit("townfolk:fished", { actor: id, x: pos.x, y: pos.y, itemId: "food_raw_fish" });
+      world.emit("townfolk:carrying", { actor: id, resource: "fish" });
       setReturning(job);
       return;
     }
@@ -1246,7 +1245,7 @@ function handleWorking(world, id, pos, job) {
       const storage = _cachedStorage;
       if (moveChestItemToActor(world, storage.mill, id, "food_flour")) {
         setCarry(job, "flour");
-        emitSafe(world, "townfolk:carrying", { actor: id, resource: "flour" });
+        world.emit("townfolk:carrying", { actor: id, resource: "flour" });
         setReturning(job);
         return;
       }
@@ -1257,7 +1256,7 @@ function handleWorking(world, id, pos, job) {
       const storage = _cachedStorage;
       if (moveChestItemToActor(world, storage.lumber, id, "fuel_firewood")) {
         setCarry(job, "firewood");
-        emitSafe(world, "townfolk:carrying", { actor: id, resource: "firewood" });
+        world.emit("townfolk:carrying", { actor: id, resource: "firewood" });
         setReturning(job);
         return;
       }
@@ -1268,7 +1267,7 @@ function handleWorking(world, id, pos, job) {
       const storage = _cachedStorage;
       if (moveChestItemToActor(world, storage.lumber, id, "material_lumber")) {
         setCarry(job, "lumber");
-        emitSafe(world, "townfolk:carrying", { actor: id, resource: "lumber" });
+        world.emit("townfolk:carrying", { actor: id, resource: "lumber" });
         setReturning(job);
         return;
       }
@@ -1285,12 +1284,12 @@ function handleWorking(world, id, pos, job) {
       const moonleafCount = Number(stock.reagent_moonleaf || 0);
       const emberRootCount = Number(stock.reagent_ember_root || 0);
       if (countShopStock(world, id) >= BREW_STOCK_LIMIT) {
-        emitSafe(world, "townfolk:stocked", { actor: id, x: pos.x, y: pos.y });
+        world.emit("townfolk:stocked", { actor: id, x: pos.x, y: pos.y });
         setReturning(job);
         return;
       }
       if ((herbCount + moonleafCount + emberRootCount) <= 0 || (thornCount + venomCount + moonleafCount + emberRootCount) <= 0 || !(herbChest > 0)) {
-        emitSafe(world, "townfolk:sorted_herbs", { actor: id, x: pos.x, y: pos.y });
+        world.emit("townfolk:sorted_herbs", { actor: id, x: pos.x, y: pos.y });
         setReturning(job);
         return;
       }
@@ -1328,7 +1327,7 @@ function handleWorking(world, id, pos, job) {
         const baseValue = appraiseItemValue(world, potionId);
         const price = Math.ceil(baseValue * 1.3);
         world.add(potionId, Unpaid, { shopkeeperId: id, price });
-        emitSafe(world, "townfolk:brewed", { actor: id, x: pos.x, y: pos.y, potion: potionKey });
+        world.emit("townfolk:brewed", { actor: id, x: pos.x, y: pos.y, potion: potionKey });
       }
       setReturning(job);
       return;
@@ -1342,7 +1341,7 @@ function handleWorking(world, id, pos, job) {
 function handleReturning(world, id, pos, job) {
   if (nearPoint(pos, job.homeX, job.homeY, 2)) {
     setIdle(job, world);
-    if (job.carrying) emitSafe(world, "townfolk:delivered", { actor: id, resource: job.carrying });
+    if (job.carrying) world.emit("townfolk:delivered", { actor: id, resource: job.carrying });
     job.carrying = "";
     job.carryCount = 0;
     return;
@@ -1389,7 +1388,7 @@ function handleDelivering(world, id, pos, job) {
       job.carrying = "";
       job.carryCount = 0;
     }
-    emitSafe(world, "townfolk:delivered", { actor: id, resource: job.carrying });
+    world.emit("townfolk:delivered", { actor: id, resource: job.carrying });
     if (carriedItemCount(world, id, job) <= 0) {
       job.carrying = "";
       job.carryCount = 0;
@@ -1587,43 +1586,43 @@ function getScheduleTarget(world, actorId, job) {
 function emitRoleWork(world, id, pos, job, target) {
   switch (target.kind) {
     case "tend":
-      emitSafe(world, "townfolk:tended", { actor: id, x: pos.x, y: pos.y });
+      world.emit("townfolk:tended", { actor: id, x: pos.x, y: pos.y });
       break;
     case "mill":
-      emitSafe(world, "townfolk:milled", { actor: id, x: pos.x, y: pos.y });
+      world.emit("townfolk:milled", { actor: id, x: pos.x, y: pos.y });
       break;
     case "forge_tools":
-      emitSafe(world, "townfolk:forged", { actor: id, x: pos.x, y: pos.y });
+      world.emit("townfolk:forged", { actor: id, x: pos.x, y: pos.y });
       break;
     case "minister":
     case "pray":
-      emitSafe(world, "townfolk:blessed", { actor: id, x: pos.x, y: pos.y });
+      world.emit("townfolk:blessed", { actor: id, x: pos.x, y: pos.y });
       break;
     case "cook":
-      emitSafe(world, "townfolk:cooked", { actor: id, x: pos.x, y: pos.y });
+      world.emit("townfolk:cooked", { actor: id, x: pos.x, y: pos.y });
       break;
     case "serve":
     case "pour":
-      emitSafe(world, "townfolk:poured", { actor: id, x: pos.x, y: pos.y });
+      world.emit("townfolk:poured", { actor: id, x: pos.x, y: pos.y });
       break;
     case "haul":
     case "garden":
-      emitSafe(world, "townfolk:worked", { actor: id, x: pos.x, y: pos.y, kind: target.kind });
+      world.emit("townfolk:worked", { actor: id, x: pos.x, y: pos.y, kind: target.kind });
       break;
     case "inspect":
-      emitSafe(world, "townfolk:inspected", { actor: id, x: pos.x, y: pos.y });
+      world.emit("townfolk:inspected", { actor: id, x: pos.x, y: pos.y });
       break;
     case "sort_herbs":
-      emitSafe(world, "townfolk:sorted_herbs", { actor: id, x: pos.x, y: pos.y });
+      world.emit("townfolk:sorted_herbs", { actor: id, x: pos.x, y: pos.y });
       break;
     case "stock_shelves":
-      emitSafe(world, "townfolk:stocked", { actor: id, x: pos.x, y: pos.y });
+      world.emit("townfolk:stocked", { actor: id, x: pos.x, y: pos.y });
       break;
     case "pub":
-      emitSafe(world, "townfolk:unwound", { actor: id, x: pos.x, y: pos.y });
+      world.emit("townfolk:unwound", { actor: id, x: pos.x, y: pos.y });
       break;
     case "sleep":
-      emitSafe(world, "townfolk:slept", { actor: id, x: pos.x, y: pos.y });
+      world.emit("townfolk:slept", { actor: id, x: pos.x, y: pos.y });
       break;
     default:
       break;
@@ -1677,11 +1676,11 @@ function handleScheduledTownfolk(world, id, pos, job) {
       return;
     }
     if (job.carrying) {
-      emitSafe(world, "townfolk:delivered", { actor: id, resource: job.carrying });
+      world.emit("townfolk:delivered", { actor: id, resource: job.carrying });
       job.carrying = "";
       job.carryCount = 0;
     }
-    emitSafe(world, "townfolk:routine", { actor: id, phase: target.phase, kind: target.kind });
+    world.emit("townfolk:routine", { actor: id, phase: target.phase, kind: target.kind });
 
     // Shop vendors open their door when the work phase starts.
     if (target.phase === "work" && findOwnedShopRoomByActor(world, id)) {
@@ -1821,7 +1820,7 @@ export function installBellListener(world) {
     const sightedMonsterId = state.sightedMonsterId | 0;
     confirmThreatAlarm(world, Number(actor || 0) | 0, sightedMonsterId);
     applyTownAlarmResponse(world, Number(actor || 0) | 0, sightedMonsterId);
-    emitSafe(world, "town:alarm", {
+    world.emit("town:alarm", {
       actor: Number(actor || 0) | 0,
       reason: String(reason || "bell"),
       sightedMonsterId,

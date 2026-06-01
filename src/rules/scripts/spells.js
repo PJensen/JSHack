@@ -28,7 +28,6 @@ import { findNearestValidTileAround } from "../utils/queries.js";
 import { combatSeed, hashString32, mulberry32, rollDice, pct } from "../utils/rng.js";
 import { statusStrength } from "../utils/statusFacade.js";
 import { upsertTimedEffect } from "../utils/effectSemantics.js";
-import { emitSafe } from "../utils/emitSafe.js";
 import { applyStatusEffect, ensureActiveEffects } from "../utils/effects.js";
 import { areFactionsHostile } from "../utils/factionHostility.js";
 import { chebyshev, chebyshevScalar } from "../utils/distance.js";
@@ -186,7 +185,7 @@ function resolveStormCenter(world, actor, spell, intent) {
 function runStormScript(world, actor, spell, intent, tuning) {
   const storm = resolveStormCenter(world, actor, spell, intent);
   if (!storm.ok || !storm.center) {
-    emitSafe(world, `${String(tuning.eventName)}:failed`, {
+    world.emit(`${String(tuning.eventName)}:failed`, {
       actor,
       spellId: spell.id,
       reason: storm.reason || "invalid_target",
@@ -307,7 +306,7 @@ function runStormScript(world, actor, spell, intent, tuning) {
     break;
   }
 
-  emitSafe(world, tuning.eventName, {
+  world.emit(tuning.eventName, {
     actor,
     origin: center,
     radius,
@@ -401,7 +400,7 @@ REGISTRY['lightning'] = function lightningScript(world, actor, spell, intent) {
   }
   if (!first) {
     // Nothing visible to hit; emit a short self-burst semantic
-    emitSafe(world, 'spell:bolt', { actor, targetId: actor, spellId: spell.id, from: {x: apos.x, y: apos.y}, to: {x: apos.x, y: apos.y}, chainIndex: 0 });
+    world.emit('spell:bolt', { actor, targetId: actor, spellId: spell.id, from: {x: apos.x, y: apos.y}, to: {x: apos.x, y: apos.y}, chainIndex: 0 });
     return;
   }
 
@@ -441,7 +440,7 @@ REGISTRY['lightning'] = function lightningScript(world, actor, spell, intent) {
     const segFrom = (i === 0) ? { x: apos.x, y: apos.y } : { x: chain[i-1].x, y: chain[i-1].y };
     const segTo = { x: chain[i].x, y: chain[i].y };
     const targetId = chain[i].id;
-    emitSafe(world, 'spell:bolt', { actor, targetId, spellId: spell.id, from: segFrom, to: segTo, chainIndex: i });
+    world.emit('spell:bolt', { actor, targetId, spellId: spell.id, from: segFrom, to: segTo, chainIndex: i });
 
     // Damage model: base 7 → attenuate per chain, boosted by rain
     const rawBase = (hasConductionLens && i >= CHAIN_MAX)
@@ -458,7 +457,7 @@ REGISTRY['lightning'] = function lightningScript(world, actor, spell, intent) {
     }));
   }
   if (hasConductionLens && chain.length > CHAIN_MAX) {
-    emitSafe(world, "proc:conductionLens", { actor, spellId: spell.id, extraChains: chain.length - CHAIN_MAX });
+    world.emit("proc:conductionLens", { actor, spellId: spell.id, extraChains: chain.length - CHAIN_MAX });
   }
 
   // ── Rain bonus: +50% damage and +1 chain target in rain ──────────
@@ -479,7 +478,7 @@ REGISTRY['lightning'] = function lightningScript(world, actor, spell, intent) {
       at: { x: apos.x, y: apos.y },
       salt: 0xBAC1,
     }));
-    emitSafe(world, 'spell:lightning:backlash', { actor, damage: backlashDmg });
+    world.emit('spell:lightning:backlash', { actor, damage: backlashDmg });
   }
 
   // ── Wet arc: targets standing on wet tiles arc at full damage, no chain cap ──
@@ -511,7 +510,7 @@ REGISTRY['lightning'] = function lightningScript(world, actor, spell, intent) {
     }
     if (!srcNode) continue;
     used.add(id);
-    emitSafe(world, 'spell:bolt', {
+    world.emit('spell:bolt', {
       actor, targetId: id, spellId: spell.id,
       from: { x: srcNode.x, y: srcNode.y },
       to: { x: p.x, y: p.y },
@@ -530,7 +529,7 @@ REGISTRY['lightning'] = function lightningScript(world, actor, spell, intent) {
     arcIdx++;
   }
   if (arcIdx > 0) {
-    emitSafe(world, 'spell:lightning:wetarc', { actor, spellId: spell.id, arcCount: arcIdx });
+    world.emit('spell:lightning:wetarc', { actor, spellId: spell.id, arcCount: arcIdx });
   }
 };
 
@@ -596,7 +595,7 @@ REGISTRY['blastwave'] = function blastwaveScript(world, actor, spell, intent) {
     }));
   }
 
-  emitSafe(world, 'spell:blastwave', { actor, origin: { x: apos.x, y: apos.y }, knockbacks, radius: RADIUS });
+  world.emit('spell:blastwave', { actor, origin: { x: apos.x, y: apos.y }, knockbacks, radius: RADIUS });
 };
 
 // Blink — targeted teleport up to 10 tiles.
@@ -627,7 +626,7 @@ REGISTRY['blink'] = function blinkScript(world, actor, spell, intent) {
     const tx = Number(intent?.x);
     const ty = Number(intent?.y);
     if (!Number.isFinite(tx) || !Number.isFinite(ty)) {
-      emitSafe(world, 'spell:blink:failed', { actor, spellId: spell.id, reason: 'no_target', range: maxRange });
+      world.emit('spell:blink:failed', { actor, spellId: spell.id, reason: 'no_target', range: maxRange });
       return;
     }
     requested = { x: tx | 0, y: ty | 0 };
@@ -635,7 +634,7 @@ REGISTRY['blink'] = function blinkScript(world, actor, spell, intent) {
 
   const requestedDist = chebyshev(from, requested);
   if (requestedDist <= 0 || requestedDist > maxRange) {
-    emitSafe(world, 'spell:blink:failed', { actor, spellId: spell.id, reason: 'out_of_range', requested, range: maxRange });
+    world.emit('spell:blink:failed', { actor, spellId: spell.id, reason: 'out_of_range', requested, range: maxRange });
     return;
   }
 
@@ -644,19 +643,19 @@ REGISTRY['blink'] = function blinkScript(world, actor, spell, intent) {
     exclude: [from],
   });
   if (!landing) {
-    emitSafe(world, 'spell:blink:failed', { actor, spellId: spell.id, reason: 'no_safe_landing', requested, range: maxRange });
+    world.emit('spell:blink:failed', { actor, spellId: spell.id, reason: 'no_safe_landing', requested, range: maxRange });
     return;
   }
 
   const landingDist = chebyshev(from, landing);
   if (landingDist <= 0 || landingDist > maxRange) {
-    emitSafe(world, 'spell:blink:failed', { actor, spellId: spell.id, reason: 'landing_out_of_range', requested, range: maxRange });
+    world.emit('spell:blink:failed', { actor, spellId: spell.id, reason: 'landing_out_of_range', requested, range: maxRange });
     return;
   }
 
   world.set(actor, Position, { x: landing.x | 0, y: landing.y | 0 });
-  emitSafe(world, 'moved', { id: actor, from, to: { x: landing.x | 0, y: landing.y | 0 } });
-  emitSafe(world, 'spell:blink', {
+  world.emit('moved', { id: actor, from, to: { x: landing.x | 0, y: landing.y | 0 } });
+  world.emit('spell:blink', {
     actor,
     spellId: spell.id,
     from,
@@ -696,7 +695,7 @@ REGISTRY['phase_strike'] = function phaseStrikeScript(world, actor, spell, inten
     const tx = Number(intent?.x);
     const ty = Number(intent?.y);
     if (!Number.isFinite(tx) || !Number.isFinite(ty)) {
-      emitSafe(world, 'spell:phase_strike:failed', { actor, spellId: spell.id, reason: 'no_target', range: maxRange });
+      world.emit('spell:phase_strike:failed', { actor, spellId: spell.id, reason: 'no_target', range: maxRange });
       return;
     }
     requested = { x: tx | 0, y: ty | 0 };
@@ -704,7 +703,7 @@ REGISTRY['phase_strike'] = function phaseStrikeScript(world, actor, spell, inten
 
   const requestedDist = chebyshev(from, requested);
   if (requestedDist <= 0 || requestedDist > maxRange) {
-    emitSafe(world, 'spell:phase_strike:failed', { actor, spellId: spell.id, reason: 'out_of_range', requested, range: maxRange });
+    world.emit('spell:phase_strike:failed', { actor, spellId: spell.id, reason: 'out_of_range', requested, range: maxRange });
     return;
   }
 
@@ -713,13 +712,13 @@ REGISTRY['phase_strike'] = function phaseStrikeScript(world, actor, spell, inten
     exclude: [from],
   });
   if (!landing) {
-    emitSafe(world, 'spell:phase_strike:failed', { actor, spellId: spell.id, reason: 'no_safe_landing', requested, range: maxRange });
+    world.emit('spell:phase_strike:failed', { actor, spellId: spell.id, reason: 'no_safe_landing', requested, range: maxRange });
     return;
   }
 
   const landingDist = chebyshev(from, landing);
   if (landingDist <= 0 || landingDist > maxRange) {
-    emitSafe(world, 'spell:phase_strike:failed', { actor, spellId: spell.id, reason: 'landing_out_of_range', requested, range: maxRange });
+    world.emit('spell:phase_strike:failed', { actor, spellId: spell.id, reason: 'landing_out_of_range', requested, range: maxRange });
     return;
   }
 
@@ -755,7 +754,7 @@ REGISTRY['phase_strike'] = function phaseStrikeScript(world, actor, spell, inten
 
   // Teleport the actor
   world.set(actor, Position, { x: landing.x | 0, y: landing.y | 0 });
-  emitSafe(world, 'moved', { id: actor, from, to: { x: landing.x | 0, y: landing.y | 0 } });
+  world.emit('moved', { id: actor, from, to: { x: landing.x | 0, y: landing.y | 0 } });
 
   // Resolve weapon + gear stats for damage pipeline
   const atkEq = /** @type any */ (world.get(actor, Equipment));
@@ -825,7 +824,7 @@ REGISTRY['phase_strike'] = function phaseStrikeScript(world, actor, spell, inten
     }
   }
 
-  emitSafe(world, 'spell:phase_strike', {
+  world.emit('spell:phase_strike', {
     actor,
     spellId: spell.id,
     from,
@@ -849,7 +848,7 @@ REGISTRY['homecoming'] = function homecomingScript(world, actor, spell, intent) 
     break;
   }
 
-  emitSafe(world, 'dungeon:teleport-depth', {
+  world.emit('dungeon:teleport-depth', {
     actor,
     source: 'scroll_homecoming',
     targetDepth: 0,
@@ -872,7 +871,7 @@ REGISTRY['hearthstone'] = function hearthstoneScript(world, actor, _spell, _inte
     break;
   }
 
-  emitSafe(world, 'dungeon:teleport-depth', {
+  world.emit('dungeon:teleport-depth', {
     actor,
     source: 'hearthstone',
     targetDepth: 0,
@@ -923,7 +922,7 @@ REGISTRY['meteor'] = function meteorScript(world, actor, spell, intent) {
       }
     }
     if (candidates.length <= 0) {
-      emitSafe(world, 'spell:meteor:failed', { actor, spellId: spell.id, reason: 'no_los_target', range: MAX_R });
+      world.emit('spell:meteor:failed', { actor, spellId: spell.id, reason: 'no_los_target', range: MAX_R });
       return;
     }
     const posSalt = (((apos.x | 0) & 0xffff) << 16) ^ ((apos.y | 0) & 0xffff);
@@ -936,7 +935,7 @@ REGISTRY['meteor'] = function meteorScript(world, actor, spell, intent) {
     oy = intent.y | 0;
     const dist = chebyshevScalar(ox | 0, oy | 0, apos.x | 0, apos.y | 0);
     if (!(dist > 0) || dist > MAX_R) {
-      emitSafe(world, 'spell:meteor:failed', { actor, spellId: spell.id, reason: 'out_of_range', range: MAX_R, requested: { x: ox, y: oy } });
+      world.emit('spell:meteor:failed', { actor, spellId: spell.id, reason: 'out_of_range', range: MAX_R, requested: { x: ox, y: oy } });
       return;
     }
     if (!hasSpellLineOfSight(world, {
@@ -947,7 +946,7 @@ REGISTRY['meteor'] = function meteorScript(world, actor, spell, intent) {
       isBlocked,
       allowFlyingOccupantAtTarget: true,
     })) {
-      emitSafe(world, 'spell:meteor:failed', { actor, spellId: spell.id, reason: 'blocked_los', range: MAX_R, requested: { x: ox, y: oy } });
+      world.emit('spell:meteor:failed', { actor, spellId: spell.id, reason: 'blocked_los', range: MAX_R, requested: { x: ox, y: oy } });
       return;
     }
   } else {
@@ -973,7 +972,7 @@ REGISTRY['meteor'] = function meteorScript(world, actor, spell, intent) {
       })) { bestId = id; bestD2 = d2; }
     }
     if (!bestId) {
-      emitSafe(world, 'spell:meteor:failed', { actor, spellId: spell.id, reason: 'no_target', range: MAX_R });
+      world.emit('spell:meteor:failed', { actor, spellId: spell.id, reason: 'no_target', range: MAX_R });
       return;
     }
     const tp = /** @type any */ (world.get(bestId, Position));
@@ -1012,7 +1011,7 @@ REGISTRY['meteor'] = function meteorScript(world, actor, spell, intent) {
       } else {
         try { world.add(id, ActiveEffects, { effects: [effect] }); } catch {} // ECS: may already exist
       }
-      emitSafe(world, 'proc:burning', { actor, target: id });
+      world.emit('proc:burning', { actor, target: id });
     }
   }
 
@@ -1047,7 +1046,7 @@ REGISTRY['meteor'] = function meteorScript(world, actor, spell, intent) {
     break;
   }
 
-  emitSafe(world, 'spell:meteor', {
+  world.emit('spell:meteor', {
     actor,
     from: { x: apos.x, y: apos.y },
     origin: { x: ox, y: oy },
@@ -1102,7 +1101,7 @@ REGISTRY['frost'] = function frostScript(world, actor, spell, intent) {
   }
   if (!target) {
     // No valid target; emit a fizzle pulse at caster
-    emitSafe(world, 'spell:frost', { actor, targetId: actor, at: { x: apos.x, y: apos.y }, from: { x: apos.x, y: apos.y }, duration: 0, mass: 0, projectileDelay: 0, fizzle: true });
+    world.emit('spell:frost', { actor, targetId: actor, at: { x: apos.x, y: apos.y }, from: { x: apos.x, y: apos.y }, duration: 0, mass: 0, projectileDelay: 0, fizzle: true });
     return;
   }
 
@@ -1151,7 +1150,7 @@ REGISTRY['frost'] = function frostScript(world, actor, spell, intent) {
         } else {
           ae.effects.push({ key: "stun", turnsLeft: 1, potency: 1, stacks: 1, startedAtTurn: world.step, sourceId: actor });
         }
-        emitSafe(world, "proc:glacierSigil", { actor, targetId: target.id });
+        world.emit("proc:glacierSigil", { actor, targetId: target.id });
       }
     }
   }
@@ -1160,7 +1159,7 @@ REGISTRY['frost'] = function frostScript(world, actor, spell, intent) {
   const frostFrom = { x: apos.x, y: apos.y };
   const frostAt = { x: target.x, y: target.y };
   const frostMissed = frostResult.reason === 'missed';
-  emitSafe(world, 'spell:frost', {
+  world.emit('spell:frost', {
     actor,
     targetId: target.id,
     from: frostFrom,
@@ -1242,7 +1241,7 @@ REGISTRY['heal'] = function healScript(world, actor, spell, intent) {
       at: targetPos,
       salt: 0x4EA1,
     }));
-    emitSafe(world, 'spell:heal:undead', { actor, targetId, at: targetPos, amount });
+    world.emit('spell:heal:undead', { actor, targetId, at: targetPos, amount });
     return;
   }
 
@@ -1250,7 +1249,7 @@ REGISTRY['heal'] = function healScript(world, actor, spell, intent) {
   const vit = /** @type any */ (world.get(targetId, Vitality));
   const hpCap = effectiveMaxHp(world, targetId, vit);
   if (!vit || (vit.hp | 0) >= hpCap) {
-    emitSafe(world, 'spell:heal', { actor, targetId, at: targetPos, amount: 0, reason: 'full_health' });
+    world.emit('spell:heal', { actor, targetId, at: targetPos, amount: 0, reason: 'full_health' });
     return;
   }
 
@@ -1260,8 +1259,8 @@ REGISTRY['heal'] = function healScript(world, actor, spell, intent) {
   const actualHeal = vit.hp - oldHp;
 
   // Emit events
-  emitSafe(world, 'healed', { id: targetId, amount: actualHeal });
-  emitSafe(world, 'spell:heal', { actor, targetId, at: targetPos, amount: actualHeal });
+  world.emit('healed', { id: targetId, amount: actualHeal });
+  world.emit('spell:heal', { actor, targetId, at: targetPos, amount: actualHeal });
 };
 
 // Flash Heal — high-cost, self-only instant heal.
@@ -1272,7 +1271,7 @@ REGISTRY['flash_heal'] = function flashHealScript(world, actor, spell, intent) {
   const vit = /** @type any */ (world.get(actor, Vitality));
   const flashHpCap = effectiveMaxHp(world, actor, vit);
   if (!vit || (vit.hp | 0) >= flashHpCap) {
-    emitSafe(world, 'spell:flash_heal', { actor, targetId: actor, at: { x: apos.x, y: apos.y }, amount: 0, reason: 'full_health' });
+    world.emit('spell:flash_heal', { actor, targetId: actor, at: { x: apos.x, y: apos.y }, amount: 0, reason: 'full_health' });
     return;
   }
 
@@ -1311,8 +1310,8 @@ REGISTRY['flash_heal'] = function flashHealScript(world, actor, spell, intent) {
     }
   }
 
-  emitSafe(world, 'healed', { id: actor, amount: actualHeal });
-  emitSafe(world, 'spell:flash_heal', {
+  world.emit('healed', { id: actor, amount: actualHeal });
+  world.emit('spell:flash_heal', {
     actor,
     targetId: actor,
     at: { x: apos.x, y: apos.y },
@@ -1383,7 +1382,7 @@ REGISTRY['smite'] = function smiteScript(world, actor, spell, intent) {
   }
 
   if (!target) {
-    emitSafe(world, 'spell:smite', { actor, targetId: actor, at: { x: apos.x, y: apos.y }, fizzle: true });
+    world.emit('spell:smite', { actor, targetId: actor, at: { x: apos.x, y: apos.y }, fizzle: true });
     return;
   }
 
@@ -1398,7 +1397,7 @@ REGISTRY['smite'] = function smiteScript(world, actor, spell, intent) {
 
   const smiteAt = { x: target.x, y: target.y };
   const smiteMissed = result.reason === 'missed';
-  emitSafe(world, 'spell:smite', {
+  world.emit('spell:smite', {
     actor,
     targetId: target.id,
     at: smiteAt,
@@ -1423,7 +1422,7 @@ REGISTRY['smite'] = function smiteScript(world, actor, spell, intent) {
       if (world.has(eid, Player)) playerDazzled = true;
     }
     if (playerDazzled) {
-      emitSafe(world, 'spell:smite:dazzle');
+      world.emit('spell:smite:dazzle');
     }
   }
 };
@@ -1442,7 +1441,7 @@ REGISTRY["boar_charge"] = function boarChargeScript(world, actor, spell, intent)
     : null;
   const focus = targetPos ? { x: targetPos.x | 0, y: targetPos.y | 0 } : fallbackPos;
   if (!focus) {
-    emitSafe(world, "spell:boar_charge:failed", { actor, reason: "no_target" });
+    world.emit("spell:boar_charge:failed", { actor, reason: "no_target" });
     return;
   }
 
@@ -1453,7 +1452,7 @@ REGISTRY["boar_charge"] = function boarChargeScript(world, actor, spell, intent)
   const dyRaw = (focus.y | 0) - (from.y | 0);
   const dist = chebyshevScalar(focus.x | 0, focus.y | 0, from.x | 0, from.y | 0);
   if (dist < 2) {
-    emitSafe(world, "spell:boar_charge:failed", { actor, reason: "too_close" });
+    world.emit("spell:boar_charge:failed", { actor, reason: "too_close" });
     return;
   }
 
@@ -1490,13 +1489,13 @@ REGISTRY["boar_charge"] = function boarChargeScript(world, actor, spell, intent)
 
   const to = { x: curX | 0, y: curY | 0 };
   if (to.x === from.x && to.y === from.y) {
-    emitSafe(world, "spell:boar_charge:failed", { actor, reason: "blocked" });
+    world.emit("spell:boar_charge:failed", { actor, reason: "blocked" });
     return;
   }
 
   world.set(actor, Position, to);
-  emitSafe(world, "moved", { id: actor, from, to });
-  emitSafe(world, "item:thrown", {
+  world.emit("moved", { id: actor, from, to });
+  world.emit("item:thrown", {
     itemId: actor,
     from: { x: from.x | 0, y: from.y | 0 },
     to: { x: to.x | 0, y: to.y | 0 },
@@ -1548,7 +1547,7 @@ REGISTRY["boar_charge"] = function boarChargeScript(world, actor, spell, intent)
     break;
   }
 
-  emitSafe(world, "spell:boar_charge", {
+  world.emit("spell:boar_charge", {
     actor,
     targetId: struckTarget || targetId || 0,
     from,
@@ -1587,7 +1586,7 @@ function runMeleeStatusStrike(world, actor, spell, intent, tuning) {
   const actorFaction = String(world.get(actor, Faction)?.key || "").trim();
   const targetId = Number(intent?.targetId || 0) | 0;
   if (!(targetId > 0)) {
-    emitSafe(world, `${eventName}:failed`, { actor, reason: "no_target" });
+    world.emit(`${eventName}:failed`, { actor, reason: "no_target" });
     return;
   }
 
@@ -1595,14 +1594,14 @@ function runMeleeStatusStrike(world, actor, spell, intent, tuning) {
   const tvit = world.get(targetId, Vitality);
   const tfac = world.get(targetId, Faction);
   if (!tpos || !tvit || (tvit.hp | 0) <= 0 || !tfac || !areFactionsHostile(actorFaction, String(tfac.key || ""))) {
-    emitSafe(world, `${eventName}:failed`, { actor, reason: "invalid_target" });
+    world.emit(`${eventName}:failed`, { actor, reason: "invalid_target" });
     return;
   }
 
   const range = Math.max(1, Number(spell?.range || 1) | 0);
   const dist = Math.max(Math.abs((apos.x | 0) - (tpos.x | 0)), Math.abs((apos.y | 0) - (tpos.y | 0)));
   if (dist > range) {
-    emitSafe(world, `${eventName}:failed`, { actor, reason: "out_of_range" });
+    world.emit(`${eventName}:failed`, { actor, reason: "out_of_range" });
     return;
   }
 
@@ -1634,7 +1633,7 @@ function runMeleeStatusStrike(world, actor, spell, intent, tuning) {
     }
   }
 
-  emitSafe(world, eventName, {
+  world.emit(eventName, {
     actor,
     targetId,
     at: { x: tpos.x | 0, y: tpos.y | 0 },
@@ -1774,7 +1773,7 @@ REGISTRY["bat_shriek"] = function batShriekScript(world, actor, spell, _intent) 
     }
   }
 
-  emitSafe(world, "spell:bat_shriek", {
+  world.emit("spell:bat_shriek", {
     actor,
     at: { x: apos.x | 0, y: apos.y | 0 },
     radius,
@@ -1813,7 +1812,7 @@ REGISTRY["mass_delirium"] = function massDeliriumScript(world, actor, spell, _in
     affectedIds.push(target);
   });
 
-  emitSafe(world, "spell:mass_delirium", {
+  world.emit("spell:mass_delirium", {
     actor,
     at: { x: apos.x | 0, y: apos.y | 0 },
     radius,
@@ -1829,11 +1828,11 @@ REGISTRY["web_spit"] = function webSpitScript(world, actor, spell, intent) {
   const tx = targetPos ? (targetPos.x | 0) : (Number.isFinite(intent?.x) ? (Number(intent.x) | 0) : NaN);
   const ty = targetPos ? (targetPos.y | 0) : (Number.isFinite(intent?.y) ? (Number(intent.y) | 0) : NaN);
   if (!Number.isInteger(tx) || !Number.isInteger(ty)) {
-    emitSafe(world, "spell:web_spit:failed", { actor, reason: "no_target" });
+    world.emit("spell:web_spit:failed", { actor, reason: "no_target" });
     return;
   }
   if (!isWalkable(tx, ty)) {
-    emitSafe(world, "spell:web_spit:failed", { actor, reason: "blocked" });
+    world.emit("spell:web_spit:failed", { actor, reason: "blocked" });
     return;
   }
 
@@ -1862,7 +1861,7 @@ REGISTRY["web_spit"] = function webSpitScript(world, actor, spell, intent) {
     }
   }
 
-  emitSafe(world, "spell:web_spit", {
+  world.emit("spell:web_spit", {
     actor,
     targetId,
     at: { x: tx, y: ty },
@@ -1904,7 +1903,7 @@ REGISTRY["wolf_howl"] = function wolfHowlScript(world, actor, spell, _intent) {
     alertedIds.push(id | 0);
   }
 
-  emitSafe(world, "spell:wolf_howl", {
+  world.emit("spell:wolf_howl", {
     actor,
     at: { x: apos.x | 0, y: apos.y | 0 },
     radius,
@@ -1919,19 +1918,19 @@ REGISTRY["shield_bash"] = function shieldBashScript(world, actor, spell, intent)
   const actorFaction = String(world.get(actor, Faction)?.key || "").trim();
   const targetId = Number(intent?.targetId || 0) | 0;
   if (!(targetId > 0)) {
-    emitSafe(world, "spell:shield_bash:failed", { actor, reason: "no_target" });
+    world.emit("spell:shield_bash:failed", { actor, reason: "no_target" });
     return;
   }
   const tpos = world.get(targetId, Position);
   const tvit = world.get(targetId, Vitality);
   const tfac = world.get(targetId, Faction);
   if (!tpos || !tvit || (tvit.hp | 0) <= 0 || !tfac || !areFactionsHostile(actorFaction, String(tfac.key || ""))) {
-    emitSafe(world, "spell:shield_bash:failed", { actor, reason: "invalid_target" });
+    world.emit("spell:shield_bash:failed", { actor, reason: "invalid_target" });
     return;
   }
   const dist = Math.max(Math.abs((apos.x | 0) - (tpos.x | 0)), Math.abs((apos.y | 0) - (tpos.y | 0)));
   if (dist > Math.max(1, Number(spell?.range || 1) | 0)) {
-    emitSafe(world, "spell:shield_bash:failed", { actor, reason: "out_of_range" });
+    world.emit("spell:shield_bash:failed", { actor, reason: "out_of_range" });
     return;
   }
 
@@ -1963,7 +1962,7 @@ REGISTRY["shield_bash"] = function shieldBashScript(world, actor, spell, intent)
       });
     }
   }
-  emitSafe(world, "spell:shield_bash", {
+  world.emit("spell:shield_bash", {
     actor,
     targetId,
     at: { x: tpos.x | 0, y: tpos.y | 0 },
@@ -1984,12 +1983,12 @@ REGISTRY["acid_spit"] = function acidSpitScript(world, actor, spell, intent) {
   const ty = targetPos ? (targetPos.y | 0) : (Number.isFinite(intent?.y) ? (Number(intent.y) | 0) : NaN);
   const range = Math.max(1, Number(spell?.range || 6) | 0);
   if (!Number.isInteger(tx) || !Number.isInteger(ty)) {
-    emitSafe(world, "spell:acid_spit:failed", { actor, reason: "no_target", range });
+    world.emit("spell:acid_spit:failed", { actor, reason: "no_target", range });
     return;
   }
   const dist = Math.max(Math.abs((apos.x | 0) - tx), Math.abs((apos.y | 0) - ty));
   if (dist > range) {
-    emitSafe(world, "spell:acid_spit:failed", { actor, reason: "out_of_range", range });
+    world.emit("spell:acid_spit:failed", { actor, reason: "out_of_range", range });
     return;
   }
 
@@ -2067,7 +2066,7 @@ REGISTRY["acid_spit"] = function acidSpitScript(world, actor, spell, intent) {
     name: "Acid Pool",
   });
 
-  emitSafe(world, "spell:acid_spit", {
+  world.emit("spell:acid_spit", {
     actor,
     targetId: struckId || targetId || 0,
     at: { x: tx | 0, y: ty | 0 },
@@ -2088,12 +2087,12 @@ REGISTRY["poison_spit"] = function poisonSpitScript(world, actor, spell, intent)
   const ty = targetPos ? (targetPos.y | 0) : (Number.isFinite(intent?.y) ? (Number(intent.y) | 0) : NaN);
   const range = Math.max(1, Number(spell?.range || 5) | 0);
   if (!Number.isInteger(tx) || !Number.isInteger(ty)) {
-    emitSafe(world, "spell:poison_spit:failed", { actor, reason: "no_target", range });
+    world.emit("spell:poison_spit:failed", { actor, reason: "no_target", range });
     return;
   }
   const dist = Math.max(Math.abs((apos.x | 0) - tx), Math.abs((apos.y | 0) - ty));
   if (dist > range) {
-    emitSafe(world, "spell:poison_spit:failed", { actor, reason: "out_of_range", range });
+    world.emit("spell:poison_spit:failed", { actor, reason: "out_of_range", range });
     return;
   }
 
@@ -2156,7 +2155,7 @@ REGISTRY["poison_spit"] = function poisonSpitScript(world, actor, spell, intent)
     name: "Poison Slime",
   });
 
-  emitSafe(world, "spell:poison_spit", {
+  world.emit("spell:poison_spit", {
     actor,
     targetId: struckId || targetId || 0,
     at: { x: tx | 0, y: ty | 0 },
@@ -2177,12 +2176,12 @@ REGISTRY["death_volley"] = function deathVolleyScript(world, actor, spell, inten
   const ty = tpos ? (tpos.y | 0) : (Number.isFinite(intent?.y) ? (Number(intent.y) | 0) : NaN);
   const range = Math.max(1, Number(spell?.range || 10) | 0);
   if (!Number.isInteger(tx) || !Number.isInteger(ty)) {
-    emitSafe(world, "spell:death_volley:failed", { actor, reason: "no_target", range });
+    world.emit("spell:death_volley:failed", { actor, reason: "no_target", range });
     return;
   }
   const dist = Math.max(Math.abs((apos.x | 0) - tx), Math.abs((apos.y | 0) - ty));
   if (dist > range) {
-    emitSafe(world, "spell:death_volley:failed", { actor, reason: "out_of_range", range });
+    world.emit("spell:death_volley:failed", { actor, reason: "out_of_range", range });
     return;
   }
 
@@ -2215,7 +2214,7 @@ REGISTRY["death_volley"] = function deathVolleyScript(world, actor, spell, inten
     }
   }
 
-  emitSafe(world, "spell:death_volley", {
+  world.emit("spell:death_volley", {
     actor,
     targetId,
     origin: { x: tx | 0, y: ty | 0 },
@@ -2239,7 +2238,7 @@ REGISTRY['summon_skeleton'] = function summonSkeletonScript(world, actor, spell,
     exclude: [{ x: apos.x, y: apos.y }],
   });
   if (!spawnTile) {
-    emitSafe(world, 'spell:summon_skeleton:failed', { actor, spellId: spell.id, reason: 'no_space' });
+    world.emit('spell:summon_skeleton:failed', { actor, spellId: spell.id, reason: 'no_space' });
     return;
   }
 
@@ -2279,7 +2278,7 @@ REGISTRY['summon_skeleton'] = function summonSkeletonScript(world, actor, spell,
     });
   } catch {}
 
-  emitSafe(world, 'spell:summon_skeleton', {
+  world.emit('spell:summon_skeleton', {
     actor,
     skeletonId,
     faction: summonFaction,
@@ -2329,7 +2328,7 @@ REGISTRY['shadow_bolt'] = function shadowBoltScript(world, actor, spell, intent)
     })) { target = c; break; }
   }
   if (!target) {
-    emitSafe(world, 'spell:shadow_bolt', { actor, targetId: actor, from: { x: apos.x, y: apos.y }, to: { x: apos.x, y: apos.y }, fizzle: true });
+    world.emit('spell:shadow_bolt', { actor, targetId: actor, from: { x: apos.x, y: apos.y }, to: { x: apos.x, y: apos.y }, fizzle: true });
     return;
   }
 
@@ -2351,7 +2350,7 @@ REGISTRY['shadow_bolt'] = function shadowBoltScript(world, actor, spell, intent)
   const shadowFrom = { x: apos.x, y: apos.y };
   const shadowTo = { x: target.x, y: target.y };
   const shadowMissed = result.reason === 'missed';
-  emitSafe(world, 'spell:shadow_bolt', {
+  world.emit('spell:shadow_bolt', {
     actor,
     targetId: target.id,
     from: shadowFrom,
@@ -2392,7 +2391,7 @@ REGISTRY['agony'] = function agonyScript(world, actor, spell, _intent) {
   }
 
   if (candidates.length === 0) {
-    emitSafe(world, 'spell:agony', { actor, targetId: actor, fizzle: true });
+    world.emit('spell:agony', { actor, targetId: actor, fizzle: true });
     return;
   }
 
@@ -2426,7 +2425,7 @@ REGISTRY['agony'] = function agonyScript(world, actor, spell, _intent) {
       hitChancePct,
       at: tpos,
     });
-    emitSafe(world, 'spell:agony', {
+    world.emit('spell:agony', {
       actor, targetId,
       from: { x: apos.x, y: apos.y }, at: tpos,
       missed: true, hitChancePct,
@@ -2456,7 +2455,7 @@ REGISTRY['agony'] = function agonyScript(world, actor, spell, _intent) {
   }
 
   // Emit VFX event
-  emitSafe(world, 'spell:agony', {
+  world.emit('spell:agony', {
     actor, targetId,
     from: { x: apos.x, y: apos.y }, at: tpos,
     potency: basePotency, duration: baseDuration,
@@ -2497,7 +2496,7 @@ REGISTRY['bog_curse'] = function bogCurseScript(world, actor, spell, _intent) {
   }
 
   if (!best) {
-    emitSafe(world, 'spell:bog_curse', { actor, targetId: actor, fizzle: true });
+    world.emit('spell:bog_curse', { actor, targetId: actor, fizzle: true });
     return;
   }
 
@@ -2509,7 +2508,7 @@ REGISTRY['bog_curse'] = function bogCurseScript(world, actor, spell, _intent) {
       hitChancePct,
       at: best.pos,
     });
-    emitSafe(world, 'spell:bog_curse', {
+    world.emit('spell:bog_curse', {
       actor,
       targetId,
       from: { x: apos.x, y: apos.y },
@@ -2543,7 +2542,7 @@ REGISTRY['bog_curse'] = function bogCurseScript(world, actor, spell, _intent) {
     });
   }
 
-  emitSafe(world, 'spell:bog_curse', {
+  world.emit('spell:bog_curse', {
     actor,
     targetId,
     from: { x: apos.x, y: apos.y },
@@ -2569,7 +2568,7 @@ REGISTRY['lifetap'] = function lifetapScript(world, actor, spell, intent) {
   mana.mana = Math.min(maxM, before + manaGained);
   const actual = mana.mana - before;
 
-  emitSafe(world, 'spell:lifetap', {
+  world.emit('spell:lifetap', {
     actor,
     hpSpent,
     manaGained: actual,
@@ -2648,7 +2647,7 @@ REGISTRY['drain_life'] = function drainLifeScript(world, actor, spell, intent) {
   }
 
   if (!isValidTarget(targetId, targetPos)) {
-    emitSafe(world, 'spell:drain_life:failed', {
+    world.emit('spell:drain_life:failed', {
       actor,
       spellId: spell?.id,
       reason: isChannelTick ? 'channel_lost_target' : 'no_valid_target',
@@ -2656,7 +2655,7 @@ REGISTRY['drain_life'] = function drainLifeScript(world, actor, spell, intent) {
     });
     if (isChannelTick && world.has(actor, Channeling)) {
       try { world.remove(actor, Channeling); } catch {}
-      emitSafe(world, 'channeling:cancelled', { actor, spellId: spell?.id || 'drain_life', reason: 'invalid_target' });
+      world.emit('channeling:cancelled', { actor, spellId: spell?.id || 'drain_life', reason: 'invalid_target' });
     }
     return;
   }
@@ -2720,7 +2719,7 @@ REGISTRY['drain_life'] = function drainLifeScript(world, actor, spell, intent) {
     }
   }
 
-  emitSafe(world, 'spell:drain_life:start', {
+  world.emit('spell:drain_life:start', {
     actor,
     targetId,
     spellId: spell?.id,
@@ -2769,8 +2768,8 @@ REGISTRY['gaze_beam'] = function gazeBeamScript(world, actor, spell, intent) {
   }
   world.set(targetId, ActiveEffects, ae);
 
-  emitSafe(world, 'proc:gaze:stun', { actor, target: targetId, duration: stunDuration });
-  emitSafe(world, 'proc:gaze:mindwipe', {
+  world.emit('proc:gaze:stun', { actor, target: targetId, duration: stunDuration });
+  world.emit('proc:gaze:mindwipe', {
     actor,
     target: targetId,
     stacks: ae.effects.find(e => e.key === 'mindwipe')?.stacks ?? 1,
@@ -2814,7 +2813,7 @@ REGISTRY['scorch'] = function scorchScript(world, actor, spell, intent) {
       })) { found = c; break; }
     }
     if (!found) {
-      emitSafe(world, 'spell:scorch', { actor, targetId: actor, fizzle: true });
+      world.emit('spell:scorch', { actor, targetId: actor, fizzle: true });
       return;
     }
     targetId = found.id;
@@ -2824,7 +2823,7 @@ REGISTRY['scorch'] = function scorchScript(world, actor, spell, intent) {
   // Validate target alive
   const vit = /** @type any */ (world.get(targetId, Vitality));
   if (!vit || (vit.hp | 0) <= 0) {
-    emitSafe(world, 'spell:scorch', { actor, targetId, fizzle: true });
+    world.emit('spell:scorch', { actor, targetId, fizzle: true });
     return;
   }
 
@@ -2834,14 +2833,14 @@ REGISTRY['scorch'] = function scorchScript(world, actor, spell, intent) {
     sourcePos: apos, targetPos: tpos,
     range: MAX_R, isBlocked,
   })) {
-    emitSafe(world, 'spell:scorch', { actor, targetId, fizzle: true, reason: 'no_los' });
+    world.emit('spell:scorch', { actor, targetId, fizzle: true, reason: 'no_los' });
     return;
   }
 
   // Range check
   const dist = chebyshev(apos, tpos);
   if (dist > MAX_R) {
-    emitSafe(world, 'spell:scorch', { actor, targetId, fizzle: true, reason: 'out_of_range' });
+    world.emit('spell:scorch', { actor, targetId, fizzle: true, reason: 'out_of_range' });
     return;
   }
 
@@ -2855,7 +2854,7 @@ REGISTRY['scorch'] = function scorchScript(world, actor, spell, intent) {
     });
     const scorchFrom = { x: apos.x, y: apos.y };
     const scorchAt = { x: tpos.x, y: tpos.y };
-    emitSafe(world, 'spell:scorch', {
+    world.emit('spell:scorch', {
       actor, targetId,
       from: scorchFrom, at: scorchAt,
       missed: true, hitChancePct,
@@ -2918,7 +2917,7 @@ REGISTRY['scorch'] = function scorchScript(world, actor, spell, intent) {
   }
 
   // Emit VFX event
-  emitSafe(world, 'spell:scorch', {
+  world.emit('spell:scorch', {
     actor, targetId,
     from: { x: apos.x, y: apos.y },
     at: { x: tpos.x, y: tpos.y },
@@ -2963,7 +2962,7 @@ REGISTRY['plague_swarm'] = function plagueSwarmScript(world, actor, spell, _inte
     })) { target = c; break; }
   }
   if (!target) {
-    emitSafe(world, 'spell:plague_swarm', { actor, fizzle: true });
+    world.emit('spell:plague_swarm', { actor, fizzle: true });
     return;
   }
 
@@ -2976,7 +2975,7 @@ REGISTRY['plague_swarm'] = function plagueSwarmScript(world, actor, spell, _inte
     });
     const swarmFrom = { x: apos.x, y: apos.y };
     const swarmAt = { x: target.x, y: target.y };
-    emitSafe(world, 'spell:plague_swarm', {
+    world.emit('spell:plague_swarm', {
       actor, targetId: target.id,
       from: swarmFrom, at: swarmAt,
       missed: true,
@@ -3010,7 +3009,7 @@ REGISTRY['plague_swarm'] = function plagueSwarmScript(world, actor, spell, _inte
     try { world.add(target.id, ActiveEffects, { effects: [swarmEffect] }); } catch {}
   }
 
-  emitSafe(world, 'spell:plague_swarm', {
+  world.emit('spell:plague_swarm', {
     actor, targetId: target.id,
     from: { x: apos.x, y: apos.y },
     at: { x: target.x, y: target.y },
@@ -3055,7 +3054,7 @@ REGISTRY['fireball'] = function fireballScript(world, actor, spell, _intent) {
     })) { target = c; break; }
   }
   if (!target) {
-    emitSafe(world, 'spell:fireball', { actor, fizzle: true });
+    world.emit('spell:fireball', { actor, fizzle: true });
     return;
   }
 
@@ -3089,14 +3088,14 @@ REGISTRY['fireball'] = function fireballScript(world, actor, spell, _intent) {
     } else {
       try { world.add(target.id, ActiveEffects, { effects: [burnEffect] }); } catch {}
     }
-    emitSafe(world, 'proc:burning', { actor, target: target.id });
+    world.emit('proc:burning', { actor, target: target.id });
   }
 
   // Emit VFX event
   const fireballFrom = { x: apos.x, y: apos.y };
   const fireballTo = { x: target.x, y: target.y };
   const fireballMissed = result.reason === 'missed';
-  emitSafe(world, 'spell:fireball', {
+  world.emit('spell:fireball', {
     actor,
     targetId: target.id,
     from: fireballFrom,
@@ -3192,7 +3191,7 @@ REGISTRY['verdant_ward'] = function verdantWardScript(world, actor, _spell, _int
     turnsLeft: DURATION,
   });
 
-  emitSafe(world, 'spell:verdant_ward', {
+  world.emit('spell:verdant_ward', {
     actor,
     at: { x: pos.x, y: pos.y },
     duration: DURATION,
@@ -3217,7 +3216,7 @@ REGISTRY['harmony_ward'] = function harmonyWardScript(world, actor, _spell, _int
     });
   }
 
-  emitSafe(world, 'spell:harmony_ward', {
+  world.emit('spell:harmony_ward', {
     actor,
     at: { x: pos.x, y: pos.y },
     duration: DURATION,
@@ -3264,7 +3263,7 @@ REGISTRY['shadow_veil'] = function shadowVeilScript(world, actor, _spell, _inten
     turnsLeft: DURATION,
   });
 
-  emitSafe(world, 'spell:shadow_veil', {
+  world.emit('spell:shadow_veil', {
     actor,
     at: { x: pos.x, y: pos.y },
     duration: DURATION,
@@ -3329,7 +3328,7 @@ REGISTRY['blind'] = function blindScript(world, actor, spell, intent) {
       })) { found = c; break; }
     }
     if (!found) {
-      emitSafe(world, 'spell:blind', { actor, targetId: actor, fizzle: true, from: { x: apos.x, y: apos.y }, at: { x: apos.x, y: apos.y } });
+      world.emit('spell:blind', { actor, targetId: actor, fizzle: true, from: { x: apos.x, y: apos.y }, at: { x: apos.x, y: apos.y } });
       return;
     }
     targetId = found.id;
@@ -3339,7 +3338,7 @@ REGISTRY['blind'] = function blindScript(world, actor, spell, intent) {
   // Validate target alive
   const vit = /** @type any */ (world.get(targetId, Vitality));
   if (!vit || (vit.hp | 0) <= 0) {
-    emitSafe(world, 'spell:blind', { actor, targetId, fizzle: true, from: { x: apos.x, y: apos.y }, at: { x: tpos.x, y: tpos.y } });
+    world.emit('spell:blind', { actor, targetId, fizzle: true, from: { x: apos.x, y: apos.y }, at: { x: tpos.x, y: tpos.y } });
     return;
   }
 
@@ -3348,21 +3347,21 @@ REGISTRY['blind'] = function blindScript(world, actor, spell, intent) {
     sourceId: actor, targetId,
     sourcePos: apos, targetPos: tpos, range: MAX_R, isBlocked,
   })) {
-    emitSafe(world, 'spell:blind', { actor, targetId, fizzle: true, reason: 'no_los', from: { x: apos.x, y: apos.y }, at: { x: tpos.x, y: tpos.y } });
+    world.emit('spell:blind', { actor, targetId, fizzle: true, reason: 'no_los', from: { x: apos.x, y: apos.y }, at: { x: tpos.x, y: tpos.y } });
     return;
   }
 
   // Range check
   const dist = chebyshev(apos, tpos);
   if (dist > MAX_R) {
-    emitSafe(world, 'spell:blind', { actor, targetId, fizzle: true, reason: 'out_of_range', from: { x: apos.x, y: apos.y }, at: { x: tpos.x, y: tpos.y } });
+    world.emit('spell:blind', { actor, targetId, fizzle: true, reason: 'out_of_range', from: { x: apos.x, y: apos.y }, at: { x: tpos.x, y: tpos.y } });
     return;
   }
 
   // Apply instant blackout: immediate drop to 0, hold, then recover.
   blind(world, targetId, 0, 0, 16, 4);
 
-  emitSafe(world, 'spell:blind', {
+  world.emit('spell:blind', {
     actor,
     targetId,
     from: { x: apos.x, y: apos.y },
@@ -3416,7 +3415,7 @@ REGISTRY['earthshatter'] = function earthshatterScript(world, actor, spell, inte
     meta: { stunTurns: STUN_TURNS, enhanced },
   });
 
-  emitSafe(world, 'spell:earthshatter', {
+  world.emit('spell:earthshatter', {
     actor,
     origin: { x: apos.x, y: apos.y },
     radius: RADIUS,
@@ -3448,7 +3447,7 @@ function runGeneratorScript(world, actor, spell, { baseAmount, type, cause, mana
     if (dist < bestDist) { bestDist = dist; bestId = id; }
   }
   if (!bestId) {
-    emitSafe(world, 'spell:no-target', { actor, spellId: spell?.id || cause, range });
+    world.emit('spell:no-target', { actor, spellId: spell?.id || cause, range });
     return;
   }
 
@@ -3486,7 +3485,7 @@ function runGeneratorScript(world, actor, spell, { baseAmount, type, cause, mana
   const from = { x: apos.x, y: apos.y };
   const at = { x: tpos.x, y: tpos.y };
   const missed = result.reason === "missed";
-  emitSafe(world, cause, {
+  world.emit(cause, {
     actor, targetId: bestId,
     from,
     at,
@@ -3534,7 +3533,7 @@ REGISTRY['evocation'] = function evocationScript(world, actor, spell, intent) {
   // Already full — cancel channel
   if (currentMana >= maxM) {
     try { world.remove(actor, Channeling); } catch {}
-    emitSafe(world, 'channeling:cancelled', { actor, spellId: spell?.id, reason: 'mana_full' });
+    world.emit('channeling:cancelled', { actor, spellId: spell?.id, reason: 'mana_full' });
     return;
   }
 
@@ -3549,7 +3548,7 @@ REGISTRY['evocation'] = function evocationScript(world, actor, spell, intent) {
     mana.mana = Math.min(maxM, currentMana + restored);
   }
 
-  emitSafe(world, 'spell:evocation:tick', {
+  world.emit('spell:evocation:tick', {
     actor,
     at: { x: apos.x | 0, y: apos.y | 0 },
     manaRestored: restored,
@@ -3632,7 +3631,7 @@ REGISTRY['entangle'] = function entangleScript(world, actor, spell, intent) {
     key: 'rooted', turnsLeft: STUN_TURNS + ROOT_TURNS + 1, potency: 1, stacks: 1, sourceId: actor,
   });
 
-  emitSafe(world, 'spell:entangle', {
+  world.emit('spell:entangle', {
     actor, targetId: bestId,
     at: { x: tpos.x, y: tpos.y },
   });
@@ -3691,7 +3690,7 @@ REGISTRY['thorn_burst'] = function thornBurstScript(world, actor, spell, intent)
     }
   }
 
-  emitSafe(world, 'spell:thorn_burst', {
+  world.emit('spell:thorn_burst', {
     actor,
     from: { x: apos.x, y: apos.y },
     impacts,
@@ -3737,7 +3736,7 @@ REGISTRY['war_cry'] = function warCryScript(world, actor, spell, _intent) {
     affected++;
   }
 
-  emitSafe(world, 'spell:war_cry', { actor, at: { x: apos.x, y: apos.y }, affected, affectedIds });
+  world.emit('spell:war_cry', { actor, at: { x: apos.x, y: apos.y }, affected, affectedIds });
 };
 
 REGISTRY['cleave'] = function cleaveScript(world, actor, spell, _intent) {
@@ -3768,7 +3767,7 @@ REGISTRY['cleave'] = function cleaveScript(world, actor, spell, _intent) {
     hits.push({ id, x: pos.x, y: pos.y, amount: result.amount || 0 });
   }
 
-  emitSafe(world, 'spell:cleave', {
+  world.emit('spell:cleave', {
     actor,
     at: { x: apos.x, y: apos.y },
     hits,
@@ -3787,7 +3786,7 @@ REGISTRY['bloodthirst'] = function bloodthirstScript(world, actor, _spell, _inte
     key: 'bloodthirst', turnsLeft: DURATION + 1, potency: 1, stacks: 1, sourceId: actor,
   });
 
-  emitSafe(world, 'spell:bloodthirst', { actor, at: { x: pos.x, y: pos.y }, duration: DURATION });
+  world.emit('spell:bloodthirst', { actor, at: { x: pos.x, y: pos.y }, duration: DURATION });
 };
 
 // ─── Cleric abilities ──────────────────────────────────────────────────────
@@ -3812,7 +3811,7 @@ REGISTRY['purify'] = function purifyScript(world, actor, _spell, _intent) {
     ae.effects = ae.effects.filter(e => !PURIFY_NEGATIVE_KEYS.has(String(e?.key || '')));
     removed = before - ae.effects.length;
   }
-  emitSafe(world, 'spell:purify', { actor, at: { x: pos.x, y: pos.y }, removed });
+  world.emit('spell:purify', { actor, at: { x: pos.x, y: pos.y }, removed });
 };
 
 REGISTRY['divine_shield'] = function divineShieldScript(world, actor, _spell, _intent) {
@@ -3832,7 +3831,7 @@ REGISTRY['divine_shield'] = function divineShieldScript(world, actor, _spell, _i
     key: 'bless', turnsLeft: DURATION, potency: 1, stacks: 1, sourceId: actor,
   });
 
-  emitSafe(world, 'spell:divine_shield', { actor, at: { x: pos.x, y: pos.y }, duration: DURATION });
+  world.emit('spell:divine_shield', { actor, at: { x: pos.x, y: pos.y }, duration: DURATION });
 };
 
 REGISTRY['consecrate'] = function consecrateScript(world, actor, spell, _intent) {
@@ -3870,7 +3869,7 @@ REGISTRY['consecrate'] = function consecrateScript(world, actor, spell, _intent)
     });
   }
 
-  emitSafe(world, 'spell:consecrate', {
+  world.emit('spell:consecrate', {
     actor,
     at: { x: apos.x, y: apos.y },
     radius: RADIUS,
@@ -3911,7 +3910,7 @@ REGISTRY['smoke_bomb'] = function smokeBombScript(world, actor, spell, _intent) 
     affected++;
   }
 
-  emitSafe(world, 'spell:smoke_bomb', { actor, at: { x: apos.x, y: apos.y }, affected });
+  world.emit('spell:smoke_bomb', { actor, at: { x: apos.x, y: apos.y }, affected });
 };
 
 REGISTRY['poison_blade'] = function poisonBladeScript(world, actor, _spell, _intent) {
@@ -3922,13 +3921,13 @@ REGISTRY['poison_blade'] = function poisonBladeScript(world, actor, _spell, _int
   const equip = /** @type any */ (world.get(actor, Equipment));
   const weaponId = equip ? (equip.weapon || equip.offhand || 0) : 0;
   if (!(weaponId > 0)) {
-    emitSafe(world, 'spell:poison_blade', { actor, at: { x: pos.x, y: pos.y }, fizzle: true, reason: 'no_weapon' });
+    world.emit('spell:poison_blade', { actor, at: { x: pos.x, y: pos.y }, fizzle: true, reason: 'no_weapon' });
     return;
   }
 
   const weaponInfo = /** @type any */ (world.get(weaponId, ItemInfo));
   if (!weaponInfo) {
-    emitSafe(world, 'spell:poison_blade', { actor, at: { x: pos.x, y: pos.y }, fizzle: true, reason: 'no_weapon' });
+    world.emit('spell:poison_blade', { actor, at: { x: pos.x, y: pos.y }, fizzle: true, reason: 'no_weapon' });
     return;
   }
 
@@ -3938,7 +3937,7 @@ REGISTRY['poison_blade'] = function poisonBladeScript(world, actor, _spell, _int
   weaponInfo.coating = { kind: 'poison', charges: nextCharges };
 
   const weaponName = String(/** @type any */ (world.get(weaponId, NamedIdentity))?.name || 'weapon');
-  emitSafe(world, 'spell:poison_blade', {
+  world.emit('spell:poison_blade', {
     actor,
     at: { x: pos.x, y: pos.y },
     weaponId,
@@ -3966,7 +3965,7 @@ REGISTRY['iron_flesh'] = function ironFleshScript(world, actor, _spell, _intent)
     key: 'thorns', turnsLeft: DURATION + 1, potency: 2, stacks: 1, sourceId: actor,
   });
 
-  emitSafe(world, 'spell:iron_flesh', { actor, at: { x: pos.x, y: pos.y }, duration: DURATION });
+  world.emit('spell:iron_flesh', { actor, at: { x: pos.x, y: pos.y }, duration: DURATION });
 };
 
 REGISTRY['ignite_weapons'] = function igniteWeaponsScript(world, actor, _spell, _intent) {
@@ -3980,7 +3979,7 @@ REGISTRY['ignite_weapons'] = function igniteWeaponsScript(world, actor, _spell, 
     key: 'fire_weapon', turnsLeft: DURATION + 1, potency: 3, stacks: 1, sourceId: actor,
   });
 
-  emitSafe(world, 'spell:ignite_weapons', { actor, at: { x: pos.x, y: pos.y }, duration: DURATION });
+  world.emit('spell:ignite_weapons', { actor, at: { x: pos.x, y: pos.y }, duration: DURATION });
 };
 
 REGISTRY['barkskin'] = function barkskinScript(world, actor, _spell, _intent) {
@@ -4000,7 +3999,7 @@ REGISTRY['barkskin'] = function barkskinScript(world, actor, _spell, _intent) {
     key: 'regen', turnsLeft: DURATION + 1, potency: 1, stacks: 1, sourceId: actor,
   });
 
-  emitSafe(world, 'spell:barkskin', { actor, at: { x: pos.x, y: pos.y }, duration: DURATION });
+  world.emit('spell:barkskin', { actor, at: { x: pos.x, y: pos.y }, duration: DURATION });
 };
 
 REGISTRY['quicken'] = function quickenScript(world, actor, _spell, _intent) {
@@ -4020,7 +4019,7 @@ REGISTRY['quicken'] = function quickenScript(world, actor, _spell, _intent) {
     key: 'stamina_restore', turnsLeft: DURATION + 1, potency: 5, stacks: 1, sourceId: actor,
   });
 
-  emitSafe(world, 'spell:quicken', { actor, at: { x: pos.x, y: pos.y }, duration: DURATION });
+  world.emit('spell:quicken', { actor, at: { x: pos.x, y: pos.y }, duration: DURATION });
 };
 
 REGISTRY['mark_of_death'] = function markOfDeathScript(world, actor, spell, intent) {
@@ -4063,7 +4062,7 @@ REGISTRY['mark_of_death'] = function markOfDeathScript(world, actor, spell, inte
     key: 'marked', turnsLeft: DURATION + 1, potency: 1, stacks: 1, sourceId: actor,
   });
 
-  emitSafe(world, 'spell:mark_of_death', {
+  world.emit('spell:mark_of_death', {
     actor, targetId,
     at: { x: tpos.x, y: tpos.y },
     duration: DURATION,
@@ -4109,7 +4108,7 @@ REGISTRY['primal_roar'] = function primalRoarScript(world, actor, spell, _intent
     }
   }
 
-  emitSafe(world, 'spell:primal_roar', {
+  world.emit('spell:primal_roar', {
     actor,
     at: { x: apos.x, y: apos.y },
     radius: RADIUS,

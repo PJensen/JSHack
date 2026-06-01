@@ -9,7 +9,6 @@ import { shopReputationTerms } from "./reputation.js";
 import { hasLOS } from "../../shared/math/gridLOS.js";
 import { buildBlocksVisionMap, blockedCallback } from "./vision.js";
 import { forEachInRadius } from "./spatialIndex.js";
-import { emitSafe } from "./emitSafe.js";
 
 const INSTALLED = Symbol.for("jshack:disposition:offense-listeners:installed");
 const SOCIAL_WITNESS_FACTIONS = new Set(["shopkeeper", "townfolk", "neutral"]);
@@ -147,7 +146,7 @@ function maybeEscalateAggro(world, subjectId, objectId, rec, offense) {
     aggro.searchTurnsLeft = SEARCH_TURNS_HUNTING_GRACE;
   }
 
-  emitSafe(world, "disposition:aggro-requested", {
+  world.emit("disposition:aggro-requested", {
     subjectId,
     objectId,
     disposition: rec,
@@ -173,7 +172,7 @@ export function applyOffenseDisposition(world, spec = {}) {
       victimId,
       offense: Object.freeze({ ...offense, offenseKind, severity, attribution }),
     });
-    emitSafe(world, "offense:unattributed", event);
+    world.emit("offense:unattributed", event);
     return event;
   }
   const attributionScale = attribution === OFFENSE_ATTRIBUTION.suspected ? 0.5 : 1.0;
@@ -215,7 +214,7 @@ export function applyOffenseDisposition(world, spec = {}) {
     witnessIds: Object.freeze(appliedWitnessIds),
     records: Object.freeze(changed),
   });
-  emitSafe(world, "disposition:changed", event);
+  world.emit("disposition:changed", event);
   return event;
 }
 

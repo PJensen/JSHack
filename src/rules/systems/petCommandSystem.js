@@ -8,7 +8,6 @@ import { Position } from '../components/Position.js';
 import { playerEntity } from '../utils/queries.js';
 import { ItemInfo } from '../components/ItemInfo.js';
 import { Vitality } from '../components/Vitality.js';
-import { emitSafe } from '../utils/emitSafe.js';
 
 const COMMAND_COOLDOWN = 0; // turns between commands (0 = instant)
 
@@ -53,7 +52,7 @@ export function petCommandSystem(world) {
 
     // Check cooldown
     if (petState.commandCooldown > 0) {
-      emitSafe(world, 'pet:command:cooldown', { petId, cooldown: petState.commandCooldown });
+      world.emit('pet:command:cooldown', { petId, cooldown: petState.commandCooldown });
       world.remove(intentId, PetCommandIntent);
       continue;
     }
@@ -105,10 +104,10 @@ export function petCommandSystem(world) {
             petState.targetItemId = itemId;
           } else {
             // Invalid fetch target
-            emitSafe(world, 'pet:command:invalid', { petId, reason: 'item_not_on_ground' });
+            world.emit('pet:command:invalid', { petId, reason: 'item_not_on_ground' });
           }
         } else {
-          emitSafe(world, 'pet:command:invalid', { petId, reason: 'item_not_found' });
+          world.emit('pet:command:invalid', { petId, reason: 'item_not_found' });
         }
         break;
 
@@ -131,7 +130,7 @@ export function petCommandSystem(world) {
     if (prevState !== petState.state) {
       petState.stateEnteredTurn = world.step;
       petState.commandCooldown = COMMAND_COOLDOWN;
-      emitSafe(world, 'pet:state:changed', {
+      world.emit('pet:state:changed', {
         petId,
         prevState,
         newState: petState.state,

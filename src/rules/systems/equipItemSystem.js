@@ -13,7 +13,6 @@ import {
   isEquippedInTopology,
   setEquippedSlotTopology,
 } from "../utils/equipmentTopology.js";
-import { emitSafe } from "../utils/emitSafe.js";
 import { isItemCursed, blockIfCursed } from "../utils/curseUtils.js";
 
 /**
@@ -50,7 +49,7 @@ export function equipItemSystem(world) {
         clearEquippedSlotTopology(world, actor, 'weapon');
         addToInventory(world, actor, itemId, { silent: true });
       }
-      emitSafe(world, 'item:unequipped', {
+      world.emit('item:unequipped', {
         actor,
         itemId,
         slot: equippedSlot,
@@ -201,7 +200,7 @@ export function equipItemSystem(world) {
     }
 
     // Emit events for UI/logging
-    emitSafe(world, 'item:equipped', { actor, itemId, slot: appliedSlot || slot, name: world.get(itemId, NamedIdentity)?.name });
+    world.emit('item:equipped', { actor, itemId, slot: appliedSlot || slot, name: world.get(itemId, NamedIdentity)?.name });
 
     // Clear intent
     world.remove(actor, EquipIntent);

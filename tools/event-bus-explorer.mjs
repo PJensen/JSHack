@@ -119,7 +119,6 @@ function scanText(file, text) {
   const rows = [];
   const lines = text.split(/\r?\n/);
   const literalCall = /\b(world|ctx\.io|ctx)\s*\.\s*(on|emit)\s*(?:\?\.)?\s*\(\s*(['"`])([^'"`]+)\3\s*,?\s*([^)]*)?/g;
-  const emitSafeLiteral = /\bemitSafe\s*\(\s*world\s*,\s*(['"`])([^'"`]+)\1\s*,?\s*([^)]*)?/g;
   const dynamicCall = /\b(world|ctx\.io|ctx)\s*\.\s*(on|emit)\s*(?:\?\.)?\s*\(\s*([^'"`\s][^,\)]*)/g;
 
   for (let i = 0; i < lines.length; i++) {
@@ -139,20 +138,6 @@ function scanText(file, text) {
         line: i + 1,
         layer: layerFor(file),
         payloadKeys: extractKeys(tail),
-        dynamic: false,
-      });
-    }
-
-    emitSafeLiteral.lastIndex = 0;
-    while ((match = emitSafeLiteral.exec(line))) {
-      rows.push({
-        event: match[2],
-        kind: "producer",
-        api: "emitSafe",
-        file,
-        line: i + 1,
-        layer: layerFor(file),
-        payloadKeys: extractKeys(match[3] || ""),
         dynamic: false,
       });
     }

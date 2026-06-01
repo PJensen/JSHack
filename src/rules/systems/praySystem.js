@@ -17,7 +17,6 @@ import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { HealthPotion } from "../archetypes/Items.js";
 import { ensureActiveEffects } from "../utils/effects.js";
 import { effectiveMaxHp, effectiveMaxMana } from "../utils/passiveBonuses.js";
-import { emitSafe } from "../utils/emitSafe.js";
 
 const PRAYER_STREAK_KEY = Symbol.for('jshack:prayer:boonStreak');
 const PRAYER_LAST_BOON_KEY = Symbol.for('jshack:prayer:lastBoonTurn');
@@ -49,11 +48,11 @@ function pushEffect(world, actorId, effect) {
 }
 
 function emitIntervention(world, payload) {
-  emitSafe(world, 'deity:intervention', payload);
+  world.emit('deity:intervention', payload);
 }
 
 function emitBoon(world, payload) {
-  emitSafe(world, 'deity:boon', payload);
+  world.emit('deity:boon', payload);
   emitIntervention(world, {
     playerId: payload?.actor,
     deityId: payload?.deityId,
@@ -136,7 +135,7 @@ function applyPrayerBoon(world, actorId, context) {
       const before = vit.hp;
       vit.hp = Math.min(cap, vit.hp + heal);
       const applied = Math.max(0, vit.hp - before);
-      if (applied > 0) emitSafe(world, 'healed', { id: actorId, amount: applied, source: 'divine' });
+      if (applied > 0) world.emit('healed', { id: actorId, amount: applied, source: 'divine' });
     }
     emitBoon(world, {
       actor: actorId, deityId, deityName,
@@ -153,7 +152,7 @@ function applyPrayerBoon(world, actorId, context) {
     vit.hp = Math.min(renewalCap, vit.hp + heal);
     const applied = Math.max(0, vit.hp - before);
     if (applied > 0) {
-      emitSafe(world, 'healed', { id: actorId, amount: applied, source: 'divine' });
+      world.emit('healed', { id: actorId, amount: applied, source: 'divine' });
       emitBoon(world, {
         actor: actorId,
         deityId,
@@ -309,13 +308,13 @@ export function praySystem(world) {
                   if (beat && beat.state === 'cursed') {
                     beat.state = 'uncursed';
                     const itemName = world.get(itemId, NamedIdentity)?.name || 'item';
-                    emitSafe(world, 'prayer:curse-removed', {
+                    world.emit('prayer:curse-removed', {
                       actor: id,
                       itemId,
                       name: itemName,
                       deityId,
                     });
-                    emitSafe(world, 'deity:intervention', {
+                    world.emit('deity:intervention', {
                       playerId: id,
                       deityId,
                       deityName: deity.name,
@@ -331,12 +330,12 @@ export function praySystem(world) {
           }
 
           // Emit event for logging/UI feedback
-          emitSafe(world, 'prayer', {
+          world.emit('prayer', {
             actor: id,
             deityId,
             distress
           });
-          emitSafe(world, 'prayer:insight', {
+          world.emit('prayer:insight', {
             actor: id,
             deityId,
             deityName: deity.name,
