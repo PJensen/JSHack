@@ -24,6 +24,7 @@ import { statusStrength } from "./statusFacade.js";
 import { Physiology } from "../components/Physiology.js";
 import { getMonster } from "../data/monsters.js";
 import { resolveWeaponFamily } from "../data/weaponFamilies.js";
+import { tryHandlePlayerPseudoDeath } from "./deathModes.js";
 
 function resolveEventWeaponFamily(world, weaponId) {
   if (!(weaponId > 0) || !world.isAlive(weaponId)) return "";
@@ -458,6 +459,16 @@ export function dealDamage(world, spec) {
         lichAe.effects = lichAe.effects.filter(e => e.key !== "lichdom_echo");
       }
       world.emit('lichdom_echo:saved', { id: target, source });
+    }
+  }
+
+  if (killed) {
+    const pseudoDeath = tryHandlePlayerPseudoDeath(world, target, {
+      killer: source,
+      cause,
+    });
+    if (pseudoDeath) {
+      killed = false;
     }
   }
 

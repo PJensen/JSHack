@@ -117,6 +117,7 @@ export { QuestVars } from './QuestVars.js';
 export { QuestBindings } from './QuestBindings.js';
 export { QuestLog } from './QuestLog.js';
 export { RunObjectiveTarget } from './RunObjectiveTarget.js';
+export { RunState, DEATH_MODES, DEATH_MODE_SET } from './RunState.js';
 export { CalendarState } from './CalendarState.js';
 export { GroundStackOrder } from './GroundStackOrder.js';
 export { CentipedeSegment } from './CentipedeSegment.js';

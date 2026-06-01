@@ -16,6 +16,8 @@ import {
 import { playerEntity } from "./rules/utils/queries.js";
 import { getEffectiveVisionRange, blind } from "./rules/utils/blind.js";
 import { FOV_CONE_DISABLED_KEY, getEntityFacingConeDegrees, getNormalizedEntityFacing, setFacingTurnCostEnabled } from "./rules/utils/facing.js";
+import { ensureRunState } from "./rules/utils/deathModes.js";
+import { DEATH_MODES } from "./rules/components/RunState.js";
 
 // display/ camera + director utilities (pure display resources)
 import { createCamera, updateCamera, applyCamera, worldToScreen, clientToWorld as cameraClientToWorld } from "./display/camera/controller.js";
@@ -865,6 +867,10 @@ async function _finalizeNewGame(classData) {
     }
 
     applyDebugCommands({ world, runtimeConfig });
+    ensureRunState(world, {
+      difficulty: classData?.difficulty === "hard" ? "hard" : "normal",
+      deathMode: classData?.difficulty === "hard" ? DEATH_MODES.permadeath : DEATH_MODES.dropBackpack,
+    });
 
     // Capture character creation entry conditions for telemetry.
     postCharacterCreated({

@@ -251,9 +251,12 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
     });
 
     world.on('dungeon:teleport-depth', ({ targetDepth, source, returnTicket }) => {
-      const isHomecoming = String(source || '') === 'scroll_homecoming' || String(source || '') === 'hearthstone';
+      const normalizedSource = String(source || '');
+      const isHomecoming = normalizedSource === 'scroll_homecoming'
+        || normalizedSource === 'hearthstone'
+        || normalizedSource === 'resurrection';
       queueDepth(targetDepth, {
-        source: String(source || 'dungeon:teleport-depth'),
+        source: normalizedSource || 'dungeon:teleport-depth',
         returnTicket: isHomecoming ? returnTicket : null,
         homecomingLanding: isHomecoming,
       });
