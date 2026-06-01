@@ -233,6 +233,7 @@ export async function generateFloor(world, worldSeed, depth, tombstoneRepo = nul
 
   let spawnX = Math.floor(CHUNK_SIZE / 2);
   let spawnY = Math.floor(CHUNK_SIZE / 2);
+  const chunkDatas = [];
 
   for (let cy = extent.minCY; cy <= extent.maxCY; cy++) {
     for (let cx = extent.minCX; cx <= extent.maxCX; cx++) {
@@ -309,40 +310,49 @@ export async function generateFloor(world, worldSeed, depth, tombstoneRepo = nul
         }
       }
 
-      // Populate chunk with monsters and items
-      const popSeed = chunkSeed(worldSeed, depth, cx, cy) ^ 0xDEAD;
-      const popRng = createRng(popSeed >>> 0);
-      chunkData.spawns = populateChunk(chunkData, floorPlan, popRng, tombstoneRepo, worldSeed);
-
-      // Register tile data
-      tileMapLoad(cx, cy, chunkData.tiles);
-
-      // Materialize entities (doors, stairs, spawns)
-      const ids = materializeChunk(world, chunkData, stairOpts);
-      allEntityIds.push(...ids);
-
-      // Use first room of origin chunk as spawn
-      if (cx === 0 && cy === 0 && chunkData.rooms.length > 0) {
-        const room = chunkData.rooms[0];
-        spawnX = room.x + Math.floor(room.w / 2);
-        spawnY = room.y + Math.floor(room.h / 2);
-      }
-
-      processedChunks++;
-      if (typeof onProgress === 'function') {
-        onProgress({
-          phase: 'chunks',
-          depth,
-          processed: processedChunks,
-          total: totalChunks,
-          cx,
-          cy,
-          rooms: chunkData.rooms?.length || 0,
-          spawns: chunkData.spawns?.length || 0,
-        });
-      }
-      if (_yield && (processedChunks % _YIELD_EVERY) === 0) await _yield();
+      chunkDatas.push(chunkData);
     }
+  }
+
+  floorPlan.pitLandingPriorDownStairPositions = downStairPositions.slice();
+
+  for (const chunkData of chunkDatas) {
+    const cx = chunkData.chunkX;
+    const cy = chunkData.chunkY;
+
+    // Populate chunk with monsters and items
+    const popSeed = chunkSeed(worldSeed, depth, cx, cy) ^ 0xDEAD;
+    const popRng = createRng(popSeed >>> 0);
+    chunkData.spawns = populateChunk(chunkData, floorPlan, popRng, tombstoneRepo, worldSeed);
+
+    // Register tile data
+    tileMapLoad(cx, cy, chunkData.tiles);
+
+    // Materialize entities (doors, stairs, spawns)
+    const ids = materializeChunk(world, chunkData, stairOpts);
+    allEntityIds.push(...ids);
+
+    // Use first room of origin chunk as spawn
+    if (cx === 0 && cy === 0 && chunkData.rooms.length > 0) {
+      const room = chunkData.rooms[0];
+      spawnX = room.x + Math.floor(room.w / 2);
+      spawnY = room.y + Math.floor(room.h / 2);
+    }
+
+    processedChunks++;
+    if (typeof onProgress === 'function') {
+      onProgress({
+        phase: 'chunks',
+        depth,
+        processed: processedChunks,
+        total: totalChunks,
+        cx,
+        cy,
+        rooms: chunkData.rooms?.length || 0,
+        spawns: chunkData.spawns?.length || 0,
+      });
+    }
+    if (_yield && (processedChunks % _YIELD_EVERY) === 0) await _yield();
   }
 
   return { spawnX, spawnY, entityIds: allEntityIds, downStairPositions, profileType: floorPlan.profile.id || 'default' };

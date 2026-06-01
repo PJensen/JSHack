@@ -58,6 +58,7 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
       targetDepth: Math.max(0, Math.floor(depth)),
       targetPos,
       fragActorsAtTarget: opts?.fragActorsAtTarget === true,
+      validateTargetPos: opts?.validateTargetPos === true,
       returnTicket,
       homecomingLanding: opts?.homecomingLanding === true,
       source: typeof opts?.source === "string" ? opts.source : "",
@@ -187,7 +188,12 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
 
       const hasTargetPos = Number.isFinite(pending.targetPos?.x) && Number.isFinite(pending.targetPos?.y);
       if (hasTargetPos) {
-        await transitionToDepth(world, newDepth, { x: pending.targetPos.x | 0, y: pending.targetPos.y | 0 }, { tombstoneRepo });
+        await transitionToDepth(
+          world,
+          newDepth,
+          { x: pending.targetPos.x | 0, y: pending.targetPos.y | 0 },
+          { tombstoneRepo, validateDestination: pending.validateTargetPos === true },
+        );
         if (pending.fragActorsAtTarget) {
           const pe = playerEntity();
           const playerId = pe?.id || 0;
@@ -282,7 +288,7 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
       if (!pe || pe.id !== (Number(targetId) | 0)) return;
       let currentDepth = 1;
       for (const [, ds] of world.query(DungeonState)) { currentDepth = ds.currentDepth; break; }
-      queueDepth(currentDepth + 1, { targetPos: { x: x | 0, y: y | 0 } });
+      queueDepth(currentDepth + 1, { targetPos: { x: x | 0, y: y | 0 }, validateTargetPos: true });
     });
 
     world.on("dungeon:transitioned", () => {

@@ -224,6 +224,19 @@ const DECOR_MIMIC_DISGUISE_POOL = Object.freeze(['chest', 'barrel', 'urn', 'crat
 const CATALOG_ITEM_DEFS = Object.freeze(
   listCatalogItems().filter((def) => typeof def?.id === 'string' && def.id.length > 0)
 );
+
+function isPitTrapLandingViable(worldSeed, floorPlan, x, y) {
+  return isPitLandingViable(
+    worldSeed,
+    floorPlan.depth + 1,
+    x,
+    y,
+    Array.isArray(floorPlan.pitLandingPriorDownStairPositions)
+      ? floorPlan.pitLandingPriorDownStairPositions
+      : null,
+  );
+}
+
 const CATALOG_MIMIC_ITEM_IDS = Object.freeze(
   CATALOG_ITEM_DEFS.map((def) => def.id)
 );
@@ -849,7 +862,7 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null, world
         } while (isSolid(tx, ty) && attempts < 10);
         if (isSolid(tx, ty)) continue;
         const trap = pickTrap(rng, floorPlan.depth);
-        if (trap.type === 'pit' && !isPitLandingViable(worldSeed, floorPlan.depth + 1, tx, ty)) continue;
+        if (trap.type === 'pit' && !isPitTrapLandingViable(worldSeed, floorPlan, tx, ty)) continue;
         spawns.push({ x: tx, y: ty, kind: 'trap', params: trap });
       }
     }
@@ -980,7 +993,7 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null, world
         const idx = rng.int(0, corridorCandidates.length - 1);
         const pos = corridorCandidates.splice(idx, 1)[0];
         const trap = pickTrap(rng, floorPlan.depth);
-        if (trap.type === 'pit' && !isPitLandingViable(worldSeed, floorPlan.depth + 1, pos.x, pos.y)) continue;
+        if (trap.type === 'pit' && !isPitTrapLandingViable(worldSeed, floorPlan, pos.x, pos.y)) continue;
         spawns.push({ x: pos.x, y: pos.y, kind: 'trap', params: trap });
       }
     }
@@ -1528,7 +1541,7 @@ function applyDeadEndTheme(ctx) {
       const trapPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
       if (trapPos) {
         const trap = pickTrap(rng, floorPlan.depth);
-        if (trap.type !== 'pit' || isPitLandingViable(worldSeed, floorPlan.depth + 1, trapPos.x, trapPos.y)) {
+        if (trap.type !== 'pit' || isPitTrapLandingViable(worldSeed, floorPlan, trapPos.x, trapPos.y)) {
           spawns.push({ x: trapPos.x, y: trapPos.y, kind: 'trap', params: trap });
         }
       }
@@ -1619,7 +1632,7 @@ function applyDeadEndTheme(ctx) {
       const trapPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
       if (trapPos) {
         const trap = pickTrap(rng, floorPlan.depth);
-        if (trap.type !== 'pit' || isPitLandingViable(worldSeed, floorPlan.depth + 1, trapPos.x, trapPos.y)) {
+        if (trap.type !== 'pit' || isPitTrapLandingViable(worldSeed, floorPlan, trapPos.x, trapPos.y)) {
           spawns.push({ x: trapPos.x, y: trapPos.y, kind: 'trap', params: trap });
         }
       }
@@ -1680,7 +1693,7 @@ function applyDeadEndTheme(ctx) {
       const trapPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
       if (trapPos) {
         const trap = pickTrap(rng, floorPlan.depth);
-        if (trap.type !== 'pit' || isPitLandingViable(worldSeed, floorPlan.depth + 1, trapPos.x, trapPos.y)) {
+        if (trap.type !== 'pit' || isPitTrapLandingViable(worldSeed, floorPlan, trapPos.x, trapPos.y)) {
           spawns.push({ x: trapPos.x, y: trapPos.y, kind: 'trap', params: trap });
         }
       }

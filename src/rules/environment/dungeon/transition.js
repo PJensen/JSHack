@@ -131,6 +131,28 @@ function _findPursuerLanding(world, origin, used, ignoreIds) {
   return null;
 }
 
+function _resolveValidatedDestination(destinationPos, fallbackPos) {
+  const ox = destinationPos.x | 0;
+  const oy = destinationPos.y | 0;
+  if (isWalkable(ox, oy)) return { x: ox, y: oy };
+
+  for (let r = 1; r <= 12; r++) {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const x = ox + dx;
+        const y = oy + dy;
+        if (isWalkable(x, y)) return { x, y };
+      }
+    }
+  }
+
+  const fx = fallbackPos.x | 0;
+  const fy = fallbackPos.y | 0;
+  if (isWalkable(fx, fy)) return { x: fx, y: fy };
+  return { x: ox, y: oy };
+}
+
 function _placeStairPursuers(world, pursuerIds, destinationPos, entityIds) {
   if (!Array.isArray(pursuerIds) || pursuerIds.length <= 0) return [];
   const carried = pursuerIds.filter((id) => world.isAlive(id) && world.has(id, Position));
@@ -191,7 +213,7 @@ function _buildSnapshotRegistry(world) {
  * @param {import('../../../lib/ecs-js/index.js').World} world
  * @param {number} newDepth
  * @param {{x: number, y: number}} destinationPos - world coords for player placement
- * @param {{direction?: 'up'|'down', stairPos?: {x:number,y:number}|null, tombstoneRepo?: Object, onProgress?: (progress: { phase: 'chunks', depth: number, processed: number, total: number, cx?: number, cy?: number }) => void}} [opts]
+ * @param {{direction?: 'up'|'down', stairPos?: {x:number,y:number}|null, tombstoneRepo?: Object, validateDestination?: boolean, onProgress?: (progress: { phase: 'chunks', depth: number, processed: number, total: number, cx?: number, cy?: number }) => void}} [opts]
  */
 export async function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
   // Find dungeon state
@@ -402,6 +424,9 @@ export async function transitionToDepth(world, newDepth, destinationPos, opts = 
     if (!found) {
       destinationPos = { x: spawnX, y: spawnY };
     }
+  }
+  if (opts.validateDestination === true) {
+    destinationPos = _resolveValidatedDestination(destinationPos, { x: spawnX, y: spawnY });
   }
 
   // Strip Flying from any surviving entities (player, pets) — AI re-evaluates next tick

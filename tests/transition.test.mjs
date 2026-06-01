@@ -92,6 +92,21 @@ Deno.test("transitionToDepth moves player to destination", async () => {
   }
 });
 
+Deno.test("transitionToDepth validated destination falls back to a real walkable tile", async () => {
+  clearAll();
+  const world = new World({ seed: 42 });
+  await initDungeon(world);
+  makePlayerAt(world, 0, 0);
+
+  await transitionToDepth(world, 2, { x: 9999, y: 9999 }, { validateDestination: true });
+
+  for (const [id] of world.query(Player)) {
+    const pos = world.get(id, Position);
+    assert(pos.x !== 9999 || pos.y !== 9999, "validated transition should not keep an unloaded void destination");
+    assert(isWalkable(pos.x, pos.y), `validated destination (${pos.x},${pos.y}) should be walkable`);
+  }
+});
+
 Deno.test("transitionToDepth emits dungeon:transitioned event", async () => {
   clearAll();
   const world = new World({ seed: 42 });

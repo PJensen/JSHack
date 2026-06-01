@@ -349,20 +349,30 @@ export function stairWorldPos(stair) {
  * @param {number} depth  — the floor to probe (i.e. currentDepth + 1)
  * @param {number} worldX
  * @param {number} worldY
+ * @param {{x:number,y:number}[]|null} [priorDownStairPositions]
  * @returns {number} tile constant at (worldX, worldY) on that floor
  */
-export function probeFloorTile(worldSeed, depth, worldX, worldY) {
+export function probeFloorTile(worldSeed, depth, worldX, worldY, priorDownStairPositions = null) {
   const cx = Math.floor(worldX / CHUNK_SIZE);
   const cy = Math.floor(worldY / CHUNK_SIZE);
   const lx = ((worldX % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
   const ly = ((worldY % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
-  const plan = generateFloorPlan(worldSeed, depth);
+  const plan = generateFloorPlan(worldSeed, depth, priorDownStairPositions);
   const chunkData = generateChunk(worldSeed, depth, cx, cy, plan.profile ?? null, plan);
   return chunkData.tiles[ly * CHUNK_SIZE + lx];
 }
 
 /** Convenience: returns true only if the tile at (worldX, worldY) on `depth` is walkable floor. */
-export function isPitLandingViable(worldSeed, depth, worldX, worldY) {
+export function isPitLandingViable(worldSeed, depth, worldX, worldY, priorDownStairPositions = null) {
   if (!(worldSeed > 0) || depth < 1) return false;
-  return probeFloorTile(worldSeed, depth, worldX, worldY) === TILE_FLOOR;
+  const cx = Math.floor(worldX / CHUNK_SIZE);
+  const cy = Math.floor(worldY / CHUNK_SIZE);
+  const plan = generateFloorPlan(worldSeed, depth, priorDownStairPositions);
+  const extent = plan?.extent;
+  if (!extent
+      || cx < extent.minCX || cx > extent.maxCX
+      || cy < extent.minCY || cy > extent.maxCY) {
+    return false;
+  }
+  return probeFloorTile(worldSeed, depth, worldX, worldY, priorDownStairPositions) === TILE_FLOOR;
 }
