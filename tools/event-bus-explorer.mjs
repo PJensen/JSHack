@@ -16,6 +16,9 @@ function parseArgs(argv) {
     top: 40,
     includeLib: false,
     includeTests: false,
+    producerOnly: false,
+    consumerOnly: false,
+    orphans: false,
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -27,6 +30,9 @@ function parseArgs(argv) {
     else if (arg === "--top" && argv[i + 1]) opts.top = Math.max(1, Number(argv[++i]) | 0);
     else if (arg === "--include-lib") opts.includeLib = true;
     else if (arg === "--include-tests") opts.includeTests = true;
+    else if (arg === "--producer-only") opts.producerOnly = true;
+    else if (arg === "--consumer-only") opts.consumerOnly = true;
+    else if (arg === "--orphans") opts.orphans = true;
     else if (arg === "--help" || arg === "-h") opts.help = true;
   }
 
@@ -45,11 +51,15 @@ Options:
   --out PATH                     Write output to a file instead of stdout
   --include-lib                  Include src/lib matches
   --include-tests                Use tests as the default scope when --scope is omitted
+  --producer-only                Restrict to literal producers with no literal consumers
+  --consumer-only                Restrict to literal consumers with no literal producers
+  --orphans                      Restrict to producer-only and consumer-only events
 
 Examples:
   deno run --allow-read tools/event-bus-explorer.mjs --format summary
   deno run --allow-read tools/event-bus-explorer.mjs --format csv --out /tmp/events.csv
   deno run --allow-read tools/event-bus-explorer.mjs --format mermaid --event damaged
+  deno run --allow-read tools/event-bus-explorer.mjs --producer-only --format csv
 `;
 }
 
@@ -294,6 +304,21 @@ function toMermaid(rows, opts) {
   return `${lines.join("\n")}\n`;
 }
 
+function filterRows(rows, opts) {
+  if (!opts.producerOnly && !opts.consumerOnly && !opts.orphans) return rows;
+  const stats = eventStats(rows);
+  const keep = new Set();
+  for (const rec of stats) {
+    if (rec.event.startsWith("(dynamic:")) continue;
+    const isProducerOnly = rec.producers > 0 && rec.consumers === 0;
+    const isConsumerOnly = rec.consumers > 0 && rec.producers === 0;
+    if (opts.producerOnly && isProducerOnly) keep.add(rec.event);
+    if (opts.consumerOnly && isConsumerOnly) keep.add(rec.event);
+    if (opts.orphans && (isProducerOnly || isConsumerOnly)) keep.add(rec.event);
+  }
+  return rows.filter((row) => keep.has(row.event));
+}
+
 async function main() {
   const opts = parseArgs(Deno.args);
   if (opts.help) {
@@ -309,6 +334,7 @@ async function main() {
     rows = rows.concat(scanText(file, text));
   }
   if (opts.event) rows = rows.filter((row) => row.event === opts.event);
+  rows = filterRows(rows, opts);
 
   let output;
   if (opts.format === "csv") output = toCsv(rows);
