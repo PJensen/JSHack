@@ -2,7 +2,7 @@
 
 const DEFAULT_SCOPE = "src";
 
-function parseArgs(argv) {
+export function parseArgs(argv) {
   const opts = { scope: DEFAULT_SCOPE, format: "summary" };
   for (let i = 0; i < argv.length; i++) {
     const arg = String(argv[i] || "");
@@ -13,14 +13,14 @@ function parseArgs(argv) {
   return opts;
 }
 
-function usage() {
+export function usage() {
   return `Usage:
   deno run --allow-read tools/import-boundary-report.mjs [--format summary|csv]
 
 Reports layer import violations and suspicious cross-layer imports.`;
 }
 
-async function collectFiles(root, out = []) {
+export async function collectFiles(root, out = []) {
   const st = await Deno.stat(root);
   if (st.isFile) {
     if (root.endsWith(".js") || root.endsWith(".mjs")) out.push(root);
@@ -35,7 +35,7 @@ async function collectFiles(root, out = []) {
   return out;
 }
 
-function layerOf(path) {
+export function layerOf(path) {
   if (path.startsWith("src/rules/")) return "rules";
   if (path.startsWith("src/display/")) return "display";
   if (path.startsWith("src/bridge/")) return "bridge";
@@ -45,7 +45,7 @@ function layerOf(path) {
   return "other";
 }
 
-function normalizeImport(fromFile, spec) {
+export function normalizeImport(fromFile, spec) {
   if (!spec.startsWith(".")) return spec;
   const base = fromFile.split("/").slice(0, -1);
   for (const part of spec.split("/")) {
@@ -56,17 +56,26 @@ function normalizeImport(fromFile, spec) {
   return base.join("/");
 }
 
-function classify(fromLayer, target) {
+export function classify(fromLayer, target) {
   const targetLayer = layerOf(target);
-  if (fromLayer === "rules" && (targetLayer === "display" || targetLayer === "bridge")) return "violation";
+  if (
+    fromLayer === "rules" &&
+    (targetLayer === "display" || targetLayer === "bridge")
+  ) return "violation";
   if (fromLayer === "display" && targetLayer === "rules") return "violation";
-  if (fromLayer === "shared" && targetLayer !== "shared" && targetLayer !== "other") return "violation";
+  if (
+    fromLayer === "shared" && targetLayer !== "shared" &&
+    targetLayer !== "other"
+  ) return "violation";
   if (fromLayer === "bridge" && targetLayer === "display") return "violation";
-  if (fromLayer === "main" && (targetLayer === "rules" || targetLayer === "display")) return "main-cross-layer";
+  if (
+    fromLayer === "main" &&
+    (targetLayer === "rules" || targetLayer === "display")
+  ) return "main-cross-layer";
   return "";
 }
 
-async function scanFile(file) {
+export async function scanFile(file) {
   const rows = [];
   const text = await Deno.readTextFile(file);
   const fromLayer = layerOf(file);
@@ -80,20 +89,31 @@ async function scanFile(file) {
       const target = normalizeImport(file, spec);
       const issue = classify(fromLayer, target);
       if (!issue) continue;
-      rows.push({ issue, file, line: i + 1, fromLayer, spec, target, targetLayer: layerOf(target) });
+      rows.push({
+        issue,
+        file,
+        line: i + 1,
+        fromLayer,
+        spec,
+        target,
+        targetLayer: layerOf(target),
+      });
     }
   }
   return rows;
 }
 
-function csv(rows) {
+export function csv(rows) {
   return [
     "issue,file,line,from_layer,target_layer,spec,target",
-    ...rows.map((r) => [r.issue, r.file, r.line, r.fromLayer, r.targetLayer, r.spec, r.target].join(",")),
+    ...rows.map((r) =>
+      [r.issue, r.file, r.line, r.fromLayer, r.targetLayer, r.spec, r.target]
+        .join(",")
+    ),
   ].join("\n") + "\n";
 }
 
-function summary(rows) {
+export function summary(rows) {
   const violations = rows.filter((r) => r.issue === "violation");
   const mainCross = rows.filter((r) => r.issue === "main-cross-layer");
   const lines = [];
@@ -103,18 +123,26 @@ function summary(rows) {
   if (violations.length) {
     lines.push("");
     lines.push("violations:");
-    for (const r of violations) lines.push(`  ${r.file}:${r.line} ${r.fromLayer} -> ${r.targetLayer} (${r.spec})`);
+    for (const r of violations) {
+      lines.push(
+        `  ${r.file}:${r.line} ${r.fromLayer} -> ${r.targetLayer} (${r.spec})`,
+      );
+    }
   }
   if (mainCross.length) {
     lines.push("");
     lines.push("main cross-layer imports:");
-    for (const r of mainCross.slice(0, 80)) lines.push(`  ${r.file}:${r.line} main -> ${r.targetLayer} (${r.spec})`);
-    if (mainCross.length > 80) lines.push(`  ... ${mainCross.length - 80} more`);
+    for (const r of mainCross.slice(0, 80)) {
+      lines.push(`  ${r.file}:${r.line} main -> ${r.targetLayer} (${r.spec})`);
+    }
+    if (mainCross.length > 80) {
+      lines.push(`  ... ${mainCross.length - 80} more`);
+    }
   }
   return lines.join("\n") + "\n";
 }
 
-async function main() {
+export async function main() {
   const opts = parseArgs(Deno.args);
   if (opts.help) {
     console.log(usage());
@@ -126,4 +154,4 @@ async function main() {
   console.log((opts.format === "csv" ? csv(rows) : summary(rows)).trimEnd());
 }
 
-await main();
+if (import.meta.main) await main();

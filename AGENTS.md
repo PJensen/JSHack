@@ -1,8 +1,11 @@
 # AGENTS.md - JSHack Field Manual
 
-JSHack is a zero-dependency browser roguelike: pure JavaScript, pure ES modules, ECS architecture, Deno tooling. This file is optimized for coding agents. Prefer the commands below over manual spelunking.
+JSHack is a zero-dependency browser roguelike: pure JavaScript, pure ES modules,
+ECS architecture, Deno tooling. This file is optimized for coding agents. Prefer
+the commands below over manual spelunking.
 
 Deeper docs:
+
 - [README.md](README.md)
 - [SEPARATION_MANIFEST.md](docs/architecture/SEPARATION_MANIFEST.md)
 - [RUNTIME_TOPOLOGY_DOCTRINE.md](docs/architecture/RUNTIME_TOPOLOGY_DOCTRINE.md)
@@ -13,19 +16,32 @@ Deeper docs:
 
 ## Hard Laws
 
-- **No build step.** Pure ES modules. No webpack, babel, JSX, TypeScript, or bundling.
-- **Deno, not Node.** Tests and tools run with Deno. Default test command: `deno test --allow-read`.
+- **No build step.** Pure ES modules. No webpack, babel, JSX, TypeScript, or
+  bundling.
+- **Deno, not Node.** Tests and tools run with Deno. Default test command:
+  `deno test --allow-read`.
 - **JavaScript only.** Keep source as `.js` / `.mjs`.
 - **Mobile-first.** Touch is primary; desktop keyboard is secondary.
-- **Separation is law.** `rules/` never imports `display/` or `bridge/`; `display/` never imports `rules/`; `bridge/` projects read-only rule state.
-- **No system-to-system calls.** Systems communicate with `world.emit` / `world.on`; scheduler owns ordering.
-- **No swallowed event failures.** Do not add `emitSafe`-style wrappers around `world.emit`.
-- **Determinism is sacred.** In rules simulation use `world.rand()`, never `Math.random()`. No timers/fetch/promises/async in systems.
-- **Integer grid only.** World coords may be negative. Do not clamp to `>= 0`; normalize with `Number.isFinite(v) ? (v | 0) : fallback`.
-- **One canonical path.** Spawn, damage, spell cast, status application, inventory transfer, and materialization paths must delegate to the canonical implementation.
-- **Runtime multiplicity is child entities.** Runtime effects/procs/sockets/enchantments are child topology, not arrays on parent components.
-- **ECS-js is vendored.** Do not edit `src/lib/ecs-js/` unless fixing the ECS library itself.
-- **Search before writing.** Extend existing patterns. Do exactly what was asked; no opportunistic content wiring or unrelated cleanup.
+- **Separation is law.** `rules/` never imports `display/` or `bridge/`;
+  `display/` never imports `rules/`; `bridge/` projects read-only rule state.
+- **No system-to-system calls.** Systems communicate with `world.emit` /
+  `world.on`; scheduler owns ordering.
+- **No swallowed event failures.** Do not add `emitSafe`-style wrappers around
+  `world.emit`.
+- **Determinism is sacred.** In rules simulation use `world.rand()`, never
+  `Math.random()`. No timers/fetch/promises/async in systems.
+- **Integer grid only.** World coords may be negative. Do not clamp to `>= 0`;
+  normalize with `Number.isFinite(v) ? (v | 0) : fallback`.
+- **One canonical path.** Spawn, damage, spell cast, status application,
+  inventory transfer, and materialization paths must delegate to the canonical
+  implementation.
+- **Runtime multiplicity is child entities.** Runtime
+  effects/procs/sockets/enchantments are child topology, not arrays on parent
+  components.
+- **ECS-js is vendored.** Do not edit `src/lib/ecs-js/` unless fixing the ECS
+  library itself.
+- **Search before writing.** Extend existing patterns. Do exactly what was
+  asked; no opportunistic content wiring or unrelated cleanup.
 
 ---
 
@@ -41,7 +57,9 @@ deno run --allow-read tools/import-boundary-report.mjs
 deno run --allow-read tools/system-map.mjs
 ```
 
-`agent-health` summarizes boundary violations, remaining `emitSafe` refs, nondeterminism hazards, system counts, and possible system-to-system calls. Treat findings as triage leads, not automatic truth.
+`agent-health` summarizes boundary violations, remaining `emitSafe` refs,
+nondeterminism hazards, system counts, and possible system-to-system calls.
+Treat findings as triage leads, not automatic truth.
 
 ### Event Bus
 
@@ -53,7 +71,9 @@ deno run --allow-read tools/event-bus-explorer.mjs --producer-only --format summ
 deno run --allow-read tools/event-bus-explorer.mjs --consumer-only --format summary --top 40
 ```
 
-Use producer-only events to find emitted behavior with no consumer. Use consumer-only events to find stale listeners, dynamic producers, or missing producers.
+Use producer-only events to find emitted behavior with no consumer. Use
+consumer-only events to find stale listeners, dynamic producers, or missing
+producers.
 
 ### System Map
 
@@ -65,7 +85,9 @@ deno run --allow-read tools/system-map.mjs --unregistered
 deno run --allow-read tools/system-map.mjs --missing-tests
 ```
 
-Scheduler truth lives in [src/main/scheduler.js](src/main/scheduler.js). Some imported-not-registered files are listener installers, not phase systems; audit before deleting.
+Scheduler truth lives in [src/main/scheduler.js](src/main/scheduler.js). Some
+imported-not-registered files are listener installers, not phase systems; audit
+before deleting.
 
 ### Target Lookup
 
@@ -75,7 +97,9 @@ deno run --allow-read tools/content-id-audit.mjs goblin --limit 80
 deno run --allow-read tools/content-id-audit.mjs potion_water --limit 80
 ```
 
-`agent-target` is a ranked code search for events/functions/files/tests. `content-id-audit` follows item, monster, spell, material, loot, visual, and test references by ID.
+`agent-target` is a ranked code search for events/functions/files/tests.
+`content-id-audit` follows item, monster, spell, material, loot, visual, and
+test references by ID.
 
 ### Focused Tests
 
@@ -96,7 +120,8 @@ Full runtime suite:
 deno test --allow-read --no-check
 ```
 
-Plain `deno test --allow-read` may fail during type-check on non-game packaging scripts before tests run. Use `--no-check` when you need runtime coverage.
+Plain `deno test --allow-read` may fail during type-check on non-game packaging
+scripts before tests run. Use `--no-check` when you need runtime coverage.
 
 ### Fast Greps
 
@@ -122,7 +147,8 @@ lib/      vendored ecs-js and deity-js
 content/  DSL-authored content definitions and content helpers
 ```
 
-Five scheduler phases are declared in [src/main/scheduler.js](src/main/scheduler.js):
+Five scheduler phases are declared in
+[src/main/scheduler.js](src/main/scheduler.js):
 
 ```text
 ai       intent producers
@@ -132,31 +158,33 @@ scripts  content DSL tick hooks
 cleanup  entity removal, lifespan, spatial sync
 ```
 
-The bridge contract is [src/bridge/schema/worldView.js](src/bridge/schema/worldView.js). Display must not push tags onto entity records; tag projection belongs in the bridge.
+The bridge contract is
+[src/bridge/schema/worldView.js](src/bridge/schema/worldView.js). Display must
+not push tags onto entity records; tag projection belongs in the bridge.
 
 ---
 
 ## Common Locations
 
-| Need | Start Here |
-|---|---|
-| Scheduler order | [src/main/scheduler.js](src/main/scheduler.js) |
-| WorldView projection | [src/bridge/schema/worldView.js](src/bridge/schema/worldView.js) |
-| Systems | [src/rules/systems/](src/rules/systems/) |
-| Components | [src/rules/components/](src/rules/components/) |
-| Monsters | [src/content/monsters/](src/content/monsters/), [src/rules/data/monsters.js](src/rules/data/monsters.js) |
-| Items | [src/content/items/](src/content/items/), [src/rules/data/itemCatalog.js](src/rules/data/itemCatalog.js) |
-| Spells | [src/rules/data/spells.js](src/rules/data/spells.js), [src/rules/scripts/spells.js](src/rules/scripts/spells.js) |
-| Interaction payloads | [src/rules/content/interaction/interactPayloads.js](src/rules/content/interaction/interactPayloads.js) |
-| Damage | [src/rules/utils/dealDamage.js](src/rules/utils/dealDamage.js) |
-| Status semantics | [src/rules/utils/effectSemantics.js](src/rules/utils/effectSemantics.js), [src/rules/utils/statusFacade.js](src/rules/utils/statusFacade.js) |
-| Spatial queries | [src/rules/utils/spatialIndex.js](src/rules/utils/spatialIndex.js) |
-| Inventory | [src/rules/utils/inventoryFacade.js](src/rules/utils/inventoryFacade.js), [src/rules/utils/inventoryVirtuals.js](src/rules/utils/inventoryVirtuals.js) |
-| Materials/gems | [src/rules/data/materials.js](src/rules/data/materials.js), [src/rules/data/gems.js](src/rules/data/gems.js) |
-| Dungeon tiles/FOV | [src/rules/environment/dungeon/](src/rules/environment/dungeon/) |
-| Quests/dialog | [src/rules/quests/](src/rules/quests/), [src/rules/dialogues/](src/rules/dialogues/) |
-| Display event wiring | [src/display/ui/wiring/](src/display/ui/wiring/) |
-| Audio wiring | [src/display/audio/](src/display/audio/) |
+| Need                 | Start Here                                                                                                                                             |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Scheduler order      | [src/main/scheduler.js](src/main/scheduler.js)                                                                                                         |
+| WorldView projection | [src/bridge/schema/worldView.js](src/bridge/schema/worldView.js)                                                                                       |
+| Systems              | [src/rules/systems/](src/rules/systems/)                                                                                                               |
+| Components           | [src/rules/components/](src/rules/components/)                                                                                                         |
+| Monsters             | [src/content/monsters/](src/content/monsters/), [src/rules/data/monsters.js](src/rules/data/monsters.js)                                               |
+| Items                | [src/content/items/](src/content/items/), [src/rules/data/itemCatalog.js](src/rules/data/itemCatalog.js)                                               |
+| Spells               | [src/rules/data/spells.js](src/rules/data/spells.js), [src/rules/scripts/spells.js](src/rules/scripts/spells.js)                                       |
+| Interaction payloads | [src/rules/content/interaction/interactPayloads.js](src/rules/content/interaction/interactPayloads.js)                                                 |
+| Damage               | [src/rules/utils/dealDamage.js](src/rules/utils/dealDamage.js)                                                                                         |
+| Status semantics     | [src/rules/utils/effectSemantics.js](src/rules/utils/effectSemantics.js), [src/rules/utils/statusFacade.js](src/rules/utils/statusFacade.js)           |
+| Spatial queries      | [src/rules/utils/spatialIndex.js](src/rules/utils/spatialIndex.js)                                                                                     |
+| Inventory            | [src/rules/utils/inventoryFacade.js](src/rules/utils/inventoryFacade.js), [src/rules/utils/inventoryVirtuals.js](src/rules/utils/inventoryVirtuals.js) |
+| Materials/gems       | [src/rules/data/materials.js](src/rules/data/materials.js), [src/rules/data/gems.js](src/rules/data/gems.js)                                           |
+| Dungeon tiles/FOV    | [src/rules/environment/dungeon/](src/rules/environment/dungeon/)                                                                                       |
+| Quests/dialog        | [src/rules/quests/](src/rules/quests/), [src/rules/dialogues/](src/rules/dialogues/)                                                                   |
+| Display event wiring | [src/display/ui/wiring/](src/display/ui/wiring/)                                                                                                       |
+| Audio wiring         | [src/display/audio/](src/display/audio/)                                                                                                               |
 
 ---
 
@@ -176,26 +204,31 @@ export function installFeatureListeners(world) {
 }
 ```
 
-Install listeners from `configureWorld()` unless the feature is display/main wiring.
+Install listeners from `configureWorld()` unless the feature is display/main
+wiring.
 
 ### New Systems
 
 1. Add `src/rules/systems/mySystem.js`.
-2. Register it in [src/main/scheduler.js](src/main/scheduler.js) in the right phase.
+2. Register it in [src/main/scheduler.js](src/main/scheduler.js) in the right
+   phase.
 3. Add a focused test in `tests/`.
 4. Run `deno test --allow-read tests/mySystem.test.mjs`.
 
 ### Spatial Queries
 
-Use `forEachInRadius`, `forEachInRect`, or tile query helpers. Do not full-scan `world.query()` for proximity-sensitive behavior.
+Use `forEachInRadius`, `forEachInRect`, or tile query helpers. Do not full-scan
+`world.query()` for proximity-sensitive behavior.
 
 ### Spawning
 
-Route through canonical archetypes/materialization helpers. Debug spawns, dungeon population, and spawner children must have parity tests if they differ.
+Route through canonical archetypes/materialization helpers. Debug spawns,
+dungeon population, and spawner children must have parity tests if they differ.
 
 ### Events
 
-Use direct `world.emit(event, payload)`. If an event should be visible to display/audio/messages, verify with:
+Use direct `world.emit(event, payload)`. If an event should be visible to
+display/audio/messages, verify with:
 
 ```bash
 deno run --allow-read tools/event-bus-explorer.mjs --format csv --event event:name
@@ -205,14 +238,17 @@ deno run --allow-read tools/event-bus-explorer.mjs --format csv --event event:na
 
 ## Red Tests
 
-Tests can be stale. Do not make tests green by restoring old behavior unless the user explicitly asks for that behavior.
+Tests can be stale. Do not make tests green by restoring old behavior unless the
+user explicitly asks for that behavior.
 
 Classify failures:
+
 - **Real bug:** fix implementation.
 - **Stale expectation:** update the test to current intended behavior.
 - **Ambiguous:** stop and ask.
 
-Prefer invariant tests over brittle snapshots: determinism, reachability, bounds, parity, layer boundaries, canonical paths.
+Prefer invariant tests over brittle snapshots: determinism, reachability,
+bounds, parity, layer boundaries, canonical paths.
 
 ---
 

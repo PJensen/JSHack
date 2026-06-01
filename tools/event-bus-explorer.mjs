@@ -7,7 +7,7 @@ const DEFAULT_EXCLUDES = [
   "/node_modules/",
 ];
 
-function parseArgs(argv) {
+export function parseArgs(argv) {
   const opts = {
     scope: DEFAULT_SCOPE,
     format: "summary",
@@ -27,8 +27,9 @@ function parseArgs(argv) {
     else if (arg === "--format" && argv[i + 1]) opts.format = String(argv[++i]);
     else if (arg === "--out" && argv[i + 1]) opts.out = String(argv[++i]);
     else if (arg === "--event" && argv[i + 1]) opts.event = String(argv[++i]);
-    else if (arg === "--top" && argv[i + 1]) opts.top = Math.max(1, Number(argv[++i]) | 0);
-    else if (arg === "--include-lib") opts.includeLib = true;
+    else if (arg === "--top" && argv[i + 1]) {
+      opts.top = Math.max(1, Number(argv[++i]) | 0);
+    } else if (arg === "--include-lib") opts.includeLib = true;
     else if (arg === "--include-tests") opts.includeTests = true;
     else if (arg === "--producer-only") opts.producerOnly = true;
     else if (arg === "--consumer-only") opts.consumerOnly = true;
@@ -39,7 +40,7 @@ function parseArgs(argv) {
   return opts;
 }
 
-function usage() {
+export function usage() {
   return `Usage:
   deno run --allow-read tools/event-bus-explorer.mjs [options]
 
@@ -63,11 +64,11 @@ Examples:
 `;
 }
 
-function normalizePath(path) {
+export function normalizePath(path) {
   return path.replaceAll("\\", "/");
 }
 
-function shouldSkip(path, opts) {
+export function shouldSkip(path, opts) {
   const p = `/${normalizePath(path)}`;
   if (!opts.includeLib && p.includes("/src/lib/")) return true;
   return DEFAULT_EXCLUDES.some((part) => {
@@ -76,10 +77,12 @@ function shouldSkip(path, opts) {
   });
 }
 
-async function collectFiles(root, opts, out = []) {
+export async function collectFiles(root, opts, out = []) {
   const info = await Deno.stat(root);
   if (info.isFile) {
-    if (/\.(mjs|js)$/.test(root) && !shouldSkip(root, opts)) out.push(normalizePath(root));
+    if (/\.(mjs|js)$/.test(root) && !shouldSkip(root, opts)) {
+      out.push(normalizePath(root));
+    }
     return out;
   }
 
@@ -87,12 +90,14 @@ async function collectFiles(root, opts, out = []) {
     const path = `${root.replace(/\/$/, "")}/${entry.name}`;
     if (shouldSkip(path, opts)) continue;
     if (entry.isDirectory) await collectFiles(path, opts, out);
-    else if (entry.isFile && /\.(mjs|js)$/.test(entry.name)) out.push(normalizePath(path));
+    else if (entry.isFile && /\.(mjs|js)$/.test(entry.name)) {
+      out.push(normalizePath(path));
+    }
   }
   return out;
 }
 
-function layerFor(file) {
+export function layerFor(file) {
   if (file.startsWith("src/rules/")) return "rules";
   if (file.startsWith("src/display/")) return "display";
   if (file.startsWith("src/bridge/")) return "bridge";
@@ -102,7 +107,7 @@ function layerFor(file) {
   return "other";
 }
 
-function extractKeys(text) {
+export function extractKeys(text) {
   const src = String(text || "").trim();
   const destructured = src.match(/^\(?\s*\{([^}]*)\}/);
   if (destructured) {
@@ -125,11 +130,13 @@ function extractKeys(text) {
   return "";
 }
 
-function scanText(file, text) {
+export function scanText(file, text) {
   const rows = [];
   const lines = text.split(/\r?\n/);
-  const literalCall = /\b(world|ctx\.io|ctx)\s*\.\s*(on|emit)\s*(?:\?\.)?\s*\(\s*(['"`])([^'"`]+)\3\s*,?\s*([^)]*)?/g;
-  const dynamicCall = /\b(world|ctx\.io|ctx)\s*\.\s*(on|emit)\s*(?:\?\.)?\s*\(\s*([^'"`\s][^,\)]*)/g;
+  const literalCall =
+    /\b(world|ctx\.io|ctx)\s*\.\s*(on|emit)\s*(?:\?\.)?\s*\(\s*(['"`])([^'"`]+)\3\s*,?\s*([^)]*)?/g;
+  const dynamicCall =
+    /\b(world|ctx\.io|ctx)\s*\.\s*(on|emit)\s*(?:\?\.)?\s*\(\s*([^'"`\s][^,\)]*)/g;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -172,31 +179,42 @@ function scanText(file, text) {
   return rows;
 }
 
-function csvEscape(value) {
+export function csvEscape(value) {
   const s = String(value ?? "");
   if (!/[",\n]/.test(s)) return s;
   return `"${s.replaceAll('"', '""')}"`;
 }
 
-function toCsv(rows) {
-  const header = ["event", "kind", "api", "layer", "file", "line", "payload_keys", "dynamic"];
+export function toCsv(rows) {
+  const header = [
+    "event",
+    "kind",
+    "api",
+    "layer",
+    "file",
+    "line",
+    "payload_keys",
+    "dynamic",
+  ];
   const lines = [header.join(",")];
   for (const row of rows) {
-    lines.push([
-      row.event,
-      row.kind,
-      row.api,
-      row.layer,
-      row.file,
-      row.line,
-      row.payloadKeys,
-      row.dynamic ? "yes" : "no",
-    ].map(csvEscape).join(","));
+    lines.push(
+      [
+        row.event,
+        row.kind,
+        row.api,
+        row.layer,
+        row.file,
+        row.line,
+        row.payloadKeys,
+        row.dynamic ? "yes" : "no",
+      ].map(csvEscape).join(","),
+    );
   }
   return `${lines.join("\n")}\n`;
 }
 
-function eventStats(rows) {
+export function eventStats(rows) {
   const stats = new Map();
   for (const row of rows) {
     let rec = stats.get(row.event);
@@ -227,55 +245,75 @@ function eventStats(rows) {
   });
 }
 
-function toSummary(rows, opts) {
+export function toSummary(rows, opts) {
   const stats = eventStats(rows);
   const dynamic = rows.filter((row) => row.dynamic).length;
   const producers = rows.filter((row) => row.kind === "producer").length;
   const consumers = rows.filter((row) => row.kind === "consumer").length;
-  const zeroProducer = stats.filter((rec) => rec.producers === 0 && !rec.event.startsWith("(dynamic:"));
-  const zeroConsumer = stats.filter((rec) => rec.consumers === 0 && !rec.event.startsWith("(dynamic:"));
+  const zeroProducer = stats.filter((rec) =>
+    rec.producers === 0 && !rec.event.startsWith("(dynamic:")
+  );
+  const zeroConsumer = stats.filter((rec) =>
+    rec.consumers === 0 && !rec.event.startsWith("(dynamic:")
+  );
 
   const lines = [];
   lines.push(`event bus static scan`);
   lines.push(`scope: ${opts.scope}`);
-  lines.push(`call sites: ${rows.length} (${producers} producers, ${consumers} consumers, ${dynamic} dynamic)`);
+  lines.push(
+    `call sites: ${rows.length} (${producers} producers, ${consumers} consumers, ${dynamic} dynamic)`,
+  );
   lines.push(`unique events: ${stats.length}`);
-  lines.push(`events with consumers but no literal producers: ${zeroProducer.length}`);
-  lines.push(`events with producers but no literal consumers: ${zeroConsumer.length}`);
+  lines.push(
+    `events with consumers but no literal producers: ${zeroProducer.length}`,
+  );
+  lines.push(
+    `events with producers but no literal consumers: ${zeroConsumer.length}`,
+  );
   lines.push("");
-  lines.push(`top ${Math.min(opts.top, stats.length)} events by call-site count:`);
+  lines.push(
+    `top ${Math.min(opts.top, stats.length)} events by call-site count:`,
+  );
   for (const rec of stats.slice(0, opts.top)) {
-    lines.push(`${String(rec.producers + rec.consumers).padStart(4)}  ${rec.event}  producers=${rec.producers} consumers=${rec.consumers} files=${rec.files.size}`);
+    lines.push(
+      `${
+        String(rec.producers + rec.consumers).padStart(4)
+      }  ${rec.event}  producers=${rec.producers} consumers=${rec.consumers} files=${rec.files.size}`,
+    );
   }
   lines.push("");
   lines.push("largest consumer-only event names:");
   for (const rec of zeroProducer.slice(0, 20)) {
-    lines.push(`  ${rec.event} consumers=${rec.consumers} files=${rec.consumerFiles.size}`);
+    lines.push(
+      `  ${rec.event} consumers=${rec.consumers} files=${rec.consumerFiles.size}`,
+    );
   }
   lines.push("");
   lines.push("largest producer-only event names:");
   for (const rec of zeroConsumer.slice(0, 20)) {
-    lines.push(`  ${rec.event} producers=${rec.producers} files=${rec.producerFiles.size}`);
+    lines.push(
+      `  ${rec.event} producers=${rec.producers} files=${rec.producerFiles.size}`,
+    );
   }
   return `${lines.join("\n")}\n`;
 }
 
-function nodeId(prefix, value) {
+export function nodeId(prefix, value) {
   let id = `${prefix}_${value.replace(/[^A-Za-z0-9_]/g, "_")}`;
   if (/^\d/.test(id)) id = `n_${id}`;
   return id.slice(0, 120);
 }
 
-function mermaidLabel(value) {
+export function mermaidLabel(value) {
   return String(value).replaceAll('"', '\\"');
 }
 
-function toMermaid(rows, opts) {
+export function toMermaid(rows, opts) {
   const stats = eventStats(rows);
   const selectedEvents = new Set(
     opts.event
       ? [opts.event]
-      : stats.slice(0, opts.top).map((rec) => rec.event)
+      : stats.slice(0, opts.top).map((rec) => rec.event),
   );
   const selected = rows.filter((row) => selectedEvents.has(row.event));
   const lines = ["flowchart LR"];
@@ -304,7 +342,7 @@ function toMermaid(rows, opts) {
   return `${lines.join("\n")}\n`;
 }
 
-function filterRows(rows, opts) {
+export function filterRows(rows, opts) {
   if (!opts.producerOnly && !opts.consumerOnly && !opts.orphans) return rows;
   const stats = eventStats(rows);
   const keep = new Set();
@@ -319,7 +357,7 @@ function filterRows(rows, opts) {
   return rows.filter((row) => keep.has(row.event));
 }
 
-async function main() {
+export async function main() {
   const opts = parseArgs(Deno.args);
   if (opts.help) {
     console.log(usage());
@@ -346,4 +384,4 @@ async function main() {
   else console.log(output.trimEnd());
 }
 
-await main();
+if (import.meta.main) await main();
