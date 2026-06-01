@@ -58,8 +58,9 @@ deno run --allow-read tools/system-map.mjs
 ```
 
 `agent-health` summarizes boundary violations, remaining `emitSafe` refs,
-nondeterminism hazards, system counts, and possible system-to-system calls.
-Treat findings as triage leads, not automatic truth.
+nondeterminism hazards, generation-time async allowances, system counts, and
+possible system-to-system calls. Classified allowances are context for agents;
+headline hazards are the things to investigate first.
 
 ### Event Bus
 

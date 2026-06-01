@@ -18,6 +18,8 @@ import {
 } from "../tools/agent-target.mjs";
 import { classify as classifyContentId } from "../tools/content-id-audit.mjs";
 import {
+  classifyNondeterminism,
+  classifySystemCall,
   formatHealthReport,
   normalizeImport as normalizeHealthImport,
 } from "../tools/agent-health.mjs";
@@ -195,10 +197,66 @@ Deno.test("agent-health formatting and path normalization are import-safe", () =
       line: 1,
       text: "Math.random()",
     }],
+    generationAsync: [{
+      file: "src/rules/environment/dungeon/index.js",
+      line: 1,
+      text: "await generateFloor()",
+    }],
     directSystemCalls: [],
+    systemCallNotes: [{
+      file: "src/rules/systems/plasmaCloudSystem.js",
+      line: 10,
+      text: "hazardSystem(world);",
+      kind: "compatibility-shim",
+    }],
     boundaries: [],
   });
   assert(text.includes("files scanned: 2"));
   assert(text.includes("emitSafe refs: 0"));
   assert(text.includes("rules nondeterminism hazards: 1"));
+  assert(text.includes("generation async allowances: 1"));
+  assert(text.includes("[compatibility-shim]"));
+});
+
+Deno.test("agent-health classifies known health leads before reporting", () => {
+  assertEquals(
+    classifyNondeterminism({
+      file: "src/rules/environment/dungeon/index.js",
+      line: 1,
+      text: "await generateFloor()",
+    }),
+    "generation-async",
+  );
+  assertEquals(
+    classifyNondeterminism({
+      file: "src/rules/systems/badSystem.js",
+      line: 1,
+      text: "Math.random()",
+    }),
+    "rules-hazard",
+  );
+  assertEquals(
+    classifySystemCall({
+      file: "src/rules/systems/interactionSystem.js",
+      line: 40,
+      text: "InteractionSystem(world, actor, target);",
+    }),
+    "local-dispatch-helper",
+  );
+  assertEquals(
+    classifySystemCall({
+      file: "src/rules/systems/plasmaCloudSystem.js",
+      line: 10,
+      text: "hazardSystem(world);",
+    }),
+    "compatibility-shim",
+  );
+  assertEquals(
+    classifySystemCall({
+      file: "src/rules/systems/fooSystem.js",
+      line: 10,
+      text: "barSystem(world);",
+    }),
+    "possible-violation",
+  );
 });

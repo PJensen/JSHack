@@ -94,6 +94,32 @@ export async function systemCounts() {
   return { registered, files };
 }
 
+export function classifyNondeterminism(row) {
+  if (
+    row.file.startsWith("src/rules/environment/dungeon/") &&
+    /\bawait\b|\bPromise\b|\brequestAnimationFrame\b/.test(row.text)
+  ) {
+    return "generation-async";
+  }
+  return "rules-hazard";
+}
+
+export function classifySystemCall(row) {
+  if (
+    row.file === "src/rules/systems/interactionSystem.js" &&
+    /\bInteractionSystem\s*\(/.test(row.text)
+  ) {
+    return "local-dispatch-helper";
+  }
+  if (
+    row.file === "src/rules/systems/plasmaCloudSystem.js" &&
+    /\bhazardSystem\s*\(\s*world\b/.test(row.text)
+  ) {
+    return "compatibility-shim";
+  }
+  return "possible-violation";
+}
+
 export async function buildHealthReport() {
   const src = await collectFiles("src");
   const rules = src.filter((f) => f.startsWith("src/rules/"));
@@ -107,21 +133,36 @@ export async function buildHealthReport() {
     rules,
     /\bMath\.random\b|\bDate\.now\b|\bsetTimeout\b|\bsetInterval\b|\bfetch\s*\(|\bawait\b|\bPromise\b/,
   );
-  const directSystemCalls = (await grep(
+  const directSystemCallRows = (await grep(
     rules.filter((f) => f.includes("/systems/")),
     /\b[A-Za-z_$][\w$]*System\s*\(\s*world\b/,
   ))
     .filter((row) =>
       !/\bexport\s+function\s+[A-Za-z_$][\w$]*System\s*\(/.test(row.text)
     );
+  const generationAsync = rulesNondeterminism.filter((row) =>
+    classifyNondeterminism(row) === "generation-async"
+  );
+  const nondeterminismHazards = rulesNondeterminism.filter((row) =>
+    classifyNondeterminism(row) === "rules-hazard"
+  );
+  const systemCallNotes = directSystemCallRows.map((row) => ({
+    ...row,
+    kind: classifySystemCall(row),
+  }));
+  const directSystemCalls = systemCallNotes.filter((row) =>
+    row.kind === "possible-violation"
+  );
   const boundaries = await boundaryViolations(src);
   const systems = await systemCounts();
   return {
     src,
     systems,
     emitSafe,
-    rulesNondeterminism,
+    rulesNondeterminism: nondeterminismHazards,
+    generationAsync,
     directSystemCalls,
+    systemCallNotes,
     boundaries,
   };
 }
@@ -132,7 +173,9 @@ export function formatHealthReport(report) {
     systems,
     emitSafe,
     rulesNondeterminism,
+    generationAsync = [],
     directSystemCalls,
+    systemCallNotes = directSystemCalls,
     boundaries,
   } = report;
   const lines = [];
@@ -143,20 +186,23 @@ export function formatHealthReport(report) {
   );
   lines.push(`emitSafe refs: ${emitSafe.length}`);
   lines.push(`rules nondeterminism hazards: ${rulesNondeterminism.length}`);
+  lines.push(`generation async allowances: ${generationAsync.length}`);
   lines.push(`layer boundary violations: ${boundaries.length}`);
   lines.push(`possible system-to-system calls: ${directSystemCalls.length}`);
   const sections = [
     ["emitSafe refs", emitSafe],
     ["rules nondeterminism hazards", rulesNondeterminism],
+    ["generation async allowances", generationAsync],
     ["layer boundary violations", boundaries],
-    ["possible system-to-system calls", directSystemCalls],
+    ["system call classifications", systemCallNotes],
   ];
   for (const [title, rows] of sections) {
     if (!rows.length) continue;
     lines.push("");
     lines.push(title + ":");
     for (const row of rows.slice(0, 30)) {
-      lines.push(`  ${row.file}:${row.line} ${row.text}`);
+      const prefix = row.kind ? `[${row.kind}] ` : "";
+      lines.push(`  ${row.file}:${row.line} ${prefix}${row.text}`);
     }
     if (rows.length > 30) lines.push(`  ... ${rows.length - 30} more`);
   }
