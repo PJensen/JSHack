@@ -1,9 +1,8 @@
 // src/rules/utils/electrocute.js
 // Canonical sensory-overload effect for any lightning/electric hit.
 //
-// installElectrocuteOnDamage(world) hooks into the 'damaged' event so that ANY
-// electric/lightning damage automatically triggers applyElectrocuted(). No caller
-// needs to import or invoke it directly — just deal electric damage via dealDamage.
+// Scheduled damage-reaction systems call applyElectrocuted() for electric and
+// lightning damage. The 'damaged' event is presentation/debug only.
 //
 // Effect profile (all values recoverable — no permanent damage):
 //   Stun:      2 turns
@@ -65,18 +64,12 @@ export function applyElectrocuted(world, targetId) {
 const INSTALLED = Symbol.for('jshack:electrocute:installed');
 
 /**
- * Install a one-time 'damaged' event listener that auto-applies electrocution
- * whenever an entity takes electric or lightning damage.
+ * Compatibility shim. Electrocution is now applied by a scheduled
+ * damage-reaction system; `damaged` is presentation/debug only.
  *
  * @param {import('../../lib/ecs-js/index.js').World} world
  */
 export function installElectrocuteOnDamage(world) {
   if (world[INSTALLED]) return;
   world[INSTALLED] = true;
-
-  world.on('damaged', ({ target, type, amount }) => {
-    if (type !== 'electric' && type !== 'lightning') return;
-    if (!(amount > 0)) return;
-    applyElectrocuted(world, Number(target || 0) | 0);
-  });
 }

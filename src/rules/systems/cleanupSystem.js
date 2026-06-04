@@ -38,30 +38,31 @@ const GROUND_STACK_SEQ_KEY = Symbol.for("jshack:groundStack:seq");
 const DEATH_IMPACT_KEY = Symbol.for("jshack:deathImpact:map");
 const DEATH_IMPACT_INSTALLED_KEY = Symbol.for("jshack:deathImpact:installed");
 
+export function recordDeathImpactFromDamage(world, { target, impactVector, critical, amount, rawAmount, cause }) {
+  if (!(Number(target) > 0)) return;
+  const dealt = Number(amount || rawAmount || 0);
+  if (!(dealt > 0)) return;
+  if (!world[DEATH_IMPACT_KEY]) world[DEATH_IMPACT_KEY] = new Map();
+  const dx = Number(impactVector?.dx || 0);
+  const dy = Number(impactVector?.dy || 0);
+  world[DEATH_IMPACT_KEY].set(Number(target) | 0, {
+    dx, dy,
+    critical: !!critical,
+    cause: String(cause || ''),
+    amount: Number(amount || 0) | 0,
+    rawAmount: Number(rawAmount || 0) | 0,
+    step: world.step | 0,
+  });
+}
+
 /**
- * Install a `damaged` listener that records the latest same-turn, positive-damage
- * impactVector + critical flag per target entity. cleanupSystem reads this when
- * building loot scatter.
+ * Compatibility shim. Death-impact tracking is now performed by a scheduled
+ * damage-reaction system; `damaged` is presentation/debug only.
  */
 export function installDeathImpactTracker(world) {
   if (world[DEATH_IMPACT_INSTALLED_KEY]) return;
   world[DEATH_IMPACT_INSTALLED_KEY] = true;
   world[DEATH_IMPACT_KEY] = new Map();
-  world.on("damaged", ({ target, impactVector, critical, amount, rawAmount, cause }) => {
-    if (!(Number(target) > 0)) return;
-    const dealt = Number(amount || rawAmount || 0);
-    if (!(dealt > 0)) return;
-    const dx = Number(impactVector?.dx || 0);
-    const dy = Number(impactVector?.dy || 0);
-    world[DEATH_IMPACT_KEY].set(Number(target) | 0, {
-      dx, dy,
-      critical: !!critical,
-      cause: String(cause || ''),
-      amount: Number(amount || 0) | 0,
-      rawAmount: Number(rawAmount || 0) | 0,
-      step: world.step | 0,
-    });
-  });
 }
 
 function getDeathImpact(world, entityId) {

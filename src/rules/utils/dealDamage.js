@@ -25,6 +25,7 @@ import { Physiology } from "../components/Physiology.js";
 import { getMonster } from "../data/monsters.js";
 import { resolveWeaponFamily } from "../data/weaponFamilies.js";
 import { tryHandlePlayerPseudoDeath } from "./deathModes.js";
+import { recordDamageApplied } from "./damageApplied.js";
 
 function resolveEventWeaponFamily(world, weaponId) {
   if (!(weaponId > 0) || !world.isAlive(weaponId)) return "";
@@ -379,7 +380,7 @@ export function dealDamage(world, spec) {
   // Step 5: Emit 'damaged'
   const _phys = world.get(target, Physiology);
   const eventWeaponFamily = resolveEventWeaponFamily(world, Number(spec.weaponId || 0) | 0);
-  world.emit('damaged', {
+  const damagedPayload = {
     target,
     amount: finalAmount,
     hpBefore,
@@ -403,7 +404,12 @@ export function dealDamage(world, spec) {
     goreType: String(getMonster(String(world.get(target, NamedIdentity)?.identity || ''))?.goreType || 'blood'),
     sizeClass: String(_phys?.sizeClass || 'M'),
     massKg: Number(_phys?.massKg) || 80,
+  };
+  recordDamageApplied(world, {
+    ...damagedPayload,
+    step: world.step | 0,
   });
+  world.emit('damaged', damagedPayload);
 
   if (!spec.noTrigger) {
     ensureEquippedAffixTopology(world, target);

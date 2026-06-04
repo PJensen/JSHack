@@ -97,16 +97,6 @@ export function installThreatListeners(world) {
   if (!world || world[THREAT_LISTENERS_INSTALLED]) return;
   world[THREAT_LISTENERS_INSTALLED] = true;
 
-  world.on("damaged", ({ target, source, amount, cause }) => {
-    const owner = Number(target || 0) | 0;
-    const actor = Number(source || 0) | 0;
-    const value = Math.max(0, Number(amount || 0) | 0);
-    if (!(owner > 0) || !(actor > 0) || value <= 0) return;
-    const mult = getThreatGenerationMultiplier(world, actor);
-    addThreat(world, owner, actor, Math.max(1, Math.floor((value * mult) + 1e-6)), { kind: String(cause || "damage") });
-    resolveThreatTarget(world, owner, { reason: "damage" });
-  });
-
   world.on("threat:add", ({ ownerId, targetId, sourceId, amount, kind, reason, sticky }) => {
     const owner = Number(ownerId || targetId || 0) | 0;
     const source = Number(sourceId || 0) | 0;

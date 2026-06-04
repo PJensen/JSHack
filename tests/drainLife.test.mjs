@@ -13,6 +13,7 @@ import { CastSpellIntent } from "../src/rules/components/Intents/CastSpellIntent
 import { castSpellSystem } from "../src/rules/systems/castSpellSystem.js";
 import { channelingSystem } from "../src/rules/systems/channelingSystem.js";
 import { effectSystem } from "../src/rules/systems/effectSystem.js";
+import { channelingDamageReactionSystem } from "../src/rules/systems/damageReactions/channelingDamageReactionSystem.js";
 import { installDrainLifeDamageInterruptListener } from "../src/rules/systems/channelingSystem.js";
 import { dealDamage } from "../src/rules/utils/dealDamage.js";
 import { clearAll, loadChunk } from "../src/rules/environment/dungeon/tileMap.js";
@@ -28,6 +29,7 @@ function scheduler(world) {
   installDrainLifeDamageInterruptListener(world);
   try { channelingSystem(world); } catch (e) { console.error("channeling system error", e); }
   try { castSpellSystem(world); } catch (e) { console.error("cast system error", e); }
+  try { channelingDamageReactionSystem(world); } catch (e) { console.error("channeling damage reaction error", e); }
   try { effectSystem(world); } catch (e) { console.error("effect system error", e); }
 }
 
@@ -163,6 +165,7 @@ Deno.test("drain_life: incoming damage interrupts channel", () => {
   assert(world.has(caster, Channeling), "drain_life should be actively channeling");
 
   dealDamage(world, { target: caster, source: enemy, amount: 1, type: "physical", cause: "melee" });
+  channelingDamageReactionSystem(world);
 
   assert(!world.has(caster, Channeling), "incoming damage should cancel drain_life channel");
   const ae = world.get(caster, ActiveEffects);

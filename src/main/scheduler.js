@@ -15,6 +15,14 @@ import { rangedAttackSystem } from "../rules/systems/rangedAttackSystem.js";
 import { attackDirectionSystem } from "../rules/systems/attackDirectionSystem.js";
 import { interactionSystem } from "../rules/systems/interactionSystem.js";
 import { effectSystem } from "../rules/systems/effectSystem.js";
+import { aggroDamageReactionSystem } from "../rules/systems/damageReactions/aggroDamageReactionSystem.js";
+import { channelingDamageReactionSystem } from "../rules/systems/damageReactions/channelingDamageReactionSystem.js";
+import { deathImpactDamageReactionSystem } from "../rules/systems/damageReactions/deathImpactDamageReactionSystem.js";
+import { deityDamageReactionSystem } from "../rules/systems/damageReactions/deityDamageReactionSystem.js";
+import { electrocuteDamageReactionSystem } from "../rules/systems/damageReactions/electrocuteDamageReactionSystem.js";
+import { itemDamageReactionSystem } from "../rules/systems/damageReactions/itemDamageReactionSystem.js";
+import { sleepDamageReactionSystem } from "../rules/systems/damageReactions/sleepDamageReactionSystem.js";
+import { threatDamageReactionSystem } from "../rules/systems/damageReactions/threatDamageReactionSystem.js";
 import { shieldGuardSystem } from "../rules/systems/shieldGuardSystem.js";
 import { stealthAmbushSystem } from "../rules/systems/stealthAmbushSystem.js";
 import { waitSystem } from "../rules/systems/waitSystem.js";
@@ -272,6 +280,13 @@ export function configureWorld(world) {
   // Run stealth ambush rearm before effect aging so the cooldown tracker can
   // complete cleanly and restore opener while invisibility remains active.
   registerSystem(stealthAmbushSystem, 'effects');
+  registerSystem(sleepDamageReactionSystem, 'effects', { after: [stealthAmbushSystem], before: [effectSystem] });
+  registerSystem(electrocuteDamageReactionSystem, 'effects', { after: [stealthAmbushSystem], before: [effectSystem] });
+  registerSystem(itemDamageReactionSystem, 'effects', { after: [stealthAmbushSystem], before: [effectSystem] });
+  registerSystem(channelingDamageReactionSystem, 'effects', { after: [stealthAmbushSystem], before: [effectSystem] });
+  registerSystem(aggroDamageReactionSystem, 'effects', { after: [stealthAmbushSystem], before: [effectSystem] });
+  registerSystem(threatDamageReactionSystem, 'effects', { after: [stealthAmbushSystem], before: [effectSystem] });
+  registerSystem(deityDamageReactionSystem, 'effects', { after: [stealthAmbushSystem], before: [effectSystem] });
   registerSystem(effectSystem, 'effects');
   // Keep shield guard/break icon state synced to equipped offhand shields.
   registerSystem(shieldGuardSystem, 'effects');
@@ -302,6 +317,7 @@ export function configureWorld(world) {
   // Deity mood ticks in the effects phase (after combat results are emitted)
   registerSystem(deitySystem, 'effects');
   registerSystem(perceptionMemorySystem, 'effects');
+  registerSystem(deathImpactDamageReactionSystem, 'effects', { after: [perceptionMemorySystem] });
 
   // Phase: scripts (content-DSL tick hooks: onTurnWhileCarried, etc.)
   registerSystem(scriptTickSystem, 'scripts');

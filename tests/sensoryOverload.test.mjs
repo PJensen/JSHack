@@ -12,8 +12,8 @@ import { effectSystem } from "../src/rules/systems/effectSystem.js";
 import { blind, getEffectiveVisionRange } from "../src/rules/utils/blind.js";
 import { deafen } from "../src/rules/utils/deafen.js";
 import { applyElectrocuted } from "../src/rules/utils/electrocute.js";
-import { installElectrocuteOnDamage } from "../src/rules/utils/electrocute.js";
 import { dealDamage } from "../src/rules/utils/dealDamage.js";
+import { electrocuteDamageReactionSystem } from "../src/rules/systems/damageReactions/electrocuteDamageReactionSystem.js";
 import { trapSystem, installTrapStepListener } from "../src/rules/systems/trapSystem.js";
 import { Trap } from "../src/rules/components/Trap.js";
 import { Position } from "../src/rules/components/Position.js";
@@ -236,7 +236,6 @@ Deno.test("lightning damage blinds immediately (effective sight is 0 before tick
   const player = createPlayer(world, { name: "Hero" });
   const brain = world.get(player, Brain);
   brain.visionRange = 8;
-  installElectrocuteOnDamage(world);
 
   dealDamage(world, {
     target: player,
@@ -244,6 +243,7 @@ Deno.test("lightning damage blinds immediately (effective sight is 0 before tick
     type: "lightning",
     cause: "test:lightning",
   });
+  electrocuteDamageReactionSystem(world);
 
   const vNow = getEffectiveVisionRange(world, player);
   assertEquals(vNow, 0, `lightning damage should blind immediately; got ${vNow}`);
@@ -255,7 +255,6 @@ Deno.test("shock trap blinds immediately (effective sight is 0 on trigger)", () 
   const brain = world.get(player, Brain);
   brain.visionRange = 8;
   world.set(player, Position, { x: 4, y: 4 });
-  installElectrocuteOnDamage(world);
 
   const trap = world.create();
   world.add(trap, Position, { x: 4, y: 4 });
@@ -271,6 +270,7 @@ Deno.test("shock trap blinds immediately (effective sight is 0 on trigger)", () 
   installTrapStepListener(world);
   world.emit("moved", { id: player, from: { x: 4, y: 5 }, to: { x: 4, y: 4 } });
   trapSystem(world);
+  electrocuteDamageReactionSystem(world);
 
   const vNow = getEffectiveVisionRange(world, player);
   assertEquals(vNow, 0, `shock trap should blind immediately; got ${vNow}`);

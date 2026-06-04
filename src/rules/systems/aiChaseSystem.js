@@ -317,37 +317,13 @@ const AGGRO_DAMAGE_INSTALLED = Symbol.for("jshack:aggroFromDamage:installed");
 const AGGRO_STEALTH_OFFENSE_INSTALLED = Symbol.for("jshack:aggroFromStealthOffense:installed");
 
 /**
- * When an enemy takes damage it immediately becomes alerted (if not already
- * hunting), pointing its search toward the attacker's last known position.
- * Install once per world in configureWorld().
+ * Compatibility shim. Damage-triggered aggro is now handled by a scheduled
+ * damage-reaction system; `damaged` is presentation/debug only.
  * @param {import('../../lib/ecs-js/index.js').World} world
  */
 export function installAggroFromDamageListener(world) {
   if (world[AGGRO_DAMAGE_INSTALLED]) return;
   world[AGGRO_DAMAGE_INSTALLED] = true;
-
-  world.on("damaged", ({ target, source, at }) => {
-    const aggro = world.get(target, AggroState);
-    if (!aggro) return;
-    if (aggro.alertLevel === AGGRO_LEVELS.hunting) return; // already on highest alert
-
-    // Try to point the search toward the attacker's position.
-    const srcPos = (source && world.isAlive(source)) ? world.get(source, Position) : null;
-    if (srcPos) {
-      aggro.lastKnownX = srcPos.x | 0;
-      aggro.lastKnownY = srcPos.y | 0;
-    } else if (at) {
-      aggro.lastKnownX = at.x | 0;
-      aggro.lastKnownY = at.y | 0;
-    }
-
-    aggro.alertLevel      = AGGRO_LEVELS.alerted;
-    aggro.targetId        = 0;
-    aggro.searchTurnsLeft = SEARCH_TURNS_ALERTED;
-
-    const tPos = world.get(target, Position);
-    if (tPos) world.emit('status', { id: target, kind: 'alert', at: { x: tPos.x | 0, y: tPos.y | 0 } });
-  });
 }
 
 /**

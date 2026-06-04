@@ -243,6 +243,22 @@ function applyActionToPlayerDeities(world, playerId, type, meta = {}) {
   });
 }
 
+export function applyPetDamageDeityReaction(world, { target, source, amount }) {
+  if (!source || !target) return false;
+  if (!world.has(source, Player)) return false;
+  if (!world.has(target, Pet)) return false;
+
+  const owner = world.get(target, Owner);
+  if (!owner || owner.ownerId !== source) return false;
+
+  const magnitude = Math.min(0.3, (amount || 1) * 0.05);
+  applyActionToPlayerDeities(world, source, "betray", {
+    magnitude,
+    target: "companion",
+  });
+  return true;
+}
+
 /**
  * @param {import('../../lib/ecs-js/index.js').World} world
  * @param {number} playerId
@@ -718,24 +734,6 @@ function wireWorldEvents(world) {
         desecrateStacks: stacks,
       });
     }
-  });
-
-  // Hitting your own pet → deity.action('betray') with lower magnitude
-  world.on("damaged", ({ target, source, amount }) => {
-    if (!source || !target) return;
-    if (!world.has(source, Player)) return;
-    if (!world.has(target, Pet)) return;
-
-    // Check if the player owns this pet
-    const owner = world.get(target, Owner);
-    if (!owner || owner.ownerId !== source) return;
-
-    // Lesser betrayal than killing — scale by damage dealt
-    const magnitude = Math.min(0.3, (amount || 1) * 0.05);
-    applyActionToPlayerDeities(world, source, "betray", {
-      magnitude,
-      target: "companion",
-    });
   });
 
   // Altar offerings → deity.offer()

@@ -22,44 +22,46 @@ import { spellCostPerTick, spellCostResource } from "../data/spells.js";
 
 const DRAIN_LIFE_DAMAGE_INTERRUPT_INSTALLED = Symbol.for("jshack:channeling:drainLifeDamageInterrupt:installed");
 
+export function applyDrainLifeDamageInterrupt(world, { target, source, amount, cause }) {
+  const actor = Number(target || 0) | 0;
+  if (!(actor > 0)) return false;
+
+  const ch = world.get(actor, Channeling);
+  if (!ch || String(ch.spellId || "") !== "drain_life") return false;
+
+  try { world.remove(actor, Channeling); } catch {}
+
+  const ae = world.get(actor, ActiveEffects);
+  if (ae && Array.isArray(ae.effects)) {
+    ae.effects = ae.effects.filter((e) => String(e?.key || "").toLowerCase() !== "drain_life_channel");
+  }
+
+  world.emit("spell:drain_life:break", {
+    actor,
+    targetId: Number(source || 0) | 0,
+    spellId: "drain_life",
+    reason: "damage_interrupt",
+    amount: Number(amount || 0) | 0,
+    cause: String(cause || ""),
+  });
+
+  world.emit("channeling:cancelled", {
+    actor,
+    spellId: "drain_life",
+    reason: "damage_interrupt",
+  });
+
+  return true;
+}
+
 /**
- * Drain Life-specific interrupt policy:
- * only this sustained spell breaks on incoming damage.
+ * Compatibility shim. Drain Life damage interruption is now handled by a
+ * scheduled damage-reaction system; `damaged` is presentation/debug only.
  * @param {import('../../lib/ecs-js/index.js').World} world
  */
 export function installDrainLifeDamageInterruptListener(world) {
   if (world[DRAIN_LIFE_DAMAGE_INTERRUPT_INSTALLED]) return;
   world[DRAIN_LIFE_DAMAGE_INTERRUPT_INSTALLED] = true;
-
-  world.on("damaged", ({ target, source, amount, cause }) => {
-    const actor = Number(target || 0) | 0;
-    if (!(actor > 0)) return;
-
-    const ch = world.get(actor, Channeling);
-    if (!ch || String(ch.spellId || "") !== "drain_life") return;
-
-    try { world.remove(actor, Channeling); } catch {}
-
-    const ae = world.get(actor, ActiveEffects);
-    if (ae && Array.isArray(ae.effects)) {
-      ae.effects = ae.effects.filter((e) => String(e?.key || "").toLowerCase() !== "drain_life_channel");
-    }
-
-    world.emit("spell:drain_life:break", {
-      actor,
-      targetId: Number(source || 0) | 0,
-      spellId: "drain_life",
-      reason: "damage_interrupt",
-      amount: Number(amount || 0) | 0,
-      cause: String(cause || ""),
-    });
-
-    world.emit("channeling:cancelled", {
-      actor,
-      spellId: "drain_life",
-      reason: "damage_interrupt",
-    });
-  });
 }
 
 /** @param {import('../../lib/ecs-js/index.js').World} world */

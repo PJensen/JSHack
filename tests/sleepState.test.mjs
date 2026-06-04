@@ -22,7 +22,8 @@ import { clearExplored } from "../src/rules/environment/dungeon/exploredMap.js";
 import { clearPerceptionMemory } from "../src/rules/environment/dungeon/perceptionMemory.js";
 import { CHUNK_SIZE, TILE_FLOOR } from "../src/rules/environment/dungeon/constants.js";
 import { dealDamage } from "../src/rules/utils/dealDamage.js";
-import { installSleepWakeListeners, isAsleep, putActorToSleep, SLEEP_DISPLAY_TAG, tryWakeActor } from "../src/rules/utils/sleep.js";
+import { isAsleep, putActorToSleep, SLEEP_DISPLAY_TAG, tryWakeActor } from "../src/rules/utils/sleep.js";
+import { sleepDamageReactionSystem } from "../src/rules/systems/damageReactions/sleepDamageReactionSystem.js";
 import { getMonster } from "../src/rules/data/monsters.js";
 import { listSleepProfileIds, resolveSleepProfile } from "../src/rules/data/sleepProfiles.js";
 import { toMonsterSpawnParams } from "../src/rules/utils/monsterSpawnParams.js";
@@ -111,7 +112,6 @@ Deno.test("flyIntentSystem rejects sleepers even when validation is bypassed", (
 
 Deno.test("damage wakes a sleeping actor through canonical listener", () => {
   const world = new World({ seed: 0xDA6A9E });
-  installSleepWakeListeners(world);
 
   const source = makeActor(world, 4, 5);
   const sleeper = makeActor(world, 5, 5);
@@ -126,6 +126,7 @@ Deno.test("damage wakes a sleeping actor through canonical listener", () => {
     amount: 1,
     type: "physical",
   });
+  sleepDamageReactionSystem(world);
 
   assert(!isAsleep(world, sleeper), "damage should wake sleeper");
   assertEquals(woke?.actor, sleeper);

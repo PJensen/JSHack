@@ -4,6 +4,7 @@ import { Faction } from "../components/Faction.js";
 import { Vitality } from "../components/Vitality.js";
 import { MonsterSpawner } from "../components/MonsterSpawner.js";
 import { Position } from "../components/Position.js";
+import { dealDamage } from "../utils/dealDamage.js";
 
 const GENOCIDE_LISTENER_INSTALLED = Symbol.for("jshack:genocide:listener:installed");
 
@@ -66,32 +67,30 @@ export function installGenocideListener(world) {
 
     addGenocide(best.id);
 
-    const originPos = world.get(actor, Position);
-    const targets = [];
     let killed = 0;
 
     for (const [id, ident, faction, vit, pos] of world.query(NamedIdentity, Faction, Vitality, Position)) {
       if (!ident || ident.identity !== best.id) continue;
       if (!faction || faction.key !== "enemy") continue;
       if (!vit || vit.hp <= 0) continue;
-      targets.push({ id, x: pos.x | 0, y: pos.y | 0 });
-      world.mutate(id, Vitality, (record) => { record.hp = 0; });
-      killed++;
+      const result = dealDamage(world, {
+        source: actor | 0,
+        target: id,
+        amount: Math.max(9999, Number(vit.hp || 0) | 0),
+        type: "genocide",
+        cause: "genocide",
+        critical: true,
+        at: { x: pos.x | 0, y: pos.y | 0 },
+        bypassInvuln: true,
+        bypassResist: true,
+        noTrigger: true,
+      });
+      if (result.killed || result.applied) killed++;
     }
 
     for (const [id, spawner] of world.query(MonsterSpawner)) {
       if (spawner?.spawnParams?.identity !== best.id) continue;
       world.mutate(id, MonsterSpawner, (record) => { record.isActive = false; });
-    }
-
-    for (const target of targets) {
-      world.emit?.("damaged", {
-        source: actor | 0,
-        target: target.id | 0,
-        amount: 9999,
-        critical: true,
-        at: { x: target.x | 0, y: target.y | 0 },
-      });
     }
 
     world.emit?.("message", {

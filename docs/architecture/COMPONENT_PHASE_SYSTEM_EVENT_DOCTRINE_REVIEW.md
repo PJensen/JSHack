@@ -154,37 +154,47 @@ Events are receipts, not commands; they must not be the normal path for mutating
 rules-side state.
 ```
 
-## Current Code Violations
+## Current Code Status
 
 The stricter event boundary is not just theoretical. The current codebase has
-rules-side listeners that mutate durable rule state in response to events.
+had rules-side listeners that mutated durable rule state in response to
+`damaged`. That path has been migrated.
 
-Clear examples:
+`dealDamage` now creates a short-lived `DamageApplied` rule record. Namespaced
+systems under
+[src/rules/systems/damageReactions/](../../src/rules/systems/damageReactions/)
+consume that record in scheduler order:
+
+- `sleepDamageReactionSystem`
+- `electrocuteDamageReactionSystem`
+- `itemDamageReactionSystem`
+- `aggroDamageReactionSystem`
+- `threatDamageReactionSystem`
+- `channelingDamageReactionSystem`
+- `deityDamageReactionSystem`
+- `deathImpactDamageReactionSystem`
+
+The `damaged` event remains a presentation/debug receipt. It no longer has
+rules-side listeners in `src/rules` or `src/content`.
+
+Remaining clear examples outside the `damaged` path:
 
 - [src/rules/systems/threatSystem.js](../../src/rules/systems/threatSystem.js)
-  installs listeners for `damaged`, `threat:add`, spell events,
-  `taunt:applied`, and threat-drop events, then directly mutates `AggroState`
-  threat records through `addThreat`, `forceThreatTarget`,
-  `clearThreatFromSource`, and `reduceThreatFromSource`.
-- [src/rules/utils/sleep.js](../../src/rules/utils/sleep.js) listens for
-  `damaged` and directly wakes an actor by mutating `SleepState`.
-- [src/rules/utils/electrocute.js](../../src/rules/utils/electrocute.js)
-  listens for `damaged` and directly applies stun, blindness, and deafness
-  status state.
-- [src/rules/systems/itemDestructionSystem.js](../../src/rules/systems/itemDestructionSystem.js)
-  listens for `damaged` and directly transforms or destroys inventory items.
+  still installs listeners for `threat:add`, spell events, `taunt:applied`, and
+  threat-drop events, then directly mutates threat records through `addThreat`,
+  `forceThreatTarget`, `clearThreatFromSource`, and `reduceThreatFromSource`.
 - [src/rules/systems/aiChaseSystem.js](../../src/rules/systems/aiChaseSystem.js)
-  listens for `damaged` and `stealth:offense`, then directly mutates
-  `AggroState` alert fields.
+  still listens for `stealth:offense`, then directly mutates `AggroState` alert
+  fields.
 - [src/rules/systems/scoreSystem.js](../../src/rules/systems/scoreSystem.js)
   listens for `died` and directly mutates the player's `Score`.
 - [src/rules/utils/disposition.js](../../src/rules/utils/disposition.js) and
   [src/rules/utils/reputation.js](../../src/rules/utils/reputation.js) consume
   offense/disposition events and directly mutate social/reputation state.
 - [src/rules/systems/deitySystem.js](../../src/rules/systems/deitySystem.js)
-  consumes many world events such as `died`, `damaged`, `healed`,
-  `shrine:touch`, and terrain/crafting events, then directly mutates deity
-  standing, wrath, cooldown, offering, gift, and resurrection state.
+  still consumes many world events such as `died`, `healed`, `shrine:touch`,
+  and terrain/crafting events, then directly mutates deity standing, wrath,
+  cooldown, offering, gift, and resurrection state.
 
 Borderline but less severe:
 
@@ -192,10 +202,10 @@ Borderline but less severe:
   listens for `moved` and records arrivals into a world-local queue that
   `trapSystem` later consumes in scheduler order. This still uses an event as
   a rules handoff, but the durable mutation is performed by a registered system.
-- [src/rules/systems/cleanupSystem.js](../../src/rules/systems/cleanupSystem.js)
-  listens for `damaged` and records death-impact scratch data into a
-  world-local map for `cleanupSystem`. This is phase-local metadata rather than
-  durable game truth, but it is still hidden coupling and should stay narrow.
+- [src/rules/systems/damageReactions/deathImpactDamageReactionSystem.js](../../src/rules/systems/damageReactions/deathImpactDamageReactionSystem.js)
+  records death-impact scratch data into a world-local map for `cleanupSystem`.
+  This is phase-local metadata rather than durable game truth, and it now runs
+  as an explicit scheduled system.
 
 Preferred migration shape:
 

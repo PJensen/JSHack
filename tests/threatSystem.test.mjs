@@ -16,6 +16,7 @@ import { dealDamage } from "../src/rules/utils/dealDamage.js";
 import { SPELL_DEFS } from "../src/rules/data/spells.js";
 import { addThreat, getThreatValue, forceThreatTarget, resolveThreatTarget } from "../src/rules/utils/threat.js";
 import { threatSystem, installThreatListeners } from "../src/rules/systems/threatSystem.js";
+import { threatDamageReactionSystem } from "../src/rules/systems/damageReactions/threatDamageReactionSystem.js";
 import { installTauntListener, tauntSteeringSystem } from "../src/rules/systems/tauntSystem.js";
 
 function addActor(world, x, y, factionKey, extra = {}) {
@@ -95,6 +96,7 @@ Deno.test("damage threat creates a child entry and can pull aggro in melee range
   assertEquals(aggro.targetId, pet);
 
   dealDamage(world, { target: enemy, source: player, amount: 11, type: "physical", bypassResist: true });
+  threatDamageReactionSystem(world);
 
   assertEquals(threatEntryCount(world, enemy), 2);
   assertEquals(getThreatValue(world, enemy, player), 11);
@@ -235,6 +237,7 @@ Deno.test("equipped subtle gear reduces damage threat acquisition", () => {
   equipTaggedRing(world, player, ["subtle"], { threatReduction: 0.2 });
 
   dealDamage(world, { target: enemy, source: player, amount: 10, type: "physical", bypassResist: true });
+  threatDamageReactionSystem(world);
 
   assertEquals(getThreatValue(world, enemy, player), 6);
 });

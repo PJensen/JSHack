@@ -95,22 +95,12 @@ export function tryWakeActor(world, id, opts = {}) {
 }
 
 /**
- * Install sleep wake listeners once per world.
+ * Compatibility shim. Damage wake-up is now handled by a scheduled
+ * damage-reaction system; `damaged` is presentation/debug only.
  *
  * @param {import("../../lib/ecs-js/index.js").World} world
  */
 export function installSleepWakeListeners(world) {
   if (world[INSTALLED]) return;
   world[INSTALLED] = true;
-
-  world.on("damaged", ({ target, source, amount }) => {
-    if (!(amount > 0)) return;
-    const sleep = world.get(Number(target || 0) | 0, SleepState);
-    if (!sleep || sleep.asleep !== true || sleep.wakeOnDamage === false) return;
-    tryWakeActor(world, target, {
-      reason: "damage",
-      intensity: Math.max(1, Number(amount || 0)),
-      source,
-    });
-  });
 }

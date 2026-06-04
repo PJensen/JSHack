@@ -95,54 +95,55 @@ function equippedSet(world, entityId) {
   return set;
 }
 
+export function applyItemDestructionForDamage(world, { target, type, amount }) {
+  if (!(amount > 0)) return;
+  if (!(target > 0) || !world.isAlive(target)) return;
+  if (!world.has(target, Player)) return;
+
+  const element = String(type || "").toLowerCase();
+  const stats = resolveCanonicalStats(world, target);
+  const worn = equippedSet(world, target);
+
+  for (let r = 0; r < DESTRUCTION_RULES.length; r++) {
+    const rule = DESTRUCTION_RULES[r];
+    if (!rule.elements.includes(element)) continue;
+    if (hasResistance(stats, rule.resistKey)) continue;
+
+    const items = inventoryItems(world, target);
+    for (let i = 0; i < items.length; i++) {
+      const itemId = items[i];
+      if (!(itemId > 0) || !world.isAlive(itemId)) continue;
+      if (worn.has(itemId)) continue;
+
+      const info = world.get(itemId, ItemInfo);
+      if (!info) continue;
+      const mat = world.get(itemId, Material);
+      if (!matchesItem(info, mat, rule)) continue;
+
+      if (world.rand() >= DESTRUCTION_CHANCE) continue;
+
+      const ni = world.get(itemId, NamedIdentity);
+      const name = String(ni?.name || info.description || info.type || "item");
+
+      applyMaterialTransform(world, itemId, rule.transform);
+
+      world.emit("item:destroyed:element", {
+        target,
+        itemId,
+        itemName: name,
+        element,
+        verb: rule.verb,
+      });
+    }
+  }
+}
+
 /**
- * Install the item-destruction-on-damage listener. Call once per world.
+ * Compatibility shim. Damage reactions are now scheduled systems under
+ * `systems/damageReactions/`; `damaged` is presentation/debug only.
  * @param {import('../../lib/ecs-js/index.js').World} world
  */
 export function installItemDestructionListener(world) {
   if (world[INSTALLED_KEY]) return;
   world[INSTALLED_KEY] = true;
-
-  world.on("damaged", ({ target, type, amount }) => {
-    if (!(amount > 0)) return;
-    if (!(target > 0) || !world.isAlive(target)) return;
-    if (!world.has(target, Player)) return;
-
-    const element = String(type || "").toLowerCase();
-    const stats = resolveCanonicalStats(world, target);
-    const worn = equippedSet(world, target);
-
-    for (let r = 0; r < DESTRUCTION_RULES.length; r++) {
-      const rule = DESTRUCTION_RULES[r];
-      if (!rule.elements.includes(element)) continue;
-      if (hasResistance(stats, rule.resistKey)) continue;
-
-      const items = inventoryItems(world, target);
-      for (let i = 0; i < items.length; i++) {
-        const itemId = items[i];
-        if (!(itemId > 0) || !world.isAlive(itemId)) continue;
-        if (worn.has(itemId)) continue;
-
-        const info = world.get(itemId, ItemInfo);
-        if (!info) continue;
-        const mat = world.get(itemId, Material);
-        if (!matchesItem(info, mat, rule)) continue;
-
-        if (world.rand() >= DESTRUCTION_CHANCE) continue;
-
-        const ni = world.get(itemId, NamedIdentity);
-        const name = String(ni?.name || info.description || info.type || "item");
-
-        applyMaterialTransform(world, itemId, rule.transform);
-
-        world.emit("item:destroyed:element", {
-          target,
-          itemId,
-          itemName: name,
-          element,
-          verb: rule.verb,
-        });
-      }
-    }
-  });
 }

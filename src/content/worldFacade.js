@@ -12,6 +12,7 @@ import { ActiveEffects } from '../rules/components/ActiveEffects.js';
 import { ScriptState } from '../rules/components/ScriptState.js';
 import { forEachInRadius } from '../rules/utils/spatialIndex.js';
 import { rollDice } from '../rules/utils/rng.js';
+import { dealDamage } from '../rules/utils/dealDamage.js';
 import { getMonster, monsterHasTag } from '../rules/data/monsters.js';
 import { setItemCooldown, getItemCooldownRemaining, isItemOnCooldown } from '../rules/utils/itemCooldowns.js';
 
@@ -43,11 +44,15 @@ export function createWorldFacade(world, actor, itemId) {
       });
     },
     damage(entityId, amount, _source) {
-      const vit = world.get(entityId, Vitality);
-      if (!vit) return;
       const dmg = Math.max(0, amount | 0);
-      world.mutate(entityId, Vitality, v => { v.hp = Math.max(0, v.hp - dmg); });
-      world.emit('damaged', { target: entityId, amount: dmg, source: actor, cause: 'script', type: _source || 'script' });
+      if (!(dmg > 0)) return;
+      dealDamage(world, {
+        target: entityId,
+        amount: dmg,
+        source: actor,
+        cause: 'script',
+        type: _source || 'script',
+      });
     },
     addEffect(entityId, effect) {
       const ae = world.get(entityId, ActiveEffects);

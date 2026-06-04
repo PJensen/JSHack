@@ -16,7 +16,7 @@ import { Equipment } from "../src/rules/components/Equipment.js";
 import { Resistances } from "../src/rules/components/Resistences.js";
 import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
 import { addToInventory } from "../src/rules/utils/inventoryFacade.js";
-import { installItemDestructionListener } from "../src/rules/systems/itemDestructionSystem.js";
+import { itemDamageReactionSystem } from "../src/rules/systems/damageReactions/itemDamageReactionSystem.js";
 import { dealDamage } from "../src/rules/utils/dealDamage.js";
 import { clearAll, loadChunk } from "../src/rules/environment/dungeon/tileMap.js";
 import { CHUNK_SIZE, TILE_FLOOR } from "../src/rules/environment/dungeon/constants.js";
@@ -25,8 +25,11 @@ function makeWorld(seed = 1) {
   clearAll();
   loadChunk(0, 0, new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR));
   const w = new World({ seed });
-  installItemDestructionListener(w);
   return w;
+}
+
+function applyDamageReactions(world) {
+  itemDamageReactionSystem(world);
 }
 
 function placePlayer(world, x = 5, y = 5) {
@@ -100,6 +103,7 @@ Deno.test("fire damage destroys scrolls (paper → ash)", () => {
   fixRng(world, 0); // always triggers
 
   dealDamage(world, { target: player, amount: 5, type: "fire", source: 0 });
+  applyDamageReactions(world);
 
   assertEquals(identity(world, scroll), "ash", "scroll should become ash");
   assert(isJunk(world, scroll), "scroll should be junk after burning");
@@ -112,6 +116,7 @@ Deno.test("fire damage destroys potions (glass → shatter)", () => {
   fixRng(world, 0);
 
   dealDamage(world, { target: player, amount: 5, type: "fire", source: 0 });
+  applyDamageReactions(world);
 
   assertEquals(identity(world, potion), "glass_shards", "potion should become glass shards");
   assert(isJunk(world, potion), "potion should be junk after shattering");
@@ -126,6 +131,7 @@ Deno.test("cold damage destroys potions (glass → shatter)", () => {
   fixRng(world, 0);
 
   dealDamage(world, { target: player, amount: 5, type: "cold", source: 0 });
+  applyDamageReactions(world);
 
   assertEquals(identity(world, potion), "glass_shards", "potion should shatter from cold");
 });
@@ -137,6 +143,7 @@ Deno.test("cold damage does NOT destroy scrolls", () => {
   fixRng(world, 0);
 
   dealDamage(world, { target: player, amount: 5, type: "cold", source: 0 });
+  applyDamageReactions(world);
 
   assertEquals(identity(world, scroll), "scroll_fire", "scroll should be untouched by cold");
 });
@@ -150,6 +157,7 @@ Deno.test("electric damage destroys wands", () => {
   fixRng(world, 0);
 
   dealDamage(world, { target: player, amount: 5, type: "electric", source: 0 });
+  applyDamageReactions(world);
 
   assertEquals(identity(world, wand), "glass_shards", "wand should shatter from electric");
   assert(isJunk(world, wand), "wand should be junk after shattering");
@@ -163,6 +171,7 @@ Deno.test("electric damage does NOT destroy scrolls or potions", () => {
   fixRng(world, 0);
 
   dealDamage(world, { target: player, amount: 5, type: "electric", source: 0 });
+  applyDamageReactions(world);
 
   assertEquals(identity(world, scroll), "scroll_fire", "scroll untouched by electric");
   assertEquals(identity(world, potion), "potion_heal", "potion untouched by electric");
@@ -182,6 +191,7 @@ Deno.test("fire resist ring protects scrolls and potions", () => {
   fixRng(world, 0);
 
   dealDamage(world, { target: player, amount: 5, type: "fire", source: 0 });
+  applyDamageReactions(world);
 
   assertEquals(identity(world, scroll), "scroll_fire", "scroll protected by fire resist ring");
   assertEquals(identity(world, potion), "potion_heal", "potion protected by fire resist ring");
@@ -197,6 +207,7 @@ Deno.test("cold resist ring protects potions", () => {
   fixRng(world, 0);
 
   dealDamage(world, { target: player, amount: 5, type: "cold", source: 0 });
+  applyDamageReactions(world);
 
   assertEquals(identity(world, potion), "potion_heal", "potion protected by cold resist ring");
 });
@@ -211,6 +222,7 @@ Deno.test("shock resist ring protects wands", () => {
   fixRng(world, 0);
 
   dealDamage(world, { target: player, amount: 5, type: "electric", source: 0 });
+  applyDamageReactions(world);
 
   assertEquals(identity(world, wand), "wand_lightning", "wand protected by shock resist ring");
 });
@@ -227,6 +239,7 @@ Deno.test("equipped wand is NOT destroyed by electric damage", () => {
   fixRng(world, 0);
 
   dealDamage(world, { target: player, amount: 5, type: "electric", source: 0 });
+  applyDamageReactions(world);
 
   assertEquals(identity(world, wand), "wand_lightning", "equipped wand should survive");
 });
@@ -240,6 +253,7 @@ Deno.test("high rand roll prevents item destruction", () => {
   fixRng(world, 0.99); // above 1/3 threshold
 
   dealDamage(world, { target: player, amount: 5, type: "fire", source: 0 });
+  applyDamageReactions(world);
 
   assertEquals(identity(world, scroll), "scroll_fire", "scroll survives high rand roll");
 });
@@ -255,6 +269,7 @@ Deno.test("physical damage does not destroy items", () => {
   fixRng(world, 0);
 
   dealDamage(world, { target: player, amount: 5, type: "physical", source: 0 });
+  applyDamageReactions(world);
 
   assertEquals(identity(world, scroll), "scroll_fire", "scroll untouched by physical");
   assertEquals(identity(world, potion), "potion_heal", "potion untouched by physical");
@@ -273,6 +288,7 @@ Deno.test("item:destroyed:element event is emitted on destruction", () => {
   world.on("item:destroyed:element", (ev) => events.push(ev));
 
   dealDamage(world, { target: player, amount: 5, type: "fire", source: 0 });
+  applyDamageReactions(world);
 
   assertEquals(events.length >= 1, true, "should emit at least one destruction event");
   assertEquals(events[0].itemName, "Scroll of Identify");
