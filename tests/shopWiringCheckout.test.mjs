@@ -189,3 +189,72 @@ Deno.test("paying checkout clears attached shop debt as well as physical unpaid 
     }
   }
 });
+
+Deno.test("paying checkout uses active session when UI omits shopkeeper id", () => {
+  const priorWindow = globalThis.window;
+  // @ts-ignore Deno test runtime does not always define window, but wiring uses it.
+  globalThis.window = globalThis;
+
+  const world = new World({ seed: 0xB177 });
+
+  const playerId = world.create();
+  world.add(playerId, Player, {});
+  world.add(playerId, Position, { x: 2, y: 2 });
+  world.add(playerId, Inventory, { capacity: 20 });
+  world.add(playerId, Equipment, {});
+
+  const shopkeeperId = world.create();
+  world.add(shopkeeperId, Position, { x: 15, y: 15 });
+  world.add(shopkeeperId, ShopInventory, { buyMarkup: 1.3, sellDiscount: 0.5 });
+
+  const itemId = world.create();
+  world.add(itemId, NamedIdentity, { identity: "test_amulet", name: "Test Amulet" });
+  world.add(itemId, ItemInfo, {
+    type: "equip",
+    slot: "neck",
+    weight: 1,
+    value: 80,
+    description: "",
+    count: 1,
+    bonuses: {},
+    rarity: 1,
+    rarityName: "common",
+    affixes: [],
+  });
+  world.add(itemId, Unpaid, { shopkeeperId, price: 80 });
+  addToInventory(world, playerId, itemId);
+
+  const goldId = world.create();
+  world.add(goldId, ItemInfo, { type: "currency", count: 100, value: 1 });
+  addToInventory(world, playerId, goldId);
+
+  const logs = [];
+
+  try {
+    installShopWiring({
+      world,
+      playerEntity: (w) => {
+        const pos = w.get(playerId, Position);
+        return pos ? { id: playerId, pos: { x: pos.x, y: pos.y } } : null;
+      },
+      log: (msg) => logs.push(msg),
+      bracketizeName: (s) => s,
+    });
+
+    world.emit("shop:exit-blocked", { actor: playerId, shopkeeperId, bill: 80 });
+
+    dispatchEvent(new CustomEvent("ui:payBill", { detail: {} }));
+
+    assert(!world.has(itemId, Unpaid), "active checkout session should identify the shopkeeper");
+    assertEquals(world.get(goldId, ItemInfo)?.count, 20);
+    assert(logs.some((msg) => msg.includes("You pay 80 gold")), "payment should complete");
+  } finally {
+    if (typeof priorWindow === "undefined") {
+      // @ts-ignore restore no-window state
+      delete globalThis.window;
+    } else {
+      // @ts-ignore restore prior window reference
+      globalThis.window = priorWindow;
+    }
+  }
+});

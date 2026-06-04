@@ -21,6 +21,7 @@ export function renderShop(panel, data, state) {
   const unpaidItems = data?.unpaidItems || [];
   const totalBill = data?.totalBill || 0;
   const gold = data?.gold || 0;
+  const shopkeeperId = Number(data?.shopkeeperId || state?.shopkeeperId || 0) | 0;
 
   // Header
   const header = document.createElement('div');
@@ -79,7 +80,6 @@ export function renderShop(panel, data, state) {
     hint.style.fontSize = '12px';
     el.appendChild(hint);
 
-    let sel = 0;
     const rows = [];
     if (!unpaidItems.length) {
       const empty = document.createElement('div');
@@ -128,16 +128,16 @@ export function renderShop(panel, data, state) {
         rows.push(row);
       });
       hint.textContent = 'Select item \u00b7 Return button/Enter=Return \u00b7 P=Pay \u00b7 Esc=Close';
-      setSel(0);
     }
 
     const { getSel, setSel } = createSimpleSel(rows, unpaidItems.length, (i) => {
       showItemTooltip(unpaidItems[i], rows[i]);
     });
+    if (unpaidItems.length) setSel(0);
 
     function payBill() {
       window.dispatchEvent(new CustomEvent('ui:payBill', {
-        detail: { shopkeeperId: state.shopkeeperId }
+        detail: { shopkeeperId }
       }));
     }
 
@@ -154,7 +154,7 @@ export function renderShop(panel, data, state) {
       pulseRow(rows[idx], 'drop');
       for (const itemId of getUiItemEntityIds(it)) {
         window.dispatchEvent(new CustomEvent('ui:removeFromInvoice', {
-          detail: { shopkeeperId: state.shopkeeperId, itemId }
+          detail: { shopkeeperId, itemId }
         }));
       }
     }

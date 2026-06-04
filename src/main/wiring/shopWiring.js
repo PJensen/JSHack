@@ -436,7 +436,8 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
     const { shopkeeperId } = e?.detail || {};
-    const sid = Number(shopkeeperId) || 0;
+    const requestedShopkeeperId = Number(shopkeeperId) || 0;
+    const sid = requestedShopkeeperId > 0 ? requestedShopkeeperId : (activeShopSession.shopkeeperId | 0);
     const pe = playerEntity(world);
     if (!pe) return;
     if (!isActiveCheckoutSessionFor(sid) && !isPlayerAdjacentToEntity(sid)) {
