@@ -88,6 +88,7 @@ function onItemThrown(world, ev = {}) {
     amount: unpaid.price,
     reason: ev.consumed === true ? "destroyed" : "thrown_out",
     evidence: "seen",
+    createsDebt: false,
   });
 }
 

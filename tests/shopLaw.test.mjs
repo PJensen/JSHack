@@ -20,6 +20,7 @@ import { addToInventory } from "../src/rules/utils/inventoryFacade.js";
 import { calculateShopDebt } from "../src/rules/utils/shopDebt.js";
 import {
   installShopLawListeners,
+  shopClaimRecords,
   shopIncidentRecords,
 } from "../src/rules/utils/shopLaw.js";
 
@@ -62,7 +63,7 @@ function addTestItem(world, identity, name, value = 100) {
   return item;
 }
 
-Deno.test("shop law records debt and incident when unpaid stock is thrown outside", () => {
+Deno.test("shop law records claim and incident without debt when unpaid stock is thrown outside", () => {
   const world = new World({ seed: 9101 });
   installShopLawListeners(world);
 
@@ -82,7 +83,11 @@ Deno.test("shop law records debt and incident when unpaid stock is thrown outsid
   world.add(actor, ThrowIntent, { itemId: gem, x: 6, y: 2 });
   throwSystem(world);
 
-  assertEquals(calculateShopDebt(world, actor, shopkeeper), 250);
+  assertEquals(calculateShopDebt(world, actor, shopkeeper), 0);
+  const claims = shopClaimRecords(world, shopkeeper);
+  assertEquals(claims.length, 1);
+  assertEquals(claims[0].claimKind, "thrown_out");
+  assertEquals(claims[0].debtId, 0);
   const incidents = shopIncidentRecords(world, shopkeeper);
   assertEquals(incidents.length, 1);
   assertEquals(incidents[0].reason, "thrown_out");
@@ -91,7 +96,7 @@ Deno.test("shop law records debt and incident when unpaid stock is thrown outsid
   assertEquals(pursuit.length, 1);
 });
 
-Deno.test("shop law converts a thrown unpaid stack unit into debt", () => {
+Deno.test("shop law records a thrown unpaid stack unit without debt", () => {
   const world = new World({ seed: 9102 });
   installShopLawListeners(world);
 
@@ -108,7 +113,10 @@ Deno.test("shop law converts a thrown unpaid stack unit into debt", () => {
 
   const info = world.get(scrolls, ItemInfo);
   assertEquals(info.count, 2, "throw should remove one unit from the stack");
-  assertEquals(calculateShopDebt(world, actor, shopkeeper), 90);
+  assertEquals(calculateShopDebt(world, actor, shopkeeper), 0);
+  const claims = shopClaimRecords(world, shopkeeper);
+  assertEquals(claims.length, 1);
+  assertEquals(claims[0].debtId, 0);
   const incidents = shopIncidentRecords(world, shopkeeper);
   assertEquals(incidents.length, 1);
   assertEquals(incidents[0].reason, "thrown_out");
