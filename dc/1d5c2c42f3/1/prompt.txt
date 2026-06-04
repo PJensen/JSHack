@@ -1,0 +1,7 @@
+propose the shape of a fix for this damaged issue
+
+---
+
+sounds like the systems should be namespaced actually, do you want to take a crack at resolving.
+
+ALSO: confirm my intuition that events are totally the wrong shape for what it's doing
