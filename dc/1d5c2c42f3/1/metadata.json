@@ -3,9 +3,9 @@
   "checkpoint_id": "dc1d5c2c42f3",
   "session_id": "019e94ea-295c-7de1-9017-ddb7f4d48f3c",
   "strategy": "manual-commit",
-  "created_at": "2026-06-04T23:39:08.370268024Z",
+  "created_at": "2026-06-04T23:39:14.758099128Z",
   "branch": "master",
-  "checkpoints_count": 1,
+  "checkpoints_count": 0,
   "files_touched": [
     "docs/architecture/COMPONENT_PHASE_SYSTEM_EVENT_DOCTRINE_REVIEW.md",
     "src/content/worldFacade.js",
@@ -39,29 +39,22 @@
   ],
   "agent": "Codex",
   "model": "gpt-5.5",
-  "turn_id": "af41f81721a6",
-  "checkpoint_transcript_start": 186,
-  "transcript_lines_at_start": 186,
-  "token_usage": {
-    "input_tokens": 176934,
-    "cache_creation_tokens": 0,
-    "cache_read_tokens": 8167936,
-    "output_tokens": 24481,
-    "api_call_count": 56
-  },
+  "turn_id": "2b3247dfb038",
+  "checkpoint_transcript_start": 598,
+  "transcript_lines_at_start": 598,
   "session_metrics": {
     "turn_count": 5
   },
   "initial_attribution": {
-    "calculated_at": "2026-06-04T23:39:08.253651786Z",
-    "agent_lines": 428,
-    "agent_removed": 218,
+    "calculated_at": "2026-06-04T23:39:14.648404919Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
     "human_added": 0,
     "human_modified": 0,
     "human_removed": 0,
-    "total_committed": 428,
-    "total_lines_changed": 646,
-    "agent_percentage": 100,
+    "total_committed": 0,
+    "total_lines_changed": 0,
+    "agent_percentage": 0,
     "metric_version": 2
   },
   "prompt_attributions": [

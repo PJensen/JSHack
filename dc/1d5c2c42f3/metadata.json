@@ -3,7 +3,7 @@
   "checkpoint_id": "dc1d5c2c42f3",
   "strategy": "manual-commit",
   "branch": "master",
-  "checkpoints_count": 2,
+  "checkpoints_count": 1,
   "files_touched": [
     "docs/architecture/COMPONENT_PHASE_SYSTEM_EVENT_DOCTRINE_REVIEW.md",
     "src/content/worldFacade.js",
@@ -46,15 +46,15 @@
       "metadata": "/dc/1d5c2c42f3/1/metadata.json",
       "transcript": "/dc/1d5c2c42f3/1/full.jsonl",
       "content_hash": "/dc/1d5c2c42f3/1/content_hash.txt",
-      "prompt": "/dc/1d5c2c42f3/1/prompt.txt"
+      "prompt": ""
     }
   ],
   "token_usage": {
-    "input_tokens": 378613,
+    "input_tokens": 201679,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 10675072,
-    "output_tokens": 40951,
-    "api_call_count": 89
+    "cache_read_tokens": 2507136,
+    "output_tokens": 16470,
+    "api_call_count": 33
   },
   "combined_attribution": {
     "calculated_at": "2026-06-04T23:39:11.583390532Z",
