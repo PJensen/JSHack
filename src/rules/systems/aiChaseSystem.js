@@ -313,18 +313,7 @@ function isStepTraversable(world, actorId, x, y, targetX, targetY, canTraverseTi
 
 // ── Damage-triggered aggro listener ──────────────────────────────────
 
-const AGGRO_DAMAGE_INSTALLED = Symbol.for("jshack:aggroFromDamage:installed");
 const AGGRO_STEALTH_OFFENSE_INSTALLED = Symbol.for("jshack:aggroFromStealthOffense:installed");
-
-/**
- * Compatibility shim. Damage-triggered aggro is now handled by a scheduled
- * damage-reaction system; `damaged` is presentation/debug only.
- * @param {import('../../lib/ecs-js/index.js').World} world
- */
-export function installAggroFromDamageListener(world) {
-  if (world[AGGRO_DAMAGE_INSTALLED]) return;
-  world[AGGRO_DAMAGE_INSTALLED] = true;
-}
 
 /**
  * Witness-based aggro for hidden attacks:

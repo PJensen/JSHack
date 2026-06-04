@@ -19,7 +19,6 @@ import { inventoryItems } from "../utils/inventoryFacade.js";
 import { resolveCanonicalStats } from "../utils/canonicalStats.js";
 import { applyMaterialTransform } from "../utils/materialTransforms.js";
 
-const INSTALLED_KEY = Symbol.for("jshack:itemDestruction:installed");
 const DESTRUCTION_CHANCE = 1 / 3;
 
 /** @typedef {{ elements: string[], match: { itemTypes?: string[], materials?: string[] }, resistKey: string, transform: string, verb: string }} DestructionRule */
@@ -136,14 +135,4 @@ export function applyItemDestructionForDamage(world, { target, type, amount }) {
       });
     }
   }
-}
-
-/**
- * Compatibility shim. Damage reactions are now scheduled systems under
- * `systems/damageReactions/`; `damaged` is presentation/debug only.
- * @param {import('../../lib/ecs-js/index.js').World} world
- */
-export function installItemDestructionListener(world) {
-  if (world[INSTALLED_KEY]) return;
-  world[INSTALLED_KEY] = true;
 }

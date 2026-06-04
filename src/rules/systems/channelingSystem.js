@@ -20,8 +20,6 @@ import { hasLOS } from "../../shared/math/gridLOS.js";
 import { buildBlocksVisionMap, blockedCallback } from "../utils/vision.js";
 import { spellCostPerTick, spellCostResource } from "../data/spells.js";
 
-const DRAIN_LIFE_DAMAGE_INTERRUPT_INSTALLED = Symbol.for("jshack:channeling:drainLifeDamageInterrupt:installed");
-
 export function applyDrainLifeDamageInterrupt(world, { target, source, amount, cause }) {
   const actor = Number(target || 0) | 0;
   if (!(actor > 0)) return false;
@@ -52,16 +50,6 @@ export function applyDrainLifeDamageInterrupt(world, { target, source, amount, c
   });
 
   return true;
-}
-
-/**
- * Compatibility shim. Drain Life damage interruption is now handled by a
- * scheduled damage-reaction system; `damaged` is presentation/debug only.
- * @param {import('../../lib/ecs-js/index.js').World} world
- */
-export function installDrainLifeDamageInterruptListener(world) {
-  if (world[DRAIN_LIFE_DAMAGE_INTERRUPT_INSTALLED]) return;
-  world[DRAIN_LIFE_DAMAGE_INTERRUPT_INSTALLED] = true;
 }
 
 /** @param {import('../../lib/ecs-js/index.js').World} world */

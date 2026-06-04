@@ -31,7 +31,7 @@ import { postureIntentSystem } from "../rules/systems/postureIntentSystem.js";
 import { flyIntentSystem } from "../rules/systems/flyIntentSystem.js";
 import { praySystem } from "../rules/systems/praySystem.js";
 import { castSpellSystem } from "../rules/systems/castSpellSystem.js";
-import { aiChaseSystem, installAggroFromDamageListener, installAggroFromStealthOffenseListener } from "../rules/systems/aiChaseSystem.js";
+import { aiChaseSystem, installAggroFromStealthOffenseListener } from "../rules/systems/aiChaseSystem.js";
 import { aiPolicySystem } from "../rules/systems/aiPolicySystem.js";
 import { aiTownfolkSystem, installTownfolkDoorListener, installBellListener } from "../rules/systems/aiTownfolkSystem.js";
 import { socialAggroSystem } from "../rules/systems/socialAggroSystem.js";
@@ -59,7 +59,7 @@ import { movementSystem, installMoveAutoPickupListener } from "../rules/systems/
 import { intentValidationSystem } from "../rules/systems/intentValidationSystem.js";
 import { combatSystem, installBumpAttackListener } from "../rules/systems/combatSystem.js";
 import { installCombatInteractions } from "../rules/data/combatInteractions.js";
-import { cleanupSystem, installDeathImpactTracker } from "../rules/systems/cleanupSystem.js";
+import { cleanupSystem } from "../rules/systems/cleanupSystem.js";
 import { trapSystem, installTrapStepListener } from "../rules/systems/trapSystem.js";
 import { disarmTrapSystem } from "../rules/systems/disarmTrapSystem.js";
 import { manaRegenerationSystem } from "../rules/systems/manaRegenerationSystem.js";
@@ -74,7 +74,6 @@ import { hazardSystem } from "../rules/systems/hazardSystem.js";
 import { installMonsterDeathHooks } from "../rules/systems/monsterDeathHookSystem.js";
 import { installScoreListener } from "../rules/systems/scoreSystem.js";
 import { installMaterialReactionListeners, materialReactionSystem } from "../rules/systems/materialReactionSystem.js";
-import { installItemDestructionListener } from "../rules/systems/itemDestructionSystem.js";
 import { foodDecaySystem } from "../rules/systems/foodDecaySystem.js";
 import { itemCooldownSystem } from "../rules/systems/itemCooldownSystem.js";
 import { spellCooldownSystem } from "../rules/systems/spellCooldownSystem.js";
@@ -90,7 +89,7 @@ import { districtConditionSystem } from "../rules/systems/districtConditionSyste
 import { installTileStepEffectListener } from "../rules/systems/tileStepEffectSystem.js";
 import { installPolymorphListener } from "../rules/systems/polymorphSystem.js";
 import { installCurseHooks } from "../rules/systems/curseHooks.js";
-import { channelingSystem, installDrainLifeDamageInterruptListener } from "../rules/systems/channelingSystem.js";
+import { channelingSystem } from "../rules/systems/channelingSystem.js";
 import { installFishingAction } from "../rules/content/useActions/fishingAction.js";
 import { installGenocideListener } from "../rules/systems/genocideSystem.js";
 import { installTamingListener } from "../rules/systems/tamingSystem.js";
@@ -115,8 +114,6 @@ import "../rules/scripts/monsters.js";
 import "../rules/data/procPackages.js";
 import "../rules/dialogues/townfolkDialogs.js";
 import { installGemSocketListener } from "../rules/data/gemSocketAffixes.js";
-import { installElectrocuteOnDamage } from "../rules/utils/electrocute.js";
-import { installSleepWakeListeners } from "../rules/utils/sleep.js";
 import { installCentipedeBodyCascade } from "../rules/utils/centipedeMovement.js";
 import { installPerceptionMemoryListeners, perceptionMemorySystem } from "../rules/systems/perceptionMemorySystem.js";
 import { installEnchantingOpenRequestListener } from "../rules/content/enchanting/benchGame.js";
@@ -152,8 +149,6 @@ export function configureWorld(world) {
   installCombatInteractions(world);
   // Install monster death hooks once per world
   installMonsterDeathHooks(world);
-  // Track killing-blow impact vectors so loot scatter is directional
-  installDeathImpactTracker(world);
   // Install taunt listeners once per world
   installTauntListener(world);
   // Install threat listeners once per world
@@ -174,23 +169,13 @@ export function configureWorld(world) {
   installTrapStepListener(world);
   // Material reactions consume semantic reaction events (water splash/dip, etc.).
   installMaterialReactionListeners(world);
-  // Elemental damage destroys vulnerable inventory items (fire→scrolls, cold→potions, etc.)
-  installItemDestructionListener(world);
   // Polymorph requests (e.g. mimic reveal on touch).
   installPolymorphListener(world);
   installCurseHooks(world);
   installGenocideListener(world);
   installTamingListener(world);
-  // Elevate enemy AggroState when they take damage (even off-screen).
-  installAggroFromDamageListener(world);
   // Witnesses react to stealth offense and enter hunting with attacker last-known position.
   installAggroFromStealthOffenseListener(world);
-  // Auto-apply electrocution (stun + blind + deafen) on any electric/lightning damage.
-  installElectrocuteOnDamage(world);
-  // Wake sleeping actors on canonical disturbance events such as damage.
-  installSleepWakeListeners(world);
-  // Drain Life is uniquely interrupted by incoming damage.
-  installDrainLifeDamageInterruptListener(world);
   installFishingAction(world);
   // Centipede body segments cascade position when the head moves.
   installCentipedeBodyCascade(world);

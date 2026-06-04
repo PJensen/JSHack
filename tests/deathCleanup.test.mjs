@@ -10,7 +10,7 @@ import { Pet } from '../src/rules/components/Pet.js';
 import { Owner } from '../src/rules/components/Owner.js';
 import { equipmentSystem } from '../src/rules/systems/equipmentSystem.js';
 import { combatSystem } from '../src/rules/systems/combatSystem.js';
-import { cleanupSystem, installDeathImpactTracker } from '../src/rules/systems/cleanupSystem.js';
+import { cleanupSystem } from '../src/rules/systems/cleanupSystem.js';
 import { Position } from '../src/rules/components/Position.js';
 import { Inventory } from '../src/rules/components/Inventory.js';
 import { addToInventory } from '../src/rules/utils/inventoryFacade.js';
@@ -141,8 +141,6 @@ Deno.test("death loot impulse uses same-turn positive-impact only", () => {
   loadChunk(0, 0, tiles);
 
   const world = new World({ seed: 4242 });
-  installDeathImpactTracker(world);
-
   const monster = world.create();
   world.add(monster, NamedIdentity, { name: "Goblin", identity: "goblin" });
   world.add(monster, Position, { x: 8, y: 8 });

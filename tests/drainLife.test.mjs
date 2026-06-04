@@ -14,7 +14,6 @@ import { castSpellSystem } from "../src/rules/systems/castSpellSystem.js";
 import { channelingSystem } from "../src/rules/systems/channelingSystem.js";
 import { effectSystem } from "../src/rules/systems/effectSystem.js";
 import { channelingDamageReactionSystem } from "../src/rules/systems/damageReactions/channelingDamageReactionSystem.js";
-import { installDrainLifeDamageInterruptListener } from "../src/rules/systems/channelingSystem.js";
 import { dealDamage } from "../src/rules/utils/dealDamage.js";
 import { clearAll, loadChunk } from "../src/rules/environment/dungeon/tileMap.js";
 import { CHUNK_SIZE, TILE_FLOOR } from "../src/rules/environment/dungeon/constants.js";
@@ -26,7 +25,6 @@ function setupFloorTiles() {
 }
 
 function scheduler(world) {
-  installDrainLifeDamageInterruptListener(world);
   try { channelingSystem(world); } catch (e) { console.error("channeling system error", e); }
   try { castSpellSystem(world); } catch (e) { console.error("cast system error", e); }
   try { channelingDamageReactionSystem(world); } catch (e) { console.error("channeling damage reaction error", e); }

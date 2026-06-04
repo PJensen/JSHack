@@ -1,7 +1,6 @@
 import { SleepState } from "../components/SleepState.js";
 import { statusStrength } from "./statusFacade.js";
 
-const INSTALLED = Symbol.for("jshack:sleep:wakeListeners:installed");
 export const SLEEP_STATUS = "sleep";
 export const SLEEP_DISPLAY_TAG = "sleeping";
 
@@ -92,15 +91,4 @@ export function tryWakeActor(world, id, opts = {}) {
     source: Number(opts.source || 0) | 0,
   });
   return true;
-}
-
-/**
- * Compatibility shim. Damage wake-up is now handled by a scheduled
- * damage-reaction system; `damaged` is presentation/debug only.
- *
- * @param {import("../../lib/ecs-js/index.js").World} world
- */
-export function installSleepWakeListeners(world) {
-  if (world[INSTALLED]) return;
-  world[INSTALLED] = true;
 }

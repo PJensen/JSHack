@@ -36,7 +36,6 @@ import { Ashes, Bone } from "../archetypes/Items.js";
 
 const GROUND_STACK_SEQ_KEY = Symbol.for("jshack:groundStack:seq");
 const DEATH_IMPACT_KEY = Symbol.for("jshack:deathImpact:map");
-const DEATH_IMPACT_INSTALLED_KEY = Symbol.for("jshack:deathImpact:installed");
 
 export function recordDeathImpactFromDamage(world, { target, impactVector, critical, amount, rawAmount, cause }) {
   if (!(Number(target) > 0)) return;
@@ -53,16 +52,6 @@ export function recordDeathImpactFromDamage(world, { target, impactVector, criti
     rawAmount: Number(rawAmount || 0) | 0,
     step: world.step | 0,
   });
-}
-
-/**
- * Compatibility shim. Death-impact tracking is now performed by a scheduled
- * damage-reaction system; `damaged` is presentation/debug only.
- */
-export function installDeathImpactTracker(world) {
-  if (world[DEATH_IMPACT_INSTALLED_KEY]) return;
-  world[DEATH_IMPACT_INSTALLED_KEY] = true;
-  world[DEATH_IMPACT_KEY] = new Map();
 }
 
 function getDeathImpact(world, entityId) {

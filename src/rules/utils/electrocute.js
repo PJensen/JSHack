@@ -60,16 +60,3 @@ export function applyElectrocuted(world, targetId) {
 
   return true;
 }
-
-const INSTALLED = Symbol.for('jshack:electrocute:installed');
-
-/**
- * Compatibility shim. Electrocution is now applied by a scheduled
- * damage-reaction system; `damaged` is presentation/debug only.
- *
- * @param {import('../../lib/ecs-js/index.js').World} world
- */
-export function installElectrocuteOnDamage(world) {
-  if (world[INSTALLED]) return;
-  world[INSTALLED] = true;
-}
