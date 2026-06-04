@@ -26,6 +26,13 @@ Deeper docs:
   `display/` never imports `rules/`; `bridge/` projects read-only rule state.
 - **No system-to-system calls.** Systems communicate with `world.emit` /
   `world.on`; scheduler owns ordering.
+- **Adopt event classes and canonical installers organically.** When touching an
+  event producer/consumer pair, prefer an `EcsEvent` class contract while
+  keeping legacy string emissions where other consumers still depend on them.
+  When touching listener installers, prefer `defineExtension(...)` with
+  `world.install(...)` over bespoke symbol guards; keep existing `installX`
+  wrappers as compatibility shims. Do not run broad migration sweeps just to
+  chase this pattern.
 - **No swallowed event failures.** Do not add `emitSafe`-style wrappers around
   `world.emit`.
 - **Determinism is sacred.** In rules simulation use `world.rand()`, never
