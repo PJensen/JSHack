@@ -56,6 +56,35 @@ Deeper docs:
 
 Run these before guessing.
 
+### Guardrail Tasks
+
+Prefer these Deno tasks over hand-assembled command strings:
+
+```bash
+deno task check
+deno task guard:architecture
+deno task guard:events
+deno task guard:death
+deno task guard:tools
+```
+
+- `check` runs the architecture and event doctrine guardrails.
+- `guard:architecture` runs agent health, import boundaries, and architecture
+  ratchet tests.
+- `guard:events` runs event doctrine ratchets and prints the event bus summary.
+- `guard:death` runs the focused death pipeline/domain migration suite.
+- `guard:tools` verifies the agent-facing tools and prints the system map.
+
+Audit-only tasks:
+
+```bash
+deno task audit:health
+deno task audit:systems
+deno task audit:events
+deno task audit:damaged
+deno task audit:died
+```
+
 ### Project Health
 
 ```bash
