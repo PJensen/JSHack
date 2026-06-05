@@ -1,0 +1,15 @@
+that sounds like the right shape, only play-testing and tests can proove things out from here.
+
+enumerate the benefits for me please.
+
+---
+
+There are seriously no other doctrinal violations? I call BS
+
+---
+
+next one. lets do it.
+
+---
+
+I don't fully get it -- did you migrate to the new event class `EcsEvent` -- formalize the payload? and move the systems into using DeathApplied?
