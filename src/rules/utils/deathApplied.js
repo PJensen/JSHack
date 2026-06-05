@@ -1,10 +1,6 @@
+import { normalizeGridPoint } from "../../shared/math/point.js";
 import { DeathApplied } from "../components/DeathApplied.js";
 import { Lifespan } from "../components/Lifespan.js";
-
-function normalizePoint(value) {
-  if (!value || !Number.isFinite(Number(value.x)) || !Number.isFinite(Number(value.y))) return null;
-  return { x: Number(value.x) | 0, y: Number(value.y) | 0 };
-}
 
 /**
  * Create a one-turn death record for scheduled rules-side reactions.
@@ -28,7 +24,7 @@ export function recordDeathApplied(world, data) {
     goreType: String(data.goreType || ""),
     sizeClass: String(data.sizeClass || ""),
     targetKind: String(data.targetKind || ""),
-    at: normalizePoint(data.at),
+    at: normalizeGridPoint(data.at),
     step: Number(data.step ?? world.step ?? 0) | 0,
   });
   world.add(id, Lifespan, { turnsLeft: 1, onExpiry: "remove", expiryEvent: "" });

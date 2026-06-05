@@ -1,9 +1,5 @@
 import { EcsEvent } from "../lib/ecs-js/index.js";
-
-function normalizePoint(value) {
-  if (!value || !Number.isFinite(Number(value.x)) || !Number.isFinite(Number(value.y))) return null;
-  return { x: Number(value.x) | 0, y: Number(value.y) | 0 };
-}
+import { normalizeGridPoint } from "../shared/math/point.js";
 
 /**
  * Typed presentation/debug receipt for canonical entity death.
@@ -31,7 +27,7 @@ export class Died extends EcsEvent {
     this.sizeClass = String(payload.sizeClass || "");
     this.impactProfile = payload.impactProfile || null;
     this.targetKind = String(payload.targetKind || "");
-    this.at = normalizePoint(payload.at);
+    this.at = normalizeGridPoint(payload.at);
 
     Object.freeze(this);
   }
