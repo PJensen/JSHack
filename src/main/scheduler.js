@@ -71,8 +71,8 @@ import { engraveSystem, installEngraveListeners } from "../rules/systems/engrave
 import { installBumpInteractListener } from "../rules/systems/interactionSystem.js";
 import { hungerSystem } from "../rules/systems/hungerSystem.js";
 import { hazardSystem } from "../rules/systems/hazardSystem.js";
-import { installMonsterDeathHooks } from "../rules/systems/monsterDeathHookSystem.js";
-import { installScoreListener } from "../rules/systems/scoreSystem.js";
+import { monsterDeathHookSystem } from "../rules/systems/monsterDeathHookSystem.js";
+import { scoreSystem } from "../rules/systems/scoreSystem.js";
 import { installMaterialReactionListeners, materialReactionSystem } from "../rules/systems/materialReactionSystem.js";
 import { foodDecaySystem } from "../rules/systems/foodDecaySystem.js";
 import { itemCooldownSystem } from "../rules/systems/itemCooldownSystem.js";
@@ -106,8 +106,8 @@ import { installShopLawListeners } from "../rules/utils/shopLaw.js";
 import { installDialogRuntime } from "../rules/dialogues/runtime.js";
 import { installQuestRuntime } from "../rules/quests/runtime.js";
 import { installStarterFetchQuestHooks } from "../rules/quests/definitions/graveyardWatch.js";
-import { installRatQuestHooks } from "../rules/quests/definitions/ratInfestation.js";
-import { installRunContractHooks } from "../rules/quests/definitions/runContract.js";
+import { installRatQuestHooks, ratInfestationDeathSystem } from "../rules/quests/definitions/ratInfestation.js";
+import { installRunContractHooks, runContractDeathSystem } from "../rules/quests/definitions/runContract.js";
 // Side-effect: registers script handlers at import time
 import "../rules/scripts/traps.js";
 import "../rules/scripts/monsters.js";
@@ -115,8 +115,9 @@ import "../rules/data/procPackages.js";
 import "../rules/dialogues/townfolkDialogs.js";
 import { installGemSocketListener } from "../rules/data/gemSocketAffixes.js";
 import { installCentipedeBodyCascade } from "../rules/utils/centipedeMovement.js";
-import { installPerceptionMemoryListeners, perceptionMemorySystem } from "../rules/systems/perceptionMemorySystem.js";
+import { perceptionMemorySystem } from "../rules/systems/perceptionMemorySystem.js";
 import { installEnchantingOpenRequestListener } from "../rules/content/enchanting/benchGame.js";
+import { tombstoneSystem } from "../rules/systems/tombstoneSystem.js";
 
 /**
  * @param {World} world
@@ -147,14 +148,10 @@ export function configureWorld(world) {
   installBumpAttackListener(world);
   // Install data-driven combat interaction rules (blessed vs undead, frozen shatter, etc.)
   installCombatInteractions(world);
-  // Install monster death hooks once per world
-  installMonsterDeathHooks(world);
   // Install taunt listeners once per world
   installTauntListener(world);
   // Install threat listeners once per world
   installThreatListeners(world);
-  // Award monster maxHp to player score on kill
-  installScoreListener(world);
   // Auto-pickup currency etc. when any actor moves onto a tile (reacts to "moved" event)
   installMoveAutoPickupListener(world);
   // Shop-law ledger catches value extraction that bypasses ordinary doorway blocking.
@@ -179,7 +176,6 @@ export function configureWorld(world) {
   installFishingAction(world);
   // Centipede body segments cascade position when the head moves.
   installCentipedeBodyCascade(world);
-  installPerceptionMemoryListeners(world);
   installEnchantingOpenRequestListener(world);
 
   // Phase: ai (intent producers — added intents are visible to later phases
@@ -301,6 +297,11 @@ export function configureWorld(world) {
   registerSystem(monsterSpawnerSystem, 'effects');
   // Deity mood ticks in the effects phase (after combat results are emitted)
   registerSystem(deitySystem, 'effects');
+  registerSystem(scoreSystem, 'effects', { after: [deitySystem] });
+  registerSystem(monsterDeathHookSystem, 'effects', { after: [scoreSystem] });
+  registerSystem(ratInfestationDeathSystem, 'effects', { after: [monsterDeathHookSystem] });
+  registerSystem(runContractDeathSystem, 'effects', { after: [ratInfestationDeathSystem] });
+  registerSystem(tombstoneSystem, 'effects', { after: [runContractDeathSystem] });
   registerSystem(perceptionMemorySystem, 'effects');
   registerSystem(deathImpactDamageReactionSystem, 'effects', { after: [perceptionMemorySystem] });
 

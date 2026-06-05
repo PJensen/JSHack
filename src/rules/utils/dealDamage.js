@@ -1,5 +1,6 @@
 // src/rules/utils/dealDamage.js
 // Canonical damage pipeline. ALL damage in the game flows through here.
+import { Died } from "../../events/Died.js";
 import { Resistances } from "../components/Resistences.js";
 import { Vitality } from "../components/Vitality.js";
 import { Player } from "../components/Player.js";
@@ -26,6 +27,7 @@ import { getMonster } from "../data/monsters.js";
 import { resolveWeaponFamily } from "../data/weaponFamilies.js";
 import { tryHandlePlayerPseudoDeath } from "./deathModes.js";
 import { recordDamageApplied } from "./damageApplied.js";
+import { recordDeathApplied } from "./deathApplied.js";
 
 function resolveEventWeaponFamily(world, weaponId) {
   if (!(weaponId > 0) || !world.isAlive(weaponId)) return "";
@@ -479,7 +481,7 @@ export function dealDamage(world, spec) {
   }
 
   if (killed) {
-    world.emit('died', {
+    const diedPayload = {
       id: target, killer: source, cause,
       weaponId: Number(spec.weaponId || 0) | 0,
       weaponFamily: eventWeaponFamily,
@@ -490,7 +492,16 @@ export function dealDamage(world, spec) {
       sizeClass: String(world.get(target, Physiology)?.sizeClass || 'M'),
       impactProfile: spec.impactProfile || undefined,
       targetKind: String(world.get(target, NamedIdentity)?.identity || ''),
+      at: spec.at || undefined,
+    };
+    const diedEvent = new Died(diedPayload);
+    recordDeathApplied(world, {
+      ...diedEvent,
+      target,
+      step: world.step | 0,
     });
+    world.emit(diedEvent);
+    world.emit('died', diedEvent.toLegacyPayload());
 
     if (!spec.noTrigger && source > 0 && world.isAlive(source)) {
       ensureEquippedAffixTopology(world, source);

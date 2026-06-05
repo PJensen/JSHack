@@ -29,6 +29,7 @@ export { Material } from './Material.js';
 export { MaterialState } from './MaterialState.js';
 export { DamageSpec } from './DamageSpec.js';
 export { DamageApplied } from './DamageApplied.js';
+export { DeathApplied } from './DeathApplied.js';
 export { Player } from './Player.js';
 export { Inventory } from './Inventory.js';
 export { InventoryRoot } from './InventoryRoot.js';

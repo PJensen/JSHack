@@ -1,9 +1,11 @@
+import { DeathApplied } from '../components/DeathApplied.js';
 import { Position } from '../components/Position.js';
 import { NamedIdentity } from '../components/NamedIdentity.js';
 import { Player } from '../components/Player.js';
 import { DungeonState } from '../components/DungeonState.js';
 
-const TOMBSTONE_LISTENER_INSTALLED = Symbol.for('jshack:tombstone:listener:installed');
+const TOMBSTONE_REPOSITORY = Symbol.for('jshack:tombstone:repository');
+const TOMBSTONE_SEEN = Symbol.for('jshack:tombstone:seenPerStep');
 const TOMBSTONE_EPOCH_MS = 1704067200000; // 2024-01-01T00:00:00.000Z
 
 /**
@@ -33,19 +35,45 @@ function buildTombstoneId(world, spec) {
 }
 
 /**
- * Install tombstone death listener
- * Captures player deaths and saves them to the tombstone repository
+ * Configure the tombstone repository used by tombstoneSystem.
+ *
  * @param {World} world - ECS world instance
  * @param {TombstoneRepository} repository - Tombstone repository instance
  */
 export function installTombstoneDeathListener(world, repository) {
   if (!world || !repository) return;
-  if (world[TOMBSTONE_LISTENER_INSTALLED]) return;
-  world[TOMBSTONE_LISTENER_INSTALLED] = true;
+  world[TOMBSTONE_REPOSITORY] = repository;
+}
 
-  world.on('died', ({ id, killer, cause }) => {
+function ensureSeenState(world) {
+  const rec = world[TOMBSTONE_SEEN];
+  if (rec && typeof rec === 'object' && rec.ids instanceof Set) return rec;
+  const created = { step: -1, ids: new Set() };
+  world[TOMBSTONE_SEEN] = created;
+  return created;
+}
+
+/**
+ * Captures player deaths and saves them to the tombstone repository.
+ * @param {World} world - ECS world instance
+ */
+export function tombstoneSystem(world) {
+  const repository = world?.[TOMBSTONE_REPOSITORY];
+  if (!repository) return;
+
+  const seen = ensureSeenState(world);
+  const step = world.step | 0;
+  if (seen.step !== step) {
+    seen.step = step;
+    seen.ids.clear();
+  }
+
+  for (const [, death] of world.query(DeathApplied)) {
+    const id = Number(death.target || 0) | 0;
     // Only capture player deaths
-    if (!world.has(id, Player)) return;
+    if (!world.has(id, Player)) continue;
+    if (seen.ids.has(id)) continue;
+    seen.ids.add(id);
 
     const pos = world.get(id, Position);
     const ident = world.get(id, NamedIdentity);
@@ -58,10 +86,11 @@ export function installTombstoneDeathListener(world, repository) {
     }
 
     // Determine cause of death and killer attribution
-    let deathCause = cause || 'unknown';
+    let deathCause = death.cause || 'unknown';
     let killerName = null;
     let killerIdentity = null;
 
+    const killer = Number(death.killer || 0) | 0;
     if (killer) {
       const killerIdent = world.get(killer, NamedIdentity);
       if (killerIdent) {
@@ -97,5 +126,5 @@ export function installTombstoneDeathListener(world, repository) {
     } catch (err) {
       console.error('Failed to save tombstone on death:', err);
     }
-  });
+  }
 }

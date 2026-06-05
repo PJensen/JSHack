@@ -1,4 +1,5 @@
 import { DungeonState } from "../../components/DungeonState.js";
+import { DeathApplied } from "../../components/DeathApplied.js";
 import { NamedIdentity } from "../../components/NamedIdentity.js";
 import { Position } from "../../components/Position.js";
 import { QuestVars } from "../../components/QuestVars.js";
@@ -292,25 +293,6 @@ export function installRunContractHooks(world) {
   if (world[RUN_CONTRACT_HOOKS_KEY]) return;
   world[RUN_CONTRACT_HOOKS_KEY] = true;
 
-  world.on("died", (payload) => {
-    const bossId = Number(payload?.id || 0) | 0;
-    if (!(bossId > 0)) return;
-    const marker = world.get(bossId, RunObjectiveTarget);
-    if (!marker || String(marker.questId || "") !== RUN_CONTRACT_QUEST_ID || String(marker.role || "") !== "boss") return;
-    const quest = getQuestRecord(world, RUN_CONTRACT_QUEST_ID, 0);
-    if (!quest || quest.vars?.data?.bossKilled) return;
-    const spec = quest.vars?.data || {};
-    const playerId = Number(quest.bindings?.player || 0) | 0;
-    if (findObjectiveEntity(world, "relic") <= 0 && !relicInInventory(world, playerId, spec)) {
-      createRelicDrop(world, spec, payload?.at || world.get(bossId, Position) || null);
-    }
-    world.emit?.("runContract:bossKilled", {
-      questId: RUN_CONTRACT_QUEST_ID,
-      playerId,
-      bossId,
-    });
-  });
-
   world.on("dungeon:transitioned", ({ depth }) => {
     const q = getQuestRecord(world, RUN_CONTRACT_QUEST_ID, 0);
     if (!q || String(q.state?.status || "") === "complete") return;
@@ -323,6 +305,27 @@ export function installRunContractHooks(world) {
       });
     }
   });
+}
+
+export function runContractDeathSystem(world) {
+  for (const [, death] of world.query(DeathApplied)) {
+    const bossId = Number(death.target || 0) | 0;
+    if (!(bossId > 0)) continue;
+    const marker = world.get(bossId, RunObjectiveTarget);
+    if (!marker || String(marker.questId || "") !== RUN_CONTRACT_QUEST_ID || String(marker.role || "") !== "boss") continue;
+    const quest = getQuestRecord(world, RUN_CONTRACT_QUEST_ID, 0);
+    if (!quest || quest.vars?.data?.bossKilled) continue;
+    const spec = quest.vars?.data || {};
+    const playerId = Number(quest.bindings?.player || 0) | 0;
+    if (findObjectiveEntity(world, "relic") <= 0 && !relicInInventory(world, playerId, spec)) {
+      createRelicDrop(world, spec, death.at || world.get(bossId, Position) || null);
+    }
+    world.emit?.("runContract:bossKilled", {
+      questId: RUN_CONTRACT_QUEST_ID,
+      playerId,
+      bossId,
+    });
+  }
 }
 
 export const RunContractQuest = registerQuest({

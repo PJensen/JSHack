@@ -5,7 +5,7 @@ import { HazardArea } from "../src/rules/components/HazardArea.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { Position } from "../src/rules/components/Position.js";
 import { Vitality } from "../src/rules/components/Vitality.js";
-import { installMonsterDeathHooks } from "../src/rules/systems/monsterDeathHookSystem.js";
+import { monsterDeathHookSystem } from "../src/rules/systems/monsterDeathHookSystem.js";
 import { hazardSystem } from "../src/rules/systems/hazardSystem.js";
 import { dealDamage } from "../src/rules/utils/dealDamage.js";
 
@@ -20,13 +20,13 @@ function makeGridBug(world, x, y, hp = 3) {
 // Test: Does the cloud spawn when the bug is killed via dealDamage outside a tick?
 Deno.test("grid_bug: onDeath cloud spawns via dealDamage (no tick)", () => {
   const world = new World({ seed: 1234 });
-  installMonsterDeathHooks(world);
 
   const spawned = [];
   world.on("hazard:spawned", (e) => spawned.push(e));
 
   const bugId = makeGridBug(world, 5, 5);
   dealDamage(world, { target: bugId, amount: 999, type: "physical", source: 0, bypassResist: true });
+  monsterDeathHookSystem(world);
 
   assertEquals(spawned.length, 1, "cloud should spawn on grid bug death");
   assertEquals(spawned[0].at.x, 5);
@@ -42,7 +42,6 @@ Deno.test("grid_bug: onDeath cloud spawns via dealDamage (no tick)", () => {
 // Test: Does the cloud spawn when the bug is killed DURING a tick?
 Deno.test("grid_bug: onDeath cloud spawns when killed during world.tick()", () => {
   const world = new World({ seed: 5678 });
-  installMonsterDeathHooks(world);
 
   const spawned = [];
   world.on("hazard:spawned", (e) => spawned.push(e));
@@ -52,6 +51,7 @@ Deno.test("grid_bug: onDeath cloud spawns when killed during world.tick()", () =
   // Simulate killing the bug inside a tick by setting up a scheduler
   world.setScheduler((w, _dt) => {
     dealDamage(w, { target: bugId, amount: 999, type: "physical", source: 0, bypassResist: true });
+    monsterDeathHookSystem(w);
   });
 
   world.tick(1); // kills the bug inside the scheduler (during _inTick=true)
@@ -82,7 +82,6 @@ Deno.test("grid_bug: onDeath cloud spawns when killed during world.tick()", () =
 // Test: Does the cloud deal damage the turn after it spawns?
 Deno.test("grid_bug: cloud deals damage on next tick after spawn", () => {
   const world = new World({ seed: 9012 });
-  installMonsterDeathHooks(world);
 
   const bugId = makeGridBug(world, 3, 3);
 
@@ -94,6 +93,7 @@ Deno.test("grid_bug: cloud deals damage on next tick after spawn", () => {
   // Tick 1: kill the bug
   world.setScheduler((w, _dt) => {
     dealDamage(w, { target: bugId, amount: 999, type: "physical", source: 0, bypassResist: true });
+    monsterDeathHookSystem(w);
   });
   world.tick(1);
 

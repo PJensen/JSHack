@@ -1,10 +1,10 @@
+import { DeathApplied } from "../components/DeathApplied.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Position } from "../components/Position.js";
 import { DeathCallbackContext } from "../data/callbacks/death.js";
 import { getMonster } from "../data/monsters.js";
 import { runCallbackList } from "../interaction/dispatch.js";
 
-const INSTALLED_KEY = Symbol.for("jshack:monsterDeathHooks:installed");
 const SEEN_KEY = Symbol.for("jshack:monsterDeathHooks:seenPerStep");
 
 function ensureSeenState(world) {
@@ -16,14 +16,12 @@ function ensureSeenState(world) {
 }
 
 /** @param {import('../../lib/ecs-js/index.js').World} world */
-export function installMonsterDeathHooks(world) {
-  if (!world || world[INSTALLED_KEY]) return;
-  world[INSTALLED_KEY] = true;
+export function monsterDeathHookSystem(world) {
   ensureSeenState(world);
 
-  world.on("died", ({ id, killer, cause }) => {
-    const deadId = Number(id || 0) | 0;
-    if (!(deadId > 0)) return;
+  for (const [, death] of world.query(DeathApplied)) {
+    const deadId = Number(death.target || 0) | 0;
+    if (!(deadId > 0)) continue;
 
     const seen = ensureSeenState(world);
     const step = world.step | 0;
@@ -31,23 +29,23 @@ export function installMonsterDeathHooks(world) {
       seen.step = step;
       seen.ids.clear();
     }
-    if (seen.ids.has(deadId)) return;
+    if (seen.ids.has(deadId)) continue;
     seen.ids.add(deadId);
 
     const ident = world.get(deadId, NamedIdentity);
-    if (!ident) return;
+    if (!ident) continue;
     const monsterDef = getMonster(String(ident.identity || ""));
     const hooks = monsterDef?.hooks?.onDeath;
-    if (!Array.isArray(hooks) || hooks.length === 0) return;
+    if (!Array.isArray(hooks) || hooks.length === 0) continue;
 
     const pos = world.get(deadId, Position);
     const ctx = new DeathCallbackContext(world, {
       deadId,
-      killer: Number(killer || 0) | 0,
-      cause: String(cause || ""),
+      killer: Number(death.killer || 0) | 0,
+      cause: String(death.cause || ""),
       identity: String(ident.identity || ""),
       pos: pos ? { x: pos.x | 0, y: pos.y | 0 } : null,
     });
     runCallbackList(hooks, ctx);
-  });
+  }
 }

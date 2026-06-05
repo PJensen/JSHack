@@ -177,6 +177,28 @@ consume that record in scheduler order:
 The `damaged` event remains a presentation/debug receipt. It no longer has
 rules-side listeners in `src/rules` or `src/content`.
 
+The next migrated slice is local `died` consequences:
+
+- [src/events/Died.js](../../src/events/Died.js) formalizes the death receipt
+  as an `EcsEvent` class for new observation consumers.
+- [src/rules/components/DeathApplied.js](../../src/rules/components/DeathApplied.js)
+  records canonical death facts produced by `dealDamage`.
+- [src/rules/systems/scoreSystem.js](../../src/rules/systems/scoreSystem.js),
+  [src/rules/systems/monsterDeathHookSystem.js](../../src/rules/systems/monsterDeathHookSystem.js),
+  [src/rules/systems/tombstoneSystem.js](../../src/rules/systems/tombstoneSystem.js),
+  and [src/rules/systems/perceptionMemorySystem.js](../../src/rules/systems/perceptionMemorySystem.js)
+  now consume `DeathApplied` in scheduler order instead of listening for
+  `died`.
+- [src/rules/quests/definitions/ratInfestation.js](../../src/rules/quests/definitions/ratInfestation.js)
+  and [src/rules/quests/definitions/runContract.js](../../src/rules/quests/definitions/runContract.js)
+  now consume `DeathApplied` through scheduled quest death systems instead of
+  listening for `died`.
+
+The legacy string `died` event remains a presentation/main-wiring receipt during
+migration. It is emitted alongside `Died` for compatibility. It still has
+rules-side listeners in the larger deity router, so this event is not fully
+migrated yet.
+
 Remaining clear examples outside the `damaged` path:
 
 - [src/rules/systems/threatSystem.js](../../src/rules/systems/threatSystem.js)
@@ -186,8 +208,6 @@ Remaining clear examples outside the `damaged` path:
 - [src/rules/systems/aiChaseSystem.js](../../src/rules/systems/aiChaseSystem.js)
   still listens for `stealth:offense`, then directly mutates `AggroState` alert
   fields.
-- [src/rules/systems/scoreSystem.js](../../src/rules/systems/scoreSystem.js)
-  listens for `died` and directly mutates the player's `Score`.
 - [src/rules/utils/disposition.js](../../src/rules/utils/disposition.js) and
   [src/rules/utils/reputation.js](../../src/rules/utils/reputation.js) consume
   offense/disposition events and directly mutate social/reputation state.

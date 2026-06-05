@@ -14,8 +14,10 @@ import {
   ensureRunContractQuest,
   ensureRunContractTargets,
   installRunContractHooks,
+  runContractDeathSystem,
   RUN_CONTRACT_QUEST_ID,
 } from "../src/rules/quests/definitions/runContract.js";
+import { recordDeathApplied } from "../src/rules/utils/deathApplied.js";
 
 function setupWorld(seed = 0xC0FFEE) {
   const world = new World({ seed });
@@ -88,10 +90,11 @@ Deno.test("run contract progresses from boss kill to relic return", () => {
   assertEquals(findObjective(world, "boss"), bossId);
 
   const bossPos = world.get(bossId, Position);
-  world.emit("died", {
-    id: bossId,
+  recordDeathApplied(world, {
+    target: bossId,
     at: { x: bossPos.x | 0, y: bossPos.y | 0 },
   });
+  runContractDeathSystem(world);
 
   quest = getQuestRecord(world, RUN_CONTRACT_QUEST_ID, playerId);
   assertEquals(quest.state.node, "recover");

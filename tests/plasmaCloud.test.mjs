@@ -9,8 +9,9 @@ import { Material } from "../src/rules/components/Material.js";
 import { Resistances } from "../src/rules/components/Resistences.js";
 import { Status } from "../src/rules/components/Status.js";
 import { Vitality } from "../src/rules/components/Vitality.js";
-import { installMonsterDeathHooks } from "../src/rules/systems/monsterDeathHookSystem.js";
+import { monsterDeathHookSystem } from "../src/rules/systems/monsterDeathHookSystem.js";
 import { plasmaCloudSystem, spawnPlasmaCloud } from "../src/rules/systems/plasmaCloudSystem.js";
+import { recordDeathApplied } from "../src/rules/utils/deathApplied.js";
 
 function makeActor(world, x, y, hp, name = "Target", identity = "target") {
   const id = world.create();
@@ -135,13 +136,11 @@ Deno.test("monster onDeath hooks install once and spawn one cloud per bug per st
   const spawned = [];
   world.on("plasmaCloud:spawned", (data) => spawned.push(data));
 
-  installMonsterDeathHooks(world);
-  installMonsterDeathHooks(world); // idempotent
-
   const bugId = makeActor(world, 4, 7, 3, "Grid Bug", "grid_bug");
   world.step = 10;
-  world.emit("died", { id: bugId });
-  world.emit("died", { id: bugId }); // duplicate in same step
+  recordDeathApplied(world, { target: bugId });
+  recordDeathApplied(world, { target: bugId }); // duplicate in same step
+  monsterDeathHookSystem(world);
 
   assertEquals(spawned.length, 1);
   // Cloud must spawn exactly on the tile where the bug died, not nearby.
@@ -153,10 +152,12 @@ Deno.test("monster onDeath hooks install once and spawn one cloud per bug per st
   assertEquals(cloudCount, 1);
 
   world.step = 11;
-  world.emit("died", { id: bugId }); // new step can spawn again
+  recordDeathApplied(world, { target: bugId }); // new step can spawn again
+  monsterDeathHookSystem(world);
   assertEquals(spawned.length, 2);
 
   const ratId = makeActor(world, 2, 2, 3, "Rat", "rat");
-  world.emit("died", { id: ratId });
+  recordDeathApplied(world, { target: ratId });
+  monsterDeathHookSystem(world);
   assertEquals(spawned.length, 2);
 });

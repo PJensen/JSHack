@@ -1,3 +1,4 @@
+import { DeathApplied } from "../../components/DeathApplied.js";
 import { NamedIdentity } from "../../components/NamedIdentity.js";
 import { Position } from "../../components/Position.js";
 import { QuestVars } from "../../components/QuestVars.js";
@@ -140,26 +141,29 @@ export function ensureRatInfestationQuestRats(world) {
 export function installRatQuestHooks(world) {
   if (world[RAT_HOOKS_KEY]) return;
   world[RAT_HOOKS_KEY] = true;
-  world.on("died", (payload) => {
-    const killerId = Number(payload?.killer || 0) | 0;
-    const victimId = Number(payload?.id || 0) | 0;
-    if (!(killerId > 0) || !(victimId > 0)) return;
-    if (!isRat(world, victimId)) return;
-
-    const playerId = firstPlayerId(world);
-    if (killerId !== playerId) return;
-
-    const quest = getQuestRecord(world, RAT_INFESTATION_QUEST_ID, playerId);
-    if (!quest) return;
-    if (String(quest.state?.status || "active") !== "active") return;
-    if (String(quest.state?.node || "") !== "hunt") return;
-
-    world.emit("rat:killed", { playerId, victimId });
-  });
   world.on("dungeon:transitioned", ({ depth }) => {
     if ((Number(depth || 0) | 0) !== 1) return;
     ensureRatInfestationQuestRats(world);
   });
+}
+
+export function ratInfestationDeathSystem(world) {
+  for (const [, death] of world.query(DeathApplied)) {
+    const killerId = Number(death.killer || 0) | 0;
+    const victimId = Number(death.target || 0) | 0;
+    if (!(killerId > 0) || !(victimId > 0)) continue;
+    if (!isRat(world, victimId)) continue;
+
+    const playerId = firstPlayerId(world);
+    if (killerId !== playerId) continue;
+
+    const quest = getQuestRecord(world, RAT_INFESTATION_QUEST_ID, playerId);
+    if (!quest) continue;
+    if (String(quest.state?.status || "active") !== "active") continue;
+    if (String(quest.state?.node || "") !== "hunt") continue;
+
+    world.emit("rat:killed", { playerId, victimId });
+  }
 }
 
 export const RatInfestationQuest = registerQuest({

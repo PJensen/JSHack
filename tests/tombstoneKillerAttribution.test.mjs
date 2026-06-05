@@ -9,7 +9,7 @@ import { Faction } from "../src/rules/components/Faction.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { AttackIntent } from "../src/rules/components/Intents/AttackIntent.js";
 import { DungeonState } from "../src/rules/components/DungeonState.js";
-import { installTombstoneDeathListener } from "../src/rules/systems/tombstoneSystem.js";
+import { installTombstoneDeathListener, tombstoneSystem } from "../src/rules/systems/tombstoneSystem.js";
 import { combatSystem } from "../src/rules/systems/combatSystem.js";
 import { installAffixTriggers } from "../src/rules/systems/affixTriggerSystem.js";
 import { dealDamage } from "../src/rules/utils/dealDamage.js";
@@ -47,6 +47,7 @@ Deno.test("tombstone: melee kill records both cause and killer identity", () => 
 
   // Lethal melee hit — both cause and killer are present (as dealDamage emits)
   dealDamage(world, { target: player, amount: 100, source: killer, type: 'physical', cause: 'melee' });
+  tombstoneSystem(world);
 
   assertEquals(repo.records.length, 1, "should save one tombstone");
   const ts = repo.records[0];
@@ -74,6 +75,7 @@ Deno.test("tombstone: starvation death records cause without killer", () => {
 
   // Environmental death — source=0, cause='starvation'
   dealDamage(world, { target: player, amount: 10, source: 0, type: 'physical', cause: 'starvation', bypassInvuln: true, bypassResist: true });
+  tombstoneSystem(world);
 
   assertEquals(repo.records.length, 1);
   const ts = repo.records[0];
@@ -91,6 +93,7 @@ Deno.test("tombstone: non-player deaths are ignored", () => {
   world.add(monster, Vitality, { maxHp: 10, hp: 5 });
 
   dealDamage(world, { target: monster, amount: 100 });
+  tombstoneSystem(world);
 
   assertEquals(repo.records.length, 0, "no tombstone for non-player");
 });
@@ -131,6 +134,7 @@ Deno.test("tombstone: mutual kill — player kills demon, hellfire kills player,
 
     world.add(player, AttackIntent, { targetId: demon });
     combatSystem(world);
+    tombstoneSystem(world);
 
     const demonVit = world.get(demon, Vitality);
     const playerVit = world.get(player, Vitality);
@@ -172,6 +176,7 @@ Deno.test("tombstone: deterministic id/timestamp for same seed + step + outcome"
     world.add(killer, NamedIdentity, { name: "Orc Warrior", identity: "orc" });
 
     dealDamage(world, { target: player, amount: 10, source: killer, type: "physical", cause: "melee" });
+    tombstoneSystem(world);
     assertEquals(repo.records.length, 1);
     return repo.records[0];
   }

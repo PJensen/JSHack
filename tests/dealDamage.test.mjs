@@ -1,5 +1,6 @@
 import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from '../src/lib/ecs-js/index.js';
+import { Died } from "../src/events/Died.js";
 import { Vitality } from '../src/rules/components/Vitality.js';
 import { ActiveEffects } from '../src/rules/components/ActiveEffects.js';
 import { StatusEffectNode } from '../src/rules/components/StatusEffectNode.js';
@@ -242,6 +243,8 @@ Deno.test("dealDamage: kill target emits 'died' and returns killed", () => {
   const id = makeTarget(world, { hp: 3 });
   const killer = world.create();
   const diedEvents = [];
+  const typedDiedEvents = [];
+  world.on(Died, (e) => typedDiedEvents.push(e));
   world.on('died', (e) => diedEvents.push(e));
   const result = dealDamage(world, { target: id, amount: 10, source: killer, cause: 'melee' });
   assertEquals(result.applied, true);
@@ -251,6 +254,10 @@ Deno.test("dealDamage: kill target emits 'died' and returns killed", () => {
   assertEquals(diedEvents[0].id, id);
   assertEquals(diedEvents[0].killer, killer);
   assertEquals(diedEvents[0].cause, 'melee');
+  assertEquals(typedDiedEvents.length, 1);
+  assertEquals(typedDiedEvents[0].id, id);
+  assertEquals(typedDiedEvents[0].killer, killer);
+  assertEquals(typedDiedEvents[0].cause, 'melee');
 });
 
 Deno.test("dealDamage: exact lethal damage kills", () => {
