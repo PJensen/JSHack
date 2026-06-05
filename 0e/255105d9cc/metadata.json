@@ -1,0 +1,33 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "0e255105d9cc",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "src/main/scheduler.js",
+    "src/rules/systems/aiChaseSystem.js",
+    "src/rules/systems/channelingSystem.js",
+    "src/rules/systems/cleanupSystem.js",
+    "src/rules/systems/itemDestructionSystem.js",
+    "src/rules/utils/electrocute.js",
+    "src/rules/utils/sleep.js",
+    "tests/deathCleanup.test.mjs",
+    "tests/drainLife.test.mjs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0e/255105d9cc/0/metadata.json",
+      "transcript": "/0e/255105d9cc/0/full.jsonl",
+      "content_hash": "/0e/255105d9cc/0/content_hash.txt",
+      "prompt": "/0e/255105d9cc/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 137385,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 2263168,
+    "output_tokens": 5109,
+    "api_call_count": 11
+  }
+}
