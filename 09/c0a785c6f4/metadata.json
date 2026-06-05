@@ -3,7 +3,7 @@
   "checkpoint_id": "09c0a785c6f4",
   "strategy": "manual-commit",
   "branch": "master",
-  "checkpoints_count": 3,
+  "checkpoints_count": 1,
   "files_touched": [
     "docs/architecture/COMPONENT_PHASE_SYSTEM_EVENT_DOCTRINE_REVIEW.md",
     "src/events/Died.js",
@@ -37,15 +37,15 @@
       "metadata": "/09/c0a785c6f4/1/metadata.json",
       "transcript": "/09/c0a785c6f4/1/full.jsonl",
       "content_hash": "/09/c0a785c6f4/1/content_hash.txt",
-      "prompt": "/09/c0a785c6f4/1/prompt.txt"
+      "prompt": ""
     }
   ],
   "token_usage": {
-    "input_tokens": 1147640,
+    "input_tokens": 205674,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 17895424,
-    "output_tokens": 77006,
-    "api_call_count": 177
+    "cache_read_tokens": 2627840,
+    "output_tokens": 16865,
+    "api_call_count": 34
   },
   "combined_attribution": {
     "calculated_at": "2026-06-05T12:53:18.293172419Z",
