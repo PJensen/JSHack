@@ -2,6 +2,8 @@
 
 [🎮 Play JSHack](https://jshack.net/) · [GitHub Pages fallback](https://pjensen.github.io/JSHack/)
 
+[![NW.js Release](https://github.com/PJensen/JSHack/actions/workflows/release-nwjs.yml/badge.svg)](https://github.com/PJensen/JSHack/actions/workflows/release-nwjs.yml)
+
 **A mobile-first roguelike built to be played, studied, and hacked.**
 
 Pure JavaScript. Zero dependencies. No build step. Serve the folder, open the page, and play. Edit a file, refresh, and the world changes.
