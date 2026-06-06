@@ -70,6 +70,15 @@ jobs:
           unzip -q "dist/nwjs-cache/downloads/nwjs-v${NWJS_VERSION}-osx-arm64.zip" \
             -d dist/nwjs-cache/runtimes/osx-arm64
 
+      - name: Build Source Zip
+        run: |
+          app_version="${{ steps.versions.outputs.app_version }}"
+          deno task wrap:nwjs --out dist/jshack-app
+          (
+            cd dist/jshack-app
+            zip -qry "../jshack-v${app_version}.zip" app
+          )
+
       - name: Build Runtime Bundles
         run: |
           deno task wrap:nwjs \
@@ -96,6 +105,8 @@ jobs:
       - name: Verify Archives
         run: |
           app_version="${{ steps.versions.outputs.app_version }}"
+          unzip -Z1 "dist/jshack-v${app_version}.zip" \
+            | grep -q 'app/index.html$'
           test -f "dist/jshack-nwjs-v${app_version}-linux-x64.tar.gz"
           unzip -Z1 "dist/jshack-nwjs-v${app_version}-win-x64.zip" \
             | grep -q 'runtime/jshack.exe$'
@@ -114,6 +125,7 @@ jobs:
               --notes "NW.js ${NWJS_VERSION} desktop packages for JSHack ${app_version}."
           fi
           gh release upload "$release_tag" \
+            "dist/jshack-v${app_version}.zip" \
             "dist/jshack-nwjs-v${app_version}-linux-x64.tar.gz" \
             "dist/jshack-nwjs-v${app_version}-win-x64.zip" \
             "dist/jshack-nwjs-v${app_version}-osx-arm64.zip" \
