@@ -2,7 +2,7 @@
 
 [🎮 Play JSHack](https://jshack.net/) · [GitHub Pages fallback](https://pjensen.github.io/JSHack/)
 
-[![NW.js Release](https://github.com/PJensen/JSHack/actions/workflows/release-nwjs.yml/badge.svg)](https://github.com/PJensen/JSHack/actions/workflows/release-nwjs.yml) | [![CI](https://github.com/PJensen/JSHack/actions/workflows/deno.yml/badge.svg)](https://github.com/PJensen/JSHack/actions/workflows/deno.yml)
+[![NW.js Release](https://github.com/PJensen/JSHack/actions/workflows/release-nwjs.yml/badge.svg)](https://github.com/PJensen/JSHack/actions/workflows/release-nwjs.yml) [![CI](https://github.com/PJensen/JSHack/actions/workflows/deno.yml/badge.svg)](https://github.com/PJensen/JSHack/actions/workflows/deno.yml)
 
 **A mobile-first roguelike built to be played, studied, and hacked.**
 
