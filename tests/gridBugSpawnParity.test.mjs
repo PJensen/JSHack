@@ -28,6 +28,7 @@ import { TILE_FLOOR, CHUNK_SIZE } from "../src/rules/environment/dungeon/constan
 import { clearAll, loadChunk } from "../src/rules/environment/dungeon/tileMap.js";
 import { applyMutation } from "../src/rules/interaction/mutations.js";
 import { getMonster } from "../src/rules/data/monsters.js";
+import { monsterDeathHookSystem } from "../src/rules/systems/monsterDeathHookSystem.js";
 import { monsterSpawnerSystem } from "../src/rules/systems/monsterSpawnerSystem.js";
 import { dealDamage } from "../src/rules/utils/dealDamage.js";
 
@@ -155,6 +156,7 @@ Deno.test("grid_bug parity: debug spawn, dungeon spawn, and spawner child share 
       bypassResist: true,
     });
   }
+  monsterDeathHookSystem(world);
 
   assertEquals(spawned.length, 3, "all grid bug variants should leave plasma");
   for (const event of spawned) {
