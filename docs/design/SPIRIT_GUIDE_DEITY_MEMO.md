@@ -1,4 +1,4 @@
-# Spirit Guide As Deity Director
+# Spirit Guide As Deity
 
 Date: 2026-06-06
 Status: Technical design memo
@@ -16,7 +16,7 @@ It is optimizing player fun.
 
 ## Goal
 
-Create a deterministic director layer that lets the deity shape runs through
+Create a deterministic deity-authorship layer that lets the deity shape runs through
 offscreen interventions while preserving the illusion that the dungeon was there
 all along.
 
@@ -27,8 +27,7 @@ The desired player experience:
 - The spirit guide can be read as helpful, but later understood as complicit.
 - The dungeon remains coherent: interventions use ordinary monsters, traps,
   loot, and terrain rules.
-- The player is never asked to believe that visible reality changed in front of
-  them without a clear miracle, curse, or hallucination.
+- The player may suspect but never prove that the deity is authoring the run.
 
 ## Core Premise
 
@@ -39,7 +38,7 @@ and hides intent.
 Recommended framing:
 
 - `Deity` owns mood, favor, boredom, surprise, wrath, serenity, and amusement.
-- A new director layer converts that divine state plus player state into
+- A new deity policy layer converts divine state plus player state into
   concrete intervention proposals.
 - Existing canonical systems perform the actual work: monster materialization,
   loot materialization, trap creation, status application, and messages.
@@ -50,9 +49,9 @@ The guide can therefore give advice about a trap it arranged, point at loot it
 planted, warn about a monster it released, or stay silent because the lesson is
 more entertaining that way.
 
-## Director Contract
+## Deity Contract
 
-The deity director should answer one question each turn or at sparse intervals:
+The deity should answer one question each turn or at sparse intervals:
 
 ```txt
 What small change, just outside player knowledge, would make the next few turns
@@ -82,7 +81,7 @@ records, and future replay inspection.
 
 ## Offscreen Law
 
-The director may cheat only outside the player's reliable knowledge.
+The deity may cheat only outside the player's reliable knowledge.
 
 Allowed placement zones:
 
@@ -103,12 +102,12 @@ Disallowed by default:
 - Invalidating deterministic replays by using timers, async, fetch, or
   `Math.random()`.
 
-If a visible violation is desired, it should be framed as a direct miracle,
+If a visible violation is desired, it *must* be framed as a direct miracle,
 wrath event, hallucination, or explicit reality break.
 
 ## Fun Signal
 
-The director needs a compact, deterministic readout of player state. It should
+The deity needs a compact, deterministic readout of player state. It should
 not try to infer fun from every variable at once.
 
 Useful signals:
@@ -207,30 +206,30 @@ These should route through existing `deity:wrath`, `deity:miracle`, and
 
 ## Topology
 
-Do not store director history as arrays on the player or deity component.
+Do not store deity-authorship history as arrays on the player or deity component.
 Runtime multiplicity should be child entities.
 
 Recommended components:
 
-- `DirectorState`
-  - attached to a deity, director singleton, or player-deity relationship
+- `DeityAuthorshipState`
+  - attached to a deity or player-deity relationship
   - stores coarse budget, cooldowns, and current pressure/relief scores
 
-- `DirectorIntervention`
+- `DeityIntervention`
   - child runtime entity
   - stores planned intervention kind, target, payload, reason, expiry, and
     visibility policy
 
-- `DirectorMemory`
+- `DeityAuthorshipMemory`
   - optional child runtime entity for recent interventions
   - supports cooldowns such as "do not place two emergency potions in a row"
 
-This keeps the director auditable and compatible with the runtime topology
+This keeps deity authorship auditable and compatible with the runtime topology
 doctrine.
 
 ## Scheduling
 
-The director should be deterministic rules code, not display wiring.
+Deity authorship should be deterministic rules code, not display wiring.
 
 Recommended integration:
 
@@ -238,10 +237,10 @@ Recommended integration:
   enqueues intervention entities.
 - A later rules system materializes due interventions through canonical helpers.
 - Display/main spirit guide wiring only visualizes outcomes and speech.
-- Existing deity mood events can feed the director, but the director should not
+- Existing deity mood events can feed the authorship layer, but it should not
   import display code or call UI directly.
 
-The director should not run every expensive search every turn. It can tick every
+The deity policy layer should not run every expensive search every turn. It can tick every
 N turns, on room entry, on damage spikes, on prayer, on floor transition, and on
 important resource thresholds.
 
@@ -264,7 +263,7 @@ script/archetype path that ordinary dungeon generation uses.
 
 ## Budgets And Cooldowns
 
-The director needs limits so it feels like a hidden mind, not a spammer.
+The deity needs limits so it feels like a hidden mind, not a spammer.
 
 Suggested budgets:
 
@@ -305,7 +304,7 @@ Potential lines should be short and ambiguous:
 - "I did not place the trap. I merely allowed it."
 
 The display layer should remain a consumer of events such as
-`deity:intervention`, `guidance:pulse`, and future `director:omen` events.
+`deity:intervention`, `guidance:pulse`, and future `deity:omen` events.
 
 ## Debugging
 
@@ -338,10 +337,118 @@ Required coverage for implementation:
 - Monster interventions use canonical spawn paths.
 - Loot interventions use canonical materialization paths.
 - Trap interventions use canonical trap paths.
-- Director entities expire and clean up.
+- Deity intervention entities expire and clean up.
 
 Avoid snapshot tests that lock exact tile choices unless the placement algorithm
 is intentionally part of the contract.
+
+## Follow-up: Total Divine Authorship
+
+There is a stronger version of this idea: the deity eventually directs
+all traps, all monsters, all loot, all miracles, and all major dungeon pressure.
+
+That is possible, but the important distinction is total authorship, not total
+micromanagement.
+
+Bad version:
+
+- Every monster spawn asks bespoke deity code what exact monster to create.
+- Every trap, chest, potion, shrine, spawner, and miracle gets special branches.
+- Dungeon generation becomes a live difficulty script with hidden ad hoc rules.
+- Existing loot tables, monster pools, trap tables, and materializers are
+  bypassed.
+
+Good version:
+
+- All content producers continue using canonical generation and materialization
+  paths.
+- The deity owns policy: budgets, weights, vetoes, pacing, and intent.
+- Existing tables still own domain content: which monsters exist, which loot can
+  drop, which traps are valid at depth, which miracles a deity can express.
+- Initial floor population and live offscreen interventions both pass through
+  the same deity-facing request shape.
+- Content can still be precomputed, but it is precomputed from a divine policy
+  instead of only from neutral dungeon density rules.
+
+The deity should become the answer to "why did this exist here?" without
+becoming the implementation of every thing that exists.
+
+### Deity As Policy Layer
+
+The long-term architecture can treat all content placement as requests:
+
+```js
+{
+  kind: "monster" | "trap" | "loot" | "feature" | "miracle",
+  phase: "floor_populate" | "offscreen_live" | "visible_divine",
+  depth,
+  roomId,
+  playerState,
+  deityState,
+  candidates,
+  constraints,
+}
+```
+
+The deity returns a decision:
+
+```js
+{
+  allow: true,
+  intent: "pressure" | "relief" | "temptation" | "lesson" | "wrath",
+  weightBias: { monster: 1.2, trap: 0.8, healing: 0.4 },
+  selectedCandidate,
+  reason: "boredom",
+}
+```
+
+This lets generation ask the deity for policy without making the deity know how
+to construct a goblin, a potion, a pit trap, or a shrine.
+
+### Initial Generation Versus Live Direction
+
+Total authorship should have two modes.
+
+Initial generation:
+
+- The deity biases room themes, trap density, monster pressure, and loot shape.
+- The level is still fully deterministic from seed plus deity/player state.
+- The player can inspect the result later and it remains coherent.
+- Most content feels like it was always there.
+
+Live offscreen direction:
+
+- The deity reacts to the run after the floor begins.
+- Only tiles outside reliable player knowledge can receive ordinary changes.
+- Live changes are represented as `DeityIntervention` entities.
+- Materialization still uses canonical paths.
+
+Visible divine direction:
+
+- Miracles, wrath, curses, omens, and hallucinations can break ordinary
+  offscreen law because the fiction tells the player reality is being acted on.
+- These should be rarer, logged, and attributable to the deity.
+
+### Migration Path
+
+This should not start by rewriting the dungeon generator. A practical follow-up
+is to build a deity policy adapter around existing placement decisions.
+
+Suggested progression:
+
+1. Add read-only instrumentation that labels existing generated monsters, traps,
+   loot, and miracles with inferred intent: pressure, relief, temptation,
+   lesson, neutral.
+2. Add a policy hook that can veto or reweight one narrow category, such as
+   healing potion placement.
+3. Expand to monster pressure budgets while still using existing monster pools.
+4. Expand to trap budgets and trap/loot pairings.
+5. Route miracle/wrath choices through the same policy vocabulary.
+6. Only after those are stable, consider making floor population ask the deity
+   for all high-level placement policy.
+
+This keeps the system shippable at every step. The first useful version can say
+"the deity caused this potion" long before the deity controls the entire dungeon.
 
 ## Implementation Slices
 
@@ -353,7 +460,7 @@ stable scoring.
 
 ### Slice 2: Intervention Entities
 
-Create `DirectorIntervention` child entities and a system that can enqueue and
+Create `DeityIntervention` child entities and a system that can enqueue and
 expire them without materializing anything. Add debug/audit output.
 
 ### Slice 3: Relief Placement
@@ -374,7 +481,7 @@ placement validation because traps can invalidate routes or feel unfair.
 
 ### Slice 6: Spirit Guide Omen Layer
 
-Let the wisp react to selected director interventions: pulse, hesitate, point, or
+Let the wisp react to selected deity interventions: pulse, hesitate, point, or
 say a short line. Keep this in display/main wiring as a consumer of rule events.
 
 ## Open Questions
@@ -383,9 +490,9 @@ say a short line. Keep this in display/main wiring as a consumer of rule events.
   should it remain subtext?
 - Should different deities optimize different flavors of fun: mercy, cruelty,
   chaos, sacrifice, mastery, greed?
-- Does the director belong to the active patron, the pantheon, or the dungeon
+- Does authorship belong to the active patron, the pantheon, or the dungeon
   itself when pantheon mode is enabled?
-- How much should the director remember across floors?
+- How much should the deity remember across floors?
 - Can high player favor request a specific kind of intervention, or only bias the
   deity's hidden choice?
 - Should death records include "divine authorship" when an intervention helped
