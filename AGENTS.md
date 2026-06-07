@@ -27,15 +27,21 @@ Deeper docs:
 - **No system-to-system calls.** Systems communicate with `world.emit` /
   `world.on`; scheduler owns ordering.
 - **New events use concrete event classes.** Any new event contract must define
-  a concrete `EcsEvent` class and emit an instance with `world.emit(new Event(...))`.
-  Do not introduce string-only events or parallel string re-emits for new
-  contracts.
+  a concrete `EcsEvent` class and emit an instance with
+  `world.emit(new Event(...))`. Do not introduce string-only events or parallel
+  string re-emits for new contracts.
 - **Touched listener installers use canonical extensions.** Any new listener
   installer, or any existing listener installer touched during a task, must use
   `defineExtension(...)` and `world.install(...)` for idempotent installation.
   Do not add new bespoke symbol-guard installers.
 - **No swallowed event failures.** Do not add `emitSafe`-style wrappers around
   `world.emit`.
+- **No new world-attached state.** Do not attach simulation state to `world`
+  with symbol or property keys (`world[...]`, `ctx.world[...]`). Use ECS
+  components for state; when the state is genuinely world-scoped, model it as an
+  explicit singleton entity/component and document the allowance. Existing
+  world-attached state is a ratcheted architecture debt tracked by
+  `ratchets/worldStateAttachmentRatchet.test.mjs`.
 - **Determinism is sacred.** In rules simulation use `world.rand()`, never
   `Math.random()`. No timers/fetch/promises/async in systems.
 - **Integer grid only.** World coords may be negative. Do not clamp to `>= 0`;
@@ -67,6 +73,7 @@ deno task guard:architecture
 deno task guard:events
 deno task guard:death
 deno task guard:tools
+deno task ratchet:world-state
 ```
 
 - `check` runs the architecture and event doctrine guardrails.
@@ -75,6 +82,8 @@ deno task guard:tools
 - `guard:events` runs event doctrine ratchets and prints the event bus summary.
 - `guard:death` runs the focused death pipeline/domain migration suite.
 - `guard:tools` verifies the agent-facing tools and prints the system map.
+- `ratchet:world-state` audits pre-existing `world[...]` simulation-state debt
+  without making the normal architecture guard carry that allowlist.
 
 Audit-only tasks:
 
@@ -236,9 +245,12 @@ Use `defineExtension(...)` and `world.install(...)` for listener installers:
 import { defineExtension } from "../../lib/ecs-js/index.js";
 import { FeatureHappened } from "../../events/FeatureHappened.js";
 
-export const featureListeners = defineExtension("jshack:domain:feature", (world) => {
-  world.on(FeatureHappened, (event) => {});
-});
+export const featureListeners = defineExtension(
+  "jshack:domain:feature",
+  (world) => {
+    world.on(FeatureHappened, (event) => {});
+  },
+);
 ```
 
 Install listeners with `world.install(featureListeners)` from `configureWorld()`
@@ -310,9 +322,12 @@ bounds, parity, layer boundaries, canonical paths.
 - [ ] No build step or new dependency pipeline.
 - [ ] No `Math.random()` in rules simulation.
 - [ ] No `emitSafe` or swallowed event errors.
+- [ ] No new `world[...]` / `ctx.world[...]` simulation state; use ECS
+      components or an explicit singleton component.
 - [ ] No direct system-to-system calls.
 - [ ] No illegal layer imports.
-- [ ] New listeners have symbol guards.
+- [ ] New or touched listeners use `defineExtension(...)` and
+      `world.install(...)`.
 - [ ] New systems are registered and tested.
 - [ ] Spawn paths use canonical constructors/materializers.
 - [ ] Event wiring checked with `tools/event-bus-explorer.mjs`.

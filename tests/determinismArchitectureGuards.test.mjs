@@ -36,6 +36,13 @@ const FORBIDDEN_RANDOM_APIS = Object.freeze([
   "getRandomValues(",
 ]);
 
+function stripLineComments(raw) {
+  return raw.split("\n").map((line) => {
+    const ci = line.indexOf("//");
+    return ci >= 0 ? line.slice(0, ci) : line;
+  }).join("\n");
+}
+
 Deno.test("deterministic layers avoid non-deterministic random/time APIs", async () => {
   const root = Deno.cwd();
   const offenders = [];
@@ -48,10 +55,7 @@ Deno.test("deterministic layers avoid non-deterministic random/time APIs", async
       const relPath = absPath.slice(root.length + 1);
       const raw = await Deno.readTextFile(absPath);
       // Strip single-line comments before scanning so doc-comments don't trigger.
-      const text = raw.split("\n").map((line) => {
-        const ci = line.indexOf("//");
-        return ci >= 0 ? line.slice(0, ci) : line;
-      }).join("\n");
+      const text = stripLineComments(raw);
       for (let t = 0; t < FORBIDDEN_RANDOM_APIS.length; t++) {
         const token = FORBIDDEN_RANDOM_APIS[t];
         if (text.includes(token)) offenders.push(`${relPath}::${token}`);
@@ -62,6 +66,8 @@ Deno.test("deterministic layers avoid non-deterministic random/time APIs", async
   assertEquals(
     offenders,
     [],
-    `Deterministic layers must stay random/time-source pure. Offenders: ${offenders.join(", ")}`,
+    `Deterministic layers must stay random/time-source pure. Offenders: ${
+      offenders.join(", ")
+    }`,
   );
 });
