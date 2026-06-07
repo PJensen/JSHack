@@ -1,0 +1,10 @@
+FYI: randomly attaching shit to `world` cannot be a good idea -- you should track precisely this type of violation, you understand it's a negative  right? I would migh rather see a singleton component which we make an explicit allowance for.
+
+---
+
+1. I am still lacking the gameplay explaination that I asked for.
+2. I never explicitly asked you to remove the event surface -- but I'll let it go for now since I don't see a clear use for it beyond debugging; however, the token burn in going backwards is painful and likely not worth the removal effort.
+
+with this ratchet, I expect there to be many existing offenses; we should somehow isolate this test into a distinct ratchets folder so I can still have tests broadly passing while retaining the ratchet.
+
+explain the sheer number of "allowances" -- are these all violations that you've papered over?
