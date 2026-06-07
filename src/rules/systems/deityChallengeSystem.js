@@ -1,5 +1,7 @@
 import { attach } from "../../lib/ecs-js/hierarchy.js";
 import { createRng } from "../../lib/ecs-js/rng.js";
+import { DeityChallengeCompleted } from "../../events/DeityChallengeCompleted.js";
+import { DeityChallengeStarted } from "../../events/DeityChallengeStarted.js";
 import { Collider } from "../components/Collider.js";
 import { DeathApplied } from "../components/DeathApplied.js";
 import { DeityAuthorshipState } from "../components/DeityAuthorshipState.js";
@@ -225,7 +227,7 @@ function spawnChallenge(world, playerId, playerPos, devotion, ds, picked) {
     });
   }
 
-  world.emit?.("deity:challenge", {
+  const event = new DeityChallengeStarted({
     deityId,
     playerId,
     challengeId,
@@ -234,6 +236,7 @@ function spawnChallenge(world, playerId, playerPos, devotion, ds, picked) {
     room: { x: room.x | 0, y: room.y | 0, w: room.w | 0, h: room.h | 0 },
     spawnedIds: spawnedIds.slice(),
   });
+  world.emit?.(event);
   world.emit?.("deity:intervention", {
     deityId,
     playerId,
@@ -265,7 +268,7 @@ function rewardChallenge(world, challengeId, challenge, at) {
     world.add(challengeId, Lifespan, { turnsLeft: 2, onExpiry: "remove", expiryEvent: "" });
   } catch {}
 
-  world.emit?.("deity:challenge:completed", {
+  const event = new DeityChallengeCompleted({
     deityId: String(challenge.deityId || ""),
     playerId: Number(challenge.playerId || 0) | 0,
     challengeId,
@@ -274,6 +277,7 @@ function rewardChallenge(world, challengeId, challenge, at) {
     amount,
     at: { x: rewardPos.x | 0, y: rewardPos.y | 0 },
   });
+  world.emit?.(event);
   world.emit?.("deity:intervention", {
     deityId: String(challenge.deityId || ""),
     playerId: Number(challenge.playerId || 0) | 0,

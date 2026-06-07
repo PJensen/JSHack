@@ -1,6 +1,8 @@
 import "./helpers/installContentMonsters.mjs";
 import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";
+import { DeityChallengeCompleted } from "../src/events/DeityChallengeCompleted.js";
+import { DeityChallengeStarted } from "../src/events/DeityChallengeStarted.js";
 import { CHUNK_SIZE, TILE_FLOOR } from "../src/rules/environment/dungeon/constants.js";
 import {
   clearAll as clearTileMap,
@@ -84,7 +86,7 @@ function runQuietTurns(world, turns = 12) {
 Deno.test("deityChallengeSystem spawns a monster challenge in an explored cleared room", () => {
   const { world, dungeon, player, room } = setupWorld();
   const events = [];
-  world.on("deity:challenge", (ev) => events.push(ev));
+  world.on(DeityChallengeStarted, (ev) => events.push(ev));
 
   runQuietTurns(world);
 
@@ -122,7 +124,7 @@ Deno.test("deityChallengeSystem does not spawn ordinary challenges in visible ro
 Deno.test("deityChallengeSystem rewards the player when all challenge monsters die", () => {
   const { world, dungeon, player } = setupWorld();
   const completed = [];
-  world.on("deity:challenge:completed", (ev) => completed.push(ev));
+  world.on(DeityChallengeCompleted, (ev) => completed.push(ev));
 
   runQuietTurns(world);
   const [[challengeId]] = [...world.query(DeityAuthorshipState)];
