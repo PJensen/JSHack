@@ -60,7 +60,7 @@ import { intentValidationSystem } from "../rules/systems/intentValidationSystem.
 import { combatSystem, installBumpAttackListener } from "../rules/systems/combatSystem.js";
 import { installCombatInteractions } from "../rules/data/combatInteractions.js";
 import { cleanupSystem } from "../rules/systems/cleanupSystem.js";
-import { trapSystem, installTrapStepListener } from "../rules/systems/trapSystem.js";
+import { trapSystem, trapStepListenerExtension } from "../rules/systems/trapSystem.js";
 import { disarmTrapSystem } from "../rules/systems/disarmTrapSystem.js";
 import { manaRegenerationSystem } from "../rules/systems/manaRegenerationSystem.js";
 import { staminaRegenerationSystem } from "../rules/systems/staminaRegenerationSystem.js";
@@ -164,7 +164,7 @@ export function configureWorld(world) {
   // Tile step effects: ice slides, lava scorch, water extinguish (reacts to "moved" event)
   installTileStepEffectListener(world);
   // Trap plates trigger from arrival movement events, then resolve in trapSystem.
-  installTrapStepListener(world);
+  world.install(trapStepListenerExtension);
   // Material reactions consume semantic reaction events (water splash/dip, etc.).
   installMaterialReactionListeners(world);
   // Polymorph requests (e.g. mimic reveal on touch).

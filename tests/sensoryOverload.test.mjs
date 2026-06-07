@@ -14,7 +14,7 @@ import { deafen } from "../src/rules/utils/deafen.js";
 import { applyElectrocuted } from "../src/rules/utils/electrocute.js";
 import { dealDamage } from "../src/rules/utils/dealDamage.js";
 import { electrocuteDamageReactionSystem } from "../src/rules/systems/damageReactions/electrocuteDamageReactionSystem.js";
-import { trapSystem, installTrapStepListener } from "../src/rules/systems/trapSystem.js";
+import { trapSystem, trapStepListenerExtension } from "../src/rules/systems/trapSystem.js";
 import { Trap } from "../src/rules/components/Trap.js";
 import { Position } from "../src/rules/components/Position.js";
 import "../src/rules/scripts/traps.js";
@@ -267,7 +267,7 @@ Deno.test("shock trap blinds immediately (effective sight is 0 on trigger)", () 
     difficulty: 21,
   });
 
-  installTrapStepListener(world);
+  world.install(trapStepListenerExtension);
   world.emit("moved", { id: player, from: { x: 4, y: 5 }, to: { x: 4, y: 4 } });
   trapSystem(world);
   electrocuteDamageReactionSystem(world);

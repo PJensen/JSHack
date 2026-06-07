@@ -8,13 +8,13 @@ import { resolveCanonicalStats } from "../utils/canonicalStats.js";
 import { mulberry32, rngInt, combatSeed, pct } from "../utils/rng.js";
 import { statusStrength } from "../utils/statusFacade.js";
 import { chebyshevScalar } from "../utils/distance.js";
+import { defineExtension } from "../../lib/ecs-js/index.js";
+import { TrapStepQueueResource } from "../resources/trapStepQueue.js";
 
 // Traps only arm when the player is within this radius.  Monsters wander freely
 // beyond it so the dungeon feels alive; once the player closes in, traps go hot
 // and any monster that blunders onto one triggers it in full view.
 const TRAP_ARM_RADIUS = 12;
-const TRAP_STEP_QUEUE = Symbol.for("jshack:trap:stepQueue");
-const TRAP_STEP_LISTENER_INSTALLED = Symbol.for("jshack:trap:stepListener:installed");
 
 function resetEveryTurns(t) {
   const raw = Number(t?.params?.resetsEvery || 0);
@@ -146,10 +146,7 @@ function triggerTrap(world, trapId, t, victimId, playerId) {
   return true;
 }
 
-export function installTrapStepListener(world) {
-  if (!world || world[TRAP_STEP_LISTENER_INSTALLED]) return;
-  world[TRAP_STEP_LISTENER_INSTALLED] = true;
-  world[TRAP_STEP_QUEUE] = [];
+export const trapStepListenerExtension = defineExtension("jshack:trap:stepListener", (world) => {
   world.on("moved", ({ id, from, to }) => {
     const actor = Number(id || 0) | 0;
     if (!(actor > 0)) return;
@@ -158,9 +155,9 @@ export function installTrapStepListener(world) {
     const fx = Number.isFinite(from?.x) ? (from.x | 0) : tx;
     const fy = Number.isFinite(from?.y) ? (from.y | 0) : ty;
     if (fx === tx && fy === ty) return;
-    world[TRAP_STEP_QUEUE].push({ actor, x: tx, y: ty });
+    world.resource(TrapStepQueueResource).push({ actor, x: tx, y: ty });
   });
-}
+});
 
 /** @param {import('../../lib/ecs-js/index.js').World} world */
 export function trapSystem(world) {
@@ -177,7 +174,7 @@ export function trapSystem(world) {
   }
   if (!playerId) return;
 
-  const arrivals = Array.isArray(world[TRAP_STEP_QUEUE]) ? world[TRAP_STEP_QUEUE].splice(0) : [];
+  const arrivals = world.resource(TrapStepQueueResource).splice(0);
   for (const arrival of arrivals) {
     const victimId = Number(arrival.actor || 0) | 0;
     if (!(victimId > 0) || !world.isAlive(victimId)) continue;

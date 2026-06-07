@@ -54,6 +54,9 @@ Deeper docs:
   components.
 - **ECS-js is vendored.** Do not edit `src/lib/ecs-js/` unless fixing the ECS
   library itself.
+- **Authoring discipline.** Do not touch unrelated code. Do not make changes
+  that do nothing. Always match the formatting preferences that already exist;
+  be a chameleon.
 - **Search before writing.** Extend existing patterns. Do exactly what was
   asked; no opportunistic content wiring or unrelated cleanup.
 

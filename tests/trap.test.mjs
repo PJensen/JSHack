@@ -10,7 +10,7 @@ import { Mana } from '../src/rules/components/Mana.js';
 import { Stamina } from '../src/rules/components/Stamina.js';
 import { Faction } from '../src/rules/components/Faction.js';
 import { ActiveEffects } from '../src/rules/components/ActiveEffects.js';
-import { trapSystem, installTrapStepListener } from '../src/rules/systems/trapSystem.js';
+import { trapSystem, trapStepListenerExtension } from '../src/rules/systems/trapSystem.js';
 import { movementSystem } from '../src/rules/systems/movementSystem.js';
 import { MoveIntent } from '../src/rules/components/Intents/MoveIntent.js';
 import { clearAll, loadChunk } from '../src/rules/environment/dungeon/tileMap.js';
@@ -20,7 +20,7 @@ import { setTile } from '../src/rules/environment/dungeon/tileMap.js';
 import '../src/rules/scripts/traps.js';
 
 function stepOntoTrap(world, actor, x, y) {
-  installTrapStepListener(world);
+  world.install(trapStepListenerExtension);
   world.emit("moved", { id: actor, from: { x, y: y + 1 }, to: { x, y } });
 }
 
@@ -536,7 +536,7 @@ Deno.test("arrow trap rearming does not fire when actor walks off the plate", ()
     loadChunk(0, 0, new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR));
     setTile(10, 9, TILE_WALL);
     const world = new World({ seed: 11 });
-    installTrapStepListener(world);
+    world.install(trapStepListenerExtension);
     world.setScheduler((w) => {
       movementSystem(w);
       trapSystem(w);
