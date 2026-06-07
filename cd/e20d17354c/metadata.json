@@ -1,0 +1,29 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "cde20d17354c",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "AGENTS.md",
+    "src/events/DeityChallengeCompleted.js",
+    "src/events/DeityChallengeStarted.js",
+    "src/rules/systems/deityChallengeSystem.js",
+    "tests/deityChallengeSystem.test.mjs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/cd/e20d17354c/0/metadata.json",
+      "transcript": "/cd/e20d17354c/0/full.jsonl",
+      "content_hash": "/cd/e20d17354c/0/content_hash.txt",
+      "prompt": "/cd/e20d17354c/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 47354,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 2747008,
+    "output_tokens": 6449,
+    "api_call_count": 15
+  }
+}
