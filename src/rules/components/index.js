@@ -31,6 +31,7 @@ export { DamageSpec } from './DamageSpec.js';
 export { DamageApplied } from './DamageApplied.js';
 export { DeathApplied } from './DeathApplied.js';
 export { DeityAuthorshipState } from './DeityAuthorshipState.js';
+export { DeityChallengeCadence } from './DeityChallengeCadence.js';
 export { DeityChallengeMember } from './DeityChallengeMember.js';
 export { Player } from './Player.js';
 export { Inventory } from './Inventory.js';

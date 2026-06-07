@@ -230,20 +230,19 @@ not push tags onto entity records; tag projection belongs in the bridge.
 
 ### Listener Installers
 
-Use symbol guards for install functions:
+Use `defineExtension(...)` and `world.install(...)` for listener installers:
 
 ```js
-const INSTALLED = Symbol.for("jshack:domain:feature:installed");
+import { defineExtension } from "../../lib/ecs-js/index.js";
+import { FeatureHappened } from "../../events/FeatureHappened.js";
 
-export function installFeatureListeners(world) {
-  if (world[INSTALLED]) return;
-  world[INSTALLED] = true;
-  world.on("event:name", (payload) => {});
-}
+export const featureListeners = defineExtension("jshack:domain:feature", (world) => {
+  world.on(FeatureHappened, (event) => {});
+});
 ```
 
-Install listeners from `configureWorld()` unless the feature is display/main
-wiring.
+Install listeners with `world.install(featureListeners)` from `configureWorld()`
+unless the feature is display/main wiring.
 
 ### New Systems
 
@@ -265,8 +264,24 @@ dungeon population, and spawner children must have parity tests if they differ.
 
 ### Events
 
-Use direct `world.emit(event, payload)`. If an event should be visible to
-display/audio/messages, verify with:
+New event contracts must be concrete `EcsEvent` classes:
+
+```js
+import { EcsEvent } from "../lib/ecs-js/index.js";
+
+export class FeatureHappened extends EcsEvent {
+  constructor(payload = {}) {
+    super();
+    this.actorId = Number(payload.actorId || 0) | 0;
+    Object.freeze(this);
+  }
+}
+
+world.emit(new FeatureHappened({ actorId }));
+```
+
+If an event should be visible to display/audio/messages, verify the complete
+producer/consumer wiring with:
 
 ```bash
 deno run --allow-read tools/event-bus-explorer.mjs --format csv --event event:name

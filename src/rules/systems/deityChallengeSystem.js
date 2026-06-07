@@ -1,10 +1,9 @@
 import { attach } from "../../lib/ecs-js/hierarchy.js";
 import { createRng } from "../../lib/ecs-js/rng.js";
-import { DeityChallengeCompleted } from "../../events/DeityChallengeCompleted.js";
-import { DeityChallengeStarted } from "../../events/DeityChallengeStarted.js";
 import { Collider } from "../components/Collider.js";
 import { DeathApplied } from "../components/DeathApplied.js";
 import { DeityAuthorshipState } from "../components/DeityAuthorshipState.js";
+import { DeityChallengeCadence } from "../components/DeityChallengeCadence.js";
 import { DeityChallengeMember } from "../components/DeityChallengeMember.js";
 import { Devotion } from "../components/Devotion.js";
 import { DungeonState } from "../components/DungeonState.js";
@@ -20,18 +19,18 @@ import { pickMonster } from "../environment/dungeon/tables.js";
 import { materializeDrop } from "../data/lootResolver.js";
 import { spawnMonsterEntity } from "../utils/spawnMonsterEntity.js";
 
-const STATE_KEY = Symbol.for("jshack:deity:challengeState");
 const QUIET_TURNS_REQUIRED = 12;
 const CHALLENGE_COOLDOWN_TURNS = 80;
 const NEAR_HOSTILE_RADIUS = 7;
 const MIN_PLAYER_ROOM_DISTANCE = 5;
 
-function ensureState(world) {
-  const rec = world[STATE_KEY];
-  if (rec && typeof rec === "object") return rec;
-  const created = { quietTurns: 0, lastChallengeStep: -999999 };
-  world[STATE_KEY] = created;
-  return created;
+function challengeCadence(world, playerId) {
+  let rec = world.get(playerId, DeityChallengeCadence);
+  if (!rec) {
+    world.add(playerId, DeityChallengeCadence, {});
+    rec = world.get(playerId, DeityChallengeCadence);
+  }
+  return rec;
 }
 
 function currentDungeonState(world) {
@@ -170,7 +169,7 @@ function challengeSeed(world, playerId, room) {
   ) >>> 0;
 }
 
-function spawnChallenge(world, playerId, playerPos, devotion, ds, picked) {
+function spawnChallenge(world, playerId, devotion, ds, picked) {
   const room = picked.room;
   const depth = Math.max(1, Number(ds?.currentDepth || 1) | 0);
   const deityId = String(devotion?.deityId || "unknown");
@@ -227,23 +226,6 @@ function spawnChallenge(world, playerId, playerPos, devotion, ds, picked) {
     });
   }
 
-  const event = new DeityChallengeStarted({
-    deityId,
-    playerId,
-    challengeId,
-    kind: "monster_ambush",
-    reason: "cleared_room",
-    room: { x: room.x | 0, y: room.y | 0, w: room.w | 0, h: room.h | 0 },
-    spawnedIds: spawnedIds.slice(),
-  });
-  world.emit?.(event);
-  world.emit?.("deity:intervention", {
-    deityId,
-    playerId,
-    kind: "challenge",
-    challengeId,
-    reason: "cleared_room",
-  });
   return challengeId;
 }
 
@@ -267,24 +249,6 @@ function rewardChallenge(world, challengeId, challenge, at) {
   try {
     world.add(challengeId, Lifespan, { turnsLeft: 2, onExpiry: "remove", expiryEvent: "" });
   } catch {}
-
-  const event = new DeityChallengeCompleted({
-    deityId: String(challenge.deityId || ""),
-    playerId: Number(challenge.playerId || 0) | 0,
-    challengeId,
-    rewardId: rewardId || 0,
-    rewardKind: "gold",
-    amount,
-    at: { x: rewardPos.x | 0, y: rewardPos.y | 0 },
-  });
-  world.emit?.(event);
-  world.emit?.("deity:intervention", {
-    deityId: String(challenge.deityId || ""),
-    playerId: Number(challenge.playerId || 0) | 0,
-    kind: "challenge_reward",
-    challengeId,
-    rewardId: rewardId || 0,
-  });
 }
 
 function completeDefeatedChallenges(world) {
@@ -330,7 +294,7 @@ export function deityChallengeSystem(world) {
   if (!(depth > 0)) return;
   if (hasActiveChallenge(world, playerId)) return;
 
-  const state = ensureState(world);
+  const state = challengeCadence(world, playerId);
   if (hasNearbyHostile(world, playerId, playerPos)) {
     state.quietTurns = 0;
     return;
@@ -342,7 +306,7 @@ export function deityChallengeSystem(world) {
   const picked = chooseRoom(world, playerId, playerPos);
   if (!picked) return;
 
-  const challengeId = spawnChallenge(world, playerId, playerPos, devotion, ds, picked);
+  const challengeId = spawnChallenge(world, playerId, devotion, ds, picked);
   if (challengeId > 0) {
     state.lastChallengeStep = world.step | 0;
     state.quietTurns = 0;
