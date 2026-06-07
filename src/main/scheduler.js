@@ -67,6 +67,7 @@ import { staminaRegenerationSystem } from "../rules/systems/staminaRegenerationS
 import { monsterSpawnerSystem } from "../rules/systems/monsterSpawnerSystem.js";
 import { spatialIndexSystem } from "../rules/systems/spatialIndexSystem.js";
 import { deitySystem } from "../rules/systems/deitySystem.js";
+import { deityChallengeSystem } from "../rules/systems/deityChallengeSystem.js";
 import { engraveSystem, installEngraveListeners } from "../rules/systems/engraveSystem.js";
 import { installBumpInteractListener } from "../rules/systems/interactionSystem.js";
 import { hungerSystem } from "../rules/systems/hungerSystem.js";
@@ -301,7 +302,8 @@ export function configureWorld(world) {
   registerSystem(monsterDeathHookSystem, 'effects', { after: [scoreSystem] });
   registerSystem(ratInfestationDeathSystem, 'effects', { after: [monsterDeathHookSystem] });
   registerSystem(runContractDeathSystem, 'effects', { after: [ratInfestationDeathSystem] });
-  registerSystem(tombstoneSystem, 'effects', { after: [runContractDeathSystem] });
+  registerSystem(deityChallengeSystem, 'effects', { after: [runContractDeathSystem] });
+  registerSystem(tombstoneSystem, 'effects', { after: [deityChallengeSystem] });
   registerSystem(perceptionMemorySystem, 'effects');
   registerSystem(deathImpactDamageReactionSystem, 'effects', { after: [perceptionMemorySystem] });
 
