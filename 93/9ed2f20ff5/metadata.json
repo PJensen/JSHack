@@ -3,9 +3,10 @@
   "checkpoint_id": "939ed2f20ff5",
   "strategy": "manual-commit",
   "branch": "master",
-  "checkpoints_count": 3,
+  "checkpoints_count": 0,
   "files_touched": [
     "AGENTS.md",
+    "VERSION",
     "deno.json",
     "ratchets/worldStateAttachmentRatchet.test.mjs",
     "tests/determinismArchitectureGuards.test.mjs"
@@ -19,10 +20,10 @@
     }
   ],
   "token_usage": {
-    "input_tokens": 171209,
+    "input_tokens": 81930,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 1020928,
-    "output_tokens": 11472,
-    "api_call_count": 21
+    "cache_read_tokens": 328704,
+    "output_tokens": 1712,
+    "api_call_count": 4
   }
 }
