@@ -8,6 +8,7 @@ import {
   canStonecoatDipTarget,
   createWaterPotionHooks,
   createPotionSplashThrowHook,
+  createWeaponCoatingDipHook,
   resolveApplyTargetName,
 } from '../../rules/data/itemCatalogHooks.js';
 import { Vitality } from '../../rules/components/Vitality.js';
@@ -27,6 +28,33 @@ function cleanupPriorExprEntity(ctx, targetId, effectKey) {
       try { ctx.world.destroy(exprId); } catch {}
     }
   }
+}
+
+function throwLandingPoint(ctx, state) {
+  const actorId = Number(state?.actor || ctx.actor || 0) | 0;
+  const throwSpec = (state?.throw && typeof state.throw === 'object') ? state.throw : null;
+  const fallback = ctx.helpers.adjacentPoint(actorId);
+  return {
+    x: Number.isFinite(Number(throwSpec?.to?.x)) ? (Number(throwSpec.to.x) | 0) : (fallback.x | 0),
+    y: Number.isFinite(Number(throwSpec?.to?.y)) ? (Number(throwSpec.to.y) | 0) : (fallback.y | 0),
+  };
+}
+
+function forEachLivingInSplash(ctx, at, radius, actorId, fn) {
+  const r = Math.max(0, Number(radius || 0) | 0);
+  const seen = new Set();
+  for (let dx = -r; dx <= r; dx++) {
+    for (let dy = -r; dy <= r; dy++) {
+      const ids = ctx.query.livingAt((at.x | 0) + dx, (at.y | 0) + dy, {});
+      for (const id of (Array.isArray(ids) ? ids : [])) {
+        const hitId = Number(id || 0) | 0;
+        if (!(hitId > 0) || hitId === actorId || seen.has(hitId)) continue;
+        seen.add(hitId);
+        fn(hitId);
+      }
+    }
+  }
+  return seen.size;
 }
 
 defineItem('potion_poison', {
@@ -111,6 +139,7 @@ defineItem('potion_vigor', {
   description: 'A crimson draught that mends wounds in a single heartbeat.',
   potion: { route: 'oral', doses: 1, channels: [], effects: [], toxicity: null, feel: 'Your wounds knit closed with a rush of heat.' },
   hooks: {
+    can_dip_target: canPoisonDipTarget,
     on_drink: (ctx, state) => {
       const targetId = ctx.rules.resolveTarget(Number(state?.actor || ctx.actor || 0) | 0);
       const vit = ctx.query.get(targetId, Vitality);
@@ -119,7 +148,34 @@ defineItem('potion_vigor', {
       ctx.helpers.heal(targetId, amount);
       return { healed: amount };
     },
-    on_throw: createPotionSplashThrowHook({ healPct: 0.15, sourceKind: 'potion_vigor' }),
+    on_dip: createWeaponCoatingDipHook({
+      kind: 'lifedraw',
+      chargesGranted: 8,
+      coatingColor: '#b82228',
+      resultType: 'lifedraw_coat',
+      messageTemplate: 'You wake a red thirst in $targetName (+$chargesGranted charges, total $chargesTotal).',
+    }),
+    on_throw: (ctx, state) => {
+      const actorId = Number(state?.actor || ctx.actor || 0) | 0;
+      const itemId = Number(state?.itemId || ctx.primary || 0) | 0;
+      const at = throwLandingPoint(ctx, state);
+      ctx.helpers.hazardSpawn({
+        kind: 'blood_pool',
+        medium: 'floor',
+        turnsLeft: 4,
+        radius: 1,
+        tickDamage: 0,
+        damageType: 'holy',
+        cause: 'vigor_blood_pool',
+        sourceId: itemId,
+        sourceKind: 'potion_vigor',
+        identity: 'blood_pool',
+        name: 'Pool of Blood',
+        meta: { source: 'potion_vigor', healAmount: 1, undeadDamage: 2 },
+      }, at);
+      ctx.io.emit('potion:splash', { actor: actorId, itemId, at: { ...at }, effectKey: 'blood_pool', hitCount: 0, sourceKind: 'potion_vigor' });
+      return { consumed: true, at, hazardKind: 'blood_pool' };
+    },
   },
 });
 
@@ -128,6 +184,7 @@ defineItem('potion_adrenaline', {
   description: 'A jolt of pure energy that instantly restores all stamina.',
   potion: { route: 'oral', doses: 1, channels: [], effects: [], toxicity: null, feel: 'Your heart pounds with sudden, explosive energy.' },
   hooks: {
+    can_dip_target: canPoisonDipTarget,
     on_drink: (ctx, state) => {
       const targetId = ctx.rules.resolveTarget(Number(state?.actor || ctx.actor || 0) | 0);
       const stam = ctx.query.get(targetId, Stamina);
@@ -138,7 +195,23 @@ defineItem('potion_adrenaline', {
       stam.stamina = cap;
       return { restored: stam.stamina - before };
     },
-    on_throw: createPotionSplashThrowHook({ effectKey: 'berserk', duration: 8, potency: 1, sourceKind: 'potion_adrenaline' }),
+    on_dip: createWeaponCoatingDipHook({
+      kind: 'adrenaline',
+      chargesGranted: 8,
+      coatingColor: '#ff3a2e',
+      resultType: 'adrenaline_coat',
+      messageTemplate: 'You prime $targetName with adrenal heat (+$chargesGranted charges, total $chargesTotal).',
+    }),
+    on_throw: (ctx, state) => {
+      const actorId = Number(state?.actor || ctx.actor || 0) | 0;
+      const itemId = Number(state?.itemId || ctx.primary || 0) | 0;
+      const at = throwLandingPoint(ctx, state);
+      const hitCount = forEachLivingInSplash(ctx, at, 1, actorId, (hitId) => {
+        ctx.helpers.addEffect(hitId, { key: 'berserk', potency: 1, turnsLeft: 8, onsetLeft: 0, peakLeft: 0, stack: 'refresh', maxStacks: 1, sourceId: itemId, meta: { source: 'potion_adrenaline', delivery: 'splash' } });
+      });
+      ctx.io.emit('potion:splash', { actor: actorId, itemId, at: { ...at }, effectKey: 'berserk', hitCount, sourceKind: 'potion_adrenaline' });
+      return { consumed: true, at, effectKey: 'berserk' };
+    },
   },
 });
 
@@ -456,6 +529,19 @@ defineItem('potion_keen_edge', {
       ctx.io.emit('status', createStatusEvent({ id: targetId, kind: 'buff', effect: 'crit_boost', source: actorId, masked: !state.identified }));
       return { turns: 35 };
     },
+    can_dip_target: canPoisonDipTarget,
+    on_dip: (ctx, state) => {
+      const targetId = Number(state?.targetId || ctx.target || 0) | 0;
+      const info = ctx.query.itemInfo(targetId);
+      if (!(targetId > 0) || !info) return { applied: false, consumedTool: false, resultType: 'nothing' };
+      const bonuses = (info?.bonuses && typeof info.bonuses === 'object') ? { ...info.bonuses } : {};
+      const bonus = 0.02;
+      bonuses.critChance = Number(bonuses.critChance || 0) + bonus;
+      const targetName = resolveApplyTargetName(ctx, state, 'weapon');
+      ctx.helpers.patchItemInfo(targetId, { bonuses });
+      ctx.io.emit('item:applied', { actor: state.actor, toolId: state.toolId, targetId, result: { type: 'keen_edge_temper', bonus, critChance: bonuses.critChance, message: `You hone ${targetName} to a hungrier edge (+2% crit chance).` } });
+      return { applied: true, consumedTool: true, resultType: 'keen_edge_temper' };
+    },
     on_throw: createPotionSplashThrowHook({ sourceKind: 'potion_keen_edge', eventName: 'potion:splash:dud' }),
   },
 });
@@ -465,6 +551,7 @@ defineItem('potion_lethargy', {
   description: 'A thick, sluggish grey brew that saps your endurance.',
   potion: { route: 'oral', doses: 1, channels: [], effects: [], feel: 'Your limbs grow heavy and sluggish.' },
   hooks: {
+    can_dip_target: canParalysisDipTarget,
     on_drink: (ctx, state) => {
       const actorId = Number(state?.actor || ctx.actor || 0) | 0;
       const targetId = ctx.rules.resolveTarget(actorId);
@@ -474,7 +561,37 @@ defineItem('potion_lethargy', {
       ctx.io.emit('potion:lethargy', { actorId });
       return { turns: 30 };
     },
-    on_throw: createPotionSplashThrowHook({ effectKey: 'slowed', duration: 12, potency: 1, sourceKind: 'potion_lethargy' }),
+    on_dip: createWeaponCoatingDipHook({
+      kind: 'lethargy',
+      chargesGranted: 6,
+      coatingColor: '#77716b',
+      resultType: 'lethargy_coat',
+      messageTemplate: 'You glaze $targetName with dragging syrup (+$chargesGranted charges, total $chargesTotal).',
+    }),
+    on_throw: (ctx, state) => {
+      const actorId = Number(state?.actor || ctx.actor || 0) | 0;
+      const itemId = Number(state?.itemId || ctx.primary || 0) | 0;
+      const at = throwLandingPoint(ctx, state);
+      const hitCount = forEachLivingInSplash(ctx, at, 1, actorId, (hitId) => {
+        ctx.helpers.addEffect(hitId, { key: 'slowed', potency: 1, turnsLeft: 12, onsetLeft: 0, peakLeft: 0, stack: 'refresh', maxStacks: 1, sourceId: itemId, meta: { source: 'potion_lethargy', delivery: 'splash' } });
+      });
+      ctx.helpers.hazardSpawn({
+        kind: 'sticky_syrup',
+        medium: 'floor',
+        turnsLeft: 4,
+        radius: 1,
+        tickDamage: 0,
+        damageType: 'generic',
+        cause: 'lethargy_syrup',
+        sourceId: itemId,
+        sourceKind: 'potion_lethargy',
+        identity: 'sticky_syrup',
+        name: 'Sticky Syrup',
+        meta: { source: 'potion_lethargy', slowTurns: 3, slowPotency: 1 },
+      }, at);
+      ctx.io.emit('potion:splash', { actor: actorId, itemId, at: { ...at }, effectKey: 'slowed', hitCount, sourceKind: 'potion_lethargy' });
+      return { consumed: true, at, effectKey: 'slowed', hazardKind: 'sticky_syrup' };
+    },
   },
 });
 

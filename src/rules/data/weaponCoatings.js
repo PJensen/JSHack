@@ -1,7 +1,10 @@
 import { ItemInfo } from '../components/ItemInfo.js';
+import { Stamina } from '../components/Stamina.js';
+import { Vitality } from '../components/Vitality.js';
 import { combatSeed, mulberry32, rngInt } from '../utils/rng.js';
 import { upsertTimedEffect } from '../utils/effectSemantics.js';
 import { ensureActiveEffects } from '../utils/effects.js';
+import { effectiveMaxStamina } from '../utils/passiveBonuses.js';
 import { ELEMENT_TINT_POISON } from './elementTints.js';
 
 export const WEAPON_COATING_DEFS = Object.freeze({
@@ -73,6 +76,28 @@ export const WEAPON_COATING_DEFS = Object.freeze({
     elementTint: 'fire',
     effect: Object.freeze({ key: 'burning', turnsLeft: 3, potency: 2, stacks: 1 }),
   }),
+  lifedraw: Object.freeze({
+    chancePct: 100,
+    consumeOnHit: true,
+    seedSalt: 0xc0470009,
+    elementTint: 'blood',
+    healAttacker: 1,
+  }),
+  adrenaline: Object.freeze({
+    chancePct: 100,
+    consumeOnHit: true,
+    seedSalt: 0xc047000a,
+    elementTint: 'fire',
+    restoreStamina: 3,
+  }),
+  lethargy: Object.freeze({
+    chancePct: 100,
+    consumeOnHit: true,
+    seedSalt: 0xc047000b,
+    emitEvent: 'proc:slowed',
+    elementTint: null,
+    effect: Object.freeze({ key: 'slowed', turnsLeft: 4, potency: 1, stacks: 1 }),
+  }),
 });
 
 function upsertEffect(world, entityId, effect) {
@@ -126,6 +151,27 @@ export function applyWeaponCoatingOnHit(world, ctx) {
   }
 
   if (def.effect) upsertEffect(world, defender, { ...def.effect });
+
+  if ((def.healAttacker | 0) > 0) {
+    const vit = world.get(attacker, Vitality);
+    if (vit) {
+      const before = vit.hp | 0;
+      vit.hp = Math.min(vit.maxHp | 0, before + (def.healAttacker | 0));
+      const healed = (vit.hp | 0) - before;
+      if (healed > 0) world.emit?.('healed', { id: attacker, amount: healed, source: defender, cause: `coating_${kind}` });
+    }
+  }
+
+  if ((def.restoreStamina | 0) > 0) {
+    const stam = world.get(attacker, Stamina);
+    if (stam) {
+      const before = Number(stam.stamina || 0);
+      const cap = effectiveMaxStamina(world, attacker, stam);
+      stam.stamina = Math.min(cap, before + (def.restoreStamina | 0));
+      const restored = stam.stamina - before;
+      if (restored > 0) world.emit?.('stamina_restored', { id: attacker, amount: restored, source: defender, cause: `coating_${kind}` });
+    }
+  }
 
   if ((def.bonusDamage | 0) > 0) {
     world.emit?.("damage", {

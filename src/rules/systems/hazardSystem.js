@@ -14,6 +14,7 @@ import { Material } from "../components/Material.js";
 import { DungeonState } from "../components/DungeonState.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { ItemInfo } from "../components/ItemInfo.js";
+import { CreatureType, CREATURE_TYPES } from "../components/CreatureType.js";
 import {
   TILE_DOOR,
   TILE_FENCE,
@@ -36,6 +37,7 @@ import {
 import { clamp01Or, clampInt } from "../utils/numberCoerce.js";
 import { applyMaterialStimulus } from "../utils/materialStimulus.js";
 import { applyMaterialTransform, resolveMaterialTransform } from "../utils/materialTransforms.js";
+import { upsertTimedEffect } from "../utils/effectSemantics.js";
 
 const DEFAULT_TURNS = 3;
 const DEFAULT_RADIUS = 1;
@@ -195,6 +197,30 @@ function hasBurningEffect(effects) {
     if (key === "burn" || key === "burning") return true;
   }
   return false;
+}
+
+function ensureActiveEffectRecord(world, entityId) {
+  let ae = /** @type any */ (world.get(entityId, ActiveEffects));
+  if (!ae) {
+    try { world.add(entityId, ActiveEffects, { effects: [] }); } catch { /* */ }
+    ae = /** @type any */ (world.get(entityId, ActiveEffects));
+  }
+  if (!ae || !Array.isArray(ae.effects)) return null;
+  return ae;
+}
+
+function applyStickySyrup(world, entityId, sourceId, turnsLeft, potency) {
+  const ae = ensureActiveEffectRecord(world, entityId);
+  if (!ae) return false;
+  upsertTimedEffect(ae.effects, {
+    key: "slowed",
+    turnsLeft,
+    potency,
+    stacks: 1,
+    sourceId,
+    startedAtTurn: world.step | 0,
+  });
+  return true;
 }
 
 function gasHazardShouldIgnite(world, x, y, radius, metric) {
@@ -422,6 +448,62 @@ export function hazardSystem(world) {
           } else {
             ae.effects.push({ key: 'stun', turnsLeft: stunTurns, potency: 1, stacks: 1, startedAtTurn: world.step, sourceId });
           }
+        }
+      }
+    }
+
+    if (kind === "sticky_syrup") {
+      const slowTurns = clampInt(hazard.meta?.slowTurns, 3, 1);
+      const slowPotency = clampInt(hazard.meta?.slowPotency, 1, 1);
+      for (const [id, tpos, vit] of world.query(Position, Vitality)) {
+        if (!tpos || !vit) continue;
+        if (id === hazardId) continue;
+        if ((vit.hp | 0) <= 0) continue;
+        if (medium === "floor" && world.has(id, Flying)) continue;
+        if (!inHazardRadius(tpos.x, tpos.y, pos.x, pos.y, radius, metric)) continue;
+        if (applyStickySyrup(world, id, sourceId || hazardId, slowTurns, slowPotency)) affectedIds.push(id);
+      }
+    }
+
+    if (kind === "blood_pool") {
+      const healAmount = clampInt(hazard.meta?.healAmount, 1, 0);
+      const undeadDamage = clampInt(hazard.meta?.undeadDamage, 2, 0);
+      for (const [id, tpos, vit] of world.query(Position, Vitality)) {
+        if (!tpos || !vit) continue;
+        if (id === hazardId) continue;
+        if ((vit.hp | 0) <= 0) continue;
+        if (medium === "floor" && world.has(id, Flying)) continue;
+        if (!inHazardRadius(tpos.x, tpos.y, pos.x, pos.y, radius, metric)) continue;
+
+        const ct = world.get(id, CreatureType);
+        if (ct?.type === CREATURE_TYPES.undead) {
+          if (undeadDamage <= 0) continue;
+          const hit = dealDamage(world, {
+            target: id,
+            amount: undeadDamage,
+            type: "holy",
+            source: hazardId,
+            at: { x: tpos.x, y: tpos.y },
+            cause,
+          });
+          if (hit.applied) affectedIds.push(id);
+          continue;
+        }
+
+        if (healAmount <= 0) continue;
+        const before = vit.hp | 0;
+        vit.hp = Math.min(vit.maxHp | 0, before + healAmount);
+        const healed = (vit.hp | 0) - before;
+        if (healed > 0) {
+          affectedIds.push(id);
+          try {
+            world.emit?.("healed", {
+              id,
+              amount: healed,
+              source: hazardId,
+              cause,
+            });
+          } catch { /* */ }
         }
       }
     }

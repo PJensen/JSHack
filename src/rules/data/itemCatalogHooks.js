@@ -302,6 +302,60 @@ export function createParalysisCoatDipHook(opts = {}) {
   };
 }
 
+/**
+ * @param {{
+ *   kind:string,
+ *   chargesGranted?: number,
+ *   coatingColor?: string,
+ *   resultType?: string,
+ *   resultEventType?: string,
+ *   messageTemplate?: string,
+ *   fallbackLabel?: string,
+ * }} opts
+ */
+export function createWeaponCoatingDipHook(opts = {}) {
+  const kind = String(opts?.kind || "");
+  const chargesGranted = Math.max(1, Number(opts?.chargesGranted ?? 6) | 0);
+  const resultType = String(opts?.resultType || `${kind}_coat`);
+  const resultEventType = String(opts?.resultEventType || resultType);
+  const fallbackLabel = String(opts?.fallbackLabel || "weapon");
+  const messageTemplate = String(
+    opts?.messageTemplate
+    || "You coat $targetName with $kind (+$chargesGranted charges, total $chargesTotal)."
+  );
+
+  return (ctx, state) => {
+    const targetInfo = state?.targetInfo;
+    if (!targetInfo || !kind) return { applied: false, consumedTool: false, resultType: "nothing" };
+    const currentCharges = Math.max(0, Number(targetInfo?.coating?.charges || 0) | 0);
+    const nextCharges = currentCharges + chargesGranted;
+    const coating = { kind, charges: nextCharges };
+    if (opts?.coatingColor) coating.color = opts.coatingColor;
+    const targetName = resolveApplyTargetName(ctx, state, fallbackLabel);
+    const message = interpolateFields(messageTemplate, {
+      kind,
+      targetName,
+      currentCharges,
+      chargesGranted,
+      chargesTotal: nextCharges,
+    });
+    ctx.helpers.patchItemInfo(state.targetId, { coating });
+    ctx.io.emit("item:applied", {
+      actor: state.actor,
+      toolId: state.toolId,
+      targetId: state.targetId,
+      result: {
+        type: resultEventType,
+        coating,
+        chargesGranted,
+        chargesTotal: nextCharges,
+        message,
+      },
+    });
+    return { applied: true, consumedTool: true, resultType };
+  };
+}
+
 const STONECOAT_ALLOWED_SLOTS = Object.freeze(new Set([
   "weapon",
   "armor",
