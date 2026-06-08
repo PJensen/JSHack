@@ -12,6 +12,60 @@ const SQRT2 = 1.4142;
 // Lava uses a lower value so the below-grade depression profile stays legible.
 const VIS_LIFT       = 0.77;
 const VIS_LIFT_LAVA  = 0.44;
+const AMBIENT_DARKNESS_LIFT_SCALE = 0.28;
+const UNSEEN_AMBIENT_LIFT_CAP = 0.42;
+const DAY_MEMORY_DARK_ALPHA_FLOOR = 72;
+
+function clamp01(v) {
+  return v < 0 ? 0 : (v > 1 ? 1 : v);
+}
+
+/**
+ * Sky ambient is illumination, not knowledge.  It should colour and brighten
+ * the world, but it must not fully erase the memory veil outside current FOV.
+ *
+ * @param {number} ambientLightSum
+ * @param {number} sight
+ * @returns {number}
+ */
+export function resolveAmbientDarknessLift(ambientLightSum, sight) {
+  const ambientLift = clamp01(Math.max(0, ambientLightSum) * AMBIENT_DARKNESS_LIFT_SCALE);
+  const s = clamp01(sight);
+  const lowSightCap = UNSEEN_AMBIENT_LIFT_CAP + (1 - UNSEEN_AMBIENT_LIFT_CAP) * s;
+  return Math.min(ambientLift, lowSightCap);
+}
+
+/**
+ * Resolve the black-overlay alpha for one lighting sub-cell.
+ * Exported for focused tests; render() still owns terrain-specific modifiers.
+ *
+ * @param {{ lightSum:number, ambientLightSum?:number, sight?:number, inLava?:boolean, dark?:number, extraDark?:number }} input
+ * @returns {number}
+ */
+export function resolveDarknessAlpha(input) {
+  const DARK = input.dark != null ? input.dark : 140;
+  const lightSum = Number(input.lightSum || 0);
+  const ambientLightSum = Math.max(0, Number(input.ambientLightSum || 0));
+  const localLightSum = Math.max(0, lightSum - ambientLightSum);
+  const sight = clamp01(Number(input.sight || 0));
+  const inLava = !!input.inLava;
+  const visLift = sight * (inLava ? VIS_LIFT_LAVA : VIS_LIFT);
+  const ambientLift = resolveAmbientDarknessLift(ambientLightSum, sight);
+  const localLightLift = clamp01(localLightSum * 0.5);
+  const totalLift = Math.min(1, visLift + ambientLift + localLightLift);
+  let extraDark = Number(input.extraDark || 0);
+
+  if (lightSum < 0) {
+    const voidDark = Math.min(1, -lightSum * 0.8);
+    extraDark += voidDark * (255 - DARK);
+  }
+
+  let alpha = Math.min(255, Math.max(0, (DARK * (1 - totalLift) + extraDark) | 0));
+  if (!inLava && ambientLightSum > 0.9 && sight < 0.08 && localLightLift < 0.2) {
+    alpha = Math.max(alpha, DAY_MEMORY_DARK_ALPHA_FLOOR);
+  }
+  return alpha;
+}
 
 /**
  * @typedef {{
@@ -975,6 +1029,22 @@ export function createLightingEngine() {
     }
   }
 
+  function ambientLightSumForCell(i, ambient, isRoofed) {
+    if (!ambient || sdf[i] <= 0) return 0;
+    const sx = i % lmW;
+    const sy = (i / lmW) | 0;
+    const tx = _tx0 + ((sx * INV_SUB) | 0);
+    const ty = _ty0 + ((sy * INV_SUB) | 0);
+    if (isRoofed && isRoofed(tx, ty)) return 0;
+    let sum = Math.max(0, ambient[0] + ambient[1] + ambient[2]);
+    if (lavaMask[i] === 1) {
+      const sd = lavaEdgeDist[i];
+      const block = Math.min(1, sd / 1.65) * 0.92;
+      sum *= (1 - block);
+    }
+    return sum;
+  }
+
   // ---- Render to canvas ------------------------------------------------
 
   /**
@@ -1078,16 +1148,13 @@ export function createLightingEngine() {
       {
         const opaqueCell = sdf[i] <= 0;
         const lightSum = lightR[i] + lightG[i] + lightB[i];
-        const brightness = Math.min(1, lightSum * 0.5);
+        const ambientLightSum = ambientLightSumForCell(i, ambient || null, isRoofed || null);
         const sight = vision[i];  // 0-1 vision mask
         // Vision lifts darkness to reveal what's there; light lifts further.
         // For below-grade surfaces we intentionally reduce this lift so the
         // depression profile can remain visible instead of flattening out.
         const inLava = lavaMask[i] === 1;
-        const visLift = sight * (inLava ? VIS_LIFT_LAVA : VIS_LIFT);
-        const lightLift = brightness;
-        let totalLift = Math.min(1, visLift + lightLift);
-        let extraDark = 0;
+        let alpha = 0;
 
         // Generic floor relief shading (debug): digs/piles should be legible
         // as terrain, independent of surface tags.
@@ -1099,8 +1166,12 @@ export function createLightingEngine() {
           const shade = Math.max(-1, Math.min(1, (-gx * 0.82) + (-gy * 0.58)));
           const digDark = Math.max(0, -hRel) * 0.95 + slope * (0.28 + 0.38 * Math.max(0, -shade));
           const pileLift = Math.max(0, hRel) * 0.58 + slope * 0.22 * Math.max(0, shade);
-          totalLift = Math.max(0, Math.min(1, totalLift - digDark + pileLift));
-          extraDark += digDark * 118;
+          alpha = resolveDarknessAlpha({ lightSum, ambientLightSum, sight, inLava, dark: DARK });
+          const liftDelta = digDark - pileLift;
+          alpha = Math.min(255, Math.max(0, alpha + liftDelta * DARK));
+          alpha = Math.min(255, Math.max(0, alpha + digDark * 118));
+        } else {
+          alpha = resolveDarknessAlpha({ lightSum, ambientLightSum, sight, inLava, dark: DARK });
         }
         // Lava below-grade basin: dark lip → lit inner wall → emissive interior.
         // Important: this applies both additive emissive lift and subtractive cut shadow
@@ -1112,22 +1183,15 @@ export function createLightingEngine() {
           const deepBand = Math.max(0, Math.min(1, (sd - 2.2) / 1.2));
           const cutShadow = lipBand * 0.82 + wallBand * 0.20;
           const emissiveLift = 0.30 + wallBand * 0.42 + deepBand * 1.08;
-          totalLift = Math.max(0, Math.min(1, totalLift - cutShadow + emissiveLift));
+          alpha = Math.min(255, Math.max(0, alpha + (cutShadow - emissiveLift) * DARK));
           // Negative-wall read: allow the lip to go darker than global DARK cap.
-          extraDark += lipBand * 92 + wallBand * 15;
+          alpha = Math.min(255, Math.max(0, alpha + lipBand * 92 + wallBand * 15));
         } else if (!opaqueCell) {
           // Slight outside rim darkening helps the cut boundary read as "below grade".
           const rimD = lavaEdgeDist[i];
-          if (rimD < 1.4) extraDark += 28 * (1 - rimD / 1.4);
+          if (rimD < 1.4) alpha = Math.min(255, Math.max(0, alpha + 28 * (1 - rimD / 1.4)));
         }
-        // Void light: negative light values push darkness beyond the normal
-        // DARK cap, creating localized absolute black holes that eat light.
-        // The deeper the negative sum, the darker — up to full 255 alpha.
-        if (lightSum < 0) {
-          const voidDark = Math.min(1, -lightSum * 0.8);
-          extraDark += voidDark * (255 - DARK);
-        }
-        pixels[pi + 3] = Math.min(255, Math.max(0, (DARK * (1 - totalLift) + extraDark) | 0));
+        pixels[pi + 3] = alpha | 0;
       }
     }
     lmCtx.putImageData(imgData, 0, 0);
