@@ -187,6 +187,8 @@ const SOUNDS = {
   "teleported":       { file: "teleported.mp3",      bus: "spells", maxVoices: 2 },
   "item:consume:food": { file: "action_eat.mp3",     bus: "items" },
   "action:move_boulder": { file: "action_move_boulder.mp3", bus: "ambient", maxVoices: 2, randomPitch: 18, volume: 0.9 },
+  "action:switch_on": { file: "action_switch_on.mp3", bus: "ambient", maxVoices: 2, randomPitch: 8 },
+  "action:switch_off": { file: "action_switch_off.mp3", bus: "ambient", maxVoices: 2, randomPitch: 8 },
   "trap:snake":       { file: "trap_snake.mp3",      bus: "ambient", maxVoices: 1, segment: 2 },
   "trap:spike":       { file: "trap_spike.mp3",      bus: "combat", maxVoices: 3, randomPitch: 12 },
   "rack:weapon:dropped": { file: "weapon_rack_dropped.mp3", bus: "items", maxVoices: 2, randomPitch: 16 },

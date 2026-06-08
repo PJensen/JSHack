@@ -191,15 +191,23 @@ Deno.test("sounds registry leaves consecrate silent until a better file exists",
 Deno.test("sounds registry exposes eating and boulder move sounds", () => {
   const eating = resolve("item:consume:food");
   const pushStone = resolve("action:move_boulder");
+  const switchOn = resolve("action:switch_on");
+  const switchOff = resolve("action:switch_off");
   const npcHmm = resolve("npc_hmm");
 
   assertExists(eating);
   assertExists(pushStone);
+  assertExists(switchOn);
+  assertExists(switchOff);
   assertExists(npcHmm);
   assertEquals(eating.file, "action_eat.mp3");
   assertEquals(eating.bus, "items");
   assertEquals(pushStone.file, "action_move_boulder.mp3");
   assertEquals(pushStone.bus, "ambient");
+  assertEquals(switchOn.file, "action_switch_on.mp3");
+  assertEquals(switchOn.bus, "ambient");
+  assertEquals(switchOff.file, "action_switch_off.mp3");
+  assertEquals(switchOff.bus, "ambient");
   assertEquals(npcHmm.file, "npc_hmm.mp3");
   assertEquals(npcHmm.bus, "ui");
 });

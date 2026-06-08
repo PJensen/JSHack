@@ -24,6 +24,7 @@ import {
   gemValueToDropDetuneCents,
   resolveCraftingResultSoundId,
   resolveAudioPlayKey,
+  resolveInteractionSoundId,
   resolveStatusSoundId,
   isSfxDebugEnabled,
   reportSfxDebugInvocation,
@@ -109,6 +110,14 @@ Deno.test("audio wiring accepts all authored generic audio payload keys", () => 
   assert(resolveAudioPlayKey({ key: "shop:enter" }) === "shop:enter");
   assert(resolveAudioPlayKey({ id: "holy_chime" }) === "holy_chime");
   assert(resolveAudioPlayKey({ sound: "status:frozen" }) === "status:frozen");
+});
+
+Deno.test("audio wiring maps interaction outcomes to door and lantern sounds", () => {
+  assert(resolveInteractionSoundId({ action: "toggleDoor", result: "opened" }) === "door:open");
+  assert(resolveInteractionSoundId({ action: "toggleDoor", result: "closed" }) === "door:close");
+  assert(resolveInteractionSoundId({ action: "toggleLantern", result: "lit" }) === "action:switch_on");
+  assert(resolveInteractionSoundId({ action: "toggleLantern", result: "extinguished" }) === "action:switch_off");
+  assert(resolveInteractionSoundId({ action: "restAtBed", result: "ok" }) === null);
 });
 
 Deno.test("audio wiring maps semantic status events to status sounds", () => {

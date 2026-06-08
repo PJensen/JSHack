@@ -193,6 +193,14 @@ export function resolveAudioPlayKey(payload) {
   return String(payload?.key || payload?.id || payload?.sound || "");
 }
 
+export function resolveInteractionSoundId(payload) {
+  const action = String(payload?.action || "");
+  const result = String(payload?.result || "");
+  if (action === "toggleDoor") return result === "opened" ? "door:open" : "door:close";
+  if (action === "toggleLantern") return result === "lit" ? "action:switch_on" : "action:switch_off";
+  return null;
+}
+
 function isSpellLikeDamageCause(cause) {
   const value = String(cause || "");
   return value === "spell" || value === "magic" || value.startsWith("spell:") || value.startsWith("familiar:");
@@ -866,10 +874,15 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
   });
 
   world.on('interaction', ({ action, result, targetId }) => {
-    if (action === 'toggleDoor') {
-      const doorSoundId = result === 'opened' ? 'door:open' : 'door:close';
+    const soundId = resolveInteractionSoundId({ action, result });
+    if (action === 'toggleDoor' && soundId) {
       const pos = targetId != null ? getPosition(targetId) : null;
-      sfxAt(doorSoundId, pos, pp(), { priority: 1, volume: 1.25 }, zg());
+      sfxAt(soundId, pos, pp(), { priority: 1, volume: 1.25 }, zg());
+      return;
+    }
+    if (action === 'toggleLantern' && soundId) {
+      const pos = targetId != null ? getPosition(targetId) : null;
+      sfxAt(soundId, pos, pp(), { priority: 1 }, zg());
     }
   });
 
