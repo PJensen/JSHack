@@ -192,6 +192,7 @@ const SOUNDS = {
   "rack:weapon:dropped": { file: "weapon_rack_dropped.mp3", bus: "items", maxVoices: 2, randomPitch: 16 },
   "torch:ignite":     { file: "light_fire.mp3",      bus: "ambient" },
   "shop:enter":       { file: "shop_door_chime.mp3", bus: "ui", maxVoices: 1 },
+  "npc_hmm":          { file: "npc_hmm.mp3",         bus: "ui", maxVoices: 2, randomPitch: 10 },
   "quest:completed":  { file: "quest_complete.mp3",  bus: "ui", maxVoices: 1 },
   "blade_ignite":     { file: "light_fire.mp3",      bus: "items" },
   "frost_explosion":  { file: "spell_frost.mp3",     bus: "spells" },

@@ -18,6 +18,7 @@ export function installSpeechBubbleWiring({ world, sceneRuntime }) {
     const line = String(text || "").trim();
     if (!(speakerId > 0) || !line) return;
     if (!sceneRuntime.canActorAddressPlayer(speakerId, 8)) return;
+    world.emit("audio:play", { id: "npc_hmm" });
     sceneRuntime.queueSpeechBubble({
       entityId: speakerId,
       text: line,
