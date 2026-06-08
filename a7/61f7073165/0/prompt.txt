@@ -1,0 +1,62 @@
+complex technical question:
+
+I'm pretty sure I know the answer here -- but why does overworld lighting raise the floor so significantly that the fog of war is all but invisible.
+
+do you know what I'm sayin'
+
+here is a screenshot of me on the beach; see what I mean? it looses some of it's mistique.
+
+NOTE: at night time howver, thinigs really do look great. I've attached that as the second screenshot.
+
+ideas?!
+
+---
+
+PLEASE IMPLEMENT THIS PLAN:
+# Preserve Daylight Mystery In Overworld Fog
+
+## Summary
+Daytime overworld fog fades because ambient sunlight is fed into the lighting engine as full-scene light. At noon, `computeAmbient()` returns roughly `[0.82, 0.81, 0.78]`; `engine.js` sums that and applies `brightness = min(1, lightSum * 0.5)`, so daylight alone saturates `lightLift` to `1`. Since explored tiles are drawn at full alpha when lighting is active, the darkness overlay becomes nearly transparent everywhere sunlight reaches.
+
+Fix this by separating “sky illumination color” from “visibility reveal.” Daylight can tint and brighten visible terrain, but explored/out-of-sight tiles should retain a memory veil.
+
+## Key Changes
+- In `src/display/lighting/engine.js`, make ambient light lift darkness less aggressively than local/emissive lights.
+- Add a small daylight fog floor for cells with little or no player vision:
+  - fully visible cells stay bright and readable;
+  - explored/out-of-sight daylight cells keep a soft veil;
+  - night remains mostly unchanged because moon ambient is already low.
+- Keep roof behavior intact: roofed overworld cells still receive no sky ambient.
+- Do not restore blocky tile-alpha fog for normal quality; preserve the smooth sub-tile vision edge.
+- Avoid touching rules/FOV state. This is display-only lighting behavior.
+
+## Implementation Shape
+- Introduce named constants in `engine.js`, for example:
+  - `AMBIENT_DARKNESS_LIFT_SCALE`
+  - `UNSEEN_AMBIENT_LIFT_CAP`
+  - `DAY_MEMORY_DARK_ALPHA_FLOOR`
+- In the darkness pass, compute ambient-derived lift separately from point-light lift instead of using total RGB brightness as one value.
+- Cap ambient lift when `vision[i]` is near zero, so daylight cannot fully erase fog outside the player’s current perception.
+- Preserve stronger local-light behavior so torches, spells, lava, shrines, and lightning can still punch through darkness.
+
+## Test Plan
+- Add focused tests for `computeAmbient()` or lighting math if the current browser-canvas engine is hard to unit test directly.
+- Cover these scenarios:
+  - midday overworld ambient does not fully eliminate darkness for `vision = 0`;
+  - midday visible cells remain bright;
+  - night/moon ambient remains darker than day;
+  - underground ambient remains `null`;
+  - roofed overworld cells still do not receive sky ambient.
+- Run:
+  - `deno test --allow-read --no-check`
+  - `deno task check`
+
+## Assumptions
+- Desired target is “Mysterious Daylight”: beach/day scenes should still read as sunny, but explored areas outside current sight should visibly recede.
+- This should be solved in display lighting, not by changing FOV, exploration memory, or overworld generation.
+
+---
+
+you gave me three options -- did I choose wrong? should it looked washed out?
+
+part 2: when inside, can that darken the outside
