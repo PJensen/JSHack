@@ -15,6 +15,7 @@ const VIS_LIFT_LAVA  = 0.44;
 const AMBIENT_DARKNESS_LIFT_SCALE = 0.28;
 const UNSEEN_AMBIENT_LIFT_CAP = 0.42;
 const DAY_MEMORY_DARK_ALPHA_FLOOR = 72;
+const SHELTERED_EXTERIOR_BLACKOUT_ALPHA = 188;
 
 function clamp01(v) {
   return v < 0 ? 0 : (v > 1 ? 1 : v);
@@ -65,6 +66,18 @@ export function resolveDarknessAlpha(input) {
     alpha = Math.max(alpha, DAY_MEMORY_DARK_ALPHA_FLOOR);
   }
   return alpha;
+}
+
+/**
+ * When the player is indoors, sky-lit exterior cells should recede.  This
+ * mirrors the audio model: outside still exists, but the shelter separates it.
+ *
+ * @param {{ playerSheltered?:boolean, shelterInterior?:boolean }} input
+ * @returns {number}
+ */
+export function resolveShelteredExteriorDarkening(input) {
+  if (!input.playerSheltered || input.shelterInterior) return 0;
+  return SHELTERED_EXTERIOR_BLACKOUT_ALPHA;
 }
 
 /**
@@ -1029,13 +1042,27 @@ export function createLightingEngine() {
     }
   }
 
-  function ambientLightSumForCell(i, ambient, isRoofed) {
-    if (!ambient || sdf[i] <= 0) return 0;
+  function roofedCell(i, isRoofed) {
+    if (!isRoofed) return false;
     const sx = i % lmW;
     const sy = (i / lmW) | 0;
     const tx = _tx0 + ((sx * INV_SUB) | 0);
     const ty = _ty0 + ((sy * INV_SUB) | 0);
-    if (isRoofed && isRoofed(tx, ty)) return 0;
+    return isRoofed(tx, ty);
+  }
+
+  function shelterInteriorCell(i, isShelterInterior) {
+    if (!isShelterInterior) return false;
+    const sx = i % lmW;
+    const sy = (i / lmW) | 0;
+    const tx = _tx0 + ((sx * INV_SUB) | 0);
+    const ty = _ty0 + ((sy * INV_SUB) | 0);
+    return isShelterInterior(tx, ty);
+  }
+
+  function ambientLightSumForCell(i, ambient, isRoofed) {
+    if (!ambient || sdf[i] <= 0) return 0;
+    if (roofedCell(i, isRoofed)) return 0;
     let sum = Math.max(0, ambient[0] + ambient[1] + ambient[2]);
     if (lavaMask[i] === 1) {
       const sd = lavaEdgeDist[i];
@@ -1062,8 +1089,9 @@ export function createLightingEngine() {
    * @param {Array<{family:string, loops:Array<Array<{x:number,y:number}>>}>} [surfaceRegions]
    * @param {number} [fxTime]
    * @param {string|number} [reliefKey] — debug floor-relief scope key (e.g. depth)
+   * @param {{ playerSheltered?: boolean, isShelterInterior?: ((x:number,y:number)=>boolean)|null }} [opts]
    */
-  function render(ctx, lights, isOpaque, vx0, vy0, vx1, vy1, ambient, maxDark, isRoofed, visionDef, surfaceRegions, fxTime, reliefKey) {
+  function render(ctx, lights, isOpaque, vx0, vy0, vx1, vy1, ambient, maxDark, isRoofed, visionDef, surfaceRegions, fxTime, reliefKey, opts) {
     const DARK = (maxDark != null) ? maxDark : 140;
     const tx0 = Math.floor(vx0) - 1;
     const ty0 = Math.floor(vy0) - 1;
@@ -1148,6 +1176,7 @@ export function createLightingEngine() {
       {
         const opaqueCell = sdf[i] <= 0;
         const lightSum = lightR[i] + lightG[i] + lightB[i];
+        const _isShelterInteriorCell = shelterInteriorCell(i, opts?.isShelterInterior || null);
         const ambientLightSum = ambientLightSumForCell(i, ambient || null, isRoofed || null);
         const sight = vision[i];  // 0-1 vision mask
         // Vision lifts darkness to reveal what's there; light lifts further.
@@ -1190,6 +1219,12 @@ export function createLightingEngine() {
           // Slight outside rim darkening helps the cut boundary read as "below grade".
           const rimD = lavaEdgeDist[i];
           if (rimD < 1.4) alpha = Math.min(255, Math.max(0, alpha + 28 * (1 - rimD / 1.4)));
+        }
+        if (!opaqueCell) {
+          alpha = Math.max(alpha, resolveShelteredExteriorDarkening({
+            playerSheltered: opts?.playerSheltered === true,
+            shelterInterior: _isShelterInteriorCell,
+          }));
         }
         pixels[pi + 3] = alpha | 0;
       }

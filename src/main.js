@@ -2885,6 +2885,9 @@ const _healthBarState = new Map();
 const _healthBarSeen = new Set();
 /** @type {Set<string>} */
 const _roofCoverKeys = new Set();
+/** @type {Set<string>} */
+const _shelterInteriorKeys = new Set();
+const _shelterFloodQueue = [];
 const _aboveRoofEntities = [];  // entities tagged flying/above_roof, collected during main loop
 const _postLightingTiles = []; // overworld tile stamps that should sit above the darkness overlay
 const _postLightingGlyphs = []; // overworld structure/entity stamps that should sit above the darkness overlay
@@ -3770,6 +3773,34 @@ function drawInvisibleVeil(ctx, entity, fxTime, hasAmbushOpener) {
 
 function roofCellKey(x, y) {
   return `${x | 0},${y | 0}`;
+}
+
+function collectShelterInteriorKeys(worldView) {
+  _shelterInteriorKeys.clear();
+  _shelterFloodQueue.length = 0;
+  if (worldView?.playerSheltered !== true) return _shelterInteriorKeys;
+  const pos = worldView?.player?.pos;
+  if (!pos) return _shelterInteriorKeys;
+  const px = pos.x | 0;
+  const py = pos.y | 0;
+  if (!isRoofed(px, py)) return _shelterInteriorKeys;
+
+  const start = roofCellKey(px, py);
+  _shelterInteriorKeys.add(start);
+  _shelterFloodQueue.push([px, py]);
+  for (let qi = 0; qi < _shelterFloodQueue.length && qi < 4096; qi++) {
+    const [x, y] = _shelterFloodQueue[qi];
+    for (let i = 0; i < 4; i++) {
+      const nx = x + (i === 0 ? 1 : (i === 1 ? -1 : 0));
+      const ny = y + (i === 2 ? 1 : (i === 3 ? -1 : 0));
+      if (!isRoofed(nx, ny)) continue;
+      const key = roofCellKey(nx, ny);
+      if (_shelterInteriorKeys.has(key)) continue;
+      _shelterInteriorKeys.add(key);
+      _shelterFloodQueue.push([nx, ny]);
+    }
+  }
+  return _shelterInteriorKeys;
 }
 
 function drawRoofSmoke(ctx, roof, fxTime, fx, quality) {
@@ -5085,6 +5116,7 @@ function render(worldView) {
     collectFxLights(_lights, { boltFx, spellAreaFx, projectileFx, cloudFx, surfaceAreaFx, statusEmitterFx, spiritWispFx });
     const _ambient = computeAmbient(worldView);
     const _roofMask = worldView.isOverworld ? isRoofed : null;
+    const _shelterInterior = collectShelterInteriorKeys(worldView);
     const _visionDef = getVisionDef();
     const _lightOpaque = worldView.isBlockedVision || isOpaque;
     const _lightViewport = resolveLightingViewport(worldView, vx0, vy0, vx1, vy1);
@@ -5141,6 +5173,10 @@ function render(worldView) {
       surfaceAreaFx.getSurfaceRegions(),
       _fxTime,
       worldView.currentDepth ?? 0,
+      {
+        playerSheltered: worldView.playerSheltered === true,
+        isShelterInterior: (x, y) => _shelterInterior.has(roofCellKey(x, y)),
+      },
     );
   }
 

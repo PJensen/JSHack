@@ -1,6 +1,7 @@
 import { assert, assertEquals } from "jsr:@std/assert";
 import {
   resolveDarknessAlpha,
+  resolveShelteredExteriorDarkening,
 } from "../src/display/lighting/engine.js";
 import { computeAmbient } from "../src/display/lighting/sources/index.js";
 
@@ -79,4 +80,23 @@ Deno.test("cells without sky ambient remain fully dark when unseen", () => {
   });
 
   assertEquals(alpha, 210);
+});
+
+Deno.test("shelter nearly blacks out cells outside the current building", () => {
+  const outside = resolveShelteredExteriorDarkening({
+    playerSheltered: true,
+    shelterInterior: false,
+  });
+  const inside = resolveShelteredExteriorDarkening({
+    playerSheltered: true,
+    shelterInterior: true,
+  });
+  const unsheltered = resolveShelteredExteriorDarkening({
+    playerSheltered: false,
+    shelterInterior: false,
+  });
+
+  assert(outside >= 180, "outside the current building should be near-black");
+  assertEquals(inside, 0);
+  assertEquals(unsheltered, 0);
 });
