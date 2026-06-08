@@ -1,5 +1,6 @@
 import { assert } from "jsr:@std/assert";
 import { assertAlmostEquals } from "jsr:@std/assert";
+import { World } from "../src/lib/ecs-js/index.js";
 import {
   CHANNELING_LOOP_OPTIONS,
   CHANNELING_LOOP_SOUND_ID,
@@ -34,6 +35,11 @@ import {
   shouldPlayDungeonOmen,
   shouldPlayTeleportSound,
 } from "../src/display/audio/audioWiring.js";
+import {
+  AUDIO_INTERACTION_ROUTES,
+  createAudioWiringExtension,
+  resolveAudioRoutePlan,
+} from "../src/display/audio/audioWiringExtension.js";
 
 Deno.test("audio wiring includes spider spell cast events", () => {
   assert(SPELL_CAST_SOUND_EVENTS.includes("spell:web_spit"));
@@ -118,6 +124,49 @@ Deno.test("audio wiring maps interaction outcomes to door and lantern sounds", (
   assert(resolveInteractionSoundId({ action: "toggleLantern", result: "lit" }) === "action:switch_on");
   assert(resolveInteractionSoundId({ action: "toggleLantern", result: "extinguished" }) === "action:switch_off");
   assert(resolveInteractionSoundId({ action: "restAtBed", result: "ok" }) === null);
+});
+
+Deno.test("audio wiring interaction routes resolve playback plans", () => {
+  const ctx = { getPosition: (id) => ({ x: id, y: 2 }) };
+  const plan = resolveAudioRoutePlan(AUDIO_INTERACTION_ROUTES, "interaction", {
+    action: "toggleDoor",
+    result: "opened",
+    targetId: 7,
+  }, ctx);
+
+  assert(plan.soundId === "door:open");
+  assert(plan.position.x === 7);
+  assert(plan.position.y === 2);
+  assert(plan.options.volume === 1.25);
+  assert(resolveAudioRoutePlan(AUDIO_INTERACTION_ROUTES, "interaction", { action: "restAtBed" }, ctx) === null);
+});
+
+Deno.test("audio wiring extension installs interaction routes", () => {
+  const world = new World({ seed: 1 });
+  const played = [];
+  const extension = createAudioWiringExtension({
+    getPosition: (id) => ({ x: id, y: 3 }),
+    getPlayerPosition: () => ({ x: 1, y: 1 }),
+    getZoomGain: () => 1.2,
+    playAt: (soundId, position, playerPosition, options, zoomGain) => {
+      played.push({ soundId, position, playerPosition, options, zoomGain });
+    },
+  });
+
+  world.install(extension);
+  world.install(extension);
+  world.emit("interaction", { action: "toggleLantern", result: "lit", targetId: 4 });
+
+  assert(played.length === 1);
+  assert(played[0].soundId === "action:switch_on");
+  assert(played[0].position.x === 4);
+  assert(played[0].playerPosition.x === 1);
+  assert(played[0].options.priority === 1);
+  assert(played[0].zoomGain === 1.2);
+
+  assert(world.uninstall(extension));
+  world.emit("interaction", { action: "toggleDoor", result: "opened", targetId: 5 });
+  assert(played.length === 1);
 });
 
 Deno.test("audio wiring maps semantic status events to status sounds", () => {
