@@ -50,3 +50,53 @@ Deno.test("jumpScareSystem emits positioned whisper audio for marsh witch", () =
   assertEquals(audio.key, "ambient:whisper");
   assertEquals(audio.at, { x: 12, y: 10 });
 });
+
+Deno.test("jumpScareSystem stays silent on the overworld", () => {
+  const world = new World({ seed: 11 });
+  const ds = world.create();
+  world.add(ds, DungeonState, { worldSeed: 11, currentDepth: 0, floorEntityIds: [] });
+
+  const player = world.create();
+  world.add(player, Player, {});
+  world.add(player, Position, { x: 10, y: 10 });
+
+  const dragon = world.create();
+  world.add(dragon, Position, { x: 12, y: 10 });
+  world.add(dragon, NamedIdentity, { name: "Dragon", identity: "dragon" });
+  world.add(dragon, Brain, { learnedSpellIds: [], itemKnowledgeIdentities: [], seenTiles: new Uint8Array(), intelligence: 8, visionRange: 6 });
+  world.add(dragon, Vitality, { maxHp: 20, hp: 20 });
+
+  const events = [];
+  world.on("audio:play", (payload) => events.push(payload));
+
+  jumpScareSystem(world);
+
+  assertEquals(events.length, 0);
+});
+
+Deno.test("jumpScareSystem emits at most one scare per dungeon depth", () => {
+  const world = new World({ seed: 11 });
+  const ds = world.create();
+  world.add(ds, DungeonState, { worldSeed: 11, currentDepth: 1, floorEntityIds: [] });
+
+  const player = world.create();
+  world.add(player, Player, {});
+  world.add(player, Position, { x: 10, y: 10 });
+
+  for (const [index, x] of [12, 13].entries()) {
+    const dragon = world.create();
+    world.add(dragon, Position, { x, y: 10 });
+    world.add(dragon, NamedIdentity, { name: "Dragon", identity: "dragon" });
+    world.add(dragon, Brain, { learnedSpellIds: [], itemKnowledgeIdentities: [], seenTiles: new Uint8Array(), intelligence: 8, visionRange: 6 });
+    world.add(dragon, Vitality, { maxHp: 20 + index, hp: 20 + index });
+  }
+
+  const events = [];
+  world.on("audio:play", (payload) => events.push(payload));
+
+  jumpScareSystem(world);
+  jumpScareSystem(world);
+
+  assertEquals(events.length, 1);
+  assertEquals(events[0].key, "ambient:roar");
+});

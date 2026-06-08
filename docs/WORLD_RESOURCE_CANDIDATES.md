@@ -16,6 +16,8 @@ properties on `world`.
   step listener and drained by `trapSystem`.
 - `MaterialReactionEventQueueResource`: runtime semantic event queue captured by
   material reaction listeners and drained by `materialReactionSystem`.
+- `JumpScareStateResource`: runtime scare pacing state keyed by dungeon depth,
+  replacing ad hoc `world[Symbol.for(...)]` bookkeeping in `jumpScareSystem`.
 
 ## Strong Next Candidates
 

@@ -11,6 +11,7 @@ import { forEachInRadius } from "../utils/spatialIndex.js";
 import { playerEntity } from "../utils/queries.js";
 import { AVG_ROOM_SIZE } from "../environment/dungeon/constants.js";
 import { getMonster } from "../data/monsters.js";
+import { JumpScareStateResource } from "../resources/jumpScareState.js";
 
 const DANGEROUS_INTEL = 8;
 export const JUMP_SCARE_SOUND_BY_TAG = Object.freeze({
@@ -53,11 +54,15 @@ export function jumpScareSystem(world) {
 
   const dungeonState = getDungeonState(world);
   const depth = dungeonState?.currentDepth ?? 0;
-  const symbol = Symbol.for(`jshack:jumpScare:triggered:depth${depth}`);
-  if (!world[symbol]) world[symbol] = new Set();
-  const triggered = world[symbol];
+  if ((depth | 0) <= 0) return;
+
+  const state = world.resource(JumpScareStateResource);
+  if (!state.triggeredByDepth.has(depth)) state.triggeredByDepth.set(depth, new Set());
+  const triggered = state.triggeredByDepth.get(depth);
+  if (triggered.size > 0) return;
 
   forEachInRadius(world, playerPos.x, playerPos.y, SCARE_RANGE, (id, pos) => {
+    if (triggered.size > 0) return;
     if (id === player.id) return;
 
     const brain = world.get(id, Brain);

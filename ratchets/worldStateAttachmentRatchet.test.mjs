@@ -45,7 +45,6 @@ const WORLD_STATE_ATTACHMENT_ALLOWANCES = Object.freeze({
   "src/rules/systems/genocideSystem.js": 2,
   "src/rules/systems/harvestRegrowthSystem.js": 5,
   "src/rules/systems/interactionSystem.js": 2,
-  "src/rules/systems/jumpScareSystem.js": 3,
   "src/rules/systems/materialReactionSystem.js": 9,
   "src/rules/systems/monsterDeathHookSystem.js": 2,
   "src/rules/systems/movementSystem.js": 5,
