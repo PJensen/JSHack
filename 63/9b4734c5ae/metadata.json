@@ -1,0 +1,28 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "639b4734c5ae",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "src/display/audio/audioWiring.js",
+    "src/display/audio/audioWiringExtension.js",
+    "src/display/audio/index.js",
+    "tests/audioWiring.test.mjs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/63/9b4734c5ae/0/metadata.json",
+      "transcript": "/63/9b4734c5ae/0/full.jsonl",
+      "content_hash": "/63/9b4734c5ae/0/content_hash.txt",
+      "prompt": "/63/9b4734c5ae/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 135408,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 947456,
+    "output_tokens": 9188,
+    "api_call_count": 22
+  }
+}
