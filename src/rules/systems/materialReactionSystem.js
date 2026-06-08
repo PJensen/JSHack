@@ -1,3 +1,4 @@
+import { defineExtension } from "../../lib/ecs-js/index.js";
 import { Beatitude } from "../components/Beatitude.js";
 import { Inventory } from "../components/Inventory.js";
 import { ItemInfo } from "../components/ItemInfo.js";
@@ -5,6 +6,7 @@ import { Material } from "../components/Material.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Position } from "../components/Position.js";
 import { MATERIAL_REACTION_RULES } from "../data/materialReactions.js";
+import { MaterialReactionEventQueueResource } from "../resources/materialReactionEventQueue.js";
 import { hasAnyStatus } from "../utils/statusFacade.js";
 import { inventoryItems } from "../utils/inventoryFacade.js";
 import { applyWaterExposure } from "../utils/waterExposure.js";
@@ -12,9 +14,6 @@ import { applyMaterialStimulus } from "../utils/materialStimulus.js";
 import { applyMaterialTransform, resolveMaterialTransform } from "../utils/materialTransforms.js";
 
 const SEEN_KEY = Symbol.for("jshack:materialReactions:seenPerStep");
-const INSTALLED_KEY = Symbol.for("jshack:materialReactions:listeners:installed");
-const EVENT_QUEUE_KEY = Symbol.for("jshack:materialReactions:eventQueue");
-const EVENT_SEQ_KEY = Symbol.for("jshack:materialReactions:eventSeq");
 
 /**
  * @param {import("../../lib/ecs-js/index.js").World} world
@@ -30,18 +29,8 @@ function ensureSeenState(world) {
 /**
  * @param {import("../../lib/ecs-js/index.js").World} world
  */
-function ensureEventQueue(world) {
-  if (!Array.isArray(world[EVENT_QUEUE_KEY])) world[EVENT_QUEUE_KEY] = [];
-  return world[EVENT_QUEUE_KEY];
-}
-
-/**
- * @param {import("../../lib/ecs-js/index.js").World} world
- */
-function nextEventSeq(world) {
-  const next = (Number(world[EVENT_SEQ_KEY] || 0) | 0) + 1;
-  world[EVENT_SEQ_KEY] = next;
-  return next;
+function materialReactionEventQueue(world) {
+  return world.resource(MaterialReactionEventQueueResource);
 }
 
 function trackedReactionEvents() {
@@ -58,28 +47,23 @@ function trackedReactionEvents() {
   return Array.from(set);
 }
 
-/**
- * Install material reaction event listeners. Call once per world in configureWorld().
- * @param {import('../../lib/ecs-js/index.js').World} world
- */
-export function installMaterialReactionListeners(world) {
-  if (!world || world[INSTALLED_KEY]) return;
-  world[INSTALLED_KEY] = true;
-  const queue = ensureEventQueue(world);
+export const materialReactionListenersExtension = defineExtension("jshack:materialReactions:listeners", (world) => {
+  const queue = materialReactionEventQueue(world);
   const trackedEvents = trackedReactionEvents();
 
   for (let i = 0; i < trackedEvents.length; i++) {
     const eventName = trackedEvents[i];
     world.on(eventName, (payload = {}) => {
       const safePayload = (payload && typeof payload === "object") ? { ...payload } : {};
-      queue.push({
-        id: nextEventSeq(world),
+      queue.nextId = (Number(queue.nextId || 0) | 0) + 1;
+      queue.events.push({
+        id: queue.nextId,
         kind: eventName,
         payload: safePayload,
       });
     });
   }
-}
+});
 
 /**
  * @param {any} point
@@ -532,9 +516,9 @@ function processStatusDrivenRules(world, seen) {
  * @param {Set<string|number>} seen
  */
 function processEventDrivenRules(world, seen) {
-  const queue = ensureEventQueue(world);
-  if (queue.length <= 0) return;
-  const pending = queue.splice(0, queue.length);
+  const queue = materialReactionEventQueue(world);
+  if (queue.events.length <= 0) return;
+  const pending = queue.events.splice(0, queue.events.length);
 
   for (let e = 0; e < pending.length; e++) {
     const ev = pending[e];

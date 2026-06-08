@@ -13,7 +13,7 @@ import { Position } from "../src/rules/components/Position.js";
 import { MaterialState } from "../src/rules/components/MaterialState.js";
 import { applySystem } from "../src/rules/systems/applySystem.js";
 import { drinkSystem } from "../src/rules/systems/drinkSystem.js";
-import { installMaterialReactionListeners, materialReactionSystem } from "../src/rules/systems/materialReactionSystem.js";
+import { materialReactionListenersExtension, materialReactionSystem } from "../src/rules/systems/materialReactionSystem.js";
 import { throwSystem } from "../src/rules/systems/throwSystem.js";
 import { useItemSystem } from "../src/rules/systems/useItemSystem.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
@@ -54,7 +54,7 @@ Deno.test("water potion drink clears burn and emits semantic event", () => {
 
 Deno.test("holy water dip blesses target potion beatitude", () => {
   const world = new World({ seed: 9002 });
-  installMaterialReactionListeners(world);
+  world.install(materialReactionListenersExtension);
   const actor = world.create();
   world.add(actor, Inventory, { items: [], maxWeight: 100 });
 
@@ -93,7 +93,7 @@ Deno.test("holy water vial item starts blessed by default", () => {
 
 Deno.test("water dip waterlogs paper targets via material reaction rules", () => {
   const world = new World({ seed: 9004 });
-  installMaterialReactionListeners(world);
+  world.install(materialReactionListenersExtension);
   const actor = world.create();
   world.add(actor, Inventory, { items: [], maxWeight: 100 });
 

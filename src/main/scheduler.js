@@ -74,7 +74,7 @@ import { hungerSystem } from "../rules/systems/hungerSystem.js";
 import { hazardSystem } from "../rules/systems/hazardSystem.js";
 import { monsterDeathHookSystem } from "../rules/systems/monsterDeathHookSystem.js";
 import { scoreSystem } from "../rules/systems/scoreSystem.js";
-import { installMaterialReactionListeners, materialReactionSystem } from "../rules/systems/materialReactionSystem.js";
+import { materialReactionListenersExtension, materialReactionSystem } from "../rules/systems/materialReactionSystem.js";
 import { foodDecaySystem } from "../rules/systems/foodDecaySystem.js";
 import { itemCooldownSystem } from "../rules/systems/itemCooldownSystem.js";
 import { spellCooldownSystem } from "../rules/systems/spellCooldownSystem.js";
@@ -166,7 +166,7 @@ export function configureWorld(world) {
   // Trap plates trigger from arrival movement events, then resolve in trapSystem.
   world.install(trapStepListenerExtension);
   // Material reactions consume semantic reaction events (water splash/dip, etc.).
-  installMaterialReactionListeners(world);
+  world.install(materialReactionListenersExtension);
   // Polymorph requests (e.g. mimic reveal on touch).
   installPolymorphListener(world);
   installCurseHooks(world);
