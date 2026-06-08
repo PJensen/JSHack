@@ -13,6 +13,7 @@ import { CreatureType } from "../src/rules/components/CreatureType.js";
 import { HazardArea } from "../src/rules/components/HazardArea.js";
 import { ThrowIntent } from "../src/rules/components/Intents/ThrowIntent.js";
 import { throwSystem } from "../src/rules/systems/throwSystem.js";
+import { hazardSystem } from "../src/rules/systems/hazardSystem.js";
 import { addToInventory, inventoryContains } from "../src/rules/utils/inventoryFacade.js";
 
 // ── Wand Shatter Tests ─────────────────────────────────────────────────
@@ -210,7 +211,7 @@ Deno.test("thrown potion_sickness poisons and damages target", () => {
   assertEquals(splashEvents[0].effectKey, "poison");
 });
 
-Deno.test("thrown potion_vigor heals target on landing tile", () => {
+Deno.test("thrown potion_vigor creates blood pool that heals after hazard pulse", () => {
   const world = new World({ seed: 9013 });
   const actor = world.create();
   world.add(actor, Inventory, { items: [], maxWeight: 999 });
@@ -232,8 +233,16 @@ Deno.test("thrown potion_vigor heals target on landing tile", () => {
   throwSystem(world);
 
   assertEquals(splashEvents.length, 1);
+  assertEquals(splashEvents[0].effectKey, "blood_pool");
+  assertEquals(splashEvents[0].hitCount, 0);
   const vit = world.get(mob, Vitality);
-  assert(vit.hp > 10, "mob should be healed by vigor splash");
+  assertEquals(vit.hp, 10, "mob should not be healed by initial vigor splash");
+
+  const pools = [...world.query(Position, HazardArea)].filter(([, , hazard]) => hazard.kind === "blood_pool");
+  assertEquals(pools.length, 1, "vigor throw should create one blood pool");
+
+  hazardSystem(world);
+  assert(world.get(mob, Vitality).hp > 10, "mob should be healed by blood pool pulse");
 });
 
 Deno.test("thrown potion_keen_edge shatters harmlessly (dud)", () => {
