@@ -6,7 +6,7 @@ const _installed = Symbol.for('jshack:debugConsole:installed');
 /**
  * Initialize the debug console overlay.
  * @param {{ world: object, messageLog: { log(msg: object): void } }} deps
- * @returns {{ registerCommand(name: string, helpText: string, handler: function): void }}
+ * @returns {{ registerCommand(name: string, helpText: string, handler: function): void, log(text: string, type?: string): void }}
  */
 export function initDebugConsole({ world, messageLog }) {
   if (/** @type {any} */ (world)[_installed]) return /** @type {any} */ (world)[_installed];
@@ -22,7 +22,7 @@ export function initDebugConsole({ world, messageLog }) {
     history = history.slice(-HISTORY_MAX);
   } catch { history = []; }
   let historyIdx = history.length;
-  const outputLines = [];   // { text, type:'cmd'|'ok'|'err' }
+  const outputLines = [];   // { text, type:'cmd'|'ok'|'err'|'debug' }
   let open = false;
 
   // --- DOM ---
@@ -102,9 +102,13 @@ export function initDebugConsole({ world, messageLog }) {
 
   panel.appendChild(container);
 
-  // Clicking outside the container closes the console
+  // Do not auto-close on backdrop clicks; keep the console open until the user
+  // explicitly closes it with ~ or Escape.
   panel.addEventListener('pointerdown', (ev) => {
-    if (ev.target === panel) close();
+    if (ev.target === panel) {
+      ev.preventDefault();
+      input.focus();
+    }
   });
 
   // Append to ui-root or body
@@ -128,6 +132,11 @@ export function initDebugConsole({ world, messageLog }) {
       if (line.type === 'cmd') {
         div.style.color = '#8899aa';
         div.textContent = `> ${line.text}`;
+      } else if (line.type === 'debug') {
+        div.style.color = '#8fd3ff';
+        div.style.paddingLeft = '10px';
+        div.style.borderLeft = '2px solid rgba(95,179,255,0.45)';
+        div.textContent = line.text;
       } else if (line.type === 'err') {
         div.style.color = '#ff6b6b';
         div.textContent = line.text;
@@ -161,7 +170,13 @@ export function initDebugConsole({ world, messageLog }) {
     }
     try {
       const result = cmd.handler(argsStr, { world, messageLog });
-      if (result != null && result !== '') {
+      if (result && typeof result.then === 'function') {
+        result.then((resolved) => {
+          if (resolved != null && resolved !== '') appendOutput(String(resolved), 'ok');
+        }).catch((err) => {
+          appendOutput(`Error: ${err?.message || err}`, 'err');
+        });
+      } else if (result != null && result !== '') {
         appendOutput(String(result), 'ok');
       }
     } catch (err) {
@@ -262,6 +277,10 @@ export function initDebugConsole({ world, messageLog }) {
   const api = Object.freeze({
     registerCommand(name, helpText, handler) {
       commands.set(name.toLowerCase(), { helpText, handler });
+    },
+    log(text, type = 'debug') {
+      if (text == null || text === '') return;
+      appendOutput(String(text), type);
     },
   });
 

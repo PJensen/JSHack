@@ -75,6 +75,16 @@ function describeItem(world, itemId) {
  */
 export function registerBuiltinCommands(console, { world, messageLog, lightingEngine }) {
 
+  function formatSfxDebugLine(event) {
+    const parts = [`[sfx] ${event.id || 'unknown'}`];
+    if (event.bus) parts.push(`bus:${event.bus}`);
+    if (Number.isFinite(Number(event.volume))) parts.push(`vol:${Number(event.volume).toFixed(2)}`);
+    if (Number.isFinite(Number(event.pan))) parts.push(`pan:${Number(event.pan).toFixed(2)}`);
+    if (Number.isFinite(Number(event.priority))) parts.push(`prio:${Number(event.priority) | 0}`);
+    if (event.file) parts.push(`file:${event.file}`);
+    return `  ${parts.join('  ')}`;
+  }
+
   function applyEffectToPlayer(rawKey, rawTurns) {
     const key = String(rawKey || "").trim().toLowerCase();
     if (!key) return "Usage: effect <key> [turns]";
@@ -689,9 +699,25 @@ export function registerBuiltinCommands(console, { world, messageLog, lightingEn
     return _sounds;
   }
 
-  console.registerCommand('sfx', 'sfx <sound-id> [volume] [pitch] — play a sound by registry ID', async (argsStr) => {
+  const writeSfxDebugLine = (event) => {
+    console.log(formatSfxDebugLine(event), 'debug');
+  };
+
+  console.registerCommand('sfx', 'sfx <sound-id> [volume] [pitch] | sfx list | sfx debug <enable|disable> — play a sound or inspect SFX debug logging', async (argsStr) => {
     const [id, volStr, pitchStr] = argsStr.trim().split(/\s+/);
-    if (!id) return 'Usage: sfx <sound-id> [volume 0-1] [randomPitch cents]\nUse "sfx list" to see all IDs.';
+    if (!id) return 'Usage: sfx <sound-id> [volume 0-1] [randomPitch cents]\n       sfx list\n       sfx debug <enable|disable>';
+    if (id === 'debug') {
+      const a = await audio();
+      const mode = String(volStr || '').toLowerCase();
+      if (!mode) return `SFX debug is ${a.isSfxDebugEnabled?.() ? 'enabled' : 'disabled'}.\nUsage: sfx debug <enable|disable>`;
+      if (mode !== 'enable' && mode !== 'disable') return 'Usage: sfx debug <enable|disable>';
+      const enabled = mode === 'enable';
+      a.setSfxDebugLogger?.(enabled ? writeSfxDebugLine : null);
+      a.setSfxDebugEnabled?.(enabled);
+      return enabled
+        ? 'SFX debug enabled. Triggered sounds will append to the debug console.'
+        : 'SFX debug disabled.';
+    }
     if (id === 'list') {
       const s = await sounds();
       const ids = s.allIds();
@@ -722,6 +748,14 @@ export function registerBuiltinCommands(console, { world, messageLog, lightingEn
     if (volStr) opts.volume = Math.max(0, Math.min(1, parseFloat(volStr)));
     if (pitchStr) opts.randomPitch = Math.abs(parseInt(pitchStr, 10));
     a.play(resolved.url, opts);
+    a.reportSfxDebugInvocation?.({
+      source: 'console',
+      id,
+      bus: resolved.bus,
+      file: resolved.file,
+      volume: opts.volume,
+      priority: 1,
+    });
     return `▶ ${id} → ${resolved.file} [bus:${resolved.bus}]${opts.volume != null ? ` vol:${opts.volume}` : ''}${opts.randomPitch ? ` pitch:±${opts.randomPitch}¢` : ''}`;
   });
 

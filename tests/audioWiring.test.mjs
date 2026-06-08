@@ -25,6 +25,10 @@ import {
   resolveCraftingResultSoundId,
   resolveAudioPlayKey,
   resolveStatusSoundId,
+  isSfxDebugEnabled,
+  reportSfxDebugInvocation,
+  setSfxDebugEnabled,
+  setSfxDebugLogger,
   shouldPlayElectrocutionSound,
   shouldPlayDungeonOmen,
   shouldPlayTeleportSound,
@@ -148,4 +152,29 @@ Deno.test("audio wiring gates dungeon omens to rare real dungeon events", () => 
 
   assert(played > 0, "real dungeon events should occasionally produce an omen");
   assert(played < 20, "omens should stay rare even during many hazard events");
+});
+
+Deno.test("audio wiring only emits sfx debug events when enabled", () => {
+  const events = [];
+  setSfxDebugLogger((event) => events.push(event));
+  setSfxDebugEnabled(false);
+
+  reportSfxDebugInvocation({ id: "spell:fireball", bus: "spells" });
+  assert(events.length === 0);
+
+  setSfxDebugEnabled(true);
+  assert(isSfxDebugEnabled());
+  reportSfxDebugInvocation({ id: "spell:fireball", bus: "spells", volume: 0.8 });
+  assert(events.length === 1);
+  assert(events[0].id === "spell:fireball");
+  assert(events[0].bus === "spells");
+
+  setSfxDebugEnabled(false);
+  assert(!isSfxDebugEnabled());
+  setSfxDebugLogger(null);
+  reportSfxDebugInvocation({ id: "spell:heal", bus: "spells", volume: 0.5 });
+  assert(events.length === 1);
+
+  setSfxDebugEnabled(false);
+  setSfxDebugLogger(null);
 });

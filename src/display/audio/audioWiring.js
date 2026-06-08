@@ -73,6 +73,28 @@ export const STATUS_SOUND_BY_KIND = Object.freeze({
 export const SECRET_FOUND_SOUND_ID = "action:secret_found";
 export const BONE_CHIME_SOUND_ID = "ambient:bone_chime";
 
+let sfxDebugEnabled = false;
+let sfxDebugLogger = null;
+
+export function setSfxDebugEnabled(enabled) {
+  sfxDebugEnabled = !!enabled;
+}
+
+export function isSfxDebugEnabled() {
+  return sfxDebugEnabled && typeof sfxDebugLogger === "function";
+}
+
+export function setSfxDebugLogger(logger) {
+  sfxDebugLogger = typeof logger === "function" ? logger : null;
+}
+
+export function reportSfxDebugInvocation(payload) {
+  if (!sfxDebugEnabled || typeof sfxDebugLogger !== "function") return;
+  try {
+    sfxDebugLogger({ ...payload });
+  } catch (_) {}
+}
+
 // Pet vocalization sound map
 const PET_VOCALIZE_SOUNDS = Object.freeze({
   cat: "creature:pet:meow",
@@ -248,13 +270,23 @@ export function shouldPlayDungeonOmen(payload, state, depth) {
 function sfx(id, opts) {
   const s = resolve(id);
   if (!s) return;
-  play(s.url, {
+  const playback = {
     bus: s.bus, maxVoices: s.maxVoices, randomPitch: s.randomPitch,
     volume: s.volume, rate: s.rate, detune: s.detune,
     stopAfter: s.stopAfter, fadeOut: s.fadeOut, segment: s.segment,
     priority: 1,
     ...opts,
+  };
+  reportSfxDebugInvocation({
+    source: playback.pan == null ? "direct" : "spatial",
+    id,
+    bus: s.bus,
+    file: s.file,
+    volume: playback.volume,
+    pan: playback.pan,
+    priority: playback.priority,
   });
+  play(s.url, playback);
 }
 
 /** Play a registered sound positioned in world space. */
