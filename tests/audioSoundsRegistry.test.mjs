@@ -68,6 +68,8 @@ Deno.test("sounds registry adopts descriptive weather filenames", () => {
   const caveBearAlert = resolve("cave_bear:alert");
   const ratAlert = resolve("rat:alert");
   const boneDrop = resolve("item:drop:bone");
+  const searchPing = resolve("action:search_ping");
+  const searchFound = resolve("action:search_found");
   const secretFound = resolve("action:secret_found");
   const boneChime = resolve("ambient:bone_chime");
   const roar = resolve("ambient:roar");
@@ -128,6 +130,10 @@ Deno.test("sounds registry adopts descriptive weather filenames", () => {
   assertEquals(caveBearAlert.file, "cave_bear_alerted.mp3");
   assertEquals(ratAlert.file, "rat_alerted_1.mp3");
   assertEquals(boneDrop.file, "bone_dropped.mp3");
+  assertEquals(searchPing.file, "action_search_ping.mp3");
+  assertEquals(searchPing.maxVoices, 2);
+  assertEquals(searchFound.file, "action_search_found.mp3");
+  assertEquals(searchFound.maxVoices, 2);
   assertEquals(secretFound.file, "action_secret_found.mp3");
   assertEquals(boneChime.file, "ambient_bone_chime.mp3");
   assertEquals(roar.file, "ambient_roar.mp3");

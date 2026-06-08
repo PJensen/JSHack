@@ -72,6 +72,8 @@ export const STATUS_SOUND_BY_KIND = Object.freeze({
   lightning: "status:electrocuted",
 });
 
+export const SEARCH_PING_SOUND_ID = "action:search_ping";
+export const SEARCH_FOUND_SOUND_ID = "action:search_found";
 export const SECRET_FOUND_SOUND_ID = "action:secret_found";
 export const BONE_CHIME_SOUND_ID = "ambient:bone_chime";
 
@@ -121,6 +123,7 @@ const PLAYER_NEAR_DEATH_RATIO = 0.25;
 const DUNGEON_OMEN_EVENT_GAP = 18;
 const DUNGEON_OMEN_CHANCE = 12;
 const DEAFENED_SOUND_COOLDOWN_MS = 2500;
+const SEARCH_REVEAL_MAX_DELAY_MS = 380;
 const WARMUP_WEAPON_FAMILIES = Object.freeze([
   "axe_large",
   "axe_small",
@@ -165,6 +168,18 @@ export function computeZoomAudibilityGain(zoomScale, referenceScale) {
   if (!Number.isFinite(zoom) || !Number.isFinite(reference) || zoom <= 0 || reference <= 0) return 1;
   const gain = Math.sqrt(zoom / reference);
   return Math.max(MIN_ZOOM_GAIN, Math.min(MAX_ZOOM_GAIN, gain));
+}
+
+export function computeSearchRevealDelayMs(origin, target, radius) {
+  if (!origin || !target) return 120;
+  const ox = Number(origin.x);
+  const oy = Number(origin.y);
+  const tx = Number(target.x);
+  const ty = Number(target.y);
+  const r = Math.max(1, Number(radius) || 1);
+  if (!Number.isFinite(ox) || !Number.isFinite(oy) || !Number.isFinite(tx) || !Number.isFinite(ty)) return 120;
+  const dist = Math.hypot(tx - ox, ty - oy);
+  return Math.max(60, Math.min(SEARCH_REVEAL_MAX_DELAY_MS, Math.round((dist / r) * SEARCH_REVEAL_MAX_DELAY_MS)));
 }
 
 function remapClamped(value, inMin, inMax, outMin, outMax) {
@@ -485,6 +500,7 @@ export function resolveCraftingResultSoundId(kind) {
  * }} deps
  */
 export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosition, getPosition, getIdentity, getDepth, getZoomScale, getReferenceZoomScale }) {
+  const recentSearchPulses = new Map();
 
   const warmupIds = [
     "item:equip:weapon",
@@ -976,10 +992,23 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     sfxAt(WEAPON_RACK_DROPPED_SOUND_ID, pos, pp(), { priority: 1 }, zg());
   });
 
-  world.on('search:revealed', ({ kind, at, entityId }) => {
-    if (String(kind || "") !== "secret_door") return;
+  world.on('search:pulse', ({ actorId, at, radius }) => {
+    const origin = at && Number.isFinite(Number(at.x)) && Number.isFinite(Number(at.y))
+      ? { x: Number(at.x), y: Number(at.y) }
+      : (actorId != null ? getPosition(actorId) : null);
+    if (actorId != null && origin) {
+      recentSearchPulses.set(actorId, { at: origin, radius: Math.max(1, Number(radius) || 1) });
+    }
+    sfxAt(SEARCH_PING_SOUND_ID, origin, pp(), { priority: 1 }, zg());
+  });
+
+  world.on('search:revealed', ({ actorId, kind, at, entityId }) => {
+    const revealKind = String(kind || "");
+    if (revealKind !== "secret_door" && revealKind !== "trap") return;
     const pos = at || (entityId != null ? getPosition(entityId) : null);
-    sfxAt(SECRET_FOUND_SOUND_ID, pos, pp(), { priority: 1 }, zg());
+    const pulse = actorId != null ? recentSearchPulses.get(actorId) : null;
+    const delayMs = pulse ? computeSearchRevealDelayMs(pulse.at, pos, pulse.radius) : 120;
+    sfxAtDelay(SEARCH_FOUND_SOUND_ID, pos, pp(), { priority: 1 }, zg(), delayMs);
   });
 
   // ── Environment ───────────────────────────────────────────

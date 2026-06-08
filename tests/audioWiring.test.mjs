@@ -15,12 +15,15 @@ import {
   FAMILIAR_FIRE_READY_SOUND_ID,
   FOOD_EAT_SOUND_ID,
   PUSH_STONE_SOUND_ID,
+  SEARCH_FOUND_SOUND_ID,
+  SEARCH_PING_SOUND_ID,
   SECRET_FOUND_SOUND_ID,
   SPELL_CAST_SOUND_EVENTS,
   TRAP_SOUND_BY_TYPE,
   URN_BROKEN_SOUND_ID,
   WEAPON_RACK_DROPPED_SOUND_ID,
   craftingMenuLoopKey,
+  computeSearchRevealDelayMs,
   computeZoomAudibilityGain,
   gemValueToDropDetuneCents,
   resolveCraftingResultSoundId,
@@ -93,8 +96,17 @@ Deno.test("audio wiring maps new authored event sounds", () => {
   assert(TRAP_SOUND_BY_TYPE.spike === "trap:spike");
   assert(URN_BROKEN_SOUND_ID === "urn:broken");
   assert(WEAPON_RACK_DROPPED_SOUND_ID === "rack:weapon:dropped");
+  assert(SEARCH_PING_SOUND_ID === "action:search_ping");
+  assert(SEARCH_FOUND_SOUND_ID === "action:search_found");
   assert(SECRET_FOUND_SOUND_ID === "action:secret_found");
   assert(BONE_CHIME_SOUND_ID === "ambient:bone_chime");
+});
+
+Deno.test("audio wiring delays search reveal sound along the pulse radius", () => {
+  assert(computeSearchRevealDelayMs({ x: 0, y: 0 }, { x: 1, y: 0 }, 6) === 63);
+  assert(computeSearchRevealDelayMs({ x: 0, y: 0 }, { x: 3, y: 0 }, 6) === 190);
+  assert(computeSearchRevealDelayMs({ x: 0, y: 0 }, { x: 6, y: 0 }, 6) === 380);
+  assert(computeSearchRevealDelayMs(null, { x: 6, y: 0 }, 6) === 120);
 });
 
 Deno.test("audio wiring zoom gain follows camera scale with clamps", () => {
