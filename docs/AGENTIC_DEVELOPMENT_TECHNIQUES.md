@@ -317,6 +317,165 @@ Technique: agent sessions become durable project memory. Future agents can
 recover the prompts, transcripts, and decisions behind changes instead of
 inferring intent only from code shape.
 
+## External Agent Toolchain
+
+The repo is not only developed by one agent interface. It sits inside a broader
+agentic toolchain.
+
+Observed external tools:
+
+- **Rust Token Killer (`rtk`)**: a local command wrapper that compresses shell
+  tool output before it reaches the agent transcript. This matters because large
+  repository scans, test runs, and grep output are otherwise token-expensive.
+  RTK makes high-frequency CLI inspection more practical.
+- **Entire**: checkpoint and chat-history provenance. It was enabled after the
+  project had already matured, so it does not explain the whole history, but it
+  changes recent work by making agent sessions searchable, explainable, and
+  attachable to commits.
+- **Reflect-JS**: local stdin MCP for JavaScript reflection. It gives agents
+  structure-oriented inspection tools for a JavaScript codebase that deliberately
+  lacks TypeScript compiler metadata.
+- **Caveman**: external workflow/tooling used with Claude Code. Like RTK and
+  Reflect-JS, it is part of the operating environment rather than a project
+  dependency.
+
+Technique: the project uses external tooling to make agents cheaper to run,
+easier to orient, and less dependent on raw transcript context. This is part of
+the agentic development story even when the tools are not checked into the repo.
+
+## Additional Tool Inventory
+
+The agentic development story also includes a wider tool surface. Some of these
+tools are agent-specific; others are project production tools that make the
+repository easier for agents to inspect, validate, or extend.
+
+Repository CLIs and Deno tasks:
+
+- `deno task test`, `test:fast`, and `test:slow` split runtime verification by
+  cost.
+- `deno task check`, `guard:architecture`, `guard:events`, `guard:death`,
+  `guard:tools`, and `ratchet:world-state` provide named safety rails.
+- `deno task audit:events`, `audit:damaged`, `audit:died`, `audit:systems`, and
+  `audit:health` expose project state without modifying code.
+- `deno task coverage` and `deno task bench` provide coverage and performance
+  hooks.
+- `tools/agent-health.mjs`, `tools/import-boundary-report.mjs`,
+  `tools/event-bus-explorer.mjs`, `tools/system-map.mjs`,
+  `tools/agent-target.mjs`, and `tools/content-id-audit.mjs` are the main
+  agent-facing inspection tools.
+
+Simulation and performance tools:
+
+- `tools/headless-runner.mjs` runs the real rules scheduler and WorldView path
+  without browser display code.
+- `docs/headless-runtime.md` documents action schedules, seed/class/depth
+  options, and reporting.
+- `tools/profile-hot-systems.mjs` profiles scheduler phases and individual
+  systems under controlled scenarios.
+- `tests/perf/*.bench.mjs` gives Deno benchmark entry points.
+
+Browser-local authoring and inspection tools:
+
+- `tools/test-runner.html` runs visual scenarios from `tests/visual/`.
+- `tests/visual/_registry.js` catalogs visual scenarios such as chase, scurry,
+  gaze stun, proc package scenarios, and spell/proc VFX cases.
+- `tools/fx-builder.html` and `tools/jshack_fx_builder.html` are browser FX
+  authoring/preview tools.
+- `tools/building-designer.html` authors building/prefab layouts and spawn
+  parameters.
+- `tools/composite-glyph-editor.html` edits composite glyphs.
+- `tools/emitter-test.html` exercises audio/visual emitter behavior.
+- `tools/help/index.html` is a browser-readable help/inspection surface for
+  game data, settings, saves, and death records.
+
+Audio pipeline tools:
+
+- `tools/download-dropbox-audio.mjs` downloads and extracts shared Dropbox audio
+  assets.
+- `tools/sync-dropbox-audio.sh` wraps audio sync with locking, `git pull`,
+  `deno task download:audio`, per-file commits, and push.
+- `tools/audio-trim-silence.mjs` shells out to `/usr/bin/ffmpeg` for silence
+  trimming.
+- `tools/audio-normalize-compress.mjs` shells out to `/usr/bin/ffmpeg` and
+  `/usr/bin/ffprobe` for loudness measurement, normalization, compression, and
+  duration metadata.
+- `tools/audio-manifest.mjs` uses `ffmpeg`/`ffprobe` to generate audio duration,
+  loudness, and bitrate metadata.
+- `tools/audio-process.mjs` chains trim and normalize/compress passes.
+- `tools/audio-utils.mjs` supports manifest/processed-file tracking.
+
+Distribution and packaging tools:
+
+- `packaging/nwjs/wrap.mjs` stages the browser app for NW.js distribution.
+- `packaging/nwjs/README.md` documents the boundary: the browser app remains
+  canonical, and NW.js is only a containment/distribution shell around
+  `index.html`.
+- `deno task wrap:nwjs` stages `dist/nwjs/app/` or an unpacked runtime layout.
+
+AI/gameplay training tools:
+
+- `tools/trainAI.js` trains a tiny neural policy using a deterministic
+  `(1 + lambda)` evolution strategy mini-sim.
+- `docs/systems/NEURAL_AI.md` documents the neural AI system and training
+  direction.
+
+Local agent skills:
+
+- `.agents/skills/add-item`
+- `.agents/skills/add-monster`
+- `.agents/skills/add-spell`
+- `.agents/skills/explain`
+- `.agents/skills/recall`
+- `.agents/skills/replay`
+- `.agents/skills/review`
+- `.agents/skills/search`
+- `.agents/skills/session-crosslink`
+- `.agents/skills/session-handoff`
+- `.agents/skills/session-to-skill`
+- `.agents/skills/teach`
+- `.agents/skills/using-entire`
+- `.agents/skills/what-happened`
+
+External/supporting tools and services observed:
+
+- Deno: test runner, task runner, benchmarks, coverage, scripts.
+- Browser runtime: primary execution target and authoring surface for visual
+  tools.
+- `ffmpeg` and `ffprobe`: audio processing and metadata.
+- Dropbox: shared audio asset source.
+- Git: source control, checkpoint trailers, audio sync commits.
+- NW.js: optional desktop wrapper.
+- RTK: token-compressing shell proxy for agent tool output.
+- Entire: checkpoint/chat-history provenance.
+- Reflect-JS: JavaScript reflection MCP.
+- Caveman: Claude Code workflow/tooling.
+- Codex, Claude Code, and GitHub Copilot: retail LLM agent/copilot products.
+
+Technique: the project is surrounded by tools that reduce agent friction at
+several levels: token cost, provenance, reflection, deterministic simulation,
+architecture auditing, visual inspection, audio production, packaging, and
+task-specific playbooks.
+
+## Multiple Retail LLM Products
+
+At least three LLM retail products have participated in the development workflow:
+
+- **Codex**
+- **Claude Code**
+- **GitHub Copilot**
+
+Evidence:
+
+- `entire status` reports active Codex sessions.
+- `STORY.md` refers to "CC -- Copilot, the AI" entering the commit history and
+  describes both its useful speed and its characteristic wrongness.
+- The project-owner workflow references Claude Code and Caveman as part of the
+  external agent environment.
+
+Technique: the project is not dependent on one model or one agent product. It
+uses a multi-agent, multi-interface workflow, with the repository's own
+constraints and guardrails acting as the stable center.
+
 ## Local Task Skills
 
 The repo contains local agent skills for repeated workflows.
@@ -355,6 +514,69 @@ Observed role:
 Technique: use external reflection to recover structure from a dynamic JS
 project. This complements repo CLIs: grep and custom scanners find textual
 contracts; reflection can inspect code/module structure more directly.
+
+## Agentic Development Stress Test
+
+JSHack is not merely a project that happened to use agents. It was also
+conceived, in part, as an agentic development stress test: can agents sustain a
+deep, complex, zero-dependency JavaScript roguelike without TypeScript, without a
+framework, without a build step, and without committee architecture?
+
+Observed result:
+
+- The result is reasonable, not perfect.
+- Agents made the project possible at its current breadth, but they did not make
+  judgment optional.
+- The successful pattern is not "let the model decide." It is human-owned
+  architecture plus agent-executed implementation inside strong constraints.
+- The project exposes real weaknesses of agentic development: plausible wrong
+  code, test incentives that can preserve stale behavior, environmental
+  brittleness, overfitting to green checks, and the need for repeated human
+  correction.
+
+Evidence:
+
+- `docs/architecture/MANIFESTO.md` says the agents made the project possible and
+  argues that the conventions survived because they were clear enough to
+  transmit.
+- `README.md` says JSHack is built through agentic development: a human directs
+  architecture, taste, constraints, and iteration while AI agents do
+  implementation work.
+- `STORY.md` describes Copilot/AI as fast and useful, but also as having "a
+  specific flavor of wrongness that requires cleanup."
+- `CHANGELOG.md` records fixes for AI-introduced mistakes and repeated attempts
+  to correct small constants.
+
+Technique: the project treats agentic development as an engineering system with
+known failure modes, not as magic. The agent is a throughput multiplier; the
+architecture, constraints, and review judgment remain the controlling mechanism.
+
+## Tests As Witnesses, Not Governors
+
+The test suite is a major part of the agentic development story, but it is not
+an unqualified good.
+
+Evidence:
+
+- The repository has thousands of Deno tests across focused behavioral,
+  architectural, content, UI, audio, and simulation surfaces.
+- `docs/architecture/TEN_COMMANDMENTS.md` says tests are the guardrail that keep
+  systems honest.
+- `AGENTS.md` explicitly warns that red tests can be stale and says failures
+  should be classified as real bug, stale expectation, or ambiguous.
+
+Risk:
+
+- A large green suite creates an incentive gradient: satisfy the harness,
+  preserve expected behavior, and avoid semantic judgment.
+- Tests can drag the project backward when stale expectations freeze old design
+  decisions.
+- Agentic development amplifies this risk because agents are very good at making
+  failing tests pass even when the better move is to update or delete the test.
+
+Technique: use tests as witnesses, not governors. The strongest pattern here is
+not "more tests"; it is tests plus doctrine, ratchets, CLI audits, and human
+judgment about when a test encodes current intent versus obsolete behavior.
 
 ## Vendored ECS Agent Manual
 
