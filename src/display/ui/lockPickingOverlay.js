@@ -63,6 +63,27 @@ export function resolvePolarLockInput(dx, dy, radius) {
   });
 }
 
+export function createLockPickingResult(game, success, reason) {
+  return Object.freeze({
+    success: !!success,
+    reason: String(reason || (success ? "unlocked" : "failed")),
+    pins: Number(game?.pinCount || 0) | 0,
+    difficulty: String(game?.difficulty?.id || "normal"),
+  });
+}
+
+export function notifyLockPickingResult(options, result) {
+  if (typeof options?.finishedPickedListener === "function") {
+    options.finishedPickedListener(result);
+  }
+  if (result.success && typeof options?.successPickedListener === "function") {
+    options.successPickedListener(result);
+  }
+  if (!result.success && typeof options?.failedPickedListener === "function") {
+    options.failedPickedListener(result);
+  }
+}
+
 export function normalizeLockDifficulty(difficulty) {
   if (difficulty && typeof difficulty === "object") {
     return Object.freeze({
@@ -278,6 +299,11 @@ function updateHud(game, els) {
   els.force.textContent = `force ${Math.round(game.state.tension * 100)}%`;
   els.status.textContent = game.state.status;
   els.toast.textContent = game.state.message;
+  if (els.open) {
+    els.open.disabled = !game.state.solved;
+    els.open.style.opacity = game.state.solved ? "1" : ".45";
+    els.open.style.cursor = game.state.solved ? "pointer" : "default";
+  }
 }
 
 function drawLock(game, canvas, ctx) {
@@ -493,7 +519,22 @@ export function renderLockPicking(panel, options = {}) {
     fontWeight: "800",
     cursor: "pointer",
   });
-  top.append(title, reset);
+  const open = make("button", "", "open");
+  open.disabled = true;
+  setStyles(open, {
+    border: "1px solid rgba(84,224,154,.38)",
+    borderRadius: "6px",
+    background: "#163024",
+    color: "#dfffee",
+    padding: "8px 12px",
+    fontWeight: "900",
+    cursor: "default",
+    opacity: ".45",
+  });
+  const actions = make("div", "");
+  setStyles(actions, { display: "flex", gap: "8px", alignItems: "center" });
+  actions.append(reset, open);
+  top.append(title, actions);
   card.appendChild(top);
 
   const stage = make("div", "lockPicking-stage");
@@ -547,7 +588,7 @@ export function renderLockPicking(panel, options = {}) {
   inner.appendChild(card);
 
   const ctx = canvas.getContext("2d");
-  const els = { progress, force, status, count, toast };
+  const els = { progress, force, status, count, toast, open };
   let pickPointer = null;
   let raf = 0;
   let lastTime = performance.now();
@@ -557,14 +598,9 @@ export function renderLockPicking(panel, options = {}) {
   function finish(success, reason) {
     if (completed) return;
     completed = true;
-    window.dispatchEvent(new CustomEvent("ui:lockPickingFinished", {
-      detail: {
-        success,
-        reason,
-        pins: game.pinCount,
-        difficulty: game.difficulty.id,
-      },
-    }));
+    const result = createLockPickingResult(game, success, reason);
+    notifyLockPickingResult(options, result);
+    window.dispatchEvent(new CustomEvent("ui:lockPickingFinished", { detail: result }));
   }
 
   function onBackdropPointerDown(e) {
@@ -579,7 +615,6 @@ export function renderLockPicking(panel, options = {}) {
     if (game.state.solved && !wasSolved) {
       wasSolved = true;
       vibrate([25, 45, 25, 45, 60]);
-      finish(true, "unlocked");
     }
     updateHud(game, els);
     fitCanvas(canvas, ctx);
@@ -617,6 +652,11 @@ export function renderLockPicking(panel, options = {}) {
     }
   });
   reset.addEventListener("click", resetGame);
+  open.addEventListener("click", () => {
+    if (!game.state.solved) return;
+    finish(true, "unlocked");
+    panel.style.display = "none";
+  });
 
   panel.addEventListener("pointerdown", onBackdropPointerDown);
 

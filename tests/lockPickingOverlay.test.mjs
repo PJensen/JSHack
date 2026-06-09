@@ -1,8 +1,10 @@
 import { assert, assertAlmostEquals, assertEquals } from "jsr:@std/assert";
 
 import {
+  createLockPickingResult,
   LockPickingMiniGame,
   normalizeLockDifficulty,
+  notifyLockPickingResult,
   resolvePolarLockInput,
 } from "../src/display/ui/lockPickingOverlay.js";
 
@@ -38,4 +40,62 @@ Deno.test("lock picking polar drag maps direction to angle and radius to force",
   assertEquals(down.active, true);
   assertAlmostEquals(down.angle, Math.PI / 2);
   assertAlmostEquals(down.force, 0.5);
+});
+
+Deno.test("lock picking result notifies finished and success listeners", () => {
+  const game = new LockPickingMiniGame(4, "easy");
+  const calls = [];
+  const result = createLockPickingResult(game, true, "unlocked");
+
+  notifyLockPickingResult({
+    finishedPickedListener(detail) {
+      calls.push(["finished", detail]);
+    },
+    successPickedListener(detail) {
+      calls.push(["success", detail]);
+    },
+    failedPickedListener(detail) {
+      calls.push(["failed", detail]);
+    },
+  }, result);
+
+  assertEquals(calls, [
+    ["finished", result],
+    ["success", result],
+  ]);
+  assertEquals(result, {
+    success: true,
+    reason: "unlocked",
+    pins: 4,
+    difficulty: "easy",
+  });
+});
+
+Deno.test("lock picking result notifies finished and failure listeners", () => {
+  const game = new LockPickingMiniGame(5, "hard");
+  const calls = [];
+  const result = createLockPickingResult(game, false, "cancelled");
+
+  notifyLockPickingResult({
+    finishedPickedListener(detail) {
+      calls.push(["finished", detail]);
+    },
+    successPickedListener(detail) {
+      calls.push(["success", detail]);
+    },
+    failedPickedListener(detail) {
+      calls.push(["failed", detail]);
+    },
+  }, result);
+
+  assertEquals(calls, [
+    ["finished", result],
+    ["failed", result],
+  ]);
+  assertEquals(result, {
+    success: false,
+    reason: "cancelled",
+    pins: 5,
+    difficulty: "hard",
+  });
 });
