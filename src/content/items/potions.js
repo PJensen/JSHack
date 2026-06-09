@@ -18,20 +18,33 @@ import { createStatusEvent } from '../../shared/events/statusEvent.js';
 import { getPassiveBonuses } from '../../rules/utils/passiveBonuses.js';
 import { attachDerivedExpression, exprAddConst } from '../../rules/utils/statProcAuthoring.js';
 
+function stateActorId(ctx, state) {
+  return Number(state?.actor || ctx.actor || 0) | 0;
+}
+
+function stateItemId(ctx, state) {
+  return Number(state?.itemId || ctx.primary || 0) | 0;
+}
+
+function destroyIfPresent(world, entityId) {
+  if (!(entityId > 0)) return;
+  try {
+    world.destroy(entityId);
+  } catch {}
+}
+
 function cleanupPriorExprEntity(ctx, targetId, effectKey) {
   const ae = ctx.query.get(targetId, ActiveEffects);
   if (!ae || !Array.isArray(ae.effects)) return;
   for (const e of ae.effects) {
     if (e?.key !== effectKey) continue;
     const exprId = e?.meta?.exprEntityId;
-    if (typeof exprId === 'number' && exprId > 0) {
-      try { ctx.world.destroy(exprId); } catch {}
-    }
+    if (typeof exprId === 'number') destroyIfPresent(ctx.world, exprId);
   }
 }
 
 function throwLandingPoint(ctx, state) {
-  const actorId = Number(state?.actor || ctx.actor || 0) | 0;
+  const actorId = stateActorId(ctx, state);
   const throwSpec = (state?.throw && typeof state.throw === 'object') ? state.throw : null;
   const fallback = ctx.helpers.adjacentPoint(actorId);
   return {
@@ -448,11 +461,9 @@ defineItem('potion_blindness', {
       return { applied: true, consumedTool: true, resultType: 'blindness_coat' };
     },
     on_throw: (ctx, state) => {
-      const actorId = Number(state?.actor || ctx.actor || 0) | 0;
-      const itemId = Number(state?.itemId || ctx.primary || 0) | 0;
-      const throwSpec = (state?.throw && typeof state.throw === 'object') ? state.throw : null;
-      const fallback = ctx.helpers.adjacentPoint(actorId);
-      const at = { x: Number.isFinite(Number(throwSpec?.to?.x)) ? (Number(throwSpec.to.x) | 0) : (fallback.x | 0), y: Number.isFinite(Number(throwSpec?.to?.y)) ? (Number(throwSpec.to.y) | 0) : (fallback.y | 0) };
+      const actorId = stateActorId(ctx, state);
+      const itemId = stateItemId(ctx, state);
+      const at = throwLandingPoint(ctx, state);
       const hitIds = ctx.query.livingAt(at.x, at.y, {});
       for (const hitId of (Array.isArray(hitIds) ? hitIds : [])) {
         const duration = 10;
@@ -692,11 +703,10 @@ defineItem('potion_oil', {
       return { consumed: true };
     },
     on_throw: (ctx, state) => {
-      const actorId = Number(state?.actor || ctx.actor || 0) | 0;
-      const itemId = Number(state?.itemId || ctx.primary || 0) | 0;
+      const actorId = stateActorId(ctx, state);
+      const itemId = stateItemId(ctx, state);
       const throwSpec = (state?.throw && typeof state.throw === 'object') ? state.throw : null;
-      const fallback = ctx.helpers.adjacentPoint(actorId);
-      const at = { x: Number.isFinite(Number(throwSpec?.to?.x)) ? (Number(throwSpec.to.x) | 0) : (fallback.x | 0), y: Number.isFinite(Number(throwSpec?.to?.y)) ? (Number(throwSpec.to.y) | 0) : (fallback.y | 0) };
+      const at = throwLandingPoint(ctx, state);
       ctx.helpers.hazardSpawn({ kind: 'fire', medium: 'floor', turnsLeft: 4, radius: 1, tickDamage: 3, damageType: 'fire', cause: 'oil_splash', sourceId: actorId, sourceKind: 'potion_oil', identity: 'oil_fire', name: 'Oil Fire', meta: { source: 'potion_oil', delivery: 'thrown' } }, at);
       const fromRaw = throwSpec?.from;
       const from = fromRaw ? { x: Number(fromRaw.x) | 0, y: Number(fromRaw.y) | 0 } : null;
