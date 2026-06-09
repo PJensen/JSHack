@@ -1,0 +1,38 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "b31b03487955",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "src/content/items/economy.js",
+    "src/display/ui/wiring/messages/environmentMessages.js",
+    "src/events/LockpickPrompted.js",
+    "src/events/LockpickResolved.js",
+    "src/main.js",
+    "src/main/input/rulesDispatch.js",
+    "src/main/wiring/lockPickingWiring.js",
+    "src/rules/content/interaction/interactPayloads.js",
+    "src/rules/data/classes.js",
+    "src/rules/utils/inventoryFacade.js",
+    "tests/classes.test.mjs",
+    "tests/interaction.test.mjs",
+    "tests/inventoryFacade.test.mjs",
+    "tests/messageWiring.test.mjs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/b3/1b03487955/0/metadata.json",
+      "transcript": "/b3/1b03487955/0/full.jsonl",
+      "content_hash": "/b3/1b03487955/0/content_hash.txt",
+      "prompt": "/b3/1b03487955/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 445688,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 7053184,
+    "output_tokens": 21958,
+    "api_call_count": 54
+  }
+}
