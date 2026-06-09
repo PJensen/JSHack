@@ -1,0 +1,29 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "2d4b028d17da",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "src/display/ui/lockPickingOverlay.js",
+    "src/display/ui/overlay.js",
+    "src/main/debug/consoleCommands.js",
+    "tests/consoleCommands.test.mjs",
+    "tests/lockPickingOverlay.test.mjs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/2d/4b028d17da/0/metadata.json",
+      "transcript": "/2d/4b028d17da/0/full.jsonl",
+      "content_hash": "/2d/4b028d17da/0/content_hash.txt",
+      "prompt": "/2d/4b028d17da/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 237451,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1453056,
+    "output_tokens": 14725,
+    "api_call_count": 24
+  }
+}
