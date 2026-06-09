@@ -3,7 +3,7 @@
   "checkpoint_id": "b62310e8dfb6",
   "strategy": "manual-commit",
   "branch": "master",
-  "checkpoints_count": 2,
+  "checkpoints_count": 3,
   "files_touched": [
     "src/content/items/potions.js"
   ],
@@ -13,13 +13,19 @@
       "transcript": "/b6/2310e8dfb6/0/full.jsonl",
       "content_hash": "/b6/2310e8dfb6/0/content_hash.txt",
       "prompt": "/b6/2310e8dfb6/0/prompt.txt"
+    },
+    {
+      "metadata": "/b6/2310e8dfb6/1/metadata.json",
+      "transcript": "/b6/2310e8dfb6/1/full.jsonl",
+      "content_hash": "/b6/2310e8dfb6/1/content_hash.txt",
+      "prompt": "/b6/2310e8dfb6/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 902410,
+    "input_tokens": 981878,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 10442368,
-    "output_tokens": 34532,
-    "api_call_count": 80
+    "cache_read_tokens": 10688512,
+    "output_tokens": 37395,
+    "api_call_count": 89
   }
 }
