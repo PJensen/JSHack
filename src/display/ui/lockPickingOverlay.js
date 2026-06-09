@@ -455,6 +455,14 @@ function updatePickFromPointer(game, canvas, e) {
   game.state.pickActive = input.active;
 }
 
+function isLockCenterPointer(canvas, e) {
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left - rect.width / 2;
+  const y = e.clientY - rect.top - rect.height / 2 - 4;
+  const radius = Math.min(rect.width, rect.height) * 0.34;
+  return Math.hypot(x, y) <= radius * 0.38;
+}
+
 export function renderLockPicking(panel, options = {}) {
   if (typeof panel._lockPickingCleanup === "function") panel._lockPickingCleanup();
 
@@ -632,6 +640,11 @@ export function renderLockPicking(panel, options = {}) {
   }
 
   canvas.addEventListener("pointerdown", (e) => {
+    if (game.state.solved && isLockCenterPointer(canvas, e)) {
+      finish(true, "unlocked");
+      panel.style.display = "none";
+      return;
+    }
     pickPointer = e.pointerId;
     canvas.setPointerCapture?.(e.pointerId);
     updatePickFromPointer(game, canvas, e);

@@ -7,6 +7,8 @@ import { Inventory } from "../components/Inventory.js";
 import { RoomMetadata } from "../components/RoomMetadata.js";
 import { ShopInventory } from "../components/ShopInventory.js";
 import { MoveIntent } from "../components/Intents/MoveIntent.js";
+import { perceiveEntity } from "../utils/perception.js";
+import { buildBlocksVisionMap, blockedCallback } from "../utils/vision.js";
 import { evaluateShopExitClaim, shopEnforcementLine } from "../utils/shopEnforcement.js";
 
 /**
@@ -29,6 +31,7 @@ export function shopkeeperSystem(world) {
   }
 
   if (shops.length === 0) return;
+  const isBlocked = blockedCallback(buildBlocksVisionMap(world));
 
   // Check player movement relative to shops
   for (const [playerId, player, pos, inv] of world.query(Player, Position, Inventory)) {
@@ -42,6 +45,8 @@ export function shopkeeperSystem(world) {
 
     // Leaving a shop?
     if (currentlyInShop && !movingToShop) {
+      if (!perceiveEntity(world, currentlyInShop.shopkeeperId, playerId, { isBlocked })) continue;
+
       const decision = evaluateShopExitClaim(world, {
         actorId: playerId,
         shopkeeperId: currentlyInShop.shopkeeperId,
