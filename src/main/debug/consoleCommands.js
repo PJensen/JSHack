@@ -146,6 +146,19 @@ export function registerBuiltinCommands(console, { world, messageLog, lightingEn
     return `Healed to ${vit.hp}/${vit.maxHp}`;
   });
 
+  // ---- lockpick [pins] [difficulty] ----
+  console.registerCommand('lockpick', 'lockpick [pins] [difficulty] — open glyph lock picker overlay', (argsStr) => {
+    const parts = String(argsStr || '').split(/\s+/).filter(Boolean);
+    const pins = Number.parseInt(parts[0] || '5', 10);
+    const pinCount = Number.isFinite(pins) ? pins : 5;
+    const difficulty = parts[1] || 'normal';
+    if (typeof globalThis.window?.dispatchEvent !== 'function') return 'Lock picker UI is unavailable.';
+    globalThis.window.dispatchEvent(new CustomEvent('ui:openLockPicking', {
+      detail: { pinCount, difficulty },
+    }));
+    return `Opened lock picker (${pinCount} pins, ${difficulty}).`;
+  });
+
   // ---- tp <x> <y> ----
   console.registerCommand('tp', 'tp <x> <y> — teleport player to world coordinates', (argsStr) => {
     const parts = argsStr.split(/\s+/).filter(Boolean);

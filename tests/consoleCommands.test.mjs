@@ -90,3 +90,39 @@ Deno.test("sfx debug command toggles logging and appends formatted debug lines",
     setSfxDebugLogger(null);
   }
 });
+
+Deno.test("lockpick debug command opens overlay with injected constructor args", () => {
+  const commands = new Map();
+  const debugConsole = {
+    registerCommand(name, helpText, handler) {
+      commands.set(name, { helpText, handler });
+    },
+    log() {},
+  };
+  const originalWindow = globalThis.window;
+  const opened = [];
+  const target = new EventTarget();
+  target.addEventListener("ui:openLockPicking", (ev) => {
+    opened.push(ev.detail);
+  });
+  globalThis.window = target;
+
+  try {
+    registerBuiltinCommands(debugConsole, {
+      world: {},
+      messageLog: { log() {} },
+    });
+
+    const lockpick = commands.get("lockpick");
+    assert(lockpick, "expected lockpick command to be registered");
+    assertStringIncludes(lockpick.helpText, "lockpick [pins] [difficulty]");
+
+    assertEquals(
+      lockpick.handler("7 hard"),
+      "Opened lock picker (7 pins, hard).",
+    );
+    assertEquals(opened, [{ pinCount: 7, difficulty: "hard" }]);
+  } finally {
+    globalThis.window = originalWindow;
+  }
+});

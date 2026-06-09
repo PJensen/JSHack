@@ -9,6 +9,7 @@ import { renderAnvil } from './anvilOverlay.js';
 import { renderEnchantingBench } from './enchantingBenchOverlay.js';
 import { renderCookingFire } from './cookingFireOverlay.js';
 import { renderDialog } from './dialogOverlay.js';
+import { renderLockPicking } from './lockPickingOverlay.js';
 import { renderMonsterChooser } from './monsterChooserOverlay.js';
 import { playDeathJingle } from '../fx/deathJingle.js';
 import { readInputMode } from '../input/inputSettings.js';
@@ -57,6 +58,7 @@ export function initOverlays() {
   const alchemy = ensurePanel('alchemy');
   const cooking = ensurePanel('cooking');
   const dialog = ensurePanel('dialog');
+  const lockPicking = ensurePanel('lockPicking');
   const monsterChooser = ensurePanel('monsterChooser');
   const shop = ensurePanel('shop');
   const chest = ensurePanel('chest');
@@ -616,6 +618,7 @@ export function initOverlays() {
     hide(spells);
     hide(alchemy);
     hide(cooking);
+    hide(lockPicking);
     hide(monsterChooser);
     hide(shop);
     hide(chest);
@@ -649,6 +652,32 @@ export function initOverlays() {
   });
   window.addEventListener('ui:closeDialog', () => {
     hide(dialog);
+  });
+
+  window.addEventListener('ui:openLockPicking', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    hide(inv);
+    hide(char);
+    hide(equip);
+    hide(settingsPanel);
+    hide(pick);
+    hide(usePanel);
+    hide(throwPanel);
+    hide(spells);
+    hide(alchemy);
+    hide(cooking);
+    hide(dialog);
+    hide(lockPicking);
+    hide(shop);
+    hide(chest);
+    hide(rack);
+    hide(altar);
+    renderLockPicking(lockPicking, e?.detail || {});
+    show(lockPicking);
+  });
+  window.addEventListener('ui:closeLockPicking', () => {
+    hide(lockPicking);
   });
 
   window.addEventListener('ui:openMonsterChooser', (ev) => {
