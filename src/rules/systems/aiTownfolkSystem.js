@@ -722,6 +722,10 @@ function shopHasCustomer(world, actorId) {
   return _player != null && isInRoom(_player.pos.x, _player.pos.y, room);
 }
 
+function isShopHours(world) {
+  return getTownPhase(world.step) === "work";
+}
+
 export function installTownfolkDoorListener(world) {
   if (!world || world[TOWNFOLK_DOOR_INSTALLED]) return;
   world[TOWNFOLK_DOOR_INSTALLED] = true;
@@ -1564,7 +1568,7 @@ function getRoleWorkTarget(world, job) {
 }
 
 function getScheduleTarget(world, actorId, job) {
-  if (shopHasCustomer(world, actorId)) {
+  if (shopHasCustomer(world, actorId) && isShopHours(world)) {
     return { phase: "shop_customer", ...getRoleWorkTarget(world, job) };
   }
   const phase = getTownPhase(world.step);

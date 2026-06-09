@@ -6,6 +6,7 @@ import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";
 import { Position }       from "../src/rules/components/Position.js";
 import { Player }         from "../src/rules/components/Player.js";
+import { RoomMetadata }   from "../src/rules/components/RoomMetadata.js";
 import { NamedIdentity }  from "../src/rules/components/NamedIdentity.js";
 import { Faction }        from "../src/rules/components/Faction.js";
 import { Collider }       from "../src/rules/components/Collider.js";
@@ -112,6 +113,27 @@ function addTownfolk(world, x, y, role, opts = {}) {
     world.set(id, Equipment, { ...world.get(id, Equipment), weapon: hatchetId });
   }
   return id;
+}
+
+function addOwnedShopRoom(world, shopkeeperId, x = 0, y = 0, w = 4, h = 4) {
+  const room = world.create();
+  world.add(room, RoomMetadata, {
+    roomType: "shop",
+    x,
+    y,
+    w,
+    h,
+    shopkeeperId,
+  });
+  return room;
+}
+
+function setPlayerPosition(world, x, y) {
+  for (const [id] of world.query(Player)) {
+    world.set(id, Position, { x, y });
+    return id;
+  }
+  return 0;
 }
 
 function addBell(world, x, y) {
@@ -603,6 +625,56 @@ Deno.test("scheduled townfolk sleeps at home before dawn", () => {
   assertEquals(job.state, TOWNFOLK_STATES.sleeping);
   assertEquals(job.targetX, 7);
   assertEquals(job.targetY, 5);
+});
+
+Deno.test("shop customer pulls vendor to stall during shop hours", () => {
+  const world = makeWorld(2001);
+  world.step = 222; // work phase
+  setPlayerPosition(world, 1, 1);
+
+  const vendor = addTownfolk(world, 9, 9, "gem_vendor", {
+    scheduleEnabled: true,
+    homeX: 9, homeY: 9,
+    bedX: 9, bedY: 9,
+    workX: 2, workY: 2,
+    workAuxX: 3, workAuxY: 2,
+    pubX: 8, pubY: 8,
+  });
+  addOwnedShopRoom(world, vendor, 0, 0, 4, 4);
+
+  aiTownfolkSystem(world);
+
+  const job = world.get(vendor, TownfolkJob);
+  assertEquals(job.lastPhase, "shop_customer");
+  assertEquals(job.routineKind, "tend_stall");
+  assertEquals(job.targetX, 2);
+  assertEquals(job.targetY, 2);
+  assertEquals(job.state, TOWNFOLK_STATES.walking);
+});
+
+Deno.test("shop customer does not pull vendor to stall outside shop hours", () => {
+  const world = makeWorld(2002);
+  world.step = 0; // sleep phase
+  setPlayerPosition(world, 1, 1);
+
+  const vendor = addTownfolk(world, 9, 9, "gem_vendor", {
+    scheduleEnabled: true,
+    homeX: 9, homeY: 9,
+    bedX: 9, bedY: 9,
+    workX: 2, workY: 2,
+    workAuxX: 3, workAuxY: 2,
+    pubX: 8, pubY: 8,
+  });
+  addOwnedShopRoom(world, vendor, 0, 0, 4, 4);
+
+  aiTownfolkSystem(world);
+
+  const job = world.get(vendor, TownfolkJob);
+  assertEquals(job.lastPhase, "sleep");
+  assertEquals(job.routineKind, "sleep");
+  assertEquals(job.targetX, 9);
+  assertEquals(job.targetY, 9);
+  assertEquals(job.state, TOWNFOLK_STATES.sleeping);
 });
 
 Deno.test("scheduled farmer alternates between field and mill during work hours", () => {

@@ -8,6 +8,7 @@ import { Player } from "../src/rules/components/Player.js";
 import { Position } from "../src/rules/components/Position.js";
 import { RoomMetadata } from "../src/rules/components/RoomMetadata.js";
 import { Unpaid } from "../src/rules/components/Unpaid.js";
+import { Brain } from "../src/rules/components/Brain.js";
 import { DrinkIntent } from "../src/rules/components/Intents/DrinkIntent.js";
 import { MoveIntent } from "../src/rules/components/Intents/MoveIntent.js";
 import { ThrowIntent } from "../src/rules/components/Intents/ThrowIntent.js";
@@ -25,6 +26,8 @@ import {
 } from "../src/rules/utils/shopLaw.js";
 
 function addShop(world, shopkeeperId) {
+  world.add(shopkeeperId, Position, { x: 1, y: 2 });
+  world.add(shopkeeperId, Brain, { visionRange: 8, intelligence: 10 });
   const roomId = world.create();
   world.add(roomId, RoomMetadata, {
     roomType: "shop",
