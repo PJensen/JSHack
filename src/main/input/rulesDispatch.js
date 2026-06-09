@@ -520,6 +520,18 @@ export function makeRulesDispatcher(world, getActorId, opts = {}) {
         world?.tick?.(1);
         break;
       }
+      case "rules.lockpickDoorResult": {
+        const { targetId = 0, success = false, reason = "" } = action.payload || {};
+        if (!Number.isInteger(targetId) || targetId <= 0) break;
+        world?.add?.(actorId, InteractIntent, {
+          targetId,
+          mode: "lockpickResult",
+          success: success === true,
+          reason: String(reason || ""),
+        });
+        world?.tick?.(1);
+        break;
+      }
       case "rules.quickInteract": {
         const actorPos = world?.get?.(actorId, Position);
         if (!actorPos) break;

@@ -10,6 +10,13 @@ defineItem('stone_touchstone', {
   hooks: { can_dip_target: canTouchstoneDipTarget, on_dip: createTouchstoneDipHook() },
 });
 
+defineItem('lockpick', {
+  name: 'Lockpick', type: 'tool', material: 'iron', rarity: 'common', value: 8, weight: 0.05,
+  glyph: '¬', color: '#c8c0a8', glow: '#7f765f', scale: 0.62,
+  description: 'A narrow pick for working simple locks. It bends out of shape after one attempt.',
+  tags: ['tool', 'lockpick', 'consumable'],
+});
+
 defineItem('relic_ember_censer', {
   name: 'Ember Censer', type: 'tool', material: 'metal', rarity: 'artifact', value: 420, weight: 6,
   description: 'A soot-black censer that never stops breathing warm ash. Town elders want it back, intact.',

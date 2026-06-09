@@ -176,5 +176,6 @@ Deno.test("all classes start with baseline utility consumables", () => {
     assert((byId.get("scroll_identify") || 0) >= 4, `${classId} should start with at least 4 scroll_identify`);
     assert((byId.get("potion_health") || 0) >= 2, `${classId} should start with at least 2 potion_health`);
     assert((byId.get("potion_mana") || 0) >= 3, `${classId} should start with at least 3 potion_mana`);
+    assert((byId.get("lockpick") || 0) >= 5, `${classId} should start with at least 5 lockpick`);
   }
 });

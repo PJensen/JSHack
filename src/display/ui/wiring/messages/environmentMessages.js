@@ -195,6 +195,7 @@ export function installEnvironmentMessages(ctx) {
         if (_playerHas('blinded')) log('You push the door shut. It clicks. Probably.', 'system');
         else log('The door swings shut with a thud.', 'system');
       }
+      else if (result === 'need_lockpick') log('You need a lockpick.', 'system');
       else log('The door is locked. It doesn\u2019t budge.', 'system');
     }
     if (action === 'toggleLantern') log(result === 'lit' ? 'You strike the lantern. Warm light spills out.' : 'You snuff the lantern. Darkness closes in.', 'system');

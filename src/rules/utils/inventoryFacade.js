@@ -450,6 +450,13 @@ export function getStackCount(world, ownerId, identity) {
 }
 
 /**
+ * Return true when the owner carries at least one item with the raw identity.
+ */
+export function hasItem(world, ownerId, identity) {
+  return getStackCount(world, ownerId, identity) > 0;
+}
+
+/**
  * Consume up to `count` units across all entities matching a raw identity.
  *
  * Returns detached entity ids representing the consumed units.

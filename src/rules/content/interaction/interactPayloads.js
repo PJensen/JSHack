@@ -19,6 +19,7 @@ import {
   addToInventory,
   consumeFromStack,
   getStackCount,
+  hasItem,
   hasCapacity,
   inventoryContains,
   inventoryItems,
@@ -79,7 +80,7 @@ import {
 import { cookAtFire, emitCookingFireOpen } from "../cooking/cookingGame.js";
 import { emitAnvilOpen, forgeAtAnvil } from "../smithing/anvilGame.js";
 import { createItemById } from "../../utils/itemFactory.js";
-import { actorHasDoorKey, setDoorState } from "../../utils/doorAccess.js";
+import { actorHasDoorKey, getDoorLockId, setDoorState } from "../../utils/doorAccess.js";
 import { effectiveMaxHp, effectiveMaxMana, effectiveMaxStamina } from "../../utils/passiveBonuses.js";
 import { buildNoticeBoardPayload } from "../../quests/localGenerator.js";
 import { GroundStackOrder } from "../../components/GroundStackOrder.js";
@@ -99,6 +100,8 @@ import {
   applyWaterExposure,
 } from "../../utils/waterExposure.js";
 import { shopDispositionTerms } from "../../utils/disposition.js";
+import { LockpickPrompted } from "../../../events/LockpickPrompted.js";
+import { LockpickResolved } from "../../../events/LockpickResolved.js";
 
 // Maps catalog item IDs → archetypes for harvest yield entity creation.
 const CATALOG_ARCHETYPES = {
@@ -146,6 +149,13 @@ const FOUNTAIN_MIN_CHARGES = 2;
 const FOUNTAIN_MAX_CHARGES = 4;
 const FOUNTAIN_COOLDOWN_MIN = 201;
 const FOUNTAIN_COOLDOWN_MAX = 259;
+const LOCKPICK_ITEM_ID = "lockpick";
+const GEM_VENDOR_LOCK_ID_PART = "gem_vendor";
+
+function isLockpickableDoor(world, doorId) {
+  return getDoorLockId(world, doorId).includes(GEM_VENDOR_LOCK_ID_PART);
+}
+
 function deriveFountainCooldownTurns(world, targetId, params) {
   const explicit = Number(params?.cooldownTurns);
   if (Number.isFinite(explicit) && explicit > 0) return explicit | 0;
@@ -653,7 +663,58 @@ export const INTERACT_PAYLOADS = {
     beforeInteract(ctx) {
       const { world, actor, targetId } = ctx;
       const ds = world.get(targetId, DoorState);
+      if (String(ctx.intent?.mode || "") === "lockpickResult") {
+        const consumed = consumeIdentityUnits(world, actor, LOCKPICK_ITEM_ID, 1) ? 1 : 0;
+        const success = ctx.intent?.success === true;
+        if (success && consumed > 0 && ds?.locked && isLockpickableDoor(world, targetId)) {
+          setDoorState(world, targetId, { open: true, locked: false }, actor);
+          world.emit?.(new LockpickResolved({
+            actor,
+            targetId,
+            success: true,
+            reason: "unlocked",
+            consumed,
+          }));
+          ctx.cancel("LOCKPICK_SUCCESS", "The lock opens.");
+          return;
+        }
+        world.emit?.(new LockpickResolved({
+          actor,
+          targetId,
+          success: false,
+          reason: consumed > 0 ? String(ctx.intent?.reason || "failed") : "no_lockpick",
+          consumed,
+        }));
+        world.emit?.("interaction", {
+          actor,
+          targetId,
+          action: "toggleDoor",
+          result: "locked",
+        });
+        ctx.cancel(consumed > 0 ? "LOCKPICK_FAILED" : "NO_LOCKPICK", "The lock resists.");
+        return;
+      }
       if (ds?.locked && !actorHasDoorKey(world, actor, targetId)) {
+        if (isLockpickableDoor(world, targetId)) {
+          if (!hasItem(world, actor, LOCKPICK_ITEM_ID)) {
+            world.emit?.("interaction", {
+              actor,
+              targetId,
+              action: "toggleDoor",
+              result: "need_lockpick",
+            });
+            ctx.cancel("NO_LOCKPICK", "You need a lockpick.");
+            return;
+          }
+          world.emit?.(new LockpickPrompted({
+            actor,
+            targetId,
+            pins: 4,
+            difficulty: "easy",
+          }));
+          ctx.cancel("LOCKPICK_PROMPT", "The lock can be picked.");
+          return;
+        }
         world.emit?.("interaction", {
           actor,
           targetId,

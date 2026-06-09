@@ -18,6 +18,7 @@ import {
   getOrCreateInventoryRoot,
   getStackCount,
   getStackView,
+  hasItem,
   hasCapacity,
   hasCapacityForItem,
   inventoryContains,
@@ -244,6 +245,8 @@ Deno.test("facade: getStackCount aggregates raw identity totals", () => {
 
   assertEquals(getStackCount(world, owner, "gold"), 15);
   assertEquals(getStackCount(world, owner, "sword"), 0);
+  assertEquals(hasItem(world, owner, "gold"), true);
+  assertEquals(hasItem(world, owner, "sword"), false);
 });
 
 Deno.test("facade: capacity counts distinct compatible stacks", () => {

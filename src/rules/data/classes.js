@@ -27,6 +27,7 @@ export const CLASS_DEFS = {
       { itemId: 'hearthstone', count: 1 },
       { itemId: 'potion_health', count: 2 },
       { itemId: 'potion_mana', count: 3 },
+      { itemId: 'lockpick', count: 5 },
       { itemId: 'scroll_identify', count: 4 },
     ],
     startingSpells: [
@@ -60,6 +61,7 @@ export const CLASS_DEFS = {
       { itemId: 'hearthstone', count: 1 },
       { itemId: 'potion_health', count: 2 },
       { itemId: 'potion_mana', count: 3 },
+      { itemId: 'lockpick', count: 5 },
       { itemId: 'scroll_identify', count: 4 },
     ],
     startingSpells: [
@@ -98,6 +100,7 @@ export const CLASS_DEFS = {
       { itemId: 'potion_mana', count: 3 },
       { itemId: 'scroll_blastwave', count: 1 },
       { itemId: 'potion_poison', count: 2 },
+      { itemId: 'lockpick', count: 5 },
       { itemId: 'scroll_identify', count: 4 },
       { itemId: 'ammo_arrows', count: 1 },
       { itemId: 'ammo_blunt_arrows', count: 1 },
@@ -137,6 +140,7 @@ export const CLASS_DEFS = {
       { itemId: 'potion_mana', count: 3 },
       { itemId: 'stone_touchstone', count: 1 },
       { itemId: 'potion_anti_venom', count: 2 },
+      { itemId: 'lockpick', count: 5 },
       { itemId: 'scroll_identify', count: 4 },
     ],
     startingSpells: [],
@@ -168,6 +172,7 @@ export const CLASS_DEFS = {
       { itemId: 'hearthstone', count: 1 },
       { itemId: 'potion_health', count: 2 },
       { itemId: 'potion_mana', count: 3 },
+      { itemId: 'lockpick', count: 5 },
       { itemId: 'scroll_identify', count: 4 },
     ],
     startingSpells: [
@@ -202,6 +207,7 @@ export const CLASS_DEFS = {
       { itemId: 'hearthstone', count: 1 },
       { itemId: 'potion_health', count: 2 },
       { itemId: 'potion_mana', count: 3 },
+      { itemId: 'lockpick', count: 5 },
       { itemId: 'scroll_identify', count: 4 },
     ],
     startingSpells: [
@@ -236,6 +242,7 @@ export const CLASS_DEFS = {
       { itemId: 'potion_health', count: 2 },
       { itemId: 'potion_mana', count: 3 },
       { itemId: 'potion_anti_venom', count: 2 },
+      { itemId: 'lockpick', count: 5 },
       { itemId: 'scroll_identify', count: 4 },
     ],
     startingSpells: [
@@ -270,6 +277,7 @@ export const CLASS_DEFS = {
       { itemId: 'hearthstone', count: 1 },
       { itemId: 'potion_health', count: 2 },
       { itemId: 'potion_mana', count: 3 },
+      { itemId: 'lockpick', count: 5 },
       { itemId: 'scroll_identify', count: 4 },
     ],
     startingSpells: [],
@@ -301,6 +309,7 @@ export const CLASS_DEFS = {
       { itemId: 'potion_health', count: 2 },
       { itemId: 'potion_mana', count: 3 },
       { itemId: 'potion_holy_water', count: 1 },
+      { itemId: 'lockpick', count: 5 },
       { itemId: 'scroll_identify', count: 4 },
     ],
     startingSpells: [

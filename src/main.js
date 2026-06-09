@@ -79,6 +79,7 @@ import { installMessageWiring } from "./display/ui/wiring/messageWiring.js";
 import { installCombatLogTooltip } from "./display/ui/combatLogTooltip.js";
 import { installShopWiring } from "./main/wiring/shopWiring.js";
 import { installChestWiring } from "./main/wiring/chestWiring.js";
+import { installLockPickingWiring } from "./main/wiring/lockPickingWiring.js";
 import { installRackWiring } from "./main/wiring/rackWiring.js";
 import { installAlchemyWiring } from "./main/wiring/alchemyWiring.js";
 import { installAnvilWiring } from "./main/wiring/anvilWiring.js";
@@ -1855,6 +1856,7 @@ addEventListener('ui:requestDisarmTrap', (ev) => {
 
 const shopWiring = installShopWiring({ world, playerEntity, log: (msg) => messageLog.log({ text: msg, type: 'system' }), bracketizeName });
 installChestWiring({ world, playerEntity, log: (msg) => messageLog.log({ text: msg, type: 'system' }), bracketizeName });
+installLockPickingWiring({ world, playerEntity, log: (msg) => messageLog.log({ text: msg, type: 'system' }) });
 installRackWiring({ world, log: (msg) => messageLog.log({ text: msg, type: 'system' }) });
 installAlchemyWiring({
   world,

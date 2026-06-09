@@ -329,6 +329,28 @@ Deno.test("messageWiring always logs player door toggles even without visibility
   assert(messageLog.entries[0].text.includes("door"), "player door toggle should always be logged");
 });
 
+Deno.test("messageWiring logs missing lockpick door feedback", () => {
+  const world = new World({ seed: 42 });
+  const playerId = world.create();
+  world.add(playerId, Player, {});
+
+  const doorId = world.create();
+  world.add(doorId, Position, { x: 10, y: 10 });
+
+  const messageLog = createMessageLog();
+  installWithDeps(world, messageLog, playerId, { isVisibleAt: () => false });
+
+  world.emit("interaction", {
+    actor: playerId,
+    action: "toggleDoor",
+    result: "need_lockpick",
+    targetId: doorId,
+  });
+
+  assertEquals(messageLog.entries.length, 1);
+  assert(messageLog.entries[0].text.includes("lockpick"), "missing lockpick should be explicit");
+});
+
 Deno.test("messageWiring scopes spell:not-known text by actor", () => {
   const world = new World({ seed: 42 });
   const playerId = world.create();
