@@ -9,7 +9,7 @@ import { ShopInventory } from "../../rules/components/ShopInventory.js";
 import { Unpaid } from "../../rules/components/Unpaid.js";
 import {
   inventoryItems, inventoryContains, addToInventory,
-  removeFromInventory, hasCapacityForItem,
+  removeFromInventory, hasCapacityForItem, transferItem,
 } from "../../rules/utils/inventoryFacade.js";
 import { resolveItemDisplayName, buildItemDisplayData } from "./itemName.js";
 import { appraiseItemValue, getUnidentifiedGemAppraisal } from "../../rules/utils/shopAppraisal.js";
@@ -415,17 +415,17 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     const unpaid = world.get(itemId, Unpaid);
     if (!unpaid || unpaid.shopkeeperId !== sid) return;
 
-    removeFromInventory(world, pe.id, itemId);
-
+    if (!transferItem(world, itemId, pe.id, sid, { silent: true })) {
+      log("The shopkeeper cannot take that back right now.");
+      return;
+    }
     const eq = world.get(pe.id, Equipment);
     if (eq) {
       for (const slot of GEAR_SLOTS) {
         if (eq[slot] === itemId) { eq[slot] = null; break; }
       }
     }
-
-    placeItemOnShopFloor(itemId, sid);
-    log(`You return ${bracketizeName(resolveItemDisplayName(world, itemId))} to the shop floor.`);
+    log(`You return ${bracketizeName(resolveItemDisplayName(world, itemId))} to the shopkeeper.`);
 
     const shop = world.get(sid, ShopInventory);
     dispatchShopData(sid, shop?.buyMarkup ?? 1.0, shop?.sellDiscount ?? 0.5, "checkout");

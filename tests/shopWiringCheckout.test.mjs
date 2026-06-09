@@ -27,6 +27,7 @@ Deno.test("shop checkout return works while blocked at exit even when not adjace
 
   const shopkeeperId = world.create();
   world.add(shopkeeperId, Position, { x: 15, y: 15 });
+  world.add(shopkeeperId, Inventory, { capacity: 20 });
   world.add(shopkeeperId, ShopInventory, { buyMarkup: 1.3, sellDiscount: 0.5 });
 
   const itemId = world.create();
@@ -72,10 +73,8 @@ Deno.test("shop checkout return works while blocked at exit even when not adjace
     }));
 
     assert(!inventoryContains(world, playerId, itemId), "item should be removed from player inventory");
-    const itemPos = world.get(itemId, Position);
-    assert(itemPos, "returned item should be placed on shop floor");
-    assertEquals(itemPos.x, 15);
-    assertEquals(itemPos.y, 15);
+    assert(inventoryContains(world, shopkeeperId, itemId), "returned item should move into shopkeeper inventory");
+    assert(!world.has(itemId, Position), "returned item should not remain stealable on the shop floor");
     assertEquals(closeEvents.length, 0, "checkout popup should remain open while returning item");
 
     const lastShopData = shopDataEvents.at(-1) || {};
