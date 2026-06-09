@@ -3,6 +3,8 @@
 // by opening this overlay and listening for ui:lockPickingFinished.
 
 const TAU = Math.PI * 2;
+const POLAR_DEADZONE = 0.18;
+const POLAR_OUTER_RING = 0.96;
 
 export const LOCK_PICKING_DIFFICULTIES = Object.freeze({
   easy: Object.freeze({
@@ -46,6 +48,19 @@ function normalizePinCount(pinCount) {
   const n = Number(pinCount);
   if (!Number.isFinite(n)) return 5;
   return clamp(n | 0, 2, 9);
+}
+
+export function resolvePolarLockInput(dx, dy, radius) {
+  const r = Math.max(1, Number(radius) || 1);
+  const distance = Math.hypot(dx, dy);
+  const inner = r * POLAR_DEADZONE;
+  const outer = r * POLAR_OUTER_RING;
+  const force = clamp((distance - inner) / Math.max(1, outer - inner), 0, 1);
+  return Object.freeze({
+    angle: Math.atan2(dy, dx),
+    force,
+    active: distance > inner,
+  });
 }
 
 export function normalizeLockDifficulty(difficulty) {
@@ -110,7 +125,7 @@ export class LockPickingMiniGame {
       jam: 0,
       flash: 0,
       shake: 0,
-      message: "Hold tension and sweep the pick.",
+      message: "Drag from the center. Direction aims the pick; distance sets force.",
       status: "find the first tooth",
     };
     this.reset();
@@ -140,7 +155,7 @@ export class LockPickingMiniGame {
     this.state.jam = 0;
     this.state.flash = 0;
     this.state.shake = 0;
-    this.state.message = "Hold tension with one thumb. Sweep the pick around the lock face with the other.";
+    this.state.message = "Drag from the center. Direction aims the pick; distance sets force.";
     this.state.status = "find the first tooth";
   }
 
@@ -210,7 +225,7 @@ export class LockPickingMiniGame {
         pin.grind += dt;
         s.jam += dt;
         s.shake = 90;
-        s.message = "Too much torque. Ease off.";
+        s.message = "Too much force. Ease off.";
         if (s.jam >= this.difficulty.jamHoldMs) {
           const lastSet = [...s.pins].reverse().find((p) => p.set);
           if (lastSet) lastSet.set = false;
@@ -260,8 +275,7 @@ function updateHud(game, els) {
   const set = game.setCount;
   els.count.textContent = `${set}/${total}`;
   els.progress.style.width = `${game.progress * 100}%`;
-  els.tensionFill.style.height = `${game.state.tension * 100}%`;
-  els.tensionNeedle.style.bottom = `${game.state.tension * 100}%`;
+  els.force.textContent = `force ${Math.round(game.state.tension * 100)}%`;
   els.status.textContent = game.state.status;
   els.toast.textContent = game.state.message;
 }
@@ -293,6 +307,19 @@ function drawLock(game, canvas, ctx) {
   ctx.beginPath();
   ctx.arc(0, 0, r * 1.04, 0, TAU);
   ctx.stroke();
+
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = "rgba(255,255,255,.10)";
+  ctx.beginPath();
+  ctx.arc(0, 0, r * POLAR_DEADZONE, 0, TAU);
+  ctx.stroke();
+
+  ctx.strokeStyle = "rgba(255,255,255,.08)";
+  ctx.setLineDash([4, 8]);
+  ctx.beginPath();
+  ctx.arc(0, 0, r * POLAR_OUTER_RING, 0, TAU);
+  ctx.stroke();
+  ctx.setLineDash([]);
 
   ctx.lineWidth = 7;
   ctx.strokeStyle = s.solved ? "rgba(84,224,154,.95)" : "rgba(119,180,214,.45)";
@@ -333,8 +360,9 @@ function drawLock(game, canvas, ctx) {
   }
 
   const a = s.shownPickAngle;
-  const px = Math.cos(a) * r * 0.98;
-  const py = Math.sin(a) * r * 0.98;
+  const pickLength = r * (POLAR_DEADZONE + (POLAR_OUTER_RING - POLAR_DEADZONE) * Math.max(0.08, s.tension));
+  const px = Math.cos(a) * pickLength;
+  const py = Math.sin(a) * pickLength;
   ctx.lineCap = "round";
   ctx.strokeStyle = s.pickActive ? "rgba(238,244,255,.92)" : "rgba(238,244,255,.38)";
   ctx.lineWidth = 5;
@@ -342,6 +370,13 @@ function drawLock(game, canvas, ctx) {
   ctx.moveTo(Math.cos(a) * r * 0.2, Math.sin(a) * r * 0.2);
   ctx.lineTo(px, py);
   ctx.stroke();
+
+  ctx.strokeStyle = s.pickActive ? "rgba(119,180,214,.28)" : "rgba(255,255,255,.09)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(0, 0, pickLength, a - 0.08, a + 0.08);
+  ctx.stroke();
+
   ctx.fillStyle = s.pickActive ? "rgba(238,244,255,.98)" : "rgba(238,244,255,.42)";
   ctx.beginPath();
   ctx.arc(px, py, 12, 0, TAU);
@@ -387,13 +422,11 @@ function updatePickFromPointer(game, canvas, e) {
   const rect = canvas.getBoundingClientRect();
   const x = e.clientX - rect.left - rect.width / 2;
   const y = e.clientY - rect.top - rect.height / 2 - 4;
-  game.state.pickAngle = Math.atan2(y, x);
-}
-
-function updateTensionFromPointer(game, pad, e) {
-  const rect = pad.getBoundingClientRect();
-  const y = clamp(e.clientY - rect.top, 0, rect.height);
-  game.state.tension = clamp(1 - y / rect.height, 0, 1);
+  const radius = Math.min(rect.width, rect.height) * 0.34;
+  const input = resolvePolarLockInput(x, y, radius);
+  game.state.pickAngle = input.angle;
+  game.state.tension = input.force;
+  game.state.pickActive = input.active;
 }
 
 export function renderLockPicking(panel, options = {}) {
@@ -473,53 +506,7 @@ export function renderLockPicking(panel, options = {}) {
   });
   const canvas = make("canvas", "");
   setStyles(canvas, { position: "absolute", inset: "0", width: "100%", height: "100%", touchAction: "none" });
-  const tension = make("div", "");
-  setStyles(tension, {
-    position: "absolute",
-    left: "14px",
-    top: "34px",
-    bottom: "34px",
-    width: "58px",
-    borderRadius: "999px",
-    background: "rgba(255,255,255,.055)",
-    border: "1px solid rgba(255,255,255,.16)",
-    overflow: "hidden",
-    touchAction: "none",
-  });
-  const tensionFill = make("div", "");
-  setStyles(tensionFill, {
-    position: "absolute",
-    left: "0",
-    right: "0",
-    bottom: "0",
-    height: "0%",
-    background: "linear-gradient(180deg, rgba(231,92,84,.95), rgba(226,180,82,.95), rgba(84,224,154,.95))",
-  });
-  const tensionNeedle = make("div", "");
-  setStyles(tensionNeedle, {
-    position: "absolute",
-    left: "8px",
-    right: "8px",
-    bottom: "0%",
-    height: "3px",
-    borderRadius: "99px",
-    background: "white",
-    boxShadow: "0 0 12px white",
-  });
-  const tensionLabel = make("div", "", "TORQ");
-  setStyles(tensionLabel, {
-    position: "absolute",
-    left: "0",
-    right: "0",
-    bottom: "11px",
-    textAlign: "center",
-    fontSize: "10px",
-    fontWeight: "900",
-    color: "rgba(255,255,255,.72)",
-    letterSpacing: ".12em",
-  });
-  tension.append(tensionFill, tensionNeedle, tensionLabel);
-  stage.append(canvas, tension);
+  stage.append(canvas);
   card.appendChild(stage);
 
   const bottom = make("div", "");
@@ -551,7 +538,8 @@ export function renderLockPicking(panel, options = {}) {
   });
   const status = make("span", "", game.state.status);
   const count = make("span", "", `0/${game.pinCount}`);
-  readout.append(status, count);
+  const force = make("span", "", "force 0%");
+  readout.append(status, force, count);
   const toast = make("div", "", game.state.message);
   setStyles(toast, { minHeight: "34px", fontSize: "12px", lineHeight: "1.35", color: "#eef4ff", opacity: ".9" });
   bottom.append(meter, readout, toast);
@@ -559,8 +547,7 @@ export function renderLockPicking(panel, options = {}) {
   inner.appendChild(card);
 
   const ctx = canvas.getContext("2d");
-  const els = { progress, tensionFill, tensionNeedle, status, count, toast };
-  let tensionPointer = null;
+  const els = { progress, force, status, count, toast };
   let pickPointer = null;
   let raf = 0;
   let lastTime = performance.now();
@@ -609,30 +596,9 @@ export function renderLockPicking(panel, options = {}) {
     drawLock(game, canvas, ctx);
   }
 
-  tension.addEventListener("pointerdown", (e) => {
-    tensionPointer = e.pointerId;
-    tension.setPointerCapture?.(e.pointerId);
-    updateTensionFromPointer(game, tension, e);
-  });
-  tension.addEventListener("pointermove", (e) => {
-    if (tensionPointer === e.pointerId) updateTensionFromPointer(game, tension, e);
-  });
-  tension.addEventListener("pointerup", (e) => {
-    if (tensionPointer === e.pointerId) {
-      tensionPointer = null;
-      game.state.tension = 0;
-    }
-  });
-  tension.addEventListener("pointercancel", (e) => {
-    if (tensionPointer === e.pointerId) {
-      tensionPointer = null;
-      game.state.tension = 0;
-    }
-  });
   canvas.addEventListener("pointerdown", (e) => {
     pickPointer = e.pointerId;
     canvas.setPointerCapture?.(e.pointerId);
-    game.state.pickActive = true;
     updatePickFromPointer(game, canvas, e);
   });
   canvas.addEventListener("pointermove", (e) => {
@@ -652,20 +618,10 @@ export function renderLockPicking(panel, options = {}) {
   });
   reset.addEventListener("click", resetGame);
 
-  function onKeyDown(e) {
-    if (panel.style.display !== "block") return;
-    if (e.key === "Escape") {
-      finish(false, "cancelled");
-      panel.style.display = "none";
-      e.preventDefault();
-    }
-  }
-  window.addEventListener("keydown", onKeyDown);
   panel.addEventListener("pointerdown", onBackdropPointerDown);
 
   function cleanup() {
     if (raf) cancelAnimationFrame(raf);
-    window.removeEventListener("keydown", onKeyDown);
     panel.removeEventListener("pointerdown", onBackdropPointerDown);
     window.removeEventListener("resize", onResize);
   }
