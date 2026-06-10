@@ -1,0 +1,48 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "ecd7bc9034e1",
+  "session_id": "019eb242-5594-7691-b6e2-ede38d689634",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-10T16:05:14.216867949Z",
+  "branch": "master",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "src/rules/utils/affixTopology.js",
+    "tests/enchantmentTopology.test.mjs"
+  ],
+  "agent": "Codex",
+  "model": "gpt-5.5",
+  "turn_id": "61b6894e4caa",
+  "token_usage": {
+    "input_tokens": 101346,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1147136,
+    "output_tokens": 9138,
+    "api_call_count": 18
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-10T16:05:14.19530014Z",
+    "agent_lines": 22,
+    "agent_removed": 1,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 22,
+    "total_lines_changed": 23,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 865,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".github/agents/Dungeon Generation and BSP Expert.agent.md": 582,
+        ".github/agents/VFX Agent.agent.md": 283
+      }
+    }
+  ]
+}
