@@ -1,6 +1,0 @@
-# Files mentioned by the user:
-
-## jshack-save-2026-06-10T13-44-13-197Z.json: /home/pjensen/Downloads/jshack-save-2026-06-10T13-44-13-197Z.json
-
-## My request for Codex:
-there must be more to the performance discussion. I've attached an exported world-state from the session that save severly degraded.
