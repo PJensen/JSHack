@@ -5,6 +5,7 @@
   "branch": "master",
   "checkpoints_count": 2,
   "files_touched": [
+    "VERSION",
     "src/rules/data/buildings/abandoned_camp.js",
     "src/rules/environment/dungeon/populate.js",
     "tests/overworldStructures.test.mjs",
