@@ -1,0 +1,17 @@
+only trouble I had is that the gem dealer appear to be either a workaholic or insomniac, he witnessed me both times from a distance, he didn't want to venture too far from his shoppe. there is a chance he doesn't have a bed elsewhere lol.
+
+but it was a cool test.
+
+I waked out, he saw me, he charged me, when I returned the item, it went to his tile instead of into his inventory. which gave me another oppertunity to steal which was funny.
+
+we should place returns into the shopkeepers inventory, i wonder he he can place it back on the shop floor after return it (and the other vendors) -- hmmm, this migh require a lot, [ShopItemLocation] or something more clever.
+
+hmmmmm..
+
+no east answers.
+
+---
+
+fine with item 1 -- please proeed.
+
+what about our ambitios shopkeeper ;-)
