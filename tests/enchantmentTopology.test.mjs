@@ -8,6 +8,7 @@ import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 import { ProcNode } from "../src/rules/components/ProcNode.js";
 import { ProcPackageNode } from "../src/rules/components/ProcPackageNode.js";
 import { Source } from "../src/rules/components/Source.js";
+import { ensureAffixTopology } from "../src/rules/utils/affixTopology.js";
 import { attachEnchantmentNode } from "../src/rules/utils/enchantmentTopology.js";
 import { descendantsWith, firstChildWith } from "../src/rules/utils/topology.js";
 
@@ -65,4 +66,20 @@ Deno.test("attachEnchantmentNode can attach proc package topology under enchantm
   assertEquals(packageNodes.length, 1);
   assertEquals(packageNodes[0][1].packageId, "graveCurrent");
   assert([...children(world, enchantment)].length > 0, "enchantment should own runtime children");
+});
+
+Deno.test("ensureAffixTopology replaces existing affix children without accumulating stale topology", () => {
+  const world = new World({ seed: 7303 });
+  const item = makeItem(world);
+  world.get(item, ItemInfo).affixes = ["stunning1", "firestorm1"];
+
+  for (let i = 0; i < 20; i++) ensureAffixTopology(world, item);
+
+  const affixes = [...children(world, item)]
+    .filter((childId) => world.get(childId, AffixTopologyNode))
+    .map((childId) => world.get(childId, AffixTopologyNode).affixId)
+    .sort();
+
+  assertEquals(affixes, ["firestorm1", "stunning1"]);
+  assert([...descendantsWith(world, item, ProcNode)].length > 0, "replacement topology should retain proc nodes");
 });

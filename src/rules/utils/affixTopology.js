@@ -10,9 +10,13 @@ import { evaluateProcNode, createProcAccumulator } from "./procEvaluator.js";
 import { addAttachedComponent, attachProcNode, gateEventKind } from "./statProcAuthoring.js";
 
 function destroyAffixChildren(world, itemId) {
+  const affixChildren = [];
   for (const childId of children(world, itemId)) {
     if (!world.get(childId, AffixTopologyNode)) continue;
-    destroySubtree(world, childId);
+    affixChildren.push(childId);
+  }
+  for (let i = 0; i < affixChildren.length; i++) {
+    destroySubtree(world, affixChildren[i]);
   }
 }
 
