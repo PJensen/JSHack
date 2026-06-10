@@ -54,3 +54,4 @@ src/main/wiring/shopWiring.js
 .codex.bak
 .codex
 .codex
+coverage.lcov
