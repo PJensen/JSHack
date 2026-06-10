@@ -19,7 +19,7 @@ import {
   WALK_INTERVAL_MIN, WALK_INTERVAL_MAX,
 } from '../input/inputSettings.js';
 import { versionLoaded } from '../../shared/version.js';
-
+import { SAVEGAME_KEY } from '../../shared/savegameKeys.js';
 
 // ---------------------------------------------------------------------------
 // Settings panel
@@ -44,168 +44,14 @@ export function renderSettings(panel, data, memGraph, dtyGraph, econGraph, tileI
   });
   markScrollable(content);
 
-  // --- Gameplay section ---
-  const gpHead = document.createElement('div');
-  gpHead.textContent = 'Gameplay';
-  Object.assign(gpHead.style, {
-    fontWeight: 'bold', fontSize: '13px', color: '#7fb8e8',
-    borderBottom: '1px solid #2d3b52', paddingBottom: '4px',
-  });
-  content.appendChild(gpHead);
-
-  content.appendChild(makeCheckbox('Identification', !!data.identificationEnabled, (on) => {
-    window.dispatchEvent(new CustomEvent('ui:setIdentification', { detail: { enabled: on } }));
-  }));
-
-  content.appendChild(makeCheckbox('FOV cone', !data.fovConeDisabled, (on) => {
-    window.dispatchEvent(new CustomEvent('ui:setFovConeDisabled', { detail: { disabled: !on } }));
-  }));
-
-  content.appendChild(makeCheckbox('Facing turn cost', !!data.facingTurnCostEnabled, (on) => {
-    window.dispatchEvent(new CustomEvent('ui:setFacingTurnCost', { detail: { enabled: on } }));
-  }));
-
-  // --- Input section ---
-  const inputHead = document.createElement('div');
-  inputHead.textContent = 'Input';
-  Object.assign(inputHead.style, {
-    fontWeight: 'bold', fontSize: '13px', color: '#7fb8e8',
-    borderBottom: '1px solid #2d3b52', paddingBottom: '4px', marginTop: '4px',
-  });
-  content.appendChild(inputHead);
-
-  // Radio: input scheme selection
-  const currentMode = readInputMode();
-  const modeRow = document.createElement('div');
-  Object.assign(modeRow.style, { display: 'flex', flexDirection: 'column', gap: '6px' });
-
-  function makeRadio(labelText, value, checked) {
-    const lbl = document.createElement('label');
-    Object.assign(lbl.style, {
-      display: 'flex', alignItems: 'center', gap: '8px',
-      cursor: 'pointer', fontSize: '13px', minHeight: '32px',
+  function makeSectionHead(label, marginTop = '4px') {
+    const head = document.createElement('div');
+    head.textContent = label;
+    Object.assign(head.style, {
+      fontWeight: 'bold', fontSize: '13px', color: '#7fb8e8',
+      borderBottom: '1px solid #2d3b52', paddingBottom: '4px', marginTop,
     });
-    const radio = document.createElement('input');
-    radio.type = 'radio';
-    radio.name = 'jshack-input-mode';
-    radio.value = value;
-    radio.checked = checked;
-    Object.assign(radio.style, { width: '16px', height: '16px', accentColor: '#5fb3ff', cursor: 'pointer' });
-    const txt = document.createElement('span');
-    txt.textContent = labelText;
-    lbl.appendChild(radio);
-    lbl.appendChild(txt);
-    radio.addEventListener('change', () => {
-      if (!radio.checked) return;
-      writeInputMode(/** @type {'walk'|'gesture'|'joystick'} */ (value));
-      window.dispatchEvent(new CustomEvent('ui:inputSettingsChanged', {
-        detail: { inputMode: value, walkInterval: readWalkInterval() },
-      }));
-      // Show/hide movement speed row.
-      speedRow.style.display = (value === 'walk' || value === 'joystick') ? 'flex' : 'none';
-    });
-    return lbl;
-  }
-
-  modeRow.appendChild(makeRadio('Tap and Hold', 'walk', currentMode === 'walk'));
-  modeRow.appendChild(makeRadio('Spell Gestures', 'gesture', currentMode === 'gesture'));
-  modeRow.appendChild(makeRadio('Joystick & Spell Gestures', 'joystick', currentMode === 'joystick'));
-  content.appendChild(modeRow);
-
-  // Trackbar: movement repeat interval (ms)
-  const speedRow = document.createElement('div');
-  Object.assign(speedRow.style, {
-    display: (currentMode === 'walk' || currentMode === 'joystick') ? 'flex' : 'none',
-    flexDirection: 'column',
-    alignItems: 'stretch',
-    gap: '6px',
-  });
-  const speedLabel = document.createElement('span');
-  speedLabel.textContent = 'Movement Speed';
-  Object.assign(speedLabel.style, { fontSize: '13px', color: '#aac8e8' });
-  speedRow.appendChild(speedLabel);
-
-  const sliderWrap = document.createElement('div');
-  Object.assign(sliderWrap.style, {
-    display: 'grid',
-    gridTemplateColumns: 'auto 1fr auto',
-    alignItems: 'center',
-    gap: '8px',
-  });
-
-  const minEl = document.createElement('span');
-  minEl.textContent = 'Slow';
-  Object.assign(minEl.style, { fontSize: '11px', color: '#6f8fb2', minWidth: '44px', textAlign: 'left' });
-
-  const speedSlider = document.createElement('input');
-  speedSlider.type = 'range';
-  speedSlider.min = '0';
-  speedSlider.max = String(WALK_INTERVAL_MAX - WALK_INTERVAL_MIN);
-  speedSlider.step = '1';
-  speedSlider.value = String(WALK_INTERVAL_MAX - readWalkInterval());
-  Object.assign(speedSlider.style, {
-    width: '100%',
-    minHeight: '34px',
-    accentColor: '#5fb3ff',
-  });
-
-  const maxEl = document.createElement('span');
-  maxEl.textContent = 'Fast';
-  Object.assign(maxEl.style, { fontSize: '11px', color: '#6f8fb2', minWidth: '50px', textAlign: 'right' });
-
-  sliderWrap.appendChild(minEl);
-  sliderWrap.appendChild(speedSlider);
-  sliderWrap.appendChild(maxEl);
-  speedRow.appendChild(sliderWrap);
-
-  function syncMovementSpeed(interval) {
-    const ms = Math.max(WALK_INTERVAL_MIN, Math.min(WALK_INTERVAL_MAX, Number(interval) | 0));
-    writeWalkInterval(ms);
-    window.dispatchEvent(new CustomEvent('ui:inputSettingsChanged', {
-      detail: { inputMode: readInputMode(), walkInterval: ms },
-    }));
-  }
-
-  speedSlider.addEventListener('input', () => {
-    const ms = WALK_INTERVAL_MAX - (Number(speedSlider.value) | 0);
-    syncMovementSpeed(ms);
-  });
-  speedSlider.addEventListener('change', () => {
-    const ms = WALK_INTERVAL_MAX - (Number(speedSlider.value) | 0);
-    syncMovementSpeed(ms);
-  });
-
-  content.appendChild(speedRow);
-
-  // --- Debugging section ---
-  const dbHead = document.createElement('div');
-  dbHead.textContent = 'Debugging';
-  Object.assign(dbHead.style, {
-    fontWeight: 'bold', fontSize: '13px', color: '#7fb8e8',
-    borderBottom: '1px solid #2d3b52', paddingBottom: '4px', marginTop: '4px',
-  });
-  content.appendChild(dbHead);
-
-  content.appendChild(makeCheckbox('Deity debugging', data.deityDebugPinned === true, (on) => {
-    window.dispatchEvent(new CustomEvent('ui:setDeityDebugPinned', { detail: { enabled: on } }));
-  }));
-
-  content.appendChild(makeCheckbox('Economy graph', econGraph.canvas.style.display === 'block', () => {
-    window.dispatchEvent(new CustomEvent('ui:toggleEconomyGraph'));
-  }));
-
-  content.appendChild(makeCheckbox('Memory visualizer', memGraph.canvas.style.display === 'block', () => {
-    window.dispatchEvent(new CustomEvent('ui:toggleMemoryGraph'));
-  }));
-
-  content.appendChild(makeCheckbox('Tile inspector', tileInsp.el.style.display === 'block', () => {
-    window.dispatchEvent(new CustomEvent('ui:toggleTileInspector'));
-  }));
-
-  if (lightPerfGraph) {
-    content.appendChild(makeCheckbox('Lighting perf', lightPerfGraph.canvas.style.display === 'block', () => {
-      window.dispatchEvent(new CustomEvent('ui:toggleLightingPerfGraph'));
-    }));
+    return head;
   }
 
   function makeAutocompleteActionRow({ ids, placeholder, buttonText, eventName, detailKey }) {
@@ -312,6 +158,153 @@ export function renderSettings(panel, data, memGraph, dtyGraph, econGraph, tileI
     detailKey: 'monsterId',
   }));
 
+  // --- Gameplay section ---
+  content.appendChild(makeSectionHead('Gameplay', '0'));
+
+  content.appendChild(makeCheckbox('Identification', !!data.identificationEnabled, (on) => {
+    window.dispatchEvent(new CustomEvent('ui:setIdentification', { detail: { enabled: on } }));
+  }));
+
+  content.appendChild(makeCheckbox('FOV cone', !data.fovConeDisabled, (on) => {
+    window.dispatchEvent(new CustomEvent('ui:setFovConeDisabled', { detail: { disabled: !on } }));
+  }));
+
+  content.appendChild(makeCheckbox('Facing turn cost', !!data.facingTurnCostEnabled, (on) => {
+    window.dispatchEvent(new CustomEvent('ui:setFacingTurnCost', { detail: { enabled: on } }));
+  }));
+
+  // --- Input section ---
+  const inputSection = document.createDocumentFragment();
+  inputSection.appendChild(makeSectionHead('Input'));
+
+  // Radio: input scheme selection
+  const currentMode = readInputMode();
+  const modeRow = document.createElement('div');
+  Object.assign(modeRow.style, { display: 'flex', flexDirection: 'column', gap: '6px' });
+
+  function makeRadio(labelText, value, checked) {
+    const lbl = document.createElement('label');
+    Object.assign(lbl.style, {
+      display: 'flex', alignItems: 'center', gap: '8px',
+      cursor: 'pointer', fontSize: '13px', minHeight: '32px',
+    });
+    const radio = document.createElement('input');
+    radio.type = 'radio';
+    radio.name = 'jshack-input-mode';
+    radio.value = value;
+    radio.checked = checked;
+    Object.assign(radio.style, { width: '16px', height: '16px', accentColor: '#5fb3ff', cursor: 'pointer' });
+    const txt = document.createElement('span');
+    txt.textContent = labelText;
+    lbl.appendChild(radio);
+    lbl.appendChild(txt);
+    radio.addEventListener('change', () => {
+      if (!radio.checked) return;
+      writeInputMode(/** @type {'walk'|'gesture'|'joystick'} */ (value));
+      window.dispatchEvent(new CustomEvent('ui:inputSettingsChanged', {
+        detail: { inputMode: value, walkInterval: readWalkInterval() },
+      }));
+      // Show/hide movement speed row.
+      speedRow.style.display = (value === 'walk' || value === 'joystick') ? 'flex' : 'none';
+    });
+    return lbl;
+  }
+
+  modeRow.appendChild(makeRadio('Tap and Hold', 'walk', currentMode === 'walk'));
+  modeRow.appendChild(makeRadio('Spell Gestures', 'gesture', currentMode === 'gesture'));
+  modeRow.appendChild(makeRadio('Joystick & Spell Gestures', 'joystick', currentMode === 'joystick'));
+  inputSection.appendChild(modeRow);
+
+  // Trackbar: movement repeat interval (ms)
+  const speedRow = document.createElement('div');
+  Object.assign(speedRow.style, {
+    display: (currentMode === 'walk' || currentMode === 'joystick') ? 'flex' : 'none',
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    gap: '6px',
+  });
+  const speedLabel = document.createElement('span');
+  speedLabel.textContent = 'Movement Speed';
+  Object.assign(speedLabel.style, { fontSize: '13px', color: '#aac8e8' });
+  speedRow.appendChild(speedLabel);
+
+  const sliderWrap = document.createElement('div');
+  Object.assign(sliderWrap.style, {
+    display: 'grid',
+    gridTemplateColumns: 'auto 1fr auto',
+    alignItems: 'center',
+    gap: '8px',
+  });
+
+  const minEl = document.createElement('span');
+  minEl.textContent = 'Slow';
+  Object.assign(minEl.style, { fontSize: '11px', color: '#6f8fb2', minWidth: '44px', textAlign: 'left' });
+
+  const speedSlider = document.createElement('input');
+  speedSlider.type = 'range';
+  speedSlider.min = '0';
+  speedSlider.max = String(WALK_INTERVAL_MAX - WALK_INTERVAL_MIN);
+  speedSlider.step = '1';
+  speedSlider.value = String(WALK_INTERVAL_MAX - readWalkInterval());
+  Object.assign(speedSlider.style, {
+    width: '100%',
+    minHeight: '34px',
+    accentColor: '#5fb3ff',
+  });
+
+  const maxEl = document.createElement('span');
+  maxEl.textContent = 'Fast';
+  Object.assign(maxEl.style, { fontSize: '11px', color: '#6f8fb2', minWidth: '50px', textAlign: 'right' });
+
+  sliderWrap.appendChild(minEl);
+  sliderWrap.appendChild(speedSlider);
+  sliderWrap.appendChild(maxEl);
+  speedRow.appendChild(sliderWrap);
+
+  function syncMovementSpeed(interval) {
+    const ms = Math.max(WALK_INTERVAL_MIN, Math.min(WALK_INTERVAL_MAX, Number(interval) | 0));
+    writeWalkInterval(ms);
+    window.dispatchEvent(new CustomEvent('ui:inputSettingsChanged', {
+      detail: { inputMode: readInputMode(), walkInterval: ms },
+    }));
+  }
+
+  speedSlider.addEventListener('input', () => {
+    const ms = WALK_INTERVAL_MAX - (Number(speedSlider.value) | 0);
+    syncMovementSpeed(ms);
+  });
+  speedSlider.addEventListener('change', () => {
+    const ms = WALK_INTERVAL_MAX - (Number(speedSlider.value) | 0);
+    syncMovementSpeed(ms);
+  });
+
+  inputSection.appendChild(speedRow);
+
+  // --- Debugging section ---
+  content.appendChild(makeSectionHead('Debugging'));
+
+  content.appendChild(makeCheckbox('Deity debugging', data.deityDebugPinned === true, (on) => {
+    window.dispatchEvent(new CustomEvent('ui:setDeityDebugPinned', { detail: { enabled: on } }));
+  }));
+
+  content.appendChild(makeCheckbox('Economy graph', econGraph.canvas.style.display === 'block', () => {
+    window.dispatchEvent(new CustomEvent('ui:toggleEconomyGraph'));
+  }));
+
+  content.appendChild(makeCheckbox('Memory visualizer', memGraph.canvas.style.display === 'block', () => {
+    window.dispatchEvent(new CustomEvent('ui:toggleMemoryGraph'));
+  }));
+
+  content.appendChild(makeCheckbox('Tile inspector', tileInsp.el.style.display === 'block', () => {
+    window.dispatchEvent(new CustomEvent('ui:toggleTileInspector'));
+  }));
+
+  if (lightPerfGraph) {
+    content.appendChild(makeCheckbox('Lighting perf', lightPerfGraph.canvas.style.display === 'block', () => {
+      window.dispatchEvent(new CustomEvent('ui:toggleLightingPerfGraph'));
+    }));
+  }
+
   // --- Resurrect pet button ---
   const petBtn = document.createElement('button');
   petBtn.textContent = 'Resurrect Pet';
@@ -329,6 +322,82 @@ export function renderSettings(panel, data, memGraph, dtyGraph, econGraph, tileI
     window.dispatchEvent(new CustomEvent('ui:requestSettingsData'));
   });
   content.appendChild(petBtn);
+
+  // --- Save data section ---
+  content.appendChild(makeSectionHead('Save Data'));
+
+  const saveRow = document.createElement('div');
+  Object.assign(saveRow.style, {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '8px',
+  });
+
+  function readSaveData() {
+    try { return localStorage.getItem(SAVEGAME_KEY) || ''; } catch { return ''; }
+  }
+
+  function clearStoredGameData() {
+    try {
+      const keys = [SAVEGAME_KEY];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('jshack:floor:')) keys.push(key);
+      }
+      for (const key of keys) localStorage.removeItem(key);
+    } catch {}
+  }
+
+  const exportBtn = document.createElement('button');
+  exportBtn.textContent = 'Export JSON';
+  decorateButton(exportBtn);
+  exportBtn.style.minHeight = '38px';
+  function downloadSaveData(raw, filename) {
+    const blob = new Blob([raw], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename || `jshack-save-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => { URL.revokeObjectURL(url); }, 0);
+  }
+  exportBtn.addEventListener('click', () => {
+    let exported = false;
+    const onExport = (ev) => {
+      const raw = String(ev?.detail?.json || '');
+      if (!raw) return;
+      exported = true;
+      downloadSaveData(raw, String(ev?.detail?.filename || ''));
+    };
+    window.addEventListener('ui:saveDataExport', onExport, { once: true });
+    window.dispatchEvent(new CustomEvent('ui:requestSaveDataExport'));
+    setTimeout(() => {
+      window.removeEventListener('ui:saveDataExport', onExport);
+      if (exported) return;
+      const raw = readSaveData();
+      if (raw) downloadSaveData(raw);
+    }, 0);
+  });
+  saveRow.appendChild(exportBtn);
+
+  const nukeBtn = document.createElement('button');
+  nukeBtn.textContent = 'Nuke Game';
+  decorateButton(nukeBtn);
+  nukeBtn.style.minHeight = '38px';
+  nukeBtn.style.borderColor = '#8f3f3f';
+  nukeBtn.style.color = '#ffd0d0';
+  nukeBtn.addEventListener('click', () => {
+    if (!confirm('Delete the saved game and reload?')) return;
+    clearStoredGameData();
+    location.reload();
+  });
+  saveRow.appendChild(nukeBtn);
+
+  content.appendChild(saveRow);
+
+  content.appendChild(inputSection);
 
   // --- Version + Subscribe row ---
   const versionRow = document.createElement('div');

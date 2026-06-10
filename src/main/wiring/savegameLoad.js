@@ -4,8 +4,8 @@ import { clearSpatialIndex } from "../../rules/utils/spatialIndex.js";
 import { invalidateTileQueryCache } from "../../rules/utils/tileQueryCache.js";
 import { normalizeInventorySnapshot } from "../../rules/utils/inventorySnapshotMigration.js";
 import { ensureCalendarState } from "../../rules/utils/calendarState.js";
-
-export const SAVEGAME_KEY = "jshack:savegame:v1";
+export { SAVEGAME_KEY } from "../../shared/savegameKeys.js";
+import { SAVEGAME_KEY } from "../../shared/savegameKeys.js";
 
 /**
  * @param {Storage | null | undefined} [storage]

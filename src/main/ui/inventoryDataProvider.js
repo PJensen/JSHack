@@ -2,13 +2,16 @@
 // addEventListener handlers that feed inventory, usable, throwable, apply,
 // message-log and death-log data to display overlays.
 
-import { playerEntity, itemsAt } from "../../rules/utils/queries.js";
+import { playerEntity, itemsAt, findNearestValidTileAround } from "../../rules/utils/queries.js";
+import { serializeWorld } from "../../lib/ecs-js/serialization.js";
 import { Inventory } from "../../rules/components/Inventory.js";
 import { inventoryItems } from "../../rules/utils/inventoryFacade.js";
 import { Equipment, GEAR_SLOTS, GEAR_SLOT_SET, getEquippedSlot } from "../../rules/components/Equipment.js";
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 import { Position } from "../../rules/components/Position.js";
+import { Faction } from "../../rules/components/Faction.js";
+import { Owner } from "../../rules/components/Owner.js";
 import { Unpaid } from "../../rules/components/Unpaid.js";
 import { Settings } from "../../rules/components/Settings.js";
 import { Vitality } from "../../rules/components/Vitality.js";
@@ -29,17 +32,20 @@ import { isApplyTool, listApplyTargetsForTool, resolveApplyPayloadForWorld } fro
 import { canonicalStatusKey } from "../../rules/utils/effectSemantics.js";
 import { resolveItemDisplayName, resolveAffixes, buildItemDisplayData as _buildItemDisplayData } from "../wiring/itemName.js";
 import { makeRulesDispatcher } from "../input/rulesDispatch.js";
-import { isIdentificationEnabled, setIdentificationEnabled } from "../../rules/data/identification.js";
+import { getIdentifiedSnapshot, isIdentificationEnabled, setIdentificationEnabled } from "../../rules/data/identification.js";
 import { createItemById, listAllItemIds } from "../../rules/utils/itemFactory.js";
 import { ScriptState } from "../../rules/components/ScriptState.js";
 import { getCatalogItem } from "../../rules/data/itemCatalog.js";
 import { addToInventory } from "../../rules/utils/inventoryFacade.js";
 import { listAllMonsterIds } from "../../rules/data/monsters.js";
 import { Pet } from "../../rules/components/Pet.js";
+import { PetState } from "../../rules/components/PetState.js";
 import { FOV_CONE_DISABLED_KEY, isFacingTurnCostEnabled, setFacingTurnCostEnabled } from "../../rules/utils/facing.js";
 import { getItemCooldown } from "../../rules/utils/itemCooldowns.js";
 import { groupDisplayItems } from "./itemGrouping.js";
 import { spawnDebugMonsterNearPlayer } from "../debug/spawnDebugMonster.js";
+import { getGemPricingSnapshot } from "../../rules/data/gemPricing.js";
+import { getSavegameRegistryNames } from "../wiring/savegameSerializationRegistry.js";
 import { isChestIdentity } from "../../shared/chests.js";
 import { getPassiveBonuses } from "../../rules/utils/passiveBonuses.js";
 import { QuestDefRef } from "../../rules/components/QuestDefRef.js";
@@ -773,14 +779,100 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
     }));
   });
 
-  addEventListener('ui:requestSettingsData', () => {
+  function stripCorpseName(value) {
+    return String(value || "Pet")
+      .replace(/^half-eaten\s+/i, "")
+      .replace(/^corpse of\s+/i, "")
+      .replace(/\s+corpse$/i, "")
+      .trim() || "Pet";
+  }
+
+  function isLivePetEntity(petId) {
+    if (world.has(petId, ItemInfo)) return false;
+    const vit = world.get(petId, Vitality);
+    return !!vit && (Number(vit.hp || 0) | 0) > 0 && world.has(petId, Position);
+  }
+
+  function findPetStatus() {
     let hasPet = false;
     let petAlive = false;
+    let petCorpseId = 0;
     for (const [petId] of world.query(Pet)) {
       hasPet = true;
-      petAlive = world.has(petId, Position);
-      break;
+      if (isLivePetEntity(petId)) {
+        petAlive = true;
+        break;
+      }
+      const info = world.get(petId, ItemInfo);
+      if (!petCorpseId && info && world.has(petId, Position)) petCorpseId = petId;
     }
+    return { hasPet, petAlive, petCorpseId };
+  }
+
+  function spawnResurrectedPetFromCorpse(corpseId, playerId, playerPos) {
+    const spawnPos = findNearestValidTileAround(world, playerPos, {
+      maxDistance: 1,
+      exclude: [{ x: playerPos.x | 0, y: playerPos.y | 0 }],
+    }) || { x: playerPos.x | 0, y: playerPos.y | 0 };
+    const ident = world.get(corpseId, NamedIdentity);
+    const petName = stripCorpseName(ident?.name || "Pet");
+    const petIdentity = String(ident?.identity || "")
+      .replace(/^corpse_/i, "")
+      .trim() || "pet";
+
+    try { world.destroy(corpseId); } catch {}
+
+    const petId = world.create();
+    world.add(petId, Pet);
+    world.add(petId, Position, { x: spawnPos.x | 0, y: spawnPos.y | 0 });
+    world.add(petId, NamedIdentity, { name: petName, identity: petIdentity });
+    world.add(petId, Faction, { key: "pet" });
+    world.add(petId, Owner, { ownerId: playerId });
+    world.add(petId, Inventory, { items: [], capacity: 1 });
+    world.add(petId, Settings, {
+      autoPickup: true,
+      autoPickupKinds: ["currency", "potion", "ammo", "scroll", "equip"],
+    });
+    world.add(petId, Vitality, { maxHp: 30, hp: 30 });
+    world.add(petId, Equipment, {
+      accuracyDerived: 2,
+      damagePowerDerived: 2,
+      evadeDerived: 2,
+    });
+    world.add(petId, PetState, {
+      state: "following",
+      targetX: null,
+      targetY: null,
+      targetItemId: 0,
+      stateEnteredTurn: world.step | 0,
+      lastPlayerX: playerPos.x | 0,
+      lastPlayerY: playerPos.y | 0,
+      commandCooldown: 0,
+      rangedCooldown: 0,
+    });
+    return petId;
+  }
+
+  function buildSaveDataExport() {
+    const registryNames = getSavegameRegistryNames(world);
+    return {
+      v: 1,
+      exportedAt: Date.now(),
+      reason: "settings_export",
+      world: serializeWorld(world, { note: "settings_export", include: registryNames }),
+      schema: { registry: registryNames },
+      identified: getIdentifiedSnapshot(),
+      gemPricing: getGemPricingSnapshot(),
+      app: {
+        activeSpellId: typeof getActiveSpellId === "function" ? (getActiveSpellId() || null) : null,
+        actionBarSlots: null,
+        pinnedSpellSlots: null,
+      },
+    };
+  }
+
+  addEventListener('ui:requestSettingsData', () => {
+    const { hasPet, petAlive } = findPetStatus();
     const p = playerEntity(world);
     const set = p ? world.get(p.id, Settings) : null;
     _uiEventTarget.dispatchEvent(new CustomEvent('ui:settingsData', {
@@ -796,6 +888,20 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
         petAlive,
       },
     }));
+  });
+
+  addEventListener('ui:requestSaveDataExport', () => {
+    try {
+      const payload = buildSaveDataExport();
+      _uiEventTarget.dispatchEvent(new CustomEvent('ui:saveDataExport', {
+        detail: {
+          json: JSON.stringify(payload, null, 2),
+          filename: `jshack-save-${new Date().toISOString().replace(/[:.]/g, '-')}.json`,
+        },
+      }));
+    } catch (e) {
+      console.warn("[settings] save export failed:", e);
+    }
   });
 
   addEventListener('ui:setIdentification', (ev) => {
@@ -866,15 +972,20 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
     if (!p) return;
     const pPos = world.get(p.id, Position);
     if (!pPos) return;
+    const status = findPetStatus();
+    if (status.petAlive) return;
+    if (status.petCorpseId > 0) {
+      const petId = spawnResurrectedPetFromCorpse(status.petCorpseId, p.id, pPos);
+      console.debug(`[settings] Resurrected pet ${petId}`);
+      return;
+    }
     for (const [petId] of world.query(Pet)) {
-      if (world.has(petId, Position)) continue; // already alive
+      if (world.has(petId, ItemInfo)) continue;
       const vit = world.get(petId, Vitality);
-      if (vit) {
-        vit.hp = vit.maxHp;
-      }
-      if (!world.has(petId, Position)) {
-        world.add(petId, Position, { x: pPos.x, y: pPos.y });
-      }
+      if (!vit) continue;
+      vit.hp = Math.max(1, Number(vit.maxHp || 1) | 0);
+      if (world.has(petId, Position)) world.set(petId, Position, { x: pPos.x, y: pPos.y });
+      else world.add(petId, Position, { x: pPos.x, y: pPos.y });
       console.debug(`[settings] Resurrected pet ${petId}`);
       break;
     }

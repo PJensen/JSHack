@@ -12,6 +12,10 @@ import { Brain } from "../src/rules/components/Brain.js";
 import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
 import { Status } from "../src/rules/components/Status.js";
 import { CalendarState } from "../src/rules/components/CalendarState.js";
+import { Vitality } from "../src/rules/components/Vitality.js";
+import { Owner } from "../src/rules/components/Owner.js";
+import { Pet } from "../src/rules/components/Pet.js";
+import { PetState } from "../src/rules/components/PetState.js";
 import { getCalendarDate, TURNS_PER_DAY } from "../src/rules/data/calendar.js";
 import { addToInventory } from "../src/rules/utils/inventoryFacade.js";
 import { clearAll, loadChunk } from "../src/rules/environment/dungeon/tileMap.js";
@@ -357,6 +361,102 @@ Deno.test("settings data exposes monster ids for spawn autocomplete", () => {
   const monsterIds = Array.isArray(payload?.allMonsterIds) ? payload.allMonsterIds : [];
   assert(monsterIds.includes("goblin"), "settings autocomplete should include goblin");
   assert(monsterIds.includes("rat"), "settings autocomplete should include rat");
+});
+
+Deno.test("settings export emits live save data JSON", () => {
+  const world = new World({ seed: 987 });
+  const player = world.create();
+  world.add(player, Player, {});
+  world.add(player, Position, { x: 2, y: 3 });
+  world.add(player, Inventory, { items: [], capacity: 20 });
+  world.add(player, Equipment, {});
+
+  installInventoryDataProvider({
+    world,
+    getActiveSpellId: () => "magic_missile",
+    isSimUiBlocked: () => false,
+    getMessageLog: () => ({ getEntries: () => [] }),
+    tombstoneRepo: { getAll: () => [] },
+  });
+
+  /** @type {any} */
+  let payload = null;
+  const onExport = (ev) => {
+    payload = ev?.detail || null;
+  };
+  addEventListener("ui:saveDataExport", onExport);
+  dispatchEvent(new CustomEvent("ui:requestSaveDataExport"));
+  removeEventListener("ui:saveDataExport", onExport);
+
+  assert(payload?.json, "expected save export JSON payload");
+  const parsed = JSON.parse(payload.json);
+  assertEquals(parsed.v, 1);
+  assertEquals(parsed.reason, "settings_export");
+  assertEquals(parsed.app.activeSpellId, "magic_missile");
+  assert(parsed.world?.comps?.Player, "export should include current world snapshot");
+});
+
+Deno.test("settings resurrect pet turns pet corpse back into live pet", () => {
+  clearAll();
+  try {
+    loadChunk(0, 0, new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR));
+
+    const world = new World({ seed: 654 });
+    const player = world.create();
+    world.add(player, Player, {});
+    world.add(player, Position, { x: 10, y: 10 });
+
+    const corpse = world.create();
+    world.add(corpse, Pet);
+    world.add(corpse, Owner, { ownerId: player });
+    world.add(corpse, Position, { x: 9, y: 10 });
+    world.add(corpse, NamedIdentity, { name: "Kitty Corpse", identity: "corpse_kitty" });
+    world.add(corpse, ItemInfo, {
+      type: "food",
+      weight: 1,
+      value: 1,
+      description: "corpse",
+      count: 1,
+    });
+
+    installInventoryDataProvider({
+      world,
+      getActiveSpellId: () => null,
+      isSimUiBlocked: () => false,
+      getMessageLog: () => ({ getEntries: () => [] }),
+      tombstoneRepo: { getAll: () => [] },
+    });
+
+    /** @type {any} */
+    let settingsPayload = null;
+    const onSettingsData = (ev) => {
+      settingsPayload = ev?.detail || null;
+    };
+    addEventListener("ui:settingsData", onSettingsData);
+    dispatchEvent(new CustomEvent("ui:requestSettingsData"));
+    removeEventListener("ui:settingsData", onSettingsData);
+
+    assertEquals(settingsPayload?.hasPet, true);
+    assertEquals(settingsPayload?.petAlive, false);
+
+    dispatchEvent(new CustomEvent("ui:debugResurrectPet"));
+
+    let livePet = null;
+    for (const [id, _pet, pos, vit, state] of world.query(Pet, Position, Vitality, PetState)) {
+      livePet = { id, pos, vit, state, ident: world.get(id, NamedIdentity), owner: world.get(id, Owner) };
+      break;
+    }
+
+    assert(livePet, "expected resurrected live pet");
+    assertEquals(livePet.vit.hp, 30);
+    assertEquals(livePet.state.state, "following");
+    assertEquals(livePet.ident.identity, "kitty");
+    assertEquals(livePet.owner.ownerId, player);
+    assertEquals(Math.abs(livePet.pos.x - 10) + Math.abs(livePet.pos.y - 10), 1);
+    assert(!world.has(livePet.id, ItemInfo), "resurrected pet should be a creature, not a corpse item");
+  } finally {
+    clearAll();
+  }
 });
 
 Deno.test("settings debug spawn spawns the selected monster near the player", () => {
