@@ -1,6 +1,6 @@
 import { assert, assertEquals } from "jsr:@std/assert";
 
-import { BUILDING_DEFS } from "../src/rules/data/buildings/buildingRegistry.js";
+import { BUILDING_DEFS, LANDMARK_DEFS } from "../src/rules/data/buildings/buildingRegistry.js";
 import { generateOverworldChunks } from "../src/rules/environment/dungeon/overworld.js";
 import {
   CHUNK_SIZE,
@@ -201,6 +201,12 @@ Deno.test("overworld places named curiosity landmarks outside the town core", as
   assert(ids.has("wayside_shrine"), "overworld should place a wayside shrine");
   assert(ids.has("abandoned_camp"), "overworld should place an abandoned camp");
   assert(ids.has("strange_grove"), "overworld should place a strange grove");
+
+  for (const id of ids) {
+    assert(LANDMARK_DEFS[id], `${id} should be backed by an authored landmark definition`);
+    assert(LANDMARK_DEFS[id].tiles.length > 0, `${id} should have authored tiles`);
+    assert(LANDMARK_DEFS[id].spawns.length > 0, `${id} should have authored spawns`);
+  }
 
   for (const spawn of landmarks) {
     const dx = spawn.x - townPlan.center.x;

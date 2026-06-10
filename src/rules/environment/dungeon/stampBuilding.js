@@ -9,6 +9,7 @@ import {
   TILE_GRASS_A,
   TILE_GRASS_C,
   TILE_GRASS_D,
+  TILE_MOORLAND,
   TILE_TREE,
   TILE_FENCE,
   TILE_COBBLESTONE,
@@ -35,6 +36,7 @@ const TILE_MAP = {
   grass_a:        TILE_GRASS_A,
   grass_c:        TILE_GRASS_C,
   grass_d:        TILE_GRASS_D,
+  moorland:       TILE_MOORLAND,
   tree:           TILE_TREE,
   fence:          TILE_FENCE,
   cobblestone:    TILE_COBBLESTONE,
@@ -73,7 +75,7 @@ export function stampBuilding(chunks, def, anchorX, anchorY) {
     const wx = anchorX + dx;
     const wy = anchorY + dy;
     setWorldTile(chunks, wx, wy, tileId);
-    if (ROOFABLE.has(tile)) {
+    if (def.roofed !== false && ROOFABLE.has(tile)) {
       setRoofed(wx, wy, true);
     }
   }

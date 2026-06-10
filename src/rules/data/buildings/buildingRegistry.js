@@ -11,6 +11,10 @@ import herbalistHut from './herbalist_hut.js';
 import generalStore from './general_store.js';
 import farm from './farm.js';
 import graveyard from './graveyard.js';
+import ruinedWatchtower from './ruined_watchtower.js';
+import waysideShrine from './wayside_shrine.js';
+import abandonedCamp from './abandoned_camp.js';
+import strangeGrove from './strange_grove.js';
 
 export const BUILDING_DEFS = {
   tavern,
@@ -33,6 +37,13 @@ export const BUILDING_POOL = [
   'apothecary', 'church', 'gem_store', 'book_shop', 'herbalist_hut', 'general_store',
   'farm', 'graveyard'
 ];
+
+export const LANDMARK_DEFS = {
+  ruined_watchtower: ruinedWatchtower,
+  wayside_shrine: waysideShrine,
+  abandoned_camp: abandonedCamp,
+  strange_grove: strangeGrove,
+};
 
 /**
  * Get random building from pool

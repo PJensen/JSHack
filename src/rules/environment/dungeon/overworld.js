@@ -2,7 +2,9 @@
 // Deterministic depth-0 overworld generation (Perlin/fBM terrain + home clearing).
 
 import { perlin2, buildPermutation, fbm01 } from "./generators/noise.js";
+import { LANDMARK_DEFS } from "../../data/buildings/buildingRegistry.js";
 import { applyTownPlacement } from "./townPlacement.js";
+import { stampBuilding } from "./stampBuilding.js";
 import { pickSpecificMonster } from "./tables.js";
 import { exportRoofedChunk } from "./tileMap.js";
 import {
@@ -776,85 +778,24 @@ function pickSeparatedCandidate(candidates, rng, placed, minDistanceSq = 28 * 28
   return null;
 }
 
-function paintClearing(chunks, center, radius, tile = TILE_GRASS) {
-  for (let dy = -radius; dy <= radius; dy++) {
-    for (let dx = -radius; dx <= radius; dx++) {
-      if (dx * dx + dy * dy > radius * radius) continue;
-      const x = center.x + dx;
-      const y = center.y + dy;
-      if (!isOverworldSpawnTile(getWorldTile(chunks, x, y))) continue;
-      setWorldTile(chunks, x, y, tile);
-    }
-  }
-}
-
-function placeRuinedWatchtower(chunks, center) {
-  for (let dy = -2; dy <= 2; dy++) {
-    for (let dx = -2; dx <= 2; dx++) {
-      const x = center.x + dx;
-      const y = center.y + dy;
-      const edge = Math.abs(dx) === 2 || Math.abs(dy) === 2;
-      setWorldTile(chunks, x, y, edge ? TILE_WALL : TILE_FLOOR);
-    }
-  }
-  setWorldTile(chunks, center.x, center.y + 2, TILE_DOOR);
-  addSpawn(chunks, center.x, center.y, "chest", {
-    lootTable: "chest:basic",
-    depth: 1,
-    landmark: "ruined_watchtower",
-  });
-  addSpawn(chunks, center.x - 1, center.y - 1, "pillar", { landmark: "ruined_watchtower" });
-  addSpawn(chunks, center.x + 1, center.y - 1, "pillar", { landmark: "ruined_watchtower" });
-}
-
-function placeWaysideShrine(chunks, center) {
-  paintClearing(chunks, center, 3, TILE_GRASS);
-  for (let i = -2; i <= 2; i++) {
-    setWorldTile(chunks, center.x + i, center.y, TILE_COBBLESTONE);
-    setWorldTile(chunks, center.x, center.y + i, TILE_COBBLESTONE);
-  }
-  addSpawn(chunks, center.x, center.y, "shrine", { landmark: "wayside_shrine" });
-  addSpawn(chunks, center.x - 2, center.y, "statue", { landmark: "wayside_shrine" });
-  addSpawn(chunks, center.x + 2, center.y, "statue", { landmark: "wayside_shrine" });
-}
-
-function placeAbandonedCamp(chunks, center) {
-  paintClearing(chunks, center, 4, TILE_GRASS);
-  addSpawn(chunks, center.x, center.y, "torch", { landmark: "abandoned_camp" });
-  addSpawn(chunks, center.x - 2, center.y, "crate", { landmark: "abandoned_camp" });
-  addSpawn(chunks, center.x + 2, center.y, "barrel", { landmark: "abandoned_camp" });
-  addSpawn(chunks, center.x, center.y + 2, "chest", {
-    lootTable: "chest:basic",
-    depth: 1,
-    landmark: "abandoned_camp",
-  });
-  addSpawn(chunks, center.x - 1, center.y - 2, "fallen_log", { landmark: "abandoned_camp" });
-}
-
-function placeStrangeGrove(chunks, center) {
-  paintClearing(chunks, center, 5, TILE_MOORLAND);
-  addSpawn(chunks, center.x, center.y, "statue", { landmark: "strange_grove" });
-  addSpawn(chunks, center.x - 2, center.y + 1, "mushrooms", { landmark: "strange_grove" });
-  addSpawn(chunks, center.x + 2, center.y + 1, "mushrooms", { landmark: "strange_grove" });
-  addSpawn(chunks, center.x, center.y - 2, "web", { landmark: "strange_grove" });
-}
-
 async function placeOverworldLandmarks(chunks, townCenter, bounds, worldSeed, tick = null) {
   const _tick = typeof tick === 'function' ? tick : null;
   const rng = createLocalRng((worldSeed ^ 0x1a4d0a9) >>> 0);
   const placed = [];
   const specs = [
-    { id: "ruined_watchtower", biomes: ["MOUNTAIN", "GRASSLAND"], place: placeRuinedWatchtower },
-    { id: "wayside_shrine", biomes: ["GRASSLAND", "FOREST"], place: placeWaysideShrine },
-    { id: "abandoned_camp", biomes: ["FOREST", "GRASSLAND", "COASTAL"], place: placeAbandonedCamp },
-    { id: "strange_grove", biomes: ["FOREST", "WETLAND"], place: placeStrangeGrove },
+    { id: "ruined_watchtower", biomes: ["MOUNTAIN", "GRASSLAND"] },
+    { id: "wayside_shrine", biomes: ["GRASSLAND", "FOREST"] },
+    { id: "abandoned_camp", biomes: ["FOREST", "GRASSLAND", "COASTAL"] },
+    { id: "strange_grove", biomes: ["FOREST", "WETLAND"] },
   ];
 
   for (const spec of specs) {
     const candidates = collectLandmarkCandidates(chunks, townCenter, bounds, spec.biomes);
     const center = pickSeparatedCandidate(candidates, rng, placed);
     if (!center) continue;
-    spec.place(chunks, center);
+    const def = LANDMARK_DEFS[spec.id];
+    if (!def) continue;
+    stampBuilding(chunks, def, center.x, center.y);
     placed.push({ ...center, id: spec.id });
     if (_tick) await _tick(`Raised ${spec.id.replaceAll("_", " ")}`);
   }
