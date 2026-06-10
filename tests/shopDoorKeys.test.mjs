@@ -497,7 +497,7 @@ Deno.test("overworld herbalist does not get the apothecary key", async () => {
   assertEquals(matchingKeyIds.length, 0, "herbalist should not have apothecary access");
 });
 
-Deno.test("scheduled gem vendor stays in the shop while the player is inside", async () => {
+function addScheduledGemVendorShop(step) {
   const world = new World({ seed: 11 });
   const dungeonId = world.create();
   world.add(dungeonId, DungeonState, {
@@ -507,7 +507,7 @@ Deno.test("scheduled gem vendor stays in the shop while the player is inside", a
     floorEntityIds: [],
     downStairPositions: [],
   });
-  world.step = 100;
+  world.step = step;
 
   const player = world.create();
   world.add(player, Player);
@@ -549,6 +549,12 @@ Deno.test("scheduled gem vendor stays in the shop while the player is inside", a
     shopkeeperId: actor,
   });
 
+  return { world, actor };
+}
+
+Deno.test("scheduled gem vendor stays in the shop while the player is inside during shop hours", async () => {
+  const { world, actor } = addScheduledGemVendorShop(222);
+
   aiTownfolkSystem(world);
 
   const job = world.get(actor, TownfolkJob);
@@ -556,4 +562,16 @@ Deno.test("scheduled gem vendor stays in the shop while the player is inside", a
   assertEquals(job.targetX, 10);
   assertEquals(job.targetY, 10);
   assertEquals(job.routineKind, "tend_stall");
+});
+
+Deno.test("scheduled gem vendor follows after-hours schedule when not already serving", async () => {
+  const { world, actor } = addScheduledGemVendorShop(100);
+
+  aiTownfolkSystem(world);
+
+  const job = world.get(actor, TownfolkJob);
+  assertEquals(world.has(actor, MoveIntent), true, "after-hours gem vendor should leave the shop for schedule");
+  assertEquals(job.targetX, 2);
+  assertEquals(job.targetY, 2);
+  assertEquals(job.routineKind, "sleep");
 });

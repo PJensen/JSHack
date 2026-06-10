@@ -677,6 +677,33 @@ Deno.test("shop customer does not pull vendor to stall outside shop hours", () =
   assertEquals(job.state, TOWNFOLK_STATES.sleeping);
 });
 
+Deno.test("shop customer keeps vendor at stall when shop hours end mid-visit", () => {
+  const world = makeWorld(2003);
+  world.step = 222; // work phase
+  setPlayerPosition(world, 1, 1);
+
+  const vendor = addTownfolk(world, 2, 2, "gem_vendor", {
+    scheduleEnabled: true,
+    homeX: 9, homeY: 9,
+    bedX: 9, bedY: 9,
+    workX: 2, workY: 2,
+    workAuxX: 3, workAuxY: 2,
+    pubX: 8, pubY: 8,
+  });
+  addOwnedShopRoom(world, vendor, 0, 0, 4, 4);
+
+  aiTownfolkSystem(world);
+  world.step = 510; // pub phase, after work
+  aiTownfolkSystem(world);
+
+  const job = world.get(vendor, TownfolkJob);
+  assertEquals(job.lastPhase, "shop_customer");
+  assertEquals(job.routineKind, "tend_stall");
+  assertEquals(job.targetX, 2);
+  assertEquals(job.targetY, 2);
+  assertEquals(job.state, TOWNFOLK_STATES.working);
+});
+
 Deno.test("scheduled farmer alternates between field and mill during work hours", () => {
   const world = makeWorld(15);
   world.step = 222; // work phase (210-509), workBeat=1 → mill
