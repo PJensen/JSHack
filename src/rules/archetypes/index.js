@@ -87,6 +87,7 @@ export {
   Fountain,
   Altar,
   Shrine,
+  Runestone,
   Statue,
   Sarcophagus,
   Pillar,

@@ -1739,8 +1739,17 @@ export const INTERACT_PAYLOADS = {
     },
   },
 
-  // ── Harvest nodes ──────────────────────────────────────────────────────────
+  //-- Runestone
+  touchRunestone: {
+    onInteract(ctx) {
+      const { world, actor, targetId } = ctx;
+      const ae = ensureActiveEffects(world, actor);
+      upsertTimedEffect(ae.effects, { key: "lucky", turnsLeft: 300, potency: 1 });
+      world.emit?.("runestone:touched", { actor, targetId });
+    }
+  },
 
+  // ── Harvest nodes ──────────────────────────────────────────────────────────
   harvestNode: {
     beforeInteract(ctx) {
       const { world, actor, targetId } = ctx;

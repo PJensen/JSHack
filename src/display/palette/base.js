@@ -370,6 +370,7 @@ export const basePalette = {
   fountain:    { glyph: "⛲", fg: "#66bbee", glow: "#3388aa" },
   altar:       { glyph: "⛩", fg: "#cc99ff", glow: "#9966cc" },
   shrine:      { glyph: "⛫", fg: "#ffdd66", glow: "#ccaa33" },
+  runestone:   { glyph: "ᚱ", fg: "#88bbff", glow: "#4477cc" },
   statue:      { glyph: "🗿", fg: "#ccccdd", glow: "#9999ab" },
   sarcophagus: { glyph: "⚰", fg: "#aaa8a0", glow: "#777570" },
   pillar:      { glyph: "#", fg: "#b0a8c0",  glow: "#706880" },

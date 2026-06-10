@@ -23,7 +23,7 @@ const _CORPSE_SKIP_KEYS = new Set([
   'apothecary_sign', 'gem_shop_sign', 'gem_display_case', 'message_board',
   'farmland', 'fence', 'roof_thatch_shadow', 'roof_thatch_lit',
   'roof_thatch_shadow_charred', 'roof_thatch_lit_charred',
-  'fountain', 'altar', 'shrine', 'statue', 'sarcophagus',
+  'fountain', 'altar', 'runestone', 'shrine', 'statue', 'sarcophagus',
   'pillar', 'weapon_rack', 'mushrooms', 'web', 'torch',
   'urn', 'ashes',
   'portcullis', 'portcullis_raised', 'chain_winch', 'flood_gate_wheel',

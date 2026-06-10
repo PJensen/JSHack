@@ -38,7 +38,7 @@ export default {
     {
       "dx": 0,
       "dy": 0,
-      "kind": "shrine",
+      "kind": "runestone",
       "params": { "landmark": "wayside_shrine" },
     },
     {

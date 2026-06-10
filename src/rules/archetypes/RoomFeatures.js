@@ -46,6 +46,16 @@ export const Shrine = defineArchetype(
   [AudioEmitter, { emitters: [{ profile: "holy_site", interior: false }] }],
 );
 
+export const Runestone = defineArchetype(
+  "Runestone",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Runestone", identity: "runestone" }],
+  [Material, { kind: "stone" }],
+  [Collider, { solid: true, blocksSight: false }],
+  [Interactable, { action: "touchRunestone", params: null }],
+  [AudioEmitter, { emitters: [{ profile: "runic", interior: false }] }],
+);
+
 // --- Decorative features ---
 
 export const Statue = defineArchetype(

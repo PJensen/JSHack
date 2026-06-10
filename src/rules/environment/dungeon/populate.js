@@ -124,7 +124,7 @@ import { appraiseItemValue, getUnidentifiedGemAppraisal } from '../../utils/shop
 import { spawnMonsterEntity } from '../../utils/spawnMonsterEntity.js';
 import { spawnCentipede } from '../../utils/spawnCentipede.js';
 import {
-  Fountain, Altar, Shrine, Statue,
+  Fountain, Altar, Shrine, Statue, Runestone,
   Sarcophagus, Pillar, WeaponRack, Mushrooms, Web, Torch, Urn,
   FlayedMan, HangingChains, Portcullis, ChainWinch, FloodGateWheel,
   DrainThroat, SteamVent, PressurePlinth, BoneChimeRack, Effigy,
@@ -163,7 +163,7 @@ const SIMPLE_SPAWN_TABLE = {
   market_stall: MarketStall, bench: Bench,
   boulder: Boulder, fallen_log: FallenLog, lily_pad: LilyPad, cattail: Cattail,
   birdbath: Birdbath, trellis: Trellis,
-  fountain: Fountain, altar: Altar, shrine: Shrine, statue: Statue, pillar: Pillar,
+  fountain: Fountain, altar: Altar, runestone: Runestone, shrine: Shrine, statue: Statue, pillar: Pillar,
   mushrooms: Mushrooms, web: Web, torch: Torch, urn: Urn,
   flayed_man: FlayedMan, hanging_chains: HangingChains,
   portcullis: Portcullis,
@@ -181,6 +181,7 @@ const ROOM_FEATURES = [
   { kind: 'fountain',    weight: 8 },
   { kind: 'altar',       weight: 6 },
   { kind: 'shrine',      weight: 6 },
+  { kind: 'runestone',    weight: 6 },
   { kind: 'statue',      weight: 10 },
   { kind: 'sarcophagus', weight: 7 },
   { kind: 'pillar',      weight: 10 },
