@@ -14,7 +14,7 @@
       "metadata": "/ec/d7bc9034e1/0/metadata.json",
       "transcript": "/ec/d7bc9034e1/0/full.jsonl",
       "content_hash": "/ec/d7bc9034e1/0/content_hash.txt",
-      "prompt": "/ec/d7bc9034e1/0/prompt.txt"
+      "prompt": ""
     },
     {
       "metadata": "/ec/d7bc9034e1/1/metadata.json",
@@ -22,12 +22,5 @@
       "content_hash": "/ec/d7bc9034e1/1/content_hash.txt",
       "prompt": ""
     }
-  ],
-  "token_usage": {
-    "input_tokens": 2564,
-    "cache_creation_tokens": 0,
-    "cache_read_tokens": 99200,
-    "output_tokens": 980,
-    "api_call_count": 2
-  }
+  ]
 }
