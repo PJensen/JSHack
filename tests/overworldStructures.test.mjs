@@ -48,6 +48,17 @@ function countKind(chunks, kind) {
   return spawnsOfKind(chunks, kind).length;
 }
 
+function landmarkSpawns(chunks) {
+  const out = [];
+  for (const chunk of chunks) {
+    for (const spawn of chunk.spawns) {
+      const landmark = String(spawn.params?.landmark || "");
+      if (landmark) out.push({ ...spawn, landmark });
+    }
+  }
+  return out.sort((a, b) => a.landmark.localeCompare(b.landmark) || a.x - b.x || a.y - b.y);
+}
+
 function nearestTileDistance(chunks, from, wantedTiles, maxR = 48) {
   for (let r = 0; r <= maxR; r++) {
     for (let dx = -r; dx <= r; dx++) {
@@ -179,6 +190,23 @@ Deno.test("overworld procedurally stamps the required town economy", async () =>
   assert(countKind(chunks, "crop_corn") >= 6, "farm should plant corn");
   assert(countKind(chunks, "farm_animal") >= 4, "farm should support animals");
   assert(countKind(chunks, "townfolk") >= 8, "buildings should open town professions");
+});
+
+Deno.test("overworld places named curiosity landmarks outside the town core", async () => {
+  const { chunks, townPlan } = await generateOverworldChunks(SEED);
+  const landmarks = landmarkSpawns(chunks);
+  const ids = new Set(landmarks.map((spawn) => spawn.landmark));
+
+  assert(ids.has("ruined_watchtower"), "overworld should place a ruined watchtower");
+  assert(ids.has("wayside_shrine"), "overworld should place a wayside shrine");
+  assert(ids.has("abandoned_camp"), "overworld should place an abandoned camp");
+  assert(ids.has("strange_grove"), "overworld should place a strange grove");
+
+  for (const spawn of landmarks) {
+    const dx = spawn.x - townPlan.center.x;
+    const dy = spawn.y - townPlan.center.y;
+    assert(dx * dx + dy * dy >= 45 * 45, `${spawn.landmark} should sit outside the town core`);
+  }
 });
 
 Deno.test("church entrance and bell anchor north of the fountain", async () => {

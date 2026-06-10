@@ -726,6 +726,140 @@ function addWaterSpawnIfOpen(chunks, x, y, kind, params = {}) {
   return true;
 }
 
+function createLocalRng(seed) {
+  return new (function(seedValue) {
+    this.seed = seedValue >>> 0;
+    this.next = function() {
+      this.seed = (this.seed * 1103515245 + 12345) >>> 0;
+      return this.seed / 4294967296;
+    };
+  })(seed);
+}
+
+function collectLandmarkCandidates(chunks, townCenter, bounds, biomeIds) {
+  const result = [];
+  const wanted = new Set(biomeIds);
+  const townExclusionRadiusSq = 52 * 52;
+
+  for (let x = bounds.minX + 12; x <= bounds.maxX - 12; x++) {
+    for (let y = bounds.minY + 12; y <= bounds.maxY - 12; y++) {
+      const dx = x - townCenter.x;
+      const dy = y - townCenter.y;
+      if (dx * dx + dy * dy < townExclusionRadiusSq) continue;
+      if (hasSpawnAt(chunks, x, y)) continue;
+      const tile = getWorldTile(chunks, x, y);
+      if (!isOverworldSpawnTile(tile)) continue;
+      const biomeId = getTileBiomeId(tile);
+      if (wanted.has(biomeId)) result.push({ x, y });
+    }
+  }
+
+  return result;
+}
+
+function pickSeparatedCandidate(candidates, rng, placed, minDistanceSq = 28 * 28) {
+  if (!candidates.length) return null;
+  const start = Math.floor(rng.next() * candidates.length);
+  for (let i = 0; i < candidates.length; i++) {
+    const candidate = candidates[(start + i) % candidates.length];
+    let tooClose = false;
+    for (const other of placed) {
+      const dx = candidate.x - other.x;
+      const dy = candidate.y - other.y;
+      if (dx * dx + dy * dy < minDistanceSq) {
+        tooClose = true;
+        break;
+      }
+    }
+    if (!tooClose) return candidate;
+  }
+  return null;
+}
+
+function paintClearing(chunks, center, radius, tile = TILE_GRASS) {
+  for (let dy = -radius; dy <= radius; dy++) {
+    for (let dx = -radius; dx <= radius; dx++) {
+      if (dx * dx + dy * dy > radius * radius) continue;
+      const x = center.x + dx;
+      const y = center.y + dy;
+      if (!isOverworldSpawnTile(getWorldTile(chunks, x, y))) continue;
+      setWorldTile(chunks, x, y, tile);
+    }
+  }
+}
+
+function placeRuinedWatchtower(chunks, center) {
+  for (let dy = -2; dy <= 2; dy++) {
+    for (let dx = -2; dx <= 2; dx++) {
+      const x = center.x + dx;
+      const y = center.y + dy;
+      const edge = Math.abs(dx) === 2 || Math.abs(dy) === 2;
+      setWorldTile(chunks, x, y, edge ? TILE_WALL : TILE_FLOOR);
+    }
+  }
+  setWorldTile(chunks, center.x, center.y + 2, TILE_DOOR);
+  addSpawn(chunks, center.x, center.y, "chest", {
+    lootTable: "chest:basic",
+    depth: 1,
+    landmark: "ruined_watchtower",
+  });
+  addSpawn(chunks, center.x - 1, center.y - 1, "pillar", { landmark: "ruined_watchtower" });
+  addSpawn(chunks, center.x + 1, center.y - 1, "pillar", { landmark: "ruined_watchtower" });
+}
+
+function placeWaysideShrine(chunks, center) {
+  paintClearing(chunks, center, 3, TILE_GRASS);
+  for (let i = -2; i <= 2; i++) {
+    setWorldTile(chunks, center.x + i, center.y, TILE_COBBLESTONE);
+    setWorldTile(chunks, center.x, center.y + i, TILE_COBBLESTONE);
+  }
+  addSpawn(chunks, center.x, center.y, "shrine", { landmark: "wayside_shrine" });
+  addSpawn(chunks, center.x - 2, center.y, "statue", { landmark: "wayside_shrine" });
+  addSpawn(chunks, center.x + 2, center.y, "statue", { landmark: "wayside_shrine" });
+}
+
+function placeAbandonedCamp(chunks, center) {
+  paintClearing(chunks, center, 4, TILE_GRASS);
+  addSpawn(chunks, center.x, center.y, "torch", { landmark: "abandoned_camp" });
+  addSpawn(chunks, center.x - 2, center.y, "crate", { landmark: "abandoned_camp" });
+  addSpawn(chunks, center.x + 2, center.y, "barrel", { landmark: "abandoned_camp" });
+  addSpawn(chunks, center.x, center.y + 2, "chest", {
+    lootTable: "chest:basic",
+    depth: 1,
+    landmark: "abandoned_camp",
+  });
+  addSpawn(chunks, center.x - 1, center.y - 2, "fallen_log", { landmark: "abandoned_camp" });
+}
+
+function placeStrangeGrove(chunks, center) {
+  paintClearing(chunks, center, 5, TILE_MOORLAND);
+  addSpawn(chunks, center.x, center.y, "statue", { landmark: "strange_grove" });
+  addSpawn(chunks, center.x - 2, center.y + 1, "mushrooms", { landmark: "strange_grove" });
+  addSpawn(chunks, center.x + 2, center.y + 1, "mushrooms", { landmark: "strange_grove" });
+  addSpawn(chunks, center.x, center.y - 2, "web", { landmark: "strange_grove" });
+}
+
+async function placeOverworldLandmarks(chunks, townCenter, bounds, worldSeed, tick = null) {
+  const _tick = typeof tick === 'function' ? tick : null;
+  const rng = createLocalRng((worldSeed ^ 0x1a4d0a9) >>> 0);
+  const placed = [];
+  const specs = [
+    { id: "ruined_watchtower", biomes: ["MOUNTAIN", "GRASSLAND"], place: placeRuinedWatchtower },
+    { id: "wayside_shrine", biomes: ["GRASSLAND", "FOREST"], place: placeWaysideShrine },
+    { id: "abandoned_camp", biomes: ["FOREST", "GRASSLAND", "COASTAL"], place: placeAbandonedCamp },
+    { id: "strange_grove", biomes: ["FOREST", "WETLAND"], place: placeStrangeGrove },
+  ];
+
+  for (const spec of specs) {
+    const candidates = collectLandmarkCandidates(chunks, townCenter, bounds, spec.biomes);
+    const center = pickSeparatedCandidate(candidates, rng, placed);
+    if (!center) continue;
+    spec.place(chunks, center);
+    placed.push({ ...center, id: spec.id });
+    if (_tick) await _tick(`Raised ${spec.id.replaceAll("_", " ")}`);
+  }
+}
+
 async function spawnOverworldCreatures(chunks, townCenter, bounds, worldSeed, tick = null) {
   const _tick = typeof tick === 'function' ? tick : null;
   const TOWN_EXCLUSION_RADIUS_SQ = 45 * 45; // covers districts up to r=36 + footprint
@@ -996,7 +1130,7 @@ async function _generateOverworldChunks(worldSeed, onPlanProgress) {
   rngSeed = (rngSeed * 1103515245 + 12345) >>> 0;
   const gradientDir = directions[rngSeed % 4];
 
-  const PLAN_TOTAL = 6;
+  const PLAN_TOTAL = 7;
   _emit('Generating terrain', 0, PLAN_TOTAL);
   if (_yield) await _yield();
   let _terrainCount = 0;
@@ -1046,21 +1180,31 @@ async function _generateOverworldChunks(worldSeed, onPlanProgress) {
     spawnY = townPlan.center.y;
   }
 
-  _emit('Spawning creatures', 4, PLAN_TOTAL);
+  _emit('Placing landmarks', 4, PLAN_TOTAL);
   if (_yield) await _yield();
-  const _creatureTick = onPlanProgress
+  const _landmarkTick = onPlanProgress
     ? async (label) => {
         onPlanProgress({ phase: 'plan', label, step: 4, total: PLAN_TOTAL });
         await _yieldFrame();
       }
     : null;
+  await placeOverworldLandmarks(chunks, townPlan?.center || { x: spawnX, y: spawnY }, { minX, maxX, minY, maxY }, worldSeed >>> 0, _landmarkTick);
+
+  _emit('Spawning creatures', 5, PLAN_TOTAL);
+  if (_yield) await _yield();
+  const _creatureTick = onPlanProgress
+    ? async (label) => {
+        onPlanProgress({ phase: 'plan', label, step: 5, total: PLAN_TOTAL });
+        await _yieldFrame();
+      }
+    : null;
   await spawnOverworldCreatures(chunks, townPlan?.center || { x: spawnX, y: spawnY }, { minX, maxX, minY, maxY }, worldSeed >>> 0, _creatureTick);
 
-  _emit('Placing resources', 5, PLAN_TOTAL);
+  _emit('Placing resources', 6, PLAN_TOTAL);
   if (_yield) await _yield();
   const _resourceTick = onPlanProgress
     ? async (label) => {
-        onPlanProgress({ phase: 'plan', label, step: 5, total: PLAN_TOTAL });
+        onPlanProgress({ phase: 'plan', label, step: 6, total: PLAN_TOTAL });
         await _yieldFrame();
       }
     : null;
