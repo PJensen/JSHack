@@ -5,6 +5,7 @@
   "branch": "master",
   "checkpoints_count": 4,
   "files_touched": [
+    "VERSION",
     "src/display/ui/overlayRenders.js",
     "src/main/ui/inventoryDataProvider.js",
     "src/main/wiring/savegameLoad.js",
