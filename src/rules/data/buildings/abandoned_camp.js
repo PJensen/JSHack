@@ -56,9 +56,15 @@ export default {
   ],
   "spawns": [
     {
-      "dx": 0,
+      "dx": 1,
       "dy": 0,
       "kind": "torch",
+      "params": { "landmark": "abandoned_camp" },
+    },
+    {
+      "dx": 0,
+      "dy": 0,
+      "kind": "cooking_fire",
       "params": { "landmark": "abandoned_camp" },
     },
     {
@@ -78,7 +84,7 @@ export default {
       "dy": 2,
       "kind": "chest",
       "params": {
-        "lootTable": "chest:basic",
+        "lootTableChoices": ["chest:epic", "chest:legendary"],
         "depth": 1,
         "landmark": "abandoned_camp",
       },
@@ -88,6 +94,46 @@ export default {
       "dy": -2,
       "kind": "fallen_log",
       "params": { "landmark": "abandoned_camp" },
+    },
+    {
+      "dx": -3,
+      "dy": -1,
+      "kind": "monster",
+      "params": {
+        "monsterId": "bandit",
+        "depth": 1,
+        "landmark": "abandoned_camp",
+      },
+    },
+    {
+      "dx": 3,
+      "dy": -1,
+      "kind": "monster",
+      "params": {
+        "monsterId": "bandit",
+        "depth": 1,
+        "landmark": "abandoned_camp",
+      },
+    },
+    {
+      "dx": -2,
+      "dy": 2,
+      "kind": "monster",
+      "params": {
+        "monsterId": "bandit_archer",
+        "depth": 1,
+        "landmark": "abandoned_camp",
+      },
+    },
+    {
+      "dx": 2,
+      "dy": 2,
+      "kind": "monster",
+      "params": {
+        "monsterId": "bandit_captain",
+        "depth": 1,
+        "landmark": "abandoned_camp",
+      },
     },
   ],
 };

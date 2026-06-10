@@ -1992,7 +1992,11 @@ export function materializeSpawn(world, spawn) {
 
   switch (spawn.kind) {
     case 'monster': {
-      const p = spawn.params;
+      const raw = spawn.params || {};
+      const resolved = typeof raw.monsterId === "string"
+        ? pickSpecificMonster(raw.monsterId, Number.isFinite(raw.depth) ? raw.depth : 1)
+        : null;
+      const p = resolved ? { ...resolved, ...raw } : raw;
       const id = spawnMonsterEntity(world, {
         x: spawn.x, y: spawn.y,
         name: p.name,
@@ -2080,7 +2084,14 @@ export function materializeSpawn(world, spawn) {
       world.add(id, Collider, { solid: true, blocksSight: false });
       world.add(id, Interactable, { action: "openChest", params: spawn.params?.interact ?? null });
       // Pre-populate chest inventory from loot table
-      const lootTable = spawn.params.lootTable || 'chest:basic';
+      const lootTableChoices = Array.isArray(spawn.params?.lootTableChoices)
+        ? spawn.params.lootTableChoices.filter((entry) => typeof entry === 'string' && entry)
+        : null;
+      const chestSeed = ((world.seed >>> 0) ^ ((id * 0x9e3779b9) >>> 0) ^ 0xCE57) >>> 0;
+      const chestRng = createRng(chestSeed);
+      const lootTable = lootTableChoices?.length
+        ? lootTableChoices[chestRng.int(0, lootTableChoices.length - 1)]
+        : (spawn.params.lootTable || 'chest:basic');
       // Set identity to reflect rarity tier so palette and glow effects can key off it
       const ni = world.get(id, NamedIdentity);
       if (ni) {
@@ -2089,8 +2100,6 @@ export function materializeSpawn(world, spawn) {
         else if (lootTable === 'chest:magic') { ni.identity = 'magic_chest'; ni.name = 'Magic Chest'; }
         else { ni.identity = 'basic_chest'; }
       }
-      const chestSeed = ((world.seed >>> 0) ^ ((id * 0x9e3779b9) >>> 0) ^ 0xCE57) >>> 0;
-      const chestRng = createRng(chestSeed);
       const depth = spawn.params.depth || 1;
       const drops = resolveLootTable(lootTable, chestRng, depth);
       const inv = world.get(id, Inventory);

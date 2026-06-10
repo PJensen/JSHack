@@ -215,6 +215,20 @@ Deno.test("overworld places named curiosity landmarks outside the town core", as
   }
 });
 
+Deno.test("abandoned camp guards an epic-or-legendary chest with bandits", async () => {
+  const { chunks } = await generateOverworldChunks(SEED);
+  const campSpawns = landmarkSpawns(chunks).filter((spawn) => spawn.landmark === "abandoned_camp");
+  const campBandits = campSpawns.filter((spawn) => spawn.kind === "monster");
+  const campChest = campSpawns.find((spawn) => spawn.kind === "chest");
+  const campFire = campSpawns.find((spawn) => spawn.kind === "cooking_fire");
+  const monsterIds = campBandits.map((spawn) => spawn.params?.monsterId).sort();
+
+  assertEquals(campBandits.length, 4, "abandoned camp should be guarded by four bandits");
+  assertEquals(monsterIds, ["bandit", "bandit", "bandit_archer", "bandit_captain"]);
+  assertEquals(campChest?.params?.lootTableChoices, ["chest:epic", "chest:legendary"]);
+  assert(campFire, "abandoned camp should include a cooking fire");
+});
+
 Deno.test("church entrance and bell anchor north of the fountain", async () => {
   const { chunks } = await generateOverworldChunks(SEED);
   const fountain = spawnsOfKind(chunks, "fountain")[0];

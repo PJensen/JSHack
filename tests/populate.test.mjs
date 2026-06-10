@@ -405,6 +405,19 @@ Deno.test("materializeSpawn creates monster entity", () => {
   assert(vit && vit.hp > 0, 'has HP');
 });
 
+Deno.test("materializeSpawn resolves authored monsterId shorthand", () => {
+  const world = new World({ seed: 42 });
+  const id = materializeSpawn(world, {
+    x: 5, y: 10, kind: "monster",
+    params: { monsterId: "bandit_archer", depth: 1 },
+  });
+
+  assert(id != null, "created entity");
+  assertEquals(world.get(id, NamedIdentity)?.identity, "bandit_archer");
+  assert(world.get(id, Vitality)?.hp > 0, "resolved monster should have HP");
+  assertEquals(world.get(id, Position), { x: 5, y: 10 });
+});
+
 Deno.test("materializeSpawn creates gold entity", () => {
   const world = new World({ seed: 42 });
   const id = materializeSpawn(world, {
@@ -975,6 +988,27 @@ Deno.test("materializeSpawn chest fixedDrops includes requested ration/food item
   const identities = new Set(itemIds.map((id) => String(world.get(id, NamedIdentity)?.identity || "")));
   assert(identities.has("food_ration"), "fixedDrops should include food_ration");
   assert(identities.has("food_iron_ration"), "fixedDrops should include food_iron_ration");
+});
+
+Deno.test("materializeSpawn chest chooses from authored lootTableChoices", () => {
+  for (let seed = 1; seed <= 10; seed++) {
+    const world = new World({ seed });
+    const chestId = materializeSpawn(world, {
+      x: 11,
+      y: 9,
+      kind: "chest",
+      params: {
+        depth: 3,
+        lootTableChoices: ["chest:epic", "chest:legendary"],
+      },
+    });
+
+    const identity = String(world.get(chestId, NamedIdentity)?.identity || "");
+    assert(
+      identity === "epic_chest" || identity === "legendary_chest",
+      `expected epic or legendary chest identity, got ${identity}`,
+    );
+  }
 });
 
 Deno.test("dead-end rooms with stairs are excluded from dead-end themes", () => {
