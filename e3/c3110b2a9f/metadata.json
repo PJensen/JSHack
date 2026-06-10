@@ -5,6 +5,7 @@
   "branch": "master",
   "checkpoints_count": 1,
   "files_touched": [
+    "VERSION",
     "src/lib/ecs-js",
     "tools/tick-lifetime-benchmark.mjs"
   ],
@@ -19,7 +20,7 @@
       "metadata": "/e3/c3110b2a9f/1/metadata.json",
       "transcript": "/e3/c3110b2a9f/1/full.jsonl",
       "content_hash": "/e3/c3110b2a9f/1/content_hash.txt",
-      "prompt": "/e3/c3110b2a9f/1/prompt.txt"
+      "prompt": ""
     }
   ],
   "token_usage": {
