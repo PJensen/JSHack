@@ -3,8 +3,11 @@
   "checkpoint_id": "02c84df13ee2",
   "strategy": "manual-commit",
   "branch": "master",
-  "checkpoints_count": 1,
+  "checkpoints_count": 2,
   "files_touched": [
+    "src/rules/data/lootTables.js",
+    "src/rules/environment/dungeon/populate.js",
+    "tests/lootResolver.test.mjs",
     "tests/populate.test.mjs"
   ],
   "sessions": [
@@ -13,13 +16,19 @@
       "transcript": "/02/c84df13ee2/0/full.jsonl",
       "content_hash": "/02/c84df13ee2/0/content_hash.txt",
       "prompt": "/02/c84df13ee2/0/prompt.txt"
+    },
+    {
+      "metadata": "/02/c84df13ee2/1/metadata.json",
+      "transcript": "/02/c84df13ee2/1/full.jsonl",
+      "content_hash": "/02/c84df13ee2/1/content_hash.txt",
+      "prompt": "/02/c84df13ee2/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 126071,
+    "input_tokens": 241724,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 2143104,
-    "output_tokens": 7548,
-    "api_call_count": 25
+    "cache_read_tokens": 3193856,
+    "output_tokens": 13619,
+    "api_call_count": 40
   }
 }
