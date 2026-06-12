@@ -181,8 +181,7 @@ function emitPatterned(out, pattern, t, id, x, y, baseRadius, baseColor, softnes
 }
 
 /**
- * Emit a void (negative) light — actively devours illumination.
- * Color values are inverted: the engine accumulates them as subtractive.
+ * Emit a void light — actively devours illumination.
  * The 'void' temporal pattern drives the breathing darkness.
  *
  * @param {LightDef[]} out
@@ -196,11 +195,12 @@ function emitPatterned(out, pattern, t, id, x, y, baseRadius, baseColor, softnes
 function emitVoid(out, t, id, x, y, radius, strength, softness) {
   const p = evaluatePattern('void', t, id);
   const s = strength * p.intensity;
-  // Negative RGB — the engine subtracts these from the light buffers
   out.push({
     x, y,
     radius,
-    color: [-255 * s, -255 * s, -255 * s],
+    kind: "void",
+    color: [155, 120, 255],
+    voidStrength: s,
     softness,
   });
 }

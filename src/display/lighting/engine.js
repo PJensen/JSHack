@@ -17,8 +17,100 @@ const UNSEEN_AMBIENT_LIFT_CAP = 0.42;
 const DAY_MEMORY_DARK_ALPHA_FLOOR = 72;
 const SHELTERED_EXTERIOR_BLACKOUT_ALPHA = 188;
 
+function clamp(v, lo, hi) {
+  return v < lo ? lo : (v > hi ? hi : v);
+}
+
 function clamp01(v) {
   return v < 0 ? 0 : (v > 1 ? 1 : v);
+}
+
+const DEFAULT_MATERIAL_RESPONSE = Object.freeze({
+  albedoR: 1,
+  albedoG: 1,
+  albedoB: 1,
+  normal: 0.5,
+  rim: 0.08,
+  sheen: 0,
+  absorb: 0,
+  emit: 0,
+  emitR: 1,
+  emitG: 0.82,
+  emitB: 0.55,
+  void: 0,
+});
+
+function colorTempToRgb01(kelvin) {
+  const k = clamp(Number(kelvin || 0), 1000, 40000) / 100;
+  let r, g, b;
+  if (k <= 66) {
+    r = 255;
+    g = 99.4708025861 * Math.log(k) - 161.1195681661;
+    b = k <= 19 ? 0 : 138.5177312231 * Math.log(k - 10) - 305.0447927307;
+  } else {
+    r = 329.698727446 * Math.pow(k - 60, -0.1332047592);
+    g = 288.1221695283 * Math.pow(k - 60, -0.0755148492);
+    b = 255;
+  }
+  return [
+    clamp(r, 0, 255) / 255,
+    clamp(g, 0, 255) / 255,
+    clamp(b, 0, 255) / 255,
+  ];
+}
+
+/**
+ * Convert rule/material catalog optical fields into display-side lighting
+ * response.  Accepts either a Material object or a catalog row with `.Material`.
+ *
+ * @param {any} material
+ * @returns {{ albedoR:number, albedoG:number, albedoB:number, normal:number, rim:number, sheen:number, absorb:number, emit:number, emitR:number, emitG:number, emitB:number, void:number }}
+ */
+export function resolveMaterialLightingResponse(material) {
+  const mat = material?.Material || material;
+  if (!mat || typeof mat !== "object") return DEFAULT_MATERIAL_RESPONSE;
+  const pass = clamp01(Number(mat.lightPass || 0));
+  const reflect = clamp01(Number(mat.lightReflect || 0));
+  const absorb = clamp01(Number(mat.lightAbsorb || 0));
+  const emit = clamp01(Number(mat.lightEmit || 0));
+  const dispersion = clamp01(Number(mat.dispersion || 0));
+  const conductivity = clamp01(Number(mat.conductivity || 0));
+  const kind = String(mat.kind || "").toLowerCase();
+  const shine = Math.max(reflect, conductivity * 0.22, dispersion * 0.55);
+  let tintR = 1, tintG = 1, tintB = 1;
+  if (kind === "ice" || kind === "quartz" || kind === "diamond") {
+    tintR = 0.88; tintG = 1.06; tintB = 1.22;
+  } else if (kind === "gold" || kind === "brass" || kind === "bronze" || kind === "amber") {
+    tintR = 1.18; tintG = 1.04; tintB = 0.78;
+  } else if (kind === "copper" || kind === "blood-iron") {
+    tintR = 1.18; tintG = 0.86; tintB = 0.72;
+  } else if (kind === "jadeite" || kind === "nephrite" || kind === "turquoise") {
+    tintR = 0.76; tintG = 1.14; tintB = 0.96;
+  } else if (kind === "obsidian" || kind === "jet" || kind === "voidstone" || kind === "darksteel") {
+    tintR = 0.58; tintG = 0.55; tintB = 0.68;
+  } else if (kind === "paper" || kind === "bone" || kind === "ivory") {
+    tintR = 1.14; tintG = 1.09; tintB = 0.96;
+  } else if (kind === "wood" || kind === "leather") {
+    tintR = 1.08; tintG = 0.88; tintB = 0.68;
+  }
+
+  const lift = reflect * 0.55 + pass * 0.32 + emit * 0.28;
+  const dim = absorb * 0.48;
+  const glow = colorTempToRgb01(mat.glowColorTempK || 3200);
+  return {
+    albedoR: clamp((1 + lift - dim) * tintR, 0.18, 1.65),
+    albedoG: clamp((1 + lift - dim) * tintG, 0.18, 1.65),
+    albedoB: clamp((1 + lift - dim) * tintB, 0.18, 1.65),
+    normal: clamp(0.42 + reflect * 1.25 + pass * 0.18 + dispersion * 0.55 - absorb * 0.22, 0.12, 1.65),
+    rim: clamp(0.06 + reflect * 0.72 + pass * 0.28 + dispersion * 0.38, 0, 0.92),
+    sheen: clamp(shine, 0, 1),
+    absorb,
+    emit,
+    emitR: glow[0],
+    emitG: glow[1],
+    emitB: glow[2],
+    void: (kind === "voidstone" || kind === "darksteel" || absorb >= 0.85) ? absorb : 0,
+  };
 }
 
 /**
@@ -40,7 +132,7 @@ export function resolveAmbientDarknessLift(ambientLightSum, sight) {
  * Resolve the black-overlay alpha for one lighting sub-cell.
  * Exported for focused tests; render() still owns terrain-specific modifiers.
  *
- * @param {{ lightSum:number, ambientLightSum?:number, sight?:number, inLava?:boolean, dark?:number, extraDark?:number }} input
+ * @param {{ lightSum:number, ambientLightSum?:number, sight?:number, inLava?:boolean, dark?:number, extraDark?:number, voidAmount?:number }} input
  * @returns {number}
  */
 export function resolveDarknessAlpha(input) {
@@ -48,6 +140,7 @@ export function resolveDarknessAlpha(input) {
   const lightSum = Number(input.lightSum || 0);
   const ambientLightSum = Math.max(0, Number(input.ambientLightSum || 0));
   const localLightSum = Math.max(0, lightSum - ambientLightSum);
+  const voidAmount = Math.max(0, Number(input.voidAmount || 0));
   const sight = clamp01(Number(input.sight || 0));
   const inLava = !!input.inLava;
   const visLift = sight * (inLava ? VIS_LIFT_LAVA : VIS_LIFT);
@@ -56,13 +149,15 @@ export function resolveDarknessAlpha(input) {
   const totalLift = Math.min(1, visLift + ambientLift + localLightLift);
   let extraDark = Number(input.extraDark || 0);
 
-  if (lightSum < 0) {
-    const voidDark = Math.min(1, -lightSum * 0.8);
-    extraDark += voidDark * (255 - DARK);
+  const legacyNegativeVoid = lightSum < 0 ? Math.max(0, -lightSum) : 0;
+  const voidDarkInput = Math.max(voidAmount, legacyNegativeVoid);
+  if (voidDarkInput > 0) {
+    const voidDark = Math.min(1, Math.pow(voidDarkInput * 0.62, 0.58));
+    extraDark += voidDark * Math.max(86, 255 - DARK + 120);
   }
 
   let alpha = Math.min(255, Math.max(0, (DARK * (1 - totalLift) + extraDark) | 0));
-  if (!inLava && ambientLightSum > 0.9 && sight < 0.08 && localLightLift < 0.2) {
+  if (!inLava && ambientLightSum > 0.9 && sight < 0.08 && localLightLift < 0.2 && voidDarkInput < 0.1) {
     alpha = Math.max(alpha, DAY_MEMORY_DARK_ALPHA_FLOOR);
   }
   return alpha;
@@ -118,6 +213,7 @@ export function createLightingEngine() {
   /** @type {Float32Array} */ let lightR = null;
   /** @type {Float32Array} */ let lightG = null;
   /** @type {Float32Array} */ let lightB = null;
+  /** @type {Float32Array} */ let voidField = null;
   /** @type {Float32Array} */ let vision = null;  // 0 = unseen, 1 = full sight
   /** @type {Float32Array} */ let floorH = null;  // debug floor relief height (tile-ish units)
   /** @type {Float32Array} */ let floorGX = null; // relief gradient x
@@ -252,6 +348,7 @@ export function createLightingEngine() {
     lightR   = new Float32Array(n);
     lightG   = new Float32Array(n);
     lightB   = new Float32Array(n);
+    voidField = new Float32Array(n);
     vision   = new Float32Array(n);
     floorH   = new Float32Array(n);
     floorGX  = new Float32Array(n);
@@ -878,10 +975,13 @@ export function createLightingEngine() {
    * @param {LightDef[]} lights
    * @param {[number,number,number]|null} ambient — RGB 0-1, added to every open cell
    * @param {((x:number,y:number)=>boolean)|null} [isRoofed] — if provided, roofed cells receive no ambient (sky blocked by roof)
+   * @param {{ materialAt?: ((x:number,y:number)=>any)|null }} [opts]
    */
-  function accumulateLights(lights, ambient, isRoofed) {
+  function accumulateLights(lights, ambient, isRoofed, opts) {
     const w = lmW, h = lmH;
     const n = w * h;
+    const materialAt = typeof opts?.materialAt === "function" ? opts.materialAt : null;
+    voidField.fill(0);
 
     // Seed with ambient (sunlight / moonlight) if provided.
     // Roofed cells are excluded — the sky can't reach under a roof.
@@ -926,9 +1026,19 @@ export function createLightingEngine() {
       const light = lights[li];
       const col = light.color || [255, 200, 140];
       const flicker = light.flicker ?? 1;
-      const cr = (col[0] / 255) * flicker;
-      const cg = (col[1] / 255) * flicker;
-      const cb = (col[2] / 255) * flicker;
+      const rawCr = (col[0] / 255) * flicker;
+      const rawCg = (col[1] / 255) * flicker;
+      const rawCb = (col[2] / 255) * flicker;
+      const isVoid = light.kind === "void" || Number(light.voidStrength || 0) > 0
+        || rawCr < 0 || rawCg < 0 || rawCb < 0;
+      const voidStrength = Math.max(
+        0,
+        Number(light.voidStrength || 0),
+        -(Math.min(rawCr, rawCg, rawCb, 0)),
+      );
+      const cr = Math.max(0, rawCr);
+      const cg = Math.max(0, rawCg);
+      const cb = Math.max(0, rawCb);
       const softK = light.softness ?? 0;   // default: hard shadows (FX lights); world lights set explicit softness
       const lr  = light.radius;          // tile units
       const lrSub = lr * SUB;            // sub-cell units
@@ -978,6 +1088,11 @@ export function createLightingEngine() {
           const dist = Math.sqrt(dist2);
           const atten = 1.0 - dist * invLrSub;
           const atten2 = atten * atten * atten * pen;   // cubic falloff × penumbra — punchy core, fast drop
+          const tx = _tx0 + ((sx * INV_SUB) | 0);
+          const ty = _ty0 + ((sy * INV_SUB) | 0);
+          const mat = materialAt
+            ? resolveMaterialLightingResponse(materialAt(tx, ty))
+            : DEFAULT_MATERIAL_RESPONSE;
 
           // Near-wall diffuse catch-light (sub-cell threshold ≈ 0.5 tiles)
           const wallThresh = 4;
@@ -988,9 +1103,12 @@ export function createLightingEngine() {
             const ldy = -dwy * invDist;
             const diffuse = Math.max(0, normX[i] * ldx + normY[i] * ldy);
             const wallBlend = 1.0 - d / wallThresh;
-            intensity = (0.9 + diffuse * wallBlend * 0.5) * atten2;
+            intensity = (0.9 + diffuse * wallBlend * mat.normal + mat.rim * wallBlend) * atten2;
           } else {
-            intensity = 0.9 * atten2;
+            const shimmer = mat.sheen > 0
+              ? 1 + mat.sheen * 0.08 * Math.sin((opts?.fxTime || 0) * 2.1 + sx * 0.087 + sy * 0.051)
+              : 1;
+            intensity = (0.9 + mat.rim * 0.18) * atten2 * shimmer;
           }
 
           const targetInLava = lavaMask[i] === 1;
@@ -1034,11 +1152,46 @@ export function createLightingEngine() {
             }
           }
 
-          lightR[i] += cr * intensity;
-          lightG[i] += cg * intensity;
-          lightB[i] += cb * intensity;
+          if (isVoid) {
+            voidField[i] += Math.max(0.0001, voidStrength) * intensity;
+            continue;
+          }
+
+          const absorbKeep = 1 - mat.absorb * 0.42;
+          lightR[i] += cr * mat.albedoR * absorbKeep * intensity;
+          lightG[i] += cg * mat.albedoG * absorbKeep * intensity;
+          lightB[i] += cb * mat.albedoB * absorbKeep * intensity;
         }
       }
+    }
+
+    if (materialAt) {
+      for (let sy = 0; sy < h; sy++) {
+        const ty = _ty0 + ((sy * INV_SUB) | 0);
+        const rowOff = sy * w;
+        for (let sx = 0; sx < w; sx++) {
+          const i = rowOff + sx;
+          if (sdf[i] <= 0) continue;
+          const tx = _tx0 + ((sx * INV_SUB) | 0);
+          const mat = resolveMaterialLightingResponse(materialAt(tx, ty));
+          if (mat.void > 0) voidField[i] += mat.void * 0.035;
+          if (mat.emit <= 0) continue;
+          const e = mat.emit * (0.05 + 0.10 * mat.sheen);
+          lightR[i] += mat.emitR * e;
+          lightG[i] += mat.emitG * e;
+          lightB[i] += mat.emitB * e;
+        }
+      }
+    }
+
+    for (let i = 0; i < n; i++) {
+      const v = voidField[i];
+      if (v <= 0) continue;
+      const eat = clamp01(Math.pow(v * 0.42, 0.72));
+      const keep = 1 - eat;
+      lightR[i] *= keep;
+      lightG[i] *= keep;
+      lightB[i] *= keep;
     }
   }
 
@@ -1089,7 +1242,7 @@ export function createLightingEngine() {
    * @param {Array<{family:string, loops:Array<Array<{x:number,y:number}>>}>} [surfaceRegions]
    * @param {number} [fxTime]
    * @param {string|number} [reliefKey] — debug floor-relief scope key (e.g. depth)
-   * @param {{ playerSheltered?: boolean, isShelterInterior?: ((x:number,y:number)=>boolean)|null }} [opts]
+   * @param {{ playerSheltered?: boolean, isShelterInterior?: ((x:number,y:number)=>boolean)|null, materialAt?: ((x:number,y:number)=>any)|null }} [opts]
    */
   function render(ctx, lights, isOpaque, vx0, vy0, vx1, vy1, ambient, maxDark, isRoofed, visionDef, surfaceRegions, fxTime, reliefKey, opts) {
     const DARK = (maxDark != null) ? maxDark : 140;
@@ -1139,7 +1292,10 @@ export function createLightingEngine() {
     if (_dirtySurface)  buildSurfaceSDF(surfaceRegions || [], tx0, ty0, tw, th);
     if (_dirtyRelief)   buildFloorRelief(tx0, ty0, tw, th, relief);
     if (_dirtyVision)   buildVision(visionDef || null);
-    accumulateLights(lights, ambient || null, isRoofed || null);
+    accumulateLights(lights, ambient || null, isRoofed || null, {
+      materialAt: opts?.materialAt || null,
+      fxTime: fxTime || 0,
+    });
 
     _dirtyGeometry = false;
     _dirtySurface  = false;
@@ -1178,7 +1334,7 @@ export function createLightingEngine() {
         const lightSum = lightR[i] + lightG[i] + lightB[i];
         const _isShelterInteriorCell = shelterInteriorCell(i, opts?.isShelterInterior || null);
         const ambientLightSum = ambientLightSumForCell(i, ambient || null, isRoofed || null);
-        const sight = vision[i];  // 0-1 vision mask
+        const sight = Math.max(0, vision[i] * (1 - clamp01(voidField[i] * 0.16)));  // 0-1 vision mask
         // Vision lifts darkness to reveal what's there; light lifts further.
         // For below-grade surfaces we intentionally reduce this lift so the
         // depression profile can remain visible instead of flattening out.
@@ -1195,12 +1351,12 @@ export function createLightingEngine() {
           const shade = Math.max(-1, Math.min(1, (-gx * 0.82) + (-gy * 0.58)));
           const digDark = Math.max(0, -hRel) * 0.95 + slope * (0.28 + 0.38 * Math.max(0, -shade));
           const pileLift = Math.max(0, hRel) * 0.58 + slope * 0.22 * Math.max(0, shade);
-          alpha = resolveDarknessAlpha({ lightSum, ambientLightSum, sight, inLava, dark: DARK });
+          alpha = resolveDarknessAlpha({ lightSum, ambientLightSum, sight, inLava, dark: DARK, voidAmount: voidField[i] });
           const liftDelta = digDark - pileLift;
           alpha = Math.min(255, Math.max(0, alpha + liftDelta * DARK));
           alpha = Math.min(255, Math.max(0, alpha + digDark * 118));
         } else {
-          alpha = resolveDarknessAlpha({ lightSum, ambientLightSum, sight, inLava, dark: DARK });
+          alpha = resolveDarknessAlpha({ lightSum, ambientLightSum, sight, inLava, dark: DARK, voidAmount: voidField[i] });
         }
         // Lava below-grade basin: dark lip → lit inner wall → emissive interior.
         // Important: this applies both additive emissive lift and subtractive cut shadow

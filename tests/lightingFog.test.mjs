@@ -1,9 +1,11 @@
 import { assert, assertEquals } from "jsr:@std/assert";
 import {
   resolveDarknessAlpha,
+  resolveMaterialLightingResponse,
   resolveShelteredExteriorDarkening,
 } from "../src/display/lighting/engine.js";
 import { computeAmbient } from "../src/display/lighting/sources/index.js";
+import { getMaterialIntrinsic } from "../src/rules/data/materials.js";
 
 function sum(rgb) {
   return rgb[0] + rgb[1] + rgb[2];
@@ -99,4 +101,33 @@ Deno.test("shelter nearly blacks out cells outside the current building", () => 
   assert(outside >= 180, "outside the current building should be near-black");
   assertEquals(inside, 0);
   assertEquals(unsheltered, 0);
+});
+
+Deno.test("material optical fields alter lighting response", () => {
+  const gold = resolveMaterialLightingResponse(getMaterialIntrinsic("gold"));
+  const voidstone = resolveMaterialLightingResponse(getMaterialIntrinsic("voidstone"));
+  const glass = resolveMaterialLightingResponse(getMaterialIntrinsic("glass"));
+
+  assert(gold.albedoR > voidstone.albedoR, "reflective gold should catch warmer light than voidstone");
+  assert(glass.normal > 0.4, "transparent glass should still produce surface response");
+  assert(voidstone.void > 0.8, "voidstone should participate in void absorption");
+});
+
+Deno.test("void darkness is independent from positive light lift", () => {
+  const lit = resolveDarknessAlpha({
+    lightSum: 2.4,
+    ambientLightSum: 0,
+    sight: 0,
+    dark: 210,
+  });
+  const voided = resolveDarknessAlpha({
+    lightSum: 2.4,
+    ambientLightSum: 0,
+    sight: 0,
+    dark: 210,
+    voidAmount: 2.4,
+  });
+
+  assertEquals(lit, 0);
+  assert(voided > 150, "void field should darken even where positive light exists");
 });

@@ -55,3 +55,4 @@ src/main/wiring/shopWiring.js
 .codex
 .codex
 coverage.lcov
+.aider*
