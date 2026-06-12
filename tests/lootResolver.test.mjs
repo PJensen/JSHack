@@ -72,6 +72,26 @@ Deno.test("known-spell filter does not affect non-book item entries", () => {
   assert(totalPotions > 0, "non-book item entries should still drop");
 });
 
+Deno.test("floor loot favors varied arcade pickups over plain gold", () => {
+  const kinds = new Set();
+  let gold = 0;
+  let total = 0;
+
+  for (let seed = 1; seed <= 300; seed++) {
+    const drops = resolveLootTable("floor:common", createRng(seed), 3);
+    for (const drop of drops) {
+      total++;
+      kinds.add(drop.kind);
+      if (drop.kind === "gold") gold++;
+    }
+  }
+
+  assert(kinds.has("equip"), "floor:common should surface equipment");
+  assert(kinds.has("item"), "floor:common should surface catalog magic/consumable items");
+  assert(kinds.has("gem"), "floor:common should surface gems");
+  assert(gold / total < 0.25, `expected gold under 25% of floor drops, got ${gold}/${total}`);
+});
+
 Deno.test("sub:equip_common can naturally drop helm_iron", () => {
   let seen = 0;
   for (let seed = 1; seed <= 300; seed++) {

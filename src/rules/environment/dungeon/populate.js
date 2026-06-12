@@ -744,11 +744,10 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null, world
       }
     }
 
-    // Monster density: ~1 per 18-28 floor tiles, scaled by depth.
-    // Fewer monsters per room → each encounter is more meaningful.
+    // Monster density: arcade-forward pressure, scaled by depth.
     // Stair-up rooms are safe — no monsters near arrival points.
-    const totalMonsterBudget = roomIsStarting ? (rng.int(18, 28), 0) : Math.max(0, Math.floor(area / rng.int(18, 28) * diff));
-    const spawnerChance = Math.min(0.40, totalMonsterBudget * SPAWNER_CHANCE_PER_MONSTER);
+    const totalMonsterBudget = roomIsStarting ? (rng.int(13, 21), 0) : Math.max(0, Math.floor(area / rng.int(13, 21) * diff));
+    const spawnerChance = Math.min(0.50, totalMonsterBudget * SPAWNER_CHANCE_PER_MONSTER);
     const spawnerBudget = (!roomIsSacred && !roomIsStarting && totalMonsterBudget > 0 && rng.next() < spawnerChance) ? 1 : 0;
     const monsterBudget = Math.max(0, totalMonsterBudget - spawnerBudget);
 
@@ -773,9 +772,9 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null, world
       }
     }
 
-    // Encounter group: ~20% chance to spawn a themed group instead of random individuals
+    // Encounter group: ~30% chance to spawn a themed group instead of random individuals
     let groupBudgetUsed = 0;
-    if (monsterBudget >= 2 && rng.next() < 0.20) {
+    if (monsterBudget >= 2 && rng.next() < 0.30) {
       const group = pickEncounterGroup(rng, floorPlan.depth, monsterBudget);
       if (group) {
         const placeGroupMember = (params) => {
@@ -833,11 +832,10 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null, world
       }
     }
 
-    // Item density: visible singleton loot should carry more of the reward load
-    // now that ordinary chests are less common.
+    // Item density: visible singleton loot keeps exploration rewarding between fights.
     const itemBudget = roomContainsStairTile(room, chunk)
       ? 0
-      : Math.max(0, Math.floor(area / rng.int(28, 42)));
+      : Math.max(0, Math.floor(area / rng.int(18, 30)));
     for (let i = 0; i < itemBudget; i++) {
       const ix = room.x + 1 + rng.int(0, Math.max(0, room.w - 3));
       const iy = room.y + 1 + rng.int(0, Math.max(0, room.h - 3));

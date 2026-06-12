@@ -244,6 +244,45 @@ Deno.test("populateChunk generates spawns in rooms", () => {
   }
 });
 
+Deno.test("populateChunk uses arcade-forward room density", () => {
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
+  tiles.fill(TILE_WALL);
+  for (let y = 2; y < 14; y++) {
+    for (let x = 2; x < 14; x++) {
+      tiles[y * CHUNK_SIZE + x] = TILE_FLOOR;
+    }
+  }
+
+  const chunk = {
+    chunkX: 0,
+    chunkY: 0,
+    tiles,
+    rooms: [{ x: 2, y: 2, w: 12, h: 12 }],
+    doors: [],
+  };
+  const rng = {
+    next: () => 0.99,
+    int: (_min, max) => max,
+    choice: (arr) => arr[0],
+    float: (min) => min,
+  };
+
+  const spawns = populateChunk(chunk, { depth: 1, difficultyMult: 1.0 }, rng);
+  const monsterCount = spawns.filter((sp) => sp.kind === "monster").length;
+  const floorLootCount = spawns.filter((sp) => (
+    sp.kind === "gold"
+    || sp.kind === "potion"
+    || sp.kind === "equipment"
+    || sp.kind === "scroll"
+    || sp.kind === "book"
+    || sp.kind.endsWith("_arrows")
+    || sp.kind === "arrows"
+  )).length;
+
+  assert(monsterCount >= 6, `expected at least 6 monsters in a large room, got ${monsterCount}`);
+  assert(floorLootCount >= 4, `expected at least 4 visible floor loot spawns, got ${floorLootCount}`);
+});
+
 Deno.test("populateChunk keeps wall torches sparse across rooms", () => {
   const chunk = generateChunk(1337, 1, 0, 0);
   const rng = createRng(2337);
