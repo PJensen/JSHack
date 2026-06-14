@@ -1,0 +1,53 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "fe03d5628c4e",
+  "session_id": "019ec78d-745d-7b33-a0b6-a99766d17942",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-14T19:22:48.961302054Z",
+  "branch": "master",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "src/main/ui/hudFeeds.js",
+    "tests/hudFeedsSunswordDock.test.mjs"
+  ],
+  "agent": "Codex",
+  "model": "gpt-5.5",
+  "turn_id": "19f253b7ef98",
+  "token_usage": {
+    "input_tokens": 161164,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1257472,
+    "output_tokens": 4907,
+    "api_call_count": 17
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-14T19:22:48.915528682Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 8,
+    "total_committed": 7,
+    "total_lines_changed": 8,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 911,
+      "user_lines_removed": 8,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".github/agents/Dungeon Generation and BSP Expert.agent.md": 582,
+        ".github/agents/VFX Agent.agent.md": 283,
+        "src/main/ui/hudFeeds.js": 1,
+        "tests/hudFeedsSunswordDock.test.mjs": 45
+      },
+      "user_removed_per_file": {
+        "src/main/ui/hudFeeds.js": 8
+      }
+    }
+  ]
+}
