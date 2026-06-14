@@ -26,6 +26,8 @@ const _CORPSE_SKIP_KEYS = new Set([
   'fountain', 'altar', 'runestone', 'shrine', 'statue', 'sarcophagus',
   'pillar', 'weapon_rack', 'mushrooms', 'web', 'torch',
   'urn', 'ashes',
+  'armor_stand', 'polished_mirror', 'glowcap_patch', 'web_mote_cluster',
+  'candle_cluster', 'ember_brazier', 'dark_reliquary', 'void_crack', 'mist_vent',
   'portcullis', 'portcullis_raised', 'chain_winch', 'flood_gate_wheel',
   'drain_throat', 'steam_vent', 'steam_blast', 'pressure_plinth',
   'pressure_plinth_pressed', 'bone_chime_rack',

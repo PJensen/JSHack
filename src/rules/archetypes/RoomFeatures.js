@@ -257,3 +257,75 @@ export const BoneChimeRack = defineArchetype(
   [Collider, { solid: true, blocksSight: false }],
   [Interactable, { action: "ringBoneChime", params: null }],
 );
+
+export const CandleCluster = defineArchetype(
+  "CandleCluster",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Candle Cluster", identity: "candle_cluster" }],
+  [Material, { kind: "wood" }],
+  [Collider, { solid: false, blocksSight: false }],
+);
+
+export const EmberBrazier = defineArchetype(
+  "EmberBrazier",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Ember Brazier", identity: "ember_brazier" }],
+  [Material, { kind: "steel" }],
+  [Collider, { solid: false, blocksSight: false }],
+);
+
+export const GlowcapPatch = defineArchetype(
+  "GlowcapPatch",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Glowcap Patch", identity: "glowcap_patch" }],
+  [Material, { kind: "wood" }],
+  [Collider, { solid: false, blocksSight: false }],
+);
+
+export const WebMoteCluster = defineArchetype(
+  "WebMoteCluster",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Web Mote Cluster", identity: "web_mote_cluster" }],
+  [Material, { kind: "organic" }],
+  [Collider, { solid: false, blocksSight: false }],
+);
+
+export const ArmorStand = defineArchetype(
+  "ArmorStand",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Armor Stand", identity: "armor_stand" }],
+  [Material, { kind: "steel" }],
+  [Collider, { solid: true, blocksSight: false }],
+);
+
+export const PolishedMirror = defineArchetype(
+  "PolishedMirror",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Polished Mirror", identity: "polished_mirror" }],
+  [Material, { kind: "silver" }],
+  [Collider, { solid: true, blocksSight: false }],
+);
+
+export const VoidCrack = defineArchetype(
+  "VoidCrack",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Void Crack", identity: "void_crack" }],
+  [Material, { kind: "obsidian" }],
+  [Collider, { solid: false, blocksSight: false }],
+);
+
+export const DarkReliquary = defineArchetype(
+  "DarkReliquary",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Dark Reliquary", identity: "dark_reliquary" }],
+  [Material, { kind: "obsidian" }],
+  [Collider, { solid: true, blocksSight: false }],
+);
+
+export const MistVent = defineArchetype(
+  "MistVent",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Mist Vent", identity: "mist_vent" }],
+  [Material, { kind: "stone" }],
+  [Collider, { solid: false, blocksSight: false }],
+);

@@ -349,11 +349,28 @@ export function collectLightSources(view, opts = {}) {
           fountain:    { radius: 3.5, pattern: 'breathe' },
           altar:       { radius: 4.5, pattern: 'breathe', softness: 4 },
           mushrooms:   { radius: 3,   pattern: 'biolum' },
+          glowcap_patch: { radius: 2.6, pattern: 'biolum', color: [65, 225, 190], softness: 7 },
+          web_mote_cluster: { radius: 2.2, pattern: 'biolum', color: [95, 190, 230], softness: 8 },
+          candle_cluster: { radius: 2.4, pattern: 'candle', color: [255, 205, 135], softness: 7 },
+          ember_brazier: { radius: 3.0, pattern: 'ember', color: [255, 115, 45], softness: 6 },
+          mist_vent: { radius: 2.8, pattern: 'pulse', color: [95, 210, 225], softness: 9 },
+          steam_vent: { radius: 2.4, pattern: 'pulse', color: [95, 210, 225], softness: 9 },
+          pressure_plinth: { radius: 2.2, pattern: 'pulse', color: [70, 185, 205], softness: 6 },
+          pressure_plinth_pressed: { radius: 3.2, pattern: 'pulse', color: [105, 235, 245], softness: 5 },
         };
         const fl = FURNITURE_LIGHT[kind];
         if (fl) {
-          const col = paletteGlow(kind) || [160, 170, 190];
+          const col = fl.color || paletteGlow(kind) || [160, 170, 190];
           emitPatterned(out, fl.pattern, t, e.id, ex, ey, fl.radius, col, fl.softness || 6);
+          continue;
+        }
+        if (kind === 'dark_reliquary') {
+          emitPatterned(out, 'occult', t, e.id, ex, ey, 2.2, SHADOW_PURPLE, 5);
+          emitVoid(out, t, e.id, ex, ey, 3.8, 0.75, 7);
+          continue;
+        }
+        if (kind === 'void_crack') {
+          emitVoid(out, t, e.id, ex, ey, 2.8, 0.65, 5);
           continue;
         }
         // Fire-based furniture — flickering, palette-coloured
@@ -372,7 +389,13 @@ export function collectLightSources(view, opts = {}) {
         emitVoid(out, t, e.id, ex, ey, 2.0, 0.5, 4);
         continue;
       }
+      if (kind === 'trap_shock' && tags && tags.includes('trap_armed')) {
+        emitPatterned(out, 'storm', t, e.id, ex, ey, 2.8, [120, 225, 255], 3);
+      }
 
+      if (e.matOptical) {
+        matInteractors.push({ id: e.id, x: ex, y: ey, kind, opt: e.matOptical });
+      }
       if (!tags) continue;
 
       // Torch-bearing NPCs/monsters
@@ -434,9 +457,6 @@ export function collectLightSources(view, opts = {}) {
       }
       // Material optical items: pure interaction (or emissive if flagged).
       // Deferred to interaction pass so we can scan the complete base source list.
-      if (e.matOptical) {
-        matInteractors.push({ id: e.id, x: ex, y: ey, kind, opt: e.matOptical });
-      }
       // Burning entities — fire light that reads as something on fire
       if (tags.includes('burning')) {
         emitPatterned(out, 'ember', t, e.id, ex, ey, 3.5, FIRE_RED, 6);

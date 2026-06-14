@@ -128,6 +128,8 @@ import {
   Sarcophagus, Pillar, WeaponRack, Mushrooms, Web, Torch, Urn,
   FlayedMan, HangingChains, Portcullis, ChainWinch, FloodGateWheel,
   DrainThroat, SteamVent, PressurePlinth, BoneChimeRack, Effigy,
+  CandleCluster, EmberBrazier, GlowcapPatch, WebMoteCluster,
+  ArmorStand, PolishedMirror, VoidCrack, DarkReliquary, MistVent,
 } from '../../archetypes/RoomFeatures.js';
 
 // Simple spawn kinds: just `createFrom(world, Archetype, { x, y })` with no extra logic.
@@ -174,6 +176,15 @@ const SIMPLE_SPAWN_TABLE = {
   pressure_plinth: PressurePlinth,
   bone_chime_rack: BoneChimeRack,
   effigy: Effigy,
+  candle_cluster: CandleCluster,
+  ember_brazier: EmberBrazier,
+  glowcap_patch: GlowcapPatch,
+  web_mote_cluster: WebMoteCluster,
+  armor_stand: ArmorStand,
+  polished_mirror: PolishedMirror,
+  void_crack: VoidCrack,
+  dark_reliquary: DarkReliquary,
+  mist_vent: MistVent,
 };
 
 // Weighted room feature table. Weight determines relative likelihood.
@@ -203,6 +214,8 @@ const DEAD_END_ROOM_THEMES = [
   { kind: 'obliiette', weight: 4 },
   { kind: 'kitchen', weight: 6 },
   { kind: 'hydraulics', weight: 5 },
+  { kind: 'spider_nest', weight: 5 },
+  { kind: 'mirror_reliquary', weight: 4 },
   { kind: 'dragon_hoard', weight: 3 },
 ];
 const DEAD_END_THEME_TOTAL_WEIGHT = DEAD_END_ROOM_THEMES.reduce((s, f) => s + f.weight, 0);
@@ -588,6 +601,7 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null, world
     'statue', 'urn', 'pillar', 'sarcophagus', 'fountain', 'altar', 'shrine',
     'mushrooms', 'weapon_rack', 'web', 'flayed_man', 'hanging_chains',
     'portcullis', 'chain_winch', 'flood_gate_wheel', 'bone_chime_rack',
+    'armor_stand', 'polished_mirror', 'dark_reliquary',
   ]);
   const SACRED_FEATURE_KINDS = new Set(['altar', 'shrine', 'church_altar']);
 
@@ -1502,6 +1516,13 @@ function findRoomExitCorridor(room, chunk) {
 function applyDeadEndTheme(ctx) {
   const { room, rng, spawns, floorPlan, chunk, isSolid, markSolid, theme, worldSeed = 0, featureCounts } = ctx;
   const reserved = new Set();
+  const addDecor = (kind, solid = false, params = {}) => {
+    const pos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
+    if (!pos) return null;
+    if (solid) markSolid(pos.x, pos.y);
+    spawns.push({ x: pos.x, y: pos.y, kind, params });
+    return pos;
+  };
 
   switch (theme) {
     case 'treasure': {
@@ -1570,6 +1591,7 @@ function applyDeadEndTheme(ctx) {
         const item = pickItem(rng, floorPlan.depth);
         spawns.push({ x: itemPos.x, y: itemPos.y, kind: item.kind, params: item });
       }
+      addDecor('candle_cluster');
       break;
     }
     case 'lore_nook': {
@@ -1583,6 +1605,7 @@ function applyDeadEndTheme(ctx) {
         const book = pickDungeonBook(rng);
         spawns.push({ x: bookPos.x, y: bookPos.y, kind: 'book', params: { bookId: book.id } });
       }
+      addDecor('candle_cluster');
       break;
     }
     case 'lair': {
@@ -1628,6 +1651,7 @@ function applyDeadEndTheme(ctx) {
           spawns.push({ x: pos.x, y: pos.y, kind: 'catalog_item', params: { itemId: rng.choice(potionPool) } });
         }
       }
+      addDecor('glowcap_patch');
       const trapPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
       if (trapPos) {
         const trap = pickTrap(rng, floorPlan.depth);
@@ -1673,6 +1697,8 @@ function applyDeadEndTheme(ctx) {
         if (!gmp) gmp = pickMonster(rng, floorPlan.depth, floorPlan.profile?.monsterFilter ?? null);
         if (gmp) spawns.push({ x: monsterPos.x, y: monsterPos.y, kind: 'monster', params: gmp });
       }
+      addDecor('candle_cluster');
+      addDecor('ember_brazier');
       break;
     }
     case 'armory': {
@@ -1681,6 +1707,7 @@ function applyDeadEndTheme(ctx) {
         markSolid(rackPos.x, rackPos.y);
         spawns.push({ x: rackPos.x, y: rackPos.y, kind: 'weapon_rack', params: { depth: floorPlan.depth } });
       }
+      addDecor('armor_stand', true);
       const equipCount = rng.int(1, 2);
       for (let i = 0; i < equipCount; i++) {
         const pos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
@@ -1696,6 +1723,7 @@ function applyDeadEndTheme(ctx) {
           spawns.push({ x: trapPos.x, y: trapPos.y, kind: 'trap', params: trap });
         }
       }
+      addDecor('ember_brazier');
       break;
     }
     case 'dragon_hoard': {
@@ -1767,6 +1795,7 @@ function applyDeadEndTheme(ctx) {
         const book = pickDungeonBook(rng);
         spawns.push({ x: bookPos.x, y: bookPos.y, kind: 'book', params: { bookId: book.id } });
       }
+      addDecor('candle_cluster');
       break;
     }
     case 'hydraulics': {
@@ -1842,6 +1871,7 @@ function applyDeadEndTheme(ctx) {
           },
         });
       }
+      addDecor('mist_vent');
 
       if (rng.next() < 0.45) {
         const chimePos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
@@ -1940,6 +1970,51 @@ function applyDeadEndTheme(ctx) {
           kind: 'catalog_item',
           params: { itemId: pantryPool[rng.int(0, pantryPool.length - 1)] },
         });
+      }
+      addDecor('ember_brazier');
+      break;
+    }
+    case 'spider_nest': {
+      if (roomContainsStairTile(room, chunk)) break;
+      removeRoomSpawns(
+        spawns,
+        room,
+        (spawn) => spawn.kind === 'shopkeeper',
+      );
+
+      addDecor('web', true);
+      addDecor('glowcap_patch');
+      addDecor('web_mote_cluster');
+      addDecor('web_mote_cluster');
+
+      const eggPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
+      if (eggPos) {
+        const gmp = pickSpecificMonster('spider', floorPlan.depth) || pickMonster(rng, floorPlan.depth, floorPlan.profile?.monsterFilter ?? null);
+        if (gmp) spawns.push({ x: eggPos.x, y: eggPos.y, kind: 'monster', params: gmp });
+      }
+      const trapPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
+      if (trapPos) {
+        spawns.push({ x: trapPos.x, y: trapPos.y, kind: 'trap', params: { type: 'swarm', params: { monsterId: 'spider', count: rng.int(3, 6) } } });
+      }
+      break;
+    }
+    case 'mirror_reliquary': {
+      if (roomContainsStairTile(room, chunk)) break;
+      removeRoomSpawns(
+        spawns,
+        room,
+        (spawn) => spawn.kind === 'shopkeeper',
+      );
+
+      addDecor('dark_reliquary', true);
+      addDecor('polished_mirror', true);
+      addDecor('void_crack');
+      addDecor('candle_cluster');
+
+      const bookPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
+      if (bookPos) {
+        const book = pickDungeonBook(rng);
+        spawns.push({ x: bookPos.x, y: bookPos.y, kind: 'book', params: { bookId: book.id } });
       }
       break;
     }

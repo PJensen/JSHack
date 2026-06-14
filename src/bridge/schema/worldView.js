@@ -222,6 +222,15 @@ function projectInteractableDisplayTags(world, id, kind, rec) {
 	}
 }
 
+function projectTrapDisplayTags(world, id, rec) {
+	const trap = world.get(id, Trap);
+	if (!trap || trap.revealed !== true) return;
+	const type = String(trap.type || "").toLowerCase();
+	if (type && !rec.tags.includes(`trap_${type}`)) rec.tags.push(`trap_${type}`);
+	if (trap.armed === true && !rec.tags.includes("trap_armed")) rec.tags.push("trap_armed");
+	if (trap.armed !== true && !rec.tags.includes("trap_disarmed")) rec.tags.push("trap_disarmed");
+}
+
 function isRoofBearingTile(tile) {
 	return tile === TILE_FLOOR || tile === TILE_WALL || tile === TILE_DOOR || tile === TILE_STAIR_DOWN;
 }
@@ -672,6 +681,24 @@ function projectItemAffixDisplayTags(kind, itemInfo, rec, matKind) {
 			}
 		}
 	}
+	// Non-gem materials on visible world objects can still participate in display
+	// lighting. This is derived from Material facts, not extra lighting state.
+	if (!rec.matOptical && matKind) {
+		const mat = getMaterialIntrinsic(matKind);
+		if (mat && (mat.lightReflect > 0.15 || mat.lightEmit > 0 || mat.lightAbsorb > 0.5)) {
+			rec.matOptical = {
+				lightPass:     mat.lightPass    || 0,
+				lightReflect:  mat.lightReflect || 0,
+				lightAbsorb:   mat.lightAbsorb  || 0,
+				dispersion:    0.0,
+				tint:          [1.0, 1.0, 1.0],
+				pattern:       mat.lightEmit > 0 ? 'breathe' : 'gem_quartz',
+				emissive:      false,
+				emitK:         mat.glowColorTempK || 0,
+				emitIntensity: mat.lightEmit      || 0,
+			};
+		}
+	}
 	if (!itemInfo || !Array.isArray(itemInfo.affixes)) return;
 	const affixes = itemInfo.affixes;
 	const hasAffix = (key) => affixes.includes(key) || affixes.includes(`affix:${key}`);
@@ -719,25 +746,6 @@ function projectItemAffixDisplayTags(kind, itemInfo, rec, matKind) {
 		                   'storm_glowing', 'soul_glowing', 'blood_glowing', 'venom_glowing', 'caustic_glowing'];
 		if (EMIT_TAGS.some(tag => rec.tags.includes(tag))) {
 			rec.matOptical.emissive = true;
-		}
-	}
-	// Non-gem items: attach matOptical for materials with meaningful optical effects.
-	// Metals get glints from lightReflect; void materials get darkness aura; emissive
-	// materials (aetherium, radiant-alloy, etc.) inject a physics-based K-temp light.
-	if (!rec.matOptical && matKind) {
-		const mat = getMaterialIntrinsic(matKind);
-		if (mat && (mat.lightReflect > 0.15 || mat.lightEmit > 0 || mat.lightAbsorb > 0.5)) {
-			rec.matOptical = {
-				lightPass:     mat.lightPass    || 0,
-				lightReflect:  mat.lightReflect || 0,
-				lightAbsorb:   mat.lightAbsorb  || 0,
-				dispersion:    0.0,
-				tint:          [1.0, 1.0, 1.0],
-				pattern:       mat.lightEmit > 0 ? 'breathe' : 'gem_quartz',
-				emissive:      false,
-				emitK:         mat.glowColorTempK || 0,
-				emitIntensity: mat.lightEmit      || 0,
-			};
 		}
 	}
 }
@@ -1091,6 +1099,7 @@ export function buildWorldView(world) {
 				rec.aggroTargetId = 0;
 				rec.aggroTargetReason = "";
 				rec.weaponVfx = null;
+				rec.matOptical = null;
 				rec.sizeClass = physSizeClass;
 				rec.itemScale = iScale;
 				rec.rotation = 0;
@@ -1101,6 +1110,7 @@ export function buildWorldView(world) {
 			projectDisplayTags(world, id, rec);
 			projectEquipmentDisplayTags(world, id, rec);
 			projectInteractableDisplayTags(world, id, kind, rec);
+			projectTrapDisplayTags(world, id, rec);
 			projectMonsterDefTags(kind, rec);
 			projectItemAffixDisplayTags(kind, itemInfo, rec, world.get(id, Material)?.kind ?? null);
 			projectCombatUi(world, id, rec, playerFactionKey);
@@ -1220,6 +1230,7 @@ export function buildWorldView(world) {
 				rec.aggroTargetId = 0;
 				rec.aggroTargetReason = "";
 				rec.weaponVfx = null;
+				rec.matOptical = null;
 				rec.sizeClass = physSizeClass2;
 				rec.itemScale = iScale2;
 				rec.rotation = 0;
@@ -1230,6 +1241,7 @@ export function buildWorldView(world) {
 			projectDisplayTags(world, id, rec);
 			projectEquipmentDisplayTags(world, id, rec);
 			projectInteractableDisplayTags(world, id, kind, rec);
+			projectTrapDisplayTags(world, id, rec);
 			projectMonsterDefTags(kind, rec);
 			projectItemAffixDisplayTags(kind, itemInfo, rec, world.get(id, Material)?.kind ?? null);
 			projectCombatUi(world, id, rec, '');
@@ -1302,6 +1314,7 @@ export function buildWorldView(world) {
 				rec.aggroTargetId = 0;
 				rec.aggroTargetReason = "";
 				rec.weaponVfx = null;
+				rec.matOptical = null;
 				rec.sizeClass = petPhysSizeClass;
 				rec.itemScale = 1;
 				rec.rotation = 0;
