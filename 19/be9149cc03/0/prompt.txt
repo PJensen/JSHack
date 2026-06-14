@@ -1,0 +1,13 @@
+the sequencing here is off, it should be on the rising edge of tile entry. it appears right now when I'm leaving the tile.
+
+also: between dodge and disarm it's a little confusing.
+
+here is where I'm landing on the distinction.
+
+1. traps that are revealed but active. when you collide with them you are given a chance to disarm. since you see the trap, and are intentionally stepping on to it, I think it makes sense to use this approach.
+
+2. for traps that are hitting you, meaning, you are stepping onto the trap, it's being triggered, on the rising edge, THEN we trigger the new dogge mecnhanic we just made.
+
+does this make sense?
+
+NOTE: it might make sense to somehow "show" the players evasion score inside the new dodge UX element.
