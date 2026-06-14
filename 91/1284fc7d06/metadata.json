@@ -1,0 +1,32 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "911284fc7d06",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "src/bridge/schema/worldView.js",
+    "src/display/lighting/sources/index.js",
+    "src/display/palette/base.js",
+    "src/display/palette/index.js",
+    "src/rules/archetypes/RoomFeatures.js",
+    "src/rules/environment/dungeon/populate.js",
+    "tests/dungeonAtmosphereLighting.test.mjs",
+    "tests/populate.test.mjs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/91/1284fc7d06/0/metadata.json",
+      "transcript": "/91/1284fc7d06/0/full.jsonl",
+      "content_hash": "/91/1284fc7d06/0/content_hash.txt",
+      "prompt": "/91/1284fc7d06/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 474649,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 10712832,
+    "output_tokens": 32768,
+    "api_call_count": 77
+  }
+}
