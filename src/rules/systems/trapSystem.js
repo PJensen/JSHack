@@ -10,6 +10,10 @@ import { statusStrength } from "../utils/statusFacade.js";
 import { chebyshevScalar } from "../utils/distance.js";
 import { defineExtension } from "../../lib/ecs-js/index.js";
 import { TrapStepQueueResource } from "../resources/trapStepQueue.js";
+import { TrapDodgePromptStateResource } from "../resources/trapDodgePromptState.js";
+import { TrapDodgePrompted } from "../../events/TrapDodgePrompted.js";
+import { TrapDodgeResolved } from "../../events/TrapDodgeResolved.js";
+import { TrapDodgeUiEnabled } from "../../events/TrapDodgeUiEnabled.js";
 
 // Traps only arm when the player is within this radius.  Monsters wander freely
 // beyond it so the dungeon feels alive; once the player closes in, traps go hot
@@ -93,42 +97,7 @@ function ensureTrapIdentity(world, trapId, t) {
   try { world.add(trapId, NamedIdentity, { name, identity }); } catch {}
 }
 
-function triggerTrap(world, trapId, t, victimId, playerId) {
-  const isPlayerVictim = victimId === playerId;
-
-  if (!isPlayerVictim) {
-    try { world.set(trapId, Trap, triggeredTrapState(clearResetMarker(t), world)); } catch {}
-    world.emit("trap:triggered", { trapId, victimId, type: t.type });
-    const scriptKey = t.script || fallbackScriptForTrap(t.type);
-    if (scriptKey) {
-      runScript(scriptKey, ScriptVerb.TrapTrigger, world, {
-        trapId, targetId: victimId, trap: t, params: t.params || {},
-      });
-    }
-    return true;
-  }
-
-  const dc = t.difficulty || 10;
-  const stats = resolveCanonicalStats(world, victimId);
-  const evade = Number(stats?.evade || 0);
-  const avoidSeed = combatSeed(world.seed, world.step, victimId, trapId, 0x7A9);
-  const avoidRng = mulberry32(avoidSeed);
-  const avoidRoll = rngInt(avoidRng, 1, 20);
-  let avoided = (avoidRoll + evade) >= (dc + 5);
-
-  const luck = Number(stats?.luck || 0) + statusStrength(world, victimId, "lucky");
-  if (!avoided && luck > 0) {
-    avoided = pct(avoidRng, luck);
-  } else if (avoided && luck < 0) {
-    avoided = !pct(avoidRng, -luck);
-  }
-
-  if (avoided) {
-    try { world.set(trapId, Trap, { ...clearResetMarker(t), revealed: true, armed: true }); } catch {}
-    world.emit("trap:avoided", { victimId, trapId, type: t.type });
-    return false;
-  }
-
+function resolveTrapHit(world, trapId, t, victimId) {
   ensureTrapIdentity(world, trapId, t);
   world.emit("trap:triggered", { trapId, victimId, type: t.type });
 
@@ -145,6 +114,94 @@ function triggerTrap(world, trapId, t, victimId, playerId) {
   try { world.set(trapId, Trap, triggeredTrapState(clearResetMarker(t), world)); } catch {}
   return true;
 }
+
+function resolveTrapDodge(world, trapId, t, victimId) {
+  try { world.set(trapId, Trap, { ...clearResetMarker(t), revealed: true, armed: true }); } catch {}
+  world.emit("trap:avoided", { victimId, trapId, type: t.type });
+  return false;
+}
+
+function trapDodgeContext(world, trapId, t, victimId) {
+  const dc = t.difficulty || 10;
+  const stats = resolveCanonicalStats(world, victimId);
+  const evade = Number(stats?.evade || 0);
+  const avoidSeed = combatSeed(world.seed, world.step, victimId, trapId, 0x7A9);
+  const avoidRng = mulberry32(avoidSeed);
+  const avoidRoll = rngInt(avoidRng, 1, 20);
+  let avoided = (avoidRoll + evade) >= (dc + 5);
+
+  const luck = Number(stats?.luck || 0) + statusStrength(world, victimId, "lucky");
+  if (!avoided && luck > 0) {
+    avoided = pct(avoidRng, luck);
+  } else if (avoided && luck < 0) {
+    avoided = !pct(avoidRng, -luck);
+  }
+
+  const durationMs = Math.max(500, Math.min(2200, 850 + Math.max(0, evade) * 70));
+  const angleDeg = rngInt(avoidRng, 0, 359);
+  return { avoided, evade, durationMs, angleDeg };
+}
+
+function triggerTrap(world, trapId, t, victimId, playerId) {
+  const isPlayerVictim = victimId === playerId;
+
+  if (!isPlayerVictim) {
+    return resolveTrapHit(world, trapId, t, victimId);
+  }
+
+  const dodge = trapDodgeContext(world, trapId, t, victimId);
+  const promptState = world.resource(TrapDodgePromptStateResource);
+  if (promptState.enabled) {
+    const promptId = [
+      "trap",
+      Number(world.step || 0) | 0,
+      victimId,
+      trapId,
+    ].join(":");
+    promptState.pending.set(promptId, {
+      trapId,
+      victimId,
+      trap: clearResetMarker(t),
+    });
+    world.emit(new TrapDodgePrompted({
+      promptId,
+      victimId,
+      trapId,
+      type: t.type,
+      durationMs: dodge.durationMs,
+      angleDeg: dodge.angleDeg,
+      evade: dodge.evade,
+    }));
+    return false;
+  }
+
+  return dodge.avoided
+    ? resolveTrapDodge(world, trapId, t, victimId)
+    : resolveTrapHit(world, trapId, t, victimId);
+}
+
+export const trapDodgePromptExtension = defineExtension("jshack:trap:dodgePrompt", (world) => {
+  world.on(TrapDodgeUiEnabled, (event) => {
+    world.resource(TrapDodgePromptStateResource).enabled = event.enabled !== false;
+  });
+
+  world.on(TrapDodgeResolved, (event) => {
+    const promptState = world.resource(TrapDodgePromptStateResource);
+    const pending = promptState.pending.get(event.promptId);
+    if (!pending) return;
+    promptState.pending.delete(event.promptId);
+    if (pending.victimId !== event.victimId || pending.trapId !== event.trapId) return;
+    if (!world.isAlive(pending.victimId)) return;
+    const current = world.get(pending.trapId, Trap);
+    if (!current || !trapIsArmedNow(current, world)) return;
+
+    if (event.dodged) {
+      resolveTrapDodge(world, pending.trapId, current, pending.victimId);
+    } else {
+      resolveTrapHit(world, pending.trapId, current, pending.victimId);
+    }
+  });
+});
 
 export const trapStepListenerExtension = defineExtension("jshack:trap:stepListener", (world) => {
   world.on("moved", ({ id, from, to }) => {

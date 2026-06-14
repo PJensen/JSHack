@@ -78,6 +78,114 @@ export function initOverlays() {
   const spellGestureHint = ensureSpellGestureHint(root);
   const virtualJoystick = ensureVirtualJoystick(root);
   const gestureDebug = ensureGestureDebugLayer(root);
+  const trapDodge = document.createElement('div');
+  const trapDodgeFill = document.createElement('div');
+  const trapDodgeBtn = document.createElement('button');
+  Object.assign(trapDodge.style, {
+    position: 'fixed',
+    left: '50%',
+    top: '50%',
+    width: '116px',
+    height: '54px',
+    transform: 'translate(-50%, -50%)',
+    zIndex: '1220',
+    display: 'none',
+    pointerEvents: 'auto',
+    touchAction: 'manipulation',
+  });
+  Object.assign(trapDodgeBtn.style, {
+    position: 'absolute',
+    inset: '0',
+    border: '1px solid rgba(255,255,255,0.48)',
+    borderRadius: '8px',
+    background: 'rgba(22,24,28,0.92)',
+    color: '#fff7d7',
+    font: '700 16px/1 system-ui, sans-serif',
+    letterSpacing: '0',
+    textTransform: 'uppercase',
+    boxShadow: '0 12px 30px rgba(0,0,0,0.42), 0 0 24px rgba(255,92,42,0.28)',
+    overflow: 'hidden',
+  });
+  Object.assign(trapDodgeFill.style, {
+    position: 'absolute',
+    left: '0',
+    bottom: '0',
+    width: '100%',
+    height: '5px',
+    background: 'linear-gradient(90deg, #f05b35, #ffd166)',
+    transformOrigin: 'left center',
+    transform: 'scaleX(1)',
+    pointerEvents: 'none',
+  });
+  trapDodgeBtn.textContent = 'Dodge';
+  trapDodgeBtn.appendChild(trapDodgeFill);
+  trapDodge.appendChild(trapDodgeBtn);
+  root.appendChild(trapDodge);
+  let trapDodgePrompt = null;
+  let trapDodgeRaf = 0;
+
+  function finishTrapDodge(dodged) {
+    if (!trapDodgePrompt) return;
+    const prompt = trapDodgePrompt;
+    trapDodgePrompt = null;
+    if (trapDodgeRaf) {
+      cancelAnimationFrame(trapDodgeRaf);
+      trapDodgeRaf = 0;
+    }
+    trapDodge.style.display = 'none';
+    window.dispatchEvent(new CustomEvent('ui:trapDodgeResolved', {
+      detail: {
+        promptId: prompt.promptId,
+        victimId: prompt.victimId,
+        trapId: prompt.trapId,
+        dodged,
+      },
+    }));
+  }
+
+  function showTrapDodgePrompt(detail) {
+    const durationMs = Math.max(250, Number(detail?.durationMs || 0) | 0);
+    const angle = Number(detail?.angleDeg || 0) * Math.PI / 180;
+    const shortSide = Math.min(window.innerWidth || 0, window.innerHeight || 0);
+    const radius = Math.max(92, Math.min(210, shortSide * 0.28));
+    const cx = (window.innerWidth || 0) * 0.5;
+    const cy = (window.innerHeight || 0) * 0.5;
+    const margin = 68;
+    const x = Math.max(margin, Math.min((window.innerWidth || 0) - margin, cx + Math.cos(angle) * radius));
+    const y = Math.max(margin, Math.min((window.innerHeight || 0) - margin, cy + Math.sin(angle) * radius));
+    trapDodgePrompt = {
+      promptId: String(detail?.promptId || ''),
+      victimId: Number(detail?.victimId || 0) | 0,
+      trapId: Number(detail?.trapId || 0) | 0,
+      startedAt: performance.now(),
+      durationMs,
+    };
+    trapDodge.style.left = `${x}px`;
+    trapDodge.style.top = `${y}px`;
+    trapDodgeFill.style.transform = 'scaleX(1)';
+    trapDodge.style.display = 'block';
+    trapDodgeBtn.focus({ preventScroll: true });
+
+    const tick = () => {
+      if (!trapDodgePrompt) return;
+      const elapsed = performance.now() - trapDodgePrompt.startedAt;
+      const remaining = Math.max(0, 1 - elapsed / trapDodgePrompt.durationMs);
+      trapDodgeFill.style.transform = `scaleX(${remaining})`;
+      if (remaining <= 0) {
+        finishTrapDodge(false);
+        return;
+      }
+      trapDodgeRaf = requestAnimationFrame(tick);
+    };
+    if (trapDodgeRaf) cancelAnimationFrame(trapDodgeRaf);
+    trapDodgeRaf = requestAnimationFrame(tick);
+  }
+
+  trapDodgeBtn.addEventListener('pointerdown', (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    finishTrapDodge(true);
+  }, { passive: false });
   // Flex container for debug graph overlays — graphs stack bottom-up
   const debugGraphStack = document.createElement('div');
   Object.assign(debugGraphStack.style, {
@@ -1230,6 +1338,12 @@ export function initOverlays() {
       spellGestureHint.wrap.style.display = 'none';
       spellGestureTimer = 0;
     }, duration);
+  });
+
+  window.addEventListener('ui:trapDodgePrompt', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    showTrapDodgePrompt(e?.detail || {});
   });
 
   // Death log overlay (all past deaths)

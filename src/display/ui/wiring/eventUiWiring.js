@@ -2,6 +2,10 @@
 // Event-driven UI wiring: engrave, item:used, spell:learned,
 // interaction (chest), harvest:picked.
 
+import { TrapDodgePrompted } from "../../../events/TrapDodgePrompted.js";
+import { TrapDodgeResolved } from "../../../events/TrapDodgeResolved.js";
+import { TrapDodgeUiEnabled } from "../../../events/TrapDodgeUiEnabled.js";
+
 const _installed = Symbol.for('jshack:display:eventUiWiring:installed');
 
 /**
@@ -31,6 +35,27 @@ export function installEventUiWiring({
 }) {
   if (/** @type {any} */ (world)[_installed]) return;
   /** @type {any} */ (world)[_installed] = true;
+  world.emit(new TrapDodgeUiEnabled({ enabled: true }));
+
+  world.on(TrapDodgePrompted, (event) => {
+    try {
+      window.dispatchEvent(new CustomEvent('ui:trapDodgePrompt', { detail: event }));
+    } catch (e) { console.debug('[eventUiWiring] dispatch ui:trapDodgePrompt:', e); }
+  });
+
+  window.addEventListener('ui:trapDodgeResolved', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const detail = e?.detail || {};
+    try {
+      world.emit(new TrapDodgeResolved({
+        promptId: detail.promptId,
+        victimId: detail.victimId,
+        trapId: detail.trapId,
+        dodged: !!detail.dodged,
+      }));
+    } catch (err) { console.debug('[eventUiWiring] emit TrapDodgeResolved:', err); }
+  });
 
   // Engrave floating text (messages handled in messageWiring)
   world.on('engrave', ({ text, x, y, profane }) => {

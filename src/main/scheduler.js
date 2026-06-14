@@ -61,7 +61,7 @@ import { intentValidationSystem } from "../rules/systems/intentValidationSystem.
 import { combatSystem, installBumpAttackListener } from "../rules/systems/combatSystem.js";
 import { installCombatInteractions } from "../rules/data/combatInteractions.js";
 import { cleanupSystem } from "../rules/systems/cleanupSystem.js";
-import { trapSystem, trapStepListenerExtension } from "../rules/systems/trapSystem.js";
+import { trapSystem, trapDodgePromptExtension, trapStepListenerExtension } from "../rules/systems/trapSystem.js";
 import { disarmTrapSystem } from "../rules/systems/disarmTrapSystem.js";
 import { manaRegenerationSystem } from "../rules/systems/manaRegenerationSystem.js";
 import { staminaRegenerationSystem } from "../rules/systems/staminaRegenerationSystem.js";
@@ -166,6 +166,7 @@ export function configureWorld(world) {
   installTileStepEffectListener(world);
   // Trap plates trigger from arrival movement events, then resolve in trapSystem.
   world.install(trapStepListenerExtension);
+  world.install(trapDodgePromptExtension);
   // Material reactions consume semantic reaction events (water splash/dip, etc.).
   world.install(materialReactionListenersExtension);
   // Polymorph requests (e.g. mimic reveal on touch).

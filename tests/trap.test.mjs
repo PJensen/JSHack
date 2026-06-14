@@ -10,7 +10,10 @@ import { Mana } from '../src/rules/components/Mana.js';
 import { Stamina } from '../src/rules/components/Stamina.js';
 import { Faction } from '../src/rules/components/Faction.js';
 import { ActiveEffects } from '../src/rules/components/ActiveEffects.js';
-import { trapSystem, trapStepListenerExtension } from '../src/rules/systems/trapSystem.js';
+import { trapSystem, trapDodgePromptExtension, trapStepListenerExtension } from '../src/rules/systems/trapSystem.js';
+import { TrapDodgePrompted } from '../src/events/TrapDodgePrompted.js';
+import { TrapDodgeResolved } from '../src/events/TrapDodgeResolved.js';
+import { TrapDodgeUiEnabled } from '../src/events/TrapDodgeUiEnabled.js';
 import { movementSystem } from '../src/rules/systems/movementSystem.js';
 import { MoveIntent } from '../src/rules/components/Intents/MoveIntent.js';
 import { clearAll, loadChunk } from '../src/rules/environment/dungeon/tileMap.js';
@@ -241,6 +244,79 @@ Deno.test("trap:avoided event emitted on avoidance", () => {
   assert(emitted.victimId === player, `victimId should be ${player}, got ${emitted.victimId}`);
   assert(emitted.trapId === trap, `trapId should be ${trap}, got ${emitted.trapId}`);
   assert(emitted.type === 'spike', `type should be spike, got ${emitted.type}`);
+});
+
+Deno.test("interactive trap dodge prompts before resolving player trap", () => {
+  const world = new World({ seed: 1 });
+  world.install(trapDodgePromptExtension);
+  world.emit(new TrapDodgeUiEnabled({ enabled: true }));
+
+  const player = world.create();
+  world.add(player, Player);
+  world.add(player, Position, { x: 3, y: 3 });
+  world.add(player, Vitality, { maxHp: 100, hp: 100 });
+  world.add(player, BaseStats, { dexterity: 50 });
+
+  const trap = world.create();
+  world.add(trap, Position, { x: 3, y: 3 });
+  world.add(trap, Trap, { type: 'spike', armed: true, revealed: false, script: 'trap_spike', params: { percent: 0.25 }, difficulty: 1 });
+
+  let prompt = null;
+  let avoided = null;
+  world.on(TrapDodgePrompted, (event) => { prompt = event; });
+  world.on('trap:avoided', (event) => { avoided = event; });
+
+  stepOntoTrap(world, player, 3, 3);
+  trapSystem(world);
+
+  assert(prompt !== null, "interactive trap dodge should emit a prompt");
+  assert(world.get(player, Vitality).hp === 100, "trap should wait for prompt resolution");
+  assert(world.get(trap, Trap).armed === true, "trap should stay armed while dodge prompt is pending");
+  assert(prompt.durationMs > 850, `evade should lengthen the dodge timer, got ${prompt.durationMs}`);
+  assert(prompt.angleDeg >= 0 && prompt.angleDeg < 360, `prompt angle should be polar degrees, got ${prompt.angleDeg}`);
+
+  world.emit(new TrapDodgeResolved({
+    promptId: prompt.promptId,
+    victimId: player,
+    trapId: trap,
+    dodged: true,
+  }));
+
+  assert(avoided !== null, "successful prompt should avoid the trap");
+  assert(world.get(player, Vitality).hp === 100, "successful dodge should prevent damage");
+  assert(world.get(trap, Trap).armed === true, "dodged trap should remain armed");
+});
+
+Deno.test("interactive trap dodge timeout triggers player trap", () => {
+  const world = new World({ seed: 1 });
+  world.install(trapDodgePromptExtension);
+  world.emit(new TrapDodgeUiEnabled({ enabled: true }));
+
+  const player = world.create();
+  world.add(player, Player);
+  world.add(player, Position, { x: 3, y: 3 });
+  world.add(player, Vitality, { maxHp: 100, hp: 100 });
+
+  const trap = world.create();
+  world.add(trap, Position, { x: 3, y: 3 });
+  world.add(trap, Trap, { type: 'spike', armed: true, revealed: false, script: 'trap_spike', params: { percent: 0.25 }, difficulty: 21 });
+
+  let prompt = null;
+  world.on(TrapDodgePrompted, (event) => { prompt = event; });
+
+  stepOntoTrap(world, player, 3, 3);
+  trapSystem(world);
+  assert(prompt !== null, "interactive trap dodge should emit a prompt");
+
+  world.emit(new TrapDodgeResolved({
+    promptId: prompt.promptId,
+    victimId: player,
+    trapId: trap,
+    dodged: false,
+  }));
+
+  assert(world.get(player, Vitality).hp === 75, "failed prompt should trigger trap damage");
+  assert(world.get(trap, Trap).armed === false, "triggered trap should disarm");
 });
 
 Deno.test("pit trap emits fall event and applies minor damage", () => {
