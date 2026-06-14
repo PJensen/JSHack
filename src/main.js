@@ -1930,6 +1930,8 @@ function hideTrapTooltip() {
   try { window.dispatchEvent(new CustomEvent('ui:hideTrapTooltip')); } catch (e) { console.debug('[main] dispatch ui:hideTrapTooltip:', e); }
 }
 
+const _resolvedTrapTooltipSuppress = new Set();
+
 // Temporary debug kill-switch while validating modern loot affordances.
 // Keep this code-only (no URL/localStorage) to make rollback cheap.
 const DEBUG_DISABLE_LEGACY_FLOOR_PICKUP_TOOLTIP = true;
@@ -1988,7 +1990,8 @@ world.on('moved', ({ id, to }) => {
   // Trap tooltip: show when standing on an armed trap
   let foundTrap = null;
   for (const [tid, tpos, t] of world.query(Position, Trap)) {
-    if (!tpos || !t || !t.armed) continue;
+    if (!tpos || !t || !t.armed || !t.revealed) continue;
+    if (_resolvedTrapTooltipSuppress.has(tid)) continue;
     if (tpos.x === to.x && tpos.y === to.y) {
       const ni = world.get(tid, NamedIdentity);
       foundTrap = { id: tid, name: ni?.name || t.type, difficulty: t.difficulty };
@@ -2054,15 +2057,19 @@ world.on('trap:triggered', ({ victimId }) => {
   hideTrapTooltip();
 });
 
-world.on('trap:disarmed', ({ actor }) => {
+world.on('trap:disarmed', ({ actor, trapId }) => {
   const pe = playerEntity(world);
   if (!pe || pe.id !== (Number(actor) | 0)) return;
+  _resolvedTrapTooltipSuppress.add(Number(trapId || 0) | 0);
+  queueMicrotask(() => _resolvedTrapTooltipSuppress.delete(Number(trapId || 0) | 0));
   hideTrapTooltip();
 });
 
-world.on('trap:disarm:failed', ({ actor }) => {
+world.on('trap:disarm:failed', ({ actor, trapId }) => {
   const pe = playerEntity(world);
   if (!pe || pe.id !== (Number(actor) | 0)) return;
+  _resolvedTrapTooltipSuppress.add(Number(trapId || 0) | 0);
+  queueMicrotask(() => _resolvedTrapTooltipSuppress.delete(Number(trapId || 0) | 0));
   hideTrapTooltip();
 });
 

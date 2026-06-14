@@ -13,6 +13,7 @@ import { renderLockPicking } from './lockPickingOverlay.js';
 import { renderMonsterChooser } from './monsterChooserOverlay.js';
 import { playDeathJingle } from '../fx/deathJingle.js';
 import { readInputMode } from '../input/inputSettings.js';
+import { setInputLock } from '../input/inputLock.js';
 import { getInventoryDefaultAction } from './inventoryUtils.js';
 export { getInventoryDefaultAction };
 
@@ -150,6 +151,7 @@ export function initOverlays() {
       trapDodgeRaf = 0;
     }
     trapDodge.style.display = 'none';
+    setInputLock('trapDodge', false);
     window.dispatchEvent(new CustomEvent('ui:trapDodgeResolved', {
       detail: {
         promptId: prompt.promptId,
@@ -182,6 +184,7 @@ export function initOverlays() {
     trapDodgeFill.style.transform = 'scaleX(1)';
     trapDodgeStat.textContent = `EVA ${Number(detail?.evade || 0) | 0}`;
     trapDodge.style.display = 'block';
+    setInputLock('trapDodge', true);
     trapDodgeBtn.focus({ preventScroll: true });
 
     const tick = () => {

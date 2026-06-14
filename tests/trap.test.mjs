@@ -1,6 +1,7 @@
 import "./helpers/installContentMonsters.mjs";
 import { assert } from "jsr:@std/assert";
 import { World } from '../src/lib/ecs-js/index.js';
+import { configureWorld } from '../src/main/scheduler.js';
 import { Position } from '../src/rules/components/Position.js';
 import { Player } from '../src/rules/components/Player.js';
 import { Trap } from '../src/rules/components/Trap.js';
@@ -346,6 +347,41 @@ Deno.test("revealed active trap entry attempts disarm instead of dodge prompt", 
   assert(disarmed.trapId === trap, `disarm should target trap ${trap}, got ${disarmed.trapId}`);
   assert(world.get(player, Vitality).hp === 100, "successful disarm should prevent damage");
   assert(world.get(trap, Trap).armed === false, "successful disarm should disable the trap");
+});
+
+Deno.test("configured movement onto revealed active trap disarms on entry", () => {
+  clearAll();
+  try {
+    loadChunk(0, 0, new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR));
+    const world = new World({ seed: 1 });
+    configureWorld(world);
+
+    const player = world.create();
+    world.add(player, Player);
+    world.add(player, Position, { x: 2, y: 3 });
+    world.add(player, Vitality, { maxHp: 100, hp: 100 });
+    world.add(player, BaseStats, { dexterity: 50 });
+
+    const trap = world.create();
+    world.add(trap, Position, { x: 3, y: 3 });
+    world.add(trap, Trap, { type: 'spike', armed: true, revealed: true, script: 'trap_spike', params: { percent: 0.25 }, difficulty: 1 });
+
+    let prompted = false;
+    let disarmed = null;
+    world.on(TrapDodgePrompted, () => { prompted = true; });
+    world.on('trap:disarmed', (event) => { disarmed = event; });
+
+    world.add(player, MoveIntent, { dx: 1, dy: 0 });
+    world.tick(1);
+
+    assert(!prompted, "configured visible trap entry should not show dodge prompt");
+    assert(disarmed !== null, "configured visible trap entry should disarm");
+    assert(disarmed.trapId === trap, `disarm should target trap ${trap}, got ${disarmed.trapId}`);
+    assert(world.get(player, Vitality).hp === 100, "successful disarm should prevent damage");
+    assert(world.get(trap, Trap).armed === false, "successful disarm should disable the trap");
+  } finally {
+    clearAll();
+  }
 });
 
 Deno.test("pit trap emits fall event and applies minor damage", () => {
