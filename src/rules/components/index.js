@@ -88,6 +88,7 @@ export { Reputation, REPUTATION_BANDS } from './Reputation.js';
 export { RoomMetadata } from './RoomMetadata.js';
 export { HarvestNode } from './HarvestNode.js';
 export { HazardArea } from './HazardArea.js';
+export { VoidHole } from './VoidHole.js';
 export { ObjectState } from './ObjectState.js';
 export { DisarmIntent } from './Intents/DisarmIntent.js';
 export { SearchIntent } from './Intents/SearchIntent.js';

@@ -47,6 +47,8 @@ import { Equipment, NON_AMMO_GEAR_SLOTS } from "../components/Equipment.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { Channeling } from "../components/Channeling.js";
 import { KnockbackPending } from "../components/KnockbackPending.js";
+import { Lifespan } from "../components/Lifespan.js";
+import { VoidHole } from "../components/VoidHole.js";
 import { AggroState, AGGRO_LEVELS, SEARCH_TURNS_ALERTED } from "../components/AggroState.js";
 import { hasEquippedProcPackageInSlot } from "../utils/spellProcGear.js";
 import { resolveCombatSnapshot } from "../utils/resolveCombatSnapshot.js";
@@ -65,6 +67,7 @@ import { spawnWeb } from "../utils/spawnWeb.js";
 import { ALL_DIRS } from "../utils/directions.js";
 import { forEachInRadius } from "../utils/spatialIndex.js";
 import { resolveScrollEffectDuration } from "../utils/scrollReading.js";
+import { attachEntityToCurrentFloor } from "../utils/floorEntities.js";
 import { ArcaneBarrageCast, MagicMissileCast } from "../../events/ArcaneProjectileCast.js";
 
 /** @returns {any|null} */
@@ -3501,6 +3504,83 @@ function runArcaneMissileSpell(world, actor, spell, tuning) {
     lanes: tuning.lanes || 1,
   }));
 }
+
+function resolveAreaSpellCenter(world, actor, spell, intent) {
+  const apos = /** @type any */ (world.get(actor, Position));
+  if (!apos) return null;
+  const actorFaction = String(world.get(actor, Faction)?.key || 'player');
+  const range = Math.max(1, Number(spell?.range || 9) | 0);
+  const isBlocked = createLOSBlocker(world);
+
+  if (intent && intent.x != null && intent.y != null) {
+    const ox = Number(intent.x) | 0;
+    const oy = Number(intent.y) | 0;
+    const dist = chebyshevScalar(ox, oy, apos.x | 0, apos.y | 0);
+    if (!(dist > 0) || dist > range) {
+      world.emit('spell:no-target', { actor, spellId: spell?.id || '', reason: 'out_of_range', range, requested: { x: ox, y: oy } });
+      return null;
+    }
+    if (!hasSpellLineOfSight(world, {
+      sourceId: actor,
+      sourcePos: apos,
+      targetPos: { x: ox, y: oy },
+      range,
+      isBlocked,
+      allowFlyingOccupantAtTarget: true,
+    })) {
+      world.emit('spell:no-target', { actor, spellId: spell?.id || '', reason: 'blocked_los', range, requested: { x: ox, y: oy } });
+      return null;
+    }
+    return { x: ox, y: oy, from: { x: apos.x | 0, y: apos.y | 0 } };
+  }
+
+  let bestId = 0;
+  let bestD2 = Infinity;
+  for (const [id, pos] of world.query(Position)) {
+    if (id === actor) continue;
+    const fac = /** @type any */ (world.get(id, Faction));
+    if (!fac || !areFactionsHostile(actorFaction, fac.key)) continue;
+    const vit = /** @type any */ (world.get(id, Vitality));
+    if (!vit || (vit.hp | 0) <= 0) continue;
+    const dx = (pos.x | 0) - (apos.x | 0);
+    const dy = (pos.y | 0) - (apos.y | 0);
+    const d2 = dx * dx + dy * dy;
+    if (d2 > range * range || d2 >= bestD2) continue;
+    if (!hasSpellLineOfSight(world, {
+      sourceId: actor,
+      targetId: id,
+      sourcePos: apos,
+      targetPos: pos,
+      range,
+      isBlocked,
+    })) continue;
+    bestId = id;
+    bestD2 = d2;
+  }
+  if (!bestId) {
+    world.emit('spell:no-target', { actor, spellId: spell?.id || '', range });
+    return null;
+  }
+  const tpos = /** @type any */ (world.get(bestId, Position));
+  return { x: tpos.x | 0, y: tpos.y | 0, from: { x: apos.x | 0, y: apos.y | 0 } };
+}
+
+REGISTRY['void_hole'] = function voidHoleScript(world, actor, spell, intent) {
+  const center = resolveAreaSpellCenter(world, actor, spell, intent);
+  if (!center) return;
+  const radius = resolveSpellRadius(world, actor, spell) || 3;
+  const holeId = world.create();
+  world.add(holeId, Position, { x: center.x, y: center.y });
+  world.add(holeId, NamedIdentity, { name: "Void Hole", identity: "void_hole" });
+  world.add(holeId, VoidHole, {
+    sourceId: actor,
+    radius,
+    pullSteps: 1,
+    tickDamage: 4,
+  });
+  world.add(holeId, Lifespan, { turnsLeft: 4, onExpiry: "remove", expiryEvent: "" });
+  attachEntityToCurrentFloor(world, holeId);
+};
 
 /** Shared helper: auto-target nearest hostile in range + LOS, deal damage, restore resources.
  *  manaPct / staminaPct are fractions of the actor's derived max pool (e.g. 0.06 = 6%). */

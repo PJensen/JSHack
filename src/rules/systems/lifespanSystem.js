@@ -20,12 +20,10 @@ export function lifespanSystem(world) {
 
     if (ls.onExpiry === "emit" && ls.expiryEvent) {
       const pos = world.get(id, Position);
-      try {
-        world.emit?.(ls.expiryEvent, {
-          id,
-          at: pos ? { x: pos.x | 0, y: pos.y | 0 } : null,
-        });
-      } catch { /* */ }
+      world.emit(ls.expiryEvent, {
+        id,
+        at: pos ? { x: pos.x | 0, y: pos.y | 0 } : null,
+      });
     }
 
     if (world.has(id, Inventory)) destroyInventoryRoot(world, id);

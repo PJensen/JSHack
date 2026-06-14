@@ -6,6 +6,7 @@ import { pathPolyline, jitterLine } from "./fxGeom.js";
 import { Particle } from "../passes/vfx/particles/particlePool.js";
 import { RadialFx, BlinkFx, PhaseStrikeFx, SearchPulseFx, ArcSweepFx, SmokeFx } from "./fxEntries.js";
 import { isGoreDisabled } from "../ui/wiring/goreEngine.js";
+import { VoidHoleCast } from "../../events/VoidHoleCast.js";
 
 /**
  * @param {{ world: import('../../lib/ecs-js/index.js').World, cam: object, fx: { pool: { spawn(o:object):void } }, PERF: { quality: string }, getFxTime: () => number, getPosition?: (id:number) => ({x:number,y:number}|null), ftext?: { addDamage: Function, addStatus?: Function }, sculptFloor?: ((x:number,y:number,delta:number,reliefKey?: string|number)=>void), sculptFloorBrush?: ((x:number,y:number,delta:number,radius:number,opts?:object,reliefKey?:string|number)=>void), getActiveReliefKey?: (() => (string|number|null|undefined)) }} deps
@@ -172,6 +173,8 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
   // --- Blastwave state ---
   /** @type {RadialFx[]} */
   const _blastwaveFx = [];
+  /** @type {Array<RadialFx & { phase:number, strength:number }>} */
+  const _voidHoleFx = [];
 
   // --- Flash Heal state ---
   /** @type {RadialFx[]} */
@@ -376,6 +379,10 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
     for (let i = _blastwaveFx.length - 1; i >= 0; i--) {
       _blastwaveFx[i].tick(dt);
       if (_blastwaveFx[i].expired) _blastwaveFx.splice(i, 1);
+    }
+    for (let i = _voidHoleFx.length - 1; i >= 0; i--) {
+      _voidHoleFx[i].tick(dt);
+      if (_voidHoleFx[i].expired) _voidHoleFx.splice(i, 1);
     }
     for (let i = _flashHealFx.length - 1; i >= 0; i--) {
       _flashHealFx[i].tick(dt);
@@ -857,6 +864,46 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
         const cFlashA = 0.7 * (1 - t / 0.16);
         ctx.fillStyle = `rgba(255,255,255,${cFlashA})`;
         ctx.beginPath(); ctx.arc(bw.x, bw.y, 0.45, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+
+  /** @param {CanvasRenderingContext2D} ctx */
+  function drawVoidHole(ctx) {
+    if (!_voidHoleFx.length) return;
+    const time = Number(getFxTime?.() || 0);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const well of _voidHoleFx) {
+      const t = well.progress;
+      const alpha = well.alpha;
+      const pulse = 0.82 + 0.18 * Math.sin(time * 5.2 + well.phase);
+      const r = Math.max(0.4, well.radius * (0.18 + t * 0.82));
+
+      ctx.strokeStyle = `rgba(150,80,230,${(0.62 * alpha).toFixed(3)})`;
+      ctx.lineWidth = Math.max(0.05, 0.20 * alpha);
+      ctx.beginPath();
+      ctx.arc(well.x, well.y, r * pulse, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.strokeStyle = `rgba(65,25,120,${(0.46 * alpha).toFixed(3)})`;
+      ctx.lineWidth = Math.max(0.04, 0.12 * alpha);
+      ctx.beginPath();
+      ctx.arc(well.x, well.y, Math.max(0.12, r * 0.62), 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.fillStyle = `rgba(25,5,45,${(0.34 * alpha).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(well.x, well.y, Math.max(0.18, r * 0.42), 0, Math.PI * 2);
+      ctx.fill();
+
+      if (t < 0.22) {
+        const flash = 1 - t / 0.22;
+        ctx.fillStyle = `rgba(205,160,255,${(0.38 * flash).toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(well.x, well.y, well.radius * (0.35 + t), 0, Math.PI * 2);
+        ctx.fill();
       }
     }
     ctx.restore();
@@ -1600,6 +1647,43 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
             size0: 0.18 + Math.random() * 0.06, size1: 0.03,
             r: 210, g: 225, b: 255,
             a0: 0.85,
+          }));
+        }
+      }
+    });
+
+    world.on(VoidHoleCast, ({ origin, radius, affected }) => {
+      if (!origin || !Number.isFinite(origin.x) || !Number.isFinite(origin.y)) return;
+      const well = new RadialFx({
+        x: Number(origin.x),
+        y: Number(origin.y),
+        radius: Math.max(2, Number(radius) || 3),
+        ttl: 0.92,
+      });
+      well.phase = Math.random() * Math.PI * 2;
+      well.strength = 0.95;
+      _voidHoleFx.push(well);
+      startShake(cam, 4, 0.16);
+
+      if (fx?.pool) {
+        const count = 22 + Math.min(18, Array.isArray(affected) ? affected.length * 4 : 0);
+        for (let i = 0; i < count; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const dist = 0.55 + Math.random() * Math.max(1.2, Number(radius) || 3);
+          const speed = 1.2 + Math.random() * 1.8;
+          fx.pool.spawn(new Particle({
+            x: Number(origin.x) + Math.cos(angle) * dist,
+            y: Number(origin.y) + Math.sin(angle) * dist,
+            vx: -Math.cos(angle) * speed,
+            vy: -Math.sin(angle) * speed,
+            life: 0.24 + Math.random() * 0.34,
+            size0: 0.055 + Math.random() * 0.075,
+            size1: 0.004,
+            r: 145 + ((Math.random() * 70) | 0),
+            g: 55 + ((Math.random() * 35) | 0),
+            b: 225 + ((Math.random() * 30) | 0),
+            a0: 0.82,
+            rotVel: (Math.random() - 0.5) * 4,
           }));
         }
       }
@@ -3136,6 +3220,19 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
       const b = _blastwaveFx[i];
       out.push({ x: b.x, y: b.y, radius: (b.radius || 2) * 2 * b.alpha, color: [255, 200, 100] });
     }
+    for (let i = 0; i < _voidHoleFx.length; i++) {
+      const v = _voidHoleFx[i];
+      const pulse = 0.82 + 0.18 * Math.sin(fxTime * 5.2 + Number(v.phase || 0));
+      out.push({
+        x: v.x,
+        y: v.y,
+        radius: Math.max(1.5, (v.radius || 3) * (0.92 + 0.14 * pulse)),
+        kind: "void",
+        color: [155, 120, 255],
+        voidStrength: Math.max(0.05, Number(v.strength || 0.8) * v.alpha * pulse),
+        softness: 6,
+      });
+    }
     for (let i = 0; i < _flashHealFx.length; i++) {
       const f = _flashHealFx[i];
       out.push({ x: f.x, y: f.y, radius: 4 * f.alpha, color: [255, 240, 180] });
@@ -3168,5 +3265,5 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
     return out;
   }
 
-  return { tick, drawBlink, drawMeteor, drawBlastwave, drawFlashHeal, drawSmite, drawPhaseStrike, drawRampage, drawSearchPulse, drawDrainLife, drawEvocation, drawFishing, drawCleave, drawWarCry, drawDivineShield, drawConsecrate, drawSmokeBomb, getActiveLights, installListeners };
+  return { tick, drawBlink, drawMeteor, drawBlastwave, drawVoidHole, drawFlashHeal, drawSmite, drawPhaseStrike, drawRampage, drawSearchPulse, drawDrainLife, drawEvocation, drawFishing, drawCleave, drawWarCry, drawDivineShield, drawConsecrate, drawSmokeBomb, getActiveLights, installListeners };
 }

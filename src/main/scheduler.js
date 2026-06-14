@@ -43,6 +43,7 @@ import { aiCorpseEatSystem } from "../rules/systems/aiCorpseEatSystem.js";
 import { aiFlyingSystem } from "../rules/systems/aiFlyingSystem.js";
 import { jumpScareSystem } from "../rules/systems/jumpScareSystem.js";
 import { lifespanSystem } from "../rules/systems/lifespanSystem.js";
+import { voidHoleSystem } from "../rules/systems/voidHoleSystem.js";
 import { knockbackSystem } from "../rules/systems/knockbackSystem.js";
 import { soundPropagationSystem } from "../rules/systems/soundPropagationSystem.js";
 import { sleepScheduleSystem } from "../rules/systems/sleepScheduleSystem.js";
@@ -280,6 +281,7 @@ export function configureWorld(world) {
   registerSystem(itemCooldownSystem, 'effects');
   registerSystem(spellCooldownSystem, 'effects');
   registerSystem(hazardSystem, 'effects');
+  registerSystem(voidHoleSystem, 'effects', { after: [hazardSystem] });
   registerSystem(manaRegenerationSystem, 'effects');
   registerSystem(staminaRegenerationSystem, 'effects');
   registerSystem(harvestRegrowthSystem, 'effects');
