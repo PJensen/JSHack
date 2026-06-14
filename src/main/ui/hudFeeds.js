@@ -337,16 +337,17 @@ export function createHudFeeds(world, deps) {
     const damageMult = Number(combat?.damageMult ?? 1);
     const atk = Math.max(0, Math.floor((avgRoll + flatBonus) * damageMult));
 
-    // DEF%: average mitigation across all physical subtypes (blunt/slash/pierce).
-    const CANONICAL_HIT = 100;
-    const afterBlunt  = resolveResistance(world, pe.id, CANONICAL_HIT, 'blunt');
-    const afterSlash  = resolveResistance(world, pe.id, CANONICAL_HIT, 'slash');
-    const afterPierce = resolveResistance(world, pe.id, CANONICAL_HIT, 'pierce');
-    const def = Math.round(CANONICAL_HIT - (afterBlunt + afterSlash + afterPierce) / 3);
-
     const luck = Number(combat?.luck ?? canonical?.luck ?? 0);
     const evade = Number(canonical?.evade ?? 0);
     const armorClass = Number(combat?.armorClass ?? (10 + evade));
+    const defenseContribution = Math.max(0, Math.round(armorClass - 10));
+    // DEF% is an at-a-glance composite: physical reduction plus to-hit defense.
+    const CANONICAL_HIT = 100;
+    const afterBlunt = resolveResistance(world, pe.id, CANONICAL_HIT, 'blunt');
+    const afterSlash = resolveResistance(world, pe.id, CANONICAL_HIT, 'slash');
+    const afterPierce = resolveResistance(world, pe.id, CANONICAL_HIT, 'pierce');
+    const physicalReduction = Math.round(CANONICAL_HIT - (afterBlunt + afterSlash + afterPierce) / 3);
+    const def = Math.max(0, physicalReduction + defenseContribution);
     const critPct = (Number(combat?.critChance ?? canonical?.critChancePhysical ?? 0) * 100) + luck;
     const posture = String(combat?.posture?.stance || "balanced");
     const mitigation = Number(canonical?.mitigation ?? 0);

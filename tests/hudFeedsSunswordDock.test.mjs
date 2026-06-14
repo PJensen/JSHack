@@ -37,6 +37,51 @@ function installTestWindow() {
   };
 }
 
+Deno.test("hudFeeds combat payload reports equipment defense as persistent bar defense", () => {
+  const restoreWindow = installTestWindow();
+
+  try {
+    const world = new World({ seed: 31 });
+    const player = world.create();
+    world.add(player, Player, {});
+    world.add(player, Position, { x: 0, y: 0 });
+    world.add(player, Equipment, {});
+
+    const armor = world.create();
+    world.add(armor, NamedIdentity, { name: "Test Mail", identity: "test_mail" });
+    world.add(armor, ItemInfo, {
+      type: "equip",
+      slot: "armor",
+      count: 1,
+      bonuses: { defense: 2 },
+      rarity: 1,
+      rarityName: "common",
+      affixes: [],
+    });
+    world.get(player, Equipment).armor = armor;
+
+    const hudFeeds = createHudFeeds(world, {
+      getPlayerMana: () => ({ mana: 0, maxMana: 0 }),
+      ensureActiveSpell: () => null,
+      updateActiveSpellLabel: () => {},
+    });
+
+    /** @type {any[]} */
+    const payloads = [];
+    const onUpdate = (ev) => payloads.push(ev?.detail || null);
+    window.addEventListener("ui:updateCombatHUD", onUpdate);
+    hudFeeds.updateCombatHUD();
+    window.removeEventListener("ui:updateCombatHUD", onUpdate);
+
+    assert(payloads.length > 0, "expected combat HUD payload");
+    const detail = payloads[payloads.length - 1];
+    assertEquals(Number(detail?.defense || 0), 2);
+    assertEquals(Number(detail?.armorClass || 0), 12);
+  } finally {
+    restoreWindow();
+  }
+});
+
 Deno.test("hudFeeds prepends equipped Sunsword action into the mobile dock and carries cooldown", () => {
   const restoreWindow = installTestWindow();
 
