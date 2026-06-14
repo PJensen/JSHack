@@ -1,0 +1,70 @@
+void hole is a spell created thing that disappears after a set interval righy?
+
+---
+
+my notes: the  void light is underwhelming, not powerful enough, crank the intensity
+
+three ideas
+
+one interesting add is that the intensity of void hole can attenuate over time, instead of just being a steep step function, we can ease in, ease out, peak strength -- naturally we've got functions that do precisely this and they're used for eyesight reduction, vision radius reduction.
+
+another idea is that it can pull mobs in based on their weights, and that the end do a huge gorefest giblets everywhere.
+
+another is that it pulls them in and heavily injurs them each tick.
+
+/plan
+
+---
+
+PLEASE IMPLEMENT THIS PLAN:
+# Void Hole Power Pass
+
+## Summary
+Make Void Hole feel like a real gravity-well spell, not a small pulsing dark tile. Implement all three notes in a controlled v1: stronger eased void lighting, mass-aware pulling, heavier tick injury, and a final collapse burst that uses existing gore/death systems.
+
+## Key Changes
+- **Lighting intensity curve**
+  - Extract the existing `computeEnvelopeValue` math into shared code, keep `blind.js` re-exporting it so current tests/API stay intact.
+  - Extend `VoidHoleCast` with `holeId`, `pulseIndex`, `durationTurns`, `strength`, and `collapsing`.
+  - Use an envelope over the 4-turn lifespan: turn 1 ease-in, turns 2-3 peak, turn 4 collapse/ease-out.
+  - Crank display tuning: peak `voidStrength` about `2.25`, display radius about `radius * 1.8`, softer edge, darker center, stronger shake on collapse.
+
+- **Rules behavior**
+  - Add `ageTurns`/`durationTurns` to `VoidHole` so the system can compute pulse strength deterministically.
+  - Increase tick damage from `4` to `7` base shadow damage per pulse.
+  - Add distance scaling: center tile/adjacent targets take a bonus, outer-ring targets take base damage.
+  - Keep canonical `dealDamage` so crits, resistances, death, gore, messages, and threat stay on existing paths.
+
+- **Mass-aware pull**
+  - Use `Physiology.massKg` as the pull resistance source.
+  - Pull strength scales with pulse strength:
+    - `<= 30kg`: up to 2 tiles on peak pulses.
+    - `31-120kg`: 1 tile on normal/peak pulses.
+    - `121-300kg`: 1 tile only on peak pulses.
+    - `> 300kg`: no forced movement, but still damaged.
+  - Existing blockers and occupancy remain respected.
+
+- **Final collapse**
+  - On the final pulse, apply a collapse burst: extra shadow damage to targets within radius 1.
+  - Add a display-only collapse visual off `VoidHoleCast.collapsing`: stronger inward particles, black flash, and boosted gore impulse for deaths caused by the collapse.
+  - Do not invent a second death pipeline; deaths still come from `dealDamage`.
+
+## Tests
+- Update `tests/voidHole.test.mjs` to cover:
+  - strength envelope values across 4 pulses;
+  - light event includes strength/duration/collapse metadata;
+  - low-mass target can be pulled farther than heavy target;
+  - very heavy target resists pull but still takes damage;
+  - final collapse applies extra close-range damage;
+  - solid blockers still stop movement.
+- Add/adjust focused shared-envelope tests so `blind.js` remains compatible.
+- Run:
+  - `deno test --allow-read --no-check tests/voidHole.test.mjs tests/blindness.test.mjs`
+  - `deno task check`
+  - `deno test --allow-read --no-check`
+
+## Assumptions
+- Implement all three ideas for this pass.
+- Keep Void Hole duration at 4 turns.
+- Increase feel mainly through lighting intensity and per-tick damage, without expanding gameplay radius beyond the authored spell radius.
+- Gore is strongest on kills/final collapse, but Void Hole should not create a separate non-canonical gibbing/death system.
