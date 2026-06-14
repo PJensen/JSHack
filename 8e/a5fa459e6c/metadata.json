@@ -3,8 +3,9 @@
   "checkpoint_id": "8ea5fa459e6c",
   "strategy": "manual-commit",
   "branch": "master",
-  "checkpoints_count": 2,
+  "checkpoints_count": 1,
   "files_touched": [
+    "VERSION",
     "src/display/fx/spellAreaFx.js",
     "src/events/VoidHoleCast.js",
     "src/rules/components/VoidHole.js",
@@ -32,11 +33,11 @@
     }
   ],
   "token_usage": {
-    "input_tokens": 504283,
+    "input_tokens": 212514,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 6541056,
-    "output_tokens": 21310,
-    "api_call_count": 50
+    "cache_read_tokens": 1434240,
+    "output_tokens": 4353,
+    "api_call_count": 20
   },
   "combined_attribution": {
     "calculated_at": "2026-06-14T15:06:02.762120024Z",
