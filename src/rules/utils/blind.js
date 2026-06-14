@@ -14,55 +14,8 @@ import { Brain } from '../components/Brain.js';
 import { ActiveEffects } from '../components/ActiveEffects.js';
 import { getPassiveBonuses } from './passiveBonuses.js';
 import { ensureActiveEffects } from './effects.js';
-
-function durationTicks(value) {
-  return Math.max(0, Number(value) | 0);
-}
-
-/**
- * Piecewise-linear envelope interpolation.
- * Deterministic: value is computed from elapsed ticks alone, not accumulated deltas.
- *
- * Phases:
- *   [0, rampIn)            : startValue → toValue
- *   [rampIn, rampIn+hold)  : toValue (hold)
- *   [rampIn+hold, total]   : toValue → endValue
- *
- * @param {number} startValue
- * @param {number} toValue
- * @param {number} endValue
- * @param {number} rampIn   ticks to ramp from startValue to toValue
- * @param {number} hold     ticks to remain at toValue
- * @param {number} rampOut  ticks to ramp from toValue to endValue
- * @param {number} elapsed  ticks elapsed since application
- * @returns {number}
- */
-export function computeEnvelopeValue(startValue, toValue, endValue, rampIn, hold, rampOut, elapsed) {
-  const inTicks = durationTicks(rampIn);
-  const holdTicks = durationTicks(hold);
-  const outTicks = durationTicks(rampOut);
-
-  if (elapsed <= 0) return startValue;
-  const total = inTicks + holdTicks + outTicks;
-  if (elapsed > total) return endValue;
-
-  // Ramp-in phase
-  if (inTicks > 0 && elapsed <= inTicks) {
-    const t = elapsed / inTicks;
-    return startValue + (toValue - startValue) * t;
-  }
-
-  // Hold phase: elapsed is in [rampIn, rampIn + hold]
-  if (elapsed <= inTicks + holdTicks) {
-    return toValue;
-  }
-
-  // Ramp-out phase. With outTicks=0 there is no recovery segment; the active
-  // effect remains at toValue until expiry, then callers observe endValue.
-  if (outTicks <= 0) return toValue;
-  const t = (elapsed - inTicks - holdTicks) / outTicks;
-  return toValue + (endValue - toValue) * Math.min(1, t);
-}
+export { computeEnvelopeValue } from '../../shared/math/envelope.js';
+import { computeEnvelopeValue } from '../../shared/math/envelope.js';
 
 /**
  * Sum the vision modifiers contributed by all active stat_envelope effects

@@ -111,7 +111,7 @@ Deno.test("townfolkAmbientDialogueSystem emits deterministic ambient NPC chatter
 });
 
 Deno.test("townfolkAmbientDialogueSystem respects cooldowns for the same nearby pair", () => {
-  const world = makeWorld(7124, 520);
+  const world = makeWorld(7124, 552);
   addTownfolk(world, { x: 9, y: 10, role: "barkeep", name: "Barkeep" });
   addTownfolk(world, { x: 11, y: 10, role: "smith", name: "Smith" });
 
@@ -121,12 +121,12 @@ Deno.test("townfolkAmbientDialogueSystem respects cooldowns for the same nearby 
   townfolkAmbientDialogueSystem(world);
   assertEquals(events.length, 1, "first eligible step should emit");
 
-  for (let step = 521; step <= 540; step++) {
+  for (let step = 553; step <= 591; step++) {
     world.step = step;
     townfolkAmbientDialogueSystem(world);
   }
 
-  assertEquals(events.length, 1, "pair cooldown should suppress repeated chatter");
+  assertEquals(events.length, 1, "ambient chatter should stay quiet for a long window after speaking");
 });
 
 Deno.test("townfolkAmbientDialogueSystem stays silent off the overworld", () => {

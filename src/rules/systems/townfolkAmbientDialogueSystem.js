@@ -13,9 +13,9 @@ import { createRng } from "../../lib/ecs-js/rng.js";
 const STATE_KEY = Symbol.for("jshack:townfolkAmbientDialogue:state");
 const PLAYER_HEARING_RADIUS = 9;
 const PAIR_RADIUS = 4;
-const GLOBAL_COOLDOWN_TURNS = 3;
-const ACTOR_COOLDOWN_TURNS = 14;
-const PAIR_COOLDOWN_TURNS = 24;
+const GLOBAL_COOLDOWN_TURNS = 40;
+const ACTOR_COOLDOWN_TURNS = 90;
+const PAIR_COOLDOWN_TURNS = 180;
 
 function getState(world) {
   let state = world[STATE_KEY];
@@ -58,12 +58,12 @@ function pairKey(a, b) {
 function cadenceFor(phase, actors) {
   const socialCount = actors.filter((actor) => actor.job.state === TOWNFOLK_STATES.socializing).length;
   const workingCount = actors.filter((actor) => actor.job.state === TOWNFOLK_STATES.working).length;
-  let cadence = 10 - Math.min(5, actors.length);
-  if (socialCount > 0) cadence -= Math.min(3, socialCount);
-  if (phase === "pub") cadence -= 2;
-  if (phase === "home") cadence -= 1;
-  if (workingCount >= 3 && phase === "work") cadence -= 1;
-  return Math.max(2, cadence);
+  let cadence = 70 - Math.min(20, actors.length * 4);
+  if (socialCount > 0) cadence -= Math.min(10, socialCount * 3);
+  if (phase === "pub") cadence -= 10;
+  if (phase === "home") cadence -= 4;
+  if (workingCount >= 3 && phase === "work") cadence -= 4;
+  return Math.max(GLOBAL_COOLDOWN_TURNS, cadence);
 }
 
 function roleAffinity(a, b) {

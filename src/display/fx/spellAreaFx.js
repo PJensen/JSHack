@@ -874,35 +874,49 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
     if (!_voidHoleFx.length) return;
     const time = Number(getFxTime?.() || 0);
     ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+    for (const well of _voidHoleFx) {
+      const t = well.progress;
+      const alpha = well.alpha;
+      const strength = Math.max(0.1, Number(well.strength || 1));
+      const collapse = well.collapsing ? 1 : 0;
+      const r = Math.max(0.4, well.radius * (0.22 + t * 0.78));
+      ctx.fillStyle = `rgba(2,0,8,${Math.min(0.78, (0.22 + collapse * 0.18) * alpha * strength).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(well.x, well.y, Math.max(0.24, r * (0.54 + collapse * 0.18)), 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.globalCompositeOperation = 'lighter';
     for (const well of _voidHoleFx) {
       const t = well.progress;
       const alpha = well.alpha;
+      const strength = Math.max(0.1, Number(well.strength || 1));
+      const collapse = well.collapsing ? 1 : 0;
       const pulse = 0.82 + 0.18 * Math.sin(time * 5.2 + well.phase);
-      const r = Math.max(0.4, well.radius * (0.18 + t * 0.82));
+      const r = Math.max(0.4, well.radius * (0.18 + t * 0.82 + collapse * 0.16));
 
-      ctx.strokeStyle = `rgba(150,80,230,${(0.62 * alpha).toFixed(3)})`;
-      ctx.lineWidth = Math.max(0.05, 0.20 * alpha);
+      ctx.strokeStyle = `rgba(185,105,255,${Math.min(0.9, 0.44 * alpha * strength).toFixed(3)})`;
+      ctx.lineWidth = Math.max(0.06, 0.18 * alpha * strength);
       ctx.beginPath();
       ctx.arc(well.x, well.y, r * pulse, 0, Math.PI * 2);
       ctx.stroke();
 
-      ctx.strokeStyle = `rgba(65,25,120,${(0.46 * alpha).toFixed(3)})`;
-      ctx.lineWidth = Math.max(0.04, 0.12 * alpha);
+      ctx.strokeStyle = `rgba(88,30,150,${Math.min(0.72, 0.38 * alpha * strength).toFixed(3)})`;
+      ctx.lineWidth = Math.max(0.04, 0.13 * alpha * strength);
       ctx.beginPath();
       ctx.arc(well.x, well.y, Math.max(0.12, r * 0.62), 0, Math.PI * 2);
       ctx.stroke();
 
-      ctx.fillStyle = `rgba(25,5,45,${(0.34 * alpha).toFixed(3)})`;
+      ctx.fillStyle = `rgba(35,0,65,${Math.min(0.62, 0.24 * alpha * strength).toFixed(3)})`;
       ctx.beginPath();
       ctx.arc(well.x, well.y, Math.max(0.18, r * 0.42), 0, Math.PI * 2);
       ctx.fill();
 
-      if (t < 0.22) {
-        const flash = 1 - t / 0.22;
-        ctx.fillStyle = `rgba(205,160,255,${(0.38 * flash).toFixed(3)})`;
+      if (t < 0.22 || collapse) {
+        const flash = Math.max(0, 1 - t / (collapse ? 0.36 : 0.22));
+        ctx.fillStyle = `rgba(215,165,255,${Math.min(0.72, (0.28 + collapse * 0.22) * flash * strength).toFixed(3)})`;
         ctx.beginPath();
-        ctx.arc(well.x, well.y, well.radius * (0.35 + t), 0, Math.PI * 2);
+        ctx.arc(well.x, well.y, well.radius * (0.35 + t + collapse * 0.35), 0, Math.PI * 2);
         ctx.fill();
       }
     }
@@ -1652,38 +1666,41 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
       }
     });
 
-    world.on(VoidHoleCast, ({ origin, radius, affected }) => {
+    world.on(VoidHoleCast, ({ origin, radius, affected, strength, collapsing }) => {
       if (!origin || !Number.isFinite(origin.x) || !Number.isFinite(origin.y)) return;
+      const pulseStrength = Math.max(0.25, Number(strength || 0.65));
+      const isCollapse = !!collapsing;
       const well = new RadialFx({
         x: Number(origin.x),
         y: Number(origin.y),
-        radius: Math.max(2, Number(radius) || 3),
-        ttl: 0.92,
+        radius: Math.max(2.8, (Number(radius) || 3) * (isCollapse ? 2.05 : 1.8)),
+        ttl: isCollapse ? 1.18 : 0.98,
       });
       well.phase = Math.random() * Math.PI * 2;
-      well.strength = 0.95;
+      well.strength = isCollapse ? Math.max(1.15, pulseStrength * 1.35) : pulseStrength;
+      well.collapsing = isCollapse;
       _voidHoleFx.push(well);
-      startShake(cam, 4, 0.16);
+      startShake(cam, isCollapse ? 9 : 4 + pulseStrength * 2, isCollapse ? 0.32 : 0.18);
 
       if (fx?.pool) {
-        const count = 22 + Math.min(18, Array.isArray(affected) ? affected.length * 4 : 0);
+        const count = (isCollapse ? 44 : 26) + Math.min(30, Array.isArray(affected) ? affected.length * 5 : 0);
         for (let i = 0; i < count; i++) {
           const angle = Math.random() * Math.PI * 2;
-          const dist = 0.55 + Math.random() * Math.max(1.2, Number(radius) || 3);
-          const speed = 1.2 + Math.random() * 1.8;
+          const dist = 0.55 + Math.random() * Math.max(1.2, (Number(radius) || 3) * (isCollapse ? 1.75 : 1.1));
+          const speed = (isCollapse ? 2.2 : 1.3) + Math.random() * (isCollapse ? 2.6 : 1.8);
           fx.pool.spawn(new Particle({
             x: Number(origin.x) + Math.cos(angle) * dist,
             y: Number(origin.y) + Math.sin(angle) * dist,
             vx: -Math.cos(angle) * speed,
             vy: -Math.sin(angle) * speed,
-            life: 0.24 + Math.random() * 0.34,
-            size0: 0.055 + Math.random() * 0.075,
+            life: (isCollapse ? 0.32 : 0.24) + Math.random() * (isCollapse ? 0.46 : 0.34),
+            size0: (isCollapse ? 0.08 : 0.055) + Math.random() * (isCollapse ? 0.11 : 0.075),
             size1: 0.004,
             r: 145 + ((Math.random() * 70) | 0),
             g: 55 + ((Math.random() * 35) | 0),
             b: 225 + ((Math.random() * 30) | 0),
-            a0: 0.82,
-            rotVel: (Math.random() - 0.5) * 4,
+            a0: isCollapse ? 0.95 : 0.82,
+            rotVel: (Math.random() - 0.5) * (isCollapse ? 8 : 4),
           }));
         }
       }
@@ -3229,8 +3246,8 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
         radius: Math.max(1.5, (v.radius || 3) * (0.92 + 0.14 * pulse)),
         kind: "void",
         color: [155, 120, 255],
-        voidStrength: Math.max(0.05, Number(v.strength || 0.8) * v.alpha * pulse),
-        softness: 6,
+        voidStrength: Math.max(0.12, Number(v.strength || 0.8) * 2.25 * v.alpha * pulse),
+        softness: v.collapsing ? 10 : 8,
       });
     }
     for (let i = 0; i < _flashHealFx.length; i++) {

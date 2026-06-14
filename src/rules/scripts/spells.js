@@ -3575,8 +3575,10 @@ REGISTRY['void_hole'] = function voidHoleScript(world, actor, spell, intent) {
   world.add(holeId, VoidHole, {
     sourceId: actor,
     radius,
-    pullSteps: 1,
-    tickDamage: 4,
+    pullSteps: 2,
+    tickDamage: 7,
+    ageTurns: 0,
+    durationTurns: 4,
   });
   world.add(holeId, Lifespan, { turnsLeft: 4, onExpiry: "remove", expiryEvent: "" });
   attachEntityToCurrentFloor(world, holeId);

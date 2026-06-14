@@ -1126,8 +1126,8 @@ export const SPELL_DEFS = {
     targeting: 'area',
     description: 'Punch a hungry absence into the floor for four turns and drag nearby enemies inward.',
     effects: [
-      { kind: 'damage', element: 'shadow', amount: '4 base per pulse, INT-scaled, can crit' },
-      { kind: 'movement', mode: 'pull', note: 'Pulls hostile creatures 1 tile toward the center each pulse' },
+      { kind: 'damage', element: 'shadow', amount: '7 base per pulse, stronger near the center, can crit' },
+      { kind: 'movement', mode: 'pull', note: 'Mass-aware pull; light creatures can be dragged farther at peak strength' },
       { kind: 'utility', note: 'Creates a short-lived void well that devours nearby light' },
     ],
   },
