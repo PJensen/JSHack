@@ -11,3 +11,8 @@ here is where I'm landing on the distinction.
 does this make sense?
 
 NOTE: it might make sense to somehow "show" the players evasion score inside the new dodge UX element.
+
+---
+
+FYI: when the dodge mechanic is up, all movement must be disabled.
+FYI: play testing reveals that visible traps do not have the expected disarm behavior.

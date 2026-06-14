@@ -5,6 +5,7 @@
   "branch": "master",
   "checkpoints_count": 0,
   "files_touched": [
+    "VERSION",
     "src/display/ui/overlay.js",
     "src/rules/systems/disarmTrapSystem.js",
     "src/rules/systems/trapSystem.js",
@@ -15,14 +16,7 @@
       "metadata": "/19/be9149cc03/0/metadata.json",
       "transcript": "/19/be9149cc03/0/full.jsonl",
       "content_hash": "/19/be9149cc03/0/content_hash.txt",
-      "prompt": ""
+      "prompt": "/19/be9149cc03/0/prompt.txt"
     }
-  ],
-  "token_usage": {
-    "input_tokens": 5116,
-    "cache_creation_tokens": 0,
-    "cache_read_tokens": 158592,
-    "output_tokens": 74,
-    "api_call_count": 1
-  }
+  ]
 }
