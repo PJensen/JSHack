@@ -57,12 +57,17 @@ export function clearFloorCache() {
   _floorEntityCache.clear();
   exploredFloorRepository.clear();
   if (typeof localStorage === 'undefined') return;
-  const keys = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const k = localStorage.key(i);
-    if (k && k.startsWith('jshack:floor:')) keys.push(k);
+  try {
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('jshack:floor:')) keys.push(k);
+    }
+    for (const k of keys) localStorage.removeItem(k);
+  } catch {
+    // Deno localStorage may be unavailable in isolated test environments.
+    // In-memory floor caches above are still cleared, so runtime correctness is preserved.
   }
-  for (const k of keys) localStorage.removeItem(k);
 }
 
 /** Evict in-memory entries farthest from `currentDepth` until within MAX_MEMORY_FLOORS.

@@ -59,6 +59,10 @@ Deeper docs:
   be a chameleon.
 - **Search before writing.** Extend existing patterns. Do exactly what was
   asked; no opportunistic content wiring or unrelated cleanup.
+- **Run the full runtime suite after every task.** Before handing work back,
+  run `deno test --allow-read --no-check` and do not leave known failing tests
+  unreported. Focused tests are useful during development, but they do not
+  replace the full suite.
 
 ---
 
@@ -335,3 +339,4 @@ bounds, parity, layer boundaries, canonical paths.
 - [ ] Spawn paths use canonical constructors/materializers.
 - [ ] Event wiring checked with `tools/event-bus-explorer.mjs`.
 - [ ] Agent health checked with `tools/agent-health.mjs`.
+- [ ] Full runtime suite passed with `deno test --allow-read --no-check`.
