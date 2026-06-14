@@ -3,7 +3,7 @@
   "checkpoint_id": "8ea5fa459e6c",
   "strategy": "manual-commit",
   "branch": "master",
-  "checkpoints_count": 1,
+  "checkpoints_count": 2,
   "files_touched": [
     "src/display/fx/spellAreaFx.js",
     "src/events/VoidHoleCast.js",
@@ -23,13 +23,19 @@
       "transcript": "/8e/a5fa459e6c/0/full.jsonl",
       "content_hash": "/8e/a5fa459e6c/0/content_hash.txt",
       "prompt": "/8e/a5fa459e6c/0/prompt.txt"
+    },
+    {
+      "metadata": "/8e/a5fa459e6c/1/metadata.json",
+      "transcript": "/8e/a5fa459e6c/1/full.jsonl",
+      "content_hash": "/8e/a5fa459e6c/1/content_hash.txt",
+      "prompt": "/8e/a5fa459e6c/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 377519,
+    "input_tokens": 504283,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 5260288,
-    "output_tokens": 17201,
-    "api_call_count": 32
+    "cache_read_tokens": 6541056,
+    "output_tokens": 21310,
+    "api_call_count": 50
   }
 }
