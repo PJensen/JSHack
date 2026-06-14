@@ -14,6 +14,7 @@ import { TrapDodgePromptStateResource } from "../resources/trapDodgePromptState.
 import { TrapDodgePrompted } from "../../events/TrapDodgePrompted.js";
 import { TrapDodgeResolved } from "../../events/TrapDodgeResolved.js";
 import { TrapDodgeUiEnabled } from "../../events/TrapDodgeUiEnabled.js";
+import { resolveDisarmTrapAttempt } from "./disarmTrapSystem.js";
 
 // Traps only arm when the player is within this radius.  Monsters wander freely
 // beyond it so the dungeon feels alive; once the player closes in, traps go hot
@@ -149,6 +150,13 @@ function triggerTrap(world, trapId, t, victimId, playerId) {
     return resolveTrapHit(world, trapId, t, victimId);
   }
 
+  if (t.revealed) {
+    if (!t.armed && trapIsArmedNow(t, world)) {
+      try { world.set(trapId, Trap, { ...clearResetMarker(t), armed: true }); } catch {}
+    }
+    return resolveDisarmTrapAttempt(world, victimId, { trapId });
+  }
+
   const dodge = trapDodgeContext(world, trapId, t, victimId);
   const promptState = world.resource(TrapDodgePromptStateResource);
   if (promptState.enabled) {
@@ -203,6 +211,33 @@ export const trapDodgePromptExtension = defineExtension("jshack:trap:dodgePrompt
   });
 });
 
+function findPlayer(world) {
+  for (const [id, pos] of world.query(Position, Player)) {
+    if (!pos) continue;
+    return { id, x: pos.x | 0, y: pos.y | 0 };
+  }
+  return null;
+}
+
+function processTrapArrival(world, arrival) {
+  const player = findPlayer(world);
+  if (!player) return false;
+
+  const victimId = Number(arrival.actor || 0) | 0;
+  if (!(victimId > 0) || !world.isAlive(victimId)) return false;
+  const vit = world.get(victimId, Vitality);
+  if (!vit || Number(vit.hp || 0) <= 0) return false;
+
+  for (const [tid, tpos, t] of world.query(Position, Trap)) {
+    if (!tpos || !t || !trapIsArmedNow(t, world)) continue;
+    if ((tpos.x | 0) !== arrival.x || (tpos.y | 0) !== arrival.y) continue;
+    if (chebyshevScalar(tpos.x | 0, tpos.y | 0, player.x, player.y) > TRAP_ARM_RADIUS) continue;
+    triggerTrap(world, tid, t, victimId, player.id);
+    return true;
+  }
+  return false;
+}
+
 export const trapStepListenerExtension = defineExtension("jshack:trap:stepListener", (world) => {
   world.on("moved", ({ id, from, to }) => {
     const actor = Number(id || 0) | 0;
@@ -212,7 +247,9 @@ export const trapStepListenerExtension = defineExtension("jshack:trap:stepListen
     const fx = Number.isFinite(from?.x) ? (from.x | 0) : tx;
     const fy = Number.isFinite(from?.y) ? (from.y | 0) : ty;
     if (fx === tx && fy === ty) return;
-    world.resource(TrapStepQueueResource).push({ actor, x: tx, y: ty });
+    if (!processTrapArrival(world, { actor, x: tx, y: ty })) {
+      world.resource(TrapStepQueueResource).push({ actor, x: tx, y: ty });
+    }
   });
 });
 
@@ -220,30 +257,8 @@ export const trapStepListenerExtension = defineExtension("jshack:trap:stepListen
 export function trapSystem(world) {
   rearmDueTraps(world);
 
-  // Locate the player — needed for the activation-radius gate.
-  let playerX = 0, playerY = 0, playerId = 0;
-  for (const [id, pos] of world.query(Position, Player)) {
-    if (!pos) continue;
-    playerX = pos.x | 0;
-    playerY = pos.y | 0;
-    playerId = id;
-    break;
-  }
-  if (!playerId) return;
-
   const arrivals = world.resource(TrapStepQueueResource).splice(0);
   for (const arrival of arrivals) {
-    const victimId = Number(arrival.actor || 0) | 0;
-    if (!(victimId > 0) || !world.isAlive(victimId)) continue;
-    const vit = world.get(victimId, Vitality);
-    if (!vit || Number(vit.hp || 0) <= 0) continue;
-
-    for (const [tid, tpos, t] of world.query(Position, Trap)) {
-      if (!tpos || !t || !trapIsArmedNow(t, world)) continue;
-      if ((tpos.x | 0) !== arrival.x || (tpos.y | 0) !== arrival.y) continue;
-      if (chebyshevScalar(tpos.x | 0, tpos.y | 0, playerX, playerY) > TRAP_ARM_RADIUS) continue;
-      triggerTrap(world, tid, t, victimId, playerId);
-      break;
-    }
+    processTrapArrival(world, arrival);
   }
 }

@@ -319,6 +319,35 @@ Deno.test("interactive trap dodge timeout triggers player trap", () => {
   assert(world.get(trap, Trap).armed === false, "triggered trap should disarm");
 });
 
+Deno.test("revealed active trap entry attempts disarm instead of dodge prompt", () => {
+  const world = new World({ seed: 1 });
+  world.install(trapDodgePromptExtension);
+  world.emit(new TrapDodgeUiEnabled({ enabled: true }));
+
+  const player = world.create();
+  world.add(player, Player);
+  world.add(player, Position, { x: 3, y: 3 });
+  world.add(player, Vitality, { maxHp: 100, hp: 100 });
+  world.add(player, BaseStats, { dexterity: 50 });
+
+  const trap = world.create();
+  world.add(trap, Position, { x: 3, y: 3 });
+  world.add(trap, Trap, { type: 'spike', armed: true, revealed: true, script: 'trap_spike', params: { percent: 0.25 }, difficulty: 1 });
+
+  let prompted = false;
+  let disarmed = null;
+  world.on(TrapDodgePrompted, () => { prompted = true; });
+  world.on('trap:disarmed', (event) => { disarmed = event; });
+
+  stepOntoTrap(world, player, 3, 3);
+
+  assert(!prompted, "revealed active traps should not use the reflex dodge prompt");
+  assert(disarmed !== null, "revealed active trap entry should attempt disarm");
+  assert(disarmed.trapId === trap, `disarm should target trap ${trap}, got ${disarmed.trapId}`);
+  assert(world.get(player, Vitality).hp === 100, "successful disarm should prevent damage");
+  assert(world.get(trap, Trap).armed === false, "successful disarm should disable the trap");
+});
+
 Deno.test("pit trap emits fall event and applies minor damage", () => {
   clearAll();
   try {

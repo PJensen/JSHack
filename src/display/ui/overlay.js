@@ -81,6 +81,8 @@ export function initOverlays() {
   const trapDodge = document.createElement('div');
   const trapDodgeFill = document.createElement('div');
   const trapDodgeBtn = document.createElement('button');
+  const trapDodgeLabel = document.createElement('div');
+  const trapDodgeStat = document.createElement('div');
   Object.assign(trapDodge.style, {
     position: 'fixed',
     left: '50%',
@@ -106,6 +108,18 @@ export function initOverlays() {
     boxShadow: '0 12px 30px rgba(0,0,0,0.42), 0 0 24px rgba(255,92,42,0.28)',
     overflow: 'hidden',
   });
+  Object.assign(trapDodgeLabel.style, {
+    position: 'relative',
+    zIndex: '1',
+    paddingTop: '10px',
+  });
+  Object.assign(trapDodgeStat.style, {
+    position: 'relative',
+    zIndex: '1',
+    marginTop: '3px',
+    color: '#ffd166',
+    font: '600 10px/1 system-ui, sans-serif',
+  });
   Object.assign(trapDodgeFill.style, {
     position: 'absolute',
     left: '0',
@@ -117,7 +131,10 @@ export function initOverlays() {
     transform: 'scaleX(1)',
     pointerEvents: 'none',
   });
-  trapDodgeBtn.textContent = 'Dodge';
+  trapDodgeLabel.textContent = 'Dodge';
+  trapDodgeStat.textContent = 'EVA 0';
+  trapDodgeBtn.appendChild(trapDodgeLabel);
+  trapDodgeBtn.appendChild(trapDodgeStat);
   trapDodgeBtn.appendChild(trapDodgeFill);
   trapDodge.appendChild(trapDodgeBtn);
   root.appendChild(trapDodge);
@@ -163,6 +180,7 @@ export function initOverlays() {
     trapDodge.style.left = `${x}px`;
     trapDodge.style.top = `${y}px`;
     trapDodgeFill.style.transform = 'scaleX(1)';
+    trapDodgeStat.textContent = `EVA ${Number(detail?.evade || 0) | 0}`;
     trapDodge.style.display = 'block';
     trapDodgeBtn.focus({ preventScroll: true });
 

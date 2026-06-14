@@ -37,6 +37,98 @@ function findTrap(world, actorPos, trapId) {
   return null;
 }
 
+function resetEveryTurns(t) {
+  const raw = Number(t?.params?.resetsEvery || 0);
+  return Number.isFinite(raw) && raw > 0 ? Math.max(1, raw | 0) : 0;
+}
+
+function triggeredTrapState(t, world) {
+  const resetsEvery = resetEveryTurns(t);
+  if (resetsEvery <= 0) return { ...t, revealed: true, armed: false };
+  return {
+    ...t,
+    revealed: true,
+    armed: false,
+    params: {
+      ...(t.params || {}),
+      resetAtStep: (Number(world.step || 0) | 0) + resetsEvery,
+    },
+  };
+}
+
+export function resolveDisarmTrapAttempt(world, actorId, intent = {}) {
+  const actorPos = world.get(actorId, Position);
+  if (!actorPos) return false;
+
+  const found = findTrap(world, actorPos, intent.trapId || 0);
+  if (!found) {
+    world.emit?.('trap:disarm:no-trap', { actor: actorId });
+    return false;
+  }
+
+  const [tid, t] = found;
+
+  // Reveal the trap (player has found it)
+  if (!t.revealed) {
+    try { world.set(tid, Trap, { ...t, revealed: true }); } catch {}
+  }
+
+  // Deterministic d20 roll seeded from world state
+  const seed = combatSeed(world.seed, world.step, actorId, tid, 0xD15A);
+  const rng = mulberry32(seed);
+  const roll = rngInt(rng, 1, 20);
+  const dc = t.difficulty || 10;
+
+  // Dexterity bonus: evade stat includes dexBonus + equipment bonuses
+  const stats = resolveCanonicalStats(world, actorId);
+  const dexBonus = Number(stats?.evade || 0);
+
+  // Skill check: d20 + dexBonus vs DC
+  let success = (roll + dexBonus) >= dc;
+  const passive = getPassiveBonuses(world, actorId);
+  const luck = Number(passive?.luckDerived || 0) + statusStrength(world, actorId, "lucky");
+  if (!success && luck > 0) {
+    success = pct(rng, luck);
+  } else if (success && luck < 0) {
+    success = !pct(rng, -luck);
+  }
+
+  if (success) {
+    // Success — disarm harmlessly
+    try { world.set(tid, Trap, { ...t, revealed: true, armed: false }); } catch {}
+    world.emit?.('trap:disarmed', {
+      actor: actorId,
+      trapId: tid,
+      trapType: t.type,
+      roll,
+      dc,
+      dexBonus,
+    });
+  } else {
+    // Failure — trap triggers on the actor
+    const scriptKey = t.script || '';
+    if (scriptKey) {
+      runScript(scriptKey, ScriptVerb.TrapTrigger, world, {
+        trapId: tid,
+        targetId: actorId,
+        trap: t,
+        params: t.params || {},
+      });
+    }
+    // Mark triggered (same as normal trigger)
+    try { world.set(tid, Trap, triggeredTrapState(t, world)); } catch {}
+    world.emit?.('trap:disarm:failed', {
+      actor: actorId,
+      trapId: tid,
+      trapType: t.type,
+      roll,
+      dc,
+      dexBonus,
+    });
+  }
+  return true;
+}
+
 /** @param {import('../../lib/ecs-js/index.js').World} world */
 export function disarmTrapSystem(world) {
   for (const [actorId, intent] of world.query(DisarmIntent)) {
@@ -44,75 +136,6 @@ export function disarmTrapSystem(world) {
 
     // Remove intent (consumed this tick)
     try { world.remove(actorId, DisarmIntent); } catch {}
-
-    const actorPos = world.get(actorId, Position);
-    if (!actorPos) continue;
-
-    const found = findTrap(world, actorPos, intent.trapId || 0);
-    if (!found) {
-      world.emit?.('trap:disarm:no-trap', { actor: actorId });
-      continue;
-    }
-
-    const [tid, t] = found;
-
-    // Reveal the trap (player has found it)
-    if (!t.revealed) {
-      try { world.set(tid, Trap, { ...t, revealed: true }); } catch {}
-    }
-
-    // Deterministic d20 roll seeded from world state
-    const seed = combatSeed(world.seed, world.step, actorId, tid, 0xD15A);
-    const rng = mulberry32(seed);
-    const roll = rngInt(rng, 1, 20);
-    const dc = t.difficulty || 10;
-
-    // Dexterity bonus: evade stat includes dexBonus + equipment bonuses
-    const stats = resolveCanonicalStats(world, actorId);
-    const dexBonus = Number(stats?.evade || 0);
-
-    // Skill check: d20 + dexBonus vs DC
-    let success = (roll + dexBonus) >= dc;
-    const passive = getPassiveBonuses(world, actorId);
-    const luck = Number(passive?.luckDerived || 0) + statusStrength(world, actorId, "lucky");
-    if (!success && luck > 0) {
-      success = pct(rng, luck);
-    } else if (success && luck < 0) {
-      success = !pct(rng, -luck);
-    }
-
-    if (success) {
-      // Success — disarm harmlessly
-      try { world.set(tid, Trap, { ...t, revealed: true, armed: false }); } catch {}
-      world.emit?.('trap:disarmed', {
-        actor: actorId,
-        trapId: tid,
-        trapType: t.type,
-        roll,
-        dc,
-        dexBonus,
-      });
-    } else {
-      // Failure — trap triggers on the actor
-      const scriptKey = t.script || '';
-      if (scriptKey) {
-        runScript(scriptKey, ScriptVerb.TrapTrigger, world, {
-          trapId: tid,
-          targetId: actorId,
-          trap: t,
-          params: t.params || {},
-        });
-      }
-      // Mark triggered (same as normal trigger)
-      try { world.set(tid, Trap, { ...t, revealed: true, armed: false }); } catch {}
-      world.emit?.('trap:disarm:failed', {
-        actor: actorId,
-        trapId: tid,
-        trapType: t.type,
-        roll,
-        dc,
-        dexBonus,
-      });
-    }
+    resolveDisarmTrapAttempt(world, actorId, intent);
   }
 }
