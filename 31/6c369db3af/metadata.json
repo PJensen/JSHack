@@ -1,0 +1,33 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "316c369db3af",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "src/display/ui/overlay.js",
+    "src/display/ui/wiring/eventUiWiring.js",
+    "src/events/TrapDodgePrompted.js",
+    "src/events/TrapDodgeResolved.js",
+    "src/events/TrapDodgeUiEnabled.js",
+    "src/main/scheduler.js",
+    "src/rules/resources/trapDodgePromptState.js",
+    "src/rules/systems/trapSystem.js",
+    "tests/trap.test.mjs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/31/6c369db3af/0/metadata.json",
+      "transcript": "/31/6c369db3af/0/full.jsonl",
+      "content_hash": "/31/6c369db3af/0/content_hash.txt",
+      "prompt": "/31/6c369db3af/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 114136,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1870208,
+    "output_tokens": 8824,
+    "api_call_count": 25
+  }
+}
