@@ -432,6 +432,14 @@ const TARGETED_SPELL_CONFIG = Object.freeze({
       return `Choose meteor target (LOS, range ${range}). Tap a tile or use arrow keys + Enter. Esc to cancel.`;
     },
   }),
+  void_hole: Object.freeze({
+    fallbackRange: 9,
+    requiresLOS: true,
+    requiresVisible: false,
+    describePrompt(range) {
+      return `Choose Void Hole center (LOS, range ${range}). Tap a tile or use arrow keys + Enter. Esc to cancel.`;
+    },
+  }),
   blizzard: Object.freeze({
     fallbackRange: 10,
     requiresLOS: true,
@@ -1168,6 +1176,7 @@ addEventListener('ui:castActiveSpell', () => {
       spellId: id,
       spellName,
       range,
+      radius: Math.max(0, Number(spell?.radius || targetedCfg.radius || 0) | 0),
       requiresLOS: targetedCfg.requiresLOS === true,
       requiresVisible: targetedCfg.requiresVisible === true,
     }, targetedCfg.describePrompt(range));
@@ -5276,6 +5285,7 @@ function render(worldView) {
   drawTargetingReticle({
     bctx,
     targetCursor: get_targetCursor(),
+    pendingSpellTargeting: get_pendingSpellTargeting(),
     hasPendingSpellTargeting: !!get_pendingSpellTargeting(),
     hasPendingThrowTargeting: !!get_pendingThrowTargeting(),
     hasPendingEnemyTargeting: !!get_pendingEnemyTargeting(),

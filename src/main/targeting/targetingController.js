@@ -97,6 +97,7 @@ export function bracketizeName(s) {
  *   spellId: string,
  *   spellName: string,
  *   range: number,
+ *   radius?: number,
  *   requiresLOS: boolean,
  *   requiresVisible?: boolean,
  *   validateTarget?: (x:number, y:number, ctx:{ player:{id:number,pos:{x:number,y:number}} }) => string | null | undefined | false,

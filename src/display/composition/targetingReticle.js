@@ -4,6 +4,7 @@
 export function drawTargetingReticle({
   bctx,
   targetCursor,
+  pendingSpellTargeting,
   hasPendingSpellTargeting,
   hasPendingThrowTargeting,
   hasPendingEnemyTargeting,
@@ -23,6 +24,19 @@ export function drawTargetingReticle({
   const bracketColor = isEnemy
     ? `rgba(220,140,255,${(0.85 * pulse).toFixed(3)})`
     : `rgba(255,255,200,${(0.85 * pulse).toFixed(3)})`;
+  const spellRadius = hasPendingSpellTargeting
+    ? Math.max(0, Number(pendingSpellTargeting?.radius || 0) | 0)
+    : 0;
+
+  if (spellRadius > 0) {
+    bctx.strokeStyle = isEnemy
+      ? `rgba(155,70,220,${(0.22 + 0.12 * pulse).toFixed(3)})`
+      : `rgba(255,210,80,${(0.20 + 0.14 * pulse).toFixed(3)})`;
+    bctx.lineWidth = 0.045;
+    bctx.beginPath();
+    bctx.arc(cx, cy, spellRadius + 0.5, 0, Math.PI * 2);
+    bctx.stroke();
+  }
 
   bctx.strokeStyle = circleColor;
   bctx.lineWidth = 0.08;
