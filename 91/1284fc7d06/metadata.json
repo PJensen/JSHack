@@ -5,6 +5,7 @@
   "branch": "master",
   "checkpoints_count": 2,
   "files_touched": [
+    "VERSION",
     "src/bridge/schema/worldView.js",
     "src/display/lighting/sources/index.js",
     "src/display/palette/base.js",
