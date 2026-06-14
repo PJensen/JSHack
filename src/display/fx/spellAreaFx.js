@@ -173,8 +173,73 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
   // --- Blastwave state ---
   /** @type {RadialFx[]} */
   const _blastwaveFx = [];
-  /** @type {Array<RadialFx & { phase:number, strength:number }>} */
+  /** @type {Array<{
+   *   holeId:number,
+   *   x:number,
+   *   y:number,
+   *   radius:number,
+   *   phase:number,
+   *   alpha:number,
+   *   targetAlpha:number,
+   *   strength:number,
+   *   targetStrength:number,
+   *   progress:number,
+   *   collapsing:boolean,
+   *   collapseFlash:number,
+   *   fadeLeft:number,
+   *   update(event:object):void,
+   *   tick(dt:number):void,
+   *   readonly expired:boolean,
+   * }>} */
   const _voidHoleFx = [];
+
+  class VoidHoleFx {
+    constructor({ holeId, origin, radius, strength, progress, collapsing }) {
+      this.holeId = Number(holeId || 0) | 0;
+      this.x = Number(origin.x);
+      this.y = Number(origin.y);
+      this.radius = Math.max(2.8, (Number(radius) || 3) * 2.05);
+      this.phase = Math.random() * Math.PI * 2;
+      this.alpha = 0.08;
+      this.targetAlpha = 1;
+      this.strength = Math.max(0.2, Number(strength || 0.75));
+      this.targetStrength = this.strength;
+      this.progress = Math.max(0, Math.min(1, Number(progress || 0)));
+      this.collapsing = !!collapsing;
+      this.collapseFlash = this.collapsing ? 1 : 0;
+      this.fadeLeft = this.collapsing ? 1.1 : Infinity;
+    }
+
+    update({ origin, radius, strength, progress, collapsing }) {
+      if (origin && Number.isFinite(origin.x) && Number.isFinite(origin.y)) {
+        this.x = Number(origin.x);
+        this.y = Number(origin.y);
+      }
+      this.radius = Math.max(2.8, (Number(radius) || 3) * 2.05);
+      this.targetStrength = Math.max(0.2, Number(strength || this.targetStrength || 0.75));
+      this.progress = Math.max(this.progress, Math.max(0, Math.min(1, Number(progress || 0))));
+      if (collapsing) {
+        this.collapsing = true;
+        this.collapseFlash = Math.max(this.collapseFlash, 1);
+        this.fadeLeft = Math.max(Number.isFinite(this.fadeLeft) ? this.fadeLeft : 0, 1.1);
+      }
+    }
+
+    tick(dt) {
+      const blend = Math.min(1, Math.max(0, dt) * 5.5);
+      this.alpha += (this.targetAlpha - this.alpha) * blend;
+      this.strength += (this.targetStrength - this.strength) * blend;
+      this.collapseFlash = Math.max(0, this.collapseFlash - Math.max(0, dt) * 1.9);
+      if (this.collapsing) {
+        this.fadeLeft -= Math.max(0, dt);
+        if (this.fadeLeft < 0.55) this.targetAlpha = 0;
+      }
+    }
+
+    get expired() {
+      return this.collapsing && this.fadeLeft <= 0 && this.alpha < 0.04;
+    }
+  }
 
   // --- Flash Heal state ---
   /** @type {RadialFx[]} */
@@ -876,47 +941,47 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
     ctx.save();
     ctx.globalCompositeOperation = 'source-over';
     for (const well of _voidHoleFx) {
-      const t = well.progress;
+      const t = Math.max(0, Math.min(1, well.progress));
       const alpha = well.alpha;
       const strength = Math.max(0.1, Number(well.strength || 1));
       const collapse = well.collapsing ? 1 : 0;
-      const r = Math.max(0.4, well.radius * (0.22 + t * 0.78));
-      ctx.fillStyle = `rgba(2,0,8,${Math.min(0.78, (0.22 + collapse * 0.18) * alpha * strength).toFixed(3)})`;
+      const r = Math.max(0.8, well.radius * (0.62 + t * 0.38));
+      ctx.fillStyle = `rgba(2,0,8,${Math.min(0.88, (0.34 + collapse * 0.18) * alpha * strength).toFixed(3)})`;
       ctx.beginPath();
-      ctx.arc(well.x, well.y, Math.max(0.24, r * (0.54 + collapse * 0.18)), 0, Math.PI * 2);
+      ctx.arc(well.x, well.y, Math.max(0.35, r * (0.50 + collapse * 0.20)), 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.globalCompositeOperation = 'lighter';
     for (const well of _voidHoleFx) {
-      const t = well.progress;
+      const t = Math.max(0, Math.min(1, well.progress));
       const alpha = well.alpha;
       const strength = Math.max(0.1, Number(well.strength || 1));
       const collapse = well.collapsing ? 1 : 0;
-      const pulse = 0.82 + 0.18 * Math.sin(time * 5.2 + well.phase);
-      const r = Math.max(0.4, well.radius * (0.18 + t * 0.82 + collapse * 0.16));
+      const drift = 0.96 + 0.04 * Math.sin(time * 2.1 + well.phase);
+      const r = Math.max(0.8, well.radius * (0.58 + t * 0.42 + collapse * 0.10));
+      const flash = Math.max(0, Number(well.collapseFlash || 0));
 
-      ctx.strokeStyle = `rgba(185,105,255,${Math.min(0.9, 0.44 * alpha * strength).toFixed(3)})`;
-      ctx.lineWidth = Math.max(0.06, 0.18 * alpha * strength);
+      ctx.strokeStyle = `rgba(190,112,255,${Math.min(0.92, (0.34 + flash * 0.30) * alpha * strength).toFixed(3)})`;
+      ctx.lineWidth = Math.max(0.08, (0.16 + flash * 0.10) * alpha * strength);
       ctx.beginPath();
-      ctx.arc(well.x, well.y, r * pulse, 0, Math.PI * 2);
+      ctx.arc(well.x, well.y, r * drift, 0, Math.PI * 2);
       ctx.stroke();
 
-      ctx.strokeStyle = `rgba(88,30,150,${Math.min(0.72, 0.38 * alpha * strength).toFixed(3)})`;
-      ctx.lineWidth = Math.max(0.04, 0.13 * alpha * strength);
+      ctx.strokeStyle = `rgba(92,24,156,${Math.min(0.78, 0.42 * alpha * strength).toFixed(3)})`;
+      ctx.lineWidth = Math.max(0.05, 0.12 * alpha * strength);
       ctx.beginPath();
-      ctx.arc(well.x, well.y, Math.max(0.12, r * 0.62), 0, Math.PI * 2);
+      ctx.arc(well.x, well.y, Math.max(0.18, r * 0.58), 0, Math.PI * 2);
       ctx.stroke();
 
-      ctx.fillStyle = `rgba(35,0,65,${Math.min(0.62, 0.24 * alpha * strength).toFixed(3)})`;
+      ctx.fillStyle = `rgba(24,0,54,${Math.min(0.72, 0.32 * alpha * strength).toFixed(3)})`;
       ctx.beginPath();
-      ctx.arc(well.x, well.y, Math.max(0.18, r * 0.42), 0, Math.PI * 2);
+      ctx.arc(well.x, well.y, Math.max(0.24, r * 0.42), 0, Math.PI * 2);
       ctx.fill();
 
-      if (t < 0.22 || collapse) {
-        const flash = Math.max(0, 1 - t / (collapse ? 0.36 : 0.22));
-        ctx.fillStyle = `rgba(215,165,255,${Math.min(0.72, (0.28 + collapse * 0.22) * flash * strength).toFixed(3)})`;
+      if (flash > 0) {
+        ctx.fillStyle = `rgba(220,170,255,${Math.min(0.82, 0.46 * flash * alpha * strength).toFixed(3)})`;
         ctx.beginPath();
-        ctx.arc(well.x, well.y, well.radius * (0.35 + t + collapse * 0.35), 0, Math.PI * 2);
+        ctx.arc(well.x, well.y, well.radius * (0.38 + (1 - flash) * 0.92), 0, Math.PI * 2);
         ctx.fill();
       }
     }
@@ -1666,40 +1731,38 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
       }
     });
 
-    world.on(VoidHoleCast, ({ origin, radius, affected, strength, collapsing }) => {
+    world.on(VoidHoleCast, (event) => {
+      const { holeId, origin, radius, affected, strength, progress, collapsing } = event;
       if (!origin || !Number.isFinite(origin.x) || !Number.isFinite(origin.y)) return;
-      const pulseStrength = Math.max(0.25, Number(strength || 0.65));
+      const wellStrength = Math.max(0.25, Number(strength || 0.75));
       const isCollapse = !!collapsing;
-      const well = new RadialFx({
-        x: Number(origin.x),
-        y: Number(origin.y),
-        radius: Math.max(2.8, (Number(radius) || 3) * (isCollapse ? 2.05 : 1.8)),
-        ttl: isCollapse ? 1.18 : 0.98,
-      });
-      well.phase = Math.random() * Math.PI * 2;
-      well.strength = isCollapse ? Math.max(1.15, pulseStrength * 1.35) : pulseStrength;
-      well.collapsing = isCollapse;
-      _voidHoleFx.push(well);
-      startShake(cam, isCollapse ? 9 : 4 + pulseStrength * 2, isCollapse ? 0.32 : 0.18);
+      let well = _voidHoleFx.find((entry) => entry.holeId === (Number(holeId || 0) | 0));
+      if (!well) {
+        well = new VoidHoleFx({ holeId, origin, radius, strength: wellStrength, progress, collapsing: isCollapse });
+        _voidHoleFx.push(well);
+      } else {
+        well.update({ origin, radius, strength: wellStrength, progress, collapsing: isCollapse });
+      }
+      startShake(cam, isCollapse ? 10 : 2.5 + wellStrength * 1.5, isCollapse ? 0.34 : 0.12);
 
       if (fx?.pool) {
-        const count = (isCollapse ? 44 : 26) + Math.min(30, Array.isArray(affected) ? affected.length * 5 : 0);
+        const count = (isCollapse ? 58 : 16) + Math.min(34, Array.isArray(affected) ? affected.length * (isCollapse ? 6 : 3) : 0);
         for (let i = 0; i < count; i++) {
           const angle = Math.random() * Math.PI * 2;
-          const dist = 0.55 + Math.random() * Math.max(1.2, (Number(radius) || 3) * (isCollapse ? 1.75 : 1.1));
-          const speed = (isCollapse ? 2.2 : 1.3) + Math.random() * (isCollapse ? 2.6 : 1.8);
+          const dist = 0.65 + Math.random() * Math.max(1.4, (Number(radius) || 3) * (isCollapse ? 1.95 : 1.45));
+          const speed = (isCollapse ? 2.6 : 0.9 + wellStrength * 0.7) + Math.random() * (isCollapse ? 3.1 : 1.4);
           fx.pool.spawn(new Particle({
             x: Number(origin.x) + Math.cos(angle) * dist,
             y: Number(origin.y) + Math.sin(angle) * dist,
             vx: -Math.cos(angle) * speed,
             vy: -Math.sin(angle) * speed,
-            life: (isCollapse ? 0.32 : 0.24) + Math.random() * (isCollapse ? 0.46 : 0.34),
-            size0: (isCollapse ? 0.08 : 0.055) + Math.random() * (isCollapse ? 0.11 : 0.075),
+            life: (isCollapse ? 0.34 : 0.46) + Math.random() * (isCollapse ? 0.52 : 0.42),
+            size0: (isCollapse ? 0.09 : 0.045) + Math.random() * (isCollapse ? 0.13 : 0.065),
             size1: 0.004,
             r: 145 + ((Math.random() * 70) | 0),
             g: 55 + ((Math.random() * 35) | 0),
             b: 225 + ((Math.random() * 30) | 0),
-            a0: isCollapse ? 0.95 : 0.82,
+            a0: isCollapse ? 0.98 : 0.70,
             rotVel: (Math.random() - 0.5) * (isCollapse ? 8 : 4),
           }));
         }
@@ -3239,15 +3302,15 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
     }
     for (let i = 0; i < _voidHoleFx.length; i++) {
       const v = _voidHoleFx[i];
-      const pulse = 0.82 + 0.18 * Math.sin(fxTime * 5.2 + Number(v.phase || 0));
+      const drift = 0.96 + 0.04 * Math.sin(fxTime * 2.1 + Number(v.phase || 0));
       out.push({
         x: v.x,
         y: v.y,
-        radius: Math.max(1.5, (v.radius || 3) * (0.92 + 0.14 * pulse)),
+        radius: Math.max(1.5, (v.radius || 3) * (0.98 + 0.08 * v.progress) * drift),
         kind: "void",
         color: [155, 120, 255],
-        voidStrength: Math.max(0.12, Number(v.strength || 0.8) * 2.25 * v.alpha * pulse),
-        softness: v.collapsing ? 10 : 8,
+        voidStrength: Math.max(0.16, Number(v.strength || 0.8) * 2.65 * v.alpha * drift),
+        softness: v.collapsing ? 11 : 9,
       });
     }
     for (let i = 0; i < _flashHealFx.length; i++) {

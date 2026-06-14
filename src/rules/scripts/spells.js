@@ -3508,7 +3508,6 @@ function runArcaneMissileSpell(world, actor, spell, tuning) {
 function resolveAreaSpellCenter(world, actor, spell, intent) {
   const apos = /** @type any */ (world.get(actor, Position));
   if (!apos) return null;
-  const actorFaction = String(world.get(actor, Faction)?.key || 'player');
   const range = Math.max(1, Number(spell?.range || 9) | 0);
   const isBlocked = createLOSBlocker(world);
 
@@ -3534,35 +3533,8 @@ function resolveAreaSpellCenter(world, actor, spell, intent) {
     return { x: ox, y: oy, from: { x: apos.x | 0, y: apos.y | 0 } };
   }
 
-  let bestId = 0;
-  let bestD2 = Infinity;
-  for (const [id, pos] of world.query(Position)) {
-    if (id === actor) continue;
-    const fac = /** @type any */ (world.get(id, Faction));
-    if (!fac || !areFactionsHostile(actorFaction, fac.key)) continue;
-    const vit = /** @type any */ (world.get(id, Vitality));
-    if (!vit || (vit.hp | 0) <= 0) continue;
-    const dx = (pos.x | 0) - (apos.x | 0);
-    const dy = (pos.y | 0) - (apos.y | 0);
-    const d2 = dx * dx + dy * dy;
-    if (d2 > range * range || d2 >= bestD2) continue;
-    if (!hasSpellLineOfSight(world, {
-      sourceId: actor,
-      targetId: id,
-      sourcePos: apos,
-      targetPos: pos,
-      range,
-      isBlocked,
-    })) continue;
-    bestId = id;
-    bestD2 = d2;
-  }
-  if (!bestId) {
-    world.emit('spell:no-target', { actor, spellId: spell?.id || '', range });
-    return null;
-  }
-  const tpos = /** @type any */ (world.get(bestId, Position));
-  return { x: tpos.x | 0, y: tpos.y | 0, from: { x: apos.x | 0, y: apos.y | 0 } };
+  world.emit('spell:no-target', { actor, spellId: spell?.id || '', reason: 'no_target', range });
+  return null;
 }
 
 REGISTRY['void_hole'] = function voidHoleScript(world, actor, spell, intent) {
@@ -3578,9 +3550,9 @@ REGISTRY['void_hole'] = function voidHoleScript(world, actor, spell, intent) {
     pullSteps: 2,
     tickDamage: 7,
     ageTurns: 0,
-    durationTurns: 4,
+    durationTurns: 6,
   });
-  world.add(holeId, Lifespan, { turnsLeft: 4, onExpiry: "remove", expiryEvent: "" });
+  world.add(holeId, Lifespan, { turnsLeft: 6, onExpiry: "remove", expiryEvent: "" });
   attachEntityToCurrentFloor(world, holeId);
 };
 

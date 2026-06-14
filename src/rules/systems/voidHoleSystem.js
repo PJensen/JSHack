@@ -9,14 +9,19 @@ import { forEachInRadius } from "../utils/spatialIndex.js";
 import { areFactionsHostile } from "../utils/factionHostility.js";
 import { dealDamage } from "../utils/dealDamage.js";
 import { buildSpellDamageSpec } from "../utils/spellDamage.js";
-import { computeEnvelopeValue } from "../../shared/math/envelope.js";
 import { VoidHoleCast } from "../../events/VoidHoleCast.js";
 
-export function computeVoidHoleStrength(pulseIndex, durationTurns) {
-  const duration = Math.max(1, Number(durationTurns || 4) | 0);
-  const pulse = Math.max(1, Number(pulseIndex || 1) | 0);
-  const elapsed = Math.min(duration - 1, pulse - 1);
-  return computeEnvelopeValue(0.65, 1, 0.75, 1, Math.max(0, duration - 3), 1, elapsed);
+export function computeVoidHoleProgress(ageTurns, durationTurns) {
+  const duration = Math.max(1, Number(durationTurns || 6) | 0);
+  if (duration <= 1) return 1;
+  const age = Math.max(0, Math.min(duration - 1, Number(ageTurns || 0) | 0));
+  return age / (duration - 1);
+}
+
+export function computeVoidHoleStrength(ageTurns, durationTurns) {
+  const t = computeVoidHoleProgress(ageTurns, durationTurns);
+  const eased = t * t * (3 - 2 * t);
+  return 0.75 + eased * 0.8;
 }
 
 function pointKey(x, y) {
@@ -69,9 +74,9 @@ function pullStepsForMass(world, id, strength, maxSteps) {
   const cap = Math.max(0, Number(maxSteps || 0) | 0);
   if (cap <= 0) return 0;
   const mass = Math.max(0, Number(world.get(id, Physiology)?.massKg || 80));
-  const peak = strength >= 0.98;
+  const peak = strength >= 1.25;
   if (mass <= 30) return Math.min(cap, peak ? 2 : 1);
-  if (mass <= 120) return Math.min(cap, strength >= 0.65 ? 1 : 0);
+  if (mass <= 120) return Math.min(cap, strength >= 0.75 ? 1 : 0);
   if (mass <= 300) return peak ? Math.min(cap, 1) : 0;
   return 0;
 }
@@ -98,10 +103,11 @@ export function voidHoleSystem(world) {
     const sourceFaction = String(world.get(sourceId, Faction)?.key || "player");
     const radius = Math.max(1, Number(hole.radius || 3) | 0);
     const maxPullSteps = Math.max(0, Number(hole.pullSteps || 0) | 0);
-    const durationTurns = Math.max(1, Number(hole.durationTurns || 4) | 0);
-    const pulseIndex = Math.min(durationTurns, Math.max(1, Number(hole.ageTurns || 0) + 1));
-    const strength = computeVoidHoleStrength(pulseIndex, durationTurns);
-    const collapsing = pulseIndex >= durationTurns;
+    const durationTurns = Math.max(1, Number(hole.durationTurns || 6) | 0);
+    const ageTurns = Math.min(durationTurns - 1, Math.max(0, Number(hole.ageTurns || 0) | 0));
+    const progress = computeVoidHoleProgress(ageTurns, durationTurns);
+    const strength = computeVoidHoleStrength(ageTurns, durationTurns);
+    const collapsing = ageTurns >= durationTurns - 1;
     const blocked = buildBlockedPoints(world, holeId);
     const affected = [];
 
@@ -132,7 +138,7 @@ export function voidHoleSystem(world) {
         cause: collapsing ? "spell:void_hole:collapse" : "spell:void_hole",
         at: { x: pos.x | 0, y: pos.y | 0 },
         impactVector: inwardImpactVector(pos, origin),
-        salt: 0x501d ^ holeId ^ id ^ pulseIndex,
+        salt: 0x501d ^ holeId ^ id ^ ageTurns,
       }));
     });
 
@@ -142,8 +148,9 @@ export function voidHoleSystem(world) {
       from: { x: origin.x | 0, y: origin.y | 0 },
       origin: { x: origin.x | 0, y: origin.y | 0 },
       radius,
-      pulseIndex,
+      ageTurns,
       durationTurns,
+      progress,
       strength,
       collapsing,
       affected,

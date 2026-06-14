@@ -22,8 +22,9 @@ export class VoidHoleCast extends EcsEvent {
     this.from = point(payload, "from");
     this.origin = point(payload, "origin");
     this.radius = Math.max(1, Number(payload.radius || 3) | 0);
-    this.pulseIndex = Math.max(1, Number(payload.pulseIndex || 1) | 0);
+    this.ageTurns = Math.max(0, Number(payload.ageTurns || 0) | 0);
     this.durationTurns = Math.max(1, Number(payload.durationTurns || 1) | 0);
+    this.progress = Math.max(0, Math.min(1, Number(payload.progress || 0)));
     this.strength = Math.max(0, Number(payload.strength || 0));
     this.collapsing = !!payload.collapsing;
     this.affected = Array.isArray(payload.affected)

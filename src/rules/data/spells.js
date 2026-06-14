@@ -1123,12 +1123,12 @@ export const SPELL_DEFS = {
     range: 9,
     radius: 3,
     script: 'void_hole',
-    targeting: 'area',
-    description: 'Punch a hungry absence into the floor for four turns and drag nearby enemies inward.',
+    targeting: 'target',
+    description: 'Punch a persistent hungry absence into the floor for six turns and drag nearby enemies inward.',
     effects: [
-      { kind: 'damage', element: 'shadow', amount: '7 base per pulse, stronger near the center, can crit' },
-      { kind: 'movement', mode: 'pull', note: 'Mass-aware pull; light creatures can be dragged farther at peak strength' },
-      { kind: 'utility', note: 'Creates a short-lived void well that devours nearby light' },
+      { kind: 'damage', element: 'shadow', amount: '7 base each turn, stronger near the center, can crit' },
+      { kind: 'movement', mode: 'pull', note: 'Mass-aware pull; light creatures can be dragged farther as the well strengthens' },
+      { kind: 'utility', note: 'Creates a growing void well that devours nearby light' },
     ],
   },
   leech_spores: {

@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "jsr:@std/assert";
+import { assert, assertAlmostEquals, assertEquals } from "jsr:@std/assert";
 import "./helpers/installContentCatalog.mjs";
 import { World } from "../src/lib/ecs-js/index.js";
 import { VoidHoleCast } from "../src/events/VoidHoleCast.js";
@@ -10,7 +10,7 @@ import { Collider } from "../src/rules/components/Collider.js";
 import { Lifespan } from "../src/rules/components/Lifespan.js";
 import { VoidHole } from "../src/rules/components/VoidHole.js";
 import { Physiology } from "../src/rules/components/Physiology.js";
-import { computeVoidHoleStrength, voidHoleSystem } from "../src/rules/systems/voidHoleSystem.js";
+import { computeVoidHoleProgress, computeVoidHoleStrength, voidHoleSystem } from "../src/rules/systems/voidHoleSystem.js";
 import { lifespanSystem } from "../src/rules/systems/lifespanSystem.js";
 import { runSpellScript } from "../src/rules/scripts/spells.js";
 import { getSpell } from "../src/rules/data/spells.js";
@@ -44,19 +44,23 @@ function createVoidHole(world, sourceId, x, y, opts = {}) {
     pullSteps: opts.pullSteps ?? 2,
     tickDamage: opts.tickDamage ?? 7,
     ageTurns: opts.ageTurns ?? 0,
-    durationTurns: opts.durationTurns ?? 4,
+    durationTurns: opts.durationTurns ?? 6,
   });
   return id;
 }
 
-Deno.test("void hole strength envelope eases in, peaks, then collapses", () => {
-  assertEquals(computeVoidHoleStrength(1, 4), 0.65);
-  assertEquals(computeVoidHoleStrength(2, 4), 1);
-  assertEquals(computeVoidHoleStrength(3, 4), 1);
-  assertEquals(computeVoidHoleStrength(4, 4), 0.75);
+Deno.test("void hole strength grows over its lifetime", () => {
+  const strengths = Array.from({ length: 6 }, (_, age) => computeVoidHoleStrength(age, 6));
+  assertAlmostEquals(strengths[0], 0.75);
+  assertAlmostEquals(strengths[5], 1.55);
+  for (let i = 1; i < strengths.length; i++) {
+    assert(strengths[i] > strengths[i - 1], `strength ${i} should grow over ${i - 1}`);
+  }
+  assertEquals(computeVoidHoleProgress(0, 6), 0);
+  assertEquals(computeVoidHoleProgress(5, 6), 1);
 });
 
-Deno.test("void hole creates a temporary well that pulses typed pull events", () => {
+Deno.test("void hole creates a persistent targeted well with typed state events", () => {
   loadFlatFloor();
   const world = new World({ seed: 0x501d });
   const events = [];
@@ -77,8 +81,8 @@ Deno.test("void hole creates a temporary well that pulses typed pull events", ()
   assertEquals(hole.radius, 3);
   assertEquals(hole.pullSteps, 2);
   assertEquals(hole.tickDamage, 7);
-  assertEquals(hole.durationTurns, 4);
-  assertEquals(lifespan.turnsLeft, 4);
+  assertEquals(hole.durationTurns, 6);
+  assertEquals(lifespan.turnsLeft, 6);
 
   voidHoleSystem(world);
 
@@ -87,9 +91,10 @@ Deno.test("void hole creates a temporary well that pulses typed pull events", ()
   assertEquals(events[0].actor, caster);
   assertEquals(events[0].holeId, holeId);
   assertEquals(events[0].origin, { x: 4, y: 2 });
-  assertEquals(events[0].pulseIndex, 1);
-  assertEquals(events[0].durationTurns, 4);
-  assertEquals(events[0].strength, 0.65);
+  assertEquals(events[0].ageTurns, 0);
+  assertEquals(events[0].durationTurns, 6);
+  assertEquals(events[0].progress, 0);
+  assertEquals(events[0].strength, 0.75);
   assertEquals(events[0].collapsing, false);
   assertEquals(events[0].affected[0].id, target);
   assertEquals(events[0].affected[0].from, { x: 7, y: 2 });
@@ -98,8 +103,25 @@ Deno.test("void hole creates a temporary well that pulses typed pull events", ()
   assert(world.get(target, Vitality).hp < 30);
   assertEquals(hole.ageTurns, 1);
 
-  for (let i = 0; i < 4; i++) lifespanSystem(world);
+  for (let i = 0; i < 6; i++) lifespanSystem(world);
   assert(!world.isAlive(holeId), "void hole should expire through Lifespan cleanup");
+});
+
+Deno.test("void hole requires an explicit targeted tile", () => {
+  loadFlatFloor();
+  const world = new World({ seed: 0x501f });
+  const failures = [];
+  world.on("spell:no-target", (event) => failures.push(event));
+
+  const caster = makeEntity(world, 2, 2, 20, "player");
+  makeEntity(world, 5, 2, 30, "enemy");
+
+  runSpellScript(world, caster, getSpell("void_hole"), {});
+
+  assertEquals([...world.query(VoidHole)].length, 0);
+  assertEquals(failures.length, 1);
+  assertEquals(failures[0].spellId, "void_hole");
+  assertEquals(failures[0].reason, "no_target");
 });
 
 Deno.test("void hole pull is mass-aware", () => {
@@ -112,13 +134,14 @@ Deno.test("void hole pull is mass-aware", () => {
   const light = makeEntity(world, 9, 2, 60, "enemy", 20);
   const heavy = makeEntity(world, 9, 4, 60, "enemy", 220);
   const massive = makeEntity(world, 9, 6, 60, "enemy", 360);
-  createVoidHole(world, caster, 4, 4, { radius: 6, ageTurns: 1 });
+  createVoidHole(world, caster, 4, 4, { radius: 6, ageTurns: 5 });
 
   voidHoleSystem(world);
 
   assertEquals(events.length, 1);
-  assertEquals(events[0].pulseIndex, 2);
-  assertEquals(events[0].strength, 1);
+  assertEquals(events[0].ageTurns, 5);
+  assertEquals(events[0].progress, 1);
+  assertEquals(events[0].strength, 1.55);
   assertEquals(world.get(light, Position), { x: 7, y: 4 });
   assertEquals(world.get(heavy, Position), { x: 8, y: 4 });
   assertEquals(world.get(massive, Position), { x: 9, y: 6 });
@@ -132,20 +155,20 @@ Deno.test("void hole final collapse applies close-range bonus damage", () => {
 
   const normalCaster = makeEntity(normalWorld, 2, 2, 20, "player");
   const normalTarget = makeEntity(normalWorld, 5, 4, 80, "enemy", 80);
-  createVoidHole(normalWorld, normalCaster, 4, 4, { radius: 3, ageTurns: 1 });
+  createVoidHole(normalWorld, normalCaster, 4, 4, { radius: 3, ageTurns: 2 });
   voidHoleSystem(normalWorld);
 
   const collapseCaster = makeEntity(collapseWorld, 2, 2, 20, "player");
   const collapseTarget = makeEntity(collapseWorld, 5, 4, 80, "enemy", 80);
   const collapseEvents = [];
   collapseWorld.on(VoidHoleCast, (event) => collapseEvents.push(event));
-  createVoidHole(collapseWorld, collapseCaster, 4, 4, { radius: 3, ageTurns: 3 });
+  createVoidHole(collapseWorld, collapseCaster, 4, 4, { radius: 3, ageTurns: 5 });
   voidHoleSystem(collapseWorld);
 
   const normalDamage = 80 - worldHp(normalWorld, normalTarget);
   const collapseDamage = 80 - worldHp(collapseWorld, collapseTarget);
   assert(collapseDamage > normalDamage, `collapse damage ${collapseDamage} should exceed normal ${normalDamage}`);
-  assertEquals(collapseEvents[0].pulseIndex, 4);
+  assertEquals(collapseEvents[0].ageTurns, 5);
   assertEquals(collapseEvents[0].collapsing, true);
 });
 
