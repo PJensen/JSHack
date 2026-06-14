@@ -3,7 +3,7 @@
   "checkpoint_id": "19be9149cc03",
   "session_id": "019ec741-8553-7e30-8b99-6c00dbedb013",
   "strategy": "manual-commit",
-  "created_at": "2026-06-14T18:28:43.892224531Z",
+  "created_at": "2026-06-14T18:28:46.41883624Z",
   "branch": "master",
   "checkpoints_count": 0,
   "files_touched": [
@@ -15,41 +15,28 @@
   "agent": "Codex",
   "model": "gpt-5.5",
   "turn_id": "436c7eb603fe",
-  "checkpoint_transcript_start": 184,
-  "transcript_lines_at_start": 184,
+  "checkpoint_transcript_start": 301,
+  "transcript_lines_at_start": 301,
   "token_usage": {
-    "input_tokens": 116412,
+    "input_tokens": 5116,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 2307072,
-    "output_tokens": 8913,
-    "api_call_count": 16
+    "cache_read_tokens": 158592,
+    "output_tokens": 74,
+    "api_call_count": 1
   },
   "session_metrics": {
     "turn_count": 1
   },
   "initial_attribution": {
-    "calculated_at": "2026-06-14T18:28:43.809455023Z",
-    "agent_lines": 175,
-    "agent_removed": 90,
+    "calculated_at": "2026-06-14T18:28:46.345428685Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
     "human_added": 0,
     "human_modified": 0,
     "human_removed": 0,
-    "total_committed": 175,
-    "total_lines_changed": 265,
-    "agent_percentage": 100,
+    "total_committed": 0,
+    "total_lines_changed": 0,
+    "agent_percentage": 0,
     "metric_version": 2
-  },
-  "prompt_attributions": [
-    {
-      "checkpoint_number": 1,
-      "user_lines_added": 865,
-      "user_lines_removed": 0,
-      "agent_lines_added": 0,
-      "agent_lines_removed": 0,
-      "user_added_per_file": {
-        ".github/agents/Dungeon Generation and BSP Expert.agent.md": 582,
-        ".github/agents/VFX Agent.agent.md": 283
-      }
-    }
-  ]
+  }
 }
