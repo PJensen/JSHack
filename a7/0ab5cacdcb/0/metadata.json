@@ -3,7 +3,7 @@
   "checkpoint_id": "a70ab5cacdcb",
   "session_id": "019ec630-0512-78d0-9759-82ac8e464592",
   "strategy": "manual-commit",
-  "created_at": "2026-06-14T13:29:36.028810534Z",
+  "created_at": "2026-06-14T13:29:39.438026821Z",
   "branch": "master",
   "checkpoints_count": 0,
   "files_touched": [
@@ -26,55 +26,28 @@
   "agent": "Codex",
   "model": "gpt-5.5",
   "turn_id": "26342a89014e",
-  "checkpoint_transcript_start": 393,
-  "transcript_lines_at_start": 393,
+  "checkpoint_transcript_start": 750,
+  "transcript_lines_at_start": 750,
   "token_usage": {
-    "input_tokens": 499562,
+    "input_tokens": 3080,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 7298560,
-    "output_tokens": 20775,
-    "api_call_count": 54
+    "cache_read_tokens": 84352,
+    "output_tokens": 246,
+    "api_call_count": 1
   },
   "session_metrics": {
     "turn_count": 1
   },
   "initial_attribution": {
-    "calculated_at": "2026-06-14T13:29:35.904958703Z",
-    "agent_lines": 89,
-    "agent_removed": 6,
+    "calculated_at": "2026-06-14T13:29:39.327932152Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
     "human_added": 0,
     "human_modified": 0,
-    "human_removed": 2,
-    "total_committed": 89,
-    "total_lines_changed": 97,
-    "agent_percentage": 97.9381443298969,
+    "human_removed": 0,
+    "total_committed": 0,
+    "total_lines_changed": 0,
+    "agent_percentage": 0,
     "metric_version": 2
-  },
-  "prompt_attributions": [
-    {
-      "checkpoint_number": 1,
-      "user_lines_added": 1244,
-      "user_lines_removed": 2,
-      "agent_lines_added": 0,
-      "agent_lines_removed": 0,
-      "user_added_per_file": {
-        ".github/agents/Dungeon Generation and BSP Expert.agent.md": 582,
-        ".github/agents/VFX Agent.agent.md": 283,
-        "src/content/items/spellbooks.js": 1,
-        "src/display/composition/effectOrchestrator.js": 3,
-        "src/display/fx/spellAreaFx.js": 98,
-        "src/display/palette/base.js": 1,
-        "src/events/VoidHoleCast.js": 34,
-        "src/rules/data/lootTables.js": 1,
-        "src/rules/data/spells.js": 19,
-        "src/rules/scripts/spells.js": 143,
-        "tests/lootResolver.test.mjs": 1,
-        "tests/voidHole.test.mjs": 78
-      },
-      "user_removed_per_file": {
-        "src/display/fx/spellAreaFx.js": 1,
-        "tests/lootResolver.test.mjs": 1
-      }
-    }
-  ]
+  }
 }
