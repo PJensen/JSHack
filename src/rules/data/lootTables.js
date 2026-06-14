@@ -291,6 +291,8 @@ export const LOOT_TABLES = {
       { type: "item", weight: 18, itemId: "book_firestorm" },
       { type: "item", weight: 28, itemId: "book_fireball" },
       { type: "item", weight: 20, itemId: "book_scorch" },
+      { type: "item", weight: 24, itemId: "book_magic_missile" },
+      { type: "item", weight: 18, itemId: "book_arcane_barrage" },
       { type: "item", weight: 22, itemId: "book_arcane_bolt" },
       // Warrior / melee
       { type: "item", weight: 22, itemId: "book_iron_flesh" },

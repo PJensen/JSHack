@@ -51,6 +51,8 @@ _book('book_plague_swarm',  'Spellbook of Plague Swarm',  'epic',   'Teaches Pla
 _book('book_divine_shield', 'Spellbook of Divine Shield', 'rare',   'Teaches Divine Shield — a holy ward of stoneskin and blessing.');
 _book('book_purify',        'Spellbook of Purify',        'rare',   'Teaches Purify — cleanse all debuffs from your body.');
 _book('book_consecrate',    'Spellbook of Consecrate',    'epic',   'Teaches Consecrate — sanctify the ground, burning the unholy.');
+_book('book_magic_missile', 'Spellbook of Magic Missile', 'magic',  'Teaches Magic Missile — curve a single arcane star through the air.');
+_book('book_arcane_barrage','Spellbook of Arcane Barrage','rare',   'Teaches Arcane Barrage — split three smaller missiles that strike together.');
 _book('book_arcane_bolt',   'Spellbook of Arcane Bolt',   'magic',  'Teaches Arcane Bolt — a lance of raw arcana that restores mana.');
 _book('book_evocation',     'Spellbook of Evocation',     'rare',   'Teaches Evocation — channel raw aether to restore mana, but stand vulnerable.');
 

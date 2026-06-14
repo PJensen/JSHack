@@ -183,6 +183,8 @@ export const basePalette = {
   book_divine_shield:   { glyph: "?", fg: "#ffdd88", glow: "#ccaa44", baseScale: 0.7 },
   book_purify:          { glyph: "?", fg: "#eeeeff", glow: "#aaaacc", baseScale: 0.7 },
   book_consecrate:      { glyph: "?", fg: "#ffcc55", glow: "#cc9922", baseScale: 0.7 },
+  book_magic_missile:   { glyph: "?", fg: "#c888ff", glow: "#8844cc", baseScale: 0.7 },
+  book_arcane_barrage:  { glyph: "?", fg: "#dda6ff", glow: "#9955dd", baseScale: 0.7 },
   book_arcane_bolt:     { glyph: "?", fg: "#cc88ff", glow: "#8844cc", baseScale: 0.7 },
   book_evocation:       { glyph: "?", fg: "#88bbff", glow: "#4477cc", baseScale: 0.7 },
   book_dead: { glyph: "?", fg: "#888888", glow: "#555555", baseScale: 0.7 },

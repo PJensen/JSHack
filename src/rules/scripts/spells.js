@@ -65,6 +65,7 @@ import { spawnWeb } from "../utils/spawnWeb.js";
 import { ALL_DIRS } from "../utils/directions.js";
 import { forEachInRadius } from "../utils/spatialIndex.js";
 import { resolveScrollEffectDuration } from "../utils/scrollReading.js";
+import { ArcaneBarrageCast, MagicMissileCast } from "../../events/ArcaneProjectileCast.js";
 
 /** @returns {any|null} */
 function _getWeather(world) {
@@ -3425,6 +3426,82 @@ REGISTRY['earthshatter'] = function earthshatterScript(world, actor, spell, inte
 
 // ─── Generators (resource builders) ─────────────────────────────────────────
 
+/**
+ * @param {World} world
+ * @param {number} actor
+ * @param {{ range?:number }} spell
+ * @returns {{ id:number, pos:any, range:number }|null}
+ */
+function findNearestHostileSpellTarget(world, actor, spell) {
+  const apos = /** @type any */ (world.get(actor, Position));
+  if (!apos) return null;
+  const actorFaction = String(world.get(actor, Faction)?.key || 'player');
+  const range = Math.max(1, Number(spell?.range || 10) | 0);
+  const isBlocked = blockedCallback(buildBlocksVisionMap(world));
+
+  let bestId = 0;
+  let bestPos = null;
+  let bestDist = Infinity;
+  for (const [id, pos] of world.query(Position)) {
+    if (id === actor) continue;
+    const fac = /** @type any */ (world.get(id, Faction));
+    if (!fac || !areFactionsHostile(actorFaction, fac.key)) continue;
+    const vit = /** @type any */ (world.get(id, Vitality));
+    if (!vit || (vit.hp | 0) <= 0) continue;
+    const dist = chebyshevScalar(pos.x | 0, pos.y | 0, apos.x | 0, apos.y | 0);
+    if (dist > range || dist >= bestDist) continue;
+    if (!hasSpellLineOfSight(world, { sourcePos: apos, targetPos: pos, range, isBlocked })) continue;
+    bestId = id;
+    bestPos = pos;
+    bestDist = dist;
+  }
+
+  return bestId && bestPos ? { id: bestId, pos: bestPos, range } : null;
+}
+
+/**
+ * @param {World} world
+ * @param {number} actor
+ * @param {any} spell
+ * @param {{ baseAmount:number, cause:string, eventCtor:any, lanes?:number, salt:number }} tuning
+ */
+function runArcaneMissileSpell(world, actor, spell, tuning) {
+  const apos = /** @type any */ (world.get(actor, Position));
+  if (!apos) return;
+  const target = findNearestHostileSpellTarget(world, actor, spell);
+  if (!target) {
+    world.emit('spell:no-target', { actor, spellId: spell?.id || tuning.cause, range: Math.max(1, Number(spell?.range || 10) | 0) });
+    return;
+  }
+
+  const from = { x: apos.x, y: apos.y };
+  const at = { x: target.pos.x, y: target.pos.y };
+  const dist = Math.hypot(at.x - from.x, at.y - from.y) || 1;
+  const projectileDelay = Math.max(0.12, Math.min(0.58, dist / 9));
+  const result = dealDamage(world, buildSpellDamageSpec(world, actor, target.id, {
+    spell,
+    baseAmount: tuning.baseAmount,
+    type: 'arcane',
+    cause: tuning.cause,
+    at,
+    projectileDelay,
+    salt: tuning.salt ^ target.id,
+  }));
+  const missed = result.reason === "missed";
+  const missTo = missed ? resolveMissTo(world, actor, target.id, from, at, tuning.cause, tuning.salt) : undefined;
+  world.emit(new tuning.eventCtor({
+    actor,
+    targetId: target.id,
+    from,
+    at,
+    hit: result.applied,
+    missed,
+    missTo,
+    projectileDelay,
+    lanes: tuning.lanes || 1,
+  }));
+}
+
 /** Shared helper: auto-target nearest hostile in range + LOS, deal damage, restore resources.
  *  manaPct / staminaPct are fractions of the actor's derived max pool (e.g. 0.06 = 6%). */
 function runGeneratorScript(world, actor, spell, { baseAmount, type, cause, manaPct, staminaPct }) {
@@ -3561,6 +3638,28 @@ REGISTRY['arcane_bolt'] = function(world, actor, spell, intent) {
   runGeneratorScript(world, actor, spell, {
     baseAmount: 3, type: 'arcane', cause: 'spell:arcane_bolt',
     manaPct: 0.05, staminaPct: 0,
+  });
+};
+
+REGISTRY['magic_missile'] = function magicMissileScript(world, actor, spell, intent) {
+  void intent;
+  runArcaneMissileSpell(world, actor, spell, {
+    baseAmount: 5,
+    cause: 'spell:magic_missile',
+    eventCtor: MagicMissileCast,
+    lanes: 1,
+    salt: 0x4d15,
+  });
+};
+
+REGISTRY['arcane_barrage'] = function arcaneBarrageScript(world, actor, spell, intent) {
+  void intent;
+  runArcaneMissileSpell(world, actor, spell, {
+    baseAmount: 7,
+    cause: 'spell:arcane_barrage',
+    eventCtor: ArcaneBarrageCast,
+    lanes: 3,
+    salt: 0xba77,
   });
 };
 

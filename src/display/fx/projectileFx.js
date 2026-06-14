@@ -8,6 +8,7 @@ import { resolveDominantProjectileVfx } from "../../bridge/schema/weaponVfxResol
 import { normalizedGoreType } from "../ui/wiring/goreEngine.js";
 import { setInputLock } from "../input/inputLock.js";
 import { computeMissEndpoint, missSeedFromIds } from "./projectileMiss.js";
+import { ArcaneBarrageCast, MagicMissileCast } from "../../events/ArcaneProjectileCast.js";
 
 // Lazy audio imports — must not break projectile VFX if audio fails to load
 let _playTracked = null;
@@ -55,6 +56,12 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
   /** @type {RadialFx[]} */
   const _frostboltImpact = [];
 
+  // --- Arcane missile projectile state ---
+  /** @type {ArrowFx[]} */
+  const _arcaneMissileFx = [];
+  /** @type {RadialFx[]} */
+  const _arcaneMissileImpact = [];
+
   // --- Ricochet Theology projectile state ---
   /** @type {ArrowFx[]} */
   const _ricochetFx = [];
@@ -76,7 +83,7 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
   function _hasInflight() {
     return _arrowFx.length > 0 || _sboltFx.length > 0 || _fireballFx.length > 0
       || _frostboltFx.length > 0 || _ricochetFx.length > 0 || _webSpitFx.length > 0
-      || _swarmFx.length > 0;
+      || _swarmFx.length > 0 || _arcaneMissileFx.length > 0;
   }
 
   function _syncInputLock() {
@@ -105,6 +112,23 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
       handle.stop();
       _travelAudio.delete(entry);
     }
+  }
+
+  function arcanePoint(p) {
+    const u = p.progress;
+    const x = p.from.x + (p.to.x - p.from.x) * u;
+    const y = p.from.y + (p.to.y - p.from.y) * u;
+    const lane = Number(p.arcaneLane || 0);
+    const amp = Number(p.arcaneAmp || 0.32);
+    const cycles = Number(p.arcaneCycles || 1.35);
+    const phase = Number(p.arcanePhase || 0);
+    const wave = Math.sin(u * Math.PI * 2 * cycles + phase) * Math.sin(u * Math.PI);
+    const px = -p.dy;
+    const py = p.dx;
+    return {
+      x: x + px * (wave * amp + lane * 0.18 * Math.sin(Math.PI * u)),
+      y: y + py * (wave * amp + lane * 0.18 * Math.sin(Math.PI * u)),
+    };
   }
 
   function tick(dt) {
@@ -444,6 +468,67 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
       if (_frostboltImpact[i].expired) _frostboltImpact.splice(i, 1);
     }
 
+    // Arcane missile projectiles
+    for (let i = _arcaneMissileFx.length - 1; i >= 0; i--) {
+      const bolt = _arcaneMissileFx[i];
+      if (fx?.pool && bolt.progress < 1) {
+        const pt = arcanePoint(bolt);
+        const count = Math.max(1, Math.ceil(dt * 70));
+        for (let j = 0; j < count; j++) {
+          fx.pool.spawn(new Particle({
+            x: pt.x + (Math.random() - 0.5) * 0.12,
+            y: pt.y + (Math.random() - 0.5) * 0.12,
+            vx: -bolt.dx * 0.55 + (Math.random() - 0.5) * 0.55,
+            vy: -bolt.dy * 0.55 + (Math.random() - 0.5) * 0.55 - 0.10,
+            ay: 0.08,
+            life: 0.14 + Math.random() * 0.18,
+            size0: 0.055 + Math.random() * 0.045,
+            size1: 0.006,
+            r: 175 + ((Math.random() * 45) | 0),
+            g: 115 + ((Math.random() * 65) | 0),
+            b: 255,
+            a0: 0.78,
+            rotVel: (Math.random() - 0.5) * 3.2,
+          }));
+        }
+      }
+
+      _tickTravelAudio(bolt);
+      bolt.tick(dt);
+
+      if (bolt.arrived) {
+        _stopTravelAudio(bolt);
+        _arcaneMissileImpact.push(new RadialFx({ x: bolt.to.x, y: bolt.to.y, radius: 0.62, ttl: 0.30 }));
+        if (!bolt.arcaneLane) startShake(cam, 3, 0.10);
+        if (fx?.pool) {
+          for (let k = 0; k < 12; k++) {
+            const angle = (k / 12) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+            const spd = 0.55 + Math.random() * 1.15;
+            fx.pool.spawn(new Particle({
+              x: bolt.to.x + (Math.random() - 0.5) * 0.20,
+              y: bolt.to.y + (Math.random() - 0.5) * 0.20,
+              vx: Math.cos(angle) * spd,
+              vy: Math.sin(angle) * spd - 0.15,
+              ay: 0.10,
+              life: 0.16 + Math.random() * 0.18,
+              size0: 0.07 + Math.random() * 0.06,
+              size1: 0.008,
+              r: 185 + ((Math.random() * 55) | 0),
+              g: 130 + ((Math.random() * 70) | 0),
+              b: 255,
+              a0: 0.90,
+              rotVel: (Math.random() - 0.5) * 3.6,
+            }));
+          }
+        }
+        _arcaneMissileFx.splice(i, 1);
+      }
+    }
+    for (let i = _arcaneMissileImpact.length - 1; i >= 0; i--) {
+      _arcaneMissileImpact[i].tick(dt);
+      if (_arcaneMissileImpact[i].expired) _arcaneMissileImpact.splice(i, 1);
+    }
+
     // Ricochet Theology projectiles
     for (let i = _ricochetFx.length - 1; i >= 0; i--) {
       const bolt = _ricochetFx[i];
@@ -644,6 +729,7 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
     fireball:     "travel:fire",
     frostbolt:    "travel:ice",
     shadow_bolt:  "travel:shadow",
+    arcane_missile: "travel:shadow",
     plague_swarm: "travel:poison",
     plain:        "travel:arrow",
     fire:         "travel:fire",
@@ -661,6 +747,10 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
     speed = 18,
     minDuration = 0.06,
     maxDuration = 0.4,
+    arcaneLane = 0,
+    arcaneAmp = 0.32,
+    arcanePhase = 0,
+    arcaneCycles = 1.35,
   }) {
     if (!from || !to) return;
     const dx = to.x - from.x;
@@ -676,10 +766,15 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
       len,
       style,
     });
+    entry.arcaneLane = arcaneLane;
+    entry.arcaneAmp = arcaneAmp;
+    entry.arcanePhase = arcanePhase;
+    entry.arcaneCycles = arcaneCycles;
 
     if (style === 'shadow_bolt') _sboltFx.push(entry);
     else if (style === 'fireball') _fireballFx.push(entry);
     else if (style === 'frostbolt') _frostboltFx.push(entry);
+    else if (style === 'arcane_missile') _arcaneMissileFx.push(entry);
     else if (style === 'ricochet_theology') _ricochetFx.push(entry);
     else if (style === 'web_spit') _webSpitFx.push(entry);
     else if (style === 'plague_swarm') _swarmFx.push(entry);
@@ -712,10 +807,11 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
     const hasSbolt = _sboltFx.length || _sboltImpact.length;
     const hasFireball = _fireballFx.length || _fireballImpact.length;
     const hasFrostbolt = _frostboltFx.length || _frostboltImpact.length;
+    const hasArcaneMissile = _arcaneMissileFx.length || _arcaneMissileImpact.length;
     const hasRicochet = _ricochetFx.length || _ricochetImpact.length;
     const hasWebSpit = _webSpitFx.length || _webSpitImpact.length;
     const hasSwarm = _swarmFx.length || _swarmImpact.length;
-    if (!hasArrows && !hasSbolt && !hasFireball && !hasFrostbolt && !hasRicochet && !hasWebSpit && !hasSwarm) return;
+    if (!hasArrows && !hasSbolt && !hasFireball && !hasFrostbolt && !hasArcaneMissile && !hasRicochet && !hasWebSpit && !hasSwarm) return;
     ctx.save();
 
     // Draw flying arrows
@@ -1070,6 +1166,58 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
           ctx.fillStyle = `rgba(160,230,255,${discA.toFixed(3)})`;
           ctx.beginPath(); ctx.arc(imp.x, imp.y, ringR * 0.45, 0, Math.PI * 2); ctx.fill();
         }
+      }
+      ctx.restore();
+    }
+
+    // --- Arcane missile projectile ---
+    if (_arcaneMissileFx.length) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      for (const bolt of _arcaneMissileFx) {
+        const head = arcanePoint(bolt);
+        const u0 = Math.max(0, bolt.progress - 0.16);
+        const fakeTail = {
+          ...bolt,
+          get progress() { return u0; },
+        };
+        const tail = arcanePoint(fakeTail);
+        const laneScale = bolt.arcaneLane ? 0.72 : 1.0;
+
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = 'rgba(120,80,255,0.24)';
+        ctx.lineWidth = 0.30 * laneScale;
+        ctx.beginPath(); ctx.moveTo(tail.x, tail.y); ctx.lineTo(head.x, head.y); ctx.stroke();
+
+        ctx.strokeStyle = 'rgba(190,120,255,0.68)';
+        ctx.lineWidth = 0.12 * laneScale;
+        ctx.beginPath(); ctx.moveTo(tail.x, tail.y); ctx.lineTo(head.x, head.y); ctx.stroke();
+
+        ctx.fillStyle = 'rgba(90,70,255,0.28)';
+        ctx.beginPath(); ctx.arc(head.x, head.y, 0.34 * laneScale, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(195,150,255,0.92)';
+        ctx.beginPath(); ctx.arc(head.x, head.y, 0.16 * laneScale, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(245,235,255,0.98)';
+        ctx.beginPath(); ctx.arc(head.x, head.y, 0.065 * laneScale, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // --- Arcane missile impact ---
+    if (_arcaneMissileImpact.length) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      for (const imp of _arcaneMissileImpact) {
+        const t = imp.progress;
+        if (t < 0.24) {
+          const a = 0.78 * (1 - t / 0.24);
+          ctx.fillStyle = `rgba(225,200,255,${a.toFixed(3)})`;
+          ctx.beginPath(); ctx.arc(imp.x, imp.y, 0.20 + t * 0.48, 0, Math.PI * 2); ctx.fill();
+        }
+        const ringA = 0.44 * (1 - t);
+        ctx.strokeStyle = `rgba(160,95,255,${ringA.toFixed(3)})`;
+        ctx.lineWidth = 0.08 * (1 - t * 0.45);
+        ctx.beginPath(); ctx.arc(imp.x, imp.y, t * (imp.radius + 0.42), 0, Math.PI * 2); ctx.stroke();
       }
       ctx.restore();
     }
@@ -1442,6 +1590,43 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
       });
     }
 
+    world.on(MagicMissileCast, ({ actor, targetId, from, at, hit, missed, missTo }) => {
+      if (!(hit || missed) || !from || !at) return;
+      const to = missed
+        ? (missTo && Number.isFinite(missTo.x) && Number.isFinite(missTo.y)
+          ? { x: Number(missTo.x), y: Number(missTo.y) }
+          : computeMissEndpoint(from, at, missSeedFromIds(actor, targetId, 0x4d15)))
+        : at;
+      spawnTransientProjectile({
+        from, to, style: 'arcane_missile',
+        speed: 9, minDuration: 0.12, maxDuration: 0.58,
+        arcaneAmp: 0.38,
+        arcanePhase: 0.45,
+        arcaneCycles: 1.45,
+      });
+    });
+
+    world.on(ArcaneBarrageCast, ({ actor, targetId, from, at, hit, missed, missTo, lanes }) => {
+      if (!(hit || missed) || !from || !at) return;
+      const to = missed
+        ? (missTo && Number.isFinite(missTo.x) && Number.isFinite(missTo.y)
+          ? { x: Number(missTo.x), y: Number(missTo.y) }
+          : computeMissEndpoint(from, at, missSeedFromIds(actor, targetId, 0xba77)))
+        : at;
+      const count = Math.max(1, Number(lanes || 3) | 0);
+      for (let i = 0; i < count; i++) {
+        const lane = i - ((count - 1) / 2);
+        spawnTransientProjectile({
+          from, to, style: 'arcane_missile',
+          speed: 9, minDuration: 0.12, maxDuration: 0.58,
+          arcaneLane: lane,
+          arcaneAmp: 0.22,
+          arcanePhase: i * 2.094,
+          arcaneCycles: 1.18,
+        });
+      }
+    });
+
     // Plague Swarm: buzzing swarm projectile from caster to target
     world.on('spell:plague_swarm', ({ actor, targetId, from, at, fizzle, missed, missTo }) => {
       if (fizzle) return;
@@ -1611,6 +1796,20 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
         radius: 4, color: [140, 200, 255],
       });
     }
+    // Arcane missiles — violet moving light on the actual sine path
+    for (let i = 0; i < _arcaneMissileFx.length; i++) {
+      const bolt = _arcaneMissileFx[i];
+      const pt = arcanePoint(bolt);
+      const laneScale = bolt.arcaneLane ? 0.72 : 1.0;
+      out.push({
+        x: pt.x,
+        y: pt.y,
+        radius: 4.2 * laneScale,
+        color: [190, 120, 255],
+        flicker: 0.85 + 0.15 * Math.sin(bolt.progress * Math.PI * 6 + Number(bolt.arcanePhase || 0)),
+        softness: 4,
+      });
+    }
     // Ricochet — holy gold
     for (let i = 0; i < _ricochetFx.length; i++) {
       const r = _ricochetFx[i];
@@ -1663,6 +1862,10 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
     for (let i = 0; i < _frostboltImpact.length; i++) {
       const imp = _frostboltImpact[i];
       out.push({ x: imp.x, y: imp.y, radius: 3 * imp.alpha, color: [140, 200, 255] });
+    }
+    for (let i = 0; i < _arcaneMissileImpact.length; i++) {
+      const imp = _arcaneMissileImpact[i];
+      out.push({ x: imp.x, y: imp.y, radius: 3.2 * imp.alpha, color: [205, 150, 255] });
     }
     // Web spit — faint cool white glow
     for (let i = 0; i < _webSpitFx.length; i++) {
