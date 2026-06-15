@@ -9,8 +9,8 @@ import { DungeonState } from "../src/rules/components/DungeonState.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { initDungeon } from "../src/rules/environment/dungeon/index.js";
 import { transitionToDepth, clearFloorCache } from "../src/rules/environment/dungeon/transition.js";
-import { clearAll, setTile, getTile } from "../src/rules/environment/dungeon/tileMap.js";
-import { TILE_FLOOR, TILE_WALL } from "../src/rules/environment/dungeon/constants.js";
+import { clearAll, setTile, getTile, loadedChunkCount } from "../src/rules/environment/dungeon/tileMap.js";
+import { TILE_FLOOR, TILE_VOID, TILE_WALL } from "../src/rules/environment/dungeon/constants.js";
 import { markDestroyedTile } from "../src/rules/utils/destroyedTiles.js";
 import { markWet, isWetAt } from "../src/rules/utils/wetTileMap.js";
 
@@ -109,6 +109,8 @@ Deno.test("authored starter regions produce targeted content", async () => {
     anchorY: tavern.entrance.anchorY,
   });
   assert(countIdentity(world, "rat") >= 5, "tavern basement should be rat-heavy");
+  assert(countIdentity(world, "skeleton") >= 3, "graveyard crypt should be resident on the same depth-one plane");
+  assert(countIdentity(world, "book_dead") >= 1, "graveyard crypt objective should be resident with the depth-one plane");
 
   await transitionToDepth(world, 0, tavern.pos, { direction: "up", stairPos: tavern.pos });
   const crypt = entranceByTemplate(world, "graveyard_crypt");
@@ -121,6 +123,29 @@ Deno.test("authored starter regions produce targeted content", async () => {
   });
   assert(countIdentity(world, "skeleton") >= 3, "graveyard crypt should be skeleton-heavy");
   assert(countIdentity(world, "book_dead") >= 1, "graveyard crypt should place the Book of the Dead objective");
+});
+
+Deno.test("depth one authored regions are resident on the same plane", async () => {
+  clearFloorCache();
+  clearAll();
+  const world = new World({ seed: 0x9191 });
+  const spawn = await initDungeon(world, { startDepth: 0 });
+  addPlayer(world, spawn.x, spawn.y);
+
+  const tavern = entranceByTemplate(world, "tavern_basement");
+  const crypt = entranceByTemplate(world, "graveyard_crypt");
+  await transitionToDepth(world, 1, tavern.pos, {
+    direction: "down",
+    stairPos: tavern.pos,
+    templateId: tavern.entrance.templateId,
+    anchorX: tavern.entrance.anchorX,
+    anchorY: tavern.entrance.anchorY,
+  });
+
+  assertEquals(dungeonState(world).currentDepth, 1);
+  assert(loadedChunkCount() >= 2, "depth-one plane should include more than the active entrance chunk");
+  assert(getTile(tavern.pos.x, tavern.pos.y) !== TILE_VOID, "tavern basement anchor should be loaded");
+  assert(getTile(crypt.pos.x, crypt.pos.y) !== TILE_VOID, "graveyard crypt anchor should be loaded from tavern basement");
 });
 
 Deno.test("mutable tile state is scoped by sparse underworld region", async () => {
@@ -157,7 +182,7 @@ Deno.test("mutable tile state is scoped by sparse underworld region", async () =
     anchorX: crypt.entrance.anchorX,
     anchorY: crypt.entrance.anchorY,
   });
-  assert(!isWetAt(world, tavern.pos.x + 1, tavern.pos.y), "crypt should not inherit tavern wet tiles");
+  assert(isWetAt(world, tavern.pos.x + 1, tavern.pos.y), "crypt should share the resident depth-one plane with tavern wet tiles");
 
   await transitionToDepth(world, 0, crypt.pos, { direction: "up", stairPos: crypt.pos });
   await transitionToDepth(world, 1, tavern.pos, {
