@@ -205,6 +205,32 @@ function emitVoid(out, t, id, x, y, radius, strength, softness) {
   });
 }
 
+function emitAuthoredLight(out, light, t) {
+  const id = Number(light?.id || 0) | 0;
+  const pos = light?.pos || {};
+  const x = Number(pos.x || 0) + 0.5;
+  const y = Number(pos.y || 0) + 0.5;
+  const radius = Number(light?.radius || 0);
+  if (!(radius > 0)) return;
+  const color = Array.isArray(light?.color) ? light.color : [255, 255, 255];
+  const pattern = String(light?.pattern || 'steady');
+  const softness = Number.isFinite(Number(light?.softness)) ? Number(light.softness) : 6;
+  const voidStrength = light?.voidStrength;
+  if (voidStrength !== null && voidStrength !== undefined) {
+    const p = evaluatePattern(pattern || 'void', t, id);
+    out.push({
+      x, y,
+      radius,
+      kind: "void",
+      color,
+      voidStrength: Math.max(0, Math.min(1, Number(voidStrength) || 0)) * p.intensity,
+      softness,
+    });
+    return;
+  }
+  emitPatterned(out, pattern, t, id, x, y, radius, color, softness);
+}
+
 /** Legacy shim — delegates to the 'torch' temporal pattern.  */
 function torchFlicker(t, id) {
   return evaluatePattern('torch', t, id).intensity;
@@ -308,6 +334,15 @@ export function collectLightSources(view, opts = {}) {
   // so the interaction pass can scan the complete base source list.
   /** @type {Array<{id:number, x:number, y:number, kind:string, opt:object}>} */
   const matInteractors = [];
+  const explicitLightEntityIds = new Set();
+
+  if (Array.isArray(view.lightEmitters)) {
+    for (let i = 0; i < view.lightEmitters.length; i++) {
+      const light = view.lightEmitters[i];
+      explicitLightEntityIds.add(Number(light?.id || 0) | 0);
+      emitAuthoredLight(out, light, t);
+    }
+  }
 
   if (Array.isArray(view.entities)) {
     for (let i = 0; i < view.entities.length; i++) {
@@ -321,6 +356,13 @@ export function collectLightSources(view, opts = {}) {
       const ex = e.pos.x + 0.5, ey = e.pos.y + 0.5;
       const layer = Number.isFinite(e.layer) ? (e.layer | 0) : 300;
       const kind = (typeof e.kind === 'string') ? e.kind.toLowerCase() : '';
+
+      if (explicitLightEntityIds.has(Number(e.id || 0) | 0)) {
+        if (e.matOptical) {
+          matInteractors.push({ id: e.id, x: ex, y: ey, kind, opt: e.matOptical });
+        }
+        continue;
+      }
 
       // Placed torches — room features (layer 300) or ground items (layer 250)
       if (kind === 'torch') {

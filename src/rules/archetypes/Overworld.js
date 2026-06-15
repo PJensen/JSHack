@@ -9,6 +9,7 @@ import { HarvestNode } from "../components/HarvestNode.js";
 import { ObjectState } from "../components/ObjectState.js";
 import { GrowthStage } from "../components/GrowthStage.js";
 import { AudioEmitter } from "../components/AudioEmitter.js";
+import { LightEmitter } from "../components/LightEmitter.js";
 import { Pushable } from "../components/Pushable.js";
 
 export const HomeBed = defineArchetype(
@@ -241,6 +242,7 @@ export const Furnace = defineArchetype(
     { profile: "smithy", interior: true },
     { profile: "cooking_fire", interior: true },
   ] }],
+  [LightEmitter, { radius: 3, color: [255, 120, 40], pattern: "ember", softness: 8, whenState: "lit" }],
 );
 
 export const CookingFire = defineArchetype(
@@ -251,6 +253,7 @@ export const CookingFire = defineArchetype(
   [Collider, { solid: true, blocksSight: false }],
   [Interactable, { action: "cookFood", params: null }],
   [AudioEmitter, { emitters: [{ profile: "cooking_fire", interior: true }] }],
+  [LightEmitter, { radius: 4, color: [255, 120, 40], pattern: "torch", softness: 8 }],
 );
 
 // ── Farm crops ────────────────────────────────────────────────────
@@ -727,6 +730,7 @@ export const LanternPost = defineArchetype(
   [Collider, { solid: true, blocksSight: false }],
   [ObjectState, { state: "lit" }],
   [Interactable, { action: "toggleLantern", params: null }],
+  [LightEmitter, { radius: 7, color: [255, 210, 140], pattern: "candle", softness: 10, whenState: "lit" }],
 );
 
 export const RainBarrel = defineArchetype(

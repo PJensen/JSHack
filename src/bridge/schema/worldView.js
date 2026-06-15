@@ -45,6 +45,7 @@ import { Facing } from "../../rules/components/Facing.js";
 import { AggroState } from "../../rules/components/AggroState.js";
 import { Interactable } from "../../rules/components/Interactable.js";
 import { AudioEmitter } from "../../rules/components/AudioEmitter.js";
+import { LightEmitter } from "../../rules/components/LightEmitter.js";
 import { HarvestNode } from "../../rules/components/HarvestNode.js";
 import { canonicalStatusKey } from "../../rules/utils/effectSemantics.js";
 import { isAsleep, SLEEP_DISPLAY_TAG } from "../../rules/utils/sleep.js";
@@ -76,12 +77,13 @@ import {
 /** @typedef {{ id:number, x:number, y:number }} SolidView */
 /** @typedef {{ x:number, y:number, kind:string, alpha:number, burning?:boolean, smoking?:boolean }} RoofTileView */
 /** @typedef {{ id:number, profile:string, pos:{x:number,y:number}, interior:boolean }} AudioEmitterView */
-/** @typedef {{ turn:number, seed:number, player: { id:number, pos:{x:number,y:number} } | null, entities: EntityView[], solids: SolidView[], emissives: any[], audioEmitters: AudioEmitterView[], roofs: RoofTileView[], fisheries: any[], tileGrid: any, isVisible: ((x:number,y:number)=>boolean)|null, isExplored: ((x:number,y:number)=>boolean)|null, currentDepth?: number }} WorldView */
+/** @typedef {{ id:number, pos:{x:number,y:number}, radius:number, color:[number,number,number], pattern:string, softness:number, voidStrength:number|null }} LightEmitterView */
+/** @typedef {{ turn:number, seed:number, player: { id:number, pos:{x:number,y:number} } | null, entities: EntityView[], solids: SolidView[], emissives: any[], audioEmitters: AudioEmitterView[], lightEmitters: LightEmitterView[], roofs: RoofTileView[], fisheries: any[], tileGrid: any, isVisible: ((x:number,y:number)=>boolean)|null, isExplored: ((x:number,y:number)=>boolean)|null, currentDepth?: number }} WorldView */
 
 /** @typedef {{ id:number, text:string, profane:boolean, pos:{x:number,y:number} }} EngravingView */
 
 /** @type {WorldView} */
-const _view = { turn: 0, seed: 0, player: null, entities: [], solids: [], emissives: [], audioEmitters: [], roofs: [], fisheries: [], engravings: [], tileGrid: null, isVisible: null, isExplored: null, isBlockedVision: null, weather: "clear", playerSheltered: false, nightAlpha: 0, dawnAlpha: 0, duskAlpha: 0, isOverworld: false, currentDepth: 0, turnInDay: 0, moonBrightness: 0, playerVisionRadius: 0, playerFacing: null, playerConeDegrees: 360, perceptionState: null };
+const _view = { turn: 0, seed: 0, player: null, entities: [], solids: [], emissives: [], audioEmitters: [], lightEmitters: [], roofs: [], fisheries: [], engravings: [], tileGrid: null, isVisible: null, isExplored: null, isBlockedVision: null, weather: "clear", playerSheltered: false, nightAlpha: 0, dawnAlpha: 0, duskAlpha: 0, isOverworld: false, currentDepth: 0, turnInDay: 0, moonBrightness: 0, playerVisionRadius: 0, playerFacing: null, playerConeDegrees: 360, perceptionState: null };
 let _lastPerceptionWorld = null;
 /** @type {Map<number, EntityView>} */
 const _entityRecs = new Map();   // id -> { id, kind, pos:{x,y}, tags:[] }
@@ -833,6 +835,23 @@ function projectFacing(world, id, rec) {
 	rec.facing = (dx === 0 && dy === 0) ? null : { dx, dy };
 }
 
+function normalizeLightColor(color) {
+	if (Array.isArray(color)) {
+		const r = Math.max(0, Math.min(255, Number(color[0]) || 0));
+		const g = Math.max(0, Math.min(255, Number(color[1]) || 0));
+		const b = Math.max(0, Math.min(255, Number(color[2]) || 0));
+		return [r, g, b];
+	}
+	if (typeof color === "string" && /^#[0-9a-fA-F]{6}$/.test(color)) {
+		return [
+			parseInt(color.slice(1, 3), 16),
+			parseInt(color.slice(3, 5), 16),
+			parseInt(color.slice(5, 7), 16),
+		];
+	}
+	return [255, 255, 255];
+}
+
 /**
  * @param {import('../../lib/ecs-js/index.js').World} world
  * @returns {WorldView}
@@ -850,6 +869,7 @@ export function buildWorldView(world) {
 	_view.solids.length = 0;
 	_view.emissives.length = 0;
 	_view.audioEmitters.length = 0;
+	_view.lightEmitters.length = 0;
 	_view.roofs.length = 0;
 	_view.fisheries.length = 0;
 	_view.engravings.length = 0;
@@ -1004,6 +1024,29 @@ export function buildWorldView(world) {
 				interior: spec?.interior === true,
 			});
 		}
+	}
+
+	for (const [id, pos, light] of world.query(Position, LightEmitter)) {
+		if (_view.player && typeof isVisible === "function" && !isVisible(pos.x, pos.y)) continue;
+		const radius = Number(light?.radius || 0);
+		if (!(radius > 0)) continue;
+		const whenState = String(light?.whenState || "").trim();
+		if (whenState) {
+			const state = String(world.get(id, ObjectState)?.state || "");
+			if (state !== whenState) continue;
+		}
+		const voidStrengthRaw = light?.voidStrength;
+		_view.lightEmitters.push({
+			id,
+			pos: { x: pos.x | 0, y: pos.y | 0 },
+			radius,
+			color: normalizeLightColor(light?.color),
+			pattern: String(light?.pattern || "steady").trim() || "steady",
+			softness: Number.isFinite(Number(light?.softness)) ? Number(light.softness) : 6,
+			voidStrength: voidStrengthRaw === null || voidStrengthRaw === undefined
+				? null
+				: Math.max(0, Math.min(1, Number(voidStrengthRaw) || 0)),
+		});
 	}
 
 	// Collect entity records near the player (or all if no player).

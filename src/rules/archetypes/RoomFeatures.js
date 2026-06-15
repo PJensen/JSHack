@@ -14,6 +14,7 @@ import { ObjectState } from "../components/ObjectState.js";
 import { HydraulicsLink } from "../components/HydraulicsLink.js";
 import { Vitality } from "../components/Vitality.js";
 import { AudioEmitter } from "../components/AudioEmitter.js";
+import { LightEmitter } from "../components/LightEmitter.js";
 
 // --- Interactive features ---
 
@@ -34,6 +35,7 @@ export const Altar = defineArchetype(
   [Collider, { solid: true, blocksSight: false }],
   [Interactable, { action: "prayAltar", params: null }],
   [AudioEmitter, { emitters: [{ profile: "holy_site", interior: false }] }],
+  [LightEmitter, { radius: 4.5, color: [204, 170, 51], pattern: "breathe", softness: 4 }],
 );
 
 export const Shrine = defineArchetype(
@@ -54,6 +56,7 @@ export const Runestone = defineArchetype(
   [Collider, { solid: true, blocksSight: false }],
   [Interactable, { action: "touchRunestone", params: null }],
   [AudioEmitter, { emitters: [{ profile: "runic", interior: false }] }],
+  [LightEmitter, { radius: 3.2, color: [136, 221, 255], pattern: "pulse", softness: 5 }],
 );
 
 // --- Decorative features ---
@@ -114,6 +117,7 @@ export const Mushrooms = defineArchetype(
     yield: "food_mushrooms", yieldMin: 1, yieldMax: 3,
   }],
   [Interactable, { action: "harvestNode", params: null }],
+  [LightEmitter, { radius: 3, color: [120, 220, 200], pattern: "biolum", softness: 6 }],
 );
 
 export const Torch = defineArchetype(
@@ -122,6 +126,7 @@ export const Torch = defineArchetype(
   [NamedIdentity, { name: "Torch", identity: "torch" }],
   [Material, { kind: "wood" }],
   [AudioEmitter, { emitters: [{ profile: "torch", interior: false }] }],
+  [LightEmitter, { radius: 6, color: [255, 190, 120], pattern: "torch", softness: 8 }],
 );
 
 export const Urn = defineArchetype(
@@ -235,6 +240,7 @@ export const SteamVent = defineArchetype(
   [NamedIdentity, { name: "Steam Vent", identity: "steam_vent" }],
   [Material, { kind: "stone" }],
   [Collider, { solid: false, blocksSight: false }],
+  [LightEmitter, { radius: 2.4, color: [95, 210, 225], pattern: "pulse", softness: 9 }],
   [Interactable, (/** @type {any} */ p) => ({
     action: "inspectSteamVent",
     params: {
@@ -264,6 +270,7 @@ export const CandleCluster = defineArchetype(
   [NamedIdentity, { name: "Candle Cluster", identity: "candle_cluster" }],
   [Material, { kind: "wood" }],
   [Collider, { solid: false, blocksSight: false }],
+  [LightEmitter, { radius: 2.4, color: [255, 205, 135], pattern: "candle", softness: 7 }],
 );
 
 export const EmberBrazier = defineArchetype(
@@ -272,6 +279,7 @@ export const EmberBrazier = defineArchetype(
   [NamedIdentity, { name: "Ember Brazier", identity: "ember_brazier" }],
   [Material, { kind: "steel" }],
   [Collider, { solid: false, blocksSight: false }],
+  [LightEmitter, { radius: 3, color: [255, 115, 45], pattern: "ember", softness: 6 }],
 );
 
 export const GlowcapPatch = defineArchetype(
@@ -280,6 +288,7 @@ export const GlowcapPatch = defineArchetype(
   [NamedIdentity, { name: "Glowcap Patch", identity: "glowcap_patch" }],
   [Material, { kind: "wood" }],
   [Collider, { solid: false, blocksSight: false }],
+  [LightEmitter, { radius: 2.6, color: [65, 225, 190], pattern: "biolum", softness: 7 }],
 );
 
 export const WebMoteCluster = defineArchetype(
@@ -288,6 +297,7 @@ export const WebMoteCluster = defineArchetype(
   [NamedIdentity, { name: "Web Mote Cluster", identity: "web_mote_cluster" }],
   [Material, { kind: "organic" }],
   [Collider, { solid: false, blocksSight: false }],
+  [LightEmitter, { radius: 2.2, color: [95, 190, 230], pattern: "biolum", softness: 8 }],
 );
 
 export const ArmorStand = defineArchetype(
@@ -312,6 +322,7 @@ export const VoidCrack = defineArchetype(
   [NamedIdentity, { name: "Void Crack", identity: "void_crack" }],
   [Material, { kind: "obsidian" }],
   [Collider, { solid: false, blocksSight: false }],
+  [LightEmitter, { radius: 2.8, color: [155, 120, 255], pattern: "void", softness: 5, voidStrength: 0.65 }],
 );
 
 export const DarkReliquary = defineArchetype(
@@ -320,6 +331,7 @@ export const DarkReliquary = defineArchetype(
   [NamedIdentity, { name: "Dark Reliquary", identity: "dark_reliquary" }],
   [Material, { kind: "obsidian" }],
   [Collider, { solid: true, blocksSight: false }],
+  [LightEmitter, { radius: 3.8, color: [155, 120, 255], pattern: "void", softness: 7, voidStrength: 0.75 }],
 );
 
 export const MistVent = defineArchetype(
@@ -328,4 +340,5 @@ export const MistVent = defineArchetype(
   [NamedIdentity, { name: "Mist Vent", identity: "mist_vent" }],
   [Material, { kind: "stone" }],
   [Collider, { solid: false, blocksSight: false }],
+  [LightEmitter, { radius: 2.8, color: [95, 210, 225], pattern: "pulse", softness: 9 }],
 );

@@ -8,6 +8,7 @@ import { Player } from "../src/rules/components/Player.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { Material } from "../src/rules/components/Material.js";
 import { Trap } from "../src/rules/components/Trap.js";
+import { LightEmitter } from "../src/rules/components/LightEmitter.js";
 
 Deno.test("dungeon atmospheric decorations materialize as concrete world objects", () => {
   const world = new World({ seed: 42 });
@@ -29,6 +30,9 @@ Deno.test("dungeon atmospheric decorations materialize as concrete world objects
     assertEquals(world.get(id, NamedIdentity)?.identity, kinds[i]);
     assert(world.get(id, Position), `${kinds[i]} should have a position`);
     assert(world.get(id, Material), `${kinds[i]} should have a material`);
+    if (!["armor_stand", "polished_mirror"].includes(kinds[i])) {
+      assert(world.get(id, LightEmitter), `${kinds[i]} should carry authored light data`);
+    }
   }
 });
 
