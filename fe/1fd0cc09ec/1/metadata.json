@@ -1,9 +1,11 @@
 {
   "cli_version": "0.6.3",
   "checkpoint_id": "fe1fd0cc09ec",
+  "session_id": "019ec78d-745d-7b33-a0b6-a99766d17942",
   "strategy": "manual-commit",
+  "created_at": "2026-06-15T16:57:11.248431879Z",
   "branch": "master",
-  "checkpoints_count": 1,
+  "checkpoints_count": 0,
   "files_touched": [
     "src/rules/data/buildings/bandit_hideout.js",
     "src/rules/data/buildings/bat_cave.js",
@@ -21,25 +23,21 @@
     "src/rules/environment/dungeon/underworldRegions.js",
     "tests/sparseUnderworld.test.mjs"
   ],
-  "sessions": [
-    {
-      "metadata": "/fe/1fd0cc09ec/0/metadata.json",
-      "transcript": "/fe/1fd0cc09ec/0/full.jsonl",
-      "content_hash": "/fe/1fd0cc09ec/0/content_hash.txt",
-      "prompt": "/fe/1fd0cc09ec/0/prompt.txt"
-    },
-    {
-      "metadata": "/fe/1fd0cc09ec/1/metadata.json",
-      "transcript": "/fe/1fd0cc09ec/1/full.jsonl",
-      "content_hash": "/fe/1fd0cc09ec/1/content_hash.txt",
-      "prompt": ""
-    }
-  ],
-  "token_usage": {
-    "input_tokens": 258661,
-    "cache_creation_tokens": 0,
-    "cache_read_tokens": 7501952,
-    "output_tokens": 19475,
-    "api_call_count": 48
+  "agent": "Codex",
+  "model": "gpt-5.5",
+  "turn_id": "19f253b7ef98",
+  "checkpoint_transcript_start": 163,
+  "transcript_lines_at_start": 163,
+  "initial_attribution": {
+    "calculated_at": "2026-06-15T16:57:11.216799764Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 0,
+    "total_lines_changed": 0,
+    "agent_percentage": 0,
+    "metric_version": 2
   }
 }
