@@ -15,6 +15,14 @@ import ruinedWatchtower from './ruined_watchtower.js';
 import waysideShrine from './wayside_shrine.js';
 import abandonedCamp from './abandoned_camp.js';
 import strangeGrove from './strange_grove.js';
+import bearCave from './bear_cave.js';
+import batCave from './bat_cave.js';
+import humanMine from './human_mine.js';
+import banditHideout from './bandit_hideout.js';
+import oldWell from './old_well.js';
+import collapsedCellar from './collapsed_cellar.js';
+import wolfDen from './wolf_den.js';
+import forgottenShrine from './forgotten_shrine.js';
 
 export const BUILDING_DEFS = {
   tavern,
@@ -43,6 +51,14 @@ export const LANDMARK_DEFS = {
   wayside_shrine: waysideShrine,
   abandoned_camp: abandonedCamp,
   strange_grove: strangeGrove,
+  bear_cave: bearCave,
+  bat_cave: batCave,
+  human_mine: humanMine,
+  bandit_hideout: banditHideout,
+  old_well: oldWell,
+  collapsed_cellar: collapsedCellar,
+  wolf_den: wolfDen,
+  forgotten_shrine: forgottenShrine,
 };
 
 /**

@@ -52,10 +52,26 @@ Deno.test("overworld stairs carry authored underworld entrance metadata", async 
 
   const tavern = entranceByTemplate(world, "tavern_basement");
   const crypt = entranceByTemplate(world, "graveyard_crypt");
+  const templates = new Set();
+  for (const [, entrance] of world.query(DungeonEntrance, Position)) {
+    templates.add(String(entrance.templateId || ""));
+  }
 
   assertEquals(tavern.entrance.targetDepth, 1);
   assertEquals(crypt.entrance.targetDepth, 1);
   assert(tavern.pos.x !== crypt.pos.x || tavern.pos.y !== crypt.pos.y, "starter entrances should be distinct overworld anchors");
+  for (const templateId of [
+    "bear_cave",
+    "bat_cave",
+    "human_mine",
+    "bandit_hideout",
+    "old_well",
+    "collapsed_cellar",
+    "wolf_den",
+    "forgotten_shrine",
+  ]) {
+    assert(templates.has(templateId), `overworld should place ${templateId} entrance metadata`);
+  }
 });
 
 Deno.test("depth one sparse regions are distinct by entrance anchor and template", async () => {
@@ -146,6 +162,34 @@ Deno.test("depth one authored regions are resident on the same plane", async () 
   assert(loadedChunkCount() >= 2, "depth-one plane should include more than the active entrance chunk");
   assert(getTile(tavern.pos.x, tavern.pos.y) !== TILE_VOID, "tavern basement anchor should be loaded");
   assert(getTile(crypt.pos.x, crypt.pos.y) !== TILE_VOID, "graveyard crypt anchor should be loaded from tavern basement");
+});
+
+Deno.test("expanded authored entrances contribute themed resident content", async () => {
+  clearFloorCache();
+  clearAll();
+  const world = new World({ seed: 0x5151 });
+  const spawn = await initDungeon(world, { startDepth: 0 });
+  addPlayer(world, spawn.x, spawn.y);
+
+  const tavern = entranceByTemplate(world, "tavern_basement");
+  const bear = entranceByTemplate(world, "bear_cave");
+  const bandits = entranceByTemplate(world, "bandit_hideout");
+  const mine = entranceByTemplate(world, "human_mine");
+  await transitionToDepth(world, 1, tavern.pos, {
+    direction: "down",
+    stairPos: tavern.pos,
+    templateId: tavern.entrance.templateId,
+    anchorX: tavern.entrance.anchorX,
+    anchorY: tavern.entrance.anchorY,
+  });
+
+  assert(getTile(bear.pos.x, bear.pos.y) !== TILE_VOID, "bear cave should be resident from tavern basement");
+  assert(getTile(bandits.pos.x, bandits.pos.y) !== TILE_VOID, "bandit hideout should be resident from tavern basement");
+  assert(getTile(mine.pos.x, mine.pos.y) !== TILE_VOID, "human mine should be resident from tavern basement");
+  assert(countIdentity(world, "cave_bear") >= 1, "bear cave should contain its dangerous bear");
+  assert(countIdentity(world, "bat") >= 6, "bat cave should be bat-heavy");
+  assert(countIdentity(world, "bandit_archer") >= 2, "bandit hideout should include archers");
+  assert(countIdentity(world, "townfolk_miner") >= 2, "human mine should include working miners");
 });
 
 Deno.test("mutable tile state is scoped by sparse underworld region", async () => {

@@ -52,15 +52,15 @@ function _depthPlaneKey(depth) {
 function _collectResidentRegions(world, depth, requestedRegion) {
   if ((depth | 0) <= 0) return [];
   const regions = [];
-  const seen = new Set();
+  const regionKeys = new Set();
   const add = (region) => {
     const templateId = String(region?.templateId || "");
     if (!templateId) return;
     const anchorX = Number(region?.anchorX || 0) | 0;
     const anchorY = Number(region?.anchorY || 0) | 0;
     const key = floorRegionKey(depth, anchorX, anchorY, templateId);
-    if (seen.has(key)) return;
-    seen.add(key);
+    if (regionKeys.has(key)) return;
+    regionKeys.add(key);
     regions.push({ templateId, anchorX, anchorY, regionKey: key });
   };
 

@@ -787,6 +787,14 @@ async function placeOverworldLandmarks(chunks, townCenter, bounds, worldSeed, ti
     { id: "wayside_shrine", biomes: ["GRASSLAND", "FOREST"] },
     { id: "abandoned_camp", biomes: ["FOREST", "GRASSLAND", "COASTAL"] },
     { id: "strange_grove", biomes: ["FOREST", "WETLAND"] },
+    { id: "bear_cave", biomes: ["MOUNTAIN", "FOREST"] },
+    { id: "bat_cave", biomes: ["MOUNTAIN", "FOREST"] },
+    { id: "human_mine", biomes: ["MOUNTAIN"] },
+    { id: "bandit_hideout", biomes: ["FOREST", "GRASSLAND", "COASTAL"] },
+    { id: "old_well", biomes: ["GRASSLAND", "WETLAND"] },
+    { id: "collapsed_cellar", biomes: ["GRASSLAND", "FOREST"] },
+    { id: "wolf_den", biomes: ["FOREST", "GRASSLAND"] },
+    { id: "forgotten_shrine", biomes: ["GRASSLAND", "FOREST", "WETLAND"] },
   ];
 
   for (const spec of specs) {

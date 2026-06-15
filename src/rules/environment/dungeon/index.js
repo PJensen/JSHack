@@ -185,6 +185,14 @@ export async function generateFloor(world, worldSeed, depth, tombstoneRepo = nul
     };
     addEntrance(tavern?.waypoints?.cellar_stairs, "tavern_basement");
     addEntrance(graveyard?.waypoints?.crypt_entrance, "graveyard_crypt");
+    for (const chunkData of ow.chunks) {
+      const chunkSpawns = Array.isArray(chunkData?.spawns) ? chunkData.spawns : [];
+      for (const spawn of chunkSpawns) {
+        const templateId = String(spawn?.params?.entranceTemplateId || "");
+        if (!templateId) continue;
+        addEntrance({ x: spawn.x | 0, y: spawn.y | 0 }, templateId);
+      }
+    }
 
     const stairOpts = {
       createStairDown: (w, x, y) => {

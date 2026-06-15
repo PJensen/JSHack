@@ -218,6 +218,62 @@ const DEAD_END_ROOM_THEMES = [
   { kind: 'mirror_reliquary', weight: 4 },
   { kind: 'dragon_hoard', weight: 3 },
 ];
+
+const AUTHORED_REGION_CONTENT = Object.freeze({
+  tavern_basement: Object.freeze({
+    monsters: Object.freeze([{ id: "rat", count: 8 }]),
+    features: Object.freeze(["torch", "barrel", "crate"]),
+    chests: Object.freeze([{ lootTable: "chest:basic" }]),
+  }),
+  graveyard_crypt: Object.freeze({
+    monsters: Object.freeze([{ id: "skeleton", count: 6 }]),
+    features: Object.freeze(["urn", "urn", "sarcophagus"]),
+    chests: Object.freeze([{ lootTable: "chest:basic" }]),
+    books: Object.freeze(["book_dead"]),
+  }),
+  bear_cave: Object.freeze({
+    monsters: Object.freeze([{ id: "cave_bear", count: 1 }]),
+    features: Object.freeze(["glowcap_patch", "mushrooms", "mushrooms"]),
+    chests: Object.freeze([{ lootTable: "chest:basic", fixedDrops: ["food_mushrooms"] }]),
+  }),
+  bat_cave: Object.freeze({
+    monsters: Object.freeze([{ id: "bat", count: 9 }, { id: "flaming_bat", count: 1 }]),
+    features: Object.freeze(["mushrooms", "glowcap_patch", "web_mote_cluster", "web_mote_cluster"]),
+    chests: Object.freeze([{ lootTable: "chest:basic" }]),
+  }),
+  human_mine: Object.freeze({
+    monsters: Object.freeze([]),
+    npcs: Object.freeze([{ townfolkId: "miner", count: 2 }]),
+    features: Object.freeze(["torch", "torch", "crate", "barrel", "harvest_iron_ore", "harvest_coal_ore", "harvest_stone"]),
+    chests: Object.freeze([{ lootTable: "chest:basic", fixedDrops: ["ore_iron", "ore_coal"] }]),
+  }),
+  bandit_hideout: Object.freeze({
+    monsters: Object.freeze([{ id: "bandit", count: 3 }, { id: "bandit_archer", count: 2 }, { id: "bandit_captain", count: 1 }]),
+    features: Object.freeze(["torch", "crate", "barrel", "weapon_rack"]),
+    chests: Object.freeze([{ lootTable: "chest:epic" }]),
+    traps: Object.freeze([{ type: "arrow" }, { type: "spike" }]),
+  }),
+  old_well: Object.freeze({
+    monsters: Object.freeze([{ id: "rat", count: 4 }, { id: "giant_frog", count: 1 }, { id: "cave_snake", count: 1 }]),
+    features: Object.freeze(["mushrooms", "urn", "drain_throat"]),
+    chests: Object.freeze([{ lootTable: "chest:basic" }]),
+  }),
+  collapsed_cellar: Object.freeze({
+    monsters: Object.freeze([{ id: "rat", count: 5 }]),
+    features: Object.freeze(["torch", "barrel", "crate", "boulder"]),
+    chests: Object.freeze([{ lootTable: "chest:basic" }]),
+  }),
+  wolf_den: Object.freeze({
+    monsters: Object.freeze([{ id: "dire_wolf", count: 3 }]),
+    features: Object.freeze(["bone_chime_rack", "mushrooms", "crate"]),
+    chests: Object.freeze([{ lootTable: "chest:basic" }]),
+  }),
+  forgotten_shrine: Object.freeze({
+    monsters: Object.freeze([{ id: "skeleton", count: 3 }, { id: "dark_acolyte", count: 1 }]),
+    features: Object.freeze(["altar", "shrine", "statue", "candle_cluster"]),
+    chests: Object.freeze([{ lootTable: "chest:epic" }]),
+  }),
+});
 const DEAD_END_THEME_TOTAL_WEIGHT = DEAD_END_ROOM_THEMES.reduce((s, f) => s + f.weight, 0);
 // Mimics should be encountered mostly in shops; wild dungeon mimics stay uncommon.
 const SHOP_MIMIC_CHANCE = 0.12;
@@ -1208,7 +1264,8 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null, world
   }
 
   const templateId = String(floorPlan.activeTemplateId || "");
-  if (templateId === "tavern_basement" || templateId === "graveyard_crypt") {
+  const authoredContent = AUTHORED_REGION_CONTENT[templateId] || null;
+  if (authoredContent) {
     const occupied = new Set([...solidPositions]);
     for (const spawn of spawns) occupied.add(`${spawn.x | 0},${spawn.y | 0}`);
     const openTiles = [];
@@ -1246,29 +1303,33 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null, world
       spawns.push({ x: pos.x, y: pos.y, kind, params });
     };
 
-    if (templateId === "tavern_basement") {
-      const ratTarget = 8;
-      const existingRats = spawns.filter((spawn) => String(spawn?.params?.identity || spawn?.params?.monsterId || "") === "rat").length;
-      for (let i = existingRats; i < ratTarget; i++) {
-        const params = pickSpecificMonster("rat", floorPlan.depth);
+    for (const entry of authoredContent.monsters || []) {
+      const monsterId = String(entry?.id || "");
+      const target = Math.max(0, Number(entry?.count || 0) | 0);
+      const existing = spawns.filter((spawn) => String(spawn?.params?.identity || spawn?.params?.monsterId || "") === monsterId).length;
+      for (let i = existing; i < target; i++) {
+        const params = pickSpecificMonster(monsterId, floorPlan.depth);
         if (params) addAt("monster", params);
       }
-      addAt("torch");
-      addAt("barrel");
-      addAt("crate");
-      addAt("chest", { lootTable: "chest:basic", depth: floorPlan.depth });
-    } else if (templateId === "graveyard_crypt") {
-      const skeletonTarget = 6;
-      const existingSkeletons = spawns.filter((spawn) => String(spawn?.params?.identity || spawn?.params?.monsterId || "") === "skeleton").length;
-      for (let i = existingSkeletons; i < skeletonTarget; i++) {
-        const params = pickSpecificMonster("skeleton", floorPlan.depth);
-        if (params) addAt("monster", params);
+    }
+    for (const feature of authoredContent.features || []) {
+      addAt(String(feature || ""));
+    }
+    for (const npc of authoredContent.npcs || []) {
+      const townfolkId = String(npc?.townfolkId || "");
+      const count = Math.max(0, Number(npc?.count || 0) | 0);
+      for (let i = 0; i < count; i++) {
+        addAt("townfolk", { townfolkId, scheduleEnabled: false });
       }
-      addAt("urn");
-      addAt("urn");
-      addAt("sarcophagus");
-      addAt("chest", { lootTable: "chest:basic", depth: floorPlan.depth });
-      addAt("book", { bookId: "book_dead" });
+    }
+    for (const trap of authoredContent.traps || []) {
+      addAt("trap", trap);
+    }
+    for (const chest of authoredContent.chests || []) {
+      addAt("chest", { ...chest, depth: floorPlan.depth });
+    }
+    for (const bookId of authoredContent.books || []) {
+      addAt("book", { bookId });
     }
   }
 

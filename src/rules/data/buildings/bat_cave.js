@@ -1,0 +1,40 @@
+export default {
+  "name": "bat_cave",
+  "keystone": { "x": 0, "y": 0 },
+  "width": 7,
+  "height": 7,
+  "roofed": false,
+  "tiles": [
+    { "dx": 0, "dy": -3, "tile": "mountain" },
+    { "dx": -2, "dy": -2, "tile": "mountain" },
+    { "dx": -1, "dy": -2, "tile": "floor" },
+    { "dx": 0, "dy": -2, "tile": "floor" },
+    { "dx": 1, "dy": -2, "tile": "floor" },
+    { "dx": 2, "dy": -2, "tile": "mountain" },
+    { "dx": -2, "dy": -1, "tile": "floor" },
+    { "dx": -1, "dy": -1, "tile": "floor" },
+    { "dx": 0, "dy": -1, "tile": "floor" },
+    { "dx": 1, "dy": -1, "tile": "floor" },
+    { "dx": 2, "dy": -1, "tile": "floor" },
+    { "dx": -3, "dy": 0, "tile": "mountain" },
+    { "dx": -2, "dy": 0, "tile": "floor" },
+    { "dx": -1, "dy": 0, "tile": "floor" },
+    { "dx": 0, "dy": 0, "tile": "stair_down" },
+    { "dx": 1, "dy": 0, "tile": "floor" },
+    { "dx": 2, "dy": 0, "tile": "floor" },
+    { "dx": 3, "dy": 0, "tile": "mountain" },
+    { "dx": -2, "dy": 1, "tile": "floor" },
+    { "dx": -1, "dy": 1, "tile": "floor" },
+    { "dx": 0, "dy": 1, "tile": "floor" },
+    { "dx": 1, "dy": 1, "tile": "floor" },
+    { "dx": 2, "dy": 1, "tile": "floor" },
+    { "dx": -1, "dy": 2, "tile": "mountain" },
+    { "dx": 0, "dy": 2, "tile": "floor" },
+    { "dx": 1, "dy": 2, "tile": "mountain" }
+  ],
+  "spawns": [
+    { "dx": 0, "dy": 0, "kind": "stair_down", "params": { "landmark": "bat_cave", "entranceTemplateId": "bat_cave" } },
+    { "dx": -1, "dy": -1, "kind": "web_mote_cluster", "params": { "landmark": "bat_cave" } },
+    { "dx": 1, "dy": 1, "kind": "mushrooms", "params": { "landmark": "bat_cave" } }
+  ]
+};
