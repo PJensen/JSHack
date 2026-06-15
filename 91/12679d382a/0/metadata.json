@@ -3,9 +3,9 @@
   "checkpoint_id": "9112679d382a",
   "session_id": "019ec742-2eab-7820-ab1a-f09131d2c8a7",
   "strategy": "manual-commit",
-  "created_at": "2026-06-15T13:21:54.966124068Z",
+  "created_at": "2026-06-15T13:21:57.904525209Z",
   "branch": "master",
-  "checkpoints_count": 1,
+  "checkpoints_count": 0,
   "files_touched": [
     "src/bridge/schema/worldView.js",
     "src/display/lighting/sources/index.js",
@@ -19,43 +19,21 @@
   "agent": "Codex",
   "model": "gpt-5.5",
   "turn_id": "30adeb9cbd86",
-  "token_usage": {
-    "input_tokens": 690632,
-    "cache_creation_tokens": 0,
-    "cache_read_tokens": 13043712,
-    "output_tokens": 46038,
-    "api_call_count": 108
-  },
+  "checkpoint_transcript_start": 756,
+  "transcript_lines_at_start": 756,
   "session_metrics": {
     "turn_count": 5
   },
   "initial_attribution": {
-    "calculated_at": "2026-06-15T13:21:54.848941757Z",
+    "calculated_at": "2026-06-15T13:21:57.797679914Z",
     "agent_lines": 0,
     "agent_removed": 0,
-    "human_added": 228,
-    "human_modified": 2,
+    "human_added": 0,
+    "human_modified": 0,
     "human_removed": 0,
-    "total_committed": 228,
-    "total_lines_changed": 230,
+    "total_committed": 0,
+    "total_lines_changed": 0,
     "agent_percentage": 0,
     "metric_version": 2
-  },
-  "prompt_attributions": [
-    {
-      "checkpoint_number": 2,
-      "user_lines_added": 901,
-      "user_lines_removed": 0,
-      "agent_lines_added": 0,
-      "agent_lines_removed": 0,
-      "user_added_per_file": {
-        ".github/agents/Dungeon Generation and BSP Expert.agent.md": 582,
-        ".github/agents/VFX Agent.agent.md": 283,
-        "src/rules/archetypes/Overworld.js": 3,
-        "src/rules/archetypes/RoomFeatures.js": 20,
-        "src/rules/components/LightEmitter.js": 12,
-        "src/rules/components/index.js": 1
-      }
-    }
-  ]
+  }
 }
