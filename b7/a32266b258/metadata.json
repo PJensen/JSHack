@@ -1,0 +1,40 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "b7a32266b258",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "src/main/wiring/transitionWiring.js",
+    "src/rules/components/DungeonEntrance.js",
+    "src/rules/components/DungeonState.js",
+    "src/rules/components/index.js",
+    "src/rules/data/buildings/tavern.js",
+    "src/rules/environment/dungeon/floorPlan.js",
+    "src/rules/environment/dungeon/index.js",
+    "src/rules/environment/dungeon/populate.js",
+    "src/rules/environment/dungeon/transition.js",
+    "src/rules/environment/dungeon/underworldRegions.js",
+    "src/rules/quests/definitions/graveyardWatch.js",
+    "src/rules/quests/definitions/ratInfestation.js",
+    "src/rules/repositories/ExploredFloorRepository.js",
+    "tests/ratInfestationQuestSpawn.test.mjs",
+    "tests/sparseUnderworld.test.mjs",
+    "tests/starterFetchQuestSpawn.test.mjs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/b7/a32266b258/0/metadata.json",
+      "transcript": "/b7/a32266b258/0/full.jsonl",
+      "content_hash": "/b7/a32266b258/0/content_hash.txt",
+      "prompt": "/b7/a32266b258/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 344868,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 9898240,
+    "output_tokens": 28271,
+    "api_call_count": 74
+  }
+}
