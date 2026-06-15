@@ -202,6 +202,7 @@ export const AlchemyBench = defineArchetype(
   [Material, { kind: "wood" }],
   [Collider, { solid: true, blocksSight: false }],
   [Interactable, { action: "brewAlchemy", params: null }],
+  [LightEmitter, { radius: 2.8, baseColor: "#5fd2e1", temporalPattern: "biolum", shadowSoftness: 7 }],
 );
 
 export const EnchantingBench = defineArchetype(
@@ -211,6 +212,7 @@ export const EnchantingBench = defineArchetype(
   [Material, { kind: "wood" }],
   [Collider, { solid: true, blocksSight: false }],
   [Interactable, { action: "craftEnchants", params: null }],
+  [LightEmitter, { radius: 3.2, baseColor: "#aa78ff", temporalPattern: "occult", shadowSoftness: 7, colorShiftScale: 0.8 }],
 );
 
 export const Anvil = defineArchetype(
@@ -252,7 +254,7 @@ export const CookingFire = defineArchetype(
   [Collider, { solid: true, blocksSight: false }],
   [Interactable, { action: "cookFood", params: null }],
   [AudioEmitter, { emitters: [{ profile: "cooking_fire", interior: true }] }],
-  [LightEmitter, { radius: 4, baseColor: [255, 120, 40], temporalPattern: "torch", shadowSoftness: 8 }],
+  [LightEmitter, { radius: 4, baseColor: "#ff7828", temporalPattern: "torch", shadowSoftness: 8 }],
 );
 
 // ── Farm crops ────────────────────────────────────────────────────
@@ -401,6 +403,7 @@ export const ChurchAltar = defineArchetype(
     { profile: "church", interior: true },
     { profile: "holy_site", interior: true },
   ] }],
+  [LightEmitter, { radius: 4.8, baseColor: "#ffeeaa", temporalPattern: "holy", shadowSoftness: 5, colorShiftScale: 0.5 }],
 );
 
 export const ChurchPew = defineArchetype(
@@ -427,6 +430,7 @@ export const ChurchFont = defineArchetype(
   [Collider, { solid: true, blocksSight: false }],
   [Interactable, { action: "fountain", params: null }],
   [AudioEmitter, { emitters: [{ profile: "church", interior: true }] }],
+  [LightEmitter, { radius: 2.8, baseColor: "#aae1ff", temporalPattern: "breathe", shadowSoftness: 6 }],
 );
 
 export const ChurchWindow = defineArchetype(
@@ -821,4 +825,5 @@ export const Fountain = defineArchetype(
   [Material, { kind: "stone" }],
   [Collider, { solid: true, blocksSight: false }],
   [Interactable, { action: "fountain", params: null }],
+  [LightEmitter, { radius: 3.5, baseColor: "#78aadc", temporalPattern: "breathe", shadowSoftness: 6 }],
 );

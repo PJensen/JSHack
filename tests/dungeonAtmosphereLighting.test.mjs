@@ -13,6 +13,7 @@ import { LightEmitter } from "../src/rules/components/LightEmitter.js";
 Deno.test("dungeon atmospheric decorations materialize as concrete world objects", () => {
   const world = new World({ seed: 42 });
   const kinds = [
+    "fountain",
     "candle_cluster",
     "ember_brazier",
     "glowcap_patch",
@@ -33,6 +34,24 @@ Deno.test("dungeon atmospheric decorations materialize as concrete world objects
     if (!["armor_stand", "polished_mirror"].includes(kinds[i])) {
       assert(world.get(id, LightEmitter), `${kinds[i]} should carry authored light data`);
     }
+  }
+});
+
+Deno.test("fixed decorative town fixtures carry authored light emitters", () => {
+  const world = new World({ seed: 42 });
+  const kinds = [
+    "alchemy_bench",
+    "enchanting_bench",
+    "church_altar",
+    "church_font",
+    "cooking_fire",
+  ];
+
+  for (let i = 0; i < kinds.length; i++) {
+    const id = materializeSpawn(world, { x: i + 1, y: 6, kind: kinds[i], params: {} });
+    assert(id > 0, `${kinds[i]} should materialize`);
+    assertEquals(world.get(id, NamedIdentity)?.identity, kinds[i]);
+    assert(world.get(id, LightEmitter), `${kinds[i]} should carry authored light data`);
   }
 });
 
@@ -76,10 +95,48 @@ Deno.test("worldView projects revealed armed shock traps as semantic trap state"
   assert(rec.tags.includes("trap_armed"));
 });
 
-Deno.test("collectLightSources infers dungeon atmosphere from decoration identity", () => {
+Deno.test("collectLightSources consumes authored dungeon atmosphere lights", () => {
   const view = {
     turn: 1,
     player: null,
+    lightEmitters: [
+      {
+        id: 1,
+        pos: { x: 1, y: 1 },
+        radius: 2.4,
+        shadowSoftness: 7,
+        temporalPattern: "candle",
+        phaseSeed: 0,
+        intensityScale: 1,
+        colorShiftScale: 1,
+        voidStrength: null,
+        baseColor: [255, 205, 135],
+      },
+      {
+        id: 2,
+        pos: { x: 3, y: 1 },
+        radius: 2.6,
+        shadowSoftness: 7,
+        temporalPattern: "biolum",
+        phaseSeed: 0,
+        intensityScale: 1,
+        colorShiftScale: 1,
+        voidStrength: null,
+        baseColor: [65, 225, 190],
+      },
+      {
+        id: 3,
+        pos: { x: 5, y: 1 },
+        radius: 2.8,
+        shadowSoftness: 5,
+        temporalPattern: "void",
+        phaseSeed: 0,
+        intensityScale: 1,
+        colorShiftScale: 1,
+        voidStrength: 0.65,
+        baseColor: [155, 120, 255],
+      },
+    ],
     entities: [
       { id: 1, kind: "candle_cluster", pos: { x: 1, y: 1 }, tags: [] },
       { id: 2, kind: "glowcap_patch", pos: { x: 3, y: 1 }, tags: [] },

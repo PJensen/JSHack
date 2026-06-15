@@ -77,7 +77,7 @@ import {
 /** @typedef {{ id:number, x:number, y:number }} SolidView */
 /** @typedef {{ x:number, y:number, kind:string, alpha:number, burning?:boolean, smoking?:boolean }} RoofTileView */
 /** @typedef {{ id:number, profile:string, pos:{x:number,y:number}, interior:boolean }} AudioEmitterView */
-/** @typedef {{ id:number, pos:{x:number,y:number}, radius:number, shadowSoftness:number, temporalPattern:string, phaseSeed:number, intensityScale:number, colorShiftScale:number, voidStrength:number|null, baseColor:[number,number,number] }} LightEmitterView */
+/** @typedef {{ id:number, pos:{x:number,y:number}, radius:number, shadowSoftness:number, temporalPattern:string, phaseSeed:number, intensity:number, intensityScale:number, colorShiftScale:number, voidStrength:number|null, baseColor:[number,number,number] }} LightEmitterView */
 /** @typedef {{ turn:number, seed:number, player: { id:number, pos:{x:number,y:number} } | null, entities: EntityView[], solids: SolidView[], emissives: any[], audioEmitters: AudioEmitterView[], lightEmitters: LightEmitterView[], roofs: RoofTileView[], fisheries: any[], tileGrid: any, isVisible: ((x:number,y:number)=>boolean)|null, isExplored: ((x:number,y:number)=>boolean)|null, currentDepth?: number }} WorldView */
 
 /** @typedef {{ id:number, text:string, profane:boolean, pos:{x:number,y:number} }} EngravingView */
@@ -842,6 +842,14 @@ function normalizeLightColor(color) {
 		const b = Math.max(0, Math.min(255, Number(color[2]) || 0));
 		return [r, g, b];
 	}
+	if (typeof color === "string" && /^#[0-9a-fA-F]{3}$/.test(color)) {
+		const expand = (digit) => parseInt(digit, 16) * 17;
+		return [
+			expand(color[1]),
+			expand(color[2]),
+			expand(color[3]),
+		];
+	}
 	if (typeof color === "string" && /^#[0-9a-fA-F]{6}$/.test(color)) {
 		return [
 			parseInt(color.slice(1, 3), 16),
@@ -1038,6 +1046,7 @@ export function buildWorldView(world) {
 			shadowSoftness: Number.isFinite(Number(light?.shadowSoftness)) ? Number(light.shadowSoftness) : 6,
 			temporalPattern: String(light?.temporalPattern || "steady").trim() || "steady",
 			phaseSeed: Number.isFinite(Number(light?.phaseSeed)) ? Number(light.phaseSeed) : 0,
+			intensity: Number.isFinite(Number(light?.intensity)) ? Number(light.intensity) : 1,
 			intensityScale: Number.isFinite(Number(light?.intensityScale)) ? Number(light.intensityScale) : 1,
 			colorShiftScale: Number.isFinite(Number(light?.colorShiftScale)) ? Number(light.colorShiftScale) : 1,
 			voidStrength: voidStrengthRaw === null || voidStrengthRaw === undefined

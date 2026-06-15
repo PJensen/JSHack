@@ -25,6 +25,7 @@ export const Fountain = defineArchetype(
   [Material, { kind: "stone" }],
   [Collider, { solid: true, blocksSight: false }],
   [Interactable, { action: "fountain", params: null }],
+  [LightEmitter, { radius: 3.5, baseColor: "#78aadc", temporalPattern: "breathe", shadowSoftness: 6 }],
 );
 
 export const Altar = defineArchetype(
@@ -35,7 +36,7 @@ export const Altar = defineArchetype(
   [Collider, { solid: true, blocksSight: false }],
   [Interactable, { action: "prayAltar", params: null }],
   [AudioEmitter, { emitters: [{ profile: "holy_site", interior: false }] }],
-  [LightEmitter, { radius: 4.5, baseColor: [204, 170, 51], temporalPattern: "breathe", shadowSoftness: 4 }],
+  [LightEmitter, { radius: 4.5, baseColor: "#ccaa33", temporalPattern: "breathe", shadowSoftness: 4 }],
 );
 
 export const Shrine = defineArchetype(
@@ -56,7 +57,7 @@ export const Runestone = defineArchetype(
   [Collider, { solid: true, blocksSight: false }],
   [Interactable, { action: "touchRunestone", params: null }],
   [AudioEmitter, { emitters: [{ profile: "runic", interior: false }] }],
-  [LightEmitter, { radius: 3.2, baseColor: [136, 221, 255], temporalPattern: "pulse", shadowSoftness: 5 }],
+  [LightEmitter, { radius: 3.2, baseColor: "#88ddff", temporalPattern: "pulse", shadowSoftness: 5 }],
 );
 
 // --- Decorative features ---
@@ -117,7 +118,7 @@ export const Mushrooms = defineArchetype(
     yield: "food_mushrooms", yieldMin: 1, yieldMax: 3,
   }],
   [Interactable, { action: "harvestNode", params: null }],
-  [LightEmitter, { radius: 3, baseColor: [120, 220, 200], temporalPattern: "biolum", shadowSoftness: 6 }],
+  [LightEmitter, { radius: 3, baseColor: "#78dcc8", temporalPattern: "biolum", shadowSoftness: 6 }],
 );
 
 export const Torch = defineArchetype(
@@ -126,7 +127,7 @@ export const Torch = defineArchetype(
   [NamedIdentity, { name: "Torch", identity: "torch" }],
   [Material, { kind: "wood" }],
   [AudioEmitter, { emitters: [{ profile: "torch", interior: false }] }],
-  [LightEmitter, { radius: 6, baseColor: [255, 190, 120], temporalPattern: "torch", shadowSoftness: 8 }],
+  [LightEmitter, { radius: 6, baseColor: "#ffbe78", temporalPattern: "torch", shadowSoftness: 8 }],
 );
 
 export const Urn = defineArchetype(
@@ -240,7 +241,7 @@ export const SteamVent = defineArchetype(
   [NamedIdentity, { name: "Steam Vent", identity: "steam_vent" }],
   [Material, { kind: "stone" }],
   [Collider, { solid: false, blocksSight: false }],
-  [LightEmitter, { radius: 2.4, baseColor: [95, 210, 225], temporalPattern: "pulse", shadowSoftness: 9 }],
+  [LightEmitter, { radius: 2.4, baseColor: "#5fd2e1", temporalPattern: "pulse", shadowSoftness: 9 }],
   [Interactable, (/** @type {any} */ p) => ({
     action: "inspectSteamVent",
     params: {
@@ -270,7 +271,7 @@ export const CandleCluster = defineArchetype(
   [NamedIdentity, { name: "Candle Cluster", identity: "candle_cluster" }],
   [Material, { kind: "wood" }],
   [Collider, { solid: false, blocksSight: false }],
-  [LightEmitter, { radius: 2.4, baseColor: [255, 205, 135], temporalPattern: "candle", shadowSoftness: 7 }],
+  [LightEmitter, { radius: 2.4, baseColor: "#ffcd87", temporalPattern: "candle", shadowSoftness: 7 }],
 );
 
 export const EmberBrazier = defineArchetype(
@@ -279,7 +280,7 @@ export const EmberBrazier = defineArchetype(
   [NamedIdentity, { name: "Ember Brazier", identity: "ember_brazier" }],
   [Material, { kind: "steel" }],
   [Collider, { solid: false, blocksSight: false }],
-  [LightEmitter, { radius: 3, baseColor: [255, 115, 45], temporalPattern: "ember", shadowSoftness: 6 }],
+  [LightEmitter, { radius: 3, baseColor: "#ff732d", temporalPattern: "ember", shadowSoftness: 6 }],
 );
 
 export const GlowcapPatch = defineArchetype(
@@ -288,7 +289,7 @@ export const GlowcapPatch = defineArchetype(
   [NamedIdentity, { name: "Glowcap Patch", identity: "glowcap_patch" }],
   [Material, { kind: "wood" }],
   [Collider, { solid: false, blocksSight: false }],
-  [LightEmitter, { radius: 2.6, baseColor: [65, 225, 190], temporalPattern: "biolum", shadowSoftness: 7 }],
+  [LightEmitter, { radius: 2.6, baseColor: "#41e1be", temporalPattern: "biolum", shadowSoftness: 7 }],
 );
 
 export const WebMoteCluster = defineArchetype(
@@ -297,7 +298,7 @@ export const WebMoteCluster = defineArchetype(
   [NamedIdentity, { name: "Web Mote Cluster", identity: "web_mote_cluster" }],
   [Material, { kind: "organic" }],
   [Collider, { solid: false, blocksSight: false }],
-  [LightEmitter, { radius: 2.2, baseColor: [95, 190, 230], temporalPattern: "biolum", shadowSoftness: 8 }],
+  [LightEmitter, { radius: 2.2, baseColor: "#5fbee6", temporalPattern: "biolum", shadowSoftness: 8 }],
 );
 
 export const ArmorStand = defineArchetype(
@@ -322,7 +323,7 @@ export const VoidCrack = defineArchetype(
   [NamedIdentity, { name: "Void Crack", identity: "void_crack" }],
   [Material, { kind: "obsidian" }],
   [Collider, { solid: false, blocksSight: false }],
-  [LightEmitter, { radius: 2.8, baseColor: [155, 120, 255], temporalPattern: "void", shadowSoftness: 5, voidStrength: 0.65 }],
+  [LightEmitter, { radius: 2.8, baseColor: "#9b78ff", temporalPattern: "void", shadowSoftness: 5, voidStrength: 0.65 }],
 );
 
 export const DarkReliquary = defineArchetype(
@@ -331,7 +332,7 @@ export const DarkReliquary = defineArchetype(
   [NamedIdentity, { name: "Dark Reliquary", identity: "dark_reliquary" }],
   [Material, { kind: "obsidian" }],
   [Collider, { solid: true, blocksSight: false }],
-  [LightEmitter, { radius: 3.8, baseColor: [155, 120, 255], temporalPattern: "void", shadowSoftness: 7, voidStrength: 0.75 }],
+  [LightEmitter, { radius: 3.8, baseColor: "#9b78ff", temporalPattern: "void", shadowSoftness: 7, voidStrength: 0.75 }],
 );
 
 export const MistVent = defineArchetype(
@@ -340,5 +341,5 @@ export const MistVent = defineArchetype(
   [NamedIdentity, { name: "Mist Vent", identity: "mist_vent" }],
   [Material, { kind: "stone" }],
   [Collider, { solid: false, blocksSight: false }],
-  [LightEmitter, { radius: 2.8, baseColor: [95, 210, 225], temporalPattern: "pulse", shadowSoftness: 9 }],
+  [LightEmitter, { radius: 2.8, baseColor: "#5fd2e1", temporalPattern: "pulse", shadowSoftness: 9 }],
 );

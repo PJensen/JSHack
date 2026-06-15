@@ -14,9 +14,10 @@ Deno.test("WorldView projects scalar light emitters", () => {
     shadowSoftness: 5,
     temporalPattern: "pulse",
     phaseSeed: 17,
+    intensity: 0.6,
     intensityScale: 0.75,
     colorShiftScale: 0.4,
-    baseColor: [120, 200, 255],
+    baseColor: "#78c8ff",
   });
 
   const view = buildWorldView(world);
@@ -27,6 +28,7 @@ Deno.test("WorldView projects scalar light emitters", () => {
     shadowSoftness: 5,
     temporalPattern: "pulse",
     phaseSeed: 17,
+    intensity: 0.6,
     intensityScale: 0.75,
     colorShiftScale: 0.4,
     voidStrength: null,
@@ -42,13 +44,35 @@ Deno.test("LightEmitter stores one flat authored light, not an emitter list", ()
     radius: 3,
     shadowSoftness: 8,
     temporalPattern: "ember",
-    baseColor: [255, 120, 40],
+    intensity: 0.5,
+    baseColor: "#ff7828",
   });
 
   const light = world.get(id, LightEmitter);
   assert(!("emitters" in light));
-  assertEquals(light.baseColor, [255, 120, 40]);
+  assertEquals(light.baseColor, "#ff7828");
+  assertEquals(light.intensity, 0.5);
   assertEquals(buildWorldView(world).lightEmitters.length, 1);
+});
+
+Deno.test("WorldView supports short hex and array baseColor fallback", () => {
+  const world = new World({ seed: 0x11947 });
+  const shortHex = world.create();
+  const arrayColor = world.create();
+  world.add(shortHex, Position, { x: 2, y: 4 });
+  world.add(shortHex, LightEmitter, {
+    radius: 3,
+    baseColor: "#fc8",
+  });
+  world.add(arrayColor, Position, { x: 3, y: 4 });
+  world.add(arrayColor, LightEmitter, {
+    radius: 3,
+    baseColor: [255, 120, 40],
+  });
+
+  const view = buildWorldView(world);
+  assertEquals(view.lightEmitters.find((light) => light.id === shortHex)?.baseColor, [255, 204, 136]);
+  assertEquals(view.lightEmitters.find((light) => light.id === arrayColor)?.baseColor, [255, 120, 40]);
 });
 
 Deno.test("collectLightSources consumes authored light emitters", () => {
@@ -62,6 +86,7 @@ Deno.test("collectLightSources consumes authored light emitters", () => {
       shadowSoftness: 5,
       temporalPattern: "void",
       phaseSeed: 0,
+      intensity: 0.5,
       intensityScale: 1,
       colorShiftScale: 1,
       voidStrength: 0.65,
@@ -71,5 +96,6 @@ Deno.test("collectLightSources consumes authored light emitters", () => {
   }, { fxTime: 1, dt: 0.016 });
 
   assert(lights.some((light) => light.kind === "void" && light.x === 8.5 && light.radius === 2.8));
+  assert(lights.some((light) => light.kind === "void" && light.voidStrength > 0 && light.voidStrength < 0.65));
   assertEquals(lights.filter((light) => light.kind === "void" && light.x === 8.5).length, 1);
 });

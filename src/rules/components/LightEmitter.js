@@ -12,8 +12,9 @@ export const LightEmitter = defineComponent("LightEmitter", {
   shadowSoftness: 6,
   temporalPattern: "steady",
   phaseSeed: 0,
+  intensity: 1,
   intensityScale: 1,
   colorShiftScale: 1,
   voidStrength: null,
-  baseColor: [255, 255, 255],
+  baseColor: "#ffffff",
 });

@@ -216,6 +216,7 @@ function emitAuthoredLight(out, light, t) {
   const pattern = String(light?.temporalPattern || 'steady');
   const softness = Number.isFinite(Number(light?.shadowSoftness)) ? Number(light.shadowSoftness) : 6;
   const phaseSeed = Number.isFinite(Number(light?.phaseSeed)) ? Number(light.phaseSeed) : 0;
+  const intensity = Number.isFinite(Number(light?.intensity)) ? Math.max(0, Number(light.intensity)) : 1;
   const intensityScale = Number.isFinite(Number(light?.intensityScale)) ? Number(light.intensityScale) : 1;
   const colorShiftScale = Number.isFinite(Number(light?.colorShiftScale)) ? Number(light.colorShiftScale) : 1;
   const patternId = (id + phaseSeed) | 0;
@@ -227,7 +228,7 @@ function emitAuthoredLight(out, light, t) {
       radius,
       kind: "void",
       color: baseColor,
-      voidStrength: Math.max(0, Math.min(1, Number(voidStrength) || 0)) * p.intensity * intensityScale,
+      voidStrength: Math.max(0, Math.min(1, Number(voidStrength) || 0)) * p.intensity * intensity * intensityScale,
       softness,
     });
     return;
@@ -240,7 +241,7 @@ function emitAuthoredLight(out, light, t) {
     x, y,
     radius,
     color: [r, g, b],
-    flicker: p.intensity * intensityScale,
+    flicker: p.intensity * intensity * intensityScale,
     softness,
   });
 }
@@ -402,15 +403,6 @@ export function collectLightSources(view, opts = {}) {
           continue;
         }
         const FURNITURE_LIGHT = {
-          fountain:    { radius: 3.5, pattern: 'breathe' },
-          altar:       { radius: 4.5, pattern: 'breathe', softness: 4 },
-          mushrooms:   { radius: 3,   pattern: 'biolum' },
-          glowcap_patch: { radius: 2.6, pattern: 'biolum', color: [65, 225, 190], softness: 7 },
-          web_mote_cluster: { radius: 2.2, pattern: 'biolum', color: [95, 190, 230], softness: 8 },
-          candle_cluster: { radius: 2.4, pattern: 'candle', color: [255, 205, 135], softness: 7 },
-          ember_brazier: { radius: 3.0, pattern: 'ember', color: [255, 115, 45], softness: 6 },
-          mist_vent: { radius: 2.8, pattern: 'pulse', color: [95, 210, 225], softness: 9 },
-          steam_vent: { radius: 2.4, pattern: 'pulse', color: [95, 210, 225], softness: 9 },
           pressure_plinth: { radius: 2.2, pattern: 'pulse', color: [70, 185, 205], softness: 6 },
           pressure_plinth_pressed: { radius: 3.2, pattern: 'pulse', color: [105, 235, 245], softness: 5 },
         };
@@ -420,20 +412,7 @@ export function collectLightSources(view, opts = {}) {
           emitPatterned(out, fl.pattern, t, e.id, ex, ey, fl.radius, col, fl.softness || 6);
           continue;
         }
-        if (kind === 'dark_reliquary') {
-          emitPatterned(out, 'occult', t, e.id, ex, ey, 2.2, SHADOW_PURPLE, 5);
-          emitVoid(out, t, e.id, ex, ey, 3.8, 0.75, 7);
-          continue;
-        }
-        if (kind === 'void_crack') {
-          emitVoid(out, t, e.id, ex, ey, 2.8, 0.65, 5);
-          continue;
-        }
-        // Fire-based furniture — flickering, palette-coloured
-        if (kind === 'cooking_fire') {
-          emitPatterned(out, 'torch', t, e.id, ex, ey, 4, paletteGlow(kind) || FIRE_RED, 8);
-          continue;
-        }
+        // State-derived fire furniture stays here until rules toggles component presence.
         if (kind === 'furnace') {
           emitPatterned(out, 'ember', t, e.id, ex, ey, 3, paletteGlow(kind) || FIRE_RED, 8);
           continue;
