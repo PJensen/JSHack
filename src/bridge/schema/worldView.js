@@ -77,7 +77,7 @@ import {
 /** @typedef {{ id:number, x:number, y:number }} SolidView */
 /** @typedef {{ x:number, y:number, kind:string, alpha:number, burning?:boolean, smoking?:boolean }} RoofTileView */
 /** @typedef {{ id:number, profile:string, pos:{x:number,y:number}, interior:boolean }} AudioEmitterView */
-/** @typedef {{ id:number, pos:{x:number,y:number}, radius:number, color:[number,number,number], pattern:string, softness:number, voidStrength:number|null }} LightEmitterView */
+/** @typedef {{ id:number, pos:{x:number,y:number}, radius:number, shadowSoftness:number, temporalPattern:string, phaseSeed:number, intensityScale:number, colorShiftScale:number, voidStrength:number|null, baseColor:[number,number,number] }} LightEmitterView */
 /** @typedef {{ turn:number, seed:number, player: { id:number, pos:{x:number,y:number} } | null, entities: EntityView[], solids: SolidView[], emissives: any[], audioEmitters: AudioEmitterView[], lightEmitters: LightEmitterView[], roofs: RoofTileView[], fisheries: any[], tileGrid: any, isVisible: ((x:number,y:number)=>boolean)|null, isExplored: ((x:number,y:number)=>boolean)|null, currentDepth?: number }} WorldView */
 
 /** @typedef {{ id:number, text:string, profane:boolean, pos:{x:number,y:number} }} EngravingView */
@@ -1030,22 +1030,20 @@ export function buildWorldView(world) {
 		if (_view.player && typeof isVisible === "function" && !isVisible(pos.x, pos.y)) continue;
 		const radius = Number(light?.radius || 0);
 		if (!(radius > 0)) continue;
-		const whenState = String(light?.whenState || "").trim();
-		if (whenState) {
-			const state = String(world.get(id, ObjectState)?.state || "");
-			if (state !== whenState) continue;
-		}
 		const voidStrengthRaw = light?.voidStrength;
 		_view.lightEmitters.push({
 			id,
 			pos: { x: pos.x | 0, y: pos.y | 0 },
 			radius,
-			color: normalizeLightColor(light?.color),
-			pattern: String(light?.pattern || "steady").trim() || "steady",
-			softness: Number.isFinite(Number(light?.softness)) ? Number(light.softness) : 6,
+			shadowSoftness: Number.isFinite(Number(light?.shadowSoftness)) ? Number(light.shadowSoftness) : 6,
+			temporalPattern: String(light?.temporalPattern || "steady").trim() || "steady",
+			phaseSeed: Number.isFinite(Number(light?.phaseSeed)) ? Number(light.phaseSeed) : 0,
+			intensityScale: Number.isFinite(Number(light?.intensityScale)) ? Number(light.intensityScale) : 1,
+			colorShiftScale: Number.isFinite(Number(light?.colorShiftScale)) ? Number(light.colorShiftScale) : 1,
 			voidStrength: voidStrengthRaw === null || voidStrengthRaw === undefined
 				? null
 				: Math.max(0, Math.min(1, Number(voidStrengthRaw) || 0)),
+			baseColor: normalizeLightColor(light?.baseColor),
 		});
 	}
 

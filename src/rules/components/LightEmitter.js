@@ -9,9 +9,11 @@ import { defineComponent } from "../../lib/ecs-js/index.js";
  */
 export const LightEmitter = defineComponent("LightEmitter", {
   radius: 0,
-  color: [255, 255, 255],
-  pattern: "steady",
-  softness: 6,
+  shadowSoftness: 6,
+  temporalPattern: "steady",
+  phaseSeed: 0,
+  intensityScale: 1,
+  colorShiftScale: 1,
   voidStrength: null,
-  whenState: "",
+  baseColor: [255, 255, 255],
 });

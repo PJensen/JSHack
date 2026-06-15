@@ -212,23 +212,37 @@ function emitAuthoredLight(out, light, t) {
   const y = Number(pos.y || 0) + 0.5;
   const radius = Number(light?.radius || 0);
   if (!(radius > 0)) return;
-  const color = Array.isArray(light?.color) ? light.color : [255, 255, 255];
-  const pattern = String(light?.pattern || 'steady');
-  const softness = Number.isFinite(Number(light?.softness)) ? Number(light.softness) : 6;
+  const baseColor = Array.isArray(light?.baseColor) ? light.baseColor : [255, 255, 255];
+  const pattern = String(light?.temporalPattern || 'steady');
+  const softness = Number.isFinite(Number(light?.shadowSoftness)) ? Number(light.shadowSoftness) : 6;
+  const phaseSeed = Number.isFinite(Number(light?.phaseSeed)) ? Number(light.phaseSeed) : 0;
+  const intensityScale = Number.isFinite(Number(light?.intensityScale)) ? Number(light.intensityScale) : 1;
+  const colorShiftScale = Number.isFinite(Number(light?.colorShiftScale)) ? Number(light.colorShiftScale) : 1;
+  const patternId = (id + phaseSeed) | 0;
   const voidStrength = light?.voidStrength;
   if (voidStrength !== null && voidStrength !== undefined) {
-    const p = evaluatePattern(pattern || 'void', t, id);
+    const p = evaluatePattern(pattern || 'void', t, patternId);
     out.push({
       x, y,
       radius,
       kind: "void",
-      color,
-      voidStrength: Math.max(0, Math.min(1, Number(voidStrength) || 0)) * p.intensity,
+      color: baseColor,
+      voidStrength: Math.max(0, Math.min(1, Number(voidStrength) || 0)) * p.intensity * intensityScale,
       softness,
     });
     return;
   }
-  emitPatterned(out, pattern, t, id, x, y, radius, color, softness);
+  const p = evaluatePattern(pattern, t, patternId);
+  const r = Math.max(0, Math.min(255, baseColor[0] * (1 + p.r * colorShiftScale)));
+  const g = Math.max(0, Math.min(255, baseColor[1] * (1 + p.g * colorShiftScale)));
+  const b = Math.max(0, Math.min(255, baseColor[2] * (1 + p.b * colorShiftScale)));
+  out.push({
+    x, y,
+    radius,
+    color: [r, g, b],
+    flicker: p.intensity * intensityScale,
+    softness,
+  });
 }
 
 /** Legacy shim — delegates to the 'torch' temporal pattern.  */
