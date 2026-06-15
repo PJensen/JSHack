@@ -8,8 +8,14 @@ export const DungeonState = defineComponent('DungeonState', {
   worldSeed: 0,
   currentDepth: 1,
   profileType: 'default', // floor profile id: 'overworld','default','catacombs','caves','grottos','arenas'
+  activeTemplateId: '',
+  activeRegionKey: '',
+  regionAnchorX: 0,
+  regionAnchorY: 0,
   floorEntityIds: [],    // all entity IDs created for this floor
   downStairPositions: [], // world {x,y} of each down-stair on the current floor
   destroyedTiles: {}, // "x,y" -> { x, y, originalTile, currentTile, destroyedAtTurn, burnedKind, cause, sourceId, sourceKind, roofTurnsLeft }
+  destroyedTilesByRegion: {},
   wetTiles: {},       // "x,y" -> { expiresAtStep } — temporary wet floor state for elemental chaining
+  wetTilesByRegion: {},
 });

@@ -40,7 +40,7 @@ function countRats(world) {
   return rats;
 }
 
-Deno.test("accepted rat quest seeds dungeon rats on depth 1 without duplication", () => {
+function setupWorld({ activeTemplateId = "" } = {}) {
   loadRatTestFloor();
   const world = new World({ seed: 123 });
 
@@ -59,6 +59,7 @@ Deno.test("accepted rat quest seeds dungeon rats on depth 1 without duplication"
   world.add(dungeon, DungeonState, {
     worldSeed: 123,
     currentDepth: 1,
+    activeTemplateId,
     floorEntityIds: [player, stair],
     downStairPositions: [{ x: 8, y: 8 }],
   });
@@ -72,6 +73,18 @@ Deno.test("accepted rat quest seeds dungeon rats on depth 1 without duplication"
     killCount: 0,
   }, { node: "hunt" });
 
+  return { world, dungeon };
+}
+
+Deno.test("accepted rat quest does not seed rats on generic depth 1", () => {
+  const { world } = setupWorld();
+
+  assertEquals(ensureRatInfestationQuestRats(world), 0);
+});
+
+Deno.test("accepted rat quest seeds tavern basement rats without duplication", () => {
+  const { world, dungeon } = setupWorld({ activeTemplateId: "tavern_basement" });
+
   const first = ensureRatInfestationQuestRats(world);
   const second = ensureRatInfestationQuestRats(world);
 
@@ -80,4 +93,3 @@ Deno.test("accepted rat quest seeds dungeon rats on depth 1 without duplication"
   assert(countRats(world) >= 10);
   assert(world.get(dungeon, DungeonState).floorEntityIds.length >= 10);
 });
-

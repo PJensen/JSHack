@@ -9,6 +9,7 @@ import { OVERWORLD_EXTENT } from './overworld.js';
 import { pickProfile } from './profiles/index.js';
 import { clamp } from '../../../shared/math/math.js';
 import { generateChunk } from './chunk.js';
+import { floorRegionKey, getUnderworldRegionTemplate } from './underworldRegions.js';
 
 function resolveBaseFootprintRadius(scale, depth) {
   if (scale <= 0.5) return 0;
@@ -48,12 +49,12 @@ function buildExtent(chunkPositions, paddingX, paddingY) {
   };
 }
 
-function buildSymmetricExtent(paddingX, paddingY) {
+function buildCenteredExtent(centerCX, centerCY, paddingX, paddingY) {
   return {
-    minCX: -paddingX,
-    maxCX: paddingX,
-    minCY: -paddingY,
-    maxCY: paddingY,
+    minCX: centerCX - paddingX,
+    maxCX: centerCX + paddingX,
+    minCY: centerCY - paddingY,
+    maxCY: centerCY + paddingY,
   };
 }
 
@@ -197,6 +198,11 @@ export function generateFloorPlan(worldSeed, depth, priorDownStairPositions = nu
 
   const seed = floorSeed(worldSeed, depth);
   const rng = createRng(seed);
+  const template = getUnderworldRegionTemplate(opts.templateId);
+  const anchorX = Number.isFinite(Number(opts.anchorX)) ? (Number(opts.anchorX) | 0) : 0;
+  const anchorY = Number.isFinite(Number(opts.anchorY)) ? (Number(opts.anchorY) | 0) : 0;
+  const anchorChunkX = Math.floor(anchorX / CHUNK_SIZE);
+  const anchorChunkY = Math.floor(anchorY / CHUNK_SIZE);
 
   const scale = Math.max(0.1, Number(dungeonConfig.dungeonScale) || 0.3);
   const baseRadius = resolveBaseFootprintRadius(scale, depth);
@@ -215,17 +221,17 @@ export function generateFloorPlan(worldSeed, depth, priorDownStairPositions = nu
   // Down stairs: generate minDownStairs–maxDownStairs per floor, each with an independent
   // chunk offset so they spread across the floor on deeper levels.
   // At shallow depths (stairOffset = 0) they share chunk (0,0) and land in different rooms.
-  const count = rng.int(dungeonConfig.minDownStairs, dungeonConfig.maxDownStairs);
+  const count = template ? 0 : rng.int(dungeonConfig.minDownStairs, dungeonConfig.maxDownStairs);
   const downStairs = [];
   const _usedChunks = new Set();
   for (let i = 0; i < count; i++) {
-    let cX = 0, cY = 0;
+    let cX = anchorChunkX, cY = anchorChunkY;
     if (stairOffset > 0) {
       // Retry up to 8 times to avoid placing two down-stairs in the same chunk.
       let attempts = 0;
       do {
-        cX = rng.int(1, stairOffset) * (rng.next() < 0.5 ? 1 : -1);
-        cY = rng.int(0, stairOffset) * (rng.next() < 0.5 ? 1 : -1);
+        cX = anchorChunkX + rng.int(1, stairOffset) * (rng.next() < 0.5 ? 1 : -1);
+        cY = anchorChunkY + rng.int(0, stairOffset) * (rng.next() < 0.5 ? 1 : -1);
         attempts++;
       } while (_usedChunks.has(`${cX},${cY}`) && attempts < 8);
       _usedChunks.add(`${cX},${cY}`);
@@ -256,8 +262,8 @@ export function generateFloorPlan(worldSeed, depth, priorDownStairPositions = nu
       }
     } else {
       upStairs.push({
-        chunkX: 0,
-        chunkY: 0,
+        chunkX: anchorChunkX,
+        chunkY: anchorChunkY,
         localX: rng.int(4, CHUNK_SIZE - 5),
         localY: rng.int(4, CHUNK_SIZE - 5),
       });
@@ -265,25 +271,34 @@ export function generateFloorPlan(worldSeed, depth, priorDownStairPositions = nu
   }
 
   const prefabRules = [];
-  if (depth === 1) {
+  if (!template && depth === 1) {
     prefabRules.push("room_boulder_puzzle");
     prefabRules.push("room_lava_puzzle_dead_end");
   }
-  if (depth >= 3 && depth <= 6) {
+  if (!template && depth >= 3 && depth <= 6) {
     prefabRules.push("room_shaman_dark_shrine");
   }
 
   // Derive chunk extent from the furthest stair plus a scale-driven footprint
   // radius.
-  const allChunkPositions = [...downStairs, ...upStairs, { chunkX: 0, chunkY: 0 }];
-  let extent = expandExtentToInclude(buildSymmetricExtent(paddingX, paddingY), allChunkPositions);
+  const allChunkPositions = [...downStairs, ...upStairs, { chunkX: anchorChunkX, chunkY: anchorChunkY }];
+  let extent = expandExtentToInclude(buildCenteredExtent(anchorChunkX, anchorChunkY, paddingX, paddingY), allChunkPositions);
+  if (template) {
+    const radius = Math.max(0, Math.ceil(Math.max(1, Number(template.length || 1)) / 6) - 1);
+    extent = {
+      minCX: anchorChunkX - radius,
+      maxCX: anchorChunkX + radius,
+      minCY: anchorChunkY - radius,
+      maxCY: anchorChunkY + radius,
+    };
+  }
   const occupiedChunks = new Set(allChunkPositions.map((s) => `${s.chunkX},${s.chunkY}`));
-  if (depth === 1) {
+  if (!template && depth === 1) {
     extent = ensureLevelOnePocketExtent(extent, occupiedChunks);
   }
 
-  const profile = resolveFloorProfile(pickProfile(rng, depth, opts.dungeonType ?? null), depth);
-  const disconnectedPocket = depth === 1 ? pickLevelOnePocketChunk(extent, occupiedChunks) : null;
+  const profile = resolveFloorProfile(template?.profile || pickProfile(rng, depth, opts.dungeonType ?? null), depth);
+  const disconnectedPocket = (!template && depth === 1) ? pickLevelOnePocketChunk(extent, occupiedChunks) : null;
 
   // Prefab rooms: hand-authored set pieces placed in non-origin chunks.
   // Only place if there's ample space (don't force extent expansion).
@@ -326,6 +341,11 @@ export function generateFloorPlan(worldSeed, depth, priorDownStairPositions = nu
     profile,
     prefabRooms,
     disconnectedPocket,
+    activeTemplateId: template?.templateId || "",
+    regionAnchorX: anchorX,
+    regionAnchorY: anchorY,
+    regionKey: floorRegionKey(depth, anchorX, anchorY, template?.templateId || ""),
+    roomTarget: Number(template?.roomTarget || 0) | 0,
   };
 }
 

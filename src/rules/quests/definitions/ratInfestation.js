@@ -8,7 +8,7 @@ import { createItemById } from "../../utils/itemFactory.js";
 import { addToInventory } from "../../utils/inventoryFacade.js";
 import { spawnMonsterEntity } from "../../utils/spawnMonsterEntity.js";
 import { attachEntityToCurrentFloor } from "../../utils/floorEntities.js";
-import { currentDepth, firstPlayerId } from "../../utils/worldAccess.js";
+import { firstPlayerId } from "../../utils/worldAccess.js";
 import { isWalkable } from "../../environment/dungeon/tileMap.js";
 import { emit, incVar, setVar } from "../actions.js";
 import { registerQuest } from "../registry.js";
@@ -84,6 +84,13 @@ function questWantsDungeonRats(world, playerId) {
   return Number(vars.killCount || 0) < REQUIRED_RAT_KILLS;
 }
 
+function isTavernBasement(world) {
+  for (const [, ds] of world.query(DungeonState)) {
+    return String(ds?.activeTemplateId || "") === "tavern_basement";
+  }
+  return false;
+}
+
 function spawnRatAt(world, x, y) {
   const def = getMonster("rat");
   if (!def) return 0;
@@ -105,7 +112,7 @@ function spawnRatAt(world, x, y) {
 }
 
 export function ensureRatInfestationQuestRats(world) {
-  if (currentDepth(world, 0) !== 1) return 0;
+  if (!isTavernBasement(world)) return 0;
 
   const playerId = firstPlayerId(world);
   if (!(playerId > 0)) return 0;
@@ -141,8 +148,8 @@ export function ensureRatInfestationQuestRats(world) {
 export function installRatQuestHooks(world) {
   if (world[RAT_HOOKS_KEY]) return;
   world[RAT_HOOKS_KEY] = true;
-  world.on("dungeon:transitioned", ({ depth }) => {
-    if ((Number(depth || 0) | 0) !== 1) return;
+  world.on("dungeon:transitioned", ({ templateId }) => {
+    if (String(templateId || "") !== "tavern_basement") return;
     ensureRatInfestationQuestRats(world);
   });
 }

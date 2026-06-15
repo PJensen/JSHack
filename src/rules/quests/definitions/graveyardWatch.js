@@ -6,7 +6,7 @@ import { consumeInventoryIdentity, inventoryHasIdentity } from "../../utils/town
 import { attachEntityToCurrentFloor } from "../../utils/floorEntities.js";
 import { addToInventory } from "../../utils/inventoryFacade.js";
 import { createItemById } from "../../utils/itemFactory.js";
-import { currentDepth, firstPlayerId } from "../../utils/worldAccess.js";
+import { firstPlayerId } from "../../utils/worldAccess.js";
 import { emit, setVar } from "../actions.js";
 import { registerQuest } from "../registry.js";
 import { STARTER_PRIEST_FETCH_QUEST_ID, getQuestRecord } from "../runtime.js";
@@ -44,8 +44,15 @@ function findBookEntity(world) {
   return 0;
 }
 
+function isGraveyardCrypt(world) {
+  for (const [, ds] of world.query(DungeonState)) {
+    return String(ds?.activeTemplateId || "") === "graveyard_crypt";
+  }
+  return false;
+}
+
 export function ensureStarterFetchQuestItem(world) {
-  if (currentDepth(world, 0) !== 1) return 0;
+  if (!isGraveyardCrypt(world)) return 0;
 
   const playerId = firstPlayerId(world);
   if (!(playerId > 0)) return 0;
@@ -70,8 +77,8 @@ export function ensureStarterFetchQuestItem(world) {
 export function installStarterFetchQuestHooks(world) {
   if (world[STARTER_FETCH_HOOKS_KEY]) return;
   world[STARTER_FETCH_HOOKS_KEY] = true;
-  world.on("dungeon:transitioned", ({ depth }) => {
-    if ((Number(depth || 0) | 0) !== 1) return;
+  world.on("dungeon:transitioned", ({ templateId }) => {
+    if (String(templateId || "") !== "graveyard_crypt") return;
     ensureStarterFetchQuestItem(world);
   });
 }

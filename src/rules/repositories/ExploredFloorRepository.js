@@ -4,34 +4,51 @@
  */
 export class ExploredFloorRepository {
   constructor() {
-    /** @type {Map<number, Map<string, Uint8Array>>} */
+    /** @type {Map<string, Map<string, Uint8Array>>} */
     this._byDepth = new Map();
   }
 
-  /** @param {number} depth @param {Map<string, Uint8Array>} snapshot @returns {boolean} */
+  /** @param {number|string} depth @param {Map<string, Uint8Array>} snapshot @returns {boolean} */
   setSnapshot(depth, snapshot) {
-    const d = Number(depth) | 0;
-    if (d <= 0 || !(snapshot instanceof Map)) return false;
-    this._byDepth.set(d, snapshot);
+    const key = this._key(depth);
+    if (!key || !(snapshot instanceof Map)) return false;
+    this._byDepth.set(key, snapshot);
     return true;
   }
 
-  /** @param {number} depth @returns {Map<string, Uint8Array>|undefined} */
+  /** @param {number|string} depth @returns {Map<string, Uint8Array>|undefined} */
   getSnapshot(depth) {
-    return this._byDepth.get(Number(depth) | 0);
+    const key = this._key(depth);
+    const exact = this._byDepth.get(key);
+    if (exact || typeof depth === "string") return exact;
+    const d = Number(depth) | 0;
+    for (const [candidate, snap] of this._byDepth) {
+      if (candidate === String(d) || candidate.startsWith(`z${d}:`)) return snap;
+    }
+    return undefined;
   }
 
-  /** @returns {number[]} */
+  /** @returns {Array<number|string>} */
   listDepths() {
-    return [...this._byDepth.keys()];
+    return [...this._byDepth.keys()].map((key) => {
+      const n = Number(key);
+      return Number.isFinite(n) && String(n | 0) === key ? (n | 0) : key;
+    });
   }
 
-  /** @param {number} depth */
+  /** @param {number|string} depth */
   deleteDepth(depth) {
-    this._byDepth.delete(Number(depth) | 0);
+    this._byDepth.delete(this._key(depth));
   }
 
   clear() {
     this._byDepth.clear();
+  }
+
+  /** @param {number|string} depth */
+  _key(depth) {
+    if (typeof depth === "string") return depth;
+    const d = Number(depth) | 0;
+    return d > 0 ? String(d) : "";
   }
 }

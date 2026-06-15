@@ -93,6 +93,7 @@ export default {
   ],
   "waypoints": [
     { "dx": 0,  "dy":  0, "name": "shop_door" },
+    { "dx": 4,  "dy":  2, "name": "cellar_stairs" },
     { "dx": 4,  "dy": -1, "name": "vendor_work" },
     { "dx": 3,  "dy":  1, "name": "pub_bench" }
   ]

@@ -23,8 +23,9 @@ import { invalidateTileQueryCache } from '../../utils/tileQueryCache.js';
 import { normalizeInventorySnapshot } from '../../utils/inventorySnapshotMigration.js';
 import { applySnapshot, serializeEntities } from '../../../lib/ecs-js/serialization.js';
 import { destroySubtree, Parent, Sibling, children } from '../../../lib/ecs-js/hierarchy.js';
+import { floorRegionKey } from './underworldRegions.js';
 
-/** @type {Map<number, { snapshot: any, order: number[] }>} floor entity snapshots keyed by depth */
+/** @type {Map<string, { snapshot: any, order: number[] }>} floor entity snapshots keyed by sparse region key */
 const _floorEntityCache = new Map();
 
 /** Max floor entity snapshots held in the JS heap; older entries are evicted to localStorage. */
@@ -32,22 +33,32 @@ const MAX_MEMORY_FLOORS = 5;
 const PURSUIT_RADIUS = 4;
 const MAX_PURSUERS = 8;
 
-/** @param {number} worldSeed @param {number} depth @returns {string} */
-function _floorStorageKey(worldSeed, depth) {
-  return `jshack:floor:${(worldSeed >>> 0).toString(16)}:${depth}`;
+function _stateRegionKey(ds, fallbackDepth = 0) {
+  if (ds?.activeRegionKey) return String(ds.activeRegionKey);
+  return floorRegionKey(
+    Number(ds?.currentDepth ?? fallbackDepth) | 0,
+    Number(ds?.regionAnchorX || 0) | 0,
+    Number(ds?.regionAnchorY || 0) | 0,
+    String(ds?.activeTemplateId || ""),
+  );
 }
 
-/** @param {number} worldSeed @param {number} depth @param {object} entry */
-function _persistFloor(worldSeed, depth, entry) {
+/** @param {number} worldSeed @param {string} key @returns {string} */
+function _floorStorageKey(worldSeed, key) {
+  return `jshack:floor:${(worldSeed >>> 0).toString(16)}:${key}`;
+}
+
+/** @param {number} worldSeed @param {string} key @param {object} entry */
+function _persistFloor(worldSeed, key, entry) {
   if (typeof localStorage === 'undefined') return;
-  try { localStorage.setItem(_floorStorageKey(worldSeed, depth), JSON.stringify(entry)); } catch { /* quota exceeded — skip */ }
+  try { localStorage.setItem(_floorStorageKey(worldSeed, key), JSON.stringify(entry)); } catch { /* quota exceeded — skip */ }
 }
 
-/** @param {number} worldSeed @param {number} depth @returns {{ snapshot: any, order: number[] }|null} */
-function _loadPersistedFloor(worldSeed, depth) {
+/** @param {number} worldSeed @param {string} key @returns {{ snapshot: any, order: number[] }|null} */
+function _loadPersistedFloor(worldSeed, key) {
   if (typeof localStorage === 'undefined') return null;
   try {
-    const raw = localStorage.getItem(_floorStorageKey(worldSeed, depth));
+    const raw = localStorage.getItem(_floorStorageKey(worldSeed, key));
     return raw ? JSON.parse(raw) : null;
   } catch { return null; }
 }
@@ -75,13 +86,15 @@ export function clearFloorCache() {
  * @param {number} currentDepth */
 function _evictMemoryFloors(currentDepth) {
   while (_floorEntityCache.size > MAX_MEMORY_FLOORS) {
-    let furthestDepth = null, maxDist = -1;
-    for (const d of _floorEntityCache.keys()) {
-      const dist = Math.abs(d - currentDepth);
-      if (dist > maxDist) { maxDist = dist; furthestDepth = d; }
+    let furthestKey = null, maxDist = -1;
+    for (const key of _floorEntityCache.keys()) {
+      const m = /^z(\d+):/.exec(String(key));
+      const depth = m ? (Number(m[1]) | 0) : 0;
+      const dist = Math.abs(depth - currentDepth);
+      if (dist > maxDist) { maxDist = dist; furthestKey = key; }
     }
-    if (furthestDepth === null) break;
-    _floorEntityCache.delete(furthestDepth);
+    if (furthestKey === null) break;
+    _floorEntityCache.delete(furthestKey);
   }
 }
 
@@ -235,6 +248,15 @@ export async function transitionToDepth(world, newDepth, destinationPos, opts = 
 
   // Save explored map for the current floor before clearing
   const currentDepth = ds ? ds.currentDepth : 0;
+  const currentRegionKey = _stateRegionKey(ds, currentDepth);
+  const requestedTemplateId = String(opts.templateId || "");
+  const requestedAnchorX = Number.isFinite(Number(opts.anchorX))
+    ? (Number(opts.anchorX) | 0)
+    : (newDepth > currentDepth ? (Number(opts.stairPos?.x || ds?.regionAnchorX || 0) | 0) : (Number(ds?.regionAnchorX || opts.stairPos?.x || 0) | 0));
+  const requestedAnchorY = Number.isFinite(Number(opts.anchorY))
+    ? (Number(opts.anchorY) | 0)
+    : (newDepth > currentDepth ? (Number(opts.stairPos?.y || ds?.regionAnchorY || 0) | 0) : (Number(ds?.regionAnchorY || opts.stairPos?.y || 0) | 0));
+  const destinationRegionKey = floorRegionKey(newDepth, requestedAnchorX, requestedAnchorY, requestedTemplateId);
   const stairPursuerIds = _collectStairPursuers(world, currentDepth, newDepth, opts.stairPos || null);
 
   // Build the permanent-entity set once and reuse it for both snapshot saving
@@ -257,18 +279,22 @@ export async function transitionToDepth(world, newDepth, destinationPos, opts = 
   }
 
   if (ds && Array.isArray(ds.floorEntityIds)) {
-    if (currentDepth > 0) exploredFloorRepository.setSnapshot(currentDepth, saveExplored());
+    if (currentDepth > 0) exploredFloorRepository.setSnapshot(currentRegionKey, saveExplored());
+    if (!ds.destroyedTilesByRegion || typeof ds.destroyedTilesByRegion !== "object") ds.destroyedTilesByRegion = {};
+    if (!ds.wetTilesByRegion || typeof ds.wetTilesByRegion !== "object") ds.wetTilesByRegion = {};
+    ds.destroyedTilesByRegion[currentRegionKey] = { ...(ds.destroyedTiles || {}) };
+    ds.wetTilesByRegion[currentRegionKey] = { ...(ds.wetTiles || {}) };
     // Capture ALL non-permanent alive entities so that chest inventory items
     // (no Position, not in floorEntityIds) and runtime-spawned monsters are
     // included in the snapshot.
     const floorIds = Array.from(world.alive)
       .filter(id => Number.isInteger(id) && id > 0 && !_permanentIds.has(id));
     const entry = {
-      snapshot: serializeEntities(world, floorIds, { note: `floor_depth_${currentDepth}` }),
+      snapshot: serializeEntities(world, floorIds, { note: `floor_${currentRegionKey}` }),
       order: floorIds.slice(),
     };
-    _persistFloor(worldSeed, currentDepth, entry);
-    _floorEntityCache.set(currentDepth, entry);
+    _persistFloor(worldSeed, currentRegionKey, entry);
+    _floorEntityCache.set(currentRegionKey, entry);
     _evictMemoryFloors(newDepth);
   }
 
@@ -303,11 +329,25 @@ export async function transitionToDepth(world, newDepth, destinationPos, opts = 
   const tombstoneRepo = opts.tombstoneRepo || null;
   const onProgress = typeof opts.onProgress === 'function' ? opts.onProgress : null;
   const isDescending = newDepth > currentDepth;
-  const priorDownStairPositions = (isDescending && Array.isArray(ds?.downStairPositions) && ds.downStairPositions.length > 0)
-    ? ds.downStairPositions : null;
-  const { spawnX, spawnY, entityIds: generatedEntityIds, downStairPositions: newDownStairPositions, profileType: newProfileType } =
-    await generateFloor(world, worldSeed, newDepth, tombstoneRepo, onProgress, priorDownStairPositions);
+  const priorDownStairPositions = (isDescending && opts.stairPos)
+    ? [opts.stairPos]
+    : ((isDescending && Array.isArray(ds?.downStairPositions) && ds.downStairPositions.length > 0)
+      ? ds.downStairPositions
+      : null);
+  const { spawnX, spawnY, entityIds: generatedEntityIds, downStairPositions: newDownStairPositions, profileType: newProfileType, regionKey: newRegionKey, activeTemplateId: newTemplateId, regionAnchorX: newRegionAnchorX, regionAnchorY: newRegionAnchorY } =
+    await generateFloor(world, worldSeed, newDepth, tombstoneRepo, onProgress, priorDownStairPositions, {
+      dungeonType: opts.dungeonType ?? null,
+      templateId: requestedTemplateId,
+      anchorX: requestedAnchorX,
+      anchorY: requestedAnchorY,
+    });
   let entityIds = generatedEntityIds;
+  const restoredRegionKey = newRegionKey || destinationRegionKey;
+
+  if (ds) {
+    ds.destroyedTiles = { ...((ds.destroyedTilesByRegion && ds.destroyedTilesByRegion[restoredRegionKey]) || {}) };
+    ds.wetTiles = { ...((ds.wetTilesByRegion && ds.wetTilesByRegion[restoredRegionKey]) || {}) };
+  }
 
   // Re-apply destroyed tiles from the ledger so burned walls stay destroyed
   // after the tile map is regenerated from scratch.
@@ -319,7 +359,7 @@ export async function transitionToDepth(world, newDepth, destinationPos, opts = 
     }
   }
 
-  const cachedFloor = _floorEntityCache.get(newDepth) ?? _loadPersistedFloor(worldSeed, newDepth);
+  const cachedFloor = _floorEntityCache.get(restoredRegionKey) ?? _loadPersistedFloor(worldSeed, restoredRegionKey);
   const normalizedSnapshot = normalizeInventorySnapshot(cachedFloor?.snapshot);
   if (normalizedSnapshot?.v === 1 && normalizedSnapshot.comps) {
     /** @type {number[]} */
@@ -403,7 +443,7 @@ export async function transitionToDepth(world, newDepth, destinationPos, opts = 
   }
 
   // Restore explored state if this floor was previously visited
-  const savedExplored = exploredFloorRepository.getSnapshot(newDepth);
+  const savedExplored = exploredFloorRepository.getSnapshot(restoredRegionKey);
   if (savedExplored) {
     restoreExplored(savedExplored);
   }
@@ -444,6 +484,10 @@ export async function transitionToDepth(world, newDepth, destinationPos, opts = 
     world.mutate(dungeonId, DungeonState, r => {
       r.currentDepth = newDepth;
       r.profileType = newProfileType || 'default';
+      r.activeTemplateId = newTemplateId || "";
+      r.activeRegionKey = restoredRegionKey;
+      r.regionAnchorX = Number(newRegionAnchorX || 0) | 0;
+      r.regionAnchorY = Number(newRegionAnchorY || 0) | 0;
       r.floorEntityIds = entityIds;
       r.downStairPositions = newDownStairPositions || [];
     });
@@ -474,6 +518,8 @@ export async function transitionToDepth(world, newDepth, destinationPos, opts = 
   if (placedPursuerIds.length > 0) {
     world.emit?.('dungeon:pursuit', {
       depth: newDepth,
+      templateId: newTemplateId || "",
+      regionKey: restoredRegionKey,
       fromDepth: currentDepth,
       pos: destinationPos,
       pursuerIds: placedPursuerIds,
@@ -481,7 +527,14 @@ export async function transitionToDepth(world, newDepth, destinationPos, opts = 
     });
   }
 
-  world.emit?.('dungeon:transitioned', { depth: newDepth, pos: destinationPos });
+  world.emit?.('dungeon:transitioned', {
+    depth: newDepth,
+    templateId: newTemplateId || "",
+    regionKey: restoredRegionKey,
+    anchor: { x: Number(newRegionAnchorX || 0) | 0, y: Number(newRegionAnchorY || 0) | 0 },
+    profileType: newProfileType || "default",
+    pos: destinationPos,
+  });
   invalidateTileQueryCache(world);
   // Transition can run in isolated tests/worlds with no scheduler installed.
   if (typeof world.scheduler === 'function') {

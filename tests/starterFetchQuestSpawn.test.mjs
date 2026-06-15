@@ -10,7 +10,7 @@ import "../src/rules/quests/definitions/graveyardWatch.js";
 import { ensureStarterFetchQuestItem } from "../src/rules/quests/definitions/graveyardWatch.js";
 import { instantiateQuest, STARTER_PRIEST_FETCH_QUEST_ID } from "../src/rules/quests/runtime.js";
 
-Deno.test("starter fetch quest seeds the book on dungeon depth 1 without duplicating it", () => {
+function setupWorld({ activeTemplateId = "" } = {}) {
   const world = new World({ seed: 123 });
 
   const player = world.create();
@@ -29,6 +29,7 @@ Deno.test("starter fetch quest seeds the book on dungeon depth 1 without duplica
     worldSeed: 123,
     currentDepth: 1,
     profileType: "catacombs",
+    activeTemplateId,
     floorEntityIds: [stair],
     downStairPositions: [{ x: 12, y: 7 }],
     destroyedTiles: {},
@@ -40,10 +41,22 @@ Deno.test("starter fetch quest seeds the book on dungeon depth 1 without duplica
     target: priest,
   }, {}, { node: "offer" });
 
+  return { world, dungeon };
+}
+
+Deno.test("starter fetch quest does not seed the book on generic depth 1", () => {
+  const { world } = setupWorld();
+
+  assertEquals(ensureStarterFetchQuestItem(world), 0);
+});
+
+Deno.test("starter fetch quest seeds the book in graveyard crypt without duplicating it", () => {
+  const { world, dungeon } = setupWorld({ activeTemplateId: "graveyard_crypt" });
+
   const first = ensureStarterFetchQuestItem(world);
   const second = ensureStarterFetchQuestItem(world);
 
-  assert(first > 0, "book should spawn on depth 1");
+  assert(first > 0, "book should spawn in graveyard crypt");
   assertEquals(first, second);
   assertEquals(world.get(first, Position), { x: 12, y: 7 });
   assert(world.get(dungeon, DungeonState).floorEntityIds.includes(first));

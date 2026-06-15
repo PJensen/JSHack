@@ -115,6 +115,7 @@ export { TownState } from './TownState.js';
 export { ThreatMemory, THREAT_MEMORY_LEVELS } from './ThreatMemory.js';
 export { EntranceProfile } from './EntranceProfile.js';
 export { EntranceState } from './EntranceState.js';
+export { DungeonEntrance } from './DungeonEntrance.js';
 export { DistrictProfile } from './DistrictProfile.js';
 export { DistrictState } from './DistrictState.js';
 export { DistrictRef } from './DistrictRef.js';

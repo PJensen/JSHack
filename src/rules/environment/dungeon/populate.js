@@ -1207,6 +1207,71 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null, world
     }
   }
 
+  const templateId = String(floorPlan.activeTemplateId || "");
+  if (templateId === "tavern_basement" || templateId === "graveyard_crypt") {
+    const occupied = new Set([...solidPositions]);
+    for (const spawn of spawns) occupied.add(`${spawn.x | 0},${spawn.y | 0}`);
+    const openTiles = [];
+    for (const room of chunk.rooms) {
+      for (let y = room.y + 1; y < room.y + Math.max(1, room.h - 1); y++) {
+        for (let x = room.x + 1; x < room.x + Math.max(1, room.w - 1); x++) {
+          const lx = x - chunk.chunkX * CHUNK_SIZE;
+          const ly = y - chunk.chunkY * CHUNK_SIZE;
+          if (!isInBoundsLocal(lx, ly)) continue;
+          if (chunk.tiles[ly * CHUNK_SIZE + lx] !== TILE_FLOOR) continue;
+          if (occupied.has(`${x},${y}`)) continue;
+          openTiles.push({ x, y });
+        }
+      }
+    }
+    for (let i = openTiles.length - 1; i > 0; i--) {
+      const j = rng.int(0, i);
+      const tmp = openTiles[i];
+      openTiles[i] = openTiles[j];
+      openTiles[j] = tmp;
+    }
+    const takeTile = () => {
+      while (openTiles.length > 0) {
+        const pos = openTiles.pop();
+        const key = `${pos.x},${pos.y}`;
+        if (occupied.has(key)) continue;
+        occupied.add(key);
+        return pos;
+      }
+      return null;
+    };
+    const addAt = (kind, params = {}) => {
+      const pos = takeTile();
+      if (!pos) return;
+      spawns.push({ x: pos.x, y: pos.y, kind, params });
+    };
+
+    if (templateId === "tavern_basement") {
+      const ratTarget = 8;
+      const existingRats = spawns.filter((spawn) => String(spawn?.params?.identity || spawn?.params?.monsterId || "") === "rat").length;
+      for (let i = existingRats; i < ratTarget; i++) {
+        const params = pickSpecificMonster("rat", floorPlan.depth);
+        if (params) addAt("monster", params);
+      }
+      addAt("torch");
+      addAt("barrel");
+      addAt("crate");
+      addAt("chest", { lootTable: "chest:basic", depth: floorPlan.depth });
+    } else if (templateId === "graveyard_crypt") {
+      const skeletonTarget = 6;
+      const existingSkeletons = spawns.filter((spawn) => String(spawn?.params?.identity || spawn?.params?.monsterId || "") === "skeleton").length;
+      for (let i = existingSkeletons; i < skeletonTarget; i++) {
+        const params = pickSpecificMonster("skeleton", floorPlan.depth);
+        if (params) addAt("monster", params);
+      }
+      addAt("urn");
+      addAt("urn");
+      addAt("sarcophagus");
+      addAt("chest", { lootTable: "chest:basic", depth: floorPlan.depth });
+      addAt("book", { bookId: "book_dead" });
+    }
+  }
+
   // Decorative book spawning: ~15% chance per chunk, at most one per chunk
   if (chunk.rooms.length > 0 && rng.next() < 0.15) {
     const room = chunk.rooms[rng.int(0, chunk.rooms.length - 1)];

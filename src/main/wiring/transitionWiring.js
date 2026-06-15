@@ -4,6 +4,7 @@
 
 import { transitionToDepth } from "../../rules/environment/dungeon/transition.js";
 import { DungeonState } from "../../rules/components/DungeonState.js";
+import { DungeonEntrance } from "../../rules/components/DungeonEntrance.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 import { Position } from "../../rules/components/Position.js";
 import { Interactable } from "../../rules/components/Interactable.js";
@@ -31,12 +32,12 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
   function isLocked() { return _inFlight || Date.now() < _lockUntilMs; }
   function armCooldown() { _lockUntilMs = Date.now() + STAIR_TRANSITION_COOLDOWN_MS; }
 
-  function queueStair(direction, stairX = null, stairY = null) {
+  function queueStair(direction, stairX = null, stairY = null, entrance = null) {
     const dir = direction === 'up' ? 'up' : (direction === 'down' ? 'down' : null);
     if (!dir) return;
     if (_pending || isLocked()) return;
     const stairPos = (stairX != null && stairY != null) ? { x: stairX, y: stairY } : null;
-    _pending = { direction: dir, stairPos };
+    _pending = { direction: dir, stairPos, entrance };
   }
 
   function queueDepth(targetDepth, opts = {}) {
@@ -180,7 +181,9 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
       if (Number.isFinite(pending.targetDepth)) {
         newDepth = Math.max(0, Math.floor(Number(pending.targetDepth)));
       } else if (pending.direction === 'down') {
-        newDepth = currentDepth + 1;
+        newDepth = pending.entrance
+          ? Math.max(1, Number(pending.entrance.targetDepth || 1) | 0)
+          : currentDepth + 1;
       } else if (pending.direction === 'up') {
         newDepth = currentDepth - 1;
       }
@@ -204,7 +207,14 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
         }
       } else {
         const direction = newDepth > currentDepth ? 'down' : 'up';
-        await transitionToDepth(world, newDepth, { x: 0, y: 0 }, { direction, stairPos: pending.stairPos || null, tombstoneRepo });
+        await transitionToDepth(world, newDepth, { x: 0, y: 0 }, {
+          direction,
+          stairPos: pending.stairPos || null,
+          tombstoneRepo,
+          templateId: pending.entrance?.templateId || "",
+          anchorX: pending.entrance ? (Number(pending.entrance.anchorX || pending.stairPos?.x || 0) | 0) : undefined,
+          anchorY: pending.entrance ? (Number(pending.entrance.anchorY || pending.stairPos?.y || 0) | 0) : undefined,
+        });
       }
 
       // Homecoming landing: reposition player at the town fountain
@@ -253,7 +263,7 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
       const actorPos = actorId > 0 ? world.get(actorId, Position) : null;
       if (!actorPos) return;
       if ((actorPos.x | 0) !== (stairPos.x | 0) || (actorPos.y | 0) !== (stairPos.y | 0)) return;
-      queueStair(direction, stairPos.x | 0, stairPos.y | 0);
+      queueStair(direction, stairPos.x | 0, stairPos.y | 0, world.get(sid, DungeonEntrance) || null);
     });
 
     world.on('dungeon:teleport-depth', ({ targetDepth, source, returnTicket }) => {
