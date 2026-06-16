@@ -102,6 +102,7 @@ import {
 import { shopDispositionTerms } from "../../utils/disposition.js";
 import { LockpickPrompted } from "../../../events/LockpickPrompted.js";
 import { LockpickResolved } from "../../../events/LockpickResolved.js";
+import { BedSleepRequested } from "../../../events/BedSleepRequested.js";
 
 // Maps catalog item IDs → archetypes for harvest yield entity creation.
 const CATALOG_ARCHETYPES = {
@@ -1131,19 +1132,7 @@ export const INTERACT_PAYLOADS = {
   restAtBed: {
     onInteract(ctx) {
       const { world, actor, targetId } = ctx;
-      const vit = world.get(actor, Vitality);
-      if (vit) world.set(actor, Vitality, { maxHp: vit.maxHp, hp: effectiveMaxHp(world, actor, vit) });
-      const mana = world.get(actor, Mana);
-      if (mana) world.set(actor, Mana, { ...mana, mana: effectiveMaxMana(world, actor, mana) });
-      const stamina = world.get(actor, Stamina);
-      if (stamina) {
-        world.set(actor, Stamina, {
-          ...stamina,
-          stamina: effectiveMaxStamina(world, actor, stamina),
-          regenCooldown: 0,
-        });
-      }
-      world.emit?.("bed:rested", { actor, targetId });
+      world.emit?.(new BedSleepRequested({ actor, targetId }));
     },
   },
 

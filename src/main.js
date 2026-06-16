@@ -40,7 +40,7 @@ import { shouldPostLightingRedrawKind } from "./display/composition/postLighting
 import { Particle, ParticleFX } from "./display/passes/vfx/particles/particlePool.js";
 // input wiring (display-only router)
 import { setupInput } from "./display/input/InputRouter.js";
-import { isInputLocked } from "./display/input/inputLock.js";
+import { isInputLocked, setInputLock } from "./display/input/inputLock.js";
 import { enableInputLockdown } from "./display/input/lockdown.js";
 import { readInputMode } from "./display/input/inputSettings.js";
 import { makeRulesDispatcher } from "./main/input/rulesDispatch.js";
@@ -101,7 +101,7 @@ import {
   restoreSnapshotFromSavegame,
 } from "./main/wiring/savegameLoad.js";
 import { loadGameData } from "./main/bootstrap/loadGameData.js";
-import { PHASE_TURNS } from "./rules/data/calendar.js";
+import { PHASE_TURNS, TURNS_PER_DAY } from "./rules/data/calendar.js";
 import { Inventory } from "./rules/components/Inventory.js";
 import { Equipment, GEAR_SLOTS, getEquippedSlot } from "./rules/components/Equipment.js";
 import { ItemInfo } from "./rules/components/ItemInfo.js";
@@ -121,6 +121,8 @@ import { createGlyphAtlas, drawKind, drawKindForeground, drawKindScaled, drawKin
 import { aegisWard as drawAegisWardGlyphFx } from "./display/passes/vfx/glyph/effects/aegisWard.js";
 import { Settings } from "./rules/components/Settings.js";
 import { Vitality } from "./rules/components/Vitality.js";
+import { Mana } from "./rules/components/Mana.js";
+import { Stamina } from "./rules/components/Stamina.js";
 import { Encumbrance } from "./rules/components/Encumbrance.js";
 import { Devotion } from "./rules/components/Devotion.js";
 import { Anatomy, HEARING_TIERS } from "./rules/components/Anatomy.js";
@@ -175,6 +177,7 @@ import { resolvePolymorph } from "./rules/systems/polymorphSystem.js";
 import { listAllMonsterIds, MONSTERS, getMonster } from "./rules/data/monsters.js";
 import { AggroState, AGGRO_LEVELS, SEARCH_TURNS_HUNTING_GRACE } from "./rules/components/AggroState.js";
 import { spawnMonsterEntity } from "./rules/utils/spawnMonsterEntity.js";
+import { effectiveMaxHp, effectiveMaxMana, effectiveMaxStamina } from "./rules/utils/passiveBonuses.js";
 import { pickMonster } from "./rules/environment/dungeon/tables.js";
 import { isApplyTool, listApplyTargetsForTool } from "./rules/content/items/applyPayloads.js";
 import { installLodbrokSpawnWiring } from "./rules/data/procPackages.js";
@@ -185,6 +188,7 @@ import { installPetWiring } from "./main/wiring/petWiring.js";
 import { createDeathLootArcFx } from "./display/fx/deathLootArcFx.js";
 import { createBubbleDialogController } from "./display/ui/bubbleDialog.js";
 import { createTransitionController } from "./main/wiring/transitionWiring.js";
+import { BedSleepRequested } from "./events/BedSleepRequested.js";
 
 // ---- Config & canvas -------------------------------------------------------
 const runtimeConfig = readRuntimeConfig();
@@ -378,6 +382,249 @@ function stepSim(dtTurns = 0) {
     try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch {}
   }
 }
+
+function advanceSleepTurns(turns) {
+  const count = Math.max(0, Number(turns || 0) | 0);
+  for (let i = 0; i < count; i++) world.tick(1);
+  if (count > 0) {
+    try { window.dispatchEvent(new CustomEvent('ui:requestInventoryData')); } catch {}
+  }
+}
+
+const SLEEP_INPUT_LOCK = "bed-sleep";
+const SLEEP_TICK_CHUNK = 8;
+
+function restoreBedSleepResources(actor) {
+  const vit = world.get(actor, Vitality);
+  if (vit) world.set(actor, Vitality, { maxHp: vit.maxHp, hp: effectiveMaxHp(world, actor, vit) });
+  const mana = world.get(actor, Mana);
+  if (mana) world.set(actor, Mana, { ...mana, mana: effectiveMaxMana(world, actor, mana) });
+  const stamina = world.get(actor, Stamina);
+  if (stamina) {
+    world.set(actor, Stamina, {
+      ...stamina,
+      stamina: effectiveMaxStamina(world, actor, stamina),
+      regenCooldown: 0,
+    });
+  }
+}
+
+function formatSleepTurns(turns) {
+  const safeTurns = Math.max(1, Number(turns || 0) | 0);
+  const totalMinutes = safeTurns * 2;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  const parts = [];
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0 || parts.length === 0) parts.push(`${minutes}m`);
+  return `${safeTurns} turns (${parts.join(" ")})`;
+}
+
+function createSleepPopup({ maxTurns = TURNS_PER_DAY, initialTurns = TURNS_PER_DAY, onConfirm, onCancel } = {}) {
+  if (typeof document === "undefined") return null;
+  const safeMax = Math.max(1, Number(maxTurns || TURNS_PER_DAY) | 0);
+  const safeInitial = Math.max(1, Math.min(safeMax, Number(initialTurns || safeMax) | 0));
+  const root = document.createElement("div");
+  Object.assign(root.style, {
+    position: "fixed",
+    left: "50%",
+    top: "18px",
+    transform: "translateX(-50%)",
+    zIndex: "12000",
+    minWidth: "min(360px, calc(100vw - 32px))",
+    padding: "12px 14px",
+    border: "1px solid rgba(245, 222, 179, 0.34)",
+    borderRadius: "8px",
+    background: "rgba(22, 18, 24, 0.94)",
+    color: "#f6ead8",
+    boxShadow: "0 10px 30px rgba(0, 0, 0, 0.45)",
+    fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    pointerEvents: "auto",
+  });
+  const label = document.createElement("div");
+  Object.assign(label.style, {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: "16px",
+    fontSize: "13px",
+    lineHeight: "18px",
+    marginBottom: "8px",
+  });
+  const title = document.createElement("span");
+  title.textContent = "Sleep";
+  const value = document.createElement("span");
+  value.textContent = formatSleepTurns(safeInitial);
+  value.style.opacity = "0.78";
+  label.append(title, value);
+
+  const slider = document.createElement("input");
+  slider.type = "range";
+  slider.min = "1";
+  slider.max = String(safeMax);
+  slider.step = "1";
+  slider.value = String(safeInitial);
+  Object.assign(slider.style, {
+    width: "100%",
+    margin: "0 0 10px",
+    accentColor: "#ffd166",
+  });
+
+  const track = document.createElement("div");
+  Object.assign(track.style, {
+    height: "8px",
+    borderRadius: "999px",
+    overflow: "hidden",
+    background: "rgba(255, 255, 255, 0.12)",
+  });
+  const bar = document.createElement("div");
+  Object.assign(bar.style, {
+    width: "0%",
+    height: "100%",
+    borderRadius: "999px",
+    background: "linear-gradient(90deg, #8ecae6, #ffd166)",
+  });
+  track.appendChild(bar);
+
+  const actions = document.createElement("div");
+  Object.assign(actions.style, {
+    display: "flex",
+    justifyContent: "flex-end",
+    gap: "8px",
+    marginTop: "12px",
+  });
+  const cancelButton = document.createElement("button");
+  cancelButton.type = "button";
+  cancelButton.textContent = "Cancel";
+  const sleepButton = document.createElement("button");
+  sleepButton.type = "button";
+  sleepButton.textContent = "Sleep";
+  for (const button of [cancelButton, sleepButton]) {
+    Object.assign(button.style, {
+      border: "1px solid rgba(255, 255, 255, 0.22)",
+      borderRadius: "6px",
+      padding: "7px 11px",
+      color: "#f6ead8",
+      background: "rgba(255, 255, 255, 0.08)",
+      font: "inherit",
+      fontSize: "13px",
+      cursor: "pointer",
+    });
+  }
+  Object.assign(sleepButton.style, {
+    color: "#20170f",
+    background: "#ffd166",
+    borderColor: "#ffd166",
+  });
+  actions.append(cancelButton, sleepButton);
+
+  root.append(label, slider, track, actions);
+  document.body.appendChild(root);
+
+  function selectedTurns() {
+    return Math.max(1, Math.min(safeMax, Number(slider.value || safeInitial) | 0));
+  }
+  function refreshSelection() {
+    const turns = selectedTurns();
+    value.textContent = formatSleepTurns(turns);
+    bar.style.width = `${Math.round((turns / safeMax) * 100)}%`;
+  }
+  slider.addEventListener("input", refreshSelection);
+  cancelButton.addEventListener("click", () => {
+    if (typeof onCancel === "function") onCancel();
+  });
+  sleepButton.addEventListener("click", () => {
+    if (typeof onConfirm === "function") onConfirm(selectedTurns());
+  });
+  refreshSelection();
+
+  return {
+    setProgressMode() {
+      title.textContent = "Sleeping";
+      slider.style.display = "none";
+      actions.style.display = "none";
+      root.style.pointerEvents = "none";
+    },
+    update(done, total) {
+      const safeTotal = Math.max(1, total | 0);
+      const safeDone = Math.max(0, Math.min(safeTotal, done | 0));
+      value.textContent = `${safeDone} / ${safeTotal} turns`;
+      bar.style.width = `${Math.round((safeDone / safeTotal) * 100)}%`;
+    },
+    close() {
+      root.remove();
+    },
+  };
+}
+
+let activeBedSleep = null;
+function startBedSleep({ actor, targetId, turns = TURNS_PER_DAY } = {}) {
+  const pe = playerEntity(world);
+  if (!pe || Number(actor || 0) !== pe.id) return;
+  if (activeBedSleep) return;
+
+  const maxTurns = Math.max(1, Number(turns || TURNS_PER_DAY) | 0);
+  const popup = createSleepPopup({
+    maxTurns,
+    initialTurns: maxTurns,
+    onConfirm: (selectedTurns) => beginSleep(selectedTurns),
+    onCancel: () => cancelSleep(),
+  });
+  activeBedSleep = {
+    actor: pe.id,
+    targetId: Number(targetId || 0) | 0,
+    done: 0,
+    total: maxTurns,
+    popup,
+    confirmed: false,
+  };
+  setInputLock(SLEEP_INPUT_LOCK, true);
+
+  function finish(completed) {
+    const sleep = activeBedSleep;
+    activeBedSleep = null;
+    popup?.close();
+    setInputLock(SLEEP_INPUT_LOCK, false);
+    if (!completed) return;
+    if (!world.has(sleep.actor, Player)) return;
+    restoreBedSleepResources(sleep.actor);
+    world.emit("bed:rested", { actor: sleep.actor, targetId: sleep.targetId, turns: sleep.total });
+  }
+
+  function cancelSleep() {
+    finish(false);
+  }
+
+  function beginSleep(selectedTurns) {
+    const sleep = activeBedSleep;
+    if (!sleep || sleep.confirmed) return;
+    sleep.confirmed = true;
+    sleep.total = Math.max(1, Math.min(maxTurns, Number(selectedTurns || maxTurns) | 0));
+    sleep.done = 0;
+    sleep.popup?.setProgressMode();
+    sleep.popup?.update(0, sleep.total);
+    requestAnimationFrame(pump);
+  }
+
+  function pump() {
+    const sleep = activeBedSleep;
+    if (!sleep || !sleep.confirmed) return;
+    if (!world.has(sleep.actor, Player)) {
+      finish(false);
+      return;
+    }
+    const remaining = sleep.total - sleep.done;
+    const chunk = Math.min(SLEEP_TICK_CHUNK, remaining);
+    advanceSleepTurns(chunk);
+    sleep.done += chunk;
+    sleep.popup?.update(sleep.done, sleep.total);
+    if (sleep.done >= sleep.total) {
+      finish(true);
+      return;
+    }
+    requestAnimationFrame(pump);
+  }
+}
+world.on(BedSleepRequested, startBedSleep);
 
 // Bubble dialog controller — created after camera (needs cam/canvas refs).
 // Placeholder; initialized below after cam is created.

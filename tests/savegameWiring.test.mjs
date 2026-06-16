@@ -80,3 +80,29 @@ Deno.test("savegameWiring ignores non-player deaths", () => {
   assert(store.getItem(SAVEGAME_KEY));
   assertEquals(store.getItem(SAVEGAME_KEY), payload);
 });
+
+Deno.test("savegameWiring saves when player finishes bed rest", () => {
+  const world = new World({ seed: 42 });
+  const playerId = world.create();
+  world.add(playerId, Player);
+  const store = memoryStorage();
+
+  withMockLocalStorage(store, () => {
+    installSavegameWiring({
+      world,
+      playerEntity: () => ({ id: playerId, pos: { x: 0, y: 0 } }),
+      getActiveSpellId: () => "spark",
+      getActionBarSlots: () => ["spark", null],
+      getPinnedSpellSlots: () => [null, "spark"],
+    });
+    world.emit("bed:rested", { actor: playerId, targetId: 99, turns: 720 });
+  });
+
+  const raw = store.getItem(SAVEGAME_KEY);
+  assert(raw, "save payload should be written");
+  const payload = JSON.parse(raw);
+  assertEquals(payload.reason, "bed:rested");
+  assertEquals(payload.app.activeSpellId, "spark");
+  assertEquals(payload.app.actionBarSlots, ["spark", null]);
+  assertEquals(payload.app.pinnedSpellSlots, [null, "spark"]);
+});

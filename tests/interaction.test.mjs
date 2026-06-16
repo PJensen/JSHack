@@ -55,6 +55,7 @@ import {
 import { createItemById } from "../src/rules/utils/itemFactory.js";
 import { LockpickPrompted } from "../src/events/LockpickPrompted.js";
 import { LockpickResolved } from "../src/events/LockpickResolved.js";
+import { BedSleepRequested } from "../src/events/BedSleepRequested.js";
 
 function makeLockedGemVendorDoor(world) {
   const door = world.create();
@@ -573,7 +574,7 @@ Deno.test("harvest node reports empty while regrowing", () => {
   );
 });
 
-Deno.test("restAtBed restores hp, mana, and stamina", () => {
+Deno.test("restAtBed requests bed sleep", () => {
   const world = new World({ seed: 23 });
   const actor = world.create();
   const bed = world.create();
@@ -587,9 +588,9 @@ Deno.test("restAtBed restores hp, mana, and stamina", () => {
   });
   world.add(bed, Interactable, { action: "restAtBed", params: null });
 
-  let rested = 0;
-  world.on("bed:rested", () => {
-    rested++;
+  let requested = null;
+  world.on(BedSleepRequested, (event) => {
+    requested = event;
   });
 
   world.add(actor, InteractIntent, { targetId: bed });
@@ -598,11 +599,12 @@ Deno.test("restAtBed restores hp, mana, and stamina", () => {
   const v = world.get(actor, Vitality);
   const m = world.get(actor, Mana);
   const s = world.get(actor, Stamina);
-  assert(v.hp === v.maxHp, "hp should be fully restored");
-  assert(m.mana === m.maxMana, "mana should be fully restored");
-  assert(s.stamina === s.maxStamina, "stamina should be fully restored");
-  assert((s.regenCooldown || 0) === 0, "regen cooldown should be reset");
-  assert(rested === 1, "rest event should fire");
+  assertEquals(v.hp, 3);
+  assertEquals(m.mana, 1);
+  assertEquals(s.stamina, 4);
+  assertEquals(s.regenCooldown, 9);
+  assertEquals(requested?.actor, actor);
+  assertEquals(requested?.targetId, bed);
 });
 
 Deno.test("thorn bramble harvest hurts actor and yields thorn pods", () => {
