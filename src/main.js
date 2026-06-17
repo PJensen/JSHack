@@ -393,6 +393,7 @@ function advanceSleepTurns(turns) {
 
 const SLEEP_INPUT_LOCK = "bed-sleep";
 const SLEEP_TICK_CHUNK = 8;
+const DEFAULT_SLEEP_TURNS = Math.max(1, Math.floor(TURNS_PER_DAY / 3));
 
 function restoreBedSleepResources(actor) {
   const vit = world.get(actor, Vitality);
@@ -565,7 +566,7 @@ function startBedSleep({ actor, targetId, turns = TURNS_PER_DAY } = {}) {
   const maxTurns = Math.max(1, Number(turns || TURNS_PER_DAY) | 0);
   const popup = createSleepPopup({
     maxTurns,
-    initialTurns: maxTurns,
+    initialTurns: Math.min(maxTurns, DEFAULT_SLEEP_TURNS),
     onConfirm: (selectedTurns) => beginSleep(selectedTurns),
     onCancel: () => cancelSleep(),
   });
