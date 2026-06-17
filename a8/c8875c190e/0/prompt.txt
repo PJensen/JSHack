@@ -1,0 +1,7 @@
+Punchlist
+
+* cooking sound is missing
+* bears take too long to attack
+* bear audio repeats and interrupts other bear audio. especially a group of bears
+* play sound on socket gem
+* boxes decoration should be multi-glyph or composite glyph
