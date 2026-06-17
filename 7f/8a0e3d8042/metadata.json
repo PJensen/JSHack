@@ -23,12 +23,5 @@
       "content_hash": "/7f/8a0e3d8042/1/content_hash.txt",
       "prompt": ""
     }
-  ],
-  "token_usage": {
-    "input_tokens": 7910,
-    "cache_creation_tokens": 0,
-    "cache_read_tokens": 161664,
-    "output_tokens": 65,
-    "api_call_count": 1
-  }
+  ]
 }
