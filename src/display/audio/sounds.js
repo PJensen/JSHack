@@ -60,6 +60,7 @@ const SOUNDS = {
   "item:equip:ranged":     { file: "equip_ranged.mp3", bus: "items", randomPitch: 18 },
   "item:equip:armor":      { file: "equip_armor.mp3", bus: "items", randomPitch: 18 },
   "item:equip:generic":    { file: "equip_generic.mp3", bus: "items", randomPitch: 18 },
+  "item:socket:gem":       { file: "drop_gem.mp3", bus: "items", maxVoices: 2, randomPitch: 18, volume: 0.85 },
 
   "chest:open":            { file: "chest_open.mp3",      bus: "items", randomPitch: 12 },
   "item:chest:opened":     { file: "chest_open.mp3",      bus: "items", randomPitch: 12 },
@@ -143,7 +144,7 @@ const SOUNDS = {
   "spell:web_spit":      { files: ["spider_attack_web_1.mp3", "spider_attack_web_2.mp3"], bus: "spells", randomPitch: 20 },
   "spell:spider_lunge":  { files: ["spider_attack_1.mp3", "spider_attack_2.mp3", "spider_attack_3.mp3"], bus: "spells", randomPitch: 25 },
   "spell:entangle":      { file: "spell_entangle.mp3",      bus: "spells" },
-  "cave_bear:attack":   { files: ["cave_bear_attack_1.mp3", "cave_bear_attack_2.mp3"], bus: "combat", randomPitch: 30 },
+  "cave_bear:attack":   { files: ["cave_bear_attack_1.mp3", "cave_bear_attack_2.mp3"], bus: "combat", maxVoices: 1, randomPitch: 18, volume: 0.9 },
   "rat:attack":         { file: "rat_attack_1.mp3", bus: "combat", maxVoices: 4, randomPitch: 35 },
   "insect:attack":      { file: "insect_attack.mp3", bus: "combat", maxVoices: 4, randomPitch: 35 },
   "spider:attack":      { files: ["spider_attack_1.mp3", "spider_attack_2.mp3", "spider_attack_3.mp3", "insect_attack.mp3"], bus: "combat", maxVoices: 4, randomPitch: 30 },

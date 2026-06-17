@@ -338,7 +338,13 @@ export const basePalette = {
   flower_bluebell:   { glyph: "🌸", fg: "#7799ff", glow: "#4466cc" },
   // Town decorations
   barrel:        { glyph: "o", fg: "#a07040", glow: "#6a4828" },
-  crate:         { glyph: "▪", fg: "#9a7a50", glow: "#6a5030" },
+  crate: {
+    layers: [
+      { glyph: "□", fg: "#5f4228", glow: "#3a2818", scale: 0.92 },
+      { glyph: "╳", fg: "#b08858", glow: "#6a5030", scale: 0.76 },
+      { glyph: "▪", fg: "#7a5634", glow: "#4a3020", dy: 0.01, scale: 0.42 },
+    ],
+  },
   woodpile:      { glyph: "≡", fg: "#8b6840", glow: "#5a4028" },
   hay_bale:      { glyph: "▓", fg: "#d4b44a", glow: "#a08828" },
   lantern_post:  { glyph: "♦", fg: "#ffcc55", glow: "#cc9922" },

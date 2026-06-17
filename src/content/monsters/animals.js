@@ -196,7 +196,7 @@ defineMonster('grid_bug', {
   sizeClass: 'XS',
   massKg: 1,
   resistances: { kinetic: { DR: 0 }, electric: { ohms: Infinity } },
-  speed: 1,
+  speed: 2,
   hooks: {
     onHit: [statusEffectOnHit(30, 0xdead0010, { key: "shock", turnsLeft: 2, potency: 1 }, "proc:shocked")],
     onDeath: [spawnPlasmaCloudOnDeath({ turnsLeft: 6, radius: 1, damage: 2 })],

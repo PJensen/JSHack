@@ -123,6 +123,7 @@ const PLAYER_NEAR_DEATH_RATIO = 0.25;
 const DUNGEON_OMEN_EVENT_GAP = 18;
 const DUNGEON_OMEN_CHANCE = 12;
 const DEAFENED_SOUND_COOLDOWN_MS = 2500;
+const CREATURE_ATTACK_SOUND_COOLDOWN_MS = 700;
 const SEARCH_REVEAL_MAX_DELAY_MS = 380;
 const WARMUP_WEAPON_FAMILIES = Object.freeze([
   "axe_large",
@@ -459,7 +460,7 @@ export const CRAFTING_MENU_LOOP_BY_KIND = Object.freeze({
 });
 
 export const CRAFTING_RESULT_SOUND_BY_KIND = Object.freeze({
-  cooking: "item:pickup:generic",
+  cooking: "item:consume:food",
   alchemy: "item:pickup:potion",
   smithing: "item:pickup:weapon",
 });
@@ -532,6 +533,7 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
   const dungeonOmenState = { eventIndex: 0, lastPlayedEventIndex: -Infinity };
   const dungeonOmenEntityIds = new Set();
   const deafenedSoundAt = new Map();
+  const creatureAttackSoundAt = new Map();
 
   function startChannelingLoop(actor) {
     if (!channelingLoopUrl || !isPlayer(actor) || channelingLoopActive) return;
@@ -732,8 +734,13 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
       const srcIdentity = String(getIdentity(source) || "");
       const creatureAttackId = CREATURE_ATTACK_SOUNDS[srcIdentity];
       if (creatureAttackId) {
-        const srcPos = source != null ? getPosition(source) : null;
-        sfxAt(creatureAttackId, srcPos, pp(), { priority: 1 }, zg());
+        const now = audioNowMs();
+        const last = creatureAttackSoundAt.get(creatureAttackId) || -Infinity;
+        if (now - last >= CREATURE_ATTACK_SOUND_COOLDOWN_MS) {
+          creatureAttackSoundAt.set(creatureAttackId, now);
+          const srcPos = source != null ? getPosition(source) : null;
+          sfxAt(creatureAttackId, srcPos, pp(), { priority: 0 }, zg());
+        }
       }
     }
     // Impact sounds on hit
@@ -927,6 +934,12 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
       return;
     }
     sfx("item:equip:generic", { priority: 1, volume: 0.75 });
+  });
+
+  world.on('gem:socketed', ({ actor, weaponId }) => {
+    if (!isPlayer(actor)) return;
+    const pos = weaponId != null ? getPosition(weaponId) : (actor != null ? getPosition(actor) : null);
+    sfxAt("item:socket:gem", pos, pp(), { priority: 1 }, zg());
   });
 
   world.on('hunger:ate', ({ actor }) => {
