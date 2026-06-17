@@ -3,9 +3,9 @@
   "checkpoint_id": "7f8a0e3d8042",
   "session_id": "019ed7b4-98c7-7cb2-8db7-663de45bce18",
   "strategy": "manual-commit",
-  "created_at": "2026-06-17T23:28:35.957649955Z",
+  "created_at": "2026-06-17T23:28:38.984942589Z",
   "branch": "master",
-  "checkpoints_count": 2,
+  "checkpoints_count": 0,
   "files_touched": [
     "src/main.js",
     "src/rules/environment/dungeon/overworld.js",
@@ -14,72 +14,21 @@
   "agent": "Codex",
   "model": "gpt-5.5",
   "turn_id": "027848e791d0",
-  "token_usage": {
-    "input_tokens": 306570,
-    "cache_creation_tokens": 0,
-    "cache_read_tokens": 4732032,
-    "output_tokens": 14304,
-    "api_call_count": 55
-  },
+  "checkpoint_transcript_start": 395,
+  "transcript_lines_at_start": 395,
   "session_metrics": {
     "turn_count": 2
   },
   "initial_attribution": {
-    "calculated_at": "2026-06-17T23:28:35.892370106Z",
+    "calculated_at": "2026-06-17T23:28:38.907575133Z",
     "agent_lines": 0,
     "agent_removed": 0,
-    "human_added": 3,
-    "human_modified": 38,
+    "human_added": 0,
+    "human_modified": 0,
     "human_removed": 0,
-    "total_committed": 7,
-    "total_lines_changed": 41,
+    "total_committed": 0,
+    "total_lines_changed": 0,
     "agent_percentage": 0,
     "metric_version": 2
-  },
-  "prompt_attributions": [
-    {
-      "checkpoint_number": 1,
-      "user_lines_added": 885,
-      "user_lines_removed": 3,
-      "agent_lines_added": 0,
-      "agent_lines_removed": 0,
-      "user_added_per_file": {
-        ".github/agents/Dungeon Generation and BSP Expert.agent.md": 582,
-        ".github/agents/VFX Agent.agent.md": 283,
-        "src/rules/environment/dungeon/overworld.js": 9,
-        "src/rules/environment/dungeon/transition.js": 11
-      },
-      "user_removed_per_file": {
-        "src/rules/environment/dungeon/overworld.js": 3
-      }
-    },
-    {
-      "checkpoint_number": 2,
-      "user_lines_added": 865,
-      "user_lines_removed": 0,
-      "agent_lines_added": 36,
-      "agent_lines_removed": 3,
-      "user_added_per_file": {
-        ".github/agents/Dungeon Generation and BSP Expert.agent.md": 582,
-        ".github/agents/VFX Agent.agent.md": 283
-      }
-    },
-    {
-      "checkpoint_number": 3,
-      "user_lines_added": 877,
-      "user_lines_removed": 5,
-      "agent_lines_added": 36,
-      "agent_lines_removed": 3,
-      "user_added_per_file": {
-        ".github/agents/Dungeon Generation and BSP Expert.agent.md": 582,
-        ".github/agents/VFX Agent.agent.md": 283,
-        "src/rules/environment/dungeon/overworld.js": 1,
-        "src/rules/environment/dungeon/transition.js": 11
-      },
-      "user_removed_per_file": {
-        "src/rules/environment/dungeon/overworld.js": 1,
-        "src/rules/environment/dungeon/transition.js": 4
-      }
-    }
-  ]
+  }
 }

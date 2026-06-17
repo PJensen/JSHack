@@ -3,7 +3,7 @@
   "checkpoint_id": "7f8a0e3d8042",
   "strategy": "manual-commit",
   "branch": "master",
-  "checkpoints_count": 2,
+  "checkpoints_count": 0,
   "files_touched": [
     "src/main.js",
     "src/rules/environment/dungeon/overworld.js",
@@ -14,7 +14,7 @@
       "metadata": "/7f/8a0e3d8042/0/metadata.json",
       "transcript": "/7f/8a0e3d8042/0/full.jsonl",
       "content_hash": "/7f/8a0e3d8042/0/content_hash.txt",
-      "prompt": "/7f/8a0e3d8042/0/prompt.txt"
+      "prompt": ""
     },
     {
       "metadata": "/7f/8a0e3d8042/1/metadata.json",
@@ -22,12 +22,5 @@
       "content_hash": "/7f/8a0e3d8042/1/content_hash.txt",
       "prompt": ""
     }
-  ],
-  "token_usage": {
-    "input_tokens": 306570,
-    "cache_creation_tokens": 0,
-    "cache_read_tokens": 4732032,
-    "output_tokens": 14304,
-    "api_call_count": 55
-  }
+  ]
 }
