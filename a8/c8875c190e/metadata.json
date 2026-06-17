@@ -5,6 +5,7 @@
   "branch": "master",
   "checkpoints_count": 0,
   "files_touched": [
+    "VERSION",
     "src/content/monsters/animals.js",
     "src/display/audio/audioWiring.js",
     "src/display/audio/sounds.js",
@@ -19,5 +20,12 @@
       "content_hash": "/a8/c8875c190e/0/content_hash.txt",
       "prompt": ""
     }
-  ]
+  ],
+  "token_usage": {
+    "input_tokens": 8447,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 263936,
+    "output_tokens": 243,
+    "api_call_count": 3
+  }
 }

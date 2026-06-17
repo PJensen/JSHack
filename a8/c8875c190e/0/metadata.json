@@ -3,10 +3,11 @@
   "checkpoint_id": "a8c8875c190e",
   "session_id": "019ed54a-0057-7523-a35b-1353819f04ef",
   "strategy": "manual-commit",
-  "created_at": "2026-06-17T11:21:37.917089102Z",
+  "created_at": "2026-06-17T11:22:10.45488396Z",
   "branch": "master",
   "checkpoints_count": 0,
   "files_touched": [
+    "VERSION",
     "src/content/monsters/animals.js",
     "src/display/audio/audioWiring.js",
     "src/display/audio/sounds.js",
@@ -19,16 +20,23 @@
   "turn_id": "cdbc7ee8bf1b",
   "checkpoint_transcript_start": 132,
   "transcript_lines_at_start": 132,
+  "token_usage": {
+    "input_tokens": 8447,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 263936,
+    "output_tokens": 243,
+    "api_call_count": 3
+  },
   "initial_attribution": {
-    "calculated_at": "2026-06-17T11:21:37.851119728Z",
-    "agent_lines": 0,
-    "agent_removed": 0,
+    "calculated_at": "2026-06-17T11:22:10.416973365Z",
+    "agent_lines": 1,
+    "agent_removed": 1,
     "human_added": 0,
     "human_modified": 0,
     "human_removed": 0,
-    "total_committed": 0,
-    "total_lines_changed": 0,
-    "agent_percentage": 0,
+    "total_committed": 1,
+    "total_lines_changed": 2,
+    "agent_percentage": 100,
     "metric_version": 2
   }
 }
