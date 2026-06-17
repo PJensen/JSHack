@@ -5,6 +5,7 @@
   "branch": "master",
   "checkpoints_count": 0,
   "files_touched": [
+    "VERSION",
     "src/main.js",
     "src/rules/environment/dungeon/overworld.js",
     "src/rules/environment/dungeon/transition.js"
