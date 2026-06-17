@@ -813,6 +813,7 @@ function setActiveSpell(id) {
 
 // ---- Dungeon initialization -------------------------------------------------
 import { initDungeon, generateFloorPlan } from "./rules/environment/dungeon/index.js";
+import { prewarmOverworldChunks } from "./rules/environment/dungeon/overworld.js";
 import { transitionToDepth, clearFloorCache } from "./rules/environment/dungeon/transition.js";
 import {
   TILE_FLOOR,
@@ -951,6 +952,11 @@ const _initialDepth = (Number.isFinite(_startDepth) && _startDepth >= 0) ? _star
 const _willShowCharCreation = !_pendingSavegame && runtimeConfig.params.get('test') !== '1';
 let spawnPos = null;
 if (!_willShowCharCreation) {
+  _bootTotalUnits += 1;
+  await bootPaint("Warming overworld return...", _bootDoneUnits);
+  await prewarmOverworldChunks(world.seed >>> 0);
+  bootAdvance("Overworld return warmed");
+
   const _bootFloorPlan = generateFloorPlan(world.seed >>> 0, _initialDepth, null, { dungeonType: runtimeConfig.dungeonType });
   const _bootChunkTotal = Math.max(
     1,
@@ -1071,6 +1077,7 @@ async function _finalizeNewGame(classData) {
   // the entropy-driven seed input. The seed-compare/regen branch is only used
   // when a savegame pre-populated the world but the player still picked a new
   // seed somehow (rare; defensive).
+  if (!_savegameLoaded) clearFloorCache();
   if (classData && typeof classData.seed === 'number') {
     const chosenSeed = classData.seed >>> 0;
     if (spawnPos === null) {
@@ -1103,7 +1110,15 @@ async function _finalizeNewGame(classData) {
   if (!_savegameLoaded) {
     // Start new games at dawn (start of "work" phase, ~7 AM)
     world.step = PHASE_TURNS.sleep + PHASE_TURNS.breakfast;
-    clearFloorCache();
+    if (classData && typeof classData.seed === 'number') {
+      if (typeof classData?.onProgress === "function") {
+        classData.onProgress({ phase: "plan", label: "Warming overworld return", step: 0, total: 1 });
+      }
+      await prewarmOverworldChunks(world.seed >>> 0);
+      if (typeof classData?.onProgress === "function") {
+        classData.onProgress({ phase: "plan", label: "Overworld return warmed", step: 1, total: 1 });
+      }
+    }
     pe = ensurePlayerSpawned(world, {
       x: spawnPos.x,
       y: spawnPos.y,

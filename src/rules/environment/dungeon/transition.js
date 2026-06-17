@@ -19,6 +19,7 @@ import { isWalkable } from './tileMap.js';
 import { clearExplored, saveExplored, restoreExplored } from './exploredMap.js';
 import { exploredFloorRepository } from './floorMemory.js';
 import { generateFloor } from './index.js';
+import { clearOverworldChunkCache } from './overworld.js';
 import { clearSpatialIndex } from '../../utils/spatialIndex.js';
 import { invalidateTileQueryCache } from '../../utils/tileQueryCache.js';
 import { normalizeInventorySnapshot } from '../../utils/inventorySnapshotMigration.js';
@@ -120,6 +121,7 @@ function _loadPersistedFloor(worldSeed, key) {
 export function clearFloorCache() {
   _floorEntityCache.clear();
   exploredFloorRepository.clear();
+  clearOverworldChunkCache();
   if (typeof localStorage === 'undefined') return;
   try {
     const keys = [];

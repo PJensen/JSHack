@@ -1043,16 +1043,31 @@ const _yieldFrame = () => {
 
 const _owCache = new Map();
 
-export async function generateOverworldChunks(worldSeed, onPlanProgress = null) {
-  if (!onPlanProgress) {
-    const key = worldSeed >>> 0;
-    if (!_owCache.has(key)) _owCache.set(key, _generateOverworldChunks(worldSeed, null));
-    const cached = await _owCache.get(key);
-    // Return fresh tile/roofed copies — loadChunk stores Uint8Array references, and setTile
-    // mutates them in-place. Without copies, test mutations corrupt the cache.
-    return { ...cached, chunks: cached.chunks.map(c => ({ ...c, tiles: Uint8Array.from(c.tiles), roofed: c.roofed ? Uint8Array.from(c.roofed) : null })) };
+function _copyCachedOverworld(cached) {
+  return { ...cached, chunks: cached.chunks.map(c => ({ ...c, tiles: Uint8Array.from(c.tiles), roofed: c.roofed ? Uint8Array.from(c.roofed) : null })) };
+}
+
+export function prewarmOverworldChunks(worldSeed) {
+  const key = worldSeed >>> 0;
+  if (!_owCache.has(key)) {
+    _owCache.set(key, _generateOverworldChunks(worldSeed, () => {}));
   }
-  return _generateOverworldChunks(worldSeed, onPlanProgress);
+  return _owCache.get(key);
+}
+
+export function clearOverworldChunkCache() {
+  _owCache.clear();
+}
+
+export async function generateOverworldChunks(worldSeed, onPlanProgress = null) {
+  const key = worldSeed >>> 0;
+  if (_owCache.has(key)) {
+    return _copyCachedOverworld(await _owCache.get(key));
+  }
+  if (!onPlanProgress) return _copyCachedOverworld(await prewarmOverworldChunks(worldSeed));
+  const generated = await _generateOverworldChunks(worldSeed, onPlanProgress);
+  _owCache.set(key, Promise.resolve(_copyCachedOverworld(generated)));
+  return generated;
 }
 
 async function _generateOverworldChunks(worldSeed, onPlanProgress) {
