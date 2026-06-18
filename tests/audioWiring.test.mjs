@@ -18,6 +18,8 @@ import {
   SEARCH_FOUND_SOUND_ID,
   SEARCH_PING_SOUND_ID,
   SECRET_FOUND_SOUND_ID,
+  GENOCIDE_SUCCESS_SOUND_ID,
+  TAMING_SUCCESS_SOUND_ID,
   SPELL_CAST_SOUND_EVENTS,
   TRAP_SOUND_BY_TYPE,
   URN_BROKEN_SOUND_ID,
@@ -100,6 +102,8 @@ Deno.test("audio wiring maps new authored event sounds", () => {
   assert(SEARCH_FOUND_SOUND_ID === "action:search_found");
   assert(SECRET_FOUND_SOUND_ID === "action:secret_found");
   assert(BONE_CHIME_SOUND_ID === "ambient:bone_chime");
+  assert(TAMING_SUCCESS_SOUND_ID === "magic:taming");
+  assert(GENOCIDE_SUCCESS_SOUND_ID === "item:scroll:genocide");
 });
 
 Deno.test("audio wiring delays search reveal sound along the pulse radius", () => {

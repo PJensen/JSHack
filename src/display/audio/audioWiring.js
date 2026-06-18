@@ -76,6 +76,8 @@ export const SEARCH_PING_SOUND_ID = "action:search_ping";
 export const SEARCH_FOUND_SOUND_ID = "action:search_found";
 export const SECRET_FOUND_SOUND_ID = "action:secret_found";
 export const BONE_CHIME_SOUND_ID = "ambient:bone_chime";
+export const TAMING_SUCCESS_SOUND_ID = "magic:taming";
+export const GENOCIDE_SUCCESS_SOUND_ID = "item:scroll:genocide";
 
 let sfxDebugEnabled = false;
 let sfxDebugLogger = null;
@@ -1197,6 +1199,15 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
   world.on('spell:meteor', (payload) => {
     const pos = payload?.origin || payload?.at || null;
     sfxAt("spell:impact:meteor", pos, pp(), { priority: 1 }, zg());
+  });
+
+  world.on('scroll:taming:vfx', ({ x, y }) => {
+    sfxAt(TAMING_SUCCESS_SOUND_ID, { x, y }, pp(), { priority: 1 }, zg());
+  });
+
+  world.on('scroll:genocide:success', ({ actor, at }) => {
+    const pos = at || (actor != null ? getPosition(actor) : null);
+    sfxAt(GENOCIDE_SUCCESS_SOUND_ID, pos, pp(), { priority: 1 }, zg());
   });
 
   // ── Weather ───────────────────────────────────────────────

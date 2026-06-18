@@ -45,8 +45,10 @@ Deno.test("genocide request only kills the chosen monster type and disables its 
 
     const damaged = [];
     const messages = [];
+    const successes = [];
     world.on("damaged", (event) => damaged.push(event));
     world.on("message", (event) => messages.push(event));
+    world.on("scroll:genocide:success", (event) => successes.push(event));
 
     world.emit("scroll:genocide:request", { actor, query: "gob" });
 
@@ -60,6 +62,13 @@ Deno.test("genocide request only kills the chosen monster type and disables its 
     assert(damaged.every((event) => Number(event?.amount) === 9999), "genocide should emit 9999 damage for each target");
 
     assert(messages.some((event) => String(event?.text || "").includes("You have genocided all Goblins")));
+    assertEquals(successes, [{
+      actor,
+      identity: "goblin",
+      name: "Goblin",
+      killed: 2,
+      at: { x: 10, y: 10 },
+    }]);
   } finally {
     clearGenocides();
   }

@@ -26,6 +26,17 @@ Deno.test("sounds registry exposes thrown potion impact sound", () => {
   assertEquals(sound.bus, "items");
 });
 
+Deno.test("sounds registry exposes taming and genocide success sounds", () => {
+  const taming = resolve("magic:taming");
+  const genocide = resolve("item:scroll:genocide");
+  assertExists(taming);
+  assertExists(genocide);
+  assertEquals(taming.file, "fairy_glow.mp3");
+  assertEquals(taming.bus, "spells");
+  assertEquals(genocide.file, "use_scroll_geno.mp3");
+  assertEquals(genocide.bus, "items");
+});
+
 Deno.test("sounds registry exposes fountain ambient loop as mp3", () => {
   const sound = resolve("fountain");
   assertExists(sound);

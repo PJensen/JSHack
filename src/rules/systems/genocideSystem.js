@@ -97,5 +97,13 @@ export function installGenocideListener(world) {
       text: `You have genocided all ${best.name}s! ${killed > 0 ? `${killed} perish${killed === 1 ? "es" : ""} instantly.` : ""}`,
       type: "system",
     });
+    const actorPos = actor ? world.get(actor | 0, Position) : null;
+    world.emit?.("scroll:genocide:success", {
+      actor: actor | 0,
+      identity: best.id,
+      name: best.name,
+      killed,
+      at: actorPos ? { x: actorPos.x | 0, y: actorPos.y | 0 } : null,
+    });
   });
 }
