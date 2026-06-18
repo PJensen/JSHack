@@ -1,0 +1,62 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "3735bcf8fa60",
+  "session_id": "019eda8c-f47e-7030-80b7-7f9c19897ab9",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-18T18:20:36.292800304Z",
+  "branch": "master",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "src/rules/environment/dungeon/populate.js",
+    "src/rules/environment/dungeon/underworldRegions.js",
+    "tests/sparseUnderworld.test.mjs"
+  ],
+  "agent": "Codex",
+  "model": "gpt-5.5",
+  "turn_id": "429bfd86986b",
+  "checkpoint_transcript_start": 447,
+  "transcript_lines_at_start": 447,
+  "token_usage": {
+    "input_tokens": 468471,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 2966784,
+    "output_tokens": 11895,
+    "api_call_count": 43
+  },
+  "session_metrics": {
+    "turn_count": 3
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-18T18:20:36.187806795Z",
+    "agent_lines": 3,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 9,
+    "total_committed": 3,
+    "total_lines_changed": 12,
+    "agent_percentage": 25,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 990,
+      "user_lines_removed": 9,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".github/agents/Dungeon Generation and BSP Expert.agent.md": 582,
+        ".github/agents/VFX Agent.agent.md": 283,
+        "src/rules/environment/dungeon/populate.js": 107,
+        "src/rules/environment/dungeon/underworldRegions.js": 12,
+        "tests/sparseUnderworld.test.mjs": 6
+      },
+      "user_removed_per_file": {
+        "src/rules/environment/dungeon/populate.js": 6,
+        "src/rules/environment/dungeon/underworldRegions.js": 2,
+        "tests/sparseUnderworld.test.mjs": 1
+      }
+    }
+  ]
+}

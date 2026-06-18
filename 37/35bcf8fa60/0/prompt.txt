@@ -1,0 +1,11 @@
+Okay, one thing that happened is that all the rats landed in the very first room, I think we should think of of more along the lines of monster budget, (e.g.) draw from the budget during generation -- instread of apparently forcing them all into the first room.
+
+another way of thinking about it, maybe an additional degree of freedom is to allow the inclusion of spawners into authored dungeon templates, kind of how we do decorations.
+
+I wonder also, if we should allow filter expressions in addition to plain old ids, (e.g.) c => c.tags.includes('beast') || c.rare || c.intelligence < 6
+
+I think you get my drift; it's allows for a lot more flexibility, so, an array of either, identifier, and/or filter expressions (predicates)
+
+---
+
+for the well, please make a better mob filter that is appropriate to the damp well.
