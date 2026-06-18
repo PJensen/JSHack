@@ -1,0 +1,33 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "457872ace6c5",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "src/content/monsters/special.js",
+    "src/rules/data/itemCatalogHooks.js",
+    "src/rules/data/lootTables.js",
+    "src/rules/interaction/facets/createFacets.js",
+    "src/rules/interaction/mutations.js",
+    "src/rules/utils/spawnCookingFire.js",
+    "tests/itemMaterials.test.mjs",
+    "tests/lootCounterplay.test.mjs",
+    "tests/shopStock.test.mjs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/45/7872ace6c5/0/metadata.json",
+      "transcript": "/45/7872ace6c5/0/full.jsonl",
+      "content_hash": "/45/7872ace6c5/0/content_hash.txt",
+      "prompt": "/45/7872ace6c5/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 650291,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 9466880,
+    "output_tokens": 24761,
+    "api_call_count": 92
+  }
+}
