@@ -5,6 +5,7 @@
   "branch": "master",
   "checkpoints_count": 2,
   "files_touched": [
+    "VERSION",
     "src/display/ui/wiring/messages/itemMessages.js",
     "src/main/wiring/scrollWandWiring.js",
     "tests/messageWiring.test.mjs",
