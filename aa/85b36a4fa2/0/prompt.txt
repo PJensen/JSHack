@@ -1,0 +1,5 @@
+Scroll taming just puts mobs to sleep. A few thoughts. Tamed creatures should be under the players control. In the future I'll think about if creatures can break free. And, what stat makes certain creatures harder to tame. Will, Willpower, Resilience, MagicResist, or magic school based resistance. Tested on cave bear, fell asleep, only followed me through forced pet moves. Was sad!
+
+---
+
+I really do not like your approach, like at all,what are tiy saying, they were suddenly in a sleep cycle after taming? there must be a better way, I don't love all the try catches if I'm honest.

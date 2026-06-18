@@ -1,0 +1,28 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "aa85b36a4fa2",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "src/rules/systems/sleepScheduleSystem.js",
+    "src/rules/systems/tamingSystem.js",
+    "tests/scrollOfTaming.test.mjs",
+    "tests/sleepState.test.mjs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/aa/85b36a4fa2/0/metadata.json",
+      "transcript": "/aa/85b36a4fa2/0/full.jsonl",
+      "content_hash": "/aa/85b36a4fa2/0/content_hash.txt",
+      "prompt": "/aa/85b36a4fa2/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 350165,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 3748992,
+    "output_tokens": 8387,
+    "api_call_count": 44
+  }
+}

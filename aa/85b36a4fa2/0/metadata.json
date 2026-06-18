@@ -1,0 +1,70 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "aa85b36a4fa2",
+  "session_id": "019edb8b-283f-7ba0-b9e2-e2c28e673d36",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-18T17:55:54.532184274Z",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "src/rules/systems/sleepScheduleSystem.js",
+    "src/rules/systems/tamingSystem.js",
+    "tests/scrollOfTaming.test.mjs",
+    "tests/sleepState.test.mjs"
+  ],
+  "agent": "Codex",
+  "model": "gpt-5.5",
+  "turn_id": "91fb36a5d786",
+  "token_usage": {
+    "input_tokens": 350165,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 3748992,
+    "output_tokens": 8387,
+    "api_call_count": 44
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-18T17:55:54.470949144Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 77,
+    "human_modified": 120,
+    "human_removed": 0,
+    "total_committed": 87,
+    "total_lines_changed": 197,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 1000,
+      "user_lines_removed": 82,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".github/agents/Dungeon Generation and BSP Expert.agent.md": 582,
+        ".github/agents/VFX Agent.agent.md": 283,
+        "src/rules/systems/tamingSystem.js": 80,
+        "tests/scrollOfTaming.test.mjs": 55
+      },
+      "user_removed_per_file": {
+        "src/rules/systems/tamingSystem.js": 60,
+        "tests/scrollOfTaming.test.mjs": 22
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 865,
+      "user_lines_removed": 0,
+      "agent_lines_added": 145,
+      "agent_lines_removed": 82,
+      "user_added_per_file": {
+        ".github/agents/Dungeon Generation and BSP Expert.agent.md": 582,
+        ".github/agents/VFX Agent.agent.md": 283
+      }
+    }
+  ]
+}
