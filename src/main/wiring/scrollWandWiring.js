@@ -27,8 +27,10 @@ import { ItemInfo } from "../../rules/components/ItemInfo.js";
 import { getEffectiveVisionRange, blind } from "../../rules/utils/blind.js";
 import { listApplyTargetsForTool } from "../../rules/content/items/applyPayloads.js";
 import { getPolymorphControl, recordPolymorphAttempt, resolvePolymorphAttempt } from "../../rules/utils/polymorphPolicy.js";
+import { setInputLock } from "../../display/input/inputLock.js";
 
 const INSTALLED_KEY = Symbol.for('jshack:scrollWandWiring:installed');
+const GENOCIDE_CHOOSER_LOCK = 'scroll:genocide:monsterChooser';
 
 /**
  * @param {object} deps
@@ -42,6 +44,21 @@ export function installScrollWandWiring({ world, targeting, playerEntity }) {
 
   const pendingMonsterChoices = new Map();
   let nextMonsterChoiceRequestId = 1;
+
+  function syncGenocideChooserLock() {
+    for (const pending of pendingMonsterChoices.values()) {
+      if (pending?.kind === 'genocide') return setInputLock(GENOCIDE_CHOOSER_LOCK, true);
+    }
+    return setInputLock(GENOCIDE_CHOOSER_LOCK, false);
+  }
+
+  function deleteMonsterChoice(requestId) {
+    const pending = pendingMonsterChoices.get(requestId);
+    if (!pending) return null;
+    pendingMonsterChoices.delete(requestId);
+    syncGenocideChooserLock();
+    return pending;
+  }
 
   function currentDepth() {
     let depth = 1;
@@ -112,9 +129,8 @@ export function installScrollWandWiring({ world, targeting, playerEntity }) {
   addEventListener('ui:monsterChosen', (ev) => {
     const detail = /** @type {CustomEvent} */ (ev).detail || {};
     const requestId = Number(detail.requestId || 0) | 0;
-    const pending = pendingMonsterChoices.get(requestId);
+    const pending = deleteMonsterChoice(requestId);
     if (!pending) return;
-    pendingMonsterChoices.delete(requestId);
     window.dispatchEvent(new CustomEvent('ui:closeMonsterChooser'));
     const monsterId = String(detail.monsterId || '');
     if (pending.kind === 'genocide') {
@@ -132,18 +148,28 @@ export function installScrollWandWiring({ world, targeting, playerEntity }) {
   addEventListener('ui:monsterChooserCanceled', (ev) => {
     const detail = /** @type {CustomEvent} */ (ev).detail || {};
     const requestId = Number(detail.requestId || 0) | 0;
-    const pending = pendingMonsterChoices.get(requestId);
+    const pending = deleteMonsterChoice(requestId);
     if (!pending) return;
-    pendingMonsterChoices.delete(requestId);
     window.dispatchEvent(new CustomEvent('ui:closeMonsterChooser'));
     const text = pending.kind === 'genocide' ? 'The scroll crumbles to dust, unused.' : 'The scroll fizzles.';
     world.emit?.('message', { text, type: 'system' });
+  });
+
+  addEventListener('ui:closeMonsterChooser', () => {
+    let changed = false;
+    for (const [requestId, pending] of pendingMonsterChoices) {
+      if (pending?.kind !== 'genocide') continue;
+      pendingMonsterChoices.delete(requestId);
+      changed = true;
+    }
+    if (changed) syncGenocideChooserLock();
   });
 
   // ── Scroll of Genocide ──────────────────────────────────────────────────
   world.on('scroll:genocide', ({ actor }) => {
     const requestId = nextMonsterChoiceRequestId++;
     pendingMonsterChoices.set(requestId, { kind: 'genocide', actor });
+    syncGenocideChooserLock();
     window.dispatchEvent(new CustomEvent('ui:openMonsterChooser', {
       detail: {
         requestId,
