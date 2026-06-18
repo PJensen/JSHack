@@ -10,11 +10,20 @@ import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 import { MaterialState } from "../src/rules/components/MaterialState.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { ApplyIntent } from "../src/rules/components/Intents/ApplyIntent.js";
+import { InteractIntent } from "../src/rules/components/Intents/InteractIntent.js";
 import { Position } from "../src/rules/components/Position.js";
 import { WeatherState } from "../src/rules/components/WeatherState.js";
 import { applySystem } from "../src/rules/systems/applySystem.js";
+import { interactionSystem } from "../src/rules/systems/interactionSystem.js";
 import { isIdentified, resetIdentification } from "../src/rules/data/identification.js";
 import { addToInventory, inventoryContains } from "../src/rules/utils/inventoryFacade.js";
+import { CHUNK_SIZE, TILE_FLOOR } from "../src/rules/environment/dungeon/constants.js";
+import { clearAll, loadChunk } from "../src/rules/environment/dungeon/tileMap.js";
+
+function loadFlatFloor() {
+  clearAll();
+  loadChunk(0, 0, new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR));
+}
 
 function cookingFires(world) {
   const out = [];
@@ -89,6 +98,7 @@ Deno.test("poison potion apply hook coats weapon and consumes the potion", () =>
 });
 
 Deno.test("flint applied to wood with wielded metal weapon creates a campfire", () => {
+  loadFlatFloor();
   const world = new World({ seed: 1003 });
   const actor = world.create();
   world.add(actor, Position, { x: 4, y: 7 });
@@ -106,8 +116,10 @@ Deno.test("flint applied to wood with wielded metal weapon creates a campfire", 
 
   const appliedEvents = [];
   const skillEvents = [];
+  const openEvents = [];
   world.on("item:applied", (ev) => appliedEvents.push(ev));
   world.on("skill:campfire", (ev) => skillEvents.push(ev));
+  world.on("cooking:open", (ev) => openEvents.push(ev));
 
   world.add(actor, ApplyIntent, { itemId: flint, targetItemId: wood });
   applySystem(world);
@@ -121,11 +133,17 @@ Deno.test("flint applied to wood with wielded metal weapon creates a campfire", 
 
   const campfires = cookingFires(world);
   assertEquals(campfires.length, 1);
-  assertEquals(campfires[0].pos, { x: 4, y: 7 });
+  assertEquals(campfires[0].pos, { x: 5, y: 7 });
   assertEquals(world.get(campfires[0].id, Interactable)?.action, "cookFood");
+
+  world.add(actor, InteractIntent, { targetId: campfires[0].id });
+  interactionSystem(world);
+  assertEquals(openEvents.length, 1);
+  assertEquals(openEvents[0].targetId, campfires[0].id);
 });
 
 Deno.test("flint campfire apply works without a wielded metal weapon", () => {
+  loadFlatFloor();
   const world = new World({ seed: 1004 });
   const actor = world.create();
   world.add(actor, Position, { x: 2, y: 2 });
@@ -149,11 +167,12 @@ Deno.test("flint campfire apply works without a wielded metal weapon", () => {
   assertEquals(Number(skillEvents[0]?.strikerId || 0), 0);
   const campfires = cookingFires(world);
   assertEquals(campfires.length, 1);
-  assertEquals(campfires[0].pos, { x: 2, y: 2 });
+  assertEquals(campfires[0].pos, { x: 3, y: 2 });
   assertEquals(world.get(campfires[0].id, Interactable)?.action, "cookFood");
 });
 
 Deno.test("flint campfire attempt in rain emits sparks but does not consume wood", () => {
+  loadFlatFloor();
   const world = new World({ seed: 1005 });
   const actor = world.create();
   const weather = world.create();
@@ -185,6 +204,7 @@ Deno.test("flint campfire attempt in rain emits sparks but does not consume wood
 });
 
 Deno.test("flint campfire attempt with wet fuel smokes out without spawning fire", () => {
+  loadFlatFloor();
   const world = new World({ seed: 1006 });
   const actor = world.create();
   world.add(actor, Position, { x: 6, y: 6 });

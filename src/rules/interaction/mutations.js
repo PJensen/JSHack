@@ -8,7 +8,6 @@
 // - Allowed importer in rules code: src/rules/utils/actionContexts.js only.
 
 import { attach } from "../../lib/ecs-js/index.js";
-import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { ActiveEffects } from "../components/ActiveEffects.js";
 import { CorpseAdaptation } from "../components/CorpseAdaptation.js";
 import { DerivedExpression } from "../components/DerivedExpression.js";
@@ -20,7 +19,6 @@ import { ItemInfo } from "../components/ItemInfo.js";
 import { Material } from "../components/Material.js";
 import { Position } from "../components/Position.js";
 import { Potion } from "../components/Potion.js";
-import { CookingFire } from "../archetypes/Overworld.js";
 
 import { DamageSpec } from "../components/DamageSpec.js";
 import { Vitality } from "../components/Vitality.js";
@@ -35,6 +33,7 @@ import { applyStatusEffect, ensureActiveEffects, isInvulnerabilityEffectKey } fr
 import { attachEnchantmentNode } from "../utils/enchantmentTopology.js";
 import { spawnHazard } from "../utils/hazardSpawn.js";
 import { spawnMonsterEntity } from "../utils/spawnMonsterEntity.js";
+import { spawnCookingFireNear } from "../utils/spawnCookingFire.js";
 import { setItemCooldown } from "../utils/itemCooldowns.js";
 import { Traits } from "../components/Traits.js";
 import { getHungerLevel } from "../data/food.js";
@@ -369,14 +368,16 @@ export function applyMutation(world, op, resolvers = {}) {
       break;
     }
     case "spawnCookingFire": {
-      const spawnX = Number.isFinite(op.x) ? (Number(op.x) | 0) : 0;
-      const spawnY = Number.isFinite(op.y) ? (Number(op.y) | 0) : 0;
-      const id = createFrom(world, CookingFire, { x: spawnX, y: spawnY });
+      const anchorX = Number.isFinite(op.x) ? (Number(op.x) | 0) : 0;
+      const anchorY = Number.isFinite(op.y) ? (Number(op.y) | 0) : 0;
+      const id = spawnCookingFireNear(world, { x: anchorX, y: anchorY });
+      if (!(id > 0)) break;
+      const pos = world.get(id, Position) || { x: anchorX, y: anchorY };
       if (op.emitEvent !== false) {
         world.emit("spawned", {
           id,
           kind: "cooking_fire",
-          at: { x: spawnX, y: spawnY },
+          at: { x: pos.x | 0, y: pos.y | 0 },
         });
       }
       break;

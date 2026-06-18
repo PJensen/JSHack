@@ -1322,32 +1322,26 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
   world.on('skill:campfire:spark', ({ at, success, reason }) => {
     if (!at || !canShowAt(at.x, at.y)) return;
     const ok = success === true;
-    const label = ok ? 'SPARK!' : (String(reason || '') === 'rain' || String(reason || '') === 'heavy_rain' ? 'HISS...' : 'SMOKE');
-    ftext.addStatus(at.x, at.y - 0.35, label, {
-      color: ok ? '#ffcf6a' : '#9aa3ad',
-      life: ok ? 0.75 : 0.95,
-      scaleStart: ok ? 1.15 : 1.0,
-      scaleEnd: 0.75,
-    });
+    const wet = String(reason || '') === 'rain' || String(reason || '') === 'heavy_rain';
     if (!fx?.pool) return;
-    const count = ok ? 18 : 10;
+    const count = ok ? 30 : (wet ? 14 : 18);
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
-      const speed = ok ? (0.55 + Math.random() * 1.1) : (0.10 + Math.random() * 0.35);
+      const speed = ok ? (0.75 + Math.random() * 1.65) : (0.12 + Math.random() * 0.45);
       fx.pool.spawn(new Particle({
-        x: at.x + (Math.random() - 0.5) * 0.18,
-        y: at.y - 0.15 + (Math.random() - 0.5) * 0.12,
+        x: at.x + (Math.random() - 0.5) * (ok ? 0.28 : 0.22),
+        y: at.y - 0.18 + (Math.random() - 0.5) * (ok ? 0.18 : 0.14),
         vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed - (ok ? 0.45 : 0.18),
+        vy: Math.sin(angle) * speed - (ok ? 0.65 : 0.12),
         ax: 0,
-        ay: ok ? 1.5 : -0.15,
-        life: ok ? 0.25 + Math.random() * 0.25 : 0.5 + Math.random() * 0.35,
-        size0: ok ? 0.08 : 0.12,
-        size1: ok ? 0.02 : 0.22,
-        r: ok ? 255 : 130,
-        g: ok ? 190 : 138,
-        b: ok ? 72 : 148,
-        a0: ok ? 0.95 : 0.42,
+        ay: ok ? 1.9 : (wet ? -0.28 : -0.08),
+        life: ok ? 0.18 + Math.random() * 0.28 : 0.45 + Math.random() * 0.38,
+        size0: ok ? 0.06 + Math.random() * 0.05 : 0.10 + Math.random() * 0.07,
+        size1: ok ? 0.01 : (wet ? 0.18 : 0.24),
+        r: ok ? 255 : (wet ? 116 : 136),
+        g: ok ? (160 + Math.floor(Math.random() * 70)) : (wet ? 132 : 126),
+        b: ok ? 48 : (wet ? 154 : 132),
+        a0: ok ? 0.98 : 0.38,
       }));
     }
   });
