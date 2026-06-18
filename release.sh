@@ -17,6 +17,7 @@ Does:
   - runs the Deno runtime suite unless --skip-tests is set
   - creates annotated tag vX.Y.Z
   - creates a GitHub release if gh is installed
+  - pushes the tag to origin if gh is not installed
   - pushes commit and tag when --push is set
 USAGE
 }
@@ -57,15 +58,21 @@ fi
 
 git tag -a "$TAG" -m "$TAG"
 
+TAG_PUSHED=0
+
 if command -v gh >/dev/null 2>&1; then
   gh release create "$TAG" --title "$TAG" --notes "Release $TAG"
 else
-  echo "gh not found; skipped GitHub release creation"
+  echo "gh not found; pushing tag instead"
+  git push origin "$TAG"
+  TAG_PUSHED=1
 fi
 
 if [[ "$PUSH" -eq 1 ]]; then
   git push origin HEAD
-  git push origin "$TAG"
+  if [[ "$TAG_PUSHED" -eq 0 ]]; then
+    git push origin "$TAG"
+  fi
 fi
 
 echo "Released $TAG"
