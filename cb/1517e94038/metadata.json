@@ -5,6 +5,7 @@
   "branch": "master",
   "checkpoints_count": 0,
   "files_touched": [
+    "VERSION",
     "src/main/wiring/scrollWandWiring.js",
     "tests/scrollWandWiringInputLock.test.mjs"
   ],
