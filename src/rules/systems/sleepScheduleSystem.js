@@ -1,9 +1,17 @@
-import { AggroState, AGGRO_LEVELS } from "../components/AggroState.js";
+import { AGGRO_LEVELS, AggroState } from "../components/AggroState.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
+import { Pet } from "../components/Pet.js";
 import { Vitality } from "../components/Vitality.js";
 import { getMonster } from "../data/monsters.js";
-import { resolveSleepProfile, resolveSleepScheduleNow } from "../data/sleepProfiles.js";
+import {
+  resolveSleepProfile,
+  resolveSleepScheduleNow,
+} from "../data/sleepProfiles.js";
 import { isAsleep, putActorToSleep, tryWakeActor } from "../utils/sleep.js";
+
+function isControlledCreature(world, id) {
+  return world.has(id, Pet);
+}
 
 function isSafeToFallAsleep(world, id) {
   const aggro = world.get(id, AggroState);
@@ -22,6 +30,7 @@ function isSafeToFallAsleep(world, id) {
 export function sleepScheduleSystem(world) {
   for (const [id, ident, vit] of world.query(NamedIdentity, Vitality)) {
     if (vit.hp <= 0) continue;
+    if (isControlledCreature(world, id)) continue;
 
     const def = getMonster(String(ident.identity || ""));
     if (!def?.sleep) continue;

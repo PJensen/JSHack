@@ -1,15 +1,22 @@
 import { assert, assertEquals } from "jsr:@std/assert";
-import { World } from '../src/lib/ecs-js/index.js';
-import { Position } from '../src/rules/components/Position.js';
-import { Player } from '../src/rules/components/Player.js';
-import { NamedIdentity } from '../src/rules/components/NamedIdentity.js';
-import { Faction } from '../src/rules/components/Faction.js';
-import { Vitality } from '../src/rules/components/Vitality.js';
-import { AggroState, AGGRO_LEVELS, SEARCH_TURNS_HUNTING_GRACE } from '../src/rules/components/AggroState.js';
-import { Pet } from '../src/rules/components/Pet.js';
-import { Owner } from '../src/rules/components/Owner.js';
-import { PetState } from '../src/rules/components/PetState.js';
-import { installTamingListener } from '../src/rules/systems/tamingSystem.js';
+import { World } from "../src/lib/ecs-js/index.js";
+import { Position } from "../src/rules/components/Position.js";
+import { Player } from "../src/rules/components/Player.js";
+import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
+import { Faction } from "../src/rules/components/Faction.js";
+import { Vitality } from "../src/rules/components/Vitality.js";
+import {
+  AGGRO_LEVELS,
+  AggroState,
+  SEARCH_TURNS_HUNTING_GRACE,
+} from "../src/rules/components/AggroState.js";
+import { Pet } from "../src/rules/components/Pet.js";
+import { Owner } from "../src/rules/components/Owner.js";
+import { PetState } from "../src/rules/components/PetState.js";
+import { SleepState } from "../src/rules/components/SleepState.js";
+import { MoveIntent } from "../src/rules/components/Intents/MoveIntent.js";
+import { installTamingListener } from "../src/rules/systems/tamingSystem.js";
+import { petBehaviorSystem } from "../src/rules/systems/petBehaviorSystem.js";
 
 function makeWorld(seed = 1) {
   const world = new World({ seed });
@@ -21,7 +28,7 @@ function makePlayer(world, x, y) {
   const id = world.create();
   world.add(id, Player);
   world.add(id, Position, { x, y });
-  world.add(id, NamedIdentity, { name: 'Hero', identity: 'player' });
+  world.add(id, NamedIdentity, { name: "Hero", identity: "player" });
   world.add(id, Vitality, { hp: 30, maxHp: 30 });
   return id;
 }
@@ -30,7 +37,7 @@ function makeEnemy(world, x, y, identity) {
   const id = world.create();
   world.add(id, Position, { x, y });
   world.add(id, NamedIdentity, { name: identity, identity });
-  world.add(id, Faction, { key: 'enemy' });
+  world.add(id, Faction, { key: "enemy" });
   world.add(id, Vitality, { hp: 10, maxHp: 10 });
   world.add(id, AggroState, {
     alertLevel: AGGRO_LEVELS.hunting,
@@ -47,7 +54,7 @@ function makeEnemy(world, x, y, identity) {
 Deno.test("taming converts enemy faction to pet", () => {
   const world = makeWorld();
   const player = makePlayer(world, 5, 5);
-  const enemy = makeEnemy(world, 8, 5, 'goblin');
+  const enemy = makeEnemy(world, 8, 5, "goblin");
 
   world.emit("scroll:taming:apply", { actor: player, target: enemy });
 
@@ -58,7 +65,7 @@ Deno.test("taming converts enemy faction to pet", () => {
 Deno.test("taming adds Pet tag component", () => {
   const world = makeWorld();
   const player = makePlayer(world, 5, 5);
-  const enemy = makeEnemy(world, 8, 5, 'goblin');
+  const enemy = makeEnemy(world, 8, 5, "goblin");
 
   world.emit("scroll:taming:apply", { actor: player, target: enemy });
 
@@ -68,7 +75,7 @@ Deno.test("taming adds Pet tag component", () => {
 Deno.test("taming adds Owner pointing to player", () => {
   const world = makeWorld();
   const player = makePlayer(world, 5, 5);
-  const enemy = makeEnemy(world, 8, 5, 'goblin');
+  const enemy = makeEnemy(world, 8, 5, "goblin");
 
   world.emit("scroll:taming:apply", { actor: player, target: enemy });
 
@@ -80,7 +87,7 @@ Deno.test("taming adds Owner pointing to player", () => {
 Deno.test("taming adds PetState in following mode", () => {
   const world = makeWorld();
   const player = makePlayer(world, 5, 5);
-  const enemy = makeEnemy(world, 8, 5, 'goblin');
+  const enemy = makeEnemy(world, 8, 5, "goblin");
 
   world.emit("scroll:taming:apply", { actor: player, target: enemy });
 
@@ -92,17 +99,43 @@ Deno.test("taming adds PetState in following mode", () => {
 Deno.test("taming removes AggroState", () => {
   const world = makeWorld();
   const player = makePlayer(world, 5, 5);
-  const enemy = makeEnemy(world, 8, 5, 'goblin');
+  const enemy = makeEnemy(world, 8, 5, "goblin");
 
   world.emit("scroll:taming:apply", { actor: player, target: enemy });
 
-  assert(!world.has(enemy, AggroState), "AggroState should be removed after taming");
+  assert(
+    !world.has(enemy, AggroState),
+    "AggroState should be removed after taming",
+  );
+});
+
+Deno.test("taming wakes sleeping enemies so they can follow as pets", () => {
+  const world = makeWorld();
+  const player = makePlayer(world, 5, 5);
+  const enemy = makeEnemy(world, 8, 5, "cave_bear");
+  world.add(enemy, SleepState, {
+    asleep: true,
+    wakeDifficulty: 20,
+    wakeRadius: 2,
+    wakeOnDamage: true,
+  });
+
+  world.emit("scroll:taming:apply", { actor: player, target: enemy });
+
+  const sleep = world.get(enemy, SleepState);
+  assertEquals(sleep.asleep, false, "tamed pet should wake up");
+
+  petBehaviorSystem(world);
+  const move = world.get(enemy, MoveIntent);
+  assert(move, "woken tamed pet should receive normal follow movement");
+  assertEquals(move.dx, -1);
+  assertEquals(move.dy, 0);
 });
 
 Deno.test("taming preserves entity position and vitality", () => {
   const world = makeWorld();
   const player = makePlayer(world, 5, 5);
-  const enemy = makeEnemy(world, 8, 5, 'goblin');
+  const enemy = makeEnemy(world, 8, 5, "goblin");
 
   world.emit("scroll:taming:apply", { actor: player, target: enemy });
 
@@ -120,8 +153,8 @@ Deno.test("taming rejects non-enemy targets", () => {
   // Create a neutral entity
   const neutral = world.create();
   world.add(neutral, Position, { x: 8, y: 5 });
-  world.add(neutral, NamedIdentity, { name: 'Villager', identity: 'villager' });
-  world.add(neutral, Faction, { key: 'neutral' });
+  world.add(neutral, NamedIdentity, { name: "Villager", identity: "villager" });
+  world.add(neutral, Faction, { key: "neutral" });
   world.add(neutral, Vitality, { hp: 10, maxHp: 10 });
 
   world.emit("scroll:taming:apply", { actor: player, target: neutral });
