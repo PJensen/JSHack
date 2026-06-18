@@ -5,6 +5,7 @@
   "branch": "master",
   "checkpoints_count": 1,
   "files_touched": [
+    "VERSION",
     "src/main/scheduler.js",
     "src/rules/components/TemporarySpawn.js",
     "src/rules/data/itemCatalogHooks.js",
