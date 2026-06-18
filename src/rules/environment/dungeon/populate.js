@@ -2089,6 +2089,18 @@ function applyDeadEndTheme(ctx) {
       if (chestPos) {
         reserved.add(`${chestPos.x},${chestPos.y}`);
         markSolid(chestPos.x, chestPos.y);
+        const ingredientChestDrops = [
+          'food_flour',
+          'food_wild_herbs',
+          'food_mushrooms',
+          'food_wild_berries',
+          'food_raw_fish',
+          'food_carrot',
+          'food_corn',
+          'water_bucket',
+          'fuel_firewood',
+          'tool_kitchen_knife',
+        ];
         spawns.push({
           x: chestPos.x,
           y: chestPos.y,
@@ -2096,27 +2108,22 @@ function applyDeadEndTheme(ctx) {
           params: {
             depth: floorPlan.depth,
             lootTable: 'chest:basic',
-            fixedDrops: [
-              'food_ration',
-              'food_ration',
-              'food_iron_ration',
-              'food_mushrooms',
-              'food_wild_berries',
-              'food_wild_herbs',
-            ],
+            fixedDrops: ingredientChestDrops,
           },
         });
       }
 
       const pantryPool = [
-        'food_ration',
-        'food_iron_ration',
+        'food_flour',
         'food_mushrooms',
         'food_wild_berries',
         'food_wild_herbs',
         'food_wheat',
         'food_carrot',
         'food_corn',
+        'food_raw_fish',
+        'water_bucket',
+        'fuel_firewood',
       ];
 
       let pantryPlaced = 0;

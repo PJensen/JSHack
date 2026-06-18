@@ -967,7 +967,7 @@ Deno.test("obliiette dead-end rooms place flayed man and hanging chains decorati
   assertEquals(shopkeepers.length, 0, "obliiette should not place shopkeepers");
 });
 
-Deno.test("kitchen dead-end rooms place cooking fire, food chest, and pantry food clutter", () => {
+Deno.test("kitchen dead-end rooms place cooking fire, ingredient chest, and pantry clutter", () => {
   const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
   tiles.fill(TILE_WALL);
   for (let y = 10; y < 18; y++) for (let x = 10; x < 18; x++) tiles[y * CHUNK_SIZE + x] = TILE_FLOOR;
@@ -1000,12 +1000,32 @@ Deno.test("kitchen dead-end rooms place cooking fire, food chest, and pantry foo
 
   const fire = spawns.find((s) => inRoom(s) && s.kind === "cooking_fire");
   const chest = spawns.find((s) => inRoom(s) && s.kind === "chest");
-  const pantry = spawns.filter((s) => inRoom(s) && s.kind === "catalog_item" && String(s.params?.itemId || "").startsWith("food_"));
+  const pantry = spawns.filter((s) => inRoom(s) && s.kind === "catalog_item");
   const shopkeepers = spawns.filter((s) => inRoom(s) && s.kind === "shopkeeper");
+  const chestDrops = new Set(chest?.params?.fixedDrops || []);
+  const pantryIds = new Set(pantry.map((s) => String(s.params?.itemId || "")));
+  const allKitchenIds = new Set([...chestDrops, ...pantryIds]);
 
   assert(fire, "kitchen should include a working cooking fire");
   assert(chest, "kitchen should include a chest");
-  assert(pantry.length >= 2, "kitchen should include multiple food pantry items");
+  assert(pantry.length >= 2, "kitchen should include multiple pantry items");
+  assert(!allKitchenIds.has("food_ration"), "kitchen should stock ingredients instead of ready-made rations");
+  assert(!allKitchenIds.has("food_iron_ration"), "kitchen should not stock preserved rations");
+  assert(chestDrops.has("food_flour"), "ingredient chest should include flour");
+  assert(chestDrops.has("food_wild_herbs"), "ingredient chest should include herbs");
+  assert(chestDrops.has("food_raw_fish"), "ingredient chest should include raw fish");
+  assert(chestDrops.has("water_bucket"), "ingredient chest should include water");
+  assert(chestDrops.has("fuel_firewood"), "ingredient chest should include fuel");
+  assert(chestDrops.has("tool_kitchen_knife"), "ingredient chest should include a cooking tool");
+  for (const itemId of allKitchenIds) {
+    const def = getCatalogItem(itemId);
+    const tags = Array.isArray(def?.tags) ? def.tags : [];
+    if (itemId === "tool_kitchen_knife") {
+      assert(tags.includes("cooking_tool"), "kitchen knife should be tagged as a cooking tool");
+    } else {
+      assert(tags.includes("cooking_ingredient"), `${itemId} should be tagged as a cooking ingredient`);
+    }
+  }
   assertEquals(shopkeepers.length, 0, "kitchen should not place shopkeepers");
 });
 

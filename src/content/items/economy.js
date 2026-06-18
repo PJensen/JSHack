@@ -66,12 +66,14 @@ defineItem('food_iron_ration', {
 defineItem('food_wild_berries', {
   name: 'Wild Berries', type: 'food', material: 'organic', rarity: 'common', value: 4, weight: 0.2,
   description: 'A handful of sweet wild berries.',
+  tags: ['cooking_ingredient'],
   hooks: { on_use: EAT_ON_USE },
 });
 
 defineItem('food_wild_herbs', {
   name: 'Wild Herbs', type: 'food', material: 'organic', rarity: 'common', value: 3, weight: 0.15,
   description: 'Fresh herbs with a sharp, earthy bite.',
+  tags: ['cooking_ingredient'],
   hooks: { on_use: EAT_ON_USE },
 });
 
@@ -79,6 +81,7 @@ defineItem('food_raw_fish', {
   name: 'Raw Fish', type: 'food', material: 'organic', rarity: 'common', value: 8, weight: 0.7,
   nutrition: 120, shelfLife: 1080,
   description: 'A clean silver fish, fresh from nearby water.',
+  tags: ['cooking_ingredient'],
   hooks: { on_use: EAT_ON_USE },
 });
 
@@ -99,24 +102,28 @@ defineItem('food_moonfin', {
 defineItem('food_wheat', {
   name: 'Wheat', type: 'food', material: 'organic', rarity: 'common', value: 5, weight: 0.3,
   description: 'A sheaf of golden wheat. Can be cooked into bread.',
+  tags: ['cooking_ingredient'],
   hooks: { on_use: EAT_ON_USE },
 });
 
 defineItem('food_carrot', {
   name: 'Carrot', type: 'food', material: 'organic', rarity: 'common', value: 4, weight: 0.4,
   description: 'A fresh carrot, pulled straight from the soil.',
+  tags: ['cooking_ingredient'],
   hooks: { on_use: EAT_ON_USE },
 });
 
 defineItem('food_corn', {
   name: 'Corn', type: 'food', material: 'organic', rarity: 'common', value: 8, weight: 1.0,
   description: 'An ear of golden corn.',
+  tags: ['cooking_ingredient'],
   hooks: { on_use: EAT_ON_USE },
 });
 
 defineItem('food_flour', {
   name: 'Flour', type: 'ingredient', material: 'organic', rarity: 'common', value: 7, weight: 0.6,
   description: 'A sack of fresh-milled flour ready for the tavern kitchen.',
+  tags: ['cooking_ingredient'],
 });
 
 defineItem('food_stew', {
@@ -129,6 +136,7 @@ defineItem('food_stew', {
 defineItem('food_mushrooms', {
   name: 'Dungeon Mushrooms', type: 'food', material: 'organic', rarity: 'common', value: 3, weight: 0.15,
   description: 'Pale mushrooms from the dungeon depths. Probably safe.',
+  tags: ['cooking_ingredient'],
   hooks: {
     on_use: (ctx, state) => {
       const result = EAT_ON_USE(ctx, state);
@@ -153,6 +161,7 @@ defineItem('tool_kitchen_knife', {
   name: 'Kitchen Knife', type: 'weapon', material: 'iron', rarity: 'common', value: 12, weight: 0.6,
   bonuses: { attack: 1 }, damageDice: '1d3', damageType: 'pierce', staminaCost: 3,
   description: 'A narrow kitchen knife for carving roots, herbs, and stew meat.',
+  tags: ['cooking_tool'],
 });
 
 // ── Economy materials ─────────────────────────────────────────────────
@@ -160,11 +169,13 @@ defineItem('tool_kitchen_knife', {
 defineItem('water_bucket', {
   name: 'Water Bucket', type: 'utility', material: 'wood', rarity: 'common', value: 2, weight: 1.4,
   description: 'A heavy bucket of clean water drawn from the town well.',
+  tags: ['cooking_ingredient'],
 });
 
 defineItem('fuel_firewood', {
   name: 'Firewood', type: 'fuel', material: 'wood', rarity: 'common', value: 4, weight: 1.0,
   description: 'A bundled armful of split firewood.',
+  tags: ['cooking_ingredient'],
 });
 
 defineItem('material_iron', {
