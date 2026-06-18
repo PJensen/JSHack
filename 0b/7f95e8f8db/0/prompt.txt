@@ -1,0 +1,1 @@
+did you want to take a crack at dungeon cooking, under the new architecture? various thematic ingredient drops, recipes, etc? instead of just corpses, food that buffs you when you eat it -- long duration buffs ideally.
