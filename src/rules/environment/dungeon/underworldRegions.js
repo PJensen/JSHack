@@ -17,7 +17,8 @@ export const UNDERWORLD_REGION_TEMPLATES = Object.freeze({
     targetDepth: 1,
     roomTarget: 3,
     content: Object.freeze({
-      monsters: Object.freeze([{ id: "rat", count: 12 }]),
+      monsters: Object.freeze([{ count: 12, pool: Object.freeze(["rat"]) }]),
+      spawners: Object.freeze([{ count: 1, pool: Object.freeze(["rat"]) }]),
       traps: Object.freeze([]),
       features: Object.freeze(["torch", "barrel", "crate"]),
       chests: Object.freeze([{ lootTable: "chest:basic" }]),
@@ -202,7 +203,25 @@ export const UNDERWORLD_REGION_TEMPLATES = Object.freeze({
     targetDepth: 1,
     roomTarget: 2,
     content: Object.freeze({
-      monsters: Object.freeze([{ id: "rat", count: 4 }, { id: "giant_frog", count: 1 }, { id: "cave_snake", count: 1 }]),
+      monsters: Object.freeze([{
+        count: 6,
+        pool: Object.freeze([
+          "rat",
+          (def) => {
+            const id = String(def?.id || "");
+            const tags = Array.isArray(def?.tags) ? def.tags : [];
+            if (tags.includes("fire") || tags.includes("bird") || tags.includes("herbivore")) return false;
+            return id === "giant_frog"
+              || id === "cave_snake"
+              || id === "snake"
+              || id === "cave_spider"
+              || id === "spider"
+              || id === "rot_grub"
+              || id === "lichen"
+              || id === "pit_viper";
+          },
+        ]),
+      }]),
       traps: Object.freeze([]),
       features: Object.freeze(["mushrooms", "urn", "drain_throat"]),
       chests: Object.freeze([{ lootTable: "chest:basic" }]),

@@ -8,6 +8,7 @@ import { DungeonEntrance } from "../src/rules/components/DungeonEntrance.js";
 import { DungeonState } from "../src/rules/components/DungeonState.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { buildWorldView } from "../src/bridge/schema/worldView.js";
+import { getMonster } from "../src/rules/data/monsters.js";
 import { initDungeon } from "../src/rules/environment/dungeon/index.js";
 import { generateFloorPlan } from "../src/rules/environment/dungeon/floorPlan.js";
 import { transitionToDepth, clearFloorCache } from "../src/rules/environment/dungeon/transition.js";
@@ -81,10 +82,16 @@ Deno.test("overworld stairs carry authored underworld entrance metadata", async 
 Deno.test("underworld templates author floor count, population count, and concrete traps", () => {
   const tavern = getUnderworldRegionTemplate("tavern_basement");
   const bandits = getUnderworldRegionTemplate("bandit_hideout");
+  const well = getUnderworldRegionTemplate("old_well");
 
   assertEquals(tavern.floors, 3);
-  assertEquals(tavern.content.monsters[0], { id: "rat", count: 12 });
+  assertEquals(tavern.content.monsters[0].count, 12);
+  assertEquals(tavern.content.monsters[0].pool[0], "rat");
+  assertEquals(tavern.content.spawners[0].pool[0], "rat");
   assertEquals(tavern.content.traps.length, 0);
+  assertEquals(typeof well.content.monsters[0].pool[1], "function");
+  assert(well.content.monsters[0].pool[1](getMonster("giant_frog")), "old well should admit damp amphibians");
+  assert(!well.content.monsters[0].pool[1](getMonster("bat")), "old well should reject off-theme vermin");
   assert(bandits.content.traps.length > 0, "authored trapped dungeon should list concrete traps");
 });
 
@@ -170,6 +177,7 @@ Deno.test("authored starter regions produce targeted content", async () => {
     anchorY: tavern.entrance.anchorY,
   });
   assert(countIdentity(world, "rat") >= 10, "tavern basement should be rat-heavy");
+  assert(countIdentity(world, "spawner") >= 1, "tavern basement should include a rat spawner");
   assert(countIdentity(world, "skeleton") >= 3, "graveyard crypt should be resident on the same depth-one plane");
   assert(countIdentity(world, "book_dead") >= 1, "graveyard crypt objective should be resident with the depth-one plane");
 

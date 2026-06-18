@@ -110,7 +110,7 @@ import { TOWNFOLK } from '../../data/townfolk.js';
 import { TownfolkJob } from '../../components/TownfolkJob.js';
 import { Inventory } from '../../components/Inventory.js';
 import { resolveLootTable, materializeDrop } from '../../data/lootResolver.js';
-import { getMonster } from '../../data/monsters.js';
+import { getAllMonsters, getMonster } from '../../data/monsters.js';
 import { RoomMetadata } from '../../components/RoomMetadata.js';
 import { addToInventory, inventoryItems } from '../../utils/inventoryFacade.js';
 import { createItemById } from '../../utils/itemFactory.js';
@@ -265,6 +265,65 @@ const PREMIUM_CATALOG_MIMIC_ITEM_IDS = Object.freeze(
     })
     .map((def) => def.id)
 );
+
+function authoredBudgetEntry(entry) {
+  if (typeof entry === 'string' || typeof entry === 'function') {
+    return { count: 1, pool: Object.freeze([entry]) };
+  }
+  if (!entry || typeof entry !== 'object') return null;
+  const rawPool = entry.pool ?? entry.id ?? entry.monsterId ?? entry.ids ?? entry.filter ?? entry.predicate;
+  const pool = Array.isArray(rawPool) ? rawPool : [rawPool];
+  return {
+    count: Math.max(0, Number(entry.count ?? entry.budget ?? 0) | 0),
+    pool: Object.freeze(pool.filter((selector) => typeof selector === 'string' || typeof selector === 'function')),
+  };
+}
+
+function authoredPoolFilter(pool) {
+  return (def) => {
+    if (!def) return false;
+    for (const selector of pool || []) {
+      if (typeof selector === 'string' && String(def.id || '') === selector) return true;
+      if (typeof selector === 'function') {
+        try {
+          if (selector(def)) return true;
+        } catch {
+          // Bad authoring predicates should fail closed for this selector.
+        }
+      }
+    }
+    return false;
+  };
+}
+
+function authoredDepthEligible(def, depth) {
+  if (!def || def.disabled) return false;
+  return true;
+}
+
+function pickAuthoredMonster(rng, depth, pool) {
+  const filter = authoredPoolFilter(pool);
+  const candidates = getAllMonsters().filter((def) => authoredDepthEligible(def, depth) && filter(def));
+  if (candidates.length === 0) return null;
+  for (let tries = 0; tries < candidates.length; tries++) {
+    const def = candidates[rng.int(0, candidates.length - 1)];
+    const params = pickSpecificMonster(def.id, depth);
+    if (params) return params;
+  }
+  return null;
+}
+
+function pickAuthoredSpawner(rng, depth, pool) {
+  const filter = authoredPoolFilter(pool);
+  const candidates = getAllMonsters().filter((def) => authoredDepthEligible(def, depth) && filter(def));
+  if (candidates.length === 0) return null;
+  for (let tries = 0; tries < candidates.length; tries++) {
+    const def = candidates[rng.int(0, candidates.length - 1)];
+    const params = pickSpecificSpawner(rng, def.id, depth);
+    if (params) return params;
+  }
+  return null;
+}
 
 function pickMimicDisguiseIdentity(rng, { preferPremium = false } = {}) {
   const hasCatalogItems = CATALOG_MIMIC_ITEM_IDS.length > 0;
@@ -1215,7 +1274,9 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null, world
     const occupied = new Set([...solidPositions]);
     for (const spawn of spawns) occupied.add(`${spawn.x | 0},${spawn.y | 0}`);
     const openTiles = [];
+    const roomBuckets = [];
     for (const room of chunk.rooms) {
+      const bucket = [];
       for (let y = room.y + 1; y < room.y + Math.max(1, room.h - 1); y++) {
         for (let x = room.x + 1; x < room.x + Math.max(1, room.w - 1); x++) {
           const lx = x - chunk.chunkX * CHUNK_SIZE;
@@ -1223,9 +1284,12 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null, world
           if (!isInBoundsLocal(lx, ly)) continue;
           if (chunk.tiles[ly * CHUNK_SIZE + lx] !== TILE_FLOOR) continue;
           if (occupied.has(`${x},${y}`)) continue;
-          openTiles.push({ x, y });
+          const pos = { x, y };
+          openTiles.push(pos);
+          bucket.push(pos);
         }
       }
+      if (bucket.length > 0) roomBuckets.push(bucket);
     }
     for (let i = openTiles.length - 1; i > 0; i--) {
       const j = rng.int(0, i);
@@ -1233,7 +1297,33 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null, world
       openTiles[i] = openTiles[j];
       openTiles[j] = tmp;
     }
+    for (const bucket of roomBuckets) {
+      for (let i = bucket.length - 1; i > 0; i--) {
+        const j = rng.int(0, i);
+        const tmp = bucket[i];
+        bucket[i] = bucket[j];
+        bucket[j] = tmp;
+      }
+    }
+    for (let i = roomBuckets.length - 1; i > 0; i--) {
+      const j = rng.int(0, i);
+      const tmp = roomBuckets[i];
+      roomBuckets[i] = roomBuckets[j];
+      roomBuckets[j] = tmp;
+    }
+    let roomCursor = 0;
     const takeTile = () => {
+      for (let attempts = 0; attempts < roomBuckets.length; attempts++) {
+        const bucket = roomBuckets[roomCursor % roomBuckets.length];
+        roomCursor++;
+        while (bucket.length > 0) {
+          const pos = bucket.pop();
+          const key = `${pos.x},${pos.y}`;
+          if (occupied.has(key)) continue;
+          occupied.add(key);
+          return pos;
+        }
+      }
       while (openTiles.length > 0) {
         const pos = openTiles.pop();
         const key = `${pos.x},${pos.y}`;
@@ -1250,12 +1340,23 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null, world
     };
 
     for (const entry of authoredContent.monsters || []) {
-      const monsterId = String(entry?.id || "");
-      const target = Math.max(0, Number(entry?.count || 0) | 0);
-      const existing = spawns.filter((spawn) => String(spawn?.params?.identity || spawn?.params?.monsterId || "") === monsterId).length;
+      const budget = authoredBudgetEntry(entry);
+      if (!budget || budget.pool.length === 0) continue;
+      const target = budget.count;
+      const matches = authoredPoolFilter(budget.pool);
+      const existing = spawns.filter((spawn) => spawn.kind === "monster" && matches(getMonster(String(spawn?.params?.identity || spawn?.params?.monsterId || "")))).length;
       for (let i = existing; i < target; i++) {
-        const params = pickSpecificMonster(monsterId, floorPlan.depth);
+        const params = pickAuthoredMonster(rng, floorPlan.depth, budget.pool);
         if (params) addAt("monster", params);
+      }
+    }
+    for (const entry of authoredContent.spawners || []) {
+      const budget = authoredBudgetEntry(entry);
+      if (!budget || budget.pool.length === 0) continue;
+      const target = budget.count;
+      for (let i = 0; i < target; i++) {
+        const params = pickAuthoredSpawner(rng, floorPlan.depth, budget.pool);
+        if (params) addAt("spawner", params);
       }
     }
     for (const feature of authoredContent.features || []) {
