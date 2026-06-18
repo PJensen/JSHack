@@ -18,7 +18,6 @@ export const UNDERWORLD_REGION_TEMPLATES = Object.freeze({
     roomTarget: 3,
     content: Object.freeze({
       monsters: Object.freeze([{ id: "rat", count: 12 }]),
-      trapsPresent: false,
       traps: Object.freeze([]),
       features: Object.freeze(["torch", "barrel", "crate"]),
       chests: Object.freeze([{ lootTable: "chest:basic" }]),
@@ -52,7 +51,6 @@ export const UNDERWORLD_REGION_TEMPLATES = Object.freeze({
     roomTarget: 6,
     content: Object.freeze({
       monsters: Object.freeze([{ id: "skeleton", count: 6 }]),
-      trapsPresent: false,
       traps: Object.freeze([]),
       features: Object.freeze(["urn", "urn", "sarcophagus"]),
       chests: Object.freeze([{ lootTable: "chest:basic" }]),
@@ -86,7 +84,6 @@ export const UNDERWORLD_REGION_TEMPLATES = Object.freeze({
     roomTarget: 1,
     content: Object.freeze({
       monsters: Object.freeze([{ id: "cave_bear", count: 1 }]),
-      trapsPresent: false,
       traps: Object.freeze([]),
       features: Object.freeze(["glowcap_patch", "mushrooms", "mushrooms"]),
       chests: Object.freeze([{ lootTable: "chest:basic", fixedDrops: ["food_mushrooms"] }]),
@@ -117,7 +114,6 @@ export const UNDERWORLD_REGION_TEMPLATES = Object.freeze({
     roomTarget: 4,
     content: Object.freeze({
       monsters: Object.freeze([{ id: "bat", count: 9 }, { id: "flaming_bat", count: 1 }]),
-      trapsPresent: false,
       traps: Object.freeze([]),
       features: Object.freeze(["mushrooms", "glowcap_patch", "web_mote_cluster", "web_mote_cluster"]),
       chests: Object.freeze([{ lootTable: "chest:basic" }]),
@@ -148,7 +144,6 @@ export const UNDERWORLD_REGION_TEMPLATES = Object.freeze({
     content: Object.freeze({
       monsters: Object.freeze([]),
       npcs: Object.freeze([{ townfolkId: "miner", count: 2 }]),
-      trapsPresent: false,
       traps: Object.freeze([]),
       features: Object.freeze(["torch", "torch", "crate", "barrel", "harvest_iron_ore", "harvest_coal_ore", "harvest_stone"]),
       chests: Object.freeze([{ lootTable: "chest:basic", fixedDrops: ["ore_iron", "ore_coal"] }]),
@@ -178,7 +173,6 @@ export const UNDERWORLD_REGION_TEMPLATES = Object.freeze({
     roomTarget: 4,
     content: Object.freeze({
       monsters: Object.freeze([{ id: "bandit", count: 3 }, { id: "bandit_archer", count: 2 }, { id: "bandit_captain", count: 1 }]),
-      trapsPresent: true,
       traps: Object.freeze([{ type: "arrow" }, { type: "spike" }]),
       features: Object.freeze(["torch", "crate", "barrel", "weapon_rack"]),
       chests: Object.freeze([{ lootTable: "chest:epic" }]),
@@ -209,7 +203,6 @@ export const UNDERWORLD_REGION_TEMPLATES = Object.freeze({
     roomTarget: 2,
     content: Object.freeze({
       monsters: Object.freeze([{ id: "rat", count: 4 }, { id: "giant_frog", count: 1 }, { id: "cave_snake", count: 1 }]),
-      trapsPresent: false,
       traps: Object.freeze([]),
       features: Object.freeze(["mushrooms", "urn", "drain_throat"]),
       chests: Object.freeze([{ lootTable: "chest:basic" }]),
@@ -243,7 +236,6 @@ export const UNDERWORLD_REGION_TEMPLATES = Object.freeze({
     roomTarget: 2,
     content: Object.freeze({
       monsters: Object.freeze([{ id: "rat", count: 5 }]),
-      trapsPresent: false,
       traps: Object.freeze([]),
       features: Object.freeze(["torch", "barrel", "crate", "boulder"]),
       chests: Object.freeze([{ lootTable: "chest:basic" }]),
@@ -274,7 +266,6 @@ export const UNDERWORLD_REGION_TEMPLATES = Object.freeze({
     roomTarget: 3,
     content: Object.freeze({
       monsters: Object.freeze([{ id: "dire_wolf", count: 3 }]),
-      trapsPresent: false,
       traps: Object.freeze([]),
       features: Object.freeze(["bone_chime_rack", "mushrooms", "crate"]),
       chests: Object.freeze([{ lootTable: "chest:basic" }]),
@@ -302,7 +293,6 @@ export const UNDERWORLD_REGION_TEMPLATES = Object.freeze({
     roomTarget: 2,
     content: Object.freeze({
       monsters: Object.freeze([{ id: "skeleton", count: 3 }, { id: "dark_acolyte", count: 1 }]),
-      trapsPresent: false,
       traps: Object.freeze([]),
       features: Object.freeze(["altar", "shrine", "statue", "candle_cluster"]),
       chests: Object.freeze([{ lootTable: "chest:epic" }]),

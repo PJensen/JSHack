@@ -78,16 +78,14 @@ Deno.test("overworld stairs carry authored underworld entrance metadata", async 
   }
 });
 
-Deno.test("underworld templates author floor count, population count, and trap presence", () => {
+Deno.test("underworld templates author floor count, population count, and concrete traps", () => {
   const tavern = getUnderworldRegionTemplate("tavern_basement");
   const bandits = getUnderworldRegionTemplate("bandit_hideout");
 
   assertEquals(tavern.floors, 3);
   assertEquals(tavern.content.monsters[0], { id: "rat", count: 12 });
-  assertEquals(tavern.content.trapsPresent, false);
   assertEquals(tavern.content.traps.length, 0);
-  assertEquals(bandits.content.trapsPresent, true);
-  assert(bandits.content.traps.length > 0, "trap-present authored dungeon should list concrete traps");
+  assert(bandits.content.traps.length > 0, "authored trapped dungeon should list concrete traps");
 });
 
 Deno.test("authored underworld floor count controls generated down-stairs", () => {
