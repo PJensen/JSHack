@@ -3,9 +3,10 @@
   "checkpoint_id": "5e9e6d5fc455",
   "strategy": "manual-commit",
   "branch": "master",
-  "checkpoints_count": 1,
+  "checkpoints_count": 3,
   "files_touched": [
-    "src/main/wiring/scrollWandWiring.js"
+    "src/main/wiring/scrollWandWiring.js",
+    "tests/scrollWandWiringInputLock.test.mjs"
   ],
   "sessions": [
     {
@@ -13,13 +14,19 @@
       "transcript": "/5e/9e6d5fc455/0/full.jsonl",
       "content_hash": "/5e/9e6d5fc455/0/content_hash.txt",
       "prompt": "/5e/9e6d5fc455/0/prompt.txt"
+    },
+    {
+      "metadata": "/5e/9e6d5fc455/1/metadata.json",
+      "transcript": "/5e/9e6d5fc455/1/full.jsonl",
+      "content_hash": "/5e/9e6d5fc455/1/content_hash.txt",
+      "prompt": "/5e/9e6d5fc455/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 18977,
+    "input_tokens": 225524,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 72192,
-    "output_tokens": 466,
-    "api_call_count": 4
+    "cache_read_tokens": 1760256,
+    "output_tokens": 6748,
+    "api_call_count": 28
   }
 }
