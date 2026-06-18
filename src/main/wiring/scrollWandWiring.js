@@ -169,7 +169,6 @@ export function installScrollWandWiring({ world, targeting, playerEntity }) {
   world.on('scroll:genocide', ({ actor }) => {
     const requestId = nextMonsterChoiceRequestId++;
     pendingMonsterChoices.set(requestId, { kind: 'genocide', actor });
-    syncGenocideChooserLock();
     window.dispatchEvent(new CustomEvent('ui:openMonsterChooser', {
       detail: {
         requestId,
@@ -179,6 +178,7 @@ export function installScrollWandWiring({ world, targeting, playerEntity }) {
         choices: buildMonsterChoiceOptions({ currentDepth: currentDepth() }),
       },
     }));
+    syncGenocideChooserLock();
   });
 
   // ── Scroll of Polymorph ─────────────────────────────────────────────────

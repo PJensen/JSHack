@@ -32,9 +32,11 @@ Deno.test("scroll genocide chooser locks game input until a species is chosen", 
   const world = new World({ seed: 11 });
   const requests = [];
   let openedRequestId = 0;
+  let lockedDuringOpen = true;
 
   const onOpen = (ev) => {
     openedRequestId = Number(ev?.detail?.requestId || 0) | 0;
+    lockedDuringOpen = isInputLocked();
   };
   addEventListener("ui:openMonsterChooser", onOpen);
   world.on("scroll:genocide:request", (event) => requests.push(event));
@@ -49,6 +51,7 @@ Deno.test("scroll genocide chooser locks game input until a species is chosen", 
     world.emit("scroll:genocide", { actor: 42 });
 
     assertEquals(openedRequestId > 0, true);
+    assertEquals(lockedDuringOpen, false);
     assertEquals(isInputLocked(), true);
 
     window.dispatchEvent(new CustomEvent("ui:monsterChosen", {
