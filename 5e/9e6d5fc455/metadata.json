@@ -3,7 +3,7 @@
   "checkpoint_id": "5e9e6d5fc455",
   "strategy": "manual-commit",
   "branch": "master",
-  "checkpoints_count": 3,
+  "checkpoints_count": 1,
   "files_touched": [
     "src/main/wiring/scrollWandWiring.js",
     "tests/scrollWandWiringInputLock.test.mjs"
@@ -35,11 +35,11 @@
     }
   ],
   "token_usage": {
-    "input_tokens": 225524,
+    "input_tokens": 22715,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 1760256,
-    "output_tokens": 6748,
-    "api_call_count": 28
+    "cache_read_tokens": 204672,
+    "output_tokens": 777,
+    "api_call_count": 5
   },
   "combined_attribution": {
     "calculated_at": "2026-06-18T19:17:44.138685947Z",
