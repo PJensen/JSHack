@@ -170,6 +170,42 @@ Deno.test("voidstone gem can socket into equipped weapon", () => {
   assert(targetSet.has(maceId), "voidstone should be socketable into equipped weapon with empty socket");
 });
 
+Deno.test("flint lists wood targets when actor wields a metal weapon", () => {
+  const world = new World({ seed: 7307 });
+  const actor = createActorWithInventory(world);
+
+  const flintId = createItemById(world, "stone_flint");
+  const firewoodId = createItemById(world, "fuel_firewood");
+  const lumberId = createItemById(world, "material_lumber");
+  const rationId = createItemById(world, "food_ration");
+  const knifeId = createItemById(world, "tool_kitchen_knife");
+  addToInventory(world, actor, flintId);
+  addToInventory(world, actor, firewoodId);
+  addToInventory(world, actor, lumberId);
+  addToInventory(world, actor, rationId);
+  world.add(actor, Equipment, { weapon: knifeId });
+
+  const targets = listApplyTargetsForTool(world, actor, flintId);
+  const targetSet = new Set(targets);
+  assert(targetSet.has(firewoodId), "flint should list firewood as a campfire target");
+  assert(targetSet.has(lumberId), "flint should list lumber as a campfire target");
+  assert(!targetSet.has(rationId), "flint should not list non-wood inventory as a campfire target");
+});
+
+Deno.test("flint target listing requires a wielded metal weapon", () => {
+  const world = new World({ seed: 7308 });
+  const actor = createActorWithInventory(world);
+
+  const flintId = createItemById(world, "stone_flint");
+  const firewoodId = createItemById(world, "fuel_firewood");
+  addToInventory(world, actor, flintId);
+  addToInventory(world, actor, firewoodId);
+
+  const targets = listApplyTargetsForTool(world, actor, flintId);
+  assertEquals(targets.length, 0);
+  assertEquals(isApplyTool(world, actor, flintId), true);
+});
+
 Deno.test("apply tool detection keeps touchstone selectable with zero targets", () => {
   const world = new World({ seed: 7304 });
   const actor = createActorWithInventory(world);

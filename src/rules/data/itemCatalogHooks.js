@@ -9,12 +9,16 @@ import { Beatitude } from "../components/Beatitude.js";
 import { CreatureType } from "../components/CreatureType.js";
 import { Equipment, GEAR_SLOTS } from "../components/Equipment.js";
 import { ItemCooldown } from "../components/ItemCooldown.js";
+import { Material } from "../components/Material.js";
+import { MaterialState } from "../components/MaterialState.js";
 import { Vitality } from "../components/Vitality.js";
 import { Stamina } from "../components/Stamina.js";
 import { Mana } from "../components/Mana.js";
+import { Position } from "../components/Position.js";
+import { WeatherState } from "../components/WeatherState.js";
 import { createStatusEvent } from "../../shared/events/statusEvent.js";
 import { getPassiveBonuses } from "../utils/passiveBonuses.js";
-import { markWet } from "../utils/wetTileMap.js";
+import { isWetAt, markWet } from "../utils/wetTileMap.js";
 import {
   emitScrollReadFailure,
   getScrollReadingQualityFromContext,
@@ -394,6 +398,229 @@ export function resolveApplyTargetName(ctx, state, fallback = "item") {
   const fromIdentity = String(state?.targetIdentity || "").trim();
   if (fromIdentity) return fromIdentity.replace(/_/g, " ");
   return String(fallback || "item");
+}
+
+const CAMPFIRE_WOOD_IDENTITIES = Object.freeze(new Set([
+  "fuel_firewood",
+  "material_lumber",
+]));
+
+const CAMPFIRE_METAL_MATERIALS = Object.freeze(new Set([
+  "metal",
+  "iron",
+  "steel",
+  "bronze",
+  "silver",
+  "gold",
+  "copper",
+  "lead",
+]));
+
+/**
+ * @param {string} value
+ */
+function isCampfireWoodIdentity(value) {
+  return CAMPFIRE_WOOD_IDENTITIES.has(String(value || "").toLowerCase());
+}
+
+/**
+ * @param {any} ctx
+ * @param {number} actor
+ */
+function resolveWieldedCampfireStriker(ctx, actor) {
+  const eq = ctx?.query?.get?.(actor, Equipment);
+  const weaponId = Number(eq?.weapon || 0) | 0;
+  if (!(weaponId > 0) || !ctx?.query?.alive?.(weaponId)) return null;
+
+  const info = ctx.query.itemInfo?.(weaponId);
+  const slot = String(info?.slot || "").toLowerCase();
+  const type = String(info?.type || "").toLowerCase();
+  if (slot !== "weapon" && type !== "weapon" && type !== "equip") return null;
+
+  const material = String(ctx.query.get?.(weaponId, Material)?.kind || info?.material || "").toLowerCase();
+  if (!CAMPFIRE_METAL_MATERIALS.has(material)) return null;
+
+  return {
+    itemId: weaponId,
+    material,
+    name: String(ctx.query.name?.(weaponId) || "weapon"),
+  };
+}
+
+/**
+ * @param {any} world
+ */
+function currentWeather(world) {
+  if (!world || typeof world.query !== "function") return "clear";
+  for (const [, weather] of world.query(WeatherState)) {
+    return String(weather?.current || "clear").toLowerCase();
+  }
+  return "clear";
+}
+
+/**
+ * @param {any} ctx
+ * @param {number} actor
+ * @param {number} woodId
+ */
+function resolveCampfireDampReason(ctx, actor, woodId) {
+  const weather = currentWeather(ctx?.world);
+  if (weather === "heavy_rain") return { reason: "heavy_rain", weather };
+  if (weather === "rain") return { reason: "rain", weather };
+
+  const woodState = ctx?.query?.get?.(woodId, MaterialState);
+  if (Number(woodState?.wetness || 0) >= 0.35) {
+    return { reason: "wet_fuel", weather };
+  }
+
+  const pos = ctx?.query?.get?.(actor, Position);
+  if (pos && isWetAt(ctx.world, pos.x | 0, pos.y | 0)) {
+    return { reason: "wet_ground", weather };
+  }
+
+  return { reason: "", weather };
+}
+
+/**
+ * @param {any} state
+ */
+export function canCampfireDipTarget(state) {
+  if (!isCampfireWoodIdentity(state?.targetIdentity)) return false;
+  const weaponId = Number(state?.actorEquipment?.weapon || 0) | 0;
+  if (!(weaponId > 0)) return false;
+  const weaponInfo = state?.weaponInfo;
+  const slot = String(weaponInfo?.slot || "").toLowerCase();
+  const type = String(weaponInfo?.type || "").toLowerCase();
+  if (slot !== "weapon" && type !== "weapon" && type !== "equip") return false;
+  const material = String(state?.weaponMaterial || weaponInfo?.material || "").toLowerCase();
+  return CAMPFIRE_METAL_MATERIALS.has(material);
+}
+
+/**
+ * @param {{
+ *   turnsLeft?: number,
+ *   tickDamage?: number,
+ * }} [opts]
+ */
+export function createCampfireDipHook(opts = {}) {
+  const turnsLeft = Math.max(1, Number(opts?.turnsLeft ?? 8) | 0);
+  const tickDamage = Math.max(0, Number(opts?.tickDamage ?? 1) | 0);
+
+  return (ctx, state) => {
+    const actor = Number(state?.actor || ctx.actor || 0) | 0;
+    const toolId = Number(state?.toolId || ctx.primary || 0) | 0;
+    const woodId = Number(state?.targetId || ctx.target || 0) | 0;
+    if (!(actor > 0) || !(toolId > 0) || !(woodId > 0)) {
+      ctx.cancel({ code: "CAMPFIRE_INVALID", message: "You need flint, wood, and a free hand to make a campfire." });
+      return { applied: false, consumedTool: false, resultType: "campfire_failed" };
+    }
+    if (!isCampfireWoodIdentity(state?.targetIdentity)) {
+      ctx.cancel({ code: "CAMPFIRE_NEEDS_WOOD", message: "You need firewood or lumber to start a campfire." });
+      return { applied: false, consumedTool: false, resultType: "campfire_failed" };
+    }
+
+    const striker = resolveWieldedCampfireStriker(ctx, actor);
+    if (!striker) {
+      ctx.cancel({ code: "CAMPFIRE_NEEDS_METAL_WEAPON", message: "You need a wielded metal weapon to strike sparks from the flint." });
+      return { applied: false, consumedTool: false, resultType: "campfire_failed" };
+    }
+
+    const actorPos = ctx.query.get?.(actor, Position) || { x: 0, y: 0 };
+    const at = { x: actorPos.x | 0, y: actorPos.y | 0 };
+    const damp = resolveCampfireDampReason(ctx, actor, woodId);
+    if (damp.reason) {
+      const woodName = resolveApplyTargetName(ctx, state, "wood");
+      const reasonText = damp.reason === "heavy_rain"
+        ? "The downpour hammers the sparks flat before they can catch."
+        : damp.reason === "rain"
+          ? "Rain beads on the wood and the sparks die into smoke."
+          : damp.reason === "wet_ground"
+            ? "The wet ground drinks the heat before the kindling can catch."
+            : "The wood is too damp. Sparks crawl over it and gutter out.";
+      const message = `You strike ${striker.name} against the flint. ${reasonText}`;
+      ctx.io.emit("skill:campfire:spark", {
+        actor,
+        toolId,
+        woodId,
+        strikerId: striker.itemId,
+        at,
+        success: false,
+        reason: damp.reason,
+        weather: damp.weather,
+        message,
+      });
+      ctx.io.emit("item:applied", {
+        actor,
+        toolId,
+        targetId: woodId,
+        result: {
+          type: "campfire_failed",
+          message,
+          reason: damp.reason,
+          consumedWood: false,
+          strikerId: striker.itemId,
+        },
+      });
+      return { applied: true, consumedTool: false, resultType: "campfire_failed" };
+    }
+
+    ctx.helpers.hazardSpawn({
+      kind: "fire",
+      medium: "floor",
+      turnsLeft,
+      radius: 0,
+      tickDamage,
+      damageType: "fire",
+      cause: "skill:campfire",
+      sourceId: actor,
+      sourceKind: "campfire",
+      identity: "campfire",
+      name: "Campfire",
+      meta: {
+        source: "skill:campfire",
+        toolId,
+        woodId,
+        strikerId: striker.itemId,
+        strikerMaterial: striker.material,
+        fireSpreadChance: 0,
+      },
+    }, at);
+    ctx.helpers.consume(woodId, actor);
+
+    const woodName = resolveApplyTargetName(ctx, state, "wood");
+    const message = `You strike ${striker.name} against the flint. Sparks catch in the ${woodName}.`;
+    ctx.io.emit("skill:campfire:spark", {
+      actor,
+      toolId,
+      woodId,
+      strikerId: striker.itemId,
+      at,
+      success: true,
+      reason: "",
+      weather: damp.weather,
+      message,
+    });
+    ctx.io.emit("skill:campfire", {
+      actor,
+      toolId,
+      woodId,
+      strikerId: striker.itemId,
+      at,
+      result: { type: "campfire", message },
+    });
+    ctx.io.emit("item:applied", {
+      actor,
+      toolId,
+      targetId: woodId,
+      result: {
+        type: "campfire",
+        message,
+        consumedWood: true,
+        strikerId: striker.itemId,
+      },
+    });
+    return { applied: true, consumedTool: false, resultType: "campfire" };
+  };
 }
 
 /**

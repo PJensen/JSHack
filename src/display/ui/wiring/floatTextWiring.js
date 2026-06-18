@@ -1319,6 +1319,39 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
 
   // ── Weather / environment ───────────────────────────────────────────
 
+  world.on('skill:campfire:spark', ({ at, success, reason }) => {
+    if (!at || !canShowAt(at.x, at.y)) return;
+    const ok = success === true;
+    const label = ok ? 'SPARK!' : (String(reason || '') === 'rain' || String(reason || '') === 'heavy_rain' ? 'HISS...' : 'SMOKE');
+    ftext.addStatus(at.x, at.y - 0.35, label, {
+      color: ok ? '#ffcf6a' : '#9aa3ad',
+      life: ok ? 0.75 : 0.95,
+      scaleStart: ok ? 1.15 : 1.0,
+      scaleEnd: 0.75,
+    });
+    if (!fx?.pool) return;
+    const count = ok ? 18 : 10;
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = ok ? (0.55 + Math.random() * 1.1) : (0.10 + Math.random() * 0.35);
+      fx.pool.spawn(new Particle({
+        x: at.x + (Math.random() - 0.5) * 0.18,
+        y: at.y - 0.15 + (Math.random() - 0.5) * 0.12,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - (ok ? 0.45 : 0.18),
+        ax: 0,
+        ay: ok ? 1.5 : -0.15,
+        life: ok ? 0.25 + Math.random() * 0.25 : 0.5 + Math.random() * 0.35,
+        size0: ok ? 0.08 : 0.12,
+        size1: ok ? 0.02 : 0.22,
+        r: ok ? 255 : 130,
+        g: ok ? 190 : 138,
+        b: ok ? 72 : 148,
+        a0: ok ? 0.95 : 0.42,
+      }));
+    }
+  });
+
   world.on('weather:lightning', ({ x, y, hitCount }) => {
     if (!canShowAt(x, y)) return;
     ftext.addStatus(x, y - 0.45, (hitCount | 0) > 0 ? 'ZAP!' : 'CRACK!', {

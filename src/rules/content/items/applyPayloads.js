@@ -4,6 +4,7 @@ import { inventoryItems, inventoryContains } from "../../utils/inventoryFacade.j
 import { Equipment, GEAR_SLOTS } from "../../components/Equipment.js";
 import { getItemHooksByIdentity } from "./itemHooks.js";
 import { Beatitude } from "../../components/Beatitude.js";
+import { Material } from "../../components/Material.js";
 
 /**
  * @typedef {{
@@ -55,6 +56,9 @@ export function buildApplyPayloadState(reader, spec) {
     toolInfo: reader?.itemInfo?.(toolId),
     targetInfo: reader?.itemInfo?.(targetId),
     targetBeatitude: String(reader?.beatitude?.(targetId) || ""),
+    actorEquipment: reader?.equipment?.(actor),
+    weaponInfo: reader?.itemInfo?.(Number(reader?.equipment?.(actor)?.weapon || 0) | 0),
+    weaponMaterial: String(reader?.material?.(Number(reader?.equipment?.(actor)?.weapon || 0) | 0) || ""),
   };
 }
 
@@ -118,6 +122,12 @@ function createWorldApplyPayloadReader(world) {
     },
     beatitude(entityId) {
       return /** @type any */ (world.get(entityId | 0, Beatitude))?.state || '';
+    },
+    equipment(entityId) {
+      return /** @type any */ (world.get(entityId | 0, Equipment));
+    },
+    material(entityId) {
+      return /** @type any */ (world.get(entityId | 0, Material))?.kind || "";
     },
   };
 }

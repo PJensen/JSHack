@@ -1,5 +1,8 @@
 import { Inventory } from "../../components/Inventory.js";
 import { ItemInfo } from "../../components/ItemInfo.js";
+import { Beatitude } from "../../components/Beatitude.js";
+import { Equipment } from "../../components/Equipment.js";
+import { Material } from "../../components/Material.js";
 import { NamedIdentity } from "../../components/NamedIdentity.js";
 import { Position } from "../../components/Position.js";
 import { Vitality } from "../../components/Vitality.js";
@@ -138,6 +141,15 @@ export function createFacets(init) {
     },
     itemInfo(entityId) {
       return /** @type any */ (world.get(entityId | 0, ItemInfo));
+    },
+    beatitude(entityId) {
+      return /** @type any */ (world.get(entityId | 0, Beatitude))?.state || "";
+    },
+    equipment(entityId) {
+      return /** @type any */ (world.get(entityId | 0, Equipment));
+    },
+    material(entityId) {
+      return /** @type any */ (world.get(entityId | 0, Material))?.kind || "";
     },
     identity(entityId) {
       const ni = /** @type any */ (world.get(entityId | 0, NamedIdentity));

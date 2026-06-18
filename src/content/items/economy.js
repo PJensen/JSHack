@@ -1,6 +1,12 @@
 // Economy, material, food, seed, reagent, relic, and junk items.
 import { defineItem } from '../define.js';
-import { canTouchstoneDipTarget, createTouchstoneDipHook, EAT_ON_USE } from '../../rules/data/itemCatalogHooks.js';
+import {
+  canCampfireDipTarget,
+  canTouchstoneDipTarget,
+  createCampfireDipHook,
+  createTouchstoneDipHook,
+  EAT_ON_USE,
+} from '../../rules/data/itemCatalogHooks.js';
 
 // ── Relics (quest items) ──────────────────────────────────────────────
 
@@ -8,6 +14,12 @@ defineItem('stone_touchstone', {
   name: 'Touchstone', type: 'tool', material: 'mineral', rarity: 'common', value: 45, weight: 10,
   description: 'A gray stone used to identify gem quality by streak and hardness.',
   hooks: { can_dip_target: canTouchstoneDipTarget, on_dip: createTouchstoneDipHook() },
+});
+
+defineItem('stone_flint', {
+  name: 'Flint Stone', type: 'tool', material: 'quartz', rarity: 'common', value: 1, weight: 10,
+  description: 'A sharp-edged gray stone that throws sparks from struck metal.',
+  hooks: { can_dip_target: canCampfireDipTarget, on_dip: createCampfireDipHook() },
 });
 
 defineItem('lockpick', {
