@@ -21,6 +21,12 @@
       "transcript": "/b5/880d7e4b2a/1/full.jsonl",
       "content_hash": "/b5/880d7e4b2a/1/content_hash.txt",
       "prompt": "/b5/880d7e4b2a/1/prompt.txt"
+    },
+    {
+      "metadata": "/b5/880d7e4b2a/2/metadata.json",
+      "transcript": "/b5/880d7e4b2a/2/full.jsonl",
+      "content_hash": "/b5/880d7e4b2a/2/content_hash.txt",
+      "prompt": ""
     }
   ],
   "token_usage": {
