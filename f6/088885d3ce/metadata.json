@@ -1,0 +1,31 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "f6088885d3ce",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "src/content/items/economy.js",
+    "src/display/ui/wiring/floatTextWiring.js",
+    "src/rules/content/items/applyPayloads.js",
+    "src/rules/data/itemCatalogHooks.js",
+    "src/rules/interaction/facets/createFacets.js",
+    "tests/applyDataDriven.test.mjs",
+    "tests/applyResolverAgreement.test.mjs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/f6/088885d3ce/0/metadata.json",
+      "transcript": "/f6/088885d3ce/0/full.jsonl",
+      "content_hash": "/f6/088885d3ce/0/content_hash.txt",
+      "prompt": "/f6/088885d3ce/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 253093,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 3980544,
+    "output_tokens": 15627,
+    "api_call_count": 39
+  }
+}
