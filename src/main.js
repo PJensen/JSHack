@@ -3939,6 +3939,37 @@ function drawFacingDot(ctx, entity) {
   ctx.restore();
 }
 
+function drawDungeonEntranceBadge(ctx, entity) {
+  const badge = entity?.entranceBadge || null;
+  if (!badge) return;
+  const level = Math.max(1, Number(badge.level || 1) | 0);
+  const floors = Math.max(1, Number(badge.floors || level) | 0);
+  const label = String(Math.min(level, 9));
+  const x = entity.pos.x + 0.27;
+  const y = entity.pos.y + 0.28;
+  const color = String(badge.color || '#70d6ff');
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = 'rgba(8,10,14,0.88)';
+  ctx.beginPath();
+  ctx.arc(x, y, 0.16, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(x, y, 0.12, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = floors > 1 ? 'rgba(255,255,255,0.82)' : 'rgba(255,255,255,0.35)';
+  ctx.lineWidth = 0.025;
+  ctx.stroke();
+  ctx.fillStyle = '#111318';
+  ctx.font = '700 0.16px monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, x, y + 0.004);
+  ctx.restore();
+}
+
 function drawStoneskinWardAura(ctx, entity, fxTime) {
   const pulse = 0.5 + 0.5 * Math.sin(fxTime * 2.3 + (entity.id | 0) * 0.71);
   const cx = entity.pos.x;
@@ -4915,6 +4946,7 @@ function render(worldView) {
 
     drawFlyingShadow(bctx, flyingPresentation);
     drawEntityGlyph(glyphAtlas, bctx, renderEntity, entityScale, entityRotation);
+    drawDungeonEntranceBadge(bctx, renderEntity);
     if (_rp) _rp.entitiesDrawn++;
     if (shouldPostLightingRedrawKind(palette, renderEntity.kind, { isOverworld: !!worldView.isOverworld, layer: renderEntity.layer })) {
       _postLightingGlyphs.push({

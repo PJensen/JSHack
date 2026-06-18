@@ -219,9 +219,13 @@ export function generateFloorPlan(worldSeed, depth, priorDownStairPositions = nu
   const stairOffset = Math.floor(growthBudget / 2);
 
   // Down stairs: generate minDownStairs–maxDownStairs per floor, each with an independent
-  // chunk offset so they spread across the floor on deeper levels.
+  // chunk offset so they spread across the floor on deeper floors.
   // At shallow depths (stairOffset = 0) they share chunk (0,0) and land in different rooms.
-  const count = template ? 0 : rng.int(dungeonConfig.minDownStairs, dungeonConfig.maxDownStairs);
+  const templateFloors = Math.max(1, Number(template?.floors ?? 1) | 0);
+  const isTemplateTerminalFloor = !!template && depth >= templateFloors;
+  const count = template
+    ? (isTemplateTerminalFloor ? 0 : 1)
+    : rng.int(dungeonConfig.minDownStairs, dungeonConfig.maxDownStairs);
   const downStairs = [];
   const _usedChunks = new Set();
   for (let i = 0; i < count; i++) {
@@ -284,7 +288,7 @@ export function generateFloorPlan(worldSeed, depth, priorDownStairPositions = nu
   const allChunkPositions = [...downStairs, ...upStairs, { chunkX: anchorChunkX, chunkY: anchorChunkY }];
   let extent = expandExtentToInclude(buildCenteredExtent(anchorChunkX, anchorChunkY, paddingX, paddingY), allChunkPositions);
   if (template) {
-    const radius = Math.max(0, Math.ceil(Math.max(1, Number(template.length || 1)) / 6) - 1);
+    const radius = Math.max(0, Math.ceil(Math.max(1, Number(template.floors || 1)) / 6) - 1);
     extent = {
       minCX: anchorChunkX - radius,
       maxCX: anchorChunkX + radius,
@@ -346,6 +350,7 @@ export function generateFloorPlan(worldSeed, depth, priorDownStairPositions = nu
     regionAnchorY: anchorY,
     regionKey: floorRegionKey(depth, anchorX, anchorY, template?.templateId || ""),
     roomTarget: Number(template?.roomTarget || 0) | 0,
+    floors: templateFloors,
   };
 }
 

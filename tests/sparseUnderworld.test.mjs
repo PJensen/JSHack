@@ -7,10 +7,13 @@ import { Player } from "../src/rules/components/Player.js";
 import { DungeonEntrance } from "../src/rules/components/DungeonEntrance.js";
 import { DungeonState } from "../src/rules/components/DungeonState.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
+import { buildWorldView } from "../src/bridge/schema/worldView.js";
 import { initDungeon } from "../src/rules/environment/dungeon/index.js";
+import { generateFloorPlan } from "../src/rules/environment/dungeon/floorPlan.js";
 import { transitionToDepth, clearFloorCache } from "../src/rules/environment/dungeon/transition.js";
 import { clearAll, setTile, getTile, loadedChunkCount } from "../src/rules/environment/dungeon/tileMap.js";
 import { TILE_FLOOR, TILE_VOID, TILE_WALL } from "../src/rules/environment/dungeon/constants.js";
+import { getUnderworldRegionTemplate } from "../src/rules/environment/dungeon/underworldRegions.js";
 import { markDestroyedTile } from "../src/rules/utils/destroyedTiles.js";
 import { markWet, isWetAt } from "../src/rules/utils/wetTileMap.js";
 
@@ -58,6 +61,7 @@ Deno.test("overworld stairs carry authored underworld entrance metadata", async 
   }
 
   assertEquals(tavern.entrance.targetDepth, 1);
+  assertEquals(tavern.entrance.floors, 3);
   assertEquals(crypt.entrance.targetDepth, 1);
   assert(tavern.pos.x !== crypt.pos.x || tavern.pos.y !== crypt.pos.y, "starter entrances should be distinct overworld anchors");
   for (const templateId of [
@@ -72,6 +76,49 @@ Deno.test("overworld stairs carry authored underworld entrance metadata", async 
   ]) {
     assert(templates.has(templateId), `overworld should place ${templateId} entrance metadata`);
   }
+});
+
+Deno.test("underworld templates author floor count, population count, and trap presence", () => {
+  const tavern = getUnderworldRegionTemplate("tavern_basement");
+  const bandits = getUnderworldRegionTemplate("bandit_hideout");
+
+  assertEquals(tavern.floors, 3);
+  assertEquals(tavern.content.monsters[0], { id: "rat", count: 12 });
+  assertEquals(tavern.content.trapsPresent, false);
+  assertEquals(tavern.content.traps.length, 0);
+  assertEquals(bandits.content.trapsPresent, true);
+  assert(bandits.content.traps.length > 0, "trap-present authored dungeon should list concrete traps");
+});
+
+Deno.test("authored underworld floor count controls generated down-stairs", () => {
+  const seed = 0x7272;
+  const opts = { templateId: "tavern_basement", anchorX: 64, anchorY: 64 };
+  const first = generateFloorPlan(seed, 1, [{ x: 64, y: 64 }], opts);
+  const second = generateFloorPlan(seed, 2, [{ x: 64, y: 64 }], opts);
+  const third = generateFloorPlan(seed, 3, [{ x: 64, y: 64 }], opts);
+
+  assertEquals(first.floors, 3);
+  assertEquals(first.downStairs.length, 1);
+  assertEquals(second.downStairs.length, 1);
+  assertEquals(third.downStairs.length, 0);
+});
+
+Deno.test("world view projects entrance floor badge metadata", async () => {
+  clearFloorCache();
+  clearAll();
+  const world = new World({ seed: 0x5353 });
+  const spawn = await initDungeon(world, { startDepth: 0 });
+  const player = addPlayer(world, spawn.x, spawn.y);
+
+  const tavern = entranceByTemplate(world, "tavern_basement");
+  world.set(player, Position, tavern.pos);
+  const view = buildWorldView(world);
+  const rec = view.entities.find((entity) => entity.id === tavern.id);
+
+  assert(rec, "tavern entrance should be projected");
+  assertEquals(rec.entranceBadge.level, 1);
+  assertEquals(rec.entranceBadge.floors, 3);
+  assert(rec.tags.includes("dungeon_entrance"), "entrance should carry display tag");
 });
 
 Deno.test("depth one sparse regions are distinct by entrance anchor and template", async () => {
@@ -124,7 +171,7 @@ Deno.test("authored starter regions produce targeted content", async () => {
     anchorX: tavern.entrance.anchorX,
     anchorY: tavern.entrance.anchorY,
   });
-  assert(countIdentity(world, "rat") >= 5, "tavern basement should be rat-heavy");
+  assert(countIdentity(world, "rat") >= 10, "tavern basement should be rat-heavy");
   assert(countIdentity(world, "skeleton") >= 3, "graveyard crypt should be resident on the same depth-one plane");
   assert(countIdentity(world, "book_dead") >= 1, "graveyard crypt objective should be resident with the depth-one plane");
 

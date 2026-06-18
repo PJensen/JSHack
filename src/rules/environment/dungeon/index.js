@@ -173,7 +173,7 @@ export async function generateFloor(world, worldSeed, depth, tombstoneRepo = nul
         templateId: template.templateId,
         label: template.label,
         type: template.type,
-        length: template.length,
+        floors: template.floors,
         biome: template.biome,
         monsterTier: template.monsterTier,
         lootTier: template.lootTier,

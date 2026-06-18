@@ -30,6 +30,7 @@ import { getMonsterTags, getMonster } from '../../rules/data/monsters.js';
 import { Flying } from '../../rules/components/Flying.js';
 import { hasOverworldAerialLOS } from '../../rules/utils/flyingEligibility.js';
 import { DungeonState } from "../../rules/components/DungeonState.js";
+import { DungeonEntrance } from "../../rules/components/DungeonEntrance.js";
 import { TURNS_PER_DAY, PHASE_BOUNDS, DAYS_PER_MONTH, getMoonPhase } from "../../rules/data/calendar.js";
 import { QuestBindings } from "../../rules/components/QuestBindings.js";
 import { QuestState } from "../../rules/components/QuestState.js";
@@ -73,7 +74,7 @@ import {
 } from "../../rules/environment/dungeon/perceptionMemory.js";
 
 // Reuse view/record objects across frames to reduce allocations/GC churn.
-/** @typedef {{ id:number, kind:string, pos:{x:number,y:number}, tags:string[], layer:number, hp:number, maxHp:number, isPet:boolean, showHealthBar:boolean, facing:{dx:number,dy:number}|null, aggroLevel:string, aggroTargetId:number, aggroTargetReason:string, threatState:string, targetLocked:boolean, weaponVfx:any[]|null, itemScale:number, rotation:number, visualOff:{dx:number,dy:number} }} EntityView */
+/** @typedef {{ id:number, kind:string, pos:{x:number,y:number}, tags:string[], layer:number, hp:number, maxHp:number, isPet:boolean, showHealthBar:boolean, facing:{dx:number,dy:number}|null, aggroLevel:string, aggroTargetId:number, aggroTargetReason:string, threatState:string, targetLocked:boolean, weaponVfx:any[]|null, itemScale:number, rotation:number, visualOff:{dx:number,dy:number}, entranceBadge?:{level:number,floors:number,color:string} }} EntityView */
 /** @typedef {{ id:number, x:number, y:number }} SolidView */
 /** @typedef {{ x:number, y:number, kind:string, alpha:number, burning?:boolean, smoking?:boolean }} RoofTileView */
 /** @typedef {{ id:number, profile:string, pos:{x:number,y:number}, interior:boolean }} AudioEmitterView */
@@ -88,6 +89,20 @@ let _lastPerceptionWorld = null;
 /** @type {Map<number, EntityView>} */
 const _entityRecs = new Map();   // id -> { id, kind, pos:{x,y}, tags:[] }
 const _zeroOff = Object.freeze({ dx: 0, dy: 0 });
+const ENTRANCE_BADGE_COLORS = Object.freeze(["#70d6ff", "#a7f070", "#ffd166", "#ef476f", "#b995ff"]);
+
+function projectDungeonEntranceBadge(world, id, rec) {
+	const entrance = /** @type {any} */ (world.get(id, DungeonEntrance));
+	if (!entrance) {
+		rec.entranceBadge = null;
+		return;
+	}
+	const targetDepth = Math.max(1, Number(entrance.targetDepth || 1) | 0);
+	const floors = Math.max(1, Number(entrance.floors || 1) | 0);
+	const color = ENTRANCE_BADGE_COLORS[(targetDepth - 1) % ENTRANCE_BADGE_COLORS.length] || ENTRANCE_BADGE_COLORS[0];
+	rec.entranceBadge = { level: targetDepth, floors, color };
+	if (!rec.tags.includes("dungeon_entrance")) rec.tags.push("dungeon_entrance");
+}
 const _questGiverIds = new Set(); // entity IDs that are active quest givers
 /** @type {Map<number, SolidView>} */
 const _solidRecs = new Map();    // id -> { id, x, y }
@@ -1154,6 +1169,7 @@ export function buildWorldView(world) {
 				rec.itemScale = iScale;
 				rec.rotation = 0;
 				rec.visualOff = vOff;
+				rec.entranceBadge = null;
 			}
 
 			// Project select status types into tags for display-only logic.
@@ -1166,6 +1182,7 @@ export function buildWorldView(world) {
 			projectCombatUi(world, id, rec, playerFactionKey);
 			projectAggroUi(world, id, rec);
 			projectProcStateTags(world, id, rec);
+			projectDungeonEntranceBadge(world, id, rec);
 			// Placed torches get the torch tag for particle/light sync
 			if (kind === 'torch' && !rec.tags.includes('torch')) {
 				rec.tags.push('torch');
@@ -1285,6 +1302,7 @@ export function buildWorldView(world) {
 				rec.itemScale = iScale2;
 				rec.rotation = 0;
 				rec.visualOff = vOff2;
+				rec.entranceBadge = null;
 			}
 
 			// Project select status types into tags for display-only logic.
@@ -1297,6 +1315,7 @@ export function buildWorldView(world) {
 			projectCombatUi(world, id, rec, '');
 			projectAggroUi(world, id, rec);
 			projectProcStateTags(world, id, rec);
+			projectDungeonEntranceBadge(world, id, rec);
 			projectFacing(world, id, rec);
 			const petState2 = /** @type {any} */ (world.get(id, PetState));
 			const isFamiliar2 = String(rec.kind || "").toLowerCase() === "familiar";

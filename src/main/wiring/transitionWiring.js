@@ -12,6 +12,7 @@ import { Vitality } from "../../rules/components/Vitality.js";
 import { Player } from "../../rules/components/Player.js";
 import { Pet } from "../../rules/components/Pet.js";
 import { PetState } from "../../rules/components/PetState.js";
+import { getUnderworldRegionTemplate } from "../../rules/environment/dungeon/underworldRegions.js";
 
 const RETURN_PORTAL_IDENTITY = 'return_portal';
 const STAIR_TRANSITION_COOLDOWN_MS = 220;
@@ -175,7 +176,12 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
 
     try {
       let currentDepth = 1;
-      for (const [, state] of world.query(DungeonState)) { currentDepth = state.currentDepth; break; }
+      let currentState = null;
+      for (const [, state] of world.query(DungeonState)) {
+        currentDepth = state.currentDepth;
+        currentState = state;
+        break;
+      }
 
       let newDepth = currentDepth;
       if (Number.isFinite(pending.targetDepth)) {
@@ -187,6 +193,10 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
       } else if (pending.direction === 'up') {
         newDepth = currentDepth - 1;
       }
+      const activeTemplateId = String(pending.entrance?.templateId || currentState?.activeTemplateId || "");
+      const activeTemplate = getUnderworldRegionTemplate(activeTemplateId);
+      const templateFloors = Math.max(1, Number(activeTemplate?.floors ?? 0) | 0);
+      if (pending.direction === 'down' && activeTemplate && currentDepth >= templateFloors) return;
       if (newDepth < 0 || newDepth === currentDepth) return;
 
       const hasTargetPos = Number.isFinite(pending.targetPos?.x) && Number.isFinite(pending.targetPos?.y);
@@ -211,9 +221,9 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
           direction,
           stairPos: pending.stairPos || null,
           tombstoneRepo,
-          templateId: pending.entrance?.templateId || "",
-          anchorX: pending.entrance ? (Number(pending.entrance.anchorX || pending.stairPos?.x || 0) | 0) : undefined,
-          anchorY: pending.entrance ? (Number(pending.entrance.anchorY || pending.stairPos?.y || 0) | 0) : undefined,
+          templateId: activeTemplateId,
+          anchorX: activeTemplateId ? (Number(pending.entrance?.anchorX ?? currentState?.regionAnchorX ?? pending.stairPos?.x ?? 0) | 0) : undefined,
+          anchorY: activeTemplateId ? (Number(pending.entrance?.anchorY ?? currentState?.regionAnchorY ?? pending.stairPos?.y ?? 0) | 0) : undefined,
         });
       }
 
