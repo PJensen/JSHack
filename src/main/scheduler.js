@@ -43,6 +43,7 @@ import { aiCorpseEatSystem } from "../rules/systems/aiCorpseEatSystem.js";
 import { aiFlyingSystem } from "../rules/systems/aiFlyingSystem.js";
 import { jumpScareSystem } from "../rules/systems/jumpScareSystem.js";
 import { lifespanSystem } from "../rules/systems/lifespanSystem.js";
+import { temporarySpawnExpirySystem } from "../rules/systems/temporarySpawnExpirySystem.js";
 import { voidHoleSystem } from "../rules/systems/voidHoleSystem.js";
 import { knockbackSystem } from "../rules/systems/knockbackSystem.js";
 import { soundPropagationSystem } from "../rules/systems/soundPropagationSystem.js";
@@ -317,6 +318,8 @@ export function configureWorld(world) {
   registerSystem(cleanupSystem, 'cleanup');
   // Lifespan countdown and entity removal (before spatial index sync).
   registerSystem(lifespanSystem, 'cleanup');
+  // Temporary materialized spawns expire on absolute world turns.
+  registerSystem(temporarySpawnExpirySystem, 'cleanup', { after: [lifespanSystem], before: [spatialIndexSystem] });
   // Keep spatial index in sync after structural changes
   registerSystem(spatialIndexSystem, 'cleanup');
 

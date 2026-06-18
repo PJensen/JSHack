@@ -12,9 +12,12 @@ import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { ApplyIntent } from "../src/rules/components/Intents/ApplyIntent.js";
 import { InteractIntent } from "../src/rules/components/Intents/InteractIntent.js";
 import { Position } from "../src/rules/components/Position.js";
+import { TemporarySpawn } from "../src/rules/components/TemporarySpawn.js";
 import { WeatherState } from "../src/rules/components/WeatherState.js";
 import { applySystem } from "../src/rules/systems/applySystem.js";
 import { interactionSystem } from "../src/rules/systems/interactionSystem.js";
+import { temporarySpawnExpirySystem } from "../src/rules/systems/temporarySpawnExpirySystem.js";
+import { TURNS_PER_DAY } from "../src/rules/data/calendar.js";
 import { isIdentified, resetIdentification } from "../src/rules/data/identification.js";
 import { addToInventory, inventoryContains } from "../src/rules/utils/inventoryFacade.js";
 import { CHUNK_SIZE, TILE_FLOOR } from "../src/rules/environment/dungeon/constants.js";
@@ -31,6 +34,16 @@ function cookingFires(world) {
     if (String(identity?.identity || "") === "cooking_fire") out.push({ id, pos });
   }
   return out;
+}
+
+function identitiesAt(world, x, y) {
+  const out = [];
+  for (const [, pos, identity] of world.query(Position, NamedIdentity)) {
+    if ((pos.x | 0) === (x | 0) && (pos.y | 0) === (y | 0)) {
+      out.push(String(identity?.identity || ""));
+    }
+  }
+  return out.sort();
 }
 
 Deno.test("touchstone apply hook identifies gem targets", () => {
@@ -135,6 +148,18 @@ Deno.test("flint applied to wood with wielded metal weapon creates a campfire", 
   assertEquals(campfires.length, 1);
   assertEquals(campfires[0].pos, { x: 5, y: 7 });
   assertEquals(world.get(campfires[0].id, Interactable)?.action, "cookFood");
+  const temp = world.get(campfires[0].id, TemporarySpawn);
+  assert(temp, "flint-created cooking fire should be temporary");
+  assert(
+    temp.expiresAtTurn >= Math.floor(TURNS_PER_DAY / 2) - Math.floor(TURNS_PER_DAY / 24),
+    "campfire expiry should not jitter earlier than eleven game hours",
+  );
+  assert(
+    temp.expiresAtTurn <= Math.floor(TURNS_PER_DAY / 2) + Math.floor(TURNS_PER_DAY / 24),
+    "campfire expiry should not jitter later than thirteen game hours",
+  );
+  assertEquals(temp.replacementKind, "ashes");
+  assertEquals(temp.source, "stone_flint");
 
   world.add(actor, InteractIntent, { targetId: campfires[0].id });
   interactionSystem(world);
@@ -169,6 +194,41 @@ Deno.test("flint campfire apply works without a wielded metal weapon", () => {
   assertEquals(campfires.length, 1);
   assertEquals(campfires[0].pos, { x: 3, y: 2 });
   assertEquals(world.get(campfires[0].id, Interactable)?.action, "cookFood");
+});
+
+Deno.test("flint-created cooking fire expires into ashes after twelve game hours", () => {
+  loadFlatFloor();
+  const world = new World({ seed: 10041 });
+  const actor = world.create();
+  world.add(actor, Position, { x: 2, y: 2 });
+  world.add(actor, Inventory, { items: [], maxWeight: 100 });
+
+  const flint = createItemById(world, "stone_flint");
+  const wood = createItemById(world, "fuel_firewood");
+  assert(flint != null, "flint should be creatable");
+  assert(wood != null, "firewood should be creatable");
+  addToInventory(world, actor, flint);
+  addToInventory(world, actor, wood);
+
+  world.add(actor, ApplyIntent, { itemId: flint, targetItemId: wood });
+  applySystem(world);
+
+  const campfires = cookingFires(world);
+  assertEquals(campfires.length, 1);
+  const fireId = campfires[0].id;
+  const temp = world.get(fireId, TemporarySpawn);
+  assert(temp, "campfire should carry temporary metadata");
+  const due = temp.expiresAtTurn | 0;
+  assert(world.isAlive(fireId), "campfire should exist before expiry");
+
+  world.step = due - 1;
+  temporarySpawnExpirySystem(world);
+  assert(world.isAlive(fireId), "campfire should survive until its due turn");
+
+  world.step = due;
+  temporarySpawnExpirySystem(world);
+  assert(!world.isAlive(fireId), "campfire should expire on its due turn");
+  assertEquals(identitiesAt(world, 3, 2), ["ashes"]);
 });
 
 Deno.test("flint campfire attempt in rain emits sparks but does not consume wood", () => {

@@ -19,6 +19,7 @@ import { ItemInfo } from "../components/ItemInfo.js";
 import { Material } from "../components/Material.js";
 import { Position } from "../components/Position.js";
 import { Potion } from "../components/Potion.js";
+import { TemporarySpawn } from "../components/TemporarySpawn.js";
 
 import { DamageSpec } from "../components/DamageSpec.js";
 import { Vitality } from "../components/Vitality.js";
@@ -379,6 +380,24 @@ export function applyMutation(world, op, resolvers = {}) {
       const id = Number(materializeSpawn(world, { kind, x, y, params }) || 0) | 0;
       if (!(id > 0)) break;
       attachEntityToCurrentFloor(world, id);
+      const temporary = params.temporary === true || (Number(params.expiresInTurns || 0) | 0) > 0;
+      if (temporary) {
+        const createdAtTurn = Number(world.step || 0) | 0;
+        const baseTurns = Math.max(1, Number(params.expiresInTurns || 1) | 0);
+        const jitterTurns = Math.max(0, Number(params.expiresJitterTurns || 0) | 0);
+        const jitter = jitterTurns > 0 && typeof world.rand === "function"
+          ? ((Math.floor(world.rand() * (jitterTurns * 2 + 1)) | 0) - jitterTurns)
+          : 0;
+        const expiresInTurns = Math.max(1, baseTurns + jitter);
+        try {
+          world.add(id, TemporarySpawn, {
+            createdAtTurn,
+            expiresAtTurn: createdAtTurn + expiresInTurns,
+            replacementKind: String(params.replacementKind || ""),
+            source: String(params.source || kind),
+          });
+        } catch {}
+      }
       invalidateTileQueryCache(world);
       const pos = world.get(id, Position) || { x, y };
       if (op.emitEvent !== false) {
@@ -588,9 +607,10 @@ export function applyMutation(world, op, resolvers = {}) {
  * @typedef {{ type: 'addCorpseAdaptation', entityId: number, statKey: string, value: number, source: string, label: string }} AddCorpseAdaptationOp
  * @typedef {{ type: 'revealLoadedMap' }} RevealLoadedMapOp
  * @typedef {{ type: 'spawnHazard', spec: Record<string, unknown> }} SpawnHazardOp
+ * @typedef {{ type: 'materializeSpawn', spawn: { kind: string, x?: number, y?: number, params?: Record<string, unknown> }, emitEvent?: boolean }} MaterializeSpawnOp
  * @typedef {{ type: 'destroy', entityId: number }} DestroyOp
  * @typedef {{ type: 'setItemCooldown', entityId: number, turns: number }} SetItemCooldownOp
- * @typedef {DamageOp | HealOp | PushEffectOp | UpsertTimedEffectOp | AppendDamageChannelsOp | PatchItemInfoOp | AttachEnchantmentOp | SetBeatitudeOp | RemoveTimedEffectsByKeyOp | SetMaterialOp | SpawnItemOp | SpawnMonsterOp | LearnSpellOp | RecordShopDebtOp | RecordShopClaimOp | ConsumeOp | DropFromInventoryOp | NutritionOp | AddCorpseAdaptationOp | RevealLoadedMapOp | SpawnHazardOp | DestroyOp | SetItemCooldownOp} MutationOp
+ * @typedef {DamageOp | HealOp | PushEffectOp | UpsertTimedEffectOp | AppendDamageChannelsOp | PatchItemInfoOp | AttachEnchantmentOp | SetBeatitudeOp | RemoveTimedEffectsByKeyOp | SetMaterialOp | SpawnItemOp | SpawnMonsterOp | LearnSpellOp | RecordShopDebtOp | RecordShopClaimOp | ConsumeOp | DropFromInventoryOp | NutritionOp | AddCorpseAdaptationOp | RevealLoadedMapOp | SpawnHazardOp | MaterializeSpawnOp | DestroyOp | SetItemCooldownOp} MutationOp
  */
 
 export class ActionTransaction {

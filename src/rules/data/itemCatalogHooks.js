@@ -17,6 +17,7 @@ import { Mana } from "../components/Mana.js";
 import { Position } from "../components/Position.js";
 import { WeatherState } from "../components/WeatherState.js";
 import { isWalkable } from "../environment/dungeon/tileMap.js";
+import { TURNS_PER_DAY } from "./calendar.js";
 import { createStatusEvent } from "../../shared/events/statusEvent.js";
 import { getPassiveBonuses } from "../utils/passiveBonuses.js";
 import { getTileQuerySnapshot } from "../utils/tileQueryCache.js";
@@ -457,6 +458,8 @@ const CAMPFIRE_METAL_MATERIALS = Object.freeze(new Set([
   "copper",
   "lead",
 ]));
+const CAMPFIRE_EXPIRY_TURNS = Math.max(1, Math.floor(TURNS_PER_DAY / 2));
+const CAMPFIRE_EXPIRY_JITTER_TURNS = Math.max(1, Math.floor(TURNS_PER_DAY / 24));
 
 /**
  * @param {string} value
@@ -626,7 +629,16 @@ export function createCampfireDipHook(opts = {}) {
     }
 
     const fireAt = resolveCampfireSpawnPoint(ctx, at);
-    ctx.helpers.materializeSpawn({ kind: "cooking_fire", params: {} }, fireAt);
+    ctx.helpers.materializeSpawn({
+      kind: "cooking_fire",
+      params: {
+        temporary: true,
+        expiresInTurns: CAMPFIRE_EXPIRY_TURNS,
+        expiresJitterTurns: CAMPFIRE_EXPIRY_JITTER_TURNS,
+        replacementKind: "ashes",
+        source: "stone_flint",
+      },
+    }, fireAt);
     ctx.helpers.consume(woodId, actor);
 
     const woodName = resolveApplyTargetName(ctx, state, "wood");
