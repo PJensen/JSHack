@@ -3,7 +3,7 @@
   "checkpoint_id": "b033c5dce01a",
   "strategy": "manual-commit",
   "branch": "master",
-  "checkpoints_count": 1,
+  "checkpoints_count": 2,
   "files_touched": [
     "assets/audio/fairy_glow.mp3",
     "assets/audio/magic_unlock.mp3",
