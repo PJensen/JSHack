@@ -5,6 +5,7 @@
   "branch": "master",
   "checkpoints_count": 1,
   "files_touched": [
+    "VERSION",
     "src/content/monsters/special.js",
     "src/rules/data/itemCatalogHooks.js",
     "src/rules/data/lootTables.js",
