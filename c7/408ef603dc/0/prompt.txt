@@ -1,0 +1,23 @@
+use "stone_flint" shows no apply targets.
+
+NOTE: techncally tihs is a three way interaction, flint, wood, weapon
+
+but for now, MVP is flint -> use -> wood
+
+explain why there are no apply tagets please.
+
+---
+
+I gave myself fuel firewood, I gave myself stone_flint -- should be a no-brainer
+
+---
+
+not sure what that was about; the issue here is that we need to somehow surface that the actor  does not meet one of the requirements. think aout it with me please.
+
+---
+
+nevermind -- I am not carrying a metal weapon
+
+---
+
+keep it cheap, ohh and guess what else, there is no campfire / cooking fire created, ohh and, you made a random lighsource -- I didn't see an sparks. not sure how you did that -- but we've got to address it -- cooking_fire is a very simple interactable decoration.
