@@ -3,7 +3,7 @@
   "checkpoint_id": "ea22df9c1267",
   "strategy": "manual-commit",
   "branch": "master",
-  "checkpoints_count": 1,
+  "checkpoints_count": 0,
   "files_touched": [
     "release.sh"
   ],
@@ -12,7 +12,7 @@
       "metadata": "/ea/22df9c1267/0/metadata.json",
       "transcript": "/ea/22df9c1267/0/full.jsonl",
       "content_hash": "/ea/22df9c1267/0/content_hash.txt",
-      "prompt": "/ea/22df9c1267/0/prompt.txt"
+      "prompt": ""
     },
     {
       "metadata": "/ea/22df9c1267/1/metadata.json",
@@ -20,12 +20,5 @@
       "content_hash": "/ea/22df9c1267/1/content_hash.txt",
       "prompt": ""
     }
-  ],
-  "token_usage": {
-    "input_tokens": 176422,
-    "cache_creation_tokens": 0,
-    "cache_read_tokens": 819456,
-    "output_tokens": 4105,
-    "api_call_count": 22
-  }
+  ]
 }

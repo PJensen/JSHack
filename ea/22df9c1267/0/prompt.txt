@@ -1,1 +1,0 @@
-write me a quick shell script that creates a release, the tag, the ver, the works -- but  keep it simple please
