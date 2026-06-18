@@ -5,6 +5,7 @@
   "branch": "master",
   "checkpoints_count": 0,
   "files_touched": [
+    "VERSION",
     "src/rules/systems/sleepScheduleSystem.js",
     "src/rules/systems/tamingSystem.js",
     "tests/scrollOfTaming.test.mjs",
