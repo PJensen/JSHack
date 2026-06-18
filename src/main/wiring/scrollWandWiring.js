@@ -66,6 +66,24 @@ export function installScrollWandWiring({ world, targeting, playerEntity }) {
     return Math.max(1, Number(depth || 1) | 0);
   }
 
+  function openMonsterChoice(requestId, pending) {
+    if (!pending) return;
+    const detail = pending.chooserDetail;
+    if (!detail) return;
+    window.dispatchEvent(new CustomEvent('ui:openMonsterChooser', { detail }));
+  }
+
+  function reopenPendingGenocideChooser() {
+    for (const [requestId, pending] of pendingMonsterChoices) {
+      if (pending?.kind !== 'genocide') continue;
+      openMonsterChoice(requestId, pending);
+      syncGenocideChooserLock();
+      return true;
+    }
+    syncGenocideChooserLock();
+    return false;
+  }
+
   function applyPolymorphSelection({ actor, enemyId, targetIdentity, depth, trigger = 'scroll', reason = 'scroll_polymorph' }) {
     const fromIdent = world.get(enemyId, NamedIdentity);
     const fromName = fromIdent?.identity ? (getMonster(fromIdent.identity)?.name || fromIdent.identity) : 'creature';
@@ -156,28 +174,39 @@ export function installScrollWandWiring({ world, targeting, playerEntity }) {
   });
 
   addEventListener('ui:closeMonsterChooser', () => {
-    let changed = false;
-    for (const [requestId, pending] of pendingMonsterChoices) {
-      if (pending?.kind !== 'genocide') continue;
-      pendingMonsterChoices.delete(requestId);
-      changed = true;
-    }
-    if (changed) syncGenocideChooserLock();
+    reopenPendingGenocideChooser();
   });
+
+  addEventListener('focus', () => {
+    reopenPendingGenocideChooser();
+  });
+
+  addEventListener('pageshow', () => {
+    reopenPendingGenocideChooser();
+  });
+
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') return;
+      reopenPendingGenocideChooser();
+    });
+  }
 
   // ── Scroll of Genocide ──────────────────────────────────────────────────
   world.on('scroll:genocide', ({ actor }) => {
     const requestId = nextMonsterChoiceRequestId++;
-    pendingMonsterChoices.set(requestId, { kind: 'genocide', actor });
-    window.dispatchEvent(new CustomEvent('ui:openMonsterChooser', {
-      detail: {
+    pendingMonsterChoices.set(requestId, {
+      kind: 'genocide',
+      actor,
+      chooserDetail: {
         requestId,
         title: 'Scroll of Genocide',
         subtitle: 'Choose one species to erase from this run.',
         searchPlaceholder: 'Search species',
         choices: buildMonsterChoiceOptions({ currentDepth: currentDepth() }),
       },
-    }));
+    });
+    openMonsterChoice(requestId, pendingMonsterChoices.get(requestId));
     syncGenocideChooserLock();
   });
 

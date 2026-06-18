@@ -459,6 +459,16 @@ export function installItemMessages(ctx) {
     if (nameOfEntity(actor) !== 'You') return;
     log('Which species do you wish to genocide?', 'legendary');
   });
+  world.on('scroll:genocide:success', ({ actor, name, killed }) => {
+    if (nameOfEntity(actor) !== 'You') return;
+    const species = String(name || 'creature').trim() || 'creature';
+    const count = Math.max(0, Number(killed || 0) | 0);
+    if (count > 0) {
+      log(`You speak the forbidden name. Somewhere, ${count} ${species}${count === 1 ? '' : 's'} forget how to exist.`, 'legendary');
+    } else {
+      log(`You speak the forbidden name. From this moment on, ${species}s are unwelcome in the universe.`, 'legendary');
+    }
+  });
   world.on('scroll:polymorph', ({ actor }) => {
     if (nameOfEntity(actor) !== 'You') return;
     log('You feel a change coming over you.', 'system');
@@ -466,6 +476,14 @@ export function installItemMessages(ctx) {
   world.on('scroll:taming', ({ actor }) => {
     if (nameOfEntity(actor) !== 'You') return;
     log('You feel in harmony with the creatures around you.', 'system');
+  });
+  world.on('scroll:taming:vfx', ({ id }) => {
+    const targetName = nameOfEntity(id);
+    if (!targetName || targetName === 'Unknown') {
+      log('A creature lowers its guard. It has chosen friendship, or something close enough.', 'system');
+      return;
+    }
+    log(`${targetName} blinks, reconsiders its life choices, and decides you are family now.`, 'system');
   });
 
   // === Wand messages ===

@@ -170,6 +170,51 @@ Deno.test("messageWiring logs pet corpse munch flavor text", () => {
   assert(messageLog.entries[0].text.includes("Iron stomach"), "message should mention toxin resistance flavor");
 });
 
+Deno.test("messageWiring logs genocide success as an active player outcome", () => {
+  const world = new World({ seed: 42 });
+  const playerId = world.create();
+  world.add(playerId, Player, {});
+
+  const messageLog = createMessageLog();
+  installWithDeps(world, messageLog, playerId);
+
+  world.emit("scroll:genocide:success", {
+    actor: playerId,
+    identity: "goblin",
+    name: "Goblin",
+    killed: 3,
+  });
+
+  assertEquals(messageLog.entries.length, 1);
+  assertEquals(messageLog.entries[0].type, "legendary");
+  assert(messageLog.entries[0].text.includes("forbidden name"), "genocide success should feel deliberate");
+  assert(messageLog.entries[0].text.includes("Goblin"), "genocide success should name the species");
+  assert(messageLog.entries[0].text.includes("3"), "genocide success should include the kill count");
+});
+
+Deno.test("messageWiring logs taming success as an active player outcome", () => {
+  const world = new World({ seed: 42 });
+  const playerId = world.create();
+  world.add(playerId, Player, {});
+
+  const targetId = world.create();
+  world.add(targetId, NamedIdentity, { name: "Cave Spider", identity: "cave_spider" });
+
+  const messageLog = createMessageLog();
+  installWithDeps(world, messageLog, playerId);
+
+  world.emit("scroll:taming:vfx", {
+    id: targetId,
+    x: 1,
+    y: 0,
+  });
+
+  assertEquals(messageLog.entries.length, 1);
+  assertEquals(messageLog.entries[0].type, "system");
+  assert(messageLog.entries[0].text.includes("Cave Spider"), "taming success should name the tamed creature");
+  assert(messageLog.entries[0].text.includes("family"), "taming success should include flavor");
+});
+
 Deno.test("messageWiring resolves ambient sound audibility by depth, hearing tier, and dB clarity", () => {
   const world = new World({ seed: 42 });
   const playerId = world.create();

@@ -102,3 +102,84 @@ Deno.test("scroll genocide chooser releases game input on cancel", () => {
     restoreWindow();
   }
 });
+
+Deno.test("scroll genocide chooser reopens after unexpected close without completing", () => {
+  const restoreWindow = installTestWindow();
+  setInputLock("scroll:genocide:monsterChooser", false);
+
+  const world = new World({ seed: 13 });
+  const requests = [];
+  let openCount = 0;
+  let openedRequestId = 0;
+
+  const onOpen = (ev) => {
+    openCount++;
+    openedRequestId = Number(ev?.detail?.requestId || 0) | 0;
+  };
+  addEventListener("ui:openMonsterChooser", onOpen);
+  world.on("scroll:genocide:request", (event) => requests.push(event));
+
+  try {
+    installScrollWandWiring({
+      world,
+      targeting: {},
+      playerEntity: () => null,
+    });
+
+    world.emit("scroll:genocide", { actor: 42 });
+
+    assertEquals(openCount, 1);
+    assertEquals(openedRequestId > 0, true);
+    assertEquals(isInputLocked(), true);
+
+    window.dispatchEvent(new CustomEvent("ui:closeMonsterChooser"));
+
+    assertEquals(openCount, 2);
+    assertEquals(isInputLocked(), true);
+    assertEquals(requests.length, 0);
+
+    window.dispatchEvent(new CustomEvent("ui:monsterChosen", {
+      detail: { requestId: openedRequestId, monsterId: "goblin" },
+    }));
+
+    assertEquals(isInputLocked(), false);
+    assertEquals(requests, [{ actor: 42, query: "goblin" }]);
+  } finally {
+    removeEventListener("ui:openMonsterChooser", onOpen);
+    setInputLock("scroll:genocide:monsterChooser", false);
+    restoreWindow();
+  }
+});
+
+Deno.test("scroll genocide chooser reopens on focus while pending", () => {
+  const restoreWindow = installTestWindow();
+  setInputLock("scroll:genocide:monsterChooser", false);
+
+  const world = new World({ seed: 14 });
+  let openCount = 0;
+
+  const onOpen = () => {
+    openCount++;
+  };
+  addEventListener("ui:openMonsterChooser", onOpen);
+
+  try {
+    installScrollWandWiring({
+      world,
+      targeting: {},
+      playerEntity: () => null,
+    });
+
+    world.emit("scroll:genocide", { actor: 42 });
+    assertEquals(openCount, 1);
+
+    window.dispatchEvent(new Event("focus"));
+
+    assertEquals(openCount, 2);
+    assertEquals(isInputLocked(), true);
+  } finally {
+    removeEventListener("ui:openMonsterChooser", onOpen);
+    setInputLock("scroll:genocide:monsterChooser", false);
+    restoreWindow();
+  }
+});
