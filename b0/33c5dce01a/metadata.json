@@ -1,0 +1,27 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "b033c5dce01a",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "assets/audio/fairy_glow.mp3",
+    "assets/audio/magic_unlock.mp3",
+    "assets/audio/wand_sparkle.mp3"
+  ],
+  "sessions": [
+    {
+      "metadata": "/b0/33c5dce01a/0/metadata.json",
+      "transcript": "/b0/33c5dce01a/0/full.jsonl",
+      "content_hash": "/b0/33c5dce01a/0/content_hash.txt",
+      "prompt": "/b0/33c5dce01a/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 43913,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 54144,
+    "output_tokens": 844,
+    "api_call_count": 5
+  }
+}
