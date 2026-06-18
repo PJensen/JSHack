@@ -5,6 +5,7 @@
   "branch": "master",
   "checkpoints_count": 3,
   "files_touched": [
+    "VERSION",
     "assets/audio/use_scroll_geno.mp3",
     "src/display/audio/audioWiring.js",
     "src/display/audio/sounds.js",
