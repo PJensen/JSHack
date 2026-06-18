@@ -333,6 +333,15 @@ export function createFacets(init) {
         spec: rec,
       });
     },
+    spawnCookingFire(x, y, opts = {}) {
+      const options = (opts && typeof opts === "object") ? opts : {};
+      return tx.queueMutation({
+        type: "spawnCookingFire",
+        x: Number(x),
+        y: Number(y),
+        emitEvent: options.emitEvent !== false,
+      });
+    },
     learnSpell(entityId, spellId) {
       return tx.queueMutation({
         type: "learnSpell",
@@ -556,6 +565,15 @@ export function createFacets(init) {
       rec.x = Number.isFinite(point.x) ? (point.x | 0) : (fallback.x | 0);
       rec.y = Number.isFinite(point.y) ? (point.y | 0) : (fallback.y | 0);
       return mutate.spawnHazard(rec);
+    },
+    spawnCookingFire(at = null, opts = {}) {
+      const fallback = query.get(actor, Position) || { x: 0, y: 0 };
+      const point = (at && typeof at === "object")
+        ? { x: Number(at.x), y: Number(at.y) }
+        : { x: Number.NaN, y: Number.NaN };
+      const x = Number.isFinite(point.x) ? (point.x | 0) : (fallback.x | 0);
+      const y = Number.isFinite(point.y) ? (point.y | 0) : (fallback.y | 0);
+      return mutate.spawnCookingFire(x, y, opts);
     },
     emit(event, payload = {}) {
       return io.emit(event, payload);

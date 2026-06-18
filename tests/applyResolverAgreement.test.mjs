@@ -192,7 +192,7 @@ Deno.test("flint lists wood targets when actor wields a metal weapon", () => {
   assert(!targetSet.has(rationId), "flint should not list non-wood inventory as a campfire target");
 });
 
-Deno.test("flint target listing requires a wielded metal weapon", () => {
+Deno.test("flint target listing surfaces wood even without a wielded metal weapon", () => {
   const world = new World({ seed: 7308 });
   const actor = createActorWithInventory(world);
 
@@ -202,7 +202,7 @@ Deno.test("flint target listing requires a wielded metal weapon", () => {
   addToInventory(world, actor, firewoodId);
 
   const targets = listApplyTargetsForTool(world, actor, flintId);
-  assertEquals(targets.length, 0);
+  assertEquals(targets, [firewoodId]);
   assertEquals(isApplyTool(world, actor, flintId), true);
 });
 

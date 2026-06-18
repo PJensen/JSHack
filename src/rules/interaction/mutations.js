@@ -8,6 +8,7 @@
 // - Allowed importer in rules code: src/rules/utils/actionContexts.js only.
 
 import { attach } from "../../lib/ecs-js/index.js";
+import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { ActiveEffects } from "../components/ActiveEffects.js";
 import { CorpseAdaptation } from "../components/CorpseAdaptation.js";
 import { DerivedExpression } from "../components/DerivedExpression.js";
@@ -19,6 +20,7 @@ import { ItemInfo } from "../components/ItemInfo.js";
 import { Material } from "../components/Material.js";
 import { Position } from "../components/Position.js";
 import { Potion } from "../components/Potion.js";
+import { CookingFire } from "../archetypes/Overworld.js";
 
 import { DamageSpec } from "../components/DamageSpec.js";
 import { Vitality } from "../components/Vitality.js";
@@ -363,6 +365,19 @@ export function applyMutation(world, op, resolvers = {}) {
       const tauntMessage = String(op.tauntMessage || "");
       if (tauntMessage) {
         world.emit("message", { text: tauntMessage, type: "warning" });
+      }
+      break;
+    }
+    case "spawnCookingFire": {
+      const spawnX = Number.isFinite(op.x) ? (Number(op.x) | 0) : 0;
+      const spawnY = Number.isFinite(op.y) ? (Number(op.y) | 0) : 0;
+      const id = createFrom(world, CookingFire, { x: spawnX, y: spawnY });
+      if (op.emitEvent !== false) {
+        world.emit("spawned", {
+          id,
+          kind: "cooking_fire",
+          at: { x: spawnX, y: spawnY },
+        });
       }
       break;
     }

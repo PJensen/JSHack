@@ -525,15 +525,7 @@ function resolveCampfireDampReason(ctx, actor, woodId) {
  * @param {any} state
  */
 export function canCampfireDipTarget(state) {
-  if (!isCampfireWoodIdentity(state?.targetIdentity)) return false;
-  const weaponId = Number(state?.actorEquipment?.weapon || 0) | 0;
-  if (!(weaponId > 0)) return false;
-  const weaponInfo = state?.weaponInfo;
-  const slot = String(weaponInfo?.slot || "").toLowerCase();
-  const type = String(weaponInfo?.type || "").toLowerCase();
-  if (slot !== "weapon" && type !== "weapon" && type !== "equip") return false;
-  const material = String(state?.weaponMaterial || weaponInfo?.material || "").toLowerCase();
-  return CAMPFIRE_METAL_MATERIALS.has(material);
+  return isCampfireWoodIdentity(state?.targetIdentity);
 }
 
 /**
@@ -559,11 +551,11 @@ export function createCampfireDipHook(opts = {}) {
       return { applied: false, consumedTool: false, resultType: "campfire_failed" };
     }
 
-    const striker = resolveWieldedCampfireStriker(ctx, actor);
-    if (!striker) {
-      ctx.cancel({ code: "CAMPFIRE_NEEDS_METAL_WEAPON", message: "You need a wielded metal weapon to strike sparks from the flint." });
-      return { applied: false, consumedTool: false, resultType: "campfire_failed" };
-    }
+    const striker = resolveWieldedCampfireStriker(ctx, actor) || {
+      itemId: 0,
+      material: "",
+      name: "the flint",
+    };
 
     const actorPos = ctx.query.get?.(actor, Position) || { x: 0, y: 0 };
     const at = { x: actorPos.x | 0, y: actorPos.y | 0 };
@@ -577,7 +569,9 @@ export function createCampfireDipHook(opts = {}) {
           : damp.reason === "wet_ground"
             ? "The wet ground drinks the heat before the kindling can catch."
             : "The wood is too damp. Sparks crawl over it and gutter out.";
-      const message = `You strike ${striker.name} against the flint. ${reasonText}`;
+      const message = striker.itemId > 0
+        ? `You strike ${striker.name} against the flint. ${reasonText}`
+        : `You strike the flint over the ${woodName}. ${reasonText}`;
       ctx.io.emit("skill:campfire:spark", {
         actor,
         toolId,
@@ -604,31 +598,13 @@ export function createCampfireDipHook(opts = {}) {
       return { applied: true, consumedTool: false, resultType: "campfire_failed" };
     }
 
-    ctx.helpers.hazardSpawn({
-      kind: "fire",
-      medium: "floor",
-      turnsLeft,
-      radius: 0,
-      tickDamage,
-      damageType: "fire",
-      cause: "skill:campfire",
-      sourceId: actor,
-      sourceKind: "campfire",
-      identity: "campfire",
-      name: "Campfire",
-      meta: {
-        source: "skill:campfire",
-        toolId,
-        woodId,
-        strikerId: striker.itemId,
-        strikerMaterial: striker.material,
-        fireSpreadChance: 0,
-      },
-    }, at);
+    ctx.helpers.spawnCookingFire(at);
     ctx.helpers.consume(woodId, actor);
 
     const woodName = resolveApplyTargetName(ctx, state, "wood");
-    const message = `You strike ${striker.name} against the flint. Sparks catch in the ${woodName}.`;
+    const message = striker.itemId > 0
+      ? `You strike ${striker.name} against the flint. Sparks catch in the ${woodName}.`
+      : `You strike the flint over the ${woodName}. Sparks catch.`;
     ctx.io.emit("skill:campfire:spark", {
       actor,
       toolId,

@@ -5,15 +5,24 @@ import { createItemById } from "../src/rules/utils/itemFactory.js";
 import { buildCatalogItem } from "../src/rules/data/itemCatalogLoader.js";
 import { Inventory } from "../src/rules/components/Inventory.js";
 import { Equipment } from "../src/rules/components/Equipment.js";
-import { HazardArea } from "../src/rules/components/HazardArea.js";
+import { Interactable } from "../src/rules/components/Interactable.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 import { MaterialState } from "../src/rules/components/MaterialState.js";
+import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { ApplyIntent } from "../src/rules/components/Intents/ApplyIntent.js";
 import { Position } from "../src/rules/components/Position.js";
 import { WeatherState } from "../src/rules/components/WeatherState.js";
 import { applySystem } from "../src/rules/systems/applySystem.js";
 import { isIdentified, resetIdentification } from "../src/rules/data/identification.js";
 import { addToInventory, inventoryContains } from "../src/rules/utils/inventoryFacade.js";
+
+function cookingFires(world) {
+  const out = [];
+  for (const [id, pos, identity] of world.query(Position, NamedIdentity)) {
+    if (String(identity?.identity || "") === "cooking_fire") out.push({ id, pos });
+  }
+  return out;
+}
 
 Deno.test("touchstone apply hook identifies gem targets", () => {
   resetIdentification();
@@ -110,19 +119,13 @@ Deno.test("flint applied to wood with wielded metal weapon creates a campfire", 
   assertEquals(skillEvents.length, 1);
   assertEquals(Number(skillEvents[0]?.strikerId || 0), knife);
 
-  const campfires = [];
-  for (const [, pos, hazard] of world.query(Position, HazardArea)) {
-    if (String(hazard?.kind || "") === "fire" && String(hazard?.cause || "") === "skill:campfire") {
-      campfires.push({ pos, hazard });
-    }
-  }
+  const campfires = cookingFires(world);
   assertEquals(campfires.length, 1);
   assertEquals(campfires[0].pos, { x: 4, y: 7 });
-  assertEquals(campfires[0].hazard.medium, "floor");
-  assertEquals(campfires[0].hazard.radius, 0);
+  assertEquals(world.get(campfires[0].id, Interactable)?.action, "cookFood");
 });
 
-Deno.test("flint campfire apply cancels without a wielded metal weapon", () => {
+Deno.test("flint campfire apply works without a wielded metal weapon", () => {
   const world = new World({ seed: 1004 });
   const actor = world.create();
   world.add(actor, Position, { x: 2, y: 2 });
@@ -141,13 +144,13 @@ Deno.test("flint campfire apply cancels without a wielded metal weapon", () => {
   world.add(actor, ApplyIntent, { itemId: flint, targetItemId: wood });
   applySystem(world);
 
-  assert(world.isAlive(wood), "failed campfire should not consume wood");
-  assertEquals(skillEvents.length, 0);
-  let campfireCount = 0;
-  for (const [, , hazard] of world.query(Position, HazardArea)) {
-    if (String(hazard?.cause || "") === "skill:campfire") campfireCount += 1;
-  }
-  assertEquals(campfireCount, 0);
+  assert(!world.isAlive(wood), "campfire should consume wood");
+  assertEquals(skillEvents.length, 1);
+  assertEquals(Number(skillEvents[0]?.strikerId || 0), 0);
+  const campfires = cookingFires(world);
+  assertEquals(campfires.length, 1);
+  assertEquals(campfires[0].pos, { x: 2, y: 2 });
+  assertEquals(world.get(campfires[0].id, Interactable)?.action, "cookFood");
 });
 
 Deno.test("flint campfire attempt in rain emits sparks but does not consume wood", () => {
@@ -205,9 +208,5 @@ Deno.test("flint campfire attempt with wet fuel smokes out without spawning fire
   assertEquals(sparks.length, 1);
   assertEquals(sparks[0].success, false);
   assertEquals(sparks[0].reason, "wet_fuel");
-  let campfireCount = 0;
-  for (const [, , hazard] of world.query(Position, HazardArea)) {
-    if (String(hazard?.cause || "") === "skill:campfire") campfireCount += 1;
-  }
-  assertEquals(campfireCount, 0);
+  assertEquals(cookingFires(world).length, 0);
 });
