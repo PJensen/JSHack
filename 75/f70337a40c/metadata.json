@@ -5,6 +5,7 @@
   "branch": "master",
   "checkpoints_count": 1,
   "files_touched": [
+    "VERSION",
     "src/display/ui/wiring/floatTextWiring.js",
     "src/rules/interaction/mutations.js",
     "src/rules/utils/spawnCookingFire.js",
