@@ -1,12 +1,14 @@
 import "./helpers/installContentCatalog.mjs";
 import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";
+import { createRng } from "../src/lib/ecs-js/rng.js";
 import { Position } from "../src/rules/components/Position.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 import { Material } from "../src/rules/components/Material.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { buildCatalogItem } from "../src/rules/data/itemCatalogLoader.js";
 import { materializeDrop } from "../src/rules/data/lootResolver.js";
+import { pickGem } from "../src/rules/data/gems.js";
 import { createItemById } from "../src/rules/utils/itemFactory.js";
 import "../src/content/items/fishingRod.js";
 import { installContent } from "../src/content/install.js";
@@ -44,6 +46,18 @@ Deno.test("materializeDrop item path preserves material and placement", () => {
   const pos = world.get(id, Position);
   assert(mat && mat.kind === "paper", "scroll should carry paper material");
   assert(pos && pos.x === 4 && pos.y === 7, "drop should be placed at target tile");
+});
+
+Deno.test("digging gem pool can roll flint", () => {
+  let sawFlint = false;
+  for (let seed = 1; seed <= 600; seed++) {
+    const gem = pickGem(createRng(seed));
+    if (gem?.id === "stone_flint") {
+      sawFlint = true;
+      break;
+    }
+  }
+  assert(sawFlint, "stone_flint should be reachable through the mining gem picker");
 });
 
 Deno.test("createItemById routes magic items through materialized loader", () => {

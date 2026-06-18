@@ -2,6 +2,7 @@ import { assert } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";
 import { createRng } from "../src/lib/ecs-js/rng.js";
 import { generateAlchemyShopItem, generateGemShopStock, generateShopItem } from "../src/rules/data/shopStock.js";
+import { LOOT_TABLES } from "../src/rules/data/lootTables.js";
 import { materializeSpawn } from "../src/rules/environment/dungeon/populate.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
@@ -20,6 +21,14 @@ Deno.test("generateShopItem creates exactly one inventory-only item", () => {
   assert(after === before + 1, "only one item entity should be created");
   assert(world.has(itemId, ItemInfo), "created entity should be an item");
   assert(!world.has(itemId, Position), "shop stock item should not start on the floor");
+});
+
+Deno.test("general shop equipment table can stock flint", () => {
+  const entries = LOOT_TABLES["shop:equipment"]?.entries || [];
+  assert(
+    entries.some((entry) => entry.type === "item" && entry.itemId === "stone_flint"),
+    "shop:equipment should include stone_flint as utility stock",
+  );
 });
 
 Deno.test("shop_item spawn materializes one floor item without extra stock entities", () => {

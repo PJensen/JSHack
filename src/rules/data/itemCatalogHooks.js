@@ -16,8 +16,10 @@ import { Stamina } from "../components/Stamina.js";
 import { Mana } from "../components/Mana.js";
 import { Position } from "../components/Position.js";
 import { WeatherState } from "../components/WeatherState.js";
+import { isWalkable } from "../environment/dungeon/tileMap.js";
 import { createStatusEvent } from "../../shared/events/statusEvent.js";
 import { getPassiveBonuses } from "../utils/passiveBonuses.js";
+import { getTileQuerySnapshot } from "../utils/tileQueryCache.js";
 import { isWetAt, markWet } from "../utils/wetTileMap.js";
 import {
   emitScrollReadFailure,
@@ -521,6 +523,32 @@ function resolveCampfireDampReason(ctx, actor, woodId) {
   return { reason: "", weather };
 }
 
+function resolveCampfireAnchor(ctx, actor, woodId) {
+  const woodPos = ctx?.query?.get?.(woodId, Position);
+  if (woodPos) return { x: woodPos.x | 0, y: woodPos.y | 0 };
+  const actorPos = ctx?.query?.get?.(actor, Position);
+  return actorPos ? { x: actorPos.x | 0, y: actorPos.y | 0 } : { x: 0, y: 0 };
+}
+
+function resolveCampfireSpawnPoint(ctx, anchor) {
+  const snap = getTileQuerySnapshot(ctx.world);
+  const candidates = [
+    { x: anchor.x + 1, y: anchor.y },
+    { x: anchor.x - 1, y: anchor.y },
+    { x: anchor.x, y: anchor.y + 1 },
+    { x: anchor.x, y: anchor.y - 1 },
+  ];
+  for (let i = 0; i < candidates.length; i++) {
+    const at = candidates[i];
+    const key = `${at.x},${at.y}`;
+    if (!isWalkable(at.x, at.y)) continue;
+    if (snap.blockedByCell.has(key)) continue;
+    if (snap.interactableByCell.has(key)) continue;
+    return at;
+  }
+  return anchor;
+}
+
 /**
  * @param {any} state
  */
@@ -557,8 +585,7 @@ export function createCampfireDipHook(opts = {}) {
       name: "the flint",
     };
 
-    const actorPos = ctx.query.get?.(actor, Position) || { x: 0, y: 0 };
-    const at = { x: actorPos.x | 0, y: actorPos.y | 0 };
+    const at = resolveCampfireAnchor(ctx, actor, woodId);
     const damp = resolveCampfireDampReason(ctx, actor, woodId);
     if (damp.reason) {
       const woodName = resolveApplyTargetName(ctx, state, "wood");
@@ -598,7 +625,8 @@ export function createCampfireDipHook(opts = {}) {
       return { applied: true, consumedTool: false, resultType: "campfire_failed" };
     }
 
-    ctx.helpers.spawnCookingFire(at);
+    const fireAt = resolveCampfireSpawnPoint(ctx, at);
+    ctx.helpers.materializeSpawn({ kind: "cooking_fire", params: {} }, fireAt);
     ctx.helpers.consume(woodId, actor);
 
     const woodName = resolveApplyTargetName(ctx, state, "wood");

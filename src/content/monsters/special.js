@@ -103,6 +103,7 @@ defineMonster('stone_taunter', {
   hooks: null,
   specials: ["Strongly resists polymorph"],
   description: 'An animated stone idol that heckles anything that breathes.',
+  lootTable: 'drop:stone_taunter',
 });
 
 defineMonster('gelatinous_cube', {

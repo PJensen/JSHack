@@ -481,6 +481,17 @@ export const LOOT_TABLES = {
     ],
   },
 
+  "drop:stone_taunter": {
+    rolls: { min: 1, max: 1 },
+    entries: [
+      { type: "nothing", weight: 45 },
+      { type: "gem",     weight: 25, gemId: "stone_flint" },
+      { type: "gem",     weight: 18, gemId: "stone_rock" },
+      { type: "gem",     weight: 8,  gemId: "stone_touchstone" },
+      { type: "item",    weight: 4,  itemId: "potion_stoneskin" },
+    ],
+  },
+
   "drop:tier1": {
     rolls: { min: 1, max: 1 },
     entries: [
@@ -1114,6 +1125,7 @@ export const LOOT_TABLES = {
     rolls: { min: 2, max: 4 },
     entries: [
       { type: "item",   weight: 60, itemId: "fishing_rod" },
+      { type: "item",   weight: 45, itemId: "stone_flint" },
       { type: "table",  weight: 40, tableId: "sub:equip_common" },
       { type: "table",  weight: 30, tableId: "sub:equip_magic" },
       { type: "table",  weight: 8,  tableId: "sub:equip_catalog_backfill" },

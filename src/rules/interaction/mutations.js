@@ -27,19 +27,21 @@ import { Beatitude } from "../components/Beatitude.js";
 import { creatureTypeFromTags } from "../components/CreatureType.js";
 import { markExplored } from "../environment/dungeon/exploredMap.js";
 import { forEachLoadedTile } from "../environment/dungeon/tileMap.js";
+import { materializeSpawn } from "../environment/dungeon/populate.js";
 import { dealDamage } from "../utils/dealDamage.js";
 import { isDotEffectKey, upsertTimedEffect } from "../utils/effectSemantics.js";
 import { applyStatusEffect, ensureActiveEffects, isInvulnerabilityEffectKey } from "../utils/effects.js";
 import { attachEnchantmentNode } from "../utils/enchantmentTopology.js";
 import { spawnHazard } from "../utils/hazardSpawn.js";
 import { spawnMonsterEntity } from "../utils/spawnMonsterEntity.js";
-import { spawnCookingFireNear } from "../utils/spawnCookingFire.js";
 import { setItemCooldown } from "../utils/itemCooldowns.js";
 import { Traits } from "../components/Traits.js";
 import { getHungerLevel } from "../data/food.js";
 import { effectiveMaxHp } from "../utils/passiveBonuses.js";
 import { recordShopClaim } from "../utils/shopClaims.js";
 import { recordShopDebt } from "../utils/shopDebt.js";
+import { attachEntityToCurrentFloor } from "../utils/floorEntities.js";
+import { invalidateTileQueryCache } from "../utils/tileQueryCache.js";
 
 /**
  * @param {any} world
@@ -367,16 +369,22 @@ export function applyMutation(world, op, resolvers = {}) {
       }
       break;
     }
-    case "spawnCookingFire": {
-      const anchorX = Number.isFinite(op.x) ? (Number(op.x) | 0) : 0;
-      const anchorY = Number.isFinite(op.y) ? (Number(op.y) | 0) : 0;
-      const id = spawnCookingFireNear(world, { x: anchorX, y: anchorY });
+    case "materializeSpawn": {
+      const spawn = (op.spawn && typeof op.spawn === "object") ? op.spawn : {};
+      const kind = String(spawn.kind || op.kind || "");
+      if (!kind) break;
+      const x = Number.isFinite(spawn.x) ? (Number(spawn.x) | 0) : (Number(op.x) | 0);
+      const y = Number.isFinite(spawn.y) ? (Number(spawn.y) | 0) : (Number(op.y) | 0);
+      const params = (spawn.params && typeof spawn.params === "object") ? { ...spawn.params } : {};
+      const id = Number(materializeSpawn(world, { kind, x, y, params }) || 0) | 0;
       if (!(id > 0)) break;
-      const pos = world.get(id, Position) || { x: anchorX, y: anchorY };
+      attachEntityToCurrentFloor(world, id);
+      invalidateTileQueryCache(world);
+      const pos = world.get(id, Position) || { x, y };
       if (op.emitEvent !== false) {
         world.emit("spawned", {
           id,
-          kind: "cooking_fire",
+          kind,
           at: { x: pos.x | 0, y: pos.y | 0 },
         });
       }

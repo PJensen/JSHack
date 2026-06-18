@@ -333,12 +333,18 @@ export function createFacets(init) {
         spec: rec,
       });
     },
-    spawnCookingFire(x, y, opts = {}) {
+    materializeSpawn(spawn = {}, opts = {}) {
+      const rec = (spawn && typeof spawn === "object") ? spawn : {};
       const options = (opts && typeof opts === "object") ? opts : {};
       return tx.queueMutation({
-        type: "spawnCookingFire",
-        x: Number(x),
-        y: Number(y),
+        type: "materializeSpawn",
+        spawn: {
+          ...rec,
+          kind: String(rec.kind || ""),
+          x: Number(rec.x),
+          y: Number(rec.y),
+          params: (rec.params && typeof rec.params === "object") ? { ...rec.params } : {},
+        },
         emitEvent: options.emitEvent !== false,
       });
     },
@@ -566,14 +572,15 @@ export function createFacets(init) {
       rec.y = Number.isFinite(point.y) ? (point.y | 0) : (fallback.y | 0);
       return mutate.spawnHazard(rec);
     },
-    spawnCookingFire(at = null, opts = {}) {
+    materializeSpawn(spawn = {}, at = null, opts = {}) {
+      const rec = (spawn && typeof spawn === "object") ? { ...spawn } : {};
       const fallback = query.get(actor, Position) || { x: 0, y: 0 };
       const point = (at && typeof at === "object")
         ? { x: Number(at.x), y: Number(at.y) }
-        : { x: Number.NaN, y: Number.NaN };
-      const x = Number.isFinite(point.x) ? (point.x | 0) : (fallback.x | 0);
-      const y = Number.isFinite(point.y) ? (point.y | 0) : (fallback.y | 0);
-      return mutate.spawnCookingFire(x, y, opts);
+        : { x: Number(rec.x), y: Number(rec.y) };
+      rec.x = Number.isFinite(point.x) ? (point.x | 0) : (fallback.x | 0);
+      rec.y = Number.isFinite(point.y) ? (point.y | 0) : (fallback.y | 0);
+      return mutate.materializeSpawn(rec, opts);
     },
     emit(event, payload = {}) {
       return io.emit(event, payload);
