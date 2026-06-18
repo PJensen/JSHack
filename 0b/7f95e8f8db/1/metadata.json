@@ -1,7 +1,9 @@
 {
   "cli_version": "0.6.3",
   "checkpoint_id": "0b7f95e8f8db",
+  "session_id": "019ed7b4-98c7-7cb2-8db7-663de45bce18",
   "strategy": "manual-commit",
+  "created_at": "2026-06-18T19:01:39.578888474Z",
   "branch": "master",
   "checkpoints_count": 0,
   "files_touched": [
@@ -17,25 +19,24 @@
     "src/rules/environment/dungeon/populate.js",
     "tests/interaction.test.mjs"
   ],
-  "sessions": [
-    {
-      "metadata": "/0b/7f95e8f8db/0/metadata.json",
-      "transcript": "/0b/7f95e8f8db/0/full.jsonl",
-      "content_hash": "/0b/7f95e8f8db/0/content_hash.txt",
-      "prompt": "/0b/7f95e8f8db/0/prompt.txt"
-    },
-    {
-      "metadata": "/0b/7f95e8f8db/1/metadata.json",
-      "transcript": "/0b/7f95e8f8db/1/full.jsonl",
-      "content_hash": "/0b/7f95e8f8db/1/content_hash.txt",
-      "prompt": ""
-    }
-  ],
-  "token_usage": {
-    "input_tokens": 68300,
-    "cache_creation_tokens": 0,
-    "cache_read_tokens": 8380416,
-    "output_tokens": 18788,
-    "api_call_count": 44
+  "agent": "Codex",
+  "model": "gpt-5.5",
+  "turn_id": "027848e791d0",
+  "checkpoint_transcript_start": 399,
+  "transcript_lines_at_start": 399,
+  "session_metrics": {
+    "turn_count": 2
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-18T19:01:39.499128272Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 0,
+    "total_lines_changed": 0,
+    "agent_percentage": 0,
+    "metric_version": 2
   }
 }
