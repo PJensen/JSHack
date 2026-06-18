@@ -80,6 +80,7 @@ const SOUNDS = {
   "ambient:church":   { file: "ambient_church_inside.mp3", bus: "ambient" },
   "ambient:bubbles":  { file: "ambient_bubbles.mp3",       bus: "ambient" },
   "ambient:cooking_fire": { file: "ambient_cooking_fire.mp3", bus: "ambient" },
+  "craft:cooking:result": { file: "ambient_cooking_fire.mp3", bus: "items", maxVoices: 1, randomPitch: 6, volume: 0.55 },
   "ambient:holy_site": { file: "ambient_holy_site.mp3",    bus: "ambient" },
   "ambient:smithy":   { file: "ambient_smithy.mp3",        bus: "ambient" },
   "ambient:torch_flames": { file: "ambient_torch_flames.mp3", bus: "ambient" },

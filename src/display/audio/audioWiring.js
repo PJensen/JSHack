@@ -460,7 +460,7 @@ export const CRAFTING_MENU_LOOP_BY_KIND = Object.freeze({
 });
 
 export const CRAFTING_RESULT_SOUND_BY_KIND = Object.freeze({
-  cooking: "item:consume:food",
+  cooking: "craft:cooking:result",
   alchemy: "item:pickup:potion",
   smithing: "item:pickup:weapon",
 });

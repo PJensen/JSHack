@@ -71,7 +71,7 @@ Deno.test("audio wiring exposes crafting menu ambience and result sound contract
   assert(CRAFTING_MENU_LOOP_OPTIONS.bus === "ambient:loop");
   assert(CRAFTING_MENU_LOOP_OPTIONS.crossfade > 0);
   assert(CRAFTING_MENU_LOOP_OPTIONS.fadeOut > 0);
-  assert(CRAFTING_RESULT_SOUND_BY_KIND.cooking === "item:consume:food");
+  assert(CRAFTING_RESULT_SOUND_BY_KIND.cooking === "craft:cooking:result");
   assert(CRAFTING_RESULT_SOUND_BY_KIND.alchemy === "item:pickup:potion");
   assert(CRAFTING_RESULT_SOUND_BY_KIND.smithing === "item:pickup:weapon");
   assert(craftingMenuLoopKey("alchemy") === "ui:crafting:alchemy");

@@ -55,6 +55,7 @@ Deno.test("sounds registry adopts descriptive weather filenames", () => {
   const churchBell = resolve("church:bell");
   const bubbles = resolve("ambient:bubbles");
   const cookingFire = resolve("ambient:cooking_fire");
+  const cookingResult = resolve("craft:cooking:result");
   const holySite = resolve("ambient:holy_site");
   const smithy = resolve("ambient:smithy");
   const torchFlames = resolve("ambient:torch_flames");
@@ -116,6 +117,8 @@ Deno.test("sounds registry adopts descriptive weather filenames", () => {
   assertEquals(churchBell.file, "ambient_church_bells.mp3");
   assertEquals(bubbles.file, "ambient_bubbles.mp3");
   assertEquals(cookingFire.file, "ambient_cooking_fire.mp3");
+  assertEquals(cookingResult.file, "ambient_cooking_fire.mp3");
+  assertEquals(cookingResult.bus, "items");
   assertEquals(holySite.file, "ambient_holy_site.mp3");
   assertEquals(smithy.file, "ambient_smithy.mp3");
   assertEquals(torchFlames.file, "ambient_torch_flames.mp3");
