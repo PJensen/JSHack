@@ -3,6 +3,7 @@ import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";
 import { Interactable } from "../src/rules/components/Interactable.js";
 import { InteractIntent } from "../src/rules/components/Intents/InteractIntent.js";
+import { UseIntent } from "../src/rules/components/Intents/UseIntent.js";
 import { DoorState } from "../src/rules/components/DoorState.js";
 import { DoorLock } from "../src/rules/components/DoorLock.js";
 import { Collider } from "../src/rules/components/Collider.js";
@@ -19,6 +20,7 @@ import { HazardArea } from "../src/rules/components/HazardArea.js";
 import { Potion } from "../src/rules/components/Potion.js";
 import { Consumable } from "../src/rules/components/Consumable.js";
 import { FoodDecay } from "../src/rules/components/FoodDecay.js";
+import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
 import { ObjectState } from "../src/rules/components/ObjectState.js";
 import { DungeonState } from "../src/rules/components/DungeonState.js";
 import { Devotion } from "../src/rules/components/Devotion.js";
@@ -40,6 +42,7 @@ import {
   WildHerbs,
 } from "../src/rules/archetypes/Food.js";
 import { interactionSystem } from "../src/rules/systems/interactionSystem.js";
+import { useItemSystem } from "../src/rules/systems/useItemSystem.js";
 import { fountainRegrowthSystem } from "../src/rules/systems/fountainRegrowthSystem.js";
 import {
   deitySystem,
@@ -1215,6 +1218,80 @@ Deno.test("cooking fire: phase 2 transmogrifies corpse into ration", () => {
     fd.shelfLife === 5040,
     `shelfLife should be 5040 (ration = 7 days), got ${fd.shelfLife}`,
   );
+});
+
+Deno.test("cooking fire: recipe cooking creates long-buff food from dungeon ingredients", () => {
+  const world = new World({ seed: 172 });
+  world.setScheduler((w) => {
+    interactionSystem(w);
+  });
+  const actor = world.create();
+  world.add(actor, Inventory, { items: [], capacity: 20, weightLimit: null });
+  world.add(actor, Position, { x: 3, y: 3 });
+  world.add(actor, ActiveEffects, { effects: [] });
+
+  const corpse = world.create();
+  world.add(corpse, NamedIdentity, { name: "Rat Corpse", identity: "corpse_rat" });
+  world.add(corpse, ItemInfo, { type: "food", weight: 2, value: 5, count: 1 });
+  world.add(corpse, Consumable, { effectParams: { nutrition: 150 }, remainingUses: 1, potency: 0 });
+  addToInventory(world, actor, corpse);
+
+  for (const itemId of ["food_wild_herbs", "food_carrot", "water_bucket", "fuel_firewood", "tool_kitchen_knife"]) {
+    addToInventory(world, actor, createItemById(world, itemId));
+  }
+
+  const fire = world.create();
+  world.add(fire, Interactable, { action: "cookFood", params: null });
+  world.add(fire, Position, { x: 4, y: 3 });
+
+  const openEvents = [];
+  const cooked = [];
+  world.on("cooking:open", (e) => openEvents.push(e));
+  world.on("cooking:cooked", (e) => cooked.push(e));
+
+  world.add(actor, InteractIntent, { targetId: fire });
+  world.tick(1);
+
+  const hearty = openEvents[0].recipes.find((recipe) => recipe.key === "hearty_stew");
+  assert(hearty?.canCraft === true, "hearty stew should be craftable with corpse and pantry ingredients");
+  assertEquals(openEvents[0].ingredients.corpse, 1);
+  assertEquals(openEvents[0].ingredients.knife, 1);
+
+  world.add(actor, InteractIntent, { targetId: fire, mode: "cook", recipe: "hearty_stew" });
+  world.tick(1);
+
+  assertEquals(cooked.length, 1, "recipe should emit cooking:cooked");
+  assertEquals(cooked[0].outputIdentity, "food_hearty_stew");
+  assertEquals(getStackCount(world, actor, "food_hearty_stew"), 1);
+  assertEquals(getStackCount(world, actor, "tool_kitchen_knife"), 1, "kitchen knife should be reusable");
+  assertEquals(getStackCount(world, actor, "water_bucket"), 1, "water bucket should be reusable");
+  assertEquals(getStackCount(world, actor, "fuel_firewood"), 0, "firewood should be consumed");
+
+  const stewId = inventoryItems(world, actor).find((id) => world.get(id, NamedIdentity)?.identity === "food_hearty_stew");
+  assert(stewId > 0, "crafted stew should be in inventory");
+  const def = world.get(stewId, ItemInfo);
+  assert(Array.isArray(def.tags) && def.tags.includes("cooked_food"), "crafted meal should be tagged as cooked food");
+});
+
+Deno.test("cooked buff food feeds actor and applies long duration effect", () => {
+  const world = new World({ seed: 173 });
+  const actor = world.create();
+  world.add(actor, Inventory, { items: [], capacity: 20, weightLimit: null });
+  world.add(actor, ActiveEffects, { effects: [] });
+
+  const stew = createItemById(world, "food_hearty_stew");
+  addToInventory(world, actor, stew);
+
+  const results = [];
+  world.on("interaction:result", (event) => results.push(event));
+
+  world.add(actor, UseIntent, { itemId: stew, targetId: actor });
+  useItemSystem(world);
+
+  assert(results[0]?.ok === true, "buff food use should succeed");
+  const regen = world.get(actor, ActiveEffects)?.effects?.find((effect) => effect.key === "regen");
+  assert(regen, "hearty stew should apply regen");
+  assert(regen.turnsLeft >= 180, "cooked food buff should be long duration");
 });
 
 Deno.test("millstone mills wheat into flour", () => {

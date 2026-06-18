@@ -3,6 +3,7 @@ import { defineItem } from '../define.js';
 import {
   canCampfireDipTarget,
   canTouchstoneDipTarget,
+  createBuffFoodOnUseHook,
   createCampfireDipHook,
   createTouchstoneDipHook,
   EAT_ON_USE,
@@ -133,6 +134,70 @@ defineItem('food_stew', {
   hooks: { on_use: EAT_ON_USE },
 });
 
+defineItem('food_hearty_stew', {
+  name: 'Hearty Stew', type: 'food', material: 'organic', rarity: 'uncommon', value: 24, weight: 0.8,
+  nutrition: 360, shelfLife: 1440,
+  description: 'A rich dungeon stew that keeps wounds closing for a long while.',
+  tags: ['cooked_food'],
+  hooks: { on_use: createBuffFoodOnUseHook({ key: 'regen', turnsLeft: 180, potency: 1 }) },
+});
+
+defineItem('food_trail_bread', {
+  name: 'Trail Bread', type: 'food', material: 'organic', rarity: 'common', value: 16, weight: 0.5,
+  nutrition: 300, shelfLife: 2160,
+  description: 'Dense fire-baked bread that steadies long marches.',
+  tags: ['cooked_food'],
+  hooks: { on_use: createBuffFoodOnUseHook({ key: 'bear_vigor', turnsLeft: 180, potency: 1 }) },
+});
+
+defineItem('food_mushroom_broth', {
+  name: 'Mushroom Broth', type: 'food', material: 'organic', rarity: 'uncommon', value: 22, weight: 0.5,
+  nutrition: 260, shelfLife: 1080,
+  description: 'Earthy broth that helps the body shrug off venom.',
+  tags: ['cooked_food'],
+  hooks: { on_use: createBuffFoodOnUseHook({ key: 'resist_poison', turnsLeft: 220, potency: 1 }) },
+});
+
+defineItem('food_ember_roast', {
+  name: 'Ember Roast', type: 'food', material: 'organic', rarity: 'uncommon', value: 28, weight: 0.7,
+  nutrition: 340, shelfLife: 1440,
+  description: 'Peppery roast meat that leaves a banked heat under the skin.',
+  tags: ['cooked_food'],
+  hooks: { on_use: createBuffFoodOnUseHook({ key: 'resist_fire', turnsLeft: 220, potency: 1 }) },
+});
+
+defineItem('food_spider_skewer', {
+  name: 'Spider Skewer', type: 'food', material: 'organic', rarity: 'uncommon', value: 26, weight: 0.4,
+  nutrition: 280, shelfLife: 1080,
+  description: 'Carefully charred legs and gland oil, risky-looking but bracing.',
+  tags: ['cooked_food'],
+  hooks: { on_use: createBuffFoodOnUseHook({ key: 'spider_sense', turnsLeft: 180, potency: 1 }) },
+});
+
+defineItem('food_hunter_hash', {
+  name: 'Hunter Hash', type: 'food', material: 'organic', rarity: 'uncommon', value: 25, weight: 0.7,
+  nutrition: 320, shelfLife: 1440,
+  description: 'A tough camp hash that lends the hands a predator\'s certainty.',
+  tags: ['cooked_food'],
+  hooks: { on_use: createBuffFoodOnUseHook({ key: 'lucky', turnsLeft: 180, potency: 1 }) },
+});
+
+defineItem('food_grave_bisque', {
+  name: 'Grave Bisque', type: 'food', material: 'organic', rarity: 'uncommon', value: 30, weight: 0.5,
+  nutrition: 260, shelfLife: 1080,
+  description: 'A pale bisque that sharpens the mind toward hidden presences.',
+  tags: ['cooked_food'],
+  hooks: { on_use: createBuffFoodOnUseHook({ key: 'esp_sense', turnsLeft: 180, potency: 1 }) },
+});
+
+defineItem('food_fisher_supper', {
+  name: 'Fisher\'s Supper', type: 'food', material: 'organic', rarity: 'uncommon', value: 24, weight: 0.6,
+  nutrition: 320, shelfLife: 1080,
+  description: 'A clean coastal meal that sharpens sight and patience.',
+  tags: ['cooked_food'],
+  hooks: { on_use: createBuffFoodOnUseHook({ key: 'keen_eye', turnsLeft: 180, potency: 1 }) },
+});
+
 defineItem('food_mushrooms', {
   name: 'Dungeon Mushrooms', type: 'food', material: 'organic', rarity: 'common', value: 3, weight: 0.15,
   description: 'Pale mushrooms from the dungeon depths. Probably safe.',
@@ -225,15 +290,15 @@ defineItem('seed_corn', {
 defineItem('reagent_thorn_pod',     { name: 'Thorn Pods',       type: 'ingredient', material: 'organic',  rarity: 'common',   value: 6,  weight: 0.2,  description: 'Hardened thorn pods packed with sharp resin.' });
 defineItem('reagent_venom_frond',   { name: 'Venom Fronds',     type: 'ingredient', material: 'organic',  rarity: 'common',   value: 7,  weight: 0.2,  description: 'Slick venom fronds that reek of bitter alkaloids.' });
 defineItem('reagent_moonleaf',      { name: 'Moonleaf',         type: 'ingredient', material: 'organic',  rarity: 'common',   value: 8,  weight: 0.15, description: 'Cool silver leaves prized for soothing brews.' });
-defineItem('reagent_ember_root',    { name: 'Ember Root',       type: 'ingredient', material: 'organic',  rarity: 'common',   value: 8,  weight: 0.2,  description: 'A hot, peppery root that keeps its heat long after harvest.' });
-defineItem('reagent_spider_leg',    { name: 'Spider Leg',       type: 'ingredient', material: 'organic',  rarity: 'common',   value: 7,  weight: 0.15, description: 'A hooked spider leg, dried stiff for poison work and binding sigils.' });
-defineItem('reagent_venom_gland',   { name: 'Venom Gland',      type: 'ingredient', material: 'organic',  rarity: 'uncommon', value: 12, weight: 0.2,  description: 'A sealed venom sac prized by poisoners and enchanters alike.' });
+defineItem('reagent_ember_root',    { name: 'Ember Root',       type: 'ingredient', material: 'organic',  rarity: 'common',   value: 8,  weight: 0.2,  description: 'A hot, peppery root that keeps its heat long after harvest.', tags: ['cooking_ingredient'] });
+defineItem('reagent_spider_leg',    { name: 'Spider Leg',       type: 'ingredient', material: 'organic',  rarity: 'common',   value: 7,  weight: 0.15, description: 'A hooked spider leg, dried stiff for poison work and binding sigils.', tags: ['cooking_ingredient', 'monster_part'] });
+defineItem('reagent_venom_gland',   { name: 'Venom Gland',      type: 'ingredient', material: 'organic',  rarity: 'uncommon', value: 12, weight: 0.2,  description: 'A sealed venom sac prized by poisoners and enchanters alike.', tags: ['cooking_ingredient', 'monster_part'] });
 defineItem('reagent_resin',         { name: 'Binding Resin',    type: 'ingredient', material: 'resin',    rarity: 'common',   value: 8,  weight: 0.2,  description: 'Sticky amber resin used to seal enchantments into gear.' });
-defineItem('reagent_bone_dust',     { name: 'Bone Dust',        type: 'ingredient', material: 'bone',     rarity: 'common',   value: 8,  weight: 0.15, description: 'Pale dust from shattered bone, useful for warding work.' });
-defineItem('reagent_ectoplasm',     { name: 'Ectoplasm',        type: 'ingredient', material: 'organic',  rarity: 'uncommon', value: 13, weight: 0.15, description: 'Cold spectral residue that clings to glass and cloth.' });
+defineItem('reagent_bone_dust',     { name: 'Bone Dust',        type: 'ingredient', material: 'bone',     rarity: 'common',   value: 8,  weight: 0.15, description: 'Pale dust from shattered bone, useful for warding work.', tags: ['cooking_ingredient', 'monster_part'] });
+defineItem('reagent_ectoplasm',     { name: 'Ectoplasm',        type: 'ingredient', material: 'organic',  rarity: 'uncommon', value: 13, weight: 0.15, description: 'Cold spectral residue that clings to glass and cloth.', tags: ['cooking_ingredient', 'monster_part'] });
 defineItem('reagent_rune_fragment', { name: 'Rune Fragment',    type: 'ingredient', material: 'stone',    rarity: 'uncommon', value: 14, weight: 0.1,  description: 'A splinter of worked sigil-stone, still holding a charge.' });
 defineItem('reagent_frost_core',    { name: 'Frost Core',       type: 'ingredient', material: 'ice',      rarity: 'uncommon', value: 15, weight: 0.25, description: 'A crystal heart of trapped cold lifted from winter-touched foes.' });
-defineItem('reagent_beast_claw',    { name: 'Beast Claw',       type: 'ingredient', material: 'bone',     rarity: 'common',   value: 9,  weight: 0.2,  description: 'A heavy claw with enough bite left in it to anchor tougher wards.' });
+defineItem('reagent_beast_claw',    { name: 'Beast Claw',       type: 'ingredient', material: 'bone',     rarity: 'common',   value: 9,  weight: 0.2,  description: 'A heavy claw with enough bite left in it to anchor tougher wards.', tags: ['cooking_ingredient', 'monster_part'] });
 defineItem('reagent_cursed_thread', { name: 'Cursed Thread',    type: 'ingredient', material: 'cloth',    rarity: 'uncommon', value: 16, weight: 0.05, description: 'Black thread knotted with a whisper of malice.' });
 
 // ── Fishing & junk ────────────────────────────────────────────────────
@@ -241,6 +306,7 @@ defineItem('reagent_cursed_thread', { name: 'Cursed Thread',    type: 'ingredien
 defineItem('fishing_kelp', {
   name: 'Kelp', type: 'ingredient', material: 'organic', rarity: 'common', value: 5, weight: 0.2,
   description: 'A slick ribbon of kelp, useful in broths and coastal alchemy.',
+  tags: ['cooking_ingredient'],
 });
 
 defineItem('junk_soggy_boot', {

@@ -479,10 +479,15 @@ export function makeRulesDispatcher(world, getActorId, opts = {}) {
         break;
       }
       case "rules.cookFood": {
-        const { fireId = 0, itemId: cookItemId = 0 } = action.payload || {};
+        const { fireId = 0, itemId: cookItemId = 0, recipe = "" } = action.payload || {};
         if (!Number.isInteger(fireId) || fireId <= 0) break;
-        if (!Number.isInteger(cookItemId) || cookItemId <= 0) break;
-        world?.add?.(actorId, InteractIntent, { targetId: fireId, mode: "cook", itemId: cookItemId });
+        const recipeKey = String(recipe || "").trim().toLowerCase();
+        if (recipeKey) {
+          world?.add?.(actorId, InteractIntent, { targetId: fireId, mode: "cook", recipe: recipeKey });
+        } else {
+          if (!Number.isInteger(cookItemId) || cookItemId <= 0) break;
+          world?.add?.(actorId, InteractIntent, { targetId: fireId, mode: "cook", itemId: cookItemId });
+        }
         world?.tick?.(1);
         break;
       }

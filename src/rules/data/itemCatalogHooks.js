@@ -153,6 +153,46 @@ export function createOpenFlavorBookHook(title, text) {
   };
 }
 
+export function createBuffFoodOnUseHook(opts = {}) {
+  const eat = createEatOnUseHook({ consumeOnSuccess: opts.consumeOnSuccess });
+  const effects = Array.isArray(opts.effects)
+    ? opts.effects
+    : (opts.key ? [opts] : []);
+  return (ctx, state) => {
+    const result = eat(ctx, state);
+    const actor = Number(state?.actor || ctx.actor || 0) | 0;
+    const itemId = Number(state?.itemId || ctx.primary || 0) | 0;
+    for (const effect of effects) {
+      const key = String(effect?.key || "");
+      if (!key) continue;
+      const turnsLeft = Math.max(1, Number(effect.turnsLeft || effect.duration || 0) | 0);
+      ctx.mutate?.pushEffect?.(actor, {
+        key,
+        turnsLeft,
+        maxTurns: turnsLeft,
+        potency: Number(effect.potency || 1),
+        stacks: Math.max(1, Number(effect.stacks || 1) | 0),
+        sourceId: itemId,
+        sourceKind: "cooked_food",
+        sourceKey: String(state?.identity || ""),
+      });
+    }
+    if (effects.length > 0) {
+      ctx.io.emit("cooking:buff-food", {
+        actor,
+        itemId,
+        identity: String(state?.identity || ""),
+        effects: effects.map((effect) => ({
+          key: String(effect?.key || ""),
+          turnsLeft: Math.max(1, Number(effect?.turnsLeft || effect?.duration || 0) | 0),
+          potency: Number(effect?.potency || 1),
+        })).filter((effect) => effect.key),
+      });
+    }
+    return result;
+  };
+}
+
 /**
  * @param {any} state
  */

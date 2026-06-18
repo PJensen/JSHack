@@ -1093,6 +1093,8 @@ export function initOverlays() {
     fireId: 0,
     corpses: [],
     herbs: { count: 0 },
+    ingredients: {},
+    recipes: [],
   };
   window.addEventListener('ui:openCookingFire', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
@@ -1129,6 +1131,8 @@ export function initOverlays() {
       fireId: Number(d.fireId || _cookingState.fireId || 0) | 0,
       corpses: Array.isArray(d.corpses) ? d.corpses : [],
       herbs: d.herbs && typeof d.herbs === 'object' ? d.herbs : { count: 0 },
+      ingredients: d.ingredients && typeof d.ingredients === 'object' ? d.ingredients : {},
+      recipes: Array.isArray(d.recipes) ? d.recipes : [],
     };
     renderCookingFire(cooking, _cookingState);
   });

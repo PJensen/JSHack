@@ -3,6 +3,7 @@
 
 import { resolveItemDisplayName } from "./itemName.js";
 import { isPlayerAdjacentTo } from "./wiringUtils.js";
+import { getCatalogItem } from "../../rules/data/itemCatalog.js";
 
 const INSTALLED = Symbol.for("jshack:main:cookingWiring:installed");
 
@@ -22,7 +23,7 @@ export function installCookingWiring({ world, playerEntity, dispatchRules, log }
   const writeLog = typeof log === "function" ? log : () => {};
   let activeFireId = 0;
 
-  world.on("cooking:open", ({ actor, targetId, corpses, herbs }) => {
+  world.on("cooking:open", ({ actor, targetId, corpses, herbs, ingredients, recipes }) => {
     const pe = playerEntity(world);
     if (!pe || Number(actor || 0) !== pe.id) return;
     const fireId = Number(targetId || 0) | 0;
@@ -37,12 +38,24 @@ export function installCookingWiring({ world, playerEntity, dispatchRules, log }
         resolved.push({ id: cid, name: resolveItemDisplayName(world, cid) });
       }
     }
+    const resolvedRecipes = [];
+    if (Array.isArray(recipes)) {
+      for (const recipe of recipes) {
+        const output = getCatalogItem(String(recipe?.outputIdentity || ""));
+        resolvedRecipes.push({
+          ...recipe,
+          outputName: String(recipe?.outputName || output?.name || recipe?.label || "Cooked Food"),
+        });
+      }
+    }
     try {
       window.dispatchEvent(new CustomEvent("ui:cookingFireData", {
         detail: {
           fireId,
           corpses: resolved,
           herbs: herbs && typeof herbs === "object" ? herbs : { count: 0, items: [] },
+          ingredients: ingredients && typeof ingredients === "object" ? ingredients : {},
+          recipes: resolvedRecipes,
         },
       }));
     } catch (e) { console.debug('[cookingWiring] dispatch ui:cookingFireData:', e); }
@@ -70,5 +83,20 @@ export function installCookingWiring({ world, playerEntity, dispatchRules, log }
       return;
     }
     dispatchRules({ type: "rules.cookFood", payload: { fireId, itemId } });
+  });
+
+  addEventListener("ui:requestCookRecipe", (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const fireId = Number(e?.detail?.fireId || activeFireId || 0) | 0;
+    const recipe = String(e?.detail?.recipe || "").trim().toLowerCase();
+    if (!(fireId > 0) || !recipe) return;
+    if (!isPlayerAdjacentTo(world, fireId)) {
+      writeLog("You need to stand next to the cooking fire.");
+      activeFireId = 0;
+      try { window.dispatchEvent(new CustomEvent("ui:closeCookingFire")); } catch (e) { console.debug('[cookingWiring] dispatch ui:closeCookingFire:', e); }
+      return;
+    }
+    dispatchRules({ type: "rules.cookFood", payload: { fireId, recipe } });
   });
 }
