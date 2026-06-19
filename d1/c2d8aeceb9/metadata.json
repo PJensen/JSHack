@@ -5,6 +5,7 @@
   "branch": "master",
   "checkpoints_count": 6,
   "files_touched": [
+    "VERSION",
     "assets/audio/action_throw.mp3",
     "src/display/audio/audioWiring.js",
     "src/display/audio/sounds.js",
