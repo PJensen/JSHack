@@ -35,7 +35,7 @@
     "cache_creation_tokens": 0,
     "cache_read_tokens": 10794112,
     "output_tokens": 25512,
-    "api_call_count": 88
+    "api_call_count": 89
   },
   "combined_attribution": {
     "calculated_at": "2026-06-19T14:32:29.434052734Z",
