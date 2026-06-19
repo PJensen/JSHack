@@ -5,6 +5,7 @@
   "branch": "master",
   "checkpoints_count": 2,
   "files_touched": [
+    "VERSION",
     "assets/audio/ambient_nighttime.mp3",
     "src/display/audio/biomeAmbientController.js",
     "src/display/audio/sounds.js",
