@@ -30,6 +30,7 @@ const OCEAN_PEAK_GAIN = 0.2;
 const SWAMP_PEAK_GAIN = 0.16;
 const FOREST_PEAK_GAIN = 0.17;
 const MEADOW_PEAK_GAIN = 0.14;
+const NIGHT_PEAK_GAIN = 0.16;
 
 /**
  * Compute volume from tile count in scan area.
@@ -40,6 +41,16 @@ const MEADOW_PEAK_GAIN = 0.14;
  */
 function computeBiomeVolume(count, maxCount, peak) {
   return Math.min(1, (count / maxCount)) * peak;
+}
+
+export function computeDayBiomeFactor(nightAlpha) {
+  const n = Math.max(0, Math.min(1, Number(nightAlpha || 0)));
+  return 1 - n;
+}
+
+export function computeNightBiomeVolume(nightAlpha) {
+  const n = Math.max(0, Math.min(1, Number(nightAlpha || 0)));
+  return n * NIGHT_PEAK_GAIN;
 }
 
 /**
@@ -60,14 +71,17 @@ export function createBiomeAmbientController({
   const swampSound = resolveFn("ambient:swamp");
   const forestSound = resolveFn("ambient:forest");
   const meadowSound = resolveFn("ambient:meadow");
+  const nightSound = resolveFn("ambient:nighttime");
   const oceanUrl = oceanSound?.url || null;
   const swampUrl = swampSound?.url || null;
   const forestUrl = forestSound?.url || null;
   const meadowUrl = meadowSound?.url || null;
+  const nightUrl = nightSound?.url || null;
   let oceanActive = false;
   let swampActive = false;
   let forestActive = false;
   let meadowActive = false;
+  let nightActive = false;
 
   function stopOcean() {
     if (!oceanUrl || !oceanActive) return;
@@ -93,10 +107,17 @@ export function createBiomeAmbientController({
     meadowActive = false;
   }
 
+  function stopNight() {
+    if (!nightUrl || !nightActive) return;
+    stopLoopFn(nightUrl, { fadeOut: 0.5 });
+    nightActive = false;
+  }
+
   /**
    * @param {{
    *   player?: { pos?: { x:number, y:number } } | null,
    *   isOverworld?: boolean,
+   *   nightAlpha?: number,
    *   tileGrid?: { getTile?: (x:number, y:number)=>number, forEachTileInRect?: (x1:number,y1:number,x2:number,y2:number,cb:(t:number)=>void)=>void } | null,
    * }} worldView
    */
@@ -110,6 +131,7 @@ export function createBiomeAmbientController({
       stopSwamp();
       stopForest();
       stopMeadow();
+      stopNight();
       return;
     }
 
@@ -146,10 +168,12 @@ export function createBiomeAmbientController({
       }
     }
 
+    const dayFactor = computeDayBiomeFactor(worldView?.nightAlpha);
     const oceanVolume = computeBiomeVolume(oceanCount, 16, OCEAN_PEAK_GAIN);
     const swampVolume = computeBiomeVolume(swampCount, 24, SWAMP_PEAK_GAIN);
-    const forestVolume = computeBiomeVolume(forestCount, 24, FOREST_PEAK_GAIN);
-    const meadowVolume = computeBiomeVolume(meadowCount, 32, MEADOW_PEAK_GAIN);
+    const forestVolume = computeBiomeVolume(forestCount, 24, FOREST_PEAK_GAIN) * dayFactor;
+    const meadowVolume = computeBiomeVolume(meadowCount, 32, MEADOW_PEAK_GAIN) * dayFactor;
+    const nightVolume = computeNightBiomeVolume(worldView?.nightAlpha);
 
     if (oceanVolume > 0.001 && oceanUrl) {
       if (!oceanActive) {
@@ -193,6 +217,17 @@ export function createBiomeAmbientController({
       }
     } else {
       stopMeadow();
+    }
+
+    if (nightVolume > 0.001 && nightUrl) {
+      if (!nightActive) {
+        startLoopFn(nightUrl, { bus: AMBIENT_LOOP_BUS, volume: nightVolume, fadeIn: 0.6 });
+        nightActive = true;
+      } else {
+        setLoopVolumeFn(nightUrl, nightVolume, { ramp: 0.2 });
+      }
+    } else {
+      stopNight();
     }
   }
 
