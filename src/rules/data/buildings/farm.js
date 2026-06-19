@@ -181,12 +181,12 @@ export default {
     { "dx": 0, "dy": 5, "kind": "scarecrow" },
     { "dx": 0, "dy": 9, "kind": "scarecrow" },
     // Farm animals
-    { "dx": -2, "dy": 3, "kind": "farm_animal", "params": { "name": "Rooster", "identity": "chicken_rooster", "maxHp": 5, "massKg": 3 } },
-    { "dx": 2, "dy": 4, "kind": "farm_animal", "params": { "name": "Hen", "identity": "chicken_hen" } },
-    { "dx": -1, "dy": 7, "kind": "farm_animal", "params": { "name": "Hen", "identity": "chicken_hen" } },
-    { "dx": 3, "dy": 8, "kind": "farm_animal", "params": { "name": "Hen", "identity": "chicken_hen" } },
-    { "dx": 1, "dy": 11, "kind": "farm_animal", "params": { "name": "Chick", "identity": "chick", "maxHp": 2, "massKg": 0.5 } },
-    { "dx": 2, "dy": 11, "kind": "farm_animal", "params": { "name": "Chick", "identity": "chick", "maxHp": 2, "massKg": 0.5 } }
+    { "dx": -2, "dy": 3, "kind": "monster", "params": { "monsterId": "chicken_rooster", "depth": 0 } },
+    { "dx": 2, "dy": 4, "kind": "monster", "params": { "monsterId": "chicken_hen", "depth": 0 } },
+    { "dx": -1, "dy": 7, "kind": "monster", "params": { "monsterId": "chicken_hen", "depth": 0 } },
+    { "dx": 3, "dy": 8, "kind": "monster", "params": { "monsterId": "chicken_hen", "depth": 0 } },
+    { "dx": 1, "dy": 11, "kind": "monster", "params": { "monsterId": "chick", "depth": 0 } },
+    { "dx": 2, "dy": 11, "kind": "monster", "params": { "monsterId": "chick", "depth": 0 } }
   ],
   "waypoints": [
     { "dx": 0, "dy": 0, "name": "shop_door" },

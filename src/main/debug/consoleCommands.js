@@ -3,8 +3,6 @@
 
 import { transitionToDepth } from "../../rules/environment/dungeon/transition.js";
 import { playerEntity, findNearestValidTileAround } from "../../rules/utils/queries.js";
-import { createFrom } from "../../lib/ecs-js/archetype.js";
-import { Other } from "../../rules/archetypes/Creatures.js";
 import { manhattanScalar } from "../../rules/utils/distance.js";
 import { Inventory } from "../../rules/components/Inventory.js";
 import { ActiveEffects } from "../../rules/components/ActiveEffects.js";
@@ -354,27 +352,17 @@ export function registerBuiltinCommands(console, { world, messageLog, lightingEn
 
   // ---- chicken [hen|rooster|chick] ----
   const CHICKEN_KINDS = {
-    hen:     { name: "Hen",     identity: "chicken_hen",     maxHp: 4, massKg: 2 },
-    rooster: { name: "Rooster", identity: "chicken_rooster", maxHp: 5, massKg: 3 },
-    chick:   { name: "Chick",   identity: "chick",           maxHp: 2, massKg: 0.5 },
+    hen: "chicken_hen",
+    rooster: "chicken_rooster",
+    chick: "chick",
   };
   console.registerCommand('chicken', 'chicken [hen|rooster|chick] — spawn a chicken near player', (argsStr) => {
     const kind = (argsStr.trim() || "hen").toLowerCase();
-    const def = CHICKEN_KINDS[kind];
-    if (!def) return `Unknown kind: "${kind}". Available: ${Object.keys(CHICKEN_KINDS).join(', ')}`;
-    const pe = playerEntity(world);
-    if (!pe) return "No player entity found.";
-    const spawnAt = findNearestValidTileAround(world, pe.pos, { maxDistance: 2, exclude: [pe.pos] });
-    if (!spawnAt) return "No open tile near player.";
-    const id = createFrom(world, Other, {
-      x: spawnAt.x, y: spawnAt.y,
-      name: def.name, identity: def.identity,
-      faction: "neutral", solid: false, blocksSight: false,
-      maxHp: def.maxHp, speed: 1, sizeClass: "S",
-      massKg: def.massKg, intelligence: 1, visionRange: 4,
-      creatureType: "beast",
-    });
-    return `Spawned ${def.name} at (${spawnAt.x}, ${spawnAt.y}) [id=${id}]`;
+    const monsterId = CHICKEN_KINDS[kind];
+    if (!monsterId) return `Unknown kind: "${kind}". Available: ${Object.keys(CHICKEN_KINDS).join(', ')}`;
+    const result = spawnDebugMonsterNearPlayer(world, monsterId);
+    if (!result.ok) return result.error;
+    return `Spawned ${result.name} at (${result.x}, ${result.y})`;
   });
 
   // ---- monsters ----

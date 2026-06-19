@@ -15,7 +15,7 @@ import { DoorKey } from '../../components/DoorKey.js';
 import { DoorLock } from '../../components/DoorLock.js';
 import { DoorState } from '../../components/DoorState.js';
 import { AudioEmitter } from '../../components/AudioEmitter.js';
-import { Shopkeeper, Human, Other } from '../../archetypes/Creatures.js';
+import { Shopkeeper, Human } from '../../archetypes/Creatures.js';
 import { Equipment } from '../../components/Equipment.js';
 import { ShopInventory } from '../../components/ShopInventory.js';
 import * as shopStock from '../../data/shopStock.js';
@@ -2269,6 +2269,8 @@ export function materializeSpawn(world, spawn) {
         identity: p.identity,
         maxHp: p.maxHp,
         faction: p.faction,
+        solid: p.solid,
+        blocksSight: p.blocksSight,
         accuracyDerived: p.accuracyDerived,
         damagePowerDerived: p.damagePowerDerived,
         evadeDerived: p.evadeDerived,
@@ -2862,26 +2864,6 @@ export function materializeSpawn(world, spawn) {
           if (eq) eq.weapon = hatchetId;
         }
       }
-      return id;
-    }
-    case 'farm_animal': {
-      const p = spawn.params || {};
-      const id = createFrom(world, Other, {
-        x: spawn.x,
-        y: spawn.y,
-        name: p.name || "Chicken",
-        identity: p.identity || "chicken_hen",
-        faction: "neutral",
-        solid: false,
-        blocksSight: false,
-        maxHp: p.maxHp || 4,
-        speed: 1,
-        sizeClass: "S",
-        massKg: p.massKg || 2,
-        intelligence: 1,
-        visionRange: 4,
-        creatureType: "beast",
-      });
       return id;
     }
     default:

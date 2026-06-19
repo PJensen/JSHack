@@ -584,6 +584,13 @@ export const LOOT_TABLES = {
   // getMonsterLootTable() routes here by tag priority:
   //   caster > beast > humanoid > undead > tier fallback
 
+  "drop:domesticated": {
+    rolls: { min: 1, max: 1 },
+    entries: [
+      { type: "nothing", weight: 1 }, // TODO: egg, feather
+    ],
+  },
+
   "drop:beast": {
     rolls: { min: 1, max: 1 },
     entries: [

@@ -207,11 +207,6 @@ export const basePalette = {
   ammo_bodkin_arrows: { glyph: "/", fg: "#d0d4db", glow: "#8b929d", baseScale: 0.6 },
   ammo_blunt_arrows: { glyph: "/", fg: "#b89b72", glow: "#8f6f45", baseScale: 0.6 },
 
-  // Farm animals
-  chicken_hen:     { glyph: "🐔", fg: "#f5e0b0", glow: "#c8a050" },
-  chicken_rooster: { glyph: "🐓", fg: "#e85040", glow: "#b03020" },
-  chick:           { glyph: "🐥", fg: "#ffe066", glow: "#ccaa33", baseScale: 0.6 },
-
   // Pets
   kitty: { glyph: "f", fg: "#ffcc88", glow: "#cc9955" },
   familiar: { glyph: "f", fg: "#b366ff", glow: "#8833cc" },

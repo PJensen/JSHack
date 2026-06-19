@@ -196,6 +196,8 @@ function applyAuthoredSleep(world, entityId, params, def) {
  *   maxHp?: number,
  *   hp?: number,
  *   faction?: string,
+ *   solid?: boolean,
+ *   blocksSight?: boolean,
  *   accuracyDerived?: number,
  *   damagePowerDerived?: number,
  *   evadeDerived?: number,
@@ -234,6 +236,8 @@ export function spawnMonsterEntity(world, params = {}) {
     maxHp: Number.isFinite(p.maxHp) ? (Number(p.maxHp) | 0) : undefined,
     hp: Number.isFinite(p.hp) ? (Number(p.hp) | 0) : undefined,
     faction: p.faction,
+    solid: p.solid,
+    blocksSight: p.blocksSight,
     accuracyDerived: Number.isFinite(p.accuracyDerived)
       ? Number(p.accuracyDerived)
       : undefined,

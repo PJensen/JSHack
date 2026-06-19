@@ -48,6 +48,12 @@ function countKind(chunks, kind) {
   return spawnsOfKind(chunks, kind).length;
 }
 
+function countMonster(chunks, monsterId) {
+  return spawnsOfKind(chunks, "monster")
+    .filter((spawn) => spawn.params?.monsterId === monsterId)
+    .length;
+}
+
 function landmarkSpawns(chunks) {
   const out = [];
   for (const chunk of chunks) {
@@ -188,7 +194,9 @@ Deno.test("overworld procedurally stamps the required town economy", async () =>
   assert(countKind(chunks, "crop_wheat") >= 12, "farm should plant wheat");
   assert(countKind(chunks, "crop_carrot") >= 6, "farm should plant carrots");
   assert(countKind(chunks, "crop_corn") >= 6, "farm should plant corn");
-  assert(countKind(chunks, "farm_animal") >= 4, "farm should support animals");
+  assert(countMonster(chunks, "chicken_hen") >= 3, "farm should support hens");
+  assert(countMonster(chunks, "chicken_rooster") >= 1, "farm should support a rooster");
+  assert(countMonster(chunks, "chick") >= 2, "farm should support chicks");
   assert(countKind(chunks, "townfolk") >= 8, "buildings should open town professions");
 });
 

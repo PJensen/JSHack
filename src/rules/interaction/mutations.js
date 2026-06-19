@@ -314,7 +314,7 @@ export function applyMutation(world, op, resolvers = {}) {
       const spawnX = Number.isFinite(op.x) ? (Number(op.x) | 0) : 0;
       const spawnY = Number.isFinite(op.y) ? (Number(op.y) | 0) : 0;
       const maxHp = Number.isFinite(op.maxHp) ? (Number(op.maxHp) | 0) : Math.max(1, Number(def.baseHp || 1) | 0);
-      const faction = String(op.faction || "enemy");
+      const faction = String(op.faction || def.faction || "enemy");
       const accuracyDerived = Number.isFinite(op.accuracyDerived)
         ? Number(op.accuracyDerived)
         : Number(def.attack || 0);
@@ -336,6 +336,8 @@ export function applyMutation(world, op, resolvers = {}) {
         identity: monsterId,
         maxHp,
         faction,
+        solid: op.solid ?? def.solid,
+        blocksSight: op.blocksSight ?? def.blocksSight,
         accuracyDerived,
         damagePowerDerived,
         evadeDerived,
@@ -597,7 +599,7 @@ export function applyMutation(world, op, resolvers = {}) {
  * @typedef {{ type: 'removeTimedEffectsByKey', entityId: number, keys: string[] }} RemoveTimedEffectsByKeyOp
  * @typedef {{ type: 'setMaterial', entityId: number, kind: string }} SetMaterialOp
  * @typedef {{ type: 'spawnItem', itemId: string, x?: number, y?: number, count?: number, affixes?: string[], ownerId?: number, material?: string, patchItemInfo?: Record<string, unknown>, emitEvent?: boolean }} SpawnItemOp
- * @typedef {{ type: 'spawnMonster', monsterId: string, x: number, y: number, name?: string, faction?: string, maxHp?: number, accuracyDerived?: number, damagePowerDerived?: number, evadeDerived?: number, naturalDamageDice?: string, sizeClass?: string, massKg?: number, resistances?: Record<string, unknown>, speed?: number, tauntMessage?: string, emitEvent?: boolean, equipment?: Record<string, unknown>|null, wielding?: Array<unknown>, equipped?: Array<unknown>, inventory?: Array<unknown> }} SpawnMonsterOp
+ * @typedef {{ type: 'spawnMonster', monsterId: string, x: number, y: number, name?: string, faction?: string, solid?: boolean, blocksSight?: boolean, maxHp?: number, accuracyDerived?: number, damagePowerDerived?: number, evadeDerived?: number, naturalDamageDice?: string, sizeClass?: string, massKg?: number, resistances?: Record<string, unknown>, speed?: number, tauntMessage?: string, emitEvent?: boolean, equipment?: Record<string, unknown>|null, wielding?: Array<unknown>, equipped?: Array<unknown>, inventory?: Array<unknown> }} SpawnMonsterOp
  * @typedef {{ type: 'learnSpell', entityId: number, spellId: string }} LearnSpellOp
  * @typedef {{ type: 'recordShopDebt', actorId: number, shopkeeperId: number, amount: number, reason: string, itemId: number, identity?: string, name?: string, turn?: number }} RecordShopDebtOp
  * @typedef {{ type: 'recordShopClaim', actorId: number, shopkeeperId: number, amount?: number, reason?: string, claimKind?: string, valueKind?: string, evidence?: string, confidence?: string, createsDebt?: boolean, recordIncident?: boolean, severity?: number, itemId?: number, identity?: string, name?: string, turn?: number }} RecordShopClaimOp

@@ -357,6 +357,9 @@ export function defineItem(id, def) {
  * @param {number} [def.intelligence=3]
  * @param {number} [def.visionRange]
  * @param {string} [def.aggro] - "passive" | default
+ * @param {string} [def.faction="enemy"]
+ * @param {boolean} [def.solid=true]
+ * @param {boolean} [def.blocksSight=false]
  * @param {boolean} [def.packSense]
  * @param {number} [def.packRadius]
  * @param {number} [def.retreatHpPct]
@@ -421,6 +424,9 @@ export function defineMonster(id, def) {
   // Optional AI fields
   if (def.visionRange != null) monsterDef.visionRange = def.visionRange;
   if (def.aggro) monsterDef.aggro = def.aggro;
+  if (def.faction) monsterDef.faction = def.faction;
+  if (def.solid != null) monsterDef.solid = def.solid === true;
+  if (def.blocksSight != null) monsterDef.blocksSight = def.blocksSight === true;
   if (def.packSense != null) monsterDef.packSense = def.packSense;
   if (def.packRadius != null) monsterDef.packRadius = def.packRadius;
   if (def.retreatHpPct != null) monsterDef.retreatHpPct = def.retreatHpPct;
@@ -488,6 +494,7 @@ export function defineMonster(id, def) {
     if (def.glyph) entry.glyph = def.glyph;
     if (def.color) entry.fg = def.color;
     entry.glow = def.glow || def.color || null;
+    if (def.scale != null) entry.baseScale = Number(def.scale);
     registerPalette(id, entry);
   }
 
