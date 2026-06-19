@@ -1,0 +1,18 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "27e21a895617",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "assets/audio/ambient_nighttime.mp3"
+  ],
+  "sessions": [
+    {
+      "metadata": "/27/e21a895617/0/metadata.json",
+      "transcript": "/27/e21a895617/0/full.jsonl",
+      "content_hash": "/27/e21a895617/0/content_hash.txt",
+      "prompt": ""
+    }
+  ]
+}
