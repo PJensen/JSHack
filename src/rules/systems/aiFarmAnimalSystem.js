@@ -7,17 +7,51 @@ import { CreatureType, CREATURE_TYPES } from "../components/CreatureType.js";
 import { MoveIntent } from "../components/Intents/MoveIntent.js";
 import { DungeonState } from "../components/DungeonState.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
+import { Vitality } from "../components/Vitality.js";
 import { canActThisTurn } from "../utils/speedGate.js";
 import { CARDINAL_DIRS } from "../utils/directions.js";
 import { isWalkable } from "../environment/dungeon/tileMap.js";
 import { playerEntity } from "../utils/queries.js";
 import { forEachInRadius } from "../utils/spatialIndex.js";
+import { resolveSleepProfile, resolveSleepScheduleNow } from "../data/sleepProfiles.js";
+import { isAsleep, putActorToSleep, tryWakeActor } from "../utils/sleep.js";
 
 const ACTIVE_RADIUS = 8;
 const VOCALIZATION_COOLDOWN = 200; // turns between vocalizations per chicken
+const CHICKEN_IDENTITIES = new Set(["chicken_hen", "chicken_rooster", "chick"]);
+const CHICKEN_SLEEP_PROFILE = "diurnal";
 
 /** Track vocalization cooldown per entity (Map<id, turnsLeft>) */
 const _vocalizationCooldowns = new Map();
+
+function syncChickenSleepSchedule(world) {
+  const sleepProfile = resolveSleepProfile(CHICKEN_SLEEP_PROFILE);
+  const shouldSleep = resolveSleepScheduleNow(CHICKEN_SLEEP_PROFILE, world.step || 0) === true;
+  if (!sleepProfile) return;
+  for (const [id, identity, faction, creatureType, vitality] of world.query(
+    NamedIdentity,
+    Faction,
+    CreatureType,
+    Vitality,
+  )) {
+    if (vitality.hp <= 0 || faction.key !== "neutral") continue;
+    if (creatureType.type !== CREATURE_TYPES.beast) continue;
+    if (!CHICKEN_IDENTITIES.has(String(identity.identity || ""))) continue;
+
+    if (shouldSleep) {
+      if (!isAsleep(world, id)) {
+        putActorToSleep(world, id, {
+          reason: "scheduled_rest",
+          wakeDifficulty: sleepProfile.wakeDifficulty,
+          wakeRadius: sleepProfile.wakeRadius,
+          wakeOnDamage: sleepProfile.wakeOnDamage,
+        });
+      }
+    } else if (isAsleep(world, id)) {
+      tryWakeActor(world, id, { reason: "scheduled_wake", intensity: 999 });
+    }
+  }
+}
 
 /** @param {import('../../lib/ecs-js/index.js').World} world */
 export function aiFarmAnimalSystem(world) {
@@ -28,6 +62,8 @@ export function aiFarmAnimalSystem(world) {
     break;
   }
   if (depth !== 0) return;
+
+  syncChickenSleepSchedule(world);
 
   const player = playerEntity(world);
   if (!player) return;
@@ -40,6 +76,10 @@ export function aiFarmAnimalSystem(world) {
     const ct = world.get(id, CreatureType);
     if (!ct || ct.type !== CREATURE_TYPES.beast) return;
 
+    const identity = String(world.get(id, NamedIdentity)?.identity || "");
+    if (!CHICKEN_IDENTITIES.has(identity)) return;
+    if (isAsleep(world, id)) return;
+
     if (!canActThisTurn(world, id)) return;
     if (world.has(id, MoveIntent)) return;
 
@@ -51,7 +91,6 @@ export function aiFarmAnimalSystem(world) {
 
     // 5% chance to vocalize (if not on cooldown) — chickens cluck/cheep occasionally
     if (cooldown === 0 && world.rand() < 0.05) {
-      const identity = world.get(id, NamedIdentity)?.identity;
       if (identity) {
         world.emit?.('creature:vocalize', {
           id,

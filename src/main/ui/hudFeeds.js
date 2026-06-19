@@ -35,6 +35,16 @@ import { STARTER_RAT_QUEST_ID } from "../../rules/quests/runtime.js";
 import { REQUIRED_RAT_KILLS } from "../../rules/quests/definitions/ratInfestation.js";
 import { questRewardPreviewText } from "./questRewards.js";
 
+export function formatClockLabel12Hour(turn) {
+  const safeTurn = Math.max(0, Number(turn || 0) | 0);
+  const totalMinutes = (safeTurn % TURNS_PER_DAY) * 2;
+  const hour24 = Math.floor(totalMinutes / 60) % 24;
+  const minute = totalMinutes % 60;
+  const hour12 = (hour24 % 12) || 12;
+  const period = hour24 < 12 ? "AM" : "PM";
+  return `${hour12}:${String(minute).padStart(2, "0")} ${period}`;
+}
+
 /**
  * Provides HUD feed updaters that cache the last dispatched values.
  * @param {import('../../lib/ecs-js/index.js').World} world
@@ -105,8 +115,6 @@ export function createHudFeeds(world, deps) {
     const safeTurn = Math.max(0, Number(turn || 0) | 0);
     const turnOfDay = safeTurn % TURNS_PER_DAY;
     const totalMinutes = turnOfDay * 2;
-    const hh = Math.floor(totalMinutes / 60) % 24;
-    const mm = totalMinutes % 60;
 
     // Pick the closest emoji clock in 30-minute increments.
     const halfHourSlot = Math.round(totalMinutes / 30) % 48;
@@ -114,7 +122,7 @@ export function createHudFeeds(world, deps) {
     const isHalf = (halfHourSlot % 2) === 1;
     const emoji = isHalf ? CLOCK_HALVES[hour12 % 12] : CLOCK_HOURS[hour12 % 12];
 
-    const label = `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+    const label = formatClockLabel12Hour(safeTurn);
     return { turnOfDay, emoji, label };
   }
 

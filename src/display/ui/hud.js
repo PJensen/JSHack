@@ -407,7 +407,7 @@ export function initHUD() {
   let moonEmoji = '\uD83C\uDF11';
   let moonLabel = 'New Moon';
   let clockEmoji = '\uD83D\uDD5B';
-  let clockLabel = '00:00';
+  let clockLabel = '12:00 AM';
 
   function syncSkyChip() {
     moonPhaseEl.textContent = `${moonEmoji} ${clockEmoji} ${clockLabel}`;
