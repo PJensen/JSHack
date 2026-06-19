@@ -7,7 +7,6 @@ const TAVERN_AUDIBLE_RADIUS_TILES = 10;
 const CHURCH_AUDIBLE_RADIUS_TILES = 12;
 const SMITHY_AUDIBLE_RADIUS_TILES = 11;
 const AMBIENT_LOOP_BUS = "ambient:loop";
-const NIGHT_TOWN_ALPHA_THRESHOLD = 0.5;
 const TOWN_LOOP_GAIN = 0.16;
 const TAVERN_LOOP_GAIN = 0.22;
 const CHURCH_LOOP_GAIN = 0.14;
@@ -99,6 +98,11 @@ export function computeSmithyLoopVolume(distanceTiles) {
   return radialGain(distanceTiles, SMITHY_AUDIBLE_RADIUS_TILES, SMITHY_LOOP_GAIN);
 }
 
+export function computeTownDayFactor(nightAlpha) {
+  const night = Math.max(0, Math.min(1, Number(nightAlpha || 0)));
+  return 1 - night;
+}
+
 /**
  * @param {{
  *   startLoopFn?: typeof startLoop,
@@ -124,22 +128,21 @@ export function createWorldAmbientController({
   const churchUrl = churchSound?.url || null;
   const smithyUrl = smithySound?.url || null;
   let townActive = false;
-  let activeTownUrl = null;
+  let townNightActive = false;
   let tavernActive = false;
   let churchActive = false;
   let smithyActive = false;
 
   function stopTown() {
-    if (!activeTownUrl || !townActive) return;
-    stopLoopFn(activeTownUrl, { fadeOut: 0.5 });
+    if (!townUrl || !townActive) return;
+    stopLoopFn(townUrl, { fadeOut: 0.5 });
     townActive = false;
-    activeTownUrl = null;
   }
 
-  function townLoopUrlFor(worldView) {
-    const nightAlpha = Number(worldView?.nightAlpha || 0);
-    if (nightAlpha >= NIGHT_TOWN_ALPHA_THRESHOLD && townNightUrl) return townNightUrl;
-    return townUrl;
+  function stopTownNight() {
+    if (!townNightUrl || !townNightActive) return;
+    stopLoopFn(townNightUrl, { fadeOut: 0.5 });
+    townNightActive = false;
   }
 
   function stopTavern() {
@@ -178,6 +181,7 @@ export function createWorldAmbientController({
     const isBlockedVision = typeof worldView?.isBlockedVision === "function" ? worldView.isBlockedVision : null;
     if (!playerPos || !isOverworld || (explicitSources ? explicitSources.length === 0 : entities.length === 0)) {
       stopTown();
+      stopTownNight();
       stopTavern();
       stopChurch();
       stopSmithy();
@@ -239,12 +243,14 @@ export function createWorldAmbientController({
       }
     }
 
-    const tavernVolume = computeTavernLoopVolume(nearestTavern);
-    const smithyVolume = computeSmithyLoopVolume(nearestSmithy);
+    const dayFactor = computeTownDayFactor(worldView?.nightAlpha);
+    const nightFactor = 1 - dayFactor;
+    const tavernVolume = computeTavernLoopVolume(nearestTavern) * dayFactor;
+    const smithyVolume = computeSmithyLoopVolume(nearestSmithy) * dayFactor;
     const townBase = playerSheltered ? 0 : computeTownLoopVolume(nearestTown);
-    const townVolume = townBase * (tavernVolume > 0.02 || smithyVolume > 0.02 ? 0.28 : 1);
-    const churchVolume = playerSheltered ? computeChurchLoopVolume(nearestChurch) : 0;
-    const currentTownUrl = townLoopUrlFor(worldView);
+    const townVolume = townBase * dayFactor * (tavernVolume > 0.02 || smithyVolume > 0.02 ? 0.28 : 1);
+    const townNightVolume = townBase * nightFactor;
+    const churchVolume = playerSheltered ? computeChurchLoopVolume(nearestChurch) * dayFactor : 0;
 
     if (tavernVolume > 0.001 && tavernUrl) {
       if (!tavernActive) {
@@ -257,17 +263,26 @@ export function createWorldAmbientController({
       stopTavern();
     }
 
-    if (townVolume > 0.001 && currentTownUrl) {
-      if (!townActive || activeTownUrl !== currentTownUrl) {
-        stopTown();
-        startLoopFn(currentTownUrl, { bus: AMBIENT_LOOP_BUS, volume: townVolume, fadeIn: 0.7 });
+    if (townVolume > 0.001 && townUrl) {
+      if (!townActive) {
+        startLoopFn(townUrl, { bus: AMBIENT_LOOP_BUS, volume: townVolume, fadeIn: 0.7 });
         townActive = true;
-        activeTownUrl = currentTownUrl;
       } else {
-        setLoopVolumeFn(currentTownUrl, townVolume, { ramp: 0.2 });
+        setLoopVolumeFn(townUrl, townVolume, { ramp: 0.2 });
       }
     } else {
       stopTown();
+    }
+
+    if (townNightVolume > 0.001 && townNightUrl) {
+      if (!townNightActive) {
+        startLoopFn(townNightUrl, { bus: AMBIENT_LOOP_BUS, volume: townNightVolume, fadeIn: 0.7 });
+        townNightActive = true;
+      } else {
+        setLoopVolumeFn(townNightUrl, townNightVolume, { ramp: 0.2 });
+      }
+    } else {
+      stopTownNight();
     }
 
     if (churchVolume > 0.001 && churchUrl) {

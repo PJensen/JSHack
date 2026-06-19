@@ -1,5 +1,5 @@
 import { assert, assertAlmostEquals, assertEquals } from "jsr:@std/assert";
-import { createWorldAmbientController, computeChurchLoopVolume, computeSmithyLoopVolume, computeTavernLoopVolume, computeTownLoopVolume } from "../src/display/audio/worldAmbientController.js";
+import { createWorldAmbientController, computeChurchLoopVolume, computeSmithyLoopVolume, computeTavernLoopVolume, computeTownDayFactor, computeTownLoopVolume } from "../src/display/audio/worldAmbientController.js";
 
 Deno.test("world ambient loop curves fall to silence at their edge", () => {
   assertAlmostEquals(computeTownLoopVolume(1), 0.16, 1e-10);
@@ -14,6 +14,9 @@ Deno.test("world ambient loop curves fall to silence at their edge", () => {
   assert(computeTavernLoopVolume(4) < computeTavernLoopVolume(2));
   assert(computeChurchLoopVolume(4) < computeChurchLoopVolume(2));
   assert(computeSmithyLoopVolume(4) < computeSmithyLoopVolume(2));
+  assertEquals(computeTownDayFactor(0), 1);
+  assertEquals(computeTownDayFactor(0.5), 0.5);
+  assertEquals(computeTownDayFactor(1), 0);
 });
 
 Deno.test("world ambient controller prioritizes tavern over town bed", () => {
@@ -144,6 +147,42 @@ Deno.test("world ambient controller replaces town loop with owl ambience at nigh
   assertEquals(calls[1]?.url, "./assets/audio/ambient:town.mp3");
   assertEquals(calls[2]?.type, "start");
   assertEquals(calls[2]?.url, "./assets/audio/ambient:town:night.mp3");
+});
+
+Deno.test("world ambient controller silences outdoor town activity loops at night", () => {
+  const calls = [];
+  const controller = createWorldAmbientController({
+    resolveFn(id) {
+      return { url: `./assets/audio/${id}.mp3`, bus: "ambient" };
+    },
+    startLoopFn(url, opts) {
+      calls.push({ type: "start", url, opts });
+    },
+    stopLoopFn(url, opts) {
+      calls.push({ type: "stop", url, opts });
+    },
+    setLoopVolumeFn(url, volume, opts) {
+      calls.push({ type: "set", url, volume, opts });
+    },
+  });
+  const view = {
+    isOverworld: true,
+    nightAlpha: 0,
+    player: { pos: { x: 10, y: 10 } },
+    audioEmitters: [
+      { profile: "town", pos: { x: 11, y: 10 }, interior: false },
+      { profile: "tavern", pos: { x: 11, y: 10 }, interior: false },
+      { profile: "smithy", pos: { x: 11, y: 10 }, interior: false },
+    ],
+  };
+
+  controller.syncWorldView(view);
+  controller.syncWorldView({ ...view, nightAlpha: 1 });
+
+  assert(calls.some((call) => call.type === "stop" && call.url === "./assets/audio/ambient:town.mp3"));
+  assert(calls.some((call) => call.type === "stop" && call.url === "./assets/audio/ambient:tavern.mp3"));
+  assert(calls.some((call) => call.type === "stop" && call.url === "./assets/audio/ambient:smithy.mp3"));
+  assert(calls.some((call) => call.type === "start" && call.url === "./assets/audio/ambient:town:night.mp3"));
 });
 
 Deno.test("world ambient controller stops explicit town emitters at audible edge", () => {
