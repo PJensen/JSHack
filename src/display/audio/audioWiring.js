@@ -78,6 +78,7 @@ export const SECRET_FOUND_SOUND_ID = "action:secret_found";
 export const BONE_CHIME_SOUND_ID = "ambient:bone_chime";
 export const TAMING_SUCCESS_SOUND_ID = "magic:taming";
 export const GENOCIDE_SUCCESS_SOUND_ID = "item:scroll:genocide";
+export const THROW_SOUND_ID = "action:throw";
 
 let sfxDebugEnabled = false;
 let sfxDebugLogger = null;
@@ -126,6 +127,7 @@ const DUNGEON_OMEN_EVENT_GAP = 18;
 const DUNGEON_OMEN_CHANCE = 12;
 const DEAFENED_SOUND_COOLDOWN_MS = 2500;
 const CREATURE_ATTACK_SOUND_COOLDOWN_MS = 700;
+const CREATURE_ALERT_SOUND_COOLDOWN_MS = 1200;
 const SEARCH_REVEAL_MAX_DELAY_MS = 380;
 const WARMUP_WEAPON_FAMILIES = Object.freeze([
   "axe_large",
@@ -228,6 +230,15 @@ export function shouldPlayTeleportSound(payload, isPlayerFn) {
   if (!(id > 0) || typeof isPlayerFn !== "function" || !isPlayerFn(id)) return false;
   const src = String(payload?.source || "");
   return src !== "dungeon:teleport-depth";
+}
+
+export function shouldPlayCreatureAlertSound(soundId, state, nowMs, cooldownMs = CREATURE_ALERT_SOUND_COOLDOWN_MS) {
+  const key = String(soundId || "");
+  if (!key) return false;
+  const last = state?.get?.(key) ?? -Infinity;
+  if (Number(nowMs) - last < cooldownMs) return false;
+  state?.set?.(key, Number(nowMs));
+  return true;
 }
 
 function audioNowMs() {
@@ -536,6 +547,7 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
   const dungeonOmenEntityIds = new Set();
   const deafenedSoundAt = new Map();
   const creatureAttackSoundAt = new Map();
+  const creatureAlertSoundAt = new Map();
 
   function startChannelingLoop(actor) {
     if (!channelingLoopUrl || !isPlayer(actor) || channelingLoopActive) return;
@@ -646,9 +658,12 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
 
   function playThrownWhoosh(payload = {}) {
     const itemInfo = combatInfoForEvent(payload?.itemId, payload?.weaponFamily);
-    if (!resolveCombatFamily(itemInfo)) return;
     const pos = payload?.from || (payload?.actor != null ? getPosition(payload.actor) : null);
-    playCombatLayers(planWeaponWhoosh({ itemInfo, fallbackFamily: null }), pos);
+    if (resolveCombatFamily(itemInfo)) {
+      playCombatLayers(planWeaponWhoosh({ itemInfo, fallbackFamily: null }), pos);
+      return;
+    }
+    sfxAt(THROW_SOUND_ID, pos, pp(), null, zg());
   }
 
   function playCombatSoftHandling(itemId, at) {
@@ -1099,6 +1114,7 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
       const identity = String(getIdentity(id) || "");
       const soundId = ALERT_SOUND_BY_IDENTITY[identity];
       if (!soundId) return;
+      if (!shouldPlayCreatureAlertSound(soundId, creatureAlertSoundAt, audioNowMs())) return;
       const pos = at || getPosition(id);
       sfxAt(soundId, pos, pp(), { priority: 1 }, zg());
       return;

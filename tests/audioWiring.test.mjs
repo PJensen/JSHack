@@ -20,6 +20,7 @@ import {
   SECRET_FOUND_SOUND_ID,
   GENOCIDE_SUCCESS_SOUND_ID,
   TAMING_SUCCESS_SOUND_ID,
+  THROW_SOUND_ID,
   SPELL_CAST_SOUND_EVENTS,
   TRAP_SOUND_BY_TYPE,
   URN_BROKEN_SOUND_ID,
@@ -38,6 +39,7 @@ import {
   setSfxDebugLogger,
   shouldPlayElectrocutionSound,
   shouldPlayDungeonOmen,
+  shouldPlayCreatureAlertSound,
   shouldPlayTeleportSound,
 } from "../src/display/audio/audioWiring.js";
 import {
@@ -104,6 +106,7 @@ Deno.test("audio wiring maps new authored event sounds", () => {
   assert(BONE_CHIME_SOUND_ID === "ambient:bone_chime");
   assert(TAMING_SUCCESS_SOUND_ID === "magic:taming");
   assert(GENOCIDE_SUCCESS_SOUND_ID === "item:scroll:genocide");
+  assert(THROW_SOUND_ID === "action:throw");
 });
 
 Deno.test("audio wiring delays search reveal sound along the pulse radius", () => {
@@ -226,6 +229,15 @@ Deno.test("audio wiring gates dungeon omens to rare real dungeon events", () => 
 
   assert(played > 0, "real dungeon events should occasionally produce an omen");
   assert(played < 20, "omens should stay rare even during many hazard events");
+});
+
+Deno.test("audio wiring gates repeated creature alert bursts by sound", () => {
+  const state = new Map();
+
+  assert(shouldPlayCreatureAlertSound("creature:alert:large_beast", state, 1000, 1200));
+  assert(!shouldPlayCreatureAlertSound("creature:alert:large_beast", state, 1500, 1200));
+  assert(shouldPlayCreatureAlertSound("creature:alert:large_beast", state, 2200, 1200));
+  assert(shouldPlayCreatureAlertSound("rat:alert", state, 2300, 1200));
 });
 
 Deno.test("audio wiring only emits sfx debug events when enabled", () => {

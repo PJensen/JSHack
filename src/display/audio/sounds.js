@@ -51,6 +51,7 @@ const SOUNDS = {
   "item:drop:armor":       { file: "drop_generic.mp3",    bus: "items" },
   "item:drop:potion":      { file: "drop_potion.mp3",     bus: "items" },
   "item:impact:potion":    { file: "impact_potion.mp3",   bus: "items", maxVoices: 4 },
+  "action:throw":          { file: "action_throw.mp3",    bus: "items", maxVoices: 3, randomPitch: 16, volume: 0.85 },
   "item:drop:gem":         { file: "drop_gem.mp3",        bus: "items" },
   "item:drop:bone":        { file: "bone_dropped.mp3",    bus: "items", maxVoices: 3 },
   "item:drop:gem:glass":   { file: "drop_gem_lesser.mp3", bus: "items" },

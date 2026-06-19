@@ -22,8 +22,13 @@ Deno.test("sounds registry only references audio files present on disk", () => {
 
 Deno.test("sounds registry exposes thrown potion impact sound", () => {
   const sound = resolve("item:impact:potion");
+  const throwSound = resolve("action:throw");
+
   assertExists(sound);
   assertEquals(sound.bus, "items");
+  assertExists(throwSound);
+  assertEquals(throwSound.file, "action_throw.mp3");
+  assertEquals(throwSound.bus, "items");
 });
 
 Deno.test("sounds registry exposes taming and genocide success sounds", () => {
