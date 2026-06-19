@@ -3,7 +3,7 @@
   "checkpoint_id": "cf023d39544e",
   "strategy": "manual-commit",
   "branch": "master",
-  "checkpoints_count": 3,
+  "checkpoints_count": 1,
   "files_touched": [
     "src/display/audio/worldAmbientController.js",
     "tests/worldAmbientController.test.mjs"
@@ -29,11 +29,11 @@
     }
   ],
   "token_usage": {
-    "input_tokens": 783532,
+    "input_tokens": 125208,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 11859456,
-    "output_tokens": 31786,
-    "api_call_count": 106
+    "cache_read_tokens": 446080,
+    "output_tokens": 4197,
+    "api_call_count": 10
   },
   "combined_attribution": {
     "calculated_at": "2026-06-19T15:09:53.929483578Z",

@@ -17,3 +17,11 @@ I'm sorry -- I can only accept nighttime work -- that was really terrible on the
 ---
 
 really bad. I'll just stash it.
+
+---
+
+hey friend -- the town is still wide awake at night.
+
+---
+
+instead of 24H time being displayed, lets use 12H time, and AM and PM (when displayed), display only. Lets make sure the chickens are put to sleep at night as well.
