@@ -5,6 +5,7 @@
   "branch": "master",
   "checkpoints_count": 2,
   "files_touched": [
+    "VERSION",
     "src/content/define.js",
     "src/content/monsters/animals.js",
     "src/display/palette/base.js",
