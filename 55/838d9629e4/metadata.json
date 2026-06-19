@@ -3,7 +3,7 @@
   "checkpoint_id": "55838d9629e4",
   "strategy": "manual-commit",
   "branch": "master",
-  "checkpoints_count": 1,
+  "checkpoints_count": 2,
   "files_touched": [
     "VERSION",
     "src/main/scheduler.js",
