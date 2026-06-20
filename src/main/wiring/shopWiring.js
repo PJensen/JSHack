@@ -488,6 +488,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     }
     clearShopDebt(world, pe.id, sid);
 
+    world.emit("audio:play", { key: "shop:purchase" });
     log(`You pay ${totalBill} gold for your purchases. "Thank you, come again!"`);
     activeShopSession.mode = "browse";
     closeShopUI();

@@ -35,6 +35,9 @@ export const ALERT_SOUND_BY_IDENTITY = Object.freeze({
   dragon: "creature:alert:large_beast",
   dragon_whelp: "creature:alert:large_beast",
   rat: "rat:alert",
+  wraith: "spectral:alert",
+  carrion_shade: "spectral:alert",
+  spectral_snake: "spectral:snake:alert",
 });
 
 export const CREATURE_ATTACK_SOUNDS = Object.freeze({
@@ -128,6 +131,7 @@ const DUNGEON_OMEN_CHANCE = 12;
 const DEAFENED_SOUND_COOLDOWN_MS = 2500;
 const CREATURE_ATTACK_SOUND_COOLDOWN_MS = 700;
 const CREATURE_ALERT_SOUND_COOLDOWN_MS = 1200;
+const KITTY_HAPPY_SOUND_COOLDOWN_MS = 8000;
 const SEARCH_REVEAL_MAX_DELAY_MS = 380;
 const WARMUP_WEAPON_FAMILIES = Object.freeze([
   "axe_large",
@@ -238,6 +242,15 @@ export function shouldPlayCreatureAlertSound(soundId, state, nowMs, cooldownMs =
   const last = state?.get?.(key) ?? -Infinity;
   if (Number(nowMs) - last < cooldownMs) return false;
   state?.set?.(key, Number(nowMs));
+  return true;
+}
+
+export function shouldPlayKittyHappySound(petId, state, nowMs, cooldownMs = KITTY_HAPPY_SOUND_COOLDOWN_MS) {
+  const id = Number(petId || 0) | 0;
+  if (!(id > 0)) return false;
+  const last = state?.get?.(id) ?? -Infinity;
+  if (Number(nowMs) - last < cooldownMs) return false;
+  state?.set?.(id, Number(nowMs));
   return true;
 }
 
@@ -548,6 +561,7 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
   const deafenedSoundAt = new Map();
   const creatureAttackSoundAt = new Map();
   const creatureAlertSoundAt = new Map();
+  const kittyHappySoundAt = new Map();
 
   function startChannelingLoop(actor) {
     if (!channelingLoopUrl || !isPlayer(actor) || channelingLoopActive) return;
@@ -842,6 +856,30 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     const soundId = PET_VOCALIZE_SOUNDS[identity] || "creature:pet:meow";
     sfxAt(soundId, at, pp(), null, zg());
     _petVocalizationCooldowns.set(petId, 60); // 60-turn cooldown between vocalizations
+  });
+
+  function playHappyKitty(petId, at) {
+    const id = Number(petId || 0) | 0;
+    if (typeof getIdentity !== "function" || String(getIdentity(id) || "") !== "kitty") return;
+    if (!shouldPlayKittyHappySound(id, kittyHappySoundAt, audioNowMs())) return;
+    sfxAt("creature:kitty:happy", at || getPosition(id), pp(), null, zg());
+  }
+
+  world.on('pet:corpse-munch', ({ petId }) => {
+    playHappyKitty(petId, petId != null ? getPosition(petId) : null);
+  });
+
+  world.on('healed', ({ target, id, hpAfter, maxHp }) => {
+    if (!(Number(maxHp) > 0) || Number(hpAfter) < Number(maxHp)) return;
+    const petId = Number(target || id || 0) | 0;
+    playHappyKitty(petId, getPosition(petId));
+  });
+
+  world.on('wisp:harvest', ({ x, y, wispX, wispY }) => {
+    sfxAt("spirit:collect", {
+      x: Number.isFinite(Number(wispX)) ? Number(wispX) : Number(x),
+      y: Number.isFinite(Number(wispY)) ? Number(wispY) : Number(y),
+    }, pp(), { priority: 1 }, zg());
   });
 
   world.on('ranged:shot', ({ attacker, target }) => {

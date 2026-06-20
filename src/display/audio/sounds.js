@@ -108,6 +108,8 @@ const SOUNDS = {
   "gelatinous_cube:alert": { file: "gelatinous_cube_alerted.mp3", bus: "combat", maxVoices: 1, randomPitch: 8 },
   "cave_bear:alert":  { file: "cave_bear_alerted.mp3",     bus: "combat", maxVoices: 2, randomPitch: 15 },
   "rat:alert":        { file: "rat_alerted_1.mp3",         bus: "combat", maxVoices: 3, randomPitch: 25 },
+  "spectral:alert":   { file: "ghost_alerted.mp3",         bus: "combat", maxVoices: 3, randomPitch: 18 },
+  "spectral:snake:alert": { file: "spectral_snake_alerted.mp3", bus: "combat", maxVoices: 3, randomPitch: 18 },
   "creature:alert:large_beast": { file: "creature_alerted_large_beast.mp3", bus: "combat", maxVoices: 2, randomPitch: 15 },
   "deity:omen":       { file: "harp_reverb.mp3",   bus: "ambient", maxVoices: 2 },
 
@@ -202,6 +204,8 @@ const SOUNDS = {
   "rack:weapon:dropped": { file: "weapon_rack_dropped.mp3", bus: "items", maxVoices: 2, randomPitch: 16 },
   "torch:ignite":     { file: "light_fire.mp3",      bus: "ambient" },
   "shop:enter":       { file: "shop_door_chime.mp3", bus: "ui", maxVoices: 1 },
+  "shop:purchase":    { file: "ambient_cash_register.mp3", bus: "ui", maxVoices: 2 },
+  "spirit:collect":   { file: "sound_click.mp3",      bus: "ui", maxVoices: 16, randomPitch: 10 },
   "npc_hmm":          { file: "npc_hmm.mp3",         bus: "ui", maxVoices: 2, randomPitch: 10 },
   "quest:completed":  { file: "quest_complete.mp3",  bus: "ui", maxVoices: 1 },
   "blade_ignite":     { file: "light_fire.mp3",      bus: "items" },
@@ -217,6 +221,7 @@ const SOUNDS = {
 
   // ── Creatures (vocalizations) ───────────────────
   "creature:pet:meow":    { file: "pet_meow_1.mp3",          bus: "ambient", maxVoices: 2 },
+  "creature:kitty:happy":  { file: "pet_meow_2.mp3",          bus: "ambient", maxVoices: 1 },
   "creature:pet:eating":  { file: "pet_feline_eating.mp3",   bus: "ambient", maxVoices: 2, segment: 2 },
 
   // ── Soundscapes ─────────────────────────────────

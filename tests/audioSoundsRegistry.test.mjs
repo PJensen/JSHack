@@ -42,6 +42,21 @@ Deno.test("sounds registry exposes taming and genocide success sounds", () => {
   assertEquals(genocide.bus, "items");
 });
 
+Deno.test("sounds registry exposes spirit, spectral, kitty, and shop sounds", () => {
+  const spirit = resolve("spirit:collect");
+  const spectral = resolve("spectral:alert");
+  const spectralSnake = resolve("spectral:snake:alert");
+  const kitty = resolve("creature:kitty:happy");
+  const purchase = resolve("shop:purchase");
+
+  assertEquals(spirit?.file, "sound_click.mp3");
+  assertEquals(spirit?.maxVoices, 16);
+  assertEquals(spectral?.file, "ghost_alerted.mp3");
+  assertEquals(spectralSnake?.file, "spectral_snake_alerted.mp3");
+  assertEquals(kitty?.file, "pet_meow_2.mp3");
+  assertEquals(purchase?.file, "ambient_cash_register.mp3");
+});
+
 Deno.test("sounds registry exposes fountain ambient loop as mp3", () => {
   const sound = resolve("fountain");
   assertExists(sound);

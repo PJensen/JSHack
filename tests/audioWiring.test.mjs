@@ -240,6 +240,16 @@ Deno.test("audio wiring gates repeated creature alert bursts by sound", () => {
   assert(shouldPlayCreatureAlertSound("rat:alert", state, 2300, 1200));
 });
 
+Deno.test("kitty happy vocalizations use a per-kitty cooldown", async () => {
+  const { shouldPlayKittyHappySound } = await import("../src/display/audio/audioWiring.js");
+  const state = new Map();
+
+  assert(shouldPlayKittyHappySound(42, state, 1000, 8000));
+  assert(!shouldPlayKittyHappySound(42, state, 5000, 8000));
+  assert(shouldPlayKittyHappySound(42, state, 9000, 8000));
+  assert(shouldPlayKittyHappySound(43, state, 9000, 8000));
+});
+
 Deno.test("audio wiring only emits sfx debug events when enabled", () => {
   const events = [];
   setSfxDebugLogger((event) => events.push(event));
