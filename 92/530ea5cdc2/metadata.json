@@ -1,0 +1,37 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "92530ea5cdc2",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "src/display/ui/inventoryOverlay.js",
+    "src/display/ui/wiring/messages/itemMessages.js",
+    "src/main/ui/inventoryDataProvider.js",
+    "src/rules/components/Encumbrance.js",
+    "src/rules/data/encumbranceTuning.js",
+    "src/rules/systems/autoPickupSystem.js",
+    "src/rules/systems/encumbranceSystem.js",
+    "src/rules/systems/itemPickupSystem.js",
+    "src/rules/systems/staminaRegenerationSystem.js",
+    "src/rules/utils/encumbrance.js",
+    "src/rules/utils/inventoryFacade.js",
+    "tests/encumbrance.test.mjs",
+    "tests/inventoryContract.test.mjs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/92/530ea5cdc2/0/metadata.json",
+      "transcript": "/92/530ea5cdc2/0/full.jsonl",
+      "content_hash": "/92/530ea5cdc2/0/content_hash.txt",
+      "prompt": "/92/530ea5cdc2/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 63855,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 5284864,
+    "output_tokens": 11697,
+    "api_call_count": 32
+  }
+}
