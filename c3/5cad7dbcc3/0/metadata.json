@@ -1,0 +1,82 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "c35cad7dbcc3",
+  "session_id": "019ee6af-ca96-7ed1-8cf7-0d58798d8084",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-20T20:29:11.563287311Z",
+  "branch": "master",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "AGENTS.md",
+    "src/display/audio/audioWiring.js",
+    "src/display/audio/sounds.js",
+    "src/display/ui/wiring/floatTextWiring.js",
+    "src/main.js",
+    "src/rules/environment/dungeon/underworldRegions.js",
+    "src/rules/systems/autoPickupSystem.js",
+    "src/rules/systems/itemPickupSystem.js",
+    "src/rules/systems/movementSystem.js",
+    "src/rules/utils/inventoryFacade.js",
+    "tests/audioSoundsRegistry.test.mjs",
+    "tests/inventoryFacade.test.mjs"
+  ],
+  "agent": "Codex",
+  "model": "gpt-5.5",
+  "turn_id": "ca814ea3c712",
+  "token_usage": {
+    "input_tokens": 112333,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 7170560,
+    "output_tokens": 10941,
+    "api_call_count": 100
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-20T20:29:11.519468616Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 2730,
+    "total_committed": 0,
+    "total_lines_changed": 2730,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 6400,
+      "user_lines_removed": 2730,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".github/agents/Dungeon Generation and BSP Expert.agent.md": 582,
+        ".github/agents/VFX Agent.agent.md": 283,
+        "src/display/audio/audioWiring.js": 580,
+        "src/display/audio/sounds.js": 568,
+        "src/display/ui/wiring/floatTextWiring.js": 1108,
+        "src/main.js": 2643,
+        "src/rules/environment/dungeon/underworldRegions.js": 80,
+        "src/rules/systems/autoPickupSystem.js": 16,
+        "src/rules/systems/itemPickupSystem.js": 178,
+        "src/rules/systems/movementSystem.js": 99,
+        "src/rules/utils/inventoryFacade.js": 68,
+        "tests/audioSoundsRegistry.test.mjs": 55,
+        "tests/inventoryFacade.test.mjs": 140
+      },
+      "user_removed_per_file": {
+        "src/display/audio/audioWiring.js": 283,
+        "src/display/audio/sounds.js": 180,
+        "src/display/ui/wiring/floatTextWiring.js": 804,
+        "src/main.js": 1214,
+        "src/rules/environment/dungeon/underworldRegions.js": 24,
+        "src/rules/systems/autoPickupSystem.js": 3,
+        "src/rules/systems/itemPickupSystem.js": 126,
+        "src/rules/systems/movementSystem.js": 37,
+        "src/rules/utils/inventoryFacade.js": 20,
+        "tests/audioSoundsRegistry.test.mjs": 11,
+        "tests/inventoryFacade.test.mjs": 28
+      }
+    }
+  ]
+}
