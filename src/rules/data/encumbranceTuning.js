@@ -1,5 +1,5 @@
 /** Kilograms of normal carrying capacity granted per point of max stamina. */
-export const CARRY_KG_PER_STAMINA = 0.30;
+export const CARRY_KG_PER_STAMINA = 0.60;
 
 /** Load thresholds relative to normal carrying capacity. */
 export const HEAVY_LOAD_RATIO = 0.85;
