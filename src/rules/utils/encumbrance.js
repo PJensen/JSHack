@@ -18,10 +18,11 @@ export function resolveEncumbrance(current, limit) {
   const weight = Math.max(0, Number(current || 0));
   const capacity = Number(limit);
   if (!(capacity > 0)) {
-    return { limit: null, hardLimit: null, loadRatio: 0, heavilyLoaded: false, overloaded: false };
+    return { current: weight, limit: null, hardLimit: null, loadRatio: 0, heavilyLoaded: false, overloaded: false };
   }
   const loadRatio = weight / capacity;
   return {
+    current: weight,
     limit: capacity,
     hardLimit: capacity * MAX_LOAD_RATIO,
     loadRatio,

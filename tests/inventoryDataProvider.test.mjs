@@ -13,6 +13,7 @@ import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
 import { Status } from "../src/rules/components/Status.js";
 import { CalendarState } from "../src/rules/components/CalendarState.js";
 import { Vitality } from "../src/rules/components/Vitality.js";
+import { Stamina } from "../src/rules/components/Stamina.js";
 import { Owner } from "../src/rules/components/Owner.js";
 import { Pet } from "../src/rules/components/Pet.js";
 import { PetState } from "../src/rules/components/PetState.js";
@@ -73,6 +74,7 @@ Deno.test("inventory data provider hides equipped gear from bag and exposes char
   world.add(player, Position, { x: 0, y: 0 });
   world.add(player, Inventory, { items: [], capacity: 20 });
   world.add(player, Equipment, {});
+  world.add(player, Stamina, { maxStamina: 100, stamina: 100, staminaRegen: 3 });
 
   const sword = makeEquipItem(world, "sword_plain", "Plain Sword", "weapon");
   const boots = makeEquipItem(world, "boots_leather", "Leather Boots", "feet");
@@ -102,6 +104,8 @@ Deno.test("inventory data provider hides equipped gear from bag and exposes char
   assert(bagItems.every((it) => Number(it.id || 0) !== sword), "equipped weapon should be hidden from bagItems");
   assert(bagItems.some((it) => Number(it.id || 0) === boots), "unequipped gear should remain in bagItems");
   assertEquals(Number(inventoryPayload?.equippedBySlot?.weapon?.item?.id || 0), sword);
+  assertEquals(inventoryPayload?.encumbrance?.current, 2, "projection should include bag and equipped weight before an effects pass");
+  assertEquals(inventoryPayload?.encumbrance?.limit, 30, "projection should derive capacity without cached Encumbrance state");
 
   /** @type {any} */
   let characterPayload = null;
@@ -114,6 +118,19 @@ Deno.test("inventory data provider hides equipped gear from bag and exposes char
 
   assert(characterPayload, "expected ui:characterData payload");
   assertEquals(Number(characterPayload?.equippedBySlot?.weapon?.item?.id || 0), sword);
+  assertEquals(characterPayload?.stats?.carryWeight, 2);
+  assertEquals(characterPayload?.stats?.carryLimit, 30);
+
+  /** @type {any} */
+  let equipmentPayload = null;
+  const onEquipmentData = (ev) => {
+    equipmentPayload = ev?.detail || null;
+  };
+  addEventListener("ui:equipmentData", onEquipmentData);
+  dispatchEvent(new CustomEvent("ui:requestEquipmentData"));
+  removeEventListener("ui:equipmentData", onEquipmentData);
+  assertEquals(equipmentPayload?.encumbrance?.current, 2);
+  assertEquals(equipmentPayload?.encumbrance?.limit, 30);
 });
 
 Deno.test("inventory data provider does not emit learned spells as bag items", () => {

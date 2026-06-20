@@ -100,6 +100,7 @@ export function renderCharacterSheet(panel, data) {
     ['Dmg Bonus', `${Number(stats.damageFlatBonus || 0)}`, deltaColor(stats.damageFlatBonus)],
     ['Mana Regen', `${Number(stats.manaRegen || 0).toFixed(2)}/t`, deltaColor(stats.manaRegenDerived)],
     ['Stam Regen', `${Number(stats.staminaRegen || 0).toFixed(1)}/t`, deltaColor(stats.staminaRegenDerived)],
+    ['Carry', `${Number(stats.carryWeight || 0).toFixed(1)}/${Number(stats.carryLimit || 0).toFixed(1)} kg · ${humanize(String(stats.carryState || 'unburdened'))}`],
     ['Max HP Bonus', `${Number(stats.maxHpDerived || 0)}`, deltaColor(stats.maxHpDerived)],
     ['Speed', `${Number(stats.speed || 1)}`, deltaColor(stats.speed, 1) === '#64c87a' ? '#e06a6a' : deltaColor(stats.speed, 1) === '#e06a6a' ? '#64c87a' : null],
     ['Gold', `${Number(stats.gold || 0)}`],
@@ -333,8 +334,8 @@ export function renderCharacterSheet(panel, data) {
   installDetachableKeyHandler(panel, '_characterSheetDetach', (e) => onKey(e));
 }
 
-/** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Record<string, any>|null} equippedBySlot @param {string|null} playerName @param {number} [scrollOfIdentifyId] */
-export function renderEquipment(panel, equippedBySlot, playerName, scrollOfIdentifyId = 0) {
+/** @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel @param {Record<string, any>|null} equippedBySlot @param {string|null} playerName @param {number} [scrollOfIdentifyId] @param {any} [encumbrance] */
+export function renderEquipment(panel, equippedBySlot, playerName, scrollOfIdentifyId = 0, encumbrance = null) {
   const existingDetach = /** @type {any} */ (panel)._equipmentDetach;
   if (typeof existingDetach === 'function') {
     try { existingDetach(); } catch (e) { console.debug('[overlay] equipment detach failed:', e); }
@@ -351,6 +352,20 @@ export function renderEquipment(panel, equippedBySlot, playerName, scrollOfIdent
   title.style.fontWeight = 'bold';
   title.style.marginBottom = '8px';
   el.appendChild(title);
+
+  if (encumbrance?.limit > 0) {
+    const carry = document.createElement('div');
+    const state = encumbrance.overloaded ? 'overloaded'
+      : encumbrance.heavilyLoaded ? 'burdened'
+      : 'unburdened';
+    carry.textContent = `Carry weight: ${Number(encumbrance.current || 0).toFixed(1)} / ${Number(encumbrance.limit).toFixed(1)} kg · ${state}`;
+    carry.style.marginBottom = '8px';
+    carry.style.fontSize = '12px';
+    carry.style.color = encumbrance.overloaded ? '#e06a6a'
+      : encumbrance.heavilyLoaded ? '#d9963b'
+      : '#79c98a';
+    el.appendChild(carry);
+  }
 
   const _hideVal = (/** @type {any} */ (panel))._hideEmptySlots;
   let hideEmpty = _hideVal !== undefined ? _hideVal : true;

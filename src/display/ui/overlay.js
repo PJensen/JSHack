@@ -566,7 +566,7 @@ export function initOverlays() {
       if (inv.style.display === 'block') renderInventory(inv, items, ground, slotFilter, scrollOfIdentifyId, encumbrance, pinnedKeys);
       if (equip.style.display === 'block') {
         const cachedPlayerName = String((/** @type {any} */ (equip))._equipmentPlayerName || 'Hero');
-        renderEquipment(equip, equippedBySlot, cachedPlayerName, scrollOfIdentifyId);
+        renderEquipment(equip, equippedBySlot, cachedPlayerName, scrollOfIdentifyId, encumbrance);
       }
     };
 
@@ -612,8 +612,9 @@ export function initOverlays() {
     const equippedBySlot = e?.detail?.equippedBySlot || null;
     const playerName = String(e?.detail?.playerName || 'Hero');
     const scrollOfIdentifyId = Number(e?.detail?.scrollOfIdentifyId || 0) | 0;
+    const encumbrance = e?.detail?.encumbrance || null;
     (/** @type {any} */ (equip))._equipmentPlayerName = playerName;
-    if (equip.style.display === 'block') renderEquipment(equip, equippedBySlot, playerName, scrollOfIdentifyId);
+    if (equip.style.display === 'block') renderEquipment(equip, equippedBySlot, playerName, scrollOfIdentifyId, encumbrance);
   });
   window.addEventListener('ui:questJournalData', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore

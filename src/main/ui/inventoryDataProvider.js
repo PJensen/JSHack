@@ -5,7 +5,7 @@
 import { playerEntity, itemsAt, findNearestValidTileAround } from "../../rules/utils/queries.js";
 import { serializeWorld } from "../../lib/ecs-js/serialization.js";
 import { Inventory } from "../../rules/components/Inventory.js";
-import { inventoryItems } from "../../rules/utils/inventoryFacade.js";
+import { getCarriedWeight, inventoryItems } from "../../rules/utils/inventoryFacade.js";
 import { Equipment, GEAR_SLOTS, GEAR_SLOT_SET, getEquippedSlot } from "../../rules/components/Equipment.js";
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
@@ -51,7 +51,7 @@ import { getPassiveBonuses } from "../../rules/utils/passiveBonuses.js";
 import { QuestDefRef } from "../../rules/components/QuestDefRef.js";
 import { QuestState } from "../../rules/components/QuestState.js";
 import { QuestVars } from "../../rules/components/QuestVars.js";
-import { Encumbrance } from "../../rules/components/Encumbrance.js";
+import { getCarryCapacity, resolveEncumbrance } from "../../rules/utils/encumbrance.js";
 import { Traits } from "../../rules/components/Traits.js";
 import { getQuestDef } from "../../rules/quests/registry.js";
 import { buildPalette } from "../../display/palette/index.js";
@@ -67,6 +67,11 @@ const TRAIT_DISPLAY = Object.freeze({
 const _installed = Symbol.for('inventoryDataProvider');
 const _uiEventTarget = globalThis.window || globalThis;
 const _itemPalette = buildPalette();
+
+function buildEncumbranceData(world, actorId) {
+  const current = getCarriedWeight(world, actorId);
+  return resolveEncumbrance(current, getCarryCapacity(world, actorId));
+}
 
 function titleCaseWords(value) {
   return String(value || "")
@@ -443,15 +448,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
     const scrollOfIdentifyId = p ? findScrollOfIdentify(p.id) : 0;
     let encumbrance = null;
     if (p) {
-      const enc = world.get(p.id, Encumbrance);
-      encumbrance = {
-        current: enc ? enc.current : 0,
-        limit: enc ? enc.limit : null,
-        hardLimit: enc ? enc.hardLimit : null,
-        loadRatio: enc ? enc.loadRatio : 0,
-        overloaded: enc ? enc.overloaded : false,
-        heavilyLoaded: enc ? enc.heavilyLoaded : false,
-      };
+      encumbrance = buildEncumbranceData(world, p.id);
     }
     _uiEventTarget.dispatchEvent(new CustomEvent('ui:inventoryData', {
       detail: {
@@ -564,6 +561,12 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
       stats.manaRegenDerived = Number(passive?.manaRegenDerived ?? 0);
       stats.staminaRegen = Number(stamina?.staminaRegen ?? 0) + Number(passive?.staminaRegenDerived ?? 0);
       stats.staminaRegenDerived = Number(passive?.staminaRegenDerived ?? 0);
+      const encumbrance = buildEncumbranceData(world, p.id);
+      stats.carryWeight = encumbrance.current;
+      stats.carryLimit = encumbrance.limit;
+      stats.carryState = encumbrance.overloaded ? "overloaded"
+        : encumbrance.heavilyLoaded ? "burdened"
+        : "unburdened";
       stats.maxHpDerived = Number(passive?.maxHpDerived ?? 0);
       const spd = world.get(p.id, Speed);
       stats.speed = Number(spd?.actEvery ?? 1);
@@ -604,12 +607,14 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
     const p = playerEntity(world);
     let equippedBySlot = Object.fromEntries(GEAR_SLOTS.map((slot) => [slot, { item: null, blocked: false }]));
     let playerName = 'Hero';
+    let encumbrance = null;
     equippedBySlot.brain = { item: null, blocked: false };
     if (p) {
       const eq = world.get(p.id, Equipment);
       equippedBySlot = buildEquippedBySlot(eq);
       equippedBySlot.brain = { item: null, blocked: false };
       playerName = String(world.get(p.id, NamedIdentity)?.name || 'Hero');
+      encumbrance = buildEncumbranceData(world, p.id);
       const spellItem = buildActiveSpellItem();
       if (spellItem) {
         equippedBySlot.brain = { item: spellItem, blocked: false };
@@ -617,7 +622,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
     }
     const scrollOfIdentifyId = p ? findScrollOfIdentify(p.id) : 0;
     _uiEventTarget.dispatchEvent(new CustomEvent('ui:equipmentData', {
-      detail: { equippedBySlot, playerName, scrollOfIdentifyId },
+      detail: { equippedBySlot, playerName, scrollOfIdentifyId, encumbrance },
     }));
   });
 
