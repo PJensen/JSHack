@@ -1,0 +1,30 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "610b0fffcee5",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "src/display/composition/cameraEffects.js",
+    "src/display/ui/spellDock.js",
+    "src/rules/dialogues/townfolkDialogs.js",
+    "src/rules/quests/definitions/graveyardWatch.js",
+    "src/rules/quests/definitions/ratInfestation.js",
+    "tests/townDialogQuestIntegration.test.mjs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/61/0b0fffcee5/0/metadata.json",
+      "transcript": "/61/0b0fffcee5/0/full.jsonl",
+      "content_hash": "/61/0b0fffcee5/0/content_hash.txt",
+      "prompt": "/61/0b0fffcee5/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 120084,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 3654656,
+    "output_tokens": 8599,
+    "api_call_count": 48
+  }
+}
