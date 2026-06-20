@@ -13,7 +13,8 @@ import { STARTER_PRIEST_FETCH_QUEST_ID, getQuestRecord } from "../runtime.js";
 
 const STARTER_FETCH_ITEM_ID = "book_dead";
 const STARTER_FETCH_HOOKS_KEY = Symbol.for("jshack:quests:starterFetch:installed");
-const REWARD_GOLD = 100;
+const REWARD_GOLD = 200;
+const REWARD_ITEM_ID = "potion_holy_water";
 
 function playerHasBook(world, playerId) {
   return inventoryHasIdentity(world, playerId, STARTER_FETCH_ITEM_ID, 1);
@@ -168,7 +169,7 @@ export const GraveyardWatchQuest = registerQuest({
             guard: (ctx) => {
               return Number(ctx.payload?.playerId || 0) === Number(ctx.bind.player || 0)
                 && String(ctx.payload?.questId || "") === STARTER_PRIEST_FETCH_QUEST_ID
-                && Number(ctx.payload?.speakerId || 0) === Number(ctx.bind.giver || 0)
+                && Number(ctx.payload?.speakerId || 0) > 0
                 && playerHasBook(ctx.world, ctx.bind.player);
             },
             actions: [
@@ -181,6 +182,8 @@ export const GraveyardWatchQuest = registerQuest({
                 if (playerId > 0) {
                   const goldId = createItemById(ctx.world, "gold", { count: REWARD_GOLD });
                   if (goldId > 0) addToInventory(ctx.world, playerId, goldId);
+                  const rewardId = createItemById(ctx.world, REWARD_ITEM_ID);
+                  if (rewardId > 0) addToInventory(ctx.world, playerId, rewardId);
                 }
               },
               emit("quest:completed", (ctx) => ({
@@ -189,6 +192,7 @@ export const GraveyardWatchQuest = registerQuest({
                 giverId: ctx.bind.giver,
                 title: "The Book Below",
                 rewardGold: REWARD_GOLD,
+                rewardItemIds: [REWARD_ITEM_ID],
                 at: (() => {
                   const p = ctx.world.get(Number(ctx.bind.player || 0) | 0, Position);
                   return p ? { x: Number(p.x) | 0, y: Number(p.y) | 0 } : null;

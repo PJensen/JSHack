@@ -16,7 +16,7 @@ import { getQuestRecord } from "../runtime.js";
 
 export const RAT_INFESTATION_QUEST_ID = "starter.rat_infestation";
 export const REQUIRED_RAT_KILLS = 5;
-const REWARD_GOLD = 75;
+const REWARD_GOLD = 150;
 const REWARD_ITEM_IDS = Object.freeze(["bow_mirror"]);
 const DUNGEON_RAT_INFESTATION_COUNT = 10;
 
@@ -208,7 +208,8 @@ export const RatInfestationQuest = registerQuest({
               setVar("rewardGold", REWARD_GOLD),
               (ctx) => {
                 const giverId = Number(ctx.bind.giver || 0);
-                if (!(giverId > 0)) return;
+                const playerId = Number(ctx.bind.player || 0) | 0;
+                if (!(giverId > 0) || !(playerId > 0)) return;
                 const giverPos = ctx.world.get(giverId, Position);
                 if (!giverPos) return;
                 if (!Number.isFinite(giverPos.x) || !Number.isFinite(giverPos.y)) return;
@@ -216,21 +217,15 @@ export const RatInfestationQuest = registerQuest({
                 const y = giverPos.y | 0;
 
                 const bowId = createItemById(ctx.world, "bow_short");
-                if (bowId > 0) {
-                  ctx.world.add(bowId, Position, { x, y });
-                  ctx.world.emit("item:dropped", { itemId: bowId, count: 1, at: { x, y } });
-                }
+                if (bowId > 0) addToInventory(ctx.world, playerId, bowId);
 
                 const arrowsId = createItemById(ctx.world, "ammo_arrows", { count: 20 });
-                if (arrowsId > 0) {
-                  ctx.world.add(arrowsId, Position, { x, y });
-                  ctx.world.emit("item:dropped", { itemId: arrowsId, count: 20, at: { x, y } });
-                }
+                if (arrowsId > 0) addToInventory(ctx.world, playerId, arrowsId);
 
                 // Beat 1: hand over the gear
                 ctx.world.emit("npc:dialogue", {
                   actor: giverId,
-                  targetId: Number(ctx.bind.player || 0) | 0,
+                  targetId: playerId,
                   text: "take this — there are bats down there too.",
                 });
 
@@ -265,7 +260,7 @@ export const RatInfestationQuest = registerQuest({
                 if (Number.isFinite(x) && Number.isFinite(y)) {
                   ctx.world.emit("npc:dialogue", {
                     actor: giverId,
-                    targetId: Number(ctx.bind.player || 0) | 0,
+                    targetId: playerId,
                     text: "there's one! Kill it!",
                   });
                 }
@@ -325,16 +320,12 @@ export const RatInfestationQuest = registerQuest({
             guard: (ctx) => {
               return Number(ctx.payload?.playerId || 0) === Number(ctx.bind.player || 0)
                 && String(ctx.payload?.questId || "") === RAT_INFESTATION_QUEST_ID
-                && Number(ctx.payload?.speakerId || 0) === Number(ctx.bind.giver || 0);
+                && Number(ctx.payload?.speakerId || 0) > 0;
             },
             actions: [
               setVar("reported", true),
               setVar("rewardGranted", true),
               (ctx) => {
-                const giverId = Number(ctx.bind.giver || 0);
-                const giverPos = giverId > 0 ? ctx.world.get(giverId, Position) : null;
-                const x = giverPos?.x ?? 0;
-                const y = giverPos?.y ?? 0;
                 const playerId = Number(ctx.bind.player || 0) | 0;
                 if (playerId > 0) {
                   for (const rewardItemId of REWARD_ITEM_IDS) {
@@ -343,12 +334,8 @@ export const RatInfestationQuest = registerQuest({
                   }
                   const goldId = createItemById(ctx.world, "gold", { count: REWARD_GOLD });
                   if (goldId > 0) addToInventory(ctx.world, playerId, goldId);
-                }
-                // Drop a hot meal
-                const stewId = createItemById(ctx.world, "food_stew");
-                if (stewId > 0) {
-                  ctx.world.add(stewId, Position, { x, y });
-                  ctx.world.emit('item:dropped', { itemId: stewId, count: 1, at: { x, y } });
+                  const stewId = createItemById(ctx.world, "food_stew");
+                  if (stewId > 0) addToInventory(ctx.world, playerId, stewId);
                 }
               },
               emit("quest:completed", (ctx) => ({

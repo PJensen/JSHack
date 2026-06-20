@@ -54,6 +54,8 @@ Deno.test("priest dialog runs the starter fetch quest from offer to turn-in", ()
   const acceptSessionId = opened.at(-1).sessionId;
   world.emit("dialog:choose", { sessionId: acceptSessionId, choiceId: "accept_priest_fetch" });
   world.tick(0);
+  const ackSessionId = opened.at(-1).sessionId;
+  world.emit("dialog:choose", { sessionId: ackSessionId, choiceId: "leave" });
 
   const quest = getQuestRecord(world, STARTER_PRIEST_FETCH_QUEST_ID, player);
   assert(quest, "starter quest should exist");
@@ -65,11 +67,13 @@ Deno.test("priest dialog runs the starter fetch quest from offer to turn-in", ()
   world.tick(0);
   assertEquals(world.get(quest.id, QuestState)?.node, "report");
 
-  world.emit("dialog:openRequest", { actorId: player, targetId: priest, dialogId: "townfolk:priest" });
-  assertEquals(opened.at(-1).choices.some((choice) => choice.id === "turn_in_priest_fetch"), true);
-  assertEquals(opened.at(-1).choices.some((choice) => choice.id === "accept_priest_fetch"), false);
-  const reportSessionId = opened.at(-1).sessionId;
-  world.emit("dialog:choose", { sessionId: reportSessionId, choiceId: "turn_in_priest_fetch" });
+  const returningPriest = world.create();
+  world.add(returningPriest, NamedIdentity, { name: "Priest", identity: "townfolk_priest" });
+  world.emit("dialog:reported", {
+    questId: STARTER_PRIEST_FETCH_QUEST_ID,
+    playerId: player,
+    speakerId: returningPriest,
+  });
   world.tick(0);
 
   assertEquals(world.get(quest.id, QuestState)?.status, "complete");
@@ -83,9 +87,10 @@ Deno.test("priest dialog runs the starter fetch quest from offer to turn-in", ()
     goldTotal += Math.max(1, Number(info?.count || 1) | 0);
   }
   assert(goldTotal >= 100, "starter priest quest should award gold");
+  assert(inventoryHasIdentity(world, player, "potion_holy_water", 1), "starter priest quest should award an item");
 });
 
-Deno.test("barkeep rat quest acceptance drops starter bow + arrows and announces bats", () => {
+Deno.test("barkeep rat quest acceptance gives starter bow + arrows and announces bats", () => {
   const world = new World({ seed: 92 });
   world.setScheduler(composeScheduler("scripts"));
   installDialogRuntime(world);
@@ -125,17 +130,8 @@ Deno.test("barkeep rat quest acceptance drops starter bow + arrows and announces
   world.emit("dialog:choose", { sessionId: acceptSessionId, choiceId: "accept_rat_quest" });
   world.tick(0);
 
-  const dropped = [];
-  for (const [id, pos, ni] of world.query(Position, NamedIdentity)) {
-    if ((pos.x | 0) !== 12 || (pos.y | 0) !== 7) continue;
-    const identity = String(ni?.identity || "");
-    if (identity !== "bow_short" && identity !== "ammo_arrows") continue;
-    const info = world.get(id, ItemInfo);
-    dropped.push({ id, identity, count: Number(info?.count || 0) | 0 });
-  }
-
-  assertEquals(dropped.some((it) => it.identity === "bow_short"), true);
-  assertEquals(dropped.some((it) => it.identity === "ammo_arrows" && it.count >= 20), true);
+  assert(inventoryHasIdentity(world, player, "bow_short", 1));
+  assert(inventoryHasIdentity(world, player, "ammo_arrows", 20));
   assertEquals(chatter.some((evt) => String(evt?.text || "").includes("there are bats down there too")), true);
 });
 
@@ -169,7 +165,9 @@ Deno.test("barkeep rat quest turn-in grants promised Mirror Bow reward", () => {
   world.on("dialog:opened", (payload) => opened.push(payload));
   world.on("quest:completed", (payload) => completed.push(payload));
 
-  world.emit("dialog:openRequest", { actorId: player, targetId: barkeep, dialogId: "townfolk:barkeep" });
+  const returningBarkeep = world.create();
+  world.add(returningBarkeep, NamedIdentity, { name: "Barkeep", identity: "townfolk_barkeep" });
+  world.emit("dialog:openRequest", { actorId: player, targetId: returningBarkeep, dialogId: "townfolk:barkeep" });
   assert(opened.length > 0, "barkeep dialog should open");
   assertEquals(opened.at(-1).choices.some((choice) => choice.id === "turn_in_rats"), true);
   const sessionId = opened.at(-1).sessionId;
@@ -177,6 +175,7 @@ Deno.test("barkeep rat quest turn-in grants promised Mirror Bow reward", () => {
   world.tick(0);
 
   assert(inventoryHasIdentity(world, player, "bow_mirror", 1), "turn-in should grant the promised Mirror Bow");
-  assert(inventoryHasIdentity(world, player, "gold", 75), "turn-in should still grant secondary gold");
+  assert(inventoryHasIdentity(world, player, "gold", 150), "turn-in should grant boosted gold");
+  assert(inventoryHasIdentity(world, player, "food_stew", 1), "turn-in should give the meal directly");
   assertEquals(completed.at(-1)?.rewardItemIds, ["bow_mirror"]);
 });

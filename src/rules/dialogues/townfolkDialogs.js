@@ -496,7 +496,7 @@ registerDialog({
       ],
     },
     report_ack: {
-      text: "That's a load off my mind. Here — take the reward I set aside, 75 gold, and a hot meal on the house.",
+      text: "That's a load off my mind. Here — take the reward I set aside, 150 gold, and a hot meal on the house.",
       choices: [
         { id: "leave", label: "Cheers.", close: true },
       ],
@@ -621,7 +621,7 @@ registerDialog({
       ],
     },
     report_ack: {
-      text: "Good. I will lock it away before sunset. Here — 100 gold from the parish coffers. You have earned it.",
+      text: "Good. I will lock it away before sunset. Here — 200 gold and a vial of holy water from the parish stores. You have earned it.",
       choices: [
         { id: "leave", label: "Goodbye.", close: true },
       ],

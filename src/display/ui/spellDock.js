@@ -32,7 +32,7 @@ export function createPinnedSpellDock(mobileLayoutMq) {
     zIndex: '919',
   });
 
-  /** @type {{ entry: any, spellId: string|null, btn: HTMLButtonElement, glyphSpan: HTMLSpanElement, manaBadge: HTMLSpanElement, cdOverlay: HTMLDivElement, cdLabel: HTMLSpanElement, holdTimer: number|null, isHold: boolean }[]} */
+  /** @type {{ entry: any, spellId: string|null, btn: HTMLButtonElement, glyphSpan: HTMLSpanElement, manaBadge: HTMLSpanElement, cdOverlay: HTMLDivElement, cdLabel: HTMLSpanElement, holdTimer: number|null, isHold: boolean, isPressing: boolean }[]} */
   const slots = [];
 
   /** @type {any[]|null} cached spell data from last ui:spellData response */
@@ -309,13 +309,14 @@ export function createPinnedSpellDock(mobileLayoutMq) {
     });
     btn.appendChild(cdLabel);
 
-    const slot = { entry: null, spellId: null, btn, glyphSpan, manaBadge, cdOverlay, cdLabel, holdTimer: null, isHold: false };
+    const slot = { entry: null, spellId: null, btn, glyphSpan, manaBadge, cdOverlay, cdLabel, holdTimer: null, isHold: false, isPressing: false };
     slots.push(slot);
     el.appendChild(btn);
 
     // Gesture: tap = cast, hold = open fan picker
     function onPressStart() {
       if (slot.entry?.kind === 'item-use') return;
+      slot.isPressing = true;
       slot.isHold = false;
       slot.holdTimer = setTimeout(() => {
         slot.isHold = true;
@@ -324,6 +325,8 @@ export function createPinnedSpellDock(mobileLayoutMq) {
     }
 
     function onPressEnd(e) {
+      if (!slot.isPressing) return;
+      slot.isPressing = false;
       if (slot.holdTimer) { clearTimeout(slot.holdTimer); slot.holdTimer = null; }
       if (slot.isHold) {
         // Hold release — pick hovered spell
@@ -362,6 +365,7 @@ export function createPinnedSpellDock(mobileLayoutMq) {
 
     function onPressCancel() {
       if (slot.holdTimer) { clearTimeout(slot.holdTimer); slot.holdTimer = null; }
+      slot.isPressing = false;
       slot.isHold = false;
       if (_fanOpenForSlot === i) closeFan();
     }
@@ -371,7 +375,8 @@ export function createPinnedSpellDock(mobileLayoutMq) {
     btn.addEventListener('touchcancel', () => onPressCancel(), { passive: true });
     btn.addEventListener('mousedown', (e) => { if (e.button === 0) onPressStart(); });
     btn.addEventListener('mouseup', (e) => { if (e.button === 0) onPressEnd(e); });
-    btn.addEventListener('mouseleave', () => onPressCancel());
+    btn.addEventListener('mouseleave', () => { if (!slot.isHold) onPressCancel(); });
+    document.addEventListener('mouseup', (e) => { if (e.button === 0) onPressEnd(e); });
   }
 
   // --- Refresh slot visuals from data ---
