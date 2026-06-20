@@ -34,7 +34,7 @@ export function autoPickupSystem(world) {
       if (!canAddCarriedWeight(getCarriedWeight(world, actor), addedWeight, getCarryCapacity(world, actor))) continue;
       addToInventory(world, actor, itemId);
 
-      world.emit('item:pickup', { actor, itemId, count: takeCount, itemX: pos.x, itemY: pos.y });
+      world.emit('item:pickup', { actor, itemId, itemType: info.type, count: takeCount, itemX: pos.x, itemY: pos.y });
     }
   }
 }

@@ -1007,8 +1007,8 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     _fountainBurst(fx, pos, '#88ccff', 20);
   });
 
-  world.on('inventory:gold-gained', ({ ownerId, count }) => {
-    const qty = Math.max(0, Number(count || 0) | 0);
+  world.on('inventory:gold-gained', ({ ownerId, delta, count }) => {
+    const qty = Math.max(0, Number(delta ?? count ?? 0) | 0);
     if (qty <= 0) return;
     const pos = getPosition(Number(ownerId || 0));
     if (!pos || !canShowAt(pos.x, pos.y)) return;

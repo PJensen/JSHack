@@ -81,6 +81,7 @@ export function itemPickupSystem(world) {
                 world.emit('item:pickup', {
                     actor,
                     itemId: copy,
+                    itemType: info.type,
                     count: takeCount,
                     itemX: sourceChestPos?.x,
                     itemY: sourceChestPos?.y,
@@ -91,6 +92,7 @@ export function itemPickupSystem(world) {
                 world.emit('item:pickup', {
                     actor,
                     itemId,
+                    itemType: info.type,
                     count: takeCount,
                     itemX: sourceChestPos?.x,
                     itemY: sourceChestPos?.y,
@@ -118,11 +120,11 @@ export function itemPickupSystem(world) {
                     continue;
                 }
                 addToInventory(world, actor, copy);
-                world.emit('item:pickup', { actor, itemId: copy, count: takeCount, itemX: ix, itemY: iy });
+                world.emit('item:pickup', { actor, itemId: copy, itemType: info.type, count: takeCount, itemX: ix, itemY: iy });
             } else {
                 // whole stack — just attach to inventory (entity persists as-is)
                 addToInventory(world, actor, itemId);
-                world.emit('item:pickup', { actor, itemId, count: takeCount, itemX: ix, itemY: iy });
+                world.emit('item:pickup', { actor, itemId, itemType: info.type, count: takeCount, itemX: ix, itemY: iy });
             }
         }
 
@@ -147,7 +149,7 @@ export function autoPickupPostMoveSystem(world) {
             const addedWeight = Math.max(0, Number(info.weight || 0)) * takeCount;
             if (!canAddCarriedWeight(getCarriedWeight(world, id), addedWeight, getCarryCapacity(world, id))) return;
             addToInventory(world, id, itemId);
-            world.emit('item:pickup', { actor: id, itemId, count: takeCount, itemX: pos.x, itemY: pos.y });
+            world.emit('item:pickup', { actor: id, itemId, itemType: info.type, count: takeCount, itemX: pos.x, itemY: pos.y });
         });
     }
 }

@@ -374,7 +374,7 @@ export function itemCategory(getItemInfo, itemId) {
   if (t === "scroll" || t === "book" || t === "learn") return "paper";
   if (material === "paper" || tags.includes("paper")) return "paper";
   if (name.startsWith("scroll_") || name.startsWith("book_")) return "paper";
-  if (t === "gold" || t === "coin") return "gold";
+  if (t === "currency" || t === "gold" || t === "coin") return "gold";
   if (t === "food" || t === "corpse") return "food";
   if (t === "gem") return "gem";
   return "generic";
@@ -913,11 +913,18 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
 
   // ── Items (sound varies by item type) ─────────────────────
 
-  world.on('item:pickup', ({ itemId, itemX, itemY }) => {
+  world.on('item:pickup', ({ itemId, itemType, itemX, itemY }) => {
     const pos = (itemX != null && itemY != null) ? { x: itemX, y: itemY } : null;
     if (playCombatSoftHandling(itemId, pos)) return;
-    const cat = itemCategory(getItemInfo, itemId);
+    const cat = String(itemType || "").toLowerCase() === "currency"
+      ? "gold"
+      : itemCategory(getItemInfo, itemId);
     sfxAt(`item:pickup:${cat}`, pos, pp(), null, zg());
+  });
+
+  world.on('spirit:spellBoost', ({ targetId }) => {
+    const pos = targetId != null ? getPosition(targetId) : null;
+    sfxAt("magic:spirit-surge", pos, pp(), { priority: 1 }, zg());
   });
 
   world.on('item:dropped', ({ itemId, at }) => {

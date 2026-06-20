@@ -57,6 +57,9 @@ Deeper docs:
 - **Authoring discipline.** Do not touch unrelated code. Do not make changes
   that do nothing. Always match the formatting preferences that already exist;
   be a chameleon.
+- **Do not format code unless explicitly requested.** Do not run `deno fmt` or
+  any other formatter as part of implementation or verification. Preserve the
+  existing formatting and keep diffs limited to the requested functional edits.
 - **Search before writing.** Extend existing patterns. Do exactly what was
   asked; no opportunistic content wiring or unrelated cleanup.
 - **Run the full runtime suite after every task.** Before handing work back,

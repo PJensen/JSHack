@@ -93,7 +93,7 @@ function readCurrencyCount(world, itemId, fallback = 0) {
 function emitCurrencyAdded(world, ownerId, itemId, count, merged = false) {
   const qty = Math.max(0, Number(count || 0) | 0);
   if (qty <= 0) return;
-  world.emit("inventory:gold-gained", { ownerId, itemId, count: qty, merged: !!merged });
+  world.emit("inventory:gold-gained", { ownerId, itemId, count: qty, delta: qty, merged: !!merged });
 }
 
 function capacityStackKey(world, itemId) {

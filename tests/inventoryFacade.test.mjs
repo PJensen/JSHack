@@ -467,6 +467,7 @@ Deno.test("facade: currency merge emits inventory:gold-gained with incoming coun
   assertEquals(events[0].count, 8);
   assertEquals(events[0].merged, false);
   assertEquals(events[1].count, 5);
+  assertEquals(events[1].delta, 5);
   assertEquals(events[1].merged, true);
 });
 

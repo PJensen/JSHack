@@ -64,6 +64,7 @@ const SOUNDS = {
   "item:socket:gem":       { file: "drop_gem.mp3", bus: "items", maxVoices: 2, randomPitch: 18, volume: 0.85 },
   "item:scroll:genocide":  { file: "use_scroll_geno.mp3", bus: "items", maxVoices: 1, volume: 1.0 },
   "magic:taming":          { file: "fairy_glow.mp3",      bus: "spells", maxVoices: 2, volume: 0.9 },
+  "magic:spirit-surge":    { file: "fairy_glow.mp3",      bus: "spells", maxVoices: 2, volume: 0.9 },
 
   "chest:open":            { file: "chest_open.mp3",      bus: "items", randomPitch: 12 },
   "item:chest:opened":     { file: "chest_open.mp3",      bus: "items", randomPitch: 12 },

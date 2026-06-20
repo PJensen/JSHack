@@ -3806,15 +3806,20 @@ function drawEntityGlyph(atlas, ctx, entity, scale = 1, rotation = 0) {
   if (!invisible && !shadowCloak && !phaseShift && !memoryRecent && !espSensed) {
     const tint = getHitTint(entity.id);
     const redPulse = isPlayerGlyph ? deathVfx.getPlayerGlyphRedPulse(_fxTime) : 0;
-    if (tint > 0.01 || redPulse > 0.01) {
+    if (tint > 0.01) {
       ctx.save();
-      // Combine hit tint and low-HP red pulse — red pulse shifts hue toward red + boosts brightness
-      const t = Math.max(tint, redPulse);
-      const hueShift = redPulse > tint ? -30 : -50; // closer to pure red for low-HP pulse
-      ctx.filter = `saturate(${1 - t * 0.5}) sepia(${t}) hue-rotate(${hueShift}deg) brightness(${1 + t * 0.4})`;
+      ctx.filter = `saturate(${1 - tint * 0.5}) sepia(${tint}) hue-rotate(-50deg) brightness(${1 + tint * 0.4})`;
       drawKindScaled(atlas, ctx, kind, entity.pos.x, entity.pos.y, scale, rotation);
       ctx.restore();
     } else {
+      if (redPulse > 0.01) {
+        ctx.save();
+        ctx.fillStyle = `rgba(220, 24, 32, ${redPulse * 0.28})`;
+        ctx.beginPath();
+        ctx.arc(entity.pos.x, entity.pos.y, 0.38 + redPulse * 0.08, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
       drawKindScaled(atlas, ctx, kind, entity.pos.x, entity.pos.y, scale, rotation);
     }
     return;

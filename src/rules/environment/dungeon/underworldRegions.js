@@ -51,7 +51,7 @@ export const UNDERWORLD_REGION_TEMPLATES = Object.freeze({
     targetDepth: 1,
     roomTarget: 6,
     content: Object.freeze({
-      monsters: Object.freeze([{ id: "skeleton", count: 6 }]),
+      monsters: Object.freeze([{ id: "skeleton", count: 12 }]),
       traps: Object.freeze([]),
       features: Object.freeze(["urn", "urn", "sarcophagus"]),
       chests: Object.freeze([{ lootTable: "chest:basic" }]),
@@ -61,6 +61,7 @@ export const UNDERWORLD_REGION_TEMPLATES = Object.freeze({
       ...CATACOMB_PROFILE,
       id: "crypt",
       theme: "crypt",
+      bspMaxDepth: 5,
       roomSparsity: 0.05,
       shopChance: 0,
       hallwayMonsterCap: 2,
