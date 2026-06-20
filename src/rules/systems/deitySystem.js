@@ -31,6 +31,7 @@ import { Beatitude } from "../components/Beatitude.js";
 import { PetState } from "../components/PetState.js";
 import { dealDamage } from "../utils/dealDamage.js";
 import { effectiveMaxHp } from "../utils/passiveBonuses.js";
+import { applyHealing } from "../utils/applyHealing.js";
 import { hasStatus } from "../utils/statusFacade.js";
 import { getSpell } from "../data/spells.js";
 import { getHungerLevel } from "../data/food.js";
@@ -255,6 +256,15 @@ export function applyPetDamageDeityReaction(world, { target, source, amount }) {
   applyActionToPlayerDeities(world, source, "betray", {
     magnitude,
     target: "companion",
+  });
+  return true;
+}
+
+export function applyHealingDeityReaction(world, { target, cause }) {
+  if (!target || String(cause || "").startsWith("divine:")) return false;
+  applyActionToPlayerDeities(world, target, "heal", {
+    magnitude: 0.3,
+    target: "self",
   });
   return true;
 }
@@ -690,16 +700,6 @@ function wireWorldEvents(world) {
         }
       }
     }
-  });
-
-  // Heal events → deity.action('heal')
-  // Skip divine-source heals so miracles don't feed back into the mood ledger.
-  world.on("healed", ({ id, source }) => {
-    if (source === "divine") return;
-    applyActionToPlayerDeities(world, id, "heal", {
-      magnitude: 0.3,
-      target: "self",
-    });
   });
 
   // Eating pet corpse → deity.desecrate(), with heavy escalation for your own companion.
@@ -1443,18 +1443,18 @@ function wireDeityMiracles(deity, deityId, world) {
         const healAmount = Math.floor(
           deityCap * (deityDef?.alignment === "lawful" ? 0.6 : 0.4),
         );
-        vit.hp = Math.min(deityCap, vit.hp + healAmount);
+        const applied = applyHealing(world, {
+          target: playerId,
+          amount: healAmount,
+          source: playerId,
+          cause: `divine:${deityId}`,
+        }).amount;
         emitMiracle({
           playerId,
           deityId,
           effect: "heal",
-          amount: healAmount,
+          amount: applied,
           message: `${deity.name} restores your vitality!`,
-        });
-        world.emit("healed", {
-          id: playerId,
-          amount: healAmount,
-          source: "divine",
         });
       } else if (primaryNeed === "food" && world.has(playerId, Hunger)) {
         // Satiate hunger

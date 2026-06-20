@@ -12,7 +12,6 @@ import { ActiveEffects } from "../components/ActiveEffects.js";
 import { CorpseAdaptation } from "../components/CorpseAdaptation.js";
 import { DerivedExpression } from "../components/DerivedExpression.js";
 import { EffectImmunities } from "../components/EffectImmunities.js";
-import { Equipment } from "../components/Equipment.js";
 import { Hunger } from "../components/Hunger.js";
 import { addToInventory, inventoryContains, removeFromInventory } from "../utils/inventoryFacade.js";
 import { ItemInfo } from "../components/ItemInfo.js";
@@ -22,7 +21,6 @@ import { Potion } from "../components/Potion.js";
 import { TemporarySpawn } from "../components/TemporarySpawn.js";
 
 import { DamageSpec } from "../components/DamageSpec.js";
-import { Vitality } from "../components/Vitality.js";
 import { Brain } from "../components/Brain.js";
 import { Beatitude } from "../components/Beatitude.js";
 import { creatureTypeFromTags } from "../components/CreatureType.js";
@@ -30,6 +28,7 @@ import { markExplored } from "../environment/dungeon/exploredMap.js";
 import { forEachLoadedTile } from "../environment/dungeon/tileMap.js";
 import { materializeSpawn } from "../environment/dungeon/populate.js";
 import { dealDamage } from "../utils/dealDamage.js";
+import { applyHealing } from "../utils/applyHealing.js";
 import { isDotEffectKey, upsertTimedEffect } from "../utils/effectSemantics.js";
 import { applyStatusEffect, ensureActiveEffects, isInvulnerabilityEffectKey } from "../utils/effects.js";
 import { attachEnchantmentNode } from "../utils/enchantmentTopology.js";
@@ -38,7 +37,6 @@ import { spawnMonsterEntity } from "../utils/spawnMonsterEntity.js";
 import { setItemCooldown } from "../utils/itemCooldowns.js";
 import { Traits } from "../components/Traits.js";
 import { getHungerLevel } from "../data/food.js";
-import { effectiveMaxHp } from "../utils/passiveBonuses.js";
 import { recordShopClaim } from "../utils/shopClaims.js";
 import { recordShopDebt } from "../utils/shopDebt.js";
 import { attachEntityToCurrentFloor } from "../utils/floorEntities.js";
@@ -76,11 +74,12 @@ export function applyMutation(world, op, resolvers = {}) {
       break;
     }
     case "heal": {
-      const vit = /** @type any */ (world.get(op.entityId, Vitality));
-      if (!vit) return;
-      const delta = Math.max(0, op.amount | 0);
-      if (delta <= 0) return;
-      vit.hp = Math.min(effectiveMaxHp(world, op.entityId, vit), (vit.hp | 0) + delta);
+      applyHealing(world, {
+        target: op.entityId,
+        amount: op.amount,
+        source: Number(op.source || 0) | 0,
+        cause: String(op.cause || "action"),
+      });
       break;
     }
     case "pushEffect": {

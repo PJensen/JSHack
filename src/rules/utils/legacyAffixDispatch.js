@@ -1,10 +1,9 @@
-import { Vitality } from "../components/Vitality.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { getMonster } from "../data/monsters.js";
 import { CombatCallbackContext } from "../data/callbacks/combat.js";
 import { runCallbackList } from "../interaction/dispatch.js";
 import { degradeFloorMemory } from "../environment/dungeon/floorMemory.js";
-import { effectiveMaxHp } from "./passiveBonuses.js";
+import { applyHealing } from "./applyHealing.js";
 
 /**
  * @param {import("../../lib/ecs-js/index.js").World} world
@@ -25,18 +24,14 @@ export function createLegacyCombatFrame(world, base, helpers = {}) {
       helpers.heal(entity, amount);
       return;
     }
-    const vit = world.get(entity, Vitality);
-    if (!vit) return;
-    vit.hp = Math.min(effectiveMaxHp(world, entity, vit), vit.hp + Math.max(0, amount | 0));
+    applyHealing(world, { target: entity, amount, source: base.attacker, cause: "legacy-affix" });
   };
   base.healAttacker = (amount) => {
     if (typeof helpers.healAttacker === "function") {
       helpers.healAttacker(amount);
       return;
     }
-    const vit = world.get(base.attacker, Vitality);
-    if (!vit) return;
-    vit.hp = Math.min(effectiveMaxHp(world, base.attacker, vit), vit.hp + Math.max(0, amount | 0));
+    applyHealing(world, { target: base.attacker, amount, source: base.attacker, cause: "legacy-affix" });
   };
   return base;
 }

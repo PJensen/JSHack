@@ -17,6 +17,7 @@ import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { HealthPotion } from "../archetypes/Items.js";
 import { ensureActiveEffects } from "../utils/effects.js";
 import { effectiveMaxHp, effectiveMaxMana } from "../utils/passiveBonuses.js";
+import { applyHealing } from "../utils/applyHealing.js";
 
 const PRAYER_STREAK_KEY = Symbol.for('jshack:prayer:boonStreak');
 const PRAYER_LAST_BOON_KEY = Symbol.for('jshack:prayer:lastBoonTurn');
@@ -132,10 +133,7 @@ function applyPrayerBoon(world, actorId, context) {
     if (vit) {
       const cap = effectiveMaxHp(world, actorId, vit);
       const heal = Math.max(2, Math.floor(cap * 0.1 * Math.max(0.75, prayerPower)));
-      const before = vit.hp;
-      vit.hp = Math.min(cap, vit.hp + heal);
-      const applied = Math.max(0, vit.hp - before);
-      if (applied > 0) world.emit('healed', { id: actorId, amount: applied, source: 'divine' });
+      applyHealing(world, { target: actorId, amount: heal, source: actorId, cause: 'divine:extinguish' });
     }
     emitBoon(world, {
       actor: actorId, deityId, deityName,
@@ -148,11 +146,13 @@ function applyPrayerBoon(world, actorId, context) {
   if (boon === 'renewal' && vit) {
     const renewalCap = effectiveMaxHp(world, actorId, vit);
     const heal = Math.max(4, Math.floor(renewalCap * (desperate ? 0.45 : 0.28) * Math.max(0.75, prayerPower)));
-    const before = vit.hp;
-    vit.hp = Math.min(renewalCap, vit.hp + heal);
-    const applied = Math.max(0, vit.hp - before);
+    const applied = applyHealing(world, {
+      target: actorId,
+      amount: heal,
+      source: actorId,
+      cause: 'divine:renewal',
+    }).amount;
     if (applied > 0) {
-      world.emit('healed', { id: actorId, amount: applied, source: 'divine' });
       emitBoon(world, {
         actor: actorId,
         deityId,

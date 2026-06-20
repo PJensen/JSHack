@@ -28,6 +28,7 @@ import { resolveWeaponFamily } from "../data/weaponFamilies.js";
 import { tryHandlePlayerPseudoDeath } from "./deathModes.js";
 import { recordDamageApplied } from "./damageApplied.js";
 import { recordDeathApplied } from "./deathApplied.js";
+import { applyHealing } from "./applyHealing.js";
 
 function resolveEventWeaponFamily(world, weaponId) {
   if (!(weaponId > 0) || !world.isAlive(weaponId)) return "";
@@ -541,9 +542,13 @@ export function dealDamage(world, spec) {
         const sourceVit = world.get(source, Vitality);
         if (sourceVit && (sourceVit.hp | 0) > 0) {
           const healAmt = 5 * furyPot;
-          const before = sourceVit.hp | 0;
-          sourceVit.hp = Math.min(sourceVit.maxHp | 0, before + healAmt);
-          world.emit('battle_fury:heal', { id: source, amount: sourceVit.hp - before });
+          const healed = applyHealing(world, {
+            target: source,
+            amount: healAmt,
+            source,
+            cause: 'battle_fury',
+          }).amount;
+          world.emit('battle_fury:heal', { id: source, amount: healed });
         }
       }
     }

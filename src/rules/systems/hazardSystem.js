@@ -2,6 +2,7 @@ import { HazardArea } from "../components/HazardArea.js";
 import { PlasmaCloud } from "../components/PlasmaCloud.js";
 import { Position } from "../components/Position.js";
 import { Vitality } from "../components/Vitality.js";
+import { applyHealing } from "../utils/applyHealing.js";
 import { Flying } from "../components/Flying.js";
 import { Pet } from "../components/Pet.js";
 import { Player } from "../components/Player.js";
@@ -491,19 +492,14 @@ export function hazardSystem(world) {
         }
 
         if (healAmount <= 0) continue;
-        const before = vit.hp | 0;
-        vit.hp = Math.min(vit.maxHp | 0, before + healAmount);
-        const healed = (vit.hp | 0) - before;
+        const healed = applyHealing(world, {
+          target: id,
+          amount: healAmount,
+          source: hazardId,
+          cause,
+        }).amount;
         if (healed > 0) {
           affectedIds.push(id);
-          try {
-            world.emit?.("healed", {
-              id,
-              amount: healed,
-              source: hazardId,
-              cause,
-            });
-          } catch { /* */ }
         }
       }
     }

@@ -20,6 +20,7 @@ import { AggroState } from "../components/AggroState.js";
 import { MoveIntent } from "../components/Intents/MoveIntent.js";
 import { PickupIntent } from "../components/Intents/PickupIntent.js";
 import { Vitality } from "../components/Vitality.js";
+import { applyHealing } from "../utils/applyHealing.js";
 import { Faction } from "../components/Faction.js";
 import { findNearestValidTileAround, playerEntity, queryFactionActors } from "../utils/queries.js";
 import { areFactionsHostile } from "../utils/factionHostility.js";
@@ -315,11 +316,13 @@ function consumeCorpseForPet(world, petId, corpseId, vit) {
   const healAmount = Math.min(missing, healBase);
 
   if (healAmount > 0) {
-    vit.hp = Math.min(vit.maxHp, vit.hp + healAmount);
-    try {
-      world.emit?.("healed", { id: petId, amount: healAmount });
-      world.emit?.("audio:play", { key: "creature:pet:eating" });
-    } catch {}
+    applyHealing(world, {
+      target: petId,
+      amount: healAmount,
+      source: petId,
+      cause: 'corpse-eating',
+    }).amount;
+    world.emit("audio:play", { key: "creature:pet:eating" });
   }
 
   const feline = isFelinePet(world, petId);

@@ -12,9 +12,9 @@ import { NamedIdentity } from "../../components/NamedIdentity.js";
 import { Vitality } from "../../components/Vitality.js";
 import { Traits } from "../../components/Traits.js";
 import { dealDamage } from "../../utils/dealDamage.js";
+import { applyHealing } from "../../utils/applyHealing.js";
 import { upsertTimedEffect } from "../../utils/effectSemantics.js";
 import { ensureActiveEffects } from "../../utils/effects.js";
-import { effectiveMaxHp } from "../../utils/passiveBonuses.js";
 
 // -- EatCallbackContext --
 
@@ -210,10 +210,12 @@ export class EatCallbackContext {
   }
 
   _applyHeal(op) {
-    const vit = this.world.get(op.entityId, Vitality);
-    if (!vit) return;
-    const amount = Math.max(0, Number(op.amount) | 0);
-    vit.hp = Math.min(effectiveMaxHp(this.world, op.entityId, vit), vit.hp + amount);
+    applyHealing(this.world, {
+      target: op.entityId,
+      amount: op.amount,
+      source: this.actor,
+      cause: "corpse-eating",
+    });
   }
 
   commit() {

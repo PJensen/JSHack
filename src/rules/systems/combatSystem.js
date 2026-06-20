@@ -4,6 +4,7 @@
 import { AttackIntent } from '../components/Intents/AttackIntent.js';
 import { Equipment, NON_AMMO_GEAR_SLOTS } from '../components/Equipment.js';
 import { Vitality } from '../components/Vitality.js';
+import { applyHealing } from '../utils/applyHealing.js';
 import { ItemInfo } from '../components/ItemInfo.js';
 import { Faction } from '../components/Faction.js';
 import { Player } from '../components/Player.js';
@@ -588,12 +589,13 @@ function resolveHitRoll(world, {
             const _hasBt = _btAe && Array.isArray(_btAe.effects) && _btAe.effects.some(e => e && e.key === 'bloodthirst' && (e.turnsLeft | 0) > 0);
             if (result.amount > 0 && _hasBt) {
                 const healAmt = Math.max(1, Math.floor(result.amount * 0.25));
-                const srcVit = world.get(source, Vitality);
-                if (srcVit) {
-                    const maxHp = Number(srcVit.maxHp || srcVit.hp) | 0;
-                    srcVit.hp = Math.min(maxHp, (srcVit.hp | 0) + healAmt);
-                    world.emit?.('proc:bloodthirst', { actor: source, target, healed: healAmt });
-                }
+                const healed = applyHealing(world, {
+                    target: source,
+                    amount: healAmt,
+                    source,
+                    cause: 'bloodthirst',
+                }).amount;
+                world.emit('proc:bloodthirst', { actor: source, target, healed });
             }
         }
         if (!result.applied && result.reason !== 'invulnerable' && result.reason !== 'resisted') {

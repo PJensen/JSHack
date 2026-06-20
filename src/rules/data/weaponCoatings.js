@@ -1,10 +1,10 @@
 import { ItemInfo } from '../components/ItemInfo.js';
 import { Stamina } from '../components/Stamina.js';
-import { Vitality } from '../components/Vitality.js';
 import { combatSeed, mulberry32, rngInt } from '../utils/rng.js';
 import { upsertTimedEffect } from '../utils/effectSemantics.js';
 import { ensureActiveEffects } from '../utils/effects.js';
 import { effectiveMaxStamina } from '../utils/passiveBonuses.js';
+import { applyHealing } from '../utils/applyHealing.js';
 import { ELEMENT_TINT_POISON } from './elementTints.js';
 
 export const WEAPON_COATING_DEFS = Object.freeze({
@@ -153,13 +153,12 @@ export function applyWeaponCoatingOnHit(world, ctx) {
   if (def.effect) upsertEffect(world, defender, { ...def.effect });
 
   if ((def.healAttacker | 0) > 0) {
-    const vit = world.get(attacker, Vitality);
-    if (vit) {
-      const before = vit.hp | 0;
-      vit.hp = Math.min(vit.maxHp | 0, before + (def.healAttacker | 0));
-      const healed = (vit.hp | 0) - before;
-      if (healed > 0) world.emit?.('healed', { id: attacker, amount: healed, source: defender, cause: `coating_${kind}` });
-    }
+    applyHealing(world, {
+      target: attacker,
+      amount: def.healAttacker,
+      source: attacker,
+      cause: `coating_${kind}`,
+    });
   }
 
   if ((def.restoreStamina | 0) > 0) {

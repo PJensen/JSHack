@@ -7,6 +7,7 @@
 import { Position }      from "../components/Position.js";
 import { Faction }       from "../components/Faction.js";
 import { Vitality }      from "../components/Vitality.js";
+import { applyHealing } from "../utils/applyHealing.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { ItemInfo }      from "../components/ItemInfo.js";
 import { Consumable }    from "../components/Consumable.js";
@@ -57,20 +58,22 @@ function extractNutrition(world, corpseId) {
 
 // ── Behaviours ──────────────────────────────────────────────────────
 
-function applyScavenge(world, id, vit, nutrition) {
+function applyScavenge(world, id, nutrition) {
   const heal = Math.max(1, Math.floor(nutrition / 100));
-  const actual = Math.min((vit.maxHp | 0) - (vit.hp | 0), heal);
-  if (actual > 0) vit.hp += actual;
-  world.emit("healed", { id, amount: actual });
+  const actual = applyHealing(world, { target: id, amount: heal, source: id, cause: 'scavenge' }).amount;
   return { healAmount: actual };
 }
 
 function applyDevour(world, id, vit, nutrition) {
   const gain = Math.max(1, Math.floor(nutrition / 80));
   const cap = Math.floor((vit.maxHp | 0) * 1.5);
-  const actual = Math.min(cap - (vit.hp | 0), gain);
-  if (actual > 0) vit.hp += actual;
-  world.emit("healed", { id, amount: actual });
+  const actual = applyHealing(world, {
+    target: id,
+    amount: gain,
+    source: id,
+    cause: 'devour',
+    maxHp: cap,
+  }).amount;
   return { healAmount: actual };
 }
 
@@ -142,7 +145,7 @@ export function aiCorpseEatSystem(world) {
     if (behavior === "devour") {
       result = applyDevour(world, id, vit, nutrition);
     } else {
-      result = applyScavenge(world, id, vit, nutrition);
+      result = applyScavenge(world, id, nutrition);
     }
 
     try { world.destroy(corpseId); } catch {}

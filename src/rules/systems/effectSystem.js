@@ -16,7 +16,8 @@ import { areFactionsHostile } from '../utils/factionHostility.js';
 import { EFFECT_DEFS } from '../data/effectDefs.js';
 import { dealDamage } from '../utils/dealDamage.js';
 import { compactDotEffects } from '../utils/effectSemantics.js';
-import { getPassiveBonuses, effectiveMaxHp } from '../utils/passiveBonuses.js';
+import { getPassiveBonuses } from '../utils/passiveBonuses.js';
+import { applyHealing } from '../utils/applyHealing.js';
 import { buildSpellDamageSpecFromContext } from '../utils/spellDamage.js';
 import { computeEnvelopeValue } from '../utils/blind.js';
 import { chebyshev } from '../utils/distance.js';
@@ -84,10 +85,7 @@ function applyEffectOperation(world, id, vit, operation, potency, stacks, key) {
     }
 
     if (operation === 'heal') {
-        const before = vit.hp;
-        vit.hp = Math.min(effectiveMaxHp(world, id, vit), vit.hp + amount);
-        const delta = vit.hp - before;
-        if (delta > 0) { world.emit('healed', { id, amount: delta }); }
+        applyHealing(world, { target: id, amount, source: id, cause: key || 'effect' });
         return;
     }
 
@@ -238,10 +236,12 @@ function tickDrainLifeChannel(world, casterId, effect) {
         const healFraction = Math.max(0, Number(channel.healFraction || 0.75));
         const drained = Math.max(1, Number(result.amount || potency) | 0);
         const healAmount = Math.max(1, Math.floor(drained * healFraction));
-        const maxHp = effectiveMaxHp(world, casterId, casterVit);
-        const before = casterVit.hp | 0;
-        casterVit.hp = Math.min(maxHp, (casterVit.hp | 0) + healAmount);
-        const appliedHeal = Math.max(0, (casterVit.hp | 0) - before);
+        const appliedHeal = applyHealing(world, {
+            target: casterId,
+            amount: healAmount,
+            source: casterId,
+            cause: 'spell:drain_life:tick',
+        }).amount;
 
         world.emit('spell:drain_life:tick', {
             actor: casterId,

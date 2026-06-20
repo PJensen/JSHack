@@ -3,7 +3,8 @@ import { Stamina } from "../components/Stamina.js";
 import { Vitality } from "../components/Vitality.js";
 import { upsertTimedEffect } from "./effectSemantics.js";
 import { applyStatusEffect, ensureActiveEffects, isInvulnerabilityEffectKey } from "./effects.js";
-import { effectiveMaxHp, effectiveMaxMana, effectiveMaxStamina } from "./passiveBonuses.js";
+import { effectiveMaxMana, effectiveMaxStamina } from "./passiveBonuses.js";
+import { applyHealing } from "./applyHealing.js";
 
 function applyStatusEffects(world, out) {
   for (let i = 0; i < out.statusesToApply.length; i++) {
@@ -55,11 +56,11 @@ function applyVitalityRestore(world, out) {
     const entityId = Number(entry?.target || 0) | 0;
     const amount = Math.max(0, Number(entry?.amount || 0));
     if (!(entityId > 0) || !world.isAlive?.(entityId) || amount <= 0) continue;
-    const vitality = world.get(entityId, Vitality);
-    if (!vitality) continue;
-    world.set(entityId, Vitality, {
-      ...vitality,
-      hp: Math.min(effectiveMaxHp(world, entityId, vitality), Number(vitality.hp || 0) + amount),
+    applyHealing(world, {
+      target: entityId,
+      amount,
+      source: Number(entry?.source || 0) | 0,
+      cause: "proc",
     });
   }
 }

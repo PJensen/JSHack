@@ -19,6 +19,7 @@ import { aggroDamageReactionSystem } from "../rules/systems/damageReactions/aggr
 import { channelingDamageReactionSystem } from "../rules/systems/damageReactions/channelingDamageReactionSystem.js";
 import { deathImpactDamageReactionSystem } from "../rules/systems/damageReactions/deathImpactDamageReactionSystem.js";
 import { deityDamageReactionSystem } from "../rules/systems/damageReactions/deityDamageReactionSystem.js";
+import { deityHealingReactionSystem } from "../rules/systems/healingReactions/deityHealingReactionSystem.js";
 import { electrocuteDamageReactionSystem } from "../rules/systems/damageReactions/electrocuteDamageReactionSystem.js";
 import { itemDamageReactionSystem } from "../rules/systems/damageReactions/itemDamageReactionSystem.js";
 import { sleepDamageReactionSystem } from "../rules/systems/damageReactions/sleepDamageReactionSystem.js";
@@ -316,6 +317,7 @@ export function configureWorld(world) {
 
   // Phase: cleanup (end-of-turn removals like killing entities with hp <= 0)
   registerSystem(cleanupSystem, 'cleanup');
+  registerSystem(deityHealingReactionSystem, 'cleanup', { after: [cleanupSystem], before: [lifespanSystem] });
   // Lifespan countdown and entity removal (before spatial index sync).
   registerSystem(lifespanSystem, 'cleanup');
   // Temporary materialized spawns expire on absolute world turns.

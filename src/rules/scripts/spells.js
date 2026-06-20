@@ -24,6 +24,7 @@ import { buildBlocksVisionMap, blockedCallback } from "../utils/vision.js";
 import { hasLOS } from "../../shared/math/gridLOS.js";
 import { bresenhamLine } from "../../shared/math/bresenham.js";
 import { dealDamage } from "../utils/dealDamage.js";
+import { applyHealing } from "../utils/applyHealing.js";
 import { findNearestValidTileAround } from "../utils/queries.js";
 import { combatSeed, hashString32, mulberry32, rollDice, pct } from "../utils/rng.js";
 import { statusStrength } from "../utils/statusFacade.js";
@@ -1257,13 +1258,12 @@ REGISTRY['heal'] = function healScript(world, actor, spell, intent) {
     return;
   }
 
-  // Apply healing
-  const oldHp = vit.hp | 0;
-  vit.hp = Math.min(hpCap, oldHp + amount);
-  const actualHeal = vit.hp - oldHp;
-
-  // Emit events
-  world.emit('healed', { id: targetId, amount: actualHeal });
+  const actualHeal = applyHealing(world, {
+    target: targetId,
+    amount,
+    source: actor,
+    cause: 'spell:heal',
+  }).amount;
   world.emit('spell:heal', { actor, targetId, at: targetPos, amount: actualHeal });
 };
 
@@ -1283,9 +1283,12 @@ REGISTRY['flash_heal'] = function flashHealScript(world, actor, spell, intent) {
   const spellLevel = getFlashHealSpellLevel(world, actor, spell, intent);
   const amount = Math.max(FLASH_HEAL_TUNING.minimumHeal, Math.floor(maxHp * FLASH_HEAL_TUNING.healFraction));
 
-  const oldHp = vit.hp | 0;
-  vit.hp = Math.min(maxHp, oldHp + amount);
-  const actualHeal = vit.hp - oldHp;
+  const actualHeal = applyHealing(world, {
+    target: actor,
+    amount,
+    source: actor,
+    cause: 'spell:flash_heal',
+  }).amount;
 
   /** @type {Array<{id:number, amount:number, at:{x:number,y:number}}>} */
   const splashHits = [];
@@ -1314,7 +1317,6 @@ REGISTRY['flash_heal'] = function flashHealScript(world, actor, spell, intent) {
     }
   }
 
-  world.emit('healed', { id: actor, amount: actualHeal });
   world.emit('spell:flash_heal', {
     actor,
     targetId: actor,

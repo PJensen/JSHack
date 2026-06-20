@@ -13,6 +13,7 @@ import { ScriptState } from '../rules/components/ScriptState.js';
 import { forEachInRadius } from '../rules/utils/spatialIndex.js';
 import { rollDice } from '../rules/utils/rng.js';
 import { dealDamage } from '../rules/utils/dealDamage.js';
+import { applyHealing } from '../rules/utils/applyHealing.js';
 import { getMonster, monsterHasTag } from '../rules/data/monsters.js';
 import { setItemCooldown, getItemCooldownRemaining, isItemOnCooldown } from '../rules/utils/itemCooldowns.js';
 
@@ -37,11 +38,7 @@ export function createWorldFacade(world, actor, itemId) {
 
   const helpers = {
     heal(entityId, amount) {
-      const vit = world.get(entityId, Vitality);
-      if (!vit) return;
-      world.mutate(entityId, Vitality, v => {
-        v.hp = Math.min(v.maxHp, v.hp + Math.max(0, amount | 0));
-      });
+      return applyHealing(world, { target: entityId, amount, source: actor, cause: 'script' }).amount;
     },
     damage(entityId, amount, _source) {
       const dmg = Math.max(0, amount | 0);

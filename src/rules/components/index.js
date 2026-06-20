@@ -109,6 +109,8 @@ export { AudioEmitter } from './AudioEmitter.js';
 export { LightEmitter } from './LightEmitter.js';
 export { CreatureType, CREATURE_TYPES, creatureTypeFromTags } from './CreatureType.js';
 export { Encumbrance } from './Encumbrance.js';
+export { HealingApplied } from './HealingApplied.js';
+export { HealingModifiers } from './HealingModifiers.js';
 export { Flying } from './Flying.js';
 export { Traits } from './Traits.js';
 export { TownState } from './TownState.js';

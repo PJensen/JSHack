@@ -72,12 +72,13 @@ export class RuleActionContext {
   /**
    * @param {number} entityId
    * @param {number} amount
+   * @param {{source?:number,cause?:string}} [options]
    * @returns {number} the requested amount (applied on commit)
    */
-  heal(entityId, amount) {
+  heal(entityId, amount, options = {}) {
     const delta = Math.max(0, amount | 0);
     if (delta <= 0) return 0;
-    this._queue.enqueue({ type: "heal", entityId, amount: delta });
+    this._queue.enqueue({ type: "heal", entityId, amount: delta, ...options });
     return delta;
   }
 
