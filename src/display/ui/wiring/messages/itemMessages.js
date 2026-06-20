@@ -94,6 +94,16 @@ export function installItemMessages(ctx) {
     logPickupEvent({ actor, itemId, count });
   });
 
+  world.on('item:pickup-denied', ({ actor, reason, limit }) => {
+    const pe = playerEntity(world);
+    if (!pe || Number(actor || 0) !== Number(pe.id || 0)) return;
+    if (reason === 'weight') {
+      const capacity = Number(limit);
+      const suffix = capacity > 0 ? ` (${capacity.toFixed(1)} kg normal capacity)` : '';
+      log(`You cannot carry that much weight${suffix}. Drop or stash something first.`, 'warning');
+    }
+  });
+
   // Legacy pickup event compatibility: { id, itemId, at }
   world.on('pickup', ({ id, itemId, count }) => {
     const info = compGet(itemId, ItemInfo);

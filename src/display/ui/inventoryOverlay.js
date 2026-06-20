@@ -38,7 +38,10 @@ export function renderInventory(panel, items, ground, slotFilter = '', scrollOfI
     });
 
     const label = document.createElement('span');
-    label.textContent = `Weight: ${cur.toFixed(1)} / ${lim} kg`;
+    const state = encumbrance.overloaded ? ' · overloaded'
+      : encumbrance.heavilyLoaded ? ' · burdened'
+      : '';
+    label.textContent = `Weight: ${cur.toFixed(1)} / ${lim.toFixed(1)} kg${state}`;
     if (encumbrance.overloaded) label.style.color = '#e06a6a';
     else if (encumbrance.heavilyLoaded) label.style.color = '#d9963b';
     row.appendChild(label);

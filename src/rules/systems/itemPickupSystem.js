@@ -8,12 +8,14 @@ import { Player } from "../components/Player.js";
 import { forEachItemAt } from "../utils/tileQueryCache.js";
 import {
     addToInventory,
+    getCarriedWeight,
     hasCapacityForItem,
     inventoryContains,
     splitItemStack,
     transferItem,
 } from "../utils/inventoryFacade.js";
 import { isChestIdentity } from "../../shared/chests.js";
+import { canAddCarriedWeight, getCarryCapacity } from "../utils/encumbrance.js";
 
 
 export function itemPickupSystem(world) {
@@ -32,6 +34,19 @@ export function itemPickupSystem(world) {
         const itemPos = world.get(itemId, Position);
         const inContainer = !itemPos;
         const takeCount = Math.min(info.count || 1, intent.count || info.count || 1);
+
+        const addedWeight = Math.max(0, Number(info.weight || 0)) * takeCount;
+        const carryLimit = getCarryCapacity(world, actor);
+        if (!canAddCarriedWeight(getCarriedWeight(world, actor), addedWeight, carryLimit)) {
+            world.emit('item:pickup-denied', {
+                actor,
+                itemId,
+                reason: 'weight',
+                limit: carryLimit,
+            });
+            world.remove(actor, PickupIntent);
+            continue;
+        }
 
         // capacity gate (counts unique identity stacks)
         if (!hasCapacityForItem(world, actor, itemId)) {
@@ -129,6 +144,8 @@ export function autoPickupPostMoveSystem(world) {
             const info = world.get(itemId, ItemInfo);
             if (!info || !info.type || !kinds.includes(info.type)) return;
             const takeCount = info.count || 1;
+            const addedWeight = Math.max(0, Number(info.weight || 0)) * takeCount;
+            if (!canAddCarriedWeight(getCarriedWeight(world, id), addedWeight, getCarryCapacity(world, id))) return;
             addToInventory(world, id, itemId);
             world.emit('item:pickup', { actor: id, itemId, count: takeCount, itemX: pos.x, itemY: pos.y });
         });

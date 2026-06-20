@@ -6,6 +6,8 @@ import { ItemInfo } from "../components/ItemInfo.js";
 import { addToInventory } from "../utils/inventoryFacade.js";
 import { xyKey } from "../utils/gridKey.js";
 import { queryAllPositions, queryPlayerPosInv } from "../utils/queries.js";
+import { getCarriedWeight } from "../utils/inventoryFacade.js";
+import { canAddCarriedWeight, getCarryCapacity } from "../utils/encumbrance.js";
 
 export function autoPickupSystem(world) {
   // Build a lookup from tile -> item ids for currency only
@@ -28,6 +30,8 @@ export function autoPickupSystem(world) {
       const info = world.get(itemId, ItemInfo);
       if (!info || info.type !== "currency") continue;
       const takeCount = info.count || 1;
+      const addedWeight = Math.max(0, Number(info.weight || 0)) * takeCount;
+      if (!canAddCarriedWeight(getCarriedWeight(world, actor), addedWeight, getCarryCapacity(world, actor))) continue;
       addToInventory(world, actor, itemId);
 
       world.emit('item:pickup', { actor, itemId, count: takeCount, itemX: pos.x, itemY: pos.y });

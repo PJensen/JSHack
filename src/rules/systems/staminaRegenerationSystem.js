@@ -3,6 +3,11 @@
 import { Stamina } from '../components/Stamina.js';
 import { getPassiveBonuses } from '../utils/passiveBonuses.js';
 import { getResolvedStats } from '../utils/derivedStats.js';
+import { Encumbrance } from '../components/Encumbrance.js';
+import {
+  HEAVY_STAMINA_REGEN_MULTIPLIER,
+  OVERLOADED_STAMINA_REGEN_MULTIPLIER,
+} from '../data/encumbranceTuning.js';
 
 /**
  * Regenerate stamina each turn based on base rate plus equipment bonuses.
@@ -31,7 +36,13 @@ export function staminaRegenerationSystem(world) {
     const baseRate = Number(staminaComp.staminaRegen ?? 0);
     const regenBonus = Number(passive?.staminaRegenDerived ?? 0);
     const derivedRegenMod = Number(getResolvedStats(world, entity)?.staminaRegen ?? 0);
-    const rate = Math.max(0, baseRate + regenBonus + derivedRegenMod);
+    const encumbrance = world.get(entity, Encumbrance);
+    const loadMultiplier = encumbrance?.overloaded
+      ? OVERLOADED_STAMINA_REGEN_MULTIPLIER
+      : encumbrance?.heavilyLoaded
+      ? HEAVY_STAMINA_REGEN_MULTIPLIER
+      : 1;
+    const rate = Math.max(0, baseRate + regenBonus + derivedRegenMod) * loadMultiplier;
 
     staminaComp.stamina = Math.min(effectiveMaxStamina, staminaComp.stamina + rate);
   }

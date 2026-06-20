@@ -444,12 +444,11 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
     let encumbrance = null;
     if (p) {
       const enc = world.get(p.id, Encumbrance);
-      const stam = world.get(p.id, Stamina);
-      const maxStaminaBonus = Number(getPassiveBonuses(world, p.id)?.maxStaminaDerived ?? 0);
-      const limit = stam ? (Number(stam.maxStamina || 0) + maxStaminaBonus) : null;
       encumbrance = {
         current: enc ? enc.current : 0,
-        limit,
+        limit: enc ? enc.limit : null,
+        hardLimit: enc ? enc.hardLimit : null,
+        loadRatio: enc ? enc.loadRatio : 0,
         overloaded: enc ? enc.overloaded : false,
         heavilyLoaded: enc ? enc.heavilyLoaded : false,
       };

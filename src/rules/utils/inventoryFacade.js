@@ -15,6 +15,7 @@ import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Position } from "../components/Position.js";
 import { Unpaid } from "../components/Unpaid.js";
 import { Weight } from "../components/Weight.js";
+import { resolveEquipmentView } from "./equipmentTopology.js";
 import {
   attach,
   children,
@@ -501,7 +502,12 @@ export function consumeFromStack(world, ownerId, identity, count) {
  */
 export function getCarriedWeight(world, ownerId) {
   let total = 0;
-  for (const itemId of inventoryItems(world, ownerId)) {
+  const carried = new Set(inventoryItems(world, ownerId));
+  const equipment = resolveEquipmentView(world, ownerId);
+  for (const itemId of Object.values(equipment)) {
+    if ((Number(itemId) | 0) > 0) carried.add(Number(itemId) | 0);
+  }
+  for (const itemId of carried) {
     const info = world.get(itemId, ItemInfo);
     total += (Number(info?.weight) || 0) * Math.max(1, Number(info?.count || 0) | 0);
   }
