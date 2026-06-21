@@ -332,14 +332,17 @@ export const basePalette = {
   flower_daisy:      { glyph: "🌼", fg: "#ffeeaa", glow: "#ccbb77" },
   flower_bluebell:   { glyph: "🌸", fg: "#7799ff", glow: "#4466cc" },
   // Town decorations
-  barrel:        { glyph: "o", fg: "#a07040", glow: "#6a4828" },
-  crate: {
-    layers: [
-      { glyph: "□", fg: "#5f4228", glow: "#3a2818", scale: 0.92 },
-      { glyph: "╳", fg: "#b08858", glow: "#6a5030", scale: 0.76 },
-      { glyph: "▪", fg: "#7a5634", glow: "#4a3020", dy: 0.01, scale: 0.42 },
-    ],
-  },
+  barrel:        { glyph: "🛢️", fg: "#a07040", glow: "#6a4828" },
+  crate: { glyph: "📦", fg: "#a07040", glow: "#6a4828" },
+  
+  // {
+  //   layers: [
+  //     { glyph: "□", fg: "#5f4228", glow: "#3a2818", scale: 0.92 },
+  //     { glyph: "╳", fg: "#b08858", glow: "#6a5030", scale: 0.76 },
+  //     { glyph: "▪", fg: "#7a5634", glow: "#4a3020", dy: 0.01, scale: 0.42 },
+  //   ],
+  // }
+  
   woodpile:      { glyph: "≡", fg: "#8b6840", glow: "#5a4028" },
   hay_bale:      { glyph: "▓", fg: "#d4b44a", glow: "#a08828" },
   lantern_post:  { glyph: "♦", fg: "#ffcc55", glow: "#cc9922" },
@@ -470,14 +473,14 @@ export const basePalette = {
   food_stew:       { glyph: "%", fg: "#c88a4a", glow: "#8a5a2a", baseScale: 0.65 },
   fuel_firewood:   { glyph: "≡", fg: "#a07040", glow: "#6a4828", baseScale: 0.65 },
   material_lumber: { glyph: "≡", fg: "#b88a52", glow: "#7c5222", baseScale: 0.65 },
-  water_bucket:    { glyph: "U", fg: "#6a9ab4", glow: "#3a6a84", baseScale: 0.65 },
+  water_bucket:    { glyph: "🪣", fg: "#6a9ab4", glow: "#3a6a84", baseScale: 0.65 },
   tool_hatchet:    { glyph: ")", fg: "#a0a0a0", glow: "#707070", baseScale: 0.75 },
   tool_kitchen_knife: { glyph: ")", fg: "#c0c0c0", glow: "#888888", baseScale: 0.7 },
   // Seeds
   seed_wheat:   { glyph: "∙", fg: "#c8b060", glow: "#8a7a30", baseScale: 0.5 },
   seed_carrot:  { glyph: "∙", fg: "#e09040", glow: "#a06020", baseScale: 0.5 },
   seed_corn:    { glyph: "∙", fg: "#e8c820", glow: "#b89a10", baseScale: 0.5 },
-  // Misc tools
+  // Misc tools 
   lantern:      { glyph: "🕯", fg: "#ffcc55", glow: "#cc9922", baseScale: 0.7 },
   hearthstone:  { glyph: "◆", fg: "#bb8855", glow: "#885522", baseScale: 0.6 },
 

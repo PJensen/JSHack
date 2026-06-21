@@ -608,6 +608,9 @@ function addClosetSurprises(chunk, floorPlan, rng, spawns, isSolid, markSolid) {
 export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null, worldSeed = 0) {
   const spawns = [];
   const diff = floorPlan.difficultyMult;
+  const templateId = String(floorPlan.activeTemplateId || "");
+  const authoredContent = getUnderworldRegionTemplate(templateId)?.content || null;
+  const hasAuthoredFeatures = Array.isArray(authoredContent?.features);
   const SPAWNER_CHANCE_PER_MONSTER = 0.35; // Convert room monster budget into a per-room nest chance.
 
   // Track occupied positions for solid/immovable features (decorations, chests, tombstones,
@@ -693,7 +696,7 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null, world
     let roomHasWeaponRack = false;
     let roomIsSacred = false;
     const featureRate = floorPlan.profile?.doorFeatureRate ?? 0.50;
-    if (!isEntryRoom && rng.next() < featureRate) {
+    if (!hasAuthoredFeatures && !isEntryRoom && rng.next() < featureRate) {
       let featureKind = _pickFeature(rng, floorPlan.profile?.featurePool ?? null);
 
       // Cap shrine and altar to 1 each per floor
@@ -1268,8 +1271,6 @@ export function populateChunk(chunk, floorPlan, rng, tombstoneRepo = null, world
     }
   }
 
-  const templateId = String(floorPlan.activeTemplateId || "");
-  const authoredContent = getUnderworldRegionTemplate(templateId)?.content || null;
   if (authoredContent) {
     const occupied = new Set([...solidPositions]);
     for (const spawn of spawns) occupied.add(`${spawn.x | 0},${spawn.y | 0}`);

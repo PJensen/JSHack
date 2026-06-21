@@ -4,26 +4,26 @@ import { CAVE_PROFILE } from "./profiles/caves.js";
 import { GROTTO_PROFILE } from "./profiles/grottos.js";
 import { ARENA_PROFILE } from "./profiles/arenas.js";
 
-export const UNDERWORLD_REGION_TEMPLATES = Object.freeze({
-  tavern_basement: Object.freeze({
+export const UNDERWORLD_REGION_TEMPLATES = {
+  tavern_basement: {
     templateId: "tavern_basement",
     label: "Tavern Basement",
     type: "basement",
-    floors: 3,
+    floors: 1,
     biome: "cellar",
     monsterTier: 0,
     lootTier: 0,
     questId: "starter.rat_infestation",
     targetDepth: 1,
     roomTarget: 3,
-    content: Object.freeze({
-      monsters: Object.freeze([{ count: 12, pool: Object.freeze(["rat"]) }]),
-      spawners: Object.freeze([{ count: 1, pool: Object.freeze(["rat"]) }]),
-      traps: Object.freeze([]),
-      features: Object.freeze(["torch", "barrel", "crate"]),
-      chests: Object.freeze([{ lootTable: "chest:basic" }]),
-    }),
-    profile: Object.freeze({
+    content: {
+      monsters: [{ count: 12, pool: ["rat"] }],
+      spawners: [{ count: 1, pool: ["rat"] }],
+      traps: [],
+      features: ["torch", "barrel", "crate", "pillar"],
+      chests: [{ lootTable: "chest:magic" }],
+    },
+    profile: {
       ...DEFAULT_PROFILE,
       id: "basement",
       theme: "cellar",
@@ -36,28 +36,27 @@ export const UNDERWORLD_REGION_TEMPLATES = Object.freeze({
       shopChance: 0,
       hallwayMonsterCap: 1,
       monsterFilter: (def) => String(def?.id || "") === "rat",
-      featurePool: Object.freeze(["torch", "barrel", "crate", "chest"]),
-    }),
-  }),
-  graveyard_crypt: Object.freeze({
+    },
+  },
+  graveyard_crypt: {
     templateId: "graveyard_crypt",
     label: "Graveyard Crypt",
     type: "crypt",
-    floors: 6,
+    floors: 2,
     biome: "crypt",
     monsterTier: 0,
     lootTier: 1,
     questId: "starter.priest_fetch",
     targetDepth: 1,
     roomTarget: 6,
-    content: Object.freeze({
-      monsters: Object.freeze([{ id: "skeleton", count: 12 }]),
-      traps: Object.freeze([]),
-      features: Object.freeze(["urn", "urn", "sarcophagus"]),
-      chests: Object.freeze([{ lootTable: "chest:basic" }]),
-      books: Object.freeze(["book_dead"]),
-    }),
-    profile: Object.freeze({
+    content: {
+      monsters: [{ id: "skeleton", count: 12 }],
+      traps: ["spike_trap", "arrow_trap"],
+      features: ["urn", "urn", "sarcophagus"],
+      chests: [{ lootTable: "chest:basic" }],
+      books: ["book_dead"],
+    },
+    profile: {
       ...CATACOMB_PROFILE,
       id: "crypt",
       theme: "crypt",
@@ -70,10 +69,9 @@ export const UNDERWORLD_REGION_TEMPLATES = Object.freeze({
         const tags = Array.isArray(def?.tags) ? def.tags : [];
         return id === "skeleton" || tags.includes("undead") || tags.includes("skeletal");
       },
-      featurePool: Object.freeze(["urn", "sarcophagus", "torch", "chest"]),
-    }),
-  }),
-  bear_cave: Object.freeze({
+    },
+  },
+  bear_cave: {
     templateId: "bear_cave",
     label: "Bear Cave",
     type: "cave",
@@ -84,13 +82,13 @@ export const UNDERWORLD_REGION_TEMPLATES = Object.freeze({
     questId: "",
     targetDepth: 1,
     roomTarget: 1,
-    content: Object.freeze({
-      monsters: Object.freeze([{ id: "cave_bear", count: 1 }]),
-      traps: Object.freeze([]),
-      features: Object.freeze(["glowcap_patch", "mushrooms", "mushrooms"]),
-      chests: Object.freeze([{ lootTable: "chest:basic", fixedDrops: ["food_mushrooms"] }]),
-    }),
-    profile: Object.freeze({
+    content: {
+      monsters: [{ id: "cave_bear", count: 1 }],
+      traps: [],
+      features: ["glowcap_patch", "mushrooms", "mushrooms"],
+      chests: [{ lootTable: "chest:basic", fixedDrops: ["food_mushrooms"] }],
+    },
+    profile: {
       ...CAVE_PROFILE,
       id: "bear_cave",
       theme: "cave",
@@ -100,10 +98,9 @@ export const UNDERWORLD_REGION_TEMPLATES = Object.freeze({
       roomSparsity: 0.15,
       hallwayMonsterCap: 0,
       monsterFilter: (def) => String(def?.id || "") === "cave_bear",
-      featurePool: Object.freeze(["glowcap_patch", "mushrooms", "chest"]),
-    }),
-  }),
-  bat_cave: Object.freeze({
+    },
+  },
+  bat_cave: {
     templateId: "bat_cave",
     label: "Bat Cave",
     type: "cave",
@@ -114,13 +111,13 @@ export const UNDERWORLD_REGION_TEMPLATES = Object.freeze({
     questId: "",
     targetDepth: 1,
     roomTarget: 4,
-    content: Object.freeze({
-      monsters: Object.freeze([{ id: "bat", count: 9 }, { id: "flaming_bat", count: 1 }]),
-      traps: Object.freeze([]),
-      features: Object.freeze(["mushrooms", "glowcap_patch", "web_mote_cluster", "web_mote_cluster"]),
-      chests: Object.freeze([{ lootTable: "chest:basic" }]),
-    }),
-    profile: Object.freeze({
+    content: {
+      monsters: [{ id: "bat", count: 9 }, { id: "flaming_bat", count: 1 }],
+      traps: [],
+      features: ["mushrooms", "glowcap_patch", "web_mote_cluster", "web_mote_cluster"],
+      chests: [{ lootTable: "chest:basic" }],
+    },
+    profile: {
       ...GROTTO_PROFILE,
       id: "bat_cave",
       theme: "cave",
@@ -129,10 +126,9 @@ export const UNDERWORLD_REGION_TEMPLATES = Object.freeze({
         const id = String(def?.id || "");
         return id === "bat" || id === "flaming_bat";
       },
-      featurePool: Object.freeze(["mushrooms", "glowcap_patch", "web_mote_cluster"]),
-    }),
-  }),
-  human_mine: Object.freeze({
+    },
+  },
+  human_mine: {
     templateId: "human_mine",
     label: "Human Mine",
     type: "mine",
@@ -143,14 +139,14 @@ export const UNDERWORLD_REGION_TEMPLATES = Object.freeze({
     questId: "",
     targetDepth: 1,
     roomTarget: 5,
-    content: Object.freeze({
-      monsters: Object.freeze([]),
-      npcs: Object.freeze([{ townfolkId: "miner", count: 2 }]),
-      traps: Object.freeze([]),
-      features: Object.freeze(["torch", "torch", "crate", "barrel", "harvest_iron_ore", "harvest_coal_ore", "harvest_stone"]),
-      chests: Object.freeze([{ lootTable: "chest:basic", fixedDrops: ["ore_iron", "ore_coal"] }]),
-    }),
-    profile: Object.freeze({
+    content: {
+      monsters: [],
+      npcs: [{ townfolkId: "miner", count: 2 }],
+      traps: [],
+      features: ["torch", "torch", "crate", "barrel", "harvest_iron_ore", "harvest_coal_ore", "harvest_stone"],
+      chests: [{ lootTable: "chest:basic", fixedDrops: ["ore_iron", "ore_coal"] }],
+    },
+    profile: {
       ...DEFAULT_PROFILE,
       id: "mine",
       theme: "mine",
@@ -159,10 +155,9 @@ export const UNDERWORLD_REGION_TEMPLATES = Object.freeze({
       roomSparsity: 0.25,
       doorChance: 0.1,
       hallwayMonsterCap: 1,
-      featurePool: Object.freeze(["torch", "crate", "barrel", "chest"]),
-    }),
-  }),
-  bandit_hideout: Object.freeze({
+    },
+  },
+  bandit_hideout: {
     templateId: "bandit_hideout",
     label: "Bandit Hideout",
     type: "hideout",
@@ -173,13 +168,13 @@ export const UNDERWORLD_REGION_TEMPLATES = Object.freeze({
     questId: "",
     targetDepth: 1,
     roomTarget: 4,
-    content: Object.freeze({
-      monsters: Object.freeze([{ id: "bandit", count: 3 }, { id: "bandit_archer", count: 2 }, { id: "bandit_captain", count: 1 }]),
-      traps: Object.freeze([{ type: "arrow" }, { type: "spike" }]),
-      features: Object.freeze(["torch", "crate", "barrel", "weapon_rack"]),
-      chests: Object.freeze([{ lootTable: "chest:epic" }]),
-    }),
-    profile: Object.freeze({
+    content: {
+      monsters: [{ id: "bandit", count: 3 }, { id: "bandit_archer", count: 2 }, { id: "bandit_captain", count: 1 }],
+      traps: [{ type: "arrow" }, { type: "spike" }],
+      features: ["torch", "crate", "barrel", "weapon_rack"],
+      chests: [{ lootTable: "chest:epic" }],
+    },
+    profile: {
       ...DEFAULT_PROFILE,
       id: "bandit_hideout",
       theme: "bandit",
@@ -189,10 +184,9 @@ export const UNDERWORLD_REGION_TEMPLATES = Object.freeze({
         const id = String(def?.id || "");
         return id === "bandit" || id === "bandit_archer" || id === "bandit_captain";
       },
-      featurePool: Object.freeze(["torch", "crate", "barrel", "weapon_rack", "chest"]),
-    }),
-  }),
-  old_well: Object.freeze({
+    },
+  },
+  old_well: {
     templateId: "old_well",
     label: "Old Well",
     type: "well",
@@ -203,10 +197,10 @@ export const UNDERWORLD_REGION_TEMPLATES = Object.freeze({
     questId: "",
     targetDepth: 1,
     roomTarget: 2,
-    content: Object.freeze({
-      monsters: Object.freeze([{
+    content: {
+      monsters: [{
         count: 6,
-        pool: Object.freeze([
+        pool: [
           "rat",
           (def) => {
             const id = String(def?.id || "");
@@ -221,13 +215,13 @@ export const UNDERWORLD_REGION_TEMPLATES = Object.freeze({
               || id === "lichen"
               || id === "pit_viper";
           },
-        ]),
-      }]),
-      traps: Object.freeze([]),
-      features: Object.freeze(["mushrooms", "urn", "drain_throat"]),
-      chests: Object.freeze([{ lootTable: "chest:basic" }]),
-    }),
-    profile: Object.freeze({
+        ],
+      }],
+      traps: [],
+      features: ["mushrooms", "urn", "drain_throat"],
+      chests: [{ lootTable: "chest:basic" }],
+    },
+    profile: {
       ...DEFAULT_PROFILE,
       id: "old_well",
       theme: "sewer",
@@ -240,10 +234,9 @@ export const UNDERWORLD_REGION_TEMPLATES = Object.freeze({
         const id = String(def?.id || "");
         return id === "rat" || id === "giant_frog" || id === "cave_snake";
       },
-      featurePool: Object.freeze(["mushrooms", "urn", "chest"]),
-    }),
-  }),
-  collapsed_cellar: Object.freeze({
+    },
+  },
+  collapsed_cellar: {
     templateId: "collapsed_cellar",
     label: "Collapsed Cellar",
     type: "basement",
@@ -254,13 +247,13 @@ export const UNDERWORLD_REGION_TEMPLATES = Object.freeze({
     questId: "",
     targetDepth: 1,
     roomTarget: 2,
-    content: Object.freeze({
-      monsters: Object.freeze([{ id: "rat", count: 5 }]),
-      traps: Object.freeze([]),
-      features: Object.freeze(["torch", "barrel", "crate", "boulder"]),
-      chests: Object.freeze([{ lootTable: "chest:basic" }]),
-    }),
-    profile: Object.freeze({
+    content: {
+      monsters: [{ id: "rat", count: 5 }],
+      traps: [],
+      features: ["torch", "barrel", "crate", "boulder"],
+      chests: [{ lootTable: "chest:basic" }],
+    },
+    profile: {
       ...DEFAULT_PROFILE,
       id: "collapsed_cellar",
       theme: "cellar",
@@ -270,10 +263,9 @@ export const UNDERWORLD_REGION_TEMPLATES = Object.freeze({
       doorChance: 0.25,
       hallwayMonsterCap: 1,
       monsterFilter: (def) => String(def?.id || "") === "rat",
-      featurePool: Object.freeze(["barrel", "crate", "torch", "chest"]),
-    }),
-  }),
-  wolf_den: Object.freeze({
+    },
+  },
+  wolf_den: {
     templateId: "wolf_den",
     label: "Wolf Den",
     type: "den",
@@ -284,23 +276,22 @@ export const UNDERWORLD_REGION_TEMPLATES = Object.freeze({
     questId: "",
     targetDepth: 1,
     roomTarget: 3,
-    content: Object.freeze({
-      monsters: Object.freeze([{ id: "dire_wolf", count: 3 }]),
-      traps: Object.freeze([]),
-      features: Object.freeze(["bone_chime_rack", "mushrooms", "crate"]),
-      chests: Object.freeze([{ lootTable: "chest:basic" }]),
-    }),
-    profile: Object.freeze({
+    content: {
+      monsters: [{ id: "dire_wolf", count: 3 }],
+      traps: [],
+      features: ["bone_chime_rack", "mushrooms", "crate"],
+      chests: [{ lootTable: "chest:basic" }],
+    },
+    profile: {
       ...CAVE_PROFILE,
       id: "wolf_den",
       theme: "cave",
       roomSparsity: 0.25,
       hallwayMonsterCap: 1,
       monsterFilter: (def) => String(def?.id || "") === "dire_wolf",
-      featurePool: Object.freeze(["bone_chime_rack", "mushrooms", "chest"]),
-    }),
-  }),
-  forgotten_shrine: Object.freeze({
+    },
+  },
+  forgotten_shrine: {
     templateId: "forgotten_shrine",
     label: "Forgotten Shrine",
     type: "shrine",
@@ -311,13 +302,13 @@ export const UNDERWORLD_REGION_TEMPLATES = Object.freeze({
     questId: "",
     targetDepth: 1,
     roomTarget: 2,
-    content: Object.freeze({
-      monsters: Object.freeze([{ id: "skeleton", count: 3 }, { id: "dark_acolyte", count: 1 }]),
-      traps: Object.freeze([]),
-      features: Object.freeze(["altar", "shrine", "statue", "candle_cluster"]),
-      chests: Object.freeze([{ lootTable: "chest:epic" }]),
-    }),
-    profile: Object.freeze({
+    content: {
+      monsters: [{ id: "skeleton", count: 3 }, { id: "dark_acolyte", count: 1 }],
+      traps: [],
+      features: ["altar", "shrine", "statue", "candle_cluster"],
+      chests: [{ lootTable: "chest:epic" }],
+    },
+    profile: {
       ...ARENA_PROFILE,
       id: "forgotten_shrine",
       theme: "temple",
@@ -330,10 +321,9 @@ export const UNDERWORLD_REGION_TEMPLATES = Object.freeze({
         const tags = Array.isArray(def?.tags) ? def.tags : [];
         return id === "skeleton" || id === "dark_acolyte" || tags.includes("undead");
       },
-      featurePool: Object.freeze(["altar", "shrine", "statue", "candle_cluster", "chest"]),
-    }),
-  }),
-});
+    },
+  },
+};
 
 export function getUnderworldRegionTemplate(templateId) {
   return UNDERWORLD_REGION_TEMPLATES[String(templateId || "")] || null;
