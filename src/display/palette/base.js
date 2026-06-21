@@ -536,6 +536,10 @@ export const basePalette = {
   stone_flint:      { glyph: "`", fg: "#777777", glow: "#555555", baseScale: 0.5 },
   stone_rock:       { glyph: "`", fg: "#666666", glow: "#444444", baseScale: 0.5 },
 
+  // Miscellaneous items
+  tent:           { glyph: "⛺", fg: "#c48a50", glow: "#7a4a28" },
+  scale:          { glyph: "⚖", fg: "#d0b070", glow: "#806030" },
+
   // Fallback
   default: { glyph: "•", fg: "#cfe8ff", glow: "#6cf" }
 };
