@@ -15,7 +15,9 @@ import {
     transferItem,
 } from "../utils/inventoryFacade.js";
 import { isChestIdentity } from "../../shared/chests.js";
+import { hasLOS } from "../../shared/math/gridLOS.js";
 import { canAddCarriedWeight, getCarryCapacity } from "../utils/encumbrance.js";
+import { buildBlocksVisionMap, blockedCallback } from "../utils/vision.js";
 
 
 export function itemPickupSystem(world) {
@@ -105,6 +107,12 @@ export function itemPickupSystem(world) {
             const dist = Math.max(dx, dy); // Chebyshev distance
             if (dist > maxRange) {
                 world.emit('item:pickup-denied', { actor, itemId, reason: 'range', need: maxRange, at: { x: pos.x, y: pos.y }, itemAt: { x: itemPos.x, y: itemPos.y } });
+                world.remove(actor, PickupIntent);
+                continue;
+            }
+            const isBlocked = blockedCallback(buildBlocksVisionMap(world));
+            if (!hasLOS(pos.x | 0, pos.y | 0, itemPos.x | 0, itemPos.y | 0, isBlocked)) {
+                world.emit('item:pickup-denied', { actor, itemId, reason: 'blocked', at: { x: pos.x, y: pos.y }, itemAt: { x: itemPos.x, y: itemPos.y } });
                 world.remove(actor, PickupIntent);
                 continue;
             }
