@@ -4,6 +4,7 @@ import { World } from "../src/lib/ecs-js/index.js";
 import { configureWorld } from "../src/main/scheduler.js";
 import { generateFloor } from "../src/rules/environment/dungeon/index.js";
 import { initDungeon } from "../src/rules/environment/dungeon/index.js";
+import { clearFloorCache, transitionToDepth } from "../src/rules/environment/dungeon/transition.js";
 import { clearAll, loadChunk } from "../src/rules/environment/dungeon/tileMap.js";
 import { CHUNK_SIZE, TILE_DOOR, TILE_FLOOR } from "../src/rules/environment/dungeon/constants.js";
 import { Collider } from "../src/rules/components/Collider.js";
@@ -457,6 +458,77 @@ Deno.test("overworld bookseller blocks leaving with unpaid stock", async () => {
   assertEquals(blocked.length, 1, "bookseller should block leaving with unpaid stock");
   assertEquals(blocked[0].shopkeeperId, bookVendorId);
   assertEquals(world.get(playerId, Position), insideDoorPos, "blocked exit should keep the player on the interior door tile");
+});
+
+Deno.test("restored overworld shop retains witness and unpaid ownership links", async () => {
+  clearAll();
+  clearFloorCache();
+  const world = new World({ seed: 0xC0FFEE });
+  configureWorld(world);
+  await initDungeon(world, { startDepth: 0 });
+
+  const playerId = world.create();
+  world.add(playerId, Player, {});
+  world.add(playerId, Inventory, { capacity: 20 });
+  world.add(playerId, Position, { x: 0, y: 0 });
+
+  await transitionToDepth(world, 1, { x: 0, y: 0 });
+  await transitionToDepth(world, 0, { x: 0, y: 0 });
+
+  let bookVendorId = 0;
+  for (const [id, named] of world.query(NamedIdentity)) {
+    if (named.identity === "townfolk_book_vendor") {
+      bookVendorId = id;
+      break;
+    }
+  }
+  assert(bookVendorId > 0, "expected restored book vendor");
+
+  let shopRoom = null;
+  for (const [, room] of world.query(RoomMetadata)) {
+    if (room.roomType === "shop" && room.shopkeeperId === bookVendorId) {
+      shopRoom = room;
+      break;
+    }
+  }
+  assert(shopRoom, "restored shop room should reference the restored vendor id");
+
+  let unpaidItemId = 0;
+  for (const [itemId, unpaid] of world.query(Unpaid)) {
+    if (unpaid.shopkeeperId !== bookVendorId) continue;
+    unpaidItemId = itemId;
+    break;
+  }
+  assert(unpaidItemId > 0, "restored unpaid stock should reference the restored vendor id");
+
+  let doorId = 0;
+  for (const [id, pos] of world.query(Position, DoorState)) {
+    if (!isDoorOnRoomPerimeter(pos, shopRoom)) continue;
+    doorId = id;
+    break;
+  }
+  assert(doorId > 0, "expected restored shop door");
+  world.set(doorId, DoorState, { open: true, locked: false });
+  world.set(doorId, Collider, { solid: false, blocksSight: false });
+  addToInventory(world, playerId, unpaidItemId);
+
+  const doorPos = world.get(doorId, Position);
+  world.set(playerId, Position, { x: doorPos.x, y: doorPos.y });
+  let exitDx = 0;
+  let exitDy = 0;
+  for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+    const nx = doorPos.x + dx;
+    const ny = doorPos.y + dy;
+    if (nx >= shopRoom.x && nx < shopRoom.x + shopRoom.w && ny >= shopRoom.y && ny < shopRoom.y + shopRoom.h) continue;
+    exitDx = dx;
+    exitDy = dy;
+    break;
+  }
+  world.add(playerId, MoveIntent, { dx: exitDx, dy: exitDy });
+
+  shopkeeperSystem(world);
+
+  assert(!world.has(playerId, MoveIntent), "restored visible vendor should block an unpaid exit");
 });
 
 Deno.test("overworld herbalist does not get the apothecary key", async () => {

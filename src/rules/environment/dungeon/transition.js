@@ -10,6 +10,8 @@ import { Pet } from '../../components/Pet.js';
 import { PetState } from '../../components/PetState.js';
 import { MonsterSpawner } from '../../components/MonsterSpawner.js';
 import { NamedIdentity } from '../../components/NamedIdentity.js';
+import { RoomMetadata } from '../../components/RoomMetadata.js';
+import { Unpaid } from '../../components/Unpaid.js';
 import { Flying } from '../../components/Flying.js';
 import { Faction } from '../../components/Faction.js';
 import { AggroState, AGGRO_LEVELS, SEARCH_TURNS_HUNTING_GRACE } from '../../components/AggroState.js';
@@ -500,6 +502,18 @@ export async function transitionToDepth(world, newDepth, destinationPos, opts = 
           r.activeChildren = (r.activeChildren || [])
             .map(id => oldToNew.get(id) ?? id)
             .filter(id => world.isAlive(id));
+        });
+      }
+      for (const [eid] of world.query(RoomMetadata)) {
+        if (!_restoredSet.has(eid)) continue;
+        world.mutate(eid, RoomMetadata, r => {
+          if (r.shopkeeperId) r.shopkeeperId = oldToNew.get(r.shopkeeperId) ?? r.shopkeeperId;
+        });
+      }
+      for (const [eid] of world.query(Unpaid)) {
+        if (!_restoredSet.has(eid)) continue;
+        world.mutate(eid, Unpaid, r => {
+          if (r.shopkeeperId) r.shopkeeperId = oldToNew.get(r.shopkeeperId) ?? r.shopkeeperId;
         });
       }
       // Remap hierarchy (Parent/Sibling) entity-ID cross-references.
