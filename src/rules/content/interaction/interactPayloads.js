@@ -41,6 +41,7 @@ import { Owner } from "../../components/Owner.js";
 import { Interactable } from "../../components/Interactable.js";
 import { ObjectState } from "../../components/ObjectState.js";
 import { DungeonState } from "../../components/DungeonState.js";
+import { DungeonEntrance } from "../../components/DungeonEntrance.js";
 import { Tombstone as TombstoneComponent } from "../../components/Tombstone.js";
 import { createFrom } from "../../../lib/ecs-js/archetype.js";
 import {
@@ -1224,7 +1225,27 @@ export const INTERACT_PAYLOADS = {
   // These entries exist so the interactable component is valid and the system
   // returns true, but they are intentional no-ops in the rules layer.
 
-  descendStair: { onInteract() {} },
+  descendStair: {
+    beforeInteract(ctx) {
+      if (String(ctx.intent?.mode || "") !== "lockpickResult") return;
+      const { world, actor, targetId } = ctx;
+      const entrance = world.get(targetId, DungeonEntrance);
+      const consumed = consumeIdentityUnits(world, actor, LOCKPICK_ITEM_ID, 1) ? 1 : 0;
+      const success = ctx.intent?.success === true && consumed > 0 && !!entrance?.lockId;
+      if (success) {
+        world.set(targetId, DungeonEntrance, { ...entrance, lockId: "", lockDifficulty: "" });
+      }
+      world.emit(new LockpickResolved({
+        actor,
+        targetId,
+        success,
+        reason: success ? "unlocked" : (consumed > 0 ? String(ctx.intent?.reason || "failed") : "no_lockpick"),
+        consumed,
+      }));
+      ctx.cancel(success ? "LOCKPICK_SUCCESS" : "LOCKPICK_FAILED", success ? "The lock opens." : "The lock resists.");
+    },
+    onInteract() {},
+  },
   ascendStair: { onInteract() {} },
 
   // ── Well ───────────────────────────────────────────────────────────────────
@@ -1340,7 +1361,7 @@ export const INTERACT_PAYLOADS = {
       //  0.75–0.82  poison
       //  0.82–0.88  spawn water creature (nymph or snake)
       //  0.88–0.93  teleport
-      //  0.93–0.97  gushing flood (destroys fountain, creates water)
+      //  0.93–0.97  gushing flood (creates water around the fountain)
       //  0.97–1.00  wish (rare loot drop)
       const roll = r();
 
@@ -1463,8 +1484,7 @@ export const INTERACT_PAYLOADS = {
         }
       } else if (roll < 0.97) {
         // ── Gushing flood ──────────────────────────────────────────
-        // Fountain explodes: converts nearby floor tiles to shallow water,
-        // permanently destroys the fountain.
+        // Fountain erupts: converts nearby walkable tiles to shallow water.
         const fPos = world.get(targetId, Position);
         let tilesFlooded = 0;
         if (fPos) {
@@ -1474,21 +1494,16 @@ export const INTERACT_PAYLOADS = {
               if (dx * dx + dy * dy > 5) continue; // rough circle r~2
               const tx = cx + dx, ty = cy + dy;
               const t = getTile(tx, ty);
-              if (t === TILE_FLOOR) {
+              if (t !== TILE_SHALLOW_WATER && isWalkable(tx, ty)) {
                 setTile(tx, ty, TILE_SHALLOW_WATER);
                 tilesFlooded++;
               }
             }
           }
         }
-        // Destroy the fountain entity
         world.emit?.("fountain:drink", {
           actor, targetId, effect: "gush", tilesFlooded,
         });
-        world.emit?.("fountain:destroyed", { actor, targetId, tilesFlooded });
-        if (world.isAlive(targetId)) world.destroy(targetId);
-        // Skip normal charge decrement — fountain is gone
-        return;
       } else {
         // ── Wish: rare loot drop ───────────────────────────────────
         const fPos = world.get(targetId, Position);

@@ -2,6 +2,10 @@
 // Self-contained speech bubble dialog overlay.
 // Pure DOM — no ECS, no rules imports. Receives position via callbacks.
 
+import { DIALOG_BUBBLE_SCALE } from "../../shared/uiScale.js";
+
+const dialogPx = (value) => `${Math.round(value * DIALOG_BUBBLE_SCALE)}px`;
+
 /**
  * @typedef {{
  *   open: boolean,
@@ -32,10 +36,10 @@ function createBubbleDialogDom() {
     zIndex: "90",
     display: "none",
     pointerEvents: "auto",
-    minWidth: "220px",
-    maxWidth: "min(78vw, 360px)",
-    padding: "10px 12px 12px",
-    borderRadius: "16px",
+    minWidth: dialogPx(220),
+    maxWidth: `min(78vw, ${dialogPx(360)})`,
+    padding: `${dialogPx(10)} ${dialogPx(12)} ${dialogPx(12)}`,
+    borderRadius: dialogPx(16),
     border: "2px solid rgba(75,62,43,0.9)",
     background: "rgba(252,248,238,0.98)",
     boxShadow: "0 10px 28px rgba(0,0,0,0.28)",
@@ -45,14 +49,14 @@ function createBubbleDialogDom() {
   Object.assign(tail.style, {
     position: "absolute",
     left: "50%",
-    bottom: "-14px",
-    width: "20px",
-    height: "20px",
+    bottom: dialogPx(-14),
+    width: dialogPx(20),
+    height: dialogPx(20),
     background: "rgba(252,248,238,0.98)",
     borderRight: "2px solid rgba(75,62,43,0.9)",
     borderBottom: "2px solid rgba(75,62,43,0.9)",
     transform: "translateX(-50%) rotate(45deg)",
-    borderBottomRightRadius: "4px",
+    borderBottomRightRadius: dialogPx(4),
     pointerEvents: "none",
     boxShadow: "4px 4px 10px rgba(0,0,0,0.10)",
   });
@@ -61,7 +65,7 @@ function createBubbleDialogDom() {
     left: "0",
     top: "0",
     width: "0",
-    height: "3px",
+    height: dialogPx(3),
     display: "none",
     pointerEvents: "none",
     transformOrigin: "0 50%",
@@ -73,8 +77,8 @@ function createBubbleDialogDom() {
     position: "fixed",
     left: "0",
     top: "0",
-    width: "10px",
-    height: "10px",
+    width: dialogPx(10),
+    height: dialogPx(10),
     display: "none",
     pointerEvents: "none",
     borderRadius: "999px",
@@ -84,19 +88,19 @@ function createBubbleDialogDom() {
     zIndex: "92",
   });
   Object.assign(title.style, {
-    font: "700 14px 'Trebuchet MS', sans-serif",
+    font: `700 ${dialogPx(14)} 'Trebuchet MS', sans-serif`,
     color: "#4b3e2b",
-    marginBottom: "6px",
+    marginBottom: dialogPx(6),
   });
   Object.assign(body.style, {
-    font: "400 15px 'Trebuchet MS', sans-serif",
+    font: `400 ${dialogPx(15)} 'Trebuchet MS', sans-serif`,
     lineHeight: "1.35",
     color: "#261f16",
-    marginBottom: "10px",
+    marginBottom: dialogPx(10),
   });
   Object.assign(choices.style, {
     display: "grid",
-    gap: "8px",
+    gap: dialogPx(8),
   });
 
   el.appendChild(title);
@@ -129,7 +133,7 @@ export function createBubbleDialogController({ getPosition, playerEntity, canvas
   function getSpeakerBubbleLiftPx() {
     const cam = getCam();
     const scale = Math.max(1, Number(cam?.scale) || 1);
-    return Math.max(32, Math.min(96, Math.round(scale * 1.15)));
+    return Math.max(32, Math.min(96, Math.round(scale * 1.15))) * DIALOG_BUBBLE_SCALE;
   }
 
   function getSpeakerBubbleAnchorPos(pos) {
@@ -165,13 +169,13 @@ export function createBubbleDialogController({ getPosition, playerEntity, canvas
       const btn = document.createElement("button");
       btn.textContent = String(choice?.label || choice?.id || "Continue");
       Object.assign(btn.style, {
-        minHeight: "40px",
-        padding: "8px 10px",
-        borderRadius: "10px",
+        minHeight: dialogPx(40),
+        padding: `${dialogPx(8)} ${dialogPx(10)}`,
+        borderRadius: dialogPx(10),
         border: "1px solid rgba(75,62,43,0.35)",
         background: "rgba(255,255,255,0.96)",
         color: "#241d15",
-        font: "600 14px 'Trebuchet MS', sans-serif",
+        font: `600 ${dialogPx(14)} 'Trebuchet MS', sans-serif`,
         textAlign: "left",
         cursor: "pointer",
         touchAction: "manipulation",
@@ -221,17 +225,19 @@ export function createBubbleDialogController({ getPosition, playerEntity, canvas
     const ryScale = rect.height / logicalCanvas.height;
     const sx = rect.left + localX * rxScale;
     const sy = rect.top + localY * ryScale;
-    const boxW = dom.el.offsetWidth || 280;
-    const boxH = dom.el.offsetHeight || 120;
+    const boxW = dom.el.offsetWidth || 280 * DIALOG_BUBBLE_SCALE;
+    const boxH = dom.el.offsetHeight || 120 * DIALOG_BUBBLE_SCALE;
     const lift = getSpeakerBubbleLiftPx();
     const viewportW = typeof window !== "undefined" ? window.innerWidth : logicalCanvas.width;
     const viewportH = typeof window !== "undefined" ? window.innerHeight : logicalCanvas.height;
-    const left = Math.max(10, Math.min(viewportW - boxW - 10, Math.round(sx - (boxW / 2))));
-    const top = Math.max(10, Math.min(viewportH - boxH - 30, Math.round(sy - boxH - 12 - lift)));
+    const margin = 10 * DIALOG_BUBBLE_SCALE;
+    const bottomMargin = 30 * DIALOG_BUBBLE_SCALE;
+    const left = Math.max(margin, Math.min(viewportW - boxW - margin, Math.round(sx - (boxW / 2))));
+    const top = Math.max(margin, Math.min(viewportH - boxH - bottomMargin, Math.round(sy - boxH - 12 * DIALOG_BUBBLE_SCALE - lift)));
     dom.el.style.transform = `translate(${left}px, ${top}px)`;
 
     const tailTipX = left + (boxW * 0.5);
-    const tailTipY = top + boxH + 18;
+    const tailTipY = top + boxH + 18 * DIALOG_BUBBLE_SCALE;
     const dx = sx - tailTipX;
     const dy = sy - tailTipY;
     const dist = Math.hypot(dx, dy);

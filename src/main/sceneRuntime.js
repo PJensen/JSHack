@@ -12,6 +12,7 @@ import { Position } from "../rules/components/Position.js";
 import { Player } from "../rules/components/Player.js";
 import { DungeonState } from "../rules/components/DungeonState.js";
 import { NamedIdentity } from "../rules/components/NamedIdentity.js";
+import { DIALOG_BUBBLE_SCALE } from "../shared/uiScale.js";
 
 function createEmptyBubble() {
   return createScriptedSpeechBubble({ entityId: 0, text: "" });
@@ -383,16 +384,17 @@ export function createSceneRuntime({
     const liveProjected = projectBubbleAnchor(cam, liveAnchor, logicalCanvas, { left: 0, top: 0 });
     const liveSx = liveProjected.localX * dprScale;
     const liveSy = liveProjected.localY * dprScale;
-    const padX = 12 * dprScale;
-    const padY = 10 * dprScale;
+    const bubbleScale = DIALOG_BUBBLE_SCALE;
+    const padX = 12 * bubbleScale * dprScale;
+    const padY = 10 * bubbleScale * dprScale;
     const isGuide = typeof bubble.resolveAnchor === "function";
-    const maxWidth = Math.min(logicalCanvas.width * (isGuide ? 0.72 : 0.44), isGuide ? 480 : 360) * dprScale;
+    const maxWidth = Math.min(logicalCanvas.width * (isGuide ? 0.72 : 0.44), (isGuide ? 480 : 360) * bubbleScale) * dprScale;
     const text = bubble.text;
     const fade = Math.max(0, Math.min(1, bubble.durationSec > 0 ? bubble.ttlSec / bubble.durationSec : 1));
 
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    const fontSize = Math.round((isGuide ? 16 : 15) * dprScale);
+    const fontSize = Math.round((isGuide ? 16 : 15) * bubbleScale * dprScale);
     const lineHeight = Math.round(fontSize * 1.35);
     ctx.font = `600 ${fontSize}px 'Trebuchet MS', sans-serif`;
 
@@ -420,9 +422,9 @@ export function createSceneRuntime({
     const boxW = textWidth + (padX * 2);
     const boxH = padY * 2 + lineHeight * lines.length;
     const scale = Math.max(1, Number(cam?.scale) || 1);
-    const lift = Math.max(32, Math.min(96, Math.round(scale * 1.15))) * dprScale;
-    const tailH = Math.max(14, 14 * dprScale);
-    const tailHalfW = Math.max(10, 10 * dprScale);
+    const lift = Math.max(32, Math.min(96, Math.round(scale * 1.15))) * bubbleScale * dprScale;
+    const tailH = 14 * bubbleScale * dprScale;
+    const tailHalfW = 10 * bubbleScale * dprScale;
     const placed = placeBubbleBox({
       anchorX: sx,
       anchorY: sy,
@@ -432,8 +434,8 @@ export function createSceneRuntime({
       tailHeight: tailH,
       viewportWidth: canvas.width,
       viewportHeight: canvas.height,
-      margin: 10 * dprScale,
-      bottomMargin: 30 * dprScale,
+      margin: 10 * bubbleScale * dprScale,
+      bottomMargin: 30 * bubbleScale * dprScale,
     });
     const boxX = placed.left;
     const boxY = placed.top;
@@ -473,7 +475,7 @@ export function createSceneRuntime({
     ctx.strokeStyle = `rgba(57,46,32,${Math.min(1, alpha + 0.1).toFixed(3)})`;
     ctx.lineWidth = Math.max(1, 2 * dprScale);
     ctx.beginPath();
-    ctx.roundRect(boxX, boxY, boxW, boxH, 12 * dprScale);
+    ctx.roundRect(boxX, boxY, boxW, boxH, 12 * bubbleScale * dprScale);
     ctx.fill();
     ctx.stroke();
 

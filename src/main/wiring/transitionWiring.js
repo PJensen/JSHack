@@ -14,8 +14,10 @@ import { Pet } from "../../rules/components/Pet.js";
 import { PetState } from "../../rules/components/PetState.js";
 import { getUnderworldRegionTemplate } from "../../rules/environment/dungeon/underworldRegions.js";
 import { DoorKey } from "../../rules/components/DoorKey.js";
-import { inventoryItems } from "../../rules/utils/inventoryFacade.js";
+import { hasItem, inventoryItems } from "../../rules/utils/inventoryFacade.js";
 import { defineExtension } from "../../lib/ecs-js/index.js";
+import { LockpickPrompted } from "../../events/LockpickPrompted.js";
+import { LockpickResolved } from "../../events/LockpickResolved.js";
 
 const RETURN_PORTAL_IDENTITY = 'return_portal';
 const STAIR_TRANSITION_COOLDOWN_MS = 220;
@@ -289,12 +291,30 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
       const entrance = world.get(sid, DungeonEntrance) || null;
       if (!canTraverseDungeonEntrance(world, actorId, entrance)) {
         world.emit("message", {
-          text: "The cellar hatch is secured by a formidable lock. The barkeep must have the key.",
+          text: "The dungeon entrance is locked.",
           type: "system",
         });
+        if (hasItem(world, actorId, "lockpick")) {
+          world.emit(new LockpickPrompted({
+            actor: actorId,
+            targetId: sid,
+            pins: 6,
+            difficulty: String(entrance?.lockDifficulty || "hard"),
+          }));
+        }
         return;
       }
       queueStair(direction, stairPos.x | 0, stairPos.y | 0, entrance);
+    });
+
+    const offEntranceLockpick = installedWorld.on(LockpickResolved, (event) => {
+      if (!event.success) return;
+      const entrance = world.get(event.targetId, DungeonEntrance);
+      const stairPos = world.get(event.targetId, Position);
+      const actorPos = world.get(event.actor, Position);
+      if (!entrance || !stairPos || !actorPos) return;
+      if ((actorPos.x | 0) !== (stairPos.x | 0) || (actorPos.y | 0) !== (stairPos.y | 0)) return;
+      queueStair("down", stairPos.x | 0, stairPos.y | 0, entrance);
     });
 
     const offDepth = installedWorld.on('dungeon:teleport-depth', ({ targetDepth, source, returnTicket }) => {
@@ -338,6 +358,7 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
 
     return () => {
       offStair();
+      offEntranceLockpick();
       offDepth();
       offPortal();
       offPit();
