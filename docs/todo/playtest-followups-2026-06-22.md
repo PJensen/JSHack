@@ -24,6 +24,8 @@
     keeping the destination change clear.
   - Ensure the transition works for every canonical teleport source rather
     than special-casing the fountain.
+  - Blink and Phase Strike are intentionally excluded; their existing camera
+    follow is part of the movement presentation.
 
 - [x] Increase the drop rate of the Scroll of Teleportation so it is a more
       dependable escape resource during normal play.
@@ -33,6 +35,16 @@
     explicit.
 
 ## Quest Sequence Robustness
+
+### Deferred Architecture Note
+
+- [ ] Decide where quest-specific turn-in predicates should live. The current
+      Book Below implementation shares a live-inventory predicate from the
+      quest definition with `townfolkDialogs`; this avoids synchronized shadow
+      state but still leaks quest concepts into the townfolk dialogue module.
+  - A future quest context helper such as `ctx.hasItem(...)` or authored
+    `turnInCondition` may provide the right boundary.
+  - Do not expand this architecture as part of the current playtest fixes.
 
 - [x] Make **The Book Below** work when its objectives are completed out of
       sequence, including when the player already owns the book before accepting

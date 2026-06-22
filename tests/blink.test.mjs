@@ -26,9 +26,7 @@ Deno.test("blink: targeted cast lands on requested tile", () => {
   const world = new World({ seed: 0xC0FFEE });
   const actor = makeActor(world, 10, 10);
   const blinkEvents = [];
-  const teleportEvents = [];
   world.on("spell:blink", (e) => blinkEvents.push(e));
-  world.on("teleported", (e) => teleportEvents.push(e));
 
   runSpellScript(world, actor, BLINK, { x: 15, y: 10 });
 
@@ -36,7 +34,6 @@ Deno.test("blink: targeted cast lands on requested tile", () => {
   assertEquals(pos.x, 15);
   assertEquals(pos.y, 10);
   assertEquals(blinkEvents.length, 1);
-  assertEquals(teleportEvents[0]?.source, "spell:blink");
   assertEquals(blinkEvents[0].randomized, false);
 });
 
