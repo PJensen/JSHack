@@ -313,6 +313,7 @@ export function initOverlays() {
   // Always-on, semi-transparent message ticker (non-modal)
   const ticker = ensureMessageTicker(root);
   let spellGestureTimer = 0;
+  let lastCharacterMenuTab = 'character';
 
   /** Hide all character-menu panels (mutual exclusivity). */
   function hideCharMenuPanels() {
@@ -324,27 +325,38 @@ export function initOverlays() {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
     const slotFilter = String(e?.detail?.slotFilter || '').trim().toLowerCase();
+    lastCharacterMenuTab = 'inventory';
     (/** @type {any} */ (inv))._inventorySlotFilter = slotFilter || '';
     hideCharMenuPanels();
     show(inv);
     window.dispatchEvent(new CustomEvent('ui:requestInventoryData', { detail: { slotFilter } }));
   });
-  window.addEventListener('ui:openCharacter', () => {
+  window.addEventListener('ui:openCharacter', (ev) => {
+    const restoreLastTab = !!(/** @type {CustomEvent} */ (ev))?.detail?.restoreLastTab;
+    if (restoreLastTab && lastCharacterMenuTab !== 'character') {
+      const remembered = CHARACTER_MENU_TABS.find((tab) => tab.key === lastCharacterMenuTab);
+      if (remembered) window.dispatchEvent(new CustomEvent(remembered.eventName));
+      return;
+    }
+    lastCharacterMenuTab = 'character';
     hideCharMenuPanels();
     show(char);
     window.dispatchEvent(new CustomEvent('ui:requestCharacterData'));
   });
   window.addEventListener('ui:openEquipment', () => {
+    lastCharacterMenuTab = 'equipment';
     hideCharMenuPanels();
     show(equip);
     window.dispatchEvent(new CustomEvent('ui:requestEquipmentData'));
   });
   window.addEventListener('ui:openSettings', () => {
+    lastCharacterMenuTab = 'settings';
     hideCharMenuPanels();
     show(settingsPanel);
     window.dispatchEvent(new CustomEvent('ui:requestSettingsData'));
   });
   window.addEventListener('ui:openQuests', () => {
+    lastCharacterMenuTab = 'quests';
     hideCharMenuPanels();
     show(questJournal);
     window.dispatchEvent(new CustomEvent('ui:requestQuestJournalData'));
@@ -365,12 +377,14 @@ export function initOverlays() {
     }
   });
   window.addEventListener('ui:toggleCharacter', () => {
-    if (char.style.display === 'block') {
-      hide(char);
+    const openPanel = [char, inv, equip, questJournal, settingsPanel]
+      .find((panel) => panel.style.display === 'block');
+    if (openPanel) {
+      hide(openPanel);
     } else {
-      hideCharMenuPanels();
-      show(char);
-      window.dispatchEvent(new CustomEvent('ui:requestCharacterData'));
+      window.dispatchEvent(new CustomEvent('ui:openCharacter', {
+        detail: { restoreLastTab: true },
+      }));
     }
   });
   window.addEventListener('ui:toggleEquipment', () => {
@@ -756,14 +770,23 @@ export function initOverlays() {
     hide(altar);
     renderDialog(dialog, d);
     show(dialog);
-    const escKey = (/** @type {KeyboardEvent} */ ke) => {
+    const dialogKey = (/** @type {KeyboardEvent} */ ke) => {
       if (dialog.style.display !== 'block') return;
       if (ke.key === 'Escape') {
         window.dispatchEvent(new CustomEvent('ui:requestDialogClose', { detail: { sessionId: Number(d.sessionId || 0) | 0 } }));
-        ke.preventDefault();
+      } else if (ke.key === 'Enter' || ke.code === 'NumpadEnter') {
+        const defaultChoiceId = String((Array.isArray(d.choices) ? d.choices[0]?.id : '') || '');
+        if (!defaultChoiceId) return;
+        window.dispatchEvent(new CustomEvent('ui:requestDialogChoice', {
+          detail: { sessionId: Number(d.sessionId || 0) | 0, choiceId: defaultChoiceId },
+        }));
+      } else {
+        return;
       }
+      ke.preventDefault();
+      ke.stopImmediatePropagation();
     };
-    window.addEventListener('keydown', escKey);
+    window.addEventListener('keydown', dialogKey, { capture: true });
     // Backdrop click should close the dialog session, not just hide the panel
     const backdropClose = (/** @type {PointerEvent} */ pe) => {
       if (pe.target === dialog) {
@@ -773,7 +796,7 @@ export function initOverlays() {
     dialog.addEventListener('pointerdown', backdropClose);
     const obs = new MutationObserver(() => {
       if (dialog.style.display === 'none') {
-        window.removeEventListener('keydown', escKey);
+        window.removeEventListener('keydown', dialogKey, { capture: true });
         dialog.removeEventListener('pointerdown', backdropClose);
         obs.disconnect();
       }

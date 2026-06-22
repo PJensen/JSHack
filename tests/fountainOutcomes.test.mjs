@@ -220,14 +220,13 @@ Deno.test("fountain: teleport outcome moves the player", () => {
   }
 });
 
-Deno.test("fountain: gush outcome destroys fountain and creates water tiles", () => {
+Deno.test("fountain: gush outcome preserves fountain and creates water tiles", () => {
   const hit = findSeedForEffect("gush");
   assert(hit, "should find a seed that produces gush");
   assert(hit.ev.tilesFlooded > 0, "should have flooded some tiles");
-  // The fountain entity should be destroyed.
   assert(
-    !hit.world.isAlive(hit.fountain),
-    "fountain entity should be destroyed after gush",
+    hit.world.isAlive(hit.fountain),
+    "fountain entity should survive after gush",
   );
 });
 

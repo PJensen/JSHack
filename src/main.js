@@ -1254,7 +1254,9 @@ const inputDisposers = [];
         window.dispatchEvent(new CustomEvent("ui:openInventory"));
         break;
       case "display.openCharacter":
-        window.dispatchEvent(new CustomEvent("ui:openCharacter"));
+        window.dispatchEvent(new CustomEvent("ui:openCharacter", {
+          detail: { restoreLastTab: true },
+        }));
         break;
       case "display.openEquipment":
         window.dispatchEvent(new CustomEvent("ui:openEquipment"));

@@ -13,6 +13,7 @@ const dialogPx = (value) => `${Math.round(value * DIALOG_BUBBLE_SCALE)}px`;
  *   actorId: number,
  *   targetId: number,
  *   maxDistance: number,
+ *   defaultChoiceId: string,
  * }} BubbleDialogState
  */
 
@@ -128,7 +129,7 @@ export function createBubbleDialogController({ getPosition, playerEntity, canvas
   const dom = createBubbleDialogDom();
 
   /** @type {BubbleDialogState} */
-  let state = { open: false, sessionId: 0, actorId: 0, targetId: 0, maxDistance: 2 };
+  let state = { open: false, sessionId: 0, actorId: 0, targetId: 0, maxDistance: 2, defaultChoiceId: "" };
 
   function getSpeakerBubbleLiftPx() {
     const cam = getCam();
@@ -144,7 +145,7 @@ export function createBubbleDialogController({ getPosition, playerEntity, canvas
   }
 
   function close() {
-    state = { open: false, sessionId: 0, actorId: 0, targetId: 0, maxDistance: 2 };
+    state = { open: false, sessionId: 0, actorId: 0, targetId: 0, maxDistance: 2, defaultChoiceId: "" };
     dom.el.style.display = "none";
     dom.el.style.transform = "translate(-9999px, -9999px)";
     dom.connector.style.display = "none";
@@ -161,6 +162,7 @@ export function createBubbleDialogController({ getPosition, playerEntity, canvas
       actorId: Number(detail?.actorId || 0) | 0,
       targetId: Number(detail?.targetId || 0) | 0,
       maxDistance: Math.max(1, Number(detail?.maxDistance || 2) | 0),
+      defaultChoiceId: String(choices[0]?.id || ""),
     };
     dom.title.textContent = String(detail?.speakerName || "Someone");
     dom.body.textContent = String(detail?.text || "...");
@@ -267,12 +269,20 @@ export function createBubbleDialogController({ getPosition, playerEntity, canvas
 
   addEventListener("keydown", (ev) => {
     if (!state.open) return;
-    if (ev.key !== "Escape") return;
-    window.dispatchEvent(new CustomEvent("ui:requestDialogClose", {
-      detail: { sessionId: state.sessionId },
-    }));
+    if (ev.key === "Escape") {
+      window.dispatchEvent(new CustomEvent("ui:requestDialogClose", {
+        detail: { sessionId: state.sessionId },
+      }));
+    } else if ((ev.key === "Enter" || ev.code === "NumpadEnter") && state.defaultChoiceId) {
+      window.dispatchEvent(new CustomEvent("ui:requestDialogChoice", {
+        detail: { sessionId: state.sessionId, choiceId: state.defaultChoiceId },
+      }));
+    } else {
+      return;
+    }
     ev.preventDefault();
-  });
+    ev.stopImmediatePropagation();
+  }, { capture: true });
 
   return { open, close, layout, isOpen, getSessionId };
 }
