@@ -929,7 +929,6 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
       ftext.addStatus(pos.x, pos.y - 0.45, label, { color: col, life: 1.2, scaleStart: 1.3, scaleEnd: 1.0 });
       _fountainBurst(fx, pos, col, 12);
     } else if (eff === 'gold') {
-      ftext.addGold(pos.x, pos.y - 0.45, ev.amount || 0);
       _fountainBurst(fx, pos, '#ffcc00', 10);
     } else if (eff === 'curse') {
       ftext.addStatus(pos.x, pos.y - 0.45, 'CURSED!', { color: '#aa33cc', life: 1.3, scaleStart: 1.4, scaleEnd: 1.0 });
