@@ -13,9 +13,22 @@ import { Player } from "../../rules/components/Player.js";
 import { Pet } from "../../rules/components/Pet.js";
 import { PetState } from "../../rules/components/PetState.js";
 import { getUnderworldRegionTemplate } from "../../rules/environment/dungeon/underworldRegions.js";
+import { DoorKey } from "../../rules/components/DoorKey.js";
+import { inventoryItems } from "../../rules/utils/inventoryFacade.js";
+import { defineExtension } from "../../lib/ecs-js/index.js";
 
 const RETURN_PORTAL_IDENTITY = 'return_portal';
 const STAIR_TRANSITION_COOLDOWN_MS = 220;
+const TRANSITION_WIRING_EXTENSION_KEY = Symbol.for("jshack:main:transitionWiring");
+
+export function canTraverseDungeonEntrance(world, actorId, entrance) {
+  const lockId = String(entrance?.lockId || "");
+  if (!lockId) return true;
+  for (const itemId of inventoryItems(world, Number(actorId || 0) | 0)) {
+    if (String(world.get(itemId, DoorKey)?.lockId || "") === lockId) return true;
+  }
+  return false;
+}
 
 /**
  * @param {object} deps
@@ -263,8 +276,8 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
 
   // ── Event listeners ───────────────────────────────────────────────────
 
-  function install() {
-    world.on('stair:traverse', ({ actor, direction, targetId }) => {
+  const extension = defineExtension("jshack:main:transitionWiring", (installedWorld) => {
+    const offStair = installedWorld.on('stair:traverse', ({ actor, direction, targetId }) => {
       const sid = Number(targetId) | 0;
       if (!(sid > 0)) return;
       const stairPos = world.get(sid, Position);
@@ -273,10 +286,18 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
       const actorPos = actorId > 0 ? world.get(actorId, Position) : null;
       if (!actorPos) return;
       if ((actorPos.x | 0) !== (stairPos.x | 0) || (actorPos.y | 0) !== (stairPos.y | 0)) return;
-      queueStair(direction, stairPos.x | 0, stairPos.y | 0, world.get(sid, DungeonEntrance) || null);
+      const entrance = world.get(sid, DungeonEntrance) || null;
+      if (!canTraverseDungeonEntrance(world, actorId, entrance)) {
+        world.emit("message", {
+          text: "The cellar hatch is secured by a formidable lock. The barkeep must have the key.",
+          type: "system",
+        });
+        return;
+      }
+      queueStair(direction, stairPos.x | 0, stairPos.y | 0, entrance);
     });
 
-    world.on('dungeon:teleport-depth', ({ targetDepth, source, returnTicket }) => {
+    const offDepth = installedWorld.on('dungeon:teleport-depth', ({ targetDepth, source, returnTicket }) => {
       const normalizedSource = String(source || '');
       const isHomecoming = normalizedSource === 'scroll_homecoming'
         || normalizedSource === 'hearthstone'
@@ -288,7 +309,7 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
       });
     });
 
-    world.on('portal:return', ({ portalId }) => {
+    const offPortal = installedWorld.on('portal:return', ({ portalId }) => {
       const pid = Number(portalId) | 0;
       if (!(pid > 0)) return;
       const ni = world.get(pid, NamedIdentity);
@@ -303,7 +324,7 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
       queueDepth(targetDepth, { targetPos: { x: targetX, y: targetY }, fragActorsAtTarget: true, source: 'portal:return' });
     });
 
-    world.on('trap:pit:fall', ({ targetId, x, y }) => {
+    const offPit = installedWorld.on('trap:pit:fall', ({ targetId, x, y }) => {
       const pe = playerEntity();
       if (!pe || pe.id !== (Number(targetId) | 0)) return;
       let currentDepth = 1;
@@ -311,9 +332,21 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
       queueDepth(currentDepth + 1, { targetPos: { x: x | 0, y: y | 0 }, validateTargetPos: true });
     });
 
-    world.on("dungeon:transitioned", () => {
+    const offTransitioned = installedWorld.on("dungeon:transitioned", () => {
       destroyReturnPortals();
     });
+
+    return () => {
+      offStair();
+      offDepth();
+      offPortal();
+      offPit();
+      offTransitioned();
+    };
+  }, { key: TRANSITION_WIRING_EXTENSION_KEY });
+
+  function install() {
+    world.install(extension);
   }
 
   return {

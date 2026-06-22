@@ -203,12 +203,18 @@ Deno.test("fountain: creature outcome spawns a monster", () => {
 Deno.test("fountain: teleport outcome moves the player", () => {
   const hit = findSeedForEffect("teleport");
   assert(hit, "should find a seed that produces teleport");
-  if (hit.ev.from && hit.ev.to) {
-    const pos = hit.world.get(hit.actor, Position);
-    assertEquals(pos.x, hit.ev.to.x, "player x should match teleport destination");
-    assertEquals(pos.y, hit.ev.to.y, "player y should match teleport destination");
+  const { world, actor, fountain } = makeWorld(hit.seed);
+  const teleports = [];
+  world.on("teleported", (event) => teleports.push(event));
+  const event = drinkOnce(world, actor, fountain);
+  assertEquals(teleports.length, 1, "fountain teleport should use the canonical presentation event");
+  assertEquals(teleports[0].source, "fountain:drink");
+  if (event.from && event.to) {
+    const pos = world.get(actor, Position);
+    assertEquals(pos.x, event.to.x, "player x should match teleport destination");
+    assertEquals(pos.y, event.to.y, "player y should match teleport destination");
     assert(
-      hit.ev.to.x !== hit.ev.from.x || hit.ev.to.y !== hit.ev.from.y,
+      event.to.x !== event.from.x || event.to.y !== event.from.y,
       "player should have moved",
     );
   }

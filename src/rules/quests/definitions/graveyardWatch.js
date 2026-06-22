@@ -10,19 +10,15 @@ import { firstPlayerId } from "../../utils/worldAccess.js";
 import { emit, setVar } from "../actions.js";
 import { registerQuest } from "../registry.js";
 import { STARTER_PRIEST_FETCH_QUEST_ID, getQuestRecord } from "../runtime.js";
+import { defineExtension } from "../../../lib/ecs-js/index.js";
 
 const STARTER_FETCH_ITEM_ID = "book_dead";
-const STARTER_FETCH_HOOKS_KEY = Symbol.for("jshack:quests:starterFetch:installed");
+const STARTER_FETCH_HOOKS_KEY = Symbol.for("jshack:quests:starterFetch");
 const REWARD_GOLD = 200;
 const REWARD_ITEM_ID = "potion_holy_water";
 
-function playerHasBook(world, playerId) {
+export function canTurnInStarterFetch(world, playerId) {
   return inventoryHasIdentity(world, playerId, STARTER_FETCH_ITEM_ID, 1);
-}
-
-function pickedUpBook(world, itemId) {
-  const ni = world.get(itemId, NamedIdentity);
-  return String(ni?.identity || "") === STARTER_FETCH_ITEM_ID;
 }
 
 function currentDownStairPos(world) {
@@ -64,7 +60,7 @@ export function ensureStarterFetchQuestItem(world) {
 
   const existing = findBookEntity(world);
   if (existing > 0) return existing;
-  if (playerHasBook(world, playerId)) return 0;
+  if (canTurnInStarterFetch(world, playerId)) return 0;
 
   const at = currentDownStairPos(world);
   if (!at) return 0;
@@ -76,12 +72,12 @@ export function ensureStarterFetchQuestItem(world) {
 }
 
 export function installStarterFetchQuestHooks(world) {
-  if (world[STARTER_FETCH_HOOKS_KEY]) return;
-  world[STARTER_FETCH_HOOKS_KEY] = true;
-  world.on("dungeon:transitioned", ({ templateId }) => {
-    if (String(templateId || "") !== "graveyard_crypt") return;
-    ensureStarterFetchQuestItem(world);
-  });
+  world.install(defineExtension("jshack:quests:starterFetch", (installedWorld) => {
+    return installedWorld.on("dungeon:transitioned", ({ templateId }) => {
+      if (String(templateId || "") !== "graveyard_crypt") return;
+      ensureStarterFetchQuestItem(installedWorld);
+    });
+  }, { key: STARTER_FETCH_HOOKS_KEY }));
 }
 
 export const GraveyardWatchQuest = registerQuest({
@@ -93,7 +89,6 @@ export const GraveyardWatchQuest = registerQuest({
   },
   vars: {
     accepted: false,
-    recovered: false,
     delivered: false,
   },
   nodes: {
@@ -103,30 +98,10 @@ export const GraveyardWatchQuest = registerQuest({
           {
             guard: (ctx) => {
               return Number(ctx.payload?.playerId || 0) === Number(ctx.bind.player || 0)
-                && String(ctx.payload?.questId || "") === STARTER_PRIEST_FETCH_QUEST_ID
-                && playerHasBook(ctx.world, ctx.bind.player);
-            },
-            actions: [
-              setVar("accepted", true),
-              setVar("recovered", true),
-              setVar("delivered", false),
-              emit("quest:started", (ctx) => ({
-                questId: STARTER_PRIEST_FETCH_QUEST_ID,
-                playerId: ctx.bind.player,
-                giverId: ctx.bind.giver,
-                title: "The Book Below",
-              })),
-            ],
-            to: "report",
-          },
-          {
-            guard: (ctx) => {
-              return Number(ctx.payload?.playerId || 0) === Number(ctx.bind.player || 0)
                 && String(ctx.payload?.questId || "") === STARTER_PRIEST_FETCH_QUEST_ID;
             },
             actions: [
               setVar("accepted", true),
-              setVar("recovered", false),
               setVar("delivered", false),
               emit("quest:started", (ctx) => ({
                 questId: STARTER_PRIEST_FETCH_QUEST_ID,
@@ -142,35 +117,13 @@ export const GraveyardWatchQuest = registerQuest({
     },
     recover: {
       on: {
-        "item:pickup": [
-          {
-            guard: (ctx) => {
-              return Number(ctx.payload?.actor || 0) === Number(ctx.bind.player || 0)
-                && pickedUpBook(ctx.world, Number(ctx.payload?.itemId || 0) | 0);
-            },
-            actions: [
-              setVar("recovered", true),
-              emit("quest:advanced", (ctx) => ({
-                questId: STARTER_PRIEST_FETCH_QUEST_ID,
-                playerId: ctx.bind.player,
-                giverId: ctx.bind.giver,
-                objective: "Bring the Book of the Dead back to the priest.",
-              })),
-            ],
-            to: "report",
-          },
-        ],
-      },
-    },
-    report: {
-      on: {
         "dialog:reported": [
           {
             guard: (ctx) => {
               return Number(ctx.payload?.playerId || 0) === Number(ctx.bind.player || 0)
                 && String(ctx.payload?.questId || "") === STARTER_PRIEST_FETCH_QUEST_ID
                 && Number(ctx.payload?.speakerId || 0) > 0
-                && playerHasBook(ctx.world, ctx.bind.player);
+                && canTurnInStarterFetch(ctx.world, ctx.bind.player);
             },
             actions: [
               (ctx) => {

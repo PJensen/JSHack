@@ -33,6 +33,13 @@ Deno.test("chest:basic drop count stays non-empty and within max roll bound", ()
   assertChestRollBounds("chest:basic", 1, 120);
 });
 
+Deno.test("teleportation scroll has elevated escape-scroll weight", () => {
+  const entry = LOOT_TABLES["sub:scrolls"].entries
+    .find((candidate) => candidate.itemId === "scroll_teleportation");
+  assert(entry, "scroll_teleportation should remain in the canonical scroll table");
+  assert(entry.weight >= 20, `expected elevated teleportation weight, got ${entry.weight}`);
+});
+
 Deno.test("chest:magic drop count stays non-empty and within max roll bound", () => {
   assertChestRollBounds("chest:magic", 3, 120);
 });

@@ -13,6 +13,8 @@ export const DungeonEntrance = defineComponent("DungeonEntrance", {
   monsterTier: 0,
   lootTier: 0,
   questId: "",
+  lockId: "",
+  lockDifficulty: "",
   targetDepth: 1,
   anchorX: 0,
   anchorY: 0,

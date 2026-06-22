@@ -19,6 +19,8 @@ import { startZoomPunch } from "../camera/zoomPunch.js";
 import { installFloatTextWiring } from "../ui/wiring/floatTextWiring.js";
 import { installEventUiWiring } from "../ui/wiring/eventUiWiring.js";
 import { createDeathVfxController } from "../fx/deathVfxController.js";
+import { createTeleportFxController } from "../fx/teleportFxController.js";
+import { createPolymorphSmokeExtension } from "../fx/polymorphSmokeFx.js";
 import { installAudioWiring } from "../audio/audioWiring.js";
 import { createFountainAmbientController } from "../audio/fountainAmbientController.js";
 import { createLocalEmitterAmbientController } from "../audio/localEmitterAmbientController.js";
@@ -136,6 +138,8 @@ export function setupDisplayRuntime({
   hitstopFx.installListeners({ world, isPlayer, bumpFx });
 
   const deathVfx = createDeathVfxController();
+  const teleportFx = createTeleportFxController({ world, cam, isPlayer });
+  world.install(createPolymorphSmokeExtension({ fx }));
 
   // ── Melee camera shake — scales with damage ───────────────────────
   world.on('damaged', ({ cause, amount, critical }) => {
@@ -191,5 +195,5 @@ export function setupDisplayRuntime({
   const worldAmbientFx = createWorldAmbientController();
   const biomeAmbientFx = createBiomeAmbientController();
 
-  return { statusEmitterFx, statusPresentationDelayFx, boltFx, delayedDeathFx, projectileFx, spellAreaFx, cloudFx, surfaceAreaFx, spiritWispFx, bumpFx, meleeSlashFx, aggroFx, recoilFx, hitstopFx, deathEssenceFx, deathVfx, fountainAmbientFx, localEmitterAmbientFx, worldAmbientFx, biomeAmbientFx, ftext, goreTick };
+  return { statusEmitterFx, statusPresentationDelayFx, boltFx, delayedDeathFx, projectileFx, spellAreaFx, cloudFx, surfaceAreaFx, spiritWispFx, bumpFx, meleeSlashFx, aggroFx, recoilFx, hitstopFx, deathEssenceFx, deathVfx, teleportFx, fountainAmbientFx, localEmitterAmbientFx, worldAmbientFx, biomeAmbientFx, ftext, goreTick };
 }

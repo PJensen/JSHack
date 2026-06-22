@@ -178,6 +178,8 @@ export async function generateFloor(world, worldSeed, depth, tombstoneRepo = nul
         monsterTier: template.monsterTier,
         lootTier: template.lootTier,
         questId: template.questId,
+        lockId: String(template.lockId || ""),
+        lockDifficulty: String(template.lockDifficulty || ""),
         targetDepth: template.targetDepth,
         anchorX: pos.x | 0,
         anchorY: pos.y | 0,

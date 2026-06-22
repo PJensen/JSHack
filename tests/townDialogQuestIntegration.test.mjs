@@ -11,13 +11,15 @@ import { Position } from "../src/rules/components/Position.js";
 import { QuestState } from "../src/rules/components/QuestState.js";
 import { installQuestRuntime } from "../src/rules/quests/runtime.js";
 import { addToInventory } from "../src/rules/utils/inventoryFacade.js";
-import { inventoryHasIdentity } from "../src/rules/utils/townEconomy.js";
+import { consumeInventoryIdentity, inventoryHasIdentity } from "../src/rules/utils/townEconomy.js";
 import { inventoryItems } from "../src/rules/utils/inventoryFacade.js";
 import "../src/rules/quests/definitions/graveyardWatch.js";
 import "../src/rules/dialogues/townfolkDialogs.js";
 import { installDialogRuntime } from "../src/rules/dialogues/runtime.js";
 import { getQuestRecord, instantiateQuest, STARTER_PRIEST_FETCH_QUEST_ID } from "../src/rules/quests/runtime.js";
 import { RAT_INFESTATION_QUEST_ID } from "../src/rules/quests/definitions/ratInfestation.js";
+import { DoorKey } from "../src/rules/components/DoorKey.js";
+import { RAT_CELLAR_LOCK_ID } from "../src/rules/data/questLocks.js";
 
 Deno.test("priest dialog runs the starter fetch quest from offer to turn-in", () => {
   const world = new World({ seed: 91 });
@@ -65,7 +67,7 @@ Deno.test("priest dialog runs the starter fetch quest from offer to turn-in", ()
   addToInventory(world, player, bookId);
   world.emit("item:pickup", { actor: player, itemId: bookId, count: 1 });
   world.tick(0);
-  assertEquals(world.get(quest.id, QuestState)?.node, "report");
+  assertEquals(world.get(quest.id, QuestState)?.node, "recover");
 
   const returningPriest = world.create();
   world.add(returningPriest, NamedIdentity, { name: "Priest", identity: "townfolk_priest" });
@@ -88,6 +90,51 @@ Deno.test("priest dialog runs the starter fetch quest from offer to turn-in", ()
   }
   assert(goldTotal >= 100, "starter priest quest should award gold");
   assert(inventoryHasIdentity(world, player, "potion_holy_water", 1), "starter priest quest should award an item");
+});
+
+Deno.test("priest fetch quest accepts and turns in a book already in inventory", () => {
+  const world = new World({ seed: 94 });
+  world.setScheduler(composeScheduler("scripts"));
+  installQuestRuntime(world);
+
+  const player = world.create();
+  world.add(player, Player);
+  world.add(player, Inventory, { capacity: 8 });
+  const priest = world.create();
+  world.add(priest, NamedIdentity, { name: "Priest", identity: "townfolk_priest" });
+
+  const bookId = buildCatalogItem(world, "book_dead", { count: 1 });
+  addToInventory(world, player, bookId);
+  const questId = instantiateQuest(world, STARTER_PRIEST_FETCH_QUEST_ID, {
+    player,
+    giver: priest,
+    target: priest,
+  }, {}, { node: "offer" });
+
+  world.emit("dialog:accepted", {
+    questId: STARTER_PRIEST_FETCH_QUEST_ID,
+    playerId: player,
+    speakerId: priest,
+  });
+  assertEquals(world.get(questId, QuestState)?.node, "recover");
+
+  consumeInventoryIdentity(world, player, "book_dead", 1);
+  world.emit("dialog:reported", {
+    questId: STARTER_PRIEST_FETCH_QUEST_ID,
+    playerId: player,
+    speakerId: priest,
+  });
+  assertEquals(world.get(questId, QuestState)?.status, "active", "turn-in should follow live inventory, not prior ownership");
+
+  const replacementBookId = buildCatalogItem(world, "book_dead", { count: 1 });
+  addToInventory(world, player, replacementBookId);
+  world.emit("dialog:reported", {
+    questId: STARTER_PRIEST_FETCH_QUEST_ID,
+    playerId: player,
+    speakerId: priest,
+  });
+  assertEquals(world.get(questId, QuestState)?.status, "complete");
+  assertEquals(inventoryHasIdentity(world, player, "book_dead", 1), false);
 });
 
 Deno.test("barkeep rat quest acceptance gives starter bow + arrows and announces bats", () => {
@@ -132,6 +179,9 @@ Deno.test("barkeep rat quest acceptance gives starter bow + arrows and announces
 
   assert(inventoryHasIdentity(world, player, "bow_short", 1));
   assert(inventoryHasIdentity(world, player, "ammo_arrows", 20));
+  const cellarKeys = inventoryItems(world, player)
+    .filter((itemId) => world.get(itemId, DoorKey)?.lockId === RAT_CELLAR_LOCK_ID);
+  assertEquals(cellarKeys.length, 1, "quest acceptance should grant exactly one cellar key");
   assertEquals(chatter.some((evt) => String(evt?.text || "").includes("there are bats down there too")), true);
 });
 

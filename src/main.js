@@ -3101,6 +3101,7 @@ const {
   hitstopFx,
   deathEssenceFx,
   deathVfx,
+  teleportFx,
   fountainAmbientFx,
   localEmitterAmbientFx,
   worldAmbientFx,
@@ -5652,6 +5653,7 @@ function render(worldView) {
   // Screen-space wrath flash drawn after world present so lethal hits still read.
   drawScreenEffects({ ctx, W, H, boltFx });
   sceneRuntime.drawSpeechBubble(ctx);
+  teleportFx.draw(ctx, W, H);
 
   if (_rpOn && _rp) {
     _rpStage("profile");
@@ -5707,6 +5709,7 @@ function frame(now) {
   recoilFx.tick(displayDt);
   tickHitTints(displayDt);
   deathVfx.tick(dtSec);
+  teleportFx.tick(dtSec);
   sceneRuntime.tick(dtSec);
 
   // Update vitals HUD if changed (lightweight per-frame check)

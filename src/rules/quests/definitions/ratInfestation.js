@@ -3,9 +3,13 @@ import { NamedIdentity } from "../../components/NamedIdentity.js";
 import { Position } from "../../components/Position.js";
 import { QuestVars } from "../../components/QuestVars.js";
 import { DungeonState } from "../../components/DungeonState.js";
+import { DoorKey } from "../../components/DoorKey.js";
+import { ItemInfo } from "../../components/ItemInfo.js";
+import { Material } from "../../components/Material.js";
 import { getMonster } from "../../data/monsters.js";
+import { RAT_CELLAR_LOCK_ID } from "../../data/questLocks.js";
 import { createItemById } from "../../utils/itemFactory.js";
-import { addToInventory } from "../../utils/inventoryFacade.js";
+import { addToInventory, inventoryItems } from "../../utils/inventoryFacade.js";
 import { spawnMonsterEntity } from "../../utils/spawnMonsterEntity.js";
 import { attachEntityToCurrentFloor } from "../../utils/floorEntities.js";
 import { firstPlayerId } from "../../utils/worldAccess.js";
@@ -13,14 +17,16 @@ import { isWalkable } from "../../environment/dungeon/tileMap.js";
 import { emit, incVar, setVar } from "../actions.js";
 import { registerQuest } from "../registry.js";
 import { getQuestRecord } from "../runtime.js";
+import { defineExtension } from "../../../lib/ecs-js/index.js";
 
 export const RAT_INFESTATION_QUEST_ID = "starter.rat_infestation";
 export const REQUIRED_RAT_KILLS = 5;
+export { RAT_CELLAR_LOCK_ID };
 const REWARD_GOLD = 150;
 const REWARD_ITEM_IDS = Object.freeze(["bow_mirror"]);
 const DUNGEON_RAT_INFESTATION_COUNT = 10;
 
-const RAT_HOOKS_KEY = Symbol.for("jshack:quests:ratInfestation:installed");
+const RAT_HOOKS_KEY = Symbol.for("jshack:quests:ratInfestation");
 
 function isRat(world, entityId) {
   const ni = world.get(entityId, NamedIdentity);
@@ -43,6 +49,28 @@ function ratProgressPayload(ctx) {
     label: "RATS",
     at: pos ? { x: Number(pos.x) | 0, y: Number(pos.y) | 0 } : null,
   };
+}
+
+export function ensureRatCellarKey(world, playerId) {
+  const actorId = Number(playerId || 0) | 0;
+  if (!(actorId > 0)) return 0;
+  for (const itemId of inventoryItems(world, actorId)) {
+    if (String(world.get(itemId, DoorKey)?.lockId || "") === RAT_CELLAR_LOCK_ID) return itemId;
+  }
+
+  const keyId = world.create();
+  world.add(keyId, NamedIdentity, { name: "Tavern Cellar Key", identity: "key_tavern_cellar" });
+  world.add(keyId, ItemInfo, {
+    type: "tool",
+    slot: "",
+    weight: 0.1,
+    value: 0,
+    description: "A heavy iron key for the tavern cellar hatch.",
+    count: 1,
+  });
+  world.add(keyId, Material, { kind: "iron" });
+  world.add(keyId, DoorKey, { lockId: RAT_CELLAR_LOCK_ID });
+  return addToInventory(world, actorId, keyId) ? keyId : 0;
 }
 
 function currentDownStairPos(world) {
@@ -146,12 +174,12 @@ export function ensureRatInfestationQuestRats(world) {
 }
 
 export function installRatQuestHooks(world) {
-  if (world[RAT_HOOKS_KEY]) return;
-  world[RAT_HOOKS_KEY] = true;
-  world.on("dungeon:transitioned", ({ templateId }) => {
-    if (String(templateId || "") !== "tavern_basement") return;
-    ensureRatInfestationQuestRats(world);
-  });
+  world.install(defineExtension("jshack:quests:ratInfestation", (installedWorld) => {
+    return installedWorld.on("dungeon:transitioned", ({ templateId }) => {
+      if (String(templateId || "") !== "tavern_basement") return;
+      ensureRatInfestationQuestRats(installedWorld);
+    });
+  }, { key: RAT_HOOKS_KEY }));
 }
 
 export function ratInfestationDeathSystem(world) {
@@ -210,6 +238,7 @@ export const RatInfestationQuest = registerQuest({
                 const giverId = Number(ctx.bind.giver || 0);
                 const playerId = Number(ctx.bind.player || 0) | 0;
                 if (!(giverId > 0) || !(playerId > 0)) return;
+                ensureRatCellarKey(ctx.world, playerId);
                 const giverPos = ctx.world.get(giverId, Position);
                 if (!giverPos) return;
                 if (!Number.isFinite(giverPos.x) || !Number.isFinite(giverPos.y)) return;

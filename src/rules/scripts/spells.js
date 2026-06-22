@@ -659,12 +659,14 @@ REGISTRY['blink'] = function blinkScript(world, actor, spell, intent) {
   }
 
   world.set(actor, Position, { x: landing.x | 0, y: landing.y | 0 });
-  world.emit('moved', { id: actor, from, to: { x: landing.x | 0, y: landing.y | 0 } });
+  const to = { x: landing.x | 0, y: landing.y | 0 };
+  world.emit('moved', { id: actor, from, to });
+  world.emit('teleported', { id: actor, from, to, source: 'spell:blink' });
   world.emit('spell:blink', {
     actor,
     spellId: spell.id,
     from,
-    to: { x: landing.x | 0, y: landing.y | 0 },
+    to,
     requested,
     randomized,
     randomReason: randomized ? (confusedPower > 0 ? "confused" : "hallucinating") : null,
@@ -759,7 +761,9 @@ REGISTRY['phase_strike'] = function phaseStrikeScript(world, actor, spell, inten
 
   // Teleport the actor
   world.set(actor, Position, { x: landing.x | 0, y: landing.y | 0 });
-  world.emit('moved', { id: actor, from, to: { x: landing.x | 0, y: landing.y | 0 } });
+  const to = { x: landing.x | 0, y: landing.y | 0 };
+  world.emit('moved', { id: actor, from, to });
+  world.emit('teleported', { id: actor, from, to, source: 'spell:phase_strike' });
 
   // Resolve weapon + gear stats for damage pipeline
   const atkEq = /** @type any */ (world.get(actor, Equipment));
@@ -833,7 +837,7 @@ REGISTRY['phase_strike'] = function phaseStrikeScript(world, actor, spell, inten
     actor,
     spellId: spell.id,
     from,
-    to: { x: landing.x | 0, y: landing.y | 0 },
+    to,
     requested,
     hits: hits.map(h => ({ id: h.id, x: h.x, y: h.y })),
     randomized,

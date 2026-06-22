@@ -1451,6 +1451,7 @@ export const INTERACT_PAYLOADS = {
             const to = candidates[Math.floor(r() * candidates.length)];
             world.set(actor, Position, { x: to.x, y: to.y });
             world.emit("moved", { id: actor, from, to });
+            world.emit("teleported", { id: actor, from, to, source: "fountain:drink" });
             world.emit?.("fountain:drink", {
               actor, targetId, effect: "teleport", from, to,
             });

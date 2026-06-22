@@ -1,17 +1,15 @@
 import { TOWNFOLK } from "../data/townfolk.js";
-import { inventoryHasIdentity } from "../utils/townEconomy.js";
 import { getDistrictBulletin } from "../utils/townInterpretationVirtuals.js";
 import { registerDialog } from "./registry.js";
 import { STARTER_PRIEST_FETCH_QUEST_ID, getQuestRecord } from "../quests/runtime.js";
 import { RAT_INFESTATION_QUEST_ID, REQUIRED_RAT_KILLS } from "../quests/definitions/ratInfestation.js";
+import { canTurnInStarterFetch } from "../quests/definitions/graveyardWatch.js";
 import { getTownState, getWeather } from "../utils/townStateAccess.js";
 import { Vitality } from "../components/Vitality.js";
 import { Equipment, NON_AMMO_GEAR_SLOTS } from "../components/Equipment.js";
 import { Status } from "../components/Status.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { isItemCursed } from "../utils/curseUtils.js";
-
-const PRIEST_FETCH_ITEM_ID = "book_dead";
 
 const MOOD_POOLS = {
   farmer: [
@@ -522,13 +520,8 @@ registerDialog({
           return prefix ? `${prefix} ${base}` : base;
         }
         if (String(state.node || "") === "recover") {
+          if (canTurnInStarterFetch(ctx.world, ctx.actorId)) return "You found it. Hand it here, and I will see it warded.";
           return "Go below and search the first dungeon level. The book should lie near the deeper stair.";
-        }
-        if (String(state.node || "") === "report") {
-          if (inventoryHasIdentity(ctx.world, ctx.actorId, PRIEST_FETCH_ITEM_ID, 1)) {
-            return "You found it. Hand it here, and I will see it warded.";
-          }
-          return "You had the book in hand once. Find it again and bring it directly to me.";
         }
         return "May the gods watch over you.";
       },
@@ -559,8 +552,8 @@ registerDialog({
           visible: (ctx) => {
             const quest = priestQuest(ctx.world, ctx.actorId);
             return String(quest?.state?.status || "active") === "active"
-              && String(quest?.state?.node || "") === "report"
-              && inventoryHasIdentity(ctx.world, ctx.actorId, PRIEST_FETCH_ITEM_ID, 1);
+              && String(quest?.state?.node || "") === "recover"
+              && canTurnInStarterFetch(ctx.world, ctx.actorId);
           },
           emits: [
             {
@@ -580,20 +573,10 @@ registerDialog({
           visible: (ctx) => {
             const quest = priestQuest(ctx.world, ctx.actorId);
             return String(quest?.state?.status || "active") === "active"
-              && String(quest?.state?.node || "") === "recover";
+              && String(quest?.state?.node || "") === "recover"
+              && !canTurnInStarterFetch(ctx.world, ctx.actorId);
           },
           to: "recover_reminder",
-        },
-        {
-          id: "lost_book",
-          label: "I still need to find it.",
-          visible: (ctx) => {
-            const quest = priestQuest(ctx.world, ctx.actorId);
-            return String(quest?.state?.status || "active") === "active"
-              && String(quest?.state?.node || "") === "report"
-              && !inventoryHasIdentity(ctx.world, ctx.actorId, PRIEST_FETCH_ITEM_ID, 1);
-          },
-          to: "lost_reminder",
         },
         {
           id: "leave",
@@ -610,12 +593,6 @@ registerDialog({
     },
     recover_reminder: {
       text: "Go below the church and search the first dungeon floor. The deeper stair is the likeliest place for it.",
-      choices: [
-        { id: "leave", label: "Understood.", close: true },
-      ],
-    },
-    lost_reminder: {
-      text: "Do not come back empty-handed. Find the book and put it into my hands.",
       choices: [
         { id: "leave", label: "Understood.", close: true },
       ],

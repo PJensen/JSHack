@@ -44,7 +44,9 @@ Deno.test("phase_strike: damages and stuns enemy on the path", () => {
   const enemy = makeEnemy(world, 12, 10, 20);
 
   const events = [];
+  const teleports = [];
   world.on("spell:phase_strike", (e) => events.push(e));
+  world.on("teleported", (e) => teleports.push(e));
 
   // Target tile (15,10) — enemy at (12,10) is on the Bresenham line
   runSpellScript(world, actor, PHASE_STRIKE, { x: 15, y: 10 });
@@ -55,6 +57,7 @@ Deno.test("phase_strike: damages and stuns enemy on the path", () => {
 
   // Event should fire with hits
   assertEquals(events.length, 1, "should emit spell:phase_strike event");
+  assertEquals(teleports[0]?.source, "spell:phase_strike");
   assert(events[0].hits.length >= 1, "should have at least 1 hit");
 
   // Enemy should have taken damage

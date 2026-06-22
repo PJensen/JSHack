@@ -3,6 +3,7 @@ import { CATACOMB_PROFILE } from "./profiles/catacombs.js";
 import { CAVE_PROFILE } from "./profiles/caves.js";
 import { GROTTO_PROFILE } from "./profiles/grottos.js";
 import { ARENA_PROFILE } from "./profiles/arenas.js";
+import { RAT_CELLAR_LOCK_ID } from "../../data/questLocks.js";
 
 export const UNDERWORLD_REGION_TEMPLATES = {
   tavern_basement: {
@@ -14,6 +15,8 @@ export const UNDERWORLD_REGION_TEMPLATES = {
     monsterTier: 0,
     lootTier: 0,
     questId: "starter.rat_infestation",
+    lockId: RAT_CELLAR_LOCK_ID,
+    lockDifficulty: "very_hard",
     targetDepth: 1,
     roomTarget: 3,
     content: {
