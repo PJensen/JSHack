@@ -1,0 +1,28 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "efc1c9e6ea2f",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "docs/todo/playtest-followups-2026-06-22.md",
+    "src/rules/scripts/spells.js",
+    "tests/blink.test.mjs",
+    "tests/phaseStrike.test.mjs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/ef/c1c9e6ea2f/0/metadata.json",
+      "transcript": "/ef/c1c9e6ea2f/0/full.jsonl",
+      "content_hash": "/ef/c1c9e6ea2f/0/content_hash.txt",
+      "prompt": "/ef/c1c9e6ea2f/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 3641,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 599296,
+    "output_tokens": 1546,
+    "api_call_count": 3
+  }
+}
