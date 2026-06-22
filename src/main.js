@@ -1164,18 +1164,9 @@ async function _finalizeNewGame(classData) {
   });
 
   ensureStarterQuests(world);
-  const runContractExisting = getQuestRecord(world, "run.contract", pe.id);
   ensureRunContractQuest(world, { playerId: pe.id });
   ensureLocalGeneratedQuest(world);
   ensureStarterFetchQuestItem(world);
-
-  if (!_savegameLoaded && !runContractExisting) {
-    const runContract = getQuestRecord(world, "run.contract", pe.id);
-    const title = String(runContract?.def?.id ? (runContract?.vars?.data?.titleOverride || "The Town Wants a Trophy") : "The Town Wants a Trophy");
-    const objective = String(runContract?.vars?.data?.objective || "").trim();
-    messageLog.log({ text: `New quest: "${title}".`, type: 'system' });
-    if (objective) messageLog.log({ text: `Objective: ${objective}`, type: 'system' });
-  }
 
   bootAdvance(_savegameLoaded ? "Restored saved player state" : "Spawned player state");
 
@@ -4974,16 +4965,18 @@ function render(worldView) {
       _healthBarsToDraw.push({ ...renderEntity, _sizeScale: sizeScale });
     }
 
-    // Actor name labels — hostile actors + pets, visible and within range
+    // Actor name labels — hostile actors, pets, and town NPCs.
     if (
       (renderEntity.layer | 0) === 300
-      && renderEntity.showHealthBar
+      && (renderEntity.showHealthBar || renderEntity.isNpc)
       && !_renderTagSet.has('memory_recent')
       && !_renderTagSet.has('esp_sensed')
       && !_renderTagSet.has('thermal_sensed')
       && (!worldView?.isVisible || worldView.isVisible(renderEntity.pos.x, renderEntity.pos.y))
     ) {
-      const label = monsterLabelFromKind(renderEntity.kind);
+      const label = renderEntity.isNpc
+        ? (String(renderEntity.displayName || '').trim() || monsterLabelFromKind(renderEntity.kind))
+        : monsterLabelFromKind(renderEntity.kind);
       if (label) {
         _monsterLabels.push({
           id: renderEntity.id,

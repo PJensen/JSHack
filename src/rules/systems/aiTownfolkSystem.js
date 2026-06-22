@@ -482,6 +482,12 @@ function depositCarriedItems(world, actorId, chestId, job) {
   for (const identity of carryIdentities(job)) {
     moved += transferUpToIdentity(world, actorId, chestId, identity, 99);
   }
+  // NOTE: I'm concerned scattering logic like this is hurting the project.
+  // What happens when another situation arises like this? I would much rather
+  // express this as an invariant, maybe even directly on the archetype
+  if (moved > 0 && !world.has(chestId, Collider)) {
+    world.add(chestId, Collider, { solid: true, blocksSight: false });
+  }
   return moved;
 }
 

@@ -3,6 +3,7 @@ import { DeathApplied } from "../../components/DeathApplied.js";
 import { NamedIdentity } from "../../components/NamedIdentity.js";
 import { Position } from "../../components/Position.js";
 import { QuestVars } from "../../components/QuestVars.js";
+import { QuestBindings } from "../../components/QuestBindings.js";
 import { RunObjectiveTarget } from "../../components/RunObjectiveTarget.js";
 import { attachEntityToCurrentFloor } from "../../utils/floorEntities.js";
 import { buildCatalogItem } from "../../data/itemCatalogLoader.js";
@@ -11,25 +12,27 @@ import { getCatalogItem } from "../../data/itemCatalog.js";
 import { getMonster } from "../../data/monsters.js";
 import { createRng } from "../../utils/rng.js";
 import { spawnMonsterEntity } from "../../utils/spawnMonsterEntity.js";
-import { inventoryHasIdentity } from "../../utils/townEconomy.js";
+import { consumeInventoryIdentity, inventoryHasIdentity } from "../../utils/townEconomy.js";
 import { addToInventory } from "../../utils/inventoryFacade.js";
 import { emit, setVar } from "../actions.js";
 import { registerQuest } from "../registry.js";
 import { ensureQuestRuntimeEventRoutes, findQuestEntity, getQuestRecord, instantiateQuest } from "../runtime.js";
 import { isWalkable } from "../../environment/dungeon/tileMap.js";
+import { getUnderworldRegionTemplate } from "../../environment/dungeon/underworldRegions.js";
+import { defineExtension } from "../../../lib/ecs-js/index.js";
 
 export const RUN_CONTRACT_QUEST_ID = "run.contract";
 
-const RUN_CONTRACT_HOOKS_KEY = Symbol.for("jshack:quests:runContract:installed");
+const RUN_CONTRACT_HOOKS_KEY = Symbol.for("jshack:quests:runContract");
 
 const BOSS_POOL = Object.freeze([
-  Object.freeze({ monsterId: "bandit_captain", minDepth: 2, maxDepth: 4, hpMult: 1.6, acc: 2, dmg: 2, evade: 1 }),
-  Object.freeze({ monsterId: "orc_warchief", minDepth: 3, maxDepth: 5, hpMult: 1.7, acc: 2, dmg: 2, evade: 1 }),
-  Object.freeze({ monsterId: "troll", minDepth: 4, maxDepth: 6, hpMult: 1.65, acc: 1, dmg: 3, evade: 0 }),
-  Object.freeze({ monsterId: "wraith", minDepth: 4, maxDepth: 6, hpMult: 1.5, acc: 2, dmg: 2, evade: 2 }),
-  Object.freeze({ monsterId: "dark_acolyte", minDepth: 4, maxDepth: 6, hpMult: 1.45, acc: 2, dmg: 2, evade: 1 }),
-  Object.freeze({ monsterId: "lich", minDepth: 5, maxDepth: 7, hpMult: 1.45, acc: 3, dmg: 3, evade: 2 }),
-  Object.freeze({ monsterId: "demon", minDepth: 5, maxDepth: 7, hpMult: 1.5, acc: 3, dmg: 3, evade: 1 }),
+  Object.freeze({ monsterId: "bandit_captain", templateId: "bandit_hideout", minDepth: 2, maxDepth: 4, hpMult: 1.6, acc: 2, dmg: 2, evade: 1 }),
+  Object.freeze({ monsterId: "orc_warchief", templateId: "bandit_hideout", minDepth: 2, maxDepth: 4, hpMult: 1.7, acc: 2, dmg: 2, evade: 1 }),
+  Object.freeze({ monsterId: "troll", templateId: "old_well", minDepth: 2, maxDepth: 2, hpMult: 1.65, acc: 1, dmg: 3, evade: 0 }),
+  Object.freeze({ monsterId: "wraith", templateId: "graveyard_crypt", minDepth: 2, maxDepth: 2, hpMult: 1.5, acc: 2, dmg: 2, evade: 2 }),
+  Object.freeze({ monsterId: "dark_acolyte", templateId: "forgotten_shrine", minDepth: 2, maxDepth: 2, hpMult: 1.45, acc: 2, dmg: 2, evade: 1 }),
+  Object.freeze({ monsterId: "lich", templateId: "graveyard_crypt", minDepth: 2, maxDepth: 2, hpMult: 1.45, acc: 3, dmg: 3, evade: 2 }),
+  Object.freeze({ monsterId: "demon", templateId: "forgotten_shrine", minDepth: 2, maxDepth: 2, hpMult: 1.5, acc: 3, dmg: 3, evade: 1 }),
 ]);
 
 const BOSS_FIRST_NAMES = Object.freeze([
@@ -107,7 +110,7 @@ function buildChecklist(spec, state = {}) {
   const relicDone = !!state.relicDelivered;
   return Object.freeze([
     Object.freeze({
-      text: `Kill ${spec.bossName} on floor ${spec.bossDepth}.`,
+      text: `Kill ${spec.bossName} on floor ${spec.bossDepth} of ${spec.entranceLabel}.`,
       done: bossDone,
     }),
     Object.freeze({
@@ -119,7 +122,7 @@ function buildChecklist(spec, state = {}) {
 
 function buildObjectiveText(spec, state = {}) {
   if (!state.bossKilled) {
-    return `Kill ${spec.bossName} on floor ${spec.bossDepth}, then recover ${spec.relicTitle}.`;
+    return `Enter ${spec.entranceLabel} and kill ${spec.bossName} on floor ${spec.bossDepth}, then recover ${spec.relicTitle}.`;
   }
   if (!state.relicRecovered) {
     return `Recover ${spec.relicTitle} from ${spec.bossName}'s remains.`;
@@ -136,14 +139,38 @@ function currentDepth(world, fallback = 0) {
 }
 
 function currentDownStairPos(world) {
+  let anchorX = 0;
+  let anchorY = 0;
+  let hasAnchor = false;
+  for (const [, ds] of world.query(DungeonState)) {
+    anchorX = Number(ds?.regionAnchorX || 0) | 0;
+    anchorY = Number(ds?.regionAnchorY || 0) | 0;
+    hasAnchor = true;
+    break;
+  }
+  let best = null;
+  let bestDist = Infinity;
   for (const [, pos, ni] of world.query(Position, NamedIdentity)) {
     if (String(ni?.identity || "") !== "stair_down") continue;
-    return { x: pos.x | 0, y: pos.y | 0 };
+    const candidate = { x: pos.x | 0, y: pos.y | 0 };
+    const dist = hasAnchor ? Math.max(Math.abs(candidate.x - anchorX), Math.abs(candidate.y - anchorY)) : 0;
+    if (dist < bestDist) {
+      best = candidate;
+      bestDist = dist;
+    }
   }
+  if (best) return best;
   for (const [, ds] of world.query(DungeonState)) {
     if (!Array.isArray(ds?.downStairPositions) || ds.downStairPositions.length <= 0) break;
-    const first = ds.downStairPositions[0];
-    return { x: Number(first?.x || 0) | 0, y: Number(first?.y || 0) | 0 };
+    for (const stair of ds.downStairPositions) {
+      const candidate = { x: Number(stair?.x || 0) | 0, y: Number(stair?.y || 0) | 0 };
+      const dist = hasAnchor ? Math.max(Math.abs(candidate.x - anchorX), Math.abs(candidate.y - anchorY)) : 0;
+      if (dist < bestDist) {
+        best = candidate;
+        bestDist = dist;
+      }
+    }
+    return best;
   }
   return null;
 }
@@ -166,6 +193,7 @@ export function buildRunContractSpec(world, opts = {}) {
   const bossBase = BOSS_POOL[rng.int(0, BOSS_POOL.length - 1)] || BOSS_POOL[0];
   const monster = getMonster(bossBase.monsterId) || { id: bossBase.monsterId, name: bossBase.monsterId };
   const relic = RELIC_POOL[rng.int(0, RELIC_POOL.length - 1)] || RELIC_POOL[0];
+  const entrance = getUnderworldRegionTemplate(bossBase.templateId);
   const bossDepth = rng.int(bossBase.minDepth, bossBase.maxDepth);
   const bossName = `${String(rng.choice(BOSS_FIRST_NAMES) || "Kharos")} ${String(rng.choice(BOSS_TITLES) || "the Black")}`;
   return Object.freeze({
@@ -174,6 +202,8 @@ export function buildRunContractSpec(world, opts = {}) {
     bossMonsterName: String(monster.name || bossBase.monsterId),
     bossName,
     bossDepth,
+    entranceTemplateId: String(entrance?.templateId || bossBase.templateId || ""),
+    entranceLabel: String(entrance?.label || "the marked dungeon"),
     relicItemId: String(relic.itemId),
     relicTitle: String(relic.title),
     relicObjectiveNoun: String(relic.objectiveNoun || relic.title),
@@ -197,6 +227,11 @@ function findObjectiveEntity(world, role) {
 
 function relicInInventory(world, playerId, spec) {
   return inventoryHasIdentity(world, playerId, String(spec?.relicItemId || ""), 1);
+}
+
+export function canTurnInRunContract(world, playerId) {
+  const quest = getQuestRecord(world, RUN_CONTRACT_QUEST_ID, Number(playerId || 0) | 0);
+  return !!quest && relicInInventory(world, Number(playerId || 0) | 0, quest.vars?.data || {});
 }
 
 function findOpenSpawnPosition(world, seed) {
@@ -282,7 +317,12 @@ export function ensureRunContractTargets(world) {
   const quest = getQuestRecord(world, RUN_CONTRACT_QUEST_ID, 0);
   if (!quest || String(quest.state?.status || "") === "complete") return 0;
   const spec = quest.vars?.data || {};
+  if (!spec.accepted) return 0;
   if ((currentDepth(world, 0) | 0) !== (Number(spec.bossDepth || 0) | 0)) return 0;
+  for (const [, ds] of world.query(DungeonState)) {
+    if (String(ds?.activeTemplateId || "") !== String(spec.entranceTemplateId || "")) return 0;
+    break;
+  }
   if (quest.vars?.data?.bossKilled) return 0;
   const existing = findObjectiveEntity(world, "boss");
   if (existing > 0) return existing;
@@ -290,21 +330,16 @@ export function ensureRunContractTargets(world) {
 }
 
 export function installRunContractHooks(world) {
-  if (world[RUN_CONTRACT_HOOKS_KEY]) return;
-  world[RUN_CONTRACT_HOOKS_KEY] = true;
-
-  world.on("dungeon:transitioned", ({ depth }) => {
-    const q = getQuestRecord(world, RUN_CONTRACT_QUEST_ID, 0);
-    if (!q || String(q.state?.status || "") === "complete") return;
-    const spec = q.vars?.data || {};
-    if ((Number(depth || 0) | 0) === (Number(spec.bossDepth || 0) | 0)) ensureRunContractTargets(world);
-    if ((Number(depth || 0) | 0) === 0 && q.vars?.data?.bossKilled && relicInInventory(world, Number(q.bindings?.player || 0) | 0, spec)) {
-      world.emit?.("runContract:returned", {
-        questId: RUN_CONTRACT_QUEST_ID,
-        playerId: Number(q.bindings?.player || 0) | 0,
-      });
-    }
-  });
+  world.install(defineExtension("jshack:quests:runContract", (installedWorld) => {
+    return installedWorld.on("dungeon:transitioned", ({ depth, templateId }) => {
+      const q = getQuestRecord(installedWorld, RUN_CONTRACT_QUEST_ID, 0);
+      if (!q || String(q.state?.status || "") === "complete") return;
+      const spec = q.vars?.data || {};
+      if ((Number(depth || 0) | 0) !== (Number(spec.bossDepth || 0) | 0)) return;
+      if (String(templateId || "") !== String(spec.entranceTemplateId || "")) return;
+      ensureRunContractTargets(installedWorld);
+    });
+  }, { key: RUN_CONTRACT_HOOKS_KEY }));
 }
 
 export function runContractDeathSystem(world) {
@@ -336,7 +371,7 @@ export const RunContractQuest = registerQuest({
     flavorText: "A standing contract from town leadership: kill the marked threat, recover its relic, and bring home something the whole settlement can point to.",
   },
   vars: {
-    accepted: true,
+    accepted: false,
     progress: 0,
     target: 2,
     bossKilled: false,
@@ -346,6 +381,31 @@ export const RunContractQuest = registerQuest({
     checklist: [],
   },
   nodes: {
+    offer: {
+      on: {
+        "dialog:accepted": [
+          {
+            guard: (ctx) => (
+              Number(ctx.payload?.playerId || 0) === Number(ctx.bind.player || 0)
+              && Number(ctx.payload?.speakerId || 0) === Number(ctx.bind.giver || 0)
+              && String(ctx.payload?.questId || "") === RUN_CONTRACT_QUEST_ID
+            ),
+            actions: [
+              setVar("accepted", true),
+              setVar("objective", (ctx) => buildObjectiveText(ctx.vars, ctx.vars)),
+              setVar("checklist", (ctx) => buildChecklist(ctx.vars, ctx.vars)),
+              emit("quest:started", (ctx) => ({
+                questId: RUN_CONTRACT_QUEST_ID,
+                playerId: ctx.bind.player,
+                giverId: ctx.bind.giver,
+                title: "The Town Wants a Trophy",
+              })),
+            ],
+            to: "hunt",
+          },
+        ],
+      },
+    },
     hunt: {
       on: {
         "runContract:bossKilled": [
@@ -398,14 +458,18 @@ export const RunContractQuest = registerQuest({
     },
     return: {
       on: {
-        "runContract:returned": [
+        "dialog:reported": [
           {
             guard: (ctx) => (
               Number(ctx.payload?.playerId || 0) === Number(ctx.bind.player || 0)
+              && Number(ctx.payload?.speakerId || 0) === Number(ctx.bind.giver || 0)
               && String(ctx.payload?.questId || "") === RUN_CONTRACT_QUEST_ID
               && inventoryHasIdentity(ctx.world, Number(ctx.bind.player || 0) | 0, String(ctx.vars?.relicItemId || ""), 1)
             ),
             actions: [
+              (ctx) => {
+                consumeInventoryIdentity(ctx.world, Number(ctx.bind.player || 0) | 0, String(ctx.vars?.relicItemId || ""), 1);
+              },
               setVar("relicDelivered", true),
               setVar("progress", 2),
               setVar("objective", (ctx) => buildObjectiveText(ctx.vars, {
@@ -457,16 +521,47 @@ export function ensureRunContractQuest(world, opts = {}) {
   const playerId = Number(opts.playerId || currentPlayerId(world) || 1) | 0;
   if (!(playerId > 0)) return 0;
 
+  let giverId = 0;
+  for (const [id, ni] of world.query(NamedIdentity)) {
+    if (String(ni?.identity || "") === "townfolk_mason") { giverId = id; break; }
+  }
+  ensureQuestRuntimeEventRoutes(world, ["dialog:accepted", "runContract:bossKilled", "item:pickup", "dialog:reported"]);
+
   const existing = findQuestEntity(world, RUN_CONTRACT_QUEST_ID, playerId);
-  if (existing > 0) return existing;
+  if (existing > 0) {
+    const quest = getQuestRecord(world, RUN_CONTRACT_QUEST_ID, playerId);
+    const generated = buildRunContractSpec(world, { ...opts, playerId });
+    const oldVars = quest?.vars?.data || {};
+    if (!oldVars.entranceTemplateId || !(Number(quest?.bindings?.giver || 0) > 0)) {
+      const migrated = {
+        ...generated,
+        ...oldVars,
+        accepted: oldVars.accepted !== false || String(quest?.state?.node || "") !== "offer",
+        bossDepth: oldVars.entranceTemplateId ? oldVars.bossDepth : generated.bossDepth,
+        entranceTemplateId: String(oldVars.entranceTemplateId || generated.entranceTemplateId),
+        entranceLabel: String(oldVars.entranceLabel || generated.entranceLabel),
+      };
+      if (!oldVars.entranceTemplateId) {
+        migrated.objective = buildObjectiveText(migrated, migrated);
+        migrated.checklist = buildChecklist(migrated, migrated);
+      }
+      world.set(existing, QuestVars, {
+        data: migrated,
+      });
+      if (giverId > 0) {
+        world.set(existing, QuestBindings, { player: playerId, giver: giverId, target: giverId });
+      }
+    }
+    return existing;
+  }
 
   const spec = buildRunContractSpec(world, { ...opts, playerId });
-  ensureQuestRuntimeEventRoutes(world, ["runContract:bossKilled", "item:pickup", "runContract:returned"]);
+  if (!(giverId > 0)) return 0;
 
   const qid = instantiateQuest(
     world,
     RUN_CONTRACT_QUEST_ID,
-    { player: playerId, giver: 0, target: 0 },
+    { player: playerId, giver: giverId, target: giverId },
     {
       ...spec,
       progress: 0,
@@ -474,21 +569,12 @@ export function ensureRunContractQuest(world, opts = {}) {
       bossKilled: false,
       relicRecovered: false,
       relicDelivered: false,
-      objective: buildObjectiveText(spec, {}),
-      checklist: buildChecklist(spec, {}),
+      accepted: false,
+      objective: `Ask the mason about the town's trophy contract.`,
+      checklist: [],
     },
-    { node: "hunt", status: "active" },
+    { node: "offer", status: "active" },
   );
-
-  if (qid > 0) {
-    world.emit?.("quest:started", {
-      questId: RUN_CONTRACT_QUEST_ID,
-      playerId,
-      giverId: 0,
-      title: "The Town Wants a Trophy",
-    });
-    ensureRunContractTargets(world);
-  }
 
   return qid;
 }

@@ -12,6 +12,7 @@ import { Traits } from "../src/rules/components/Traits.js";
 import { Vitality } from "../src/rules/components/Vitality.js";
 import { DoorState } from "../src/rules/components/DoorState.js";
 import { Collider } from "../src/rules/components/Collider.js";
+import { Faction } from "../src/rules/components/Faction.js";
 import { SecretDoor } from "../src/rules/components/SecretDoor.js";
 import { clearAll, loadChunk } from "../src/rules/environment/dungeon/tileMap.js";
 import { clearExplored } from "../src/rules/environment/dungeon/exploredMap.js";
@@ -24,6 +25,31 @@ function resetFloor() {
   clearPerceptionMemory();
   loadChunk(0, 0, new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR));
 }
+
+Deno.test("WorldView projects town NPC names for actor nameplates", () => {
+  resetFloor();
+  const world = new World({ seed: 0x4e5043 });
+
+  const player = world.create();
+  world.add(player, Player, {});
+  world.add(player, Position, { x: 10, y: 10 });
+  world.add(player, NamedIdentity, { name: "Hero", identity: "player" });
+  world.add(player, Facing, { dx: 1, dy: 0 });
+  world.add(player, BaseStats, { perception: 5 });
+  world.add(player, Faction, { key: "player" });
+
+  const mason = world.create();
+  world.add(mason, Position, { x: 11, y: 10 });
+  world.add(mason, NamedIdentity, { name: "Marta the Mason", identity: "townfolk_mason" });
+  world.add(mason, Vitality, { hp: 20, maxHp: 20 });
+  world.add(mason, Faction, { key: "townfolk" });
+
+  const rec = buildWorldView(world).entities.find((entity) => entity.id === mason);
+  assert(rec, "town NPC should be visible");
+  assertEquals(rec.isNpc, true);
+  assertEquals(rec.displayName, "Marta the Mason");
+  assertEquals(rec.showHealthBar, false, "friendly NPC nameplates should not require hostile health bars");
+});
 
 Deno.test("WorldView keeps frozen recent-memory glyph when turning away", () => {
   resetFloor();

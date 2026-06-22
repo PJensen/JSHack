@@ -1034,6 +1034,8 @@ Deno.test("villager hauls flour from the mill chest into the tavern chest", () =
 
   assertEquals(countInventory(world, tavernChest, "food_flour"), 1, "tavern chest should receive hauled flour");
   assertEquals(countInventory(world, npc, "food_flour"), 0, "villager inventory should be empty after delivery");
+  assert(world.has(tavernChest, Collider), "refilled chest should become solid again");
+  assertEquals(world.get(tavernChest, Collider).solid, true);
   job = world.get(npc, TownfolkJob);
   assertEquals(job.state, TOWNFOLK_STATES.returning, "villager should head home after delivery");
 });

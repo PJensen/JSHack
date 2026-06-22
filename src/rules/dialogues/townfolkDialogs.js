@@ -4,6 +4,7 @@ import { registerDialog } from "./registry.js";
 import { STARTER_PRIEST_FETCH_QUEST_ID, getQuestRecord } from "../quests/runtime.js";
 import { RAT_INFESTATION_QUEST_ID, REQUIRED_RAT_KILLS } from "../quests/definitions/ratInfestation.js";
 import { canTurnInStarterFetch } from "../quests/definitions/graveyardWatch.js";
+import { canTurnInRunContract, RUN_CONTRACT_QUEST_ID } from "../quests/definitions/runContract.js";
 import { getTownState, getWeather } from "../utils/townStateAccess.js";
 import { Vitality } from "../components/Vitality.js";
 import { Equipment, NON_AMMO_GEAR_SLOTS } from "../components/Equipment.js";
@@ -315,8 +316,12 @@ function barkeepQuest(world, actorId) {
   return getQuestRecord(world, RAT_INFESTATION_QUEST_ID, actorId);
 }
 
+function runContractQuest(world, actorId) {
+  return getQuestRecord(world, RUN_CONTRACT_QUEST_ID, actorId);
+}
+
 for (const def of Object.values(TOWNFOLK)) {
-  if (def.role === "priest" || def.role === "barkeep" || def.role === "enchantress") continue;
+  if (def.role === "priest" || def.role === "barkeep" || def.role === "mason" || def.role === "enchantress") continue;
   registerDialog({
     id: `townfolk:${def.role}`,
     start: "root",
@@ -330,6 +335,79 @@ for (const def of Object.values(TOWNFOLK)) {
     },
   });
 }
+
+registerDialog({
+  id: "townfolk:mason",
+  start: "root",
+  nodes: {
+    root: {
+      text: (ctx) => {
+        const quest = runContractQuest(ctx.world, ctx.actorId);
+        const state = quest?.state;
+        const vars = quest?.vars?.data || {};
+        if (!state) return masonAmbientText(ctx, TOWNFOLK.mason.dialogue);
+        if (String(state.status || "") === "complete") {
+          return `That ${String(vars.relicTitle || "trophy")} has given the town something to boast about. You did well.`;
+        }
+        if (String(state.node || "") === "offer") {
+          return `The town wants proof the roads below are getting safer. Hunt ${String(vars.bossName || "the marked threat")} on floor ${Number(vars.bossDepth || 1) | 0} of ${String(vars.entranceLabel || "the marked dungeon")}, and bring me ${String(vars.relicTitle || "its trophy")}.`;
+        }
+        if (String(state.node || "") === "return" && canTurnInRunContract(ctx.world, ctx.actorId)) {
+          return `You have ${String(vars.relicTitle || "the trophy")}. Hand it over and I'll see the reward paid.`;
+        }
+        if (String(state.node || "") === "recover") {
+          return `The beast is dead. Search its remains for ${String(vars.relicTitle || "the trophy")}, then bring it to me.`;
+        }
+        return `Use the entrance to ${String(vars.entranceLabel || "the marked dungeon")}. ${String(vars.bossName || "The target")} is on floor ${Number(vars.bossDepth || 1) | 0}.`;
+      },
+      choices: [
+        {
+          id: "accept_run_contract",
+          label: "I'll bring the town its trophy.",
+          visible: (ctx) => String(runContractQuest(ctx.world, ctx.actorId)?.state?.node || "") === "offer",
+          emits: [{
+            name: "dialog:accepted",
+            payload: (ctx) => ({
+              questId: RUN_CONTRACT_QUEST_ID,
+              playerId: ctx.actorId,
+              speakerId: ctx.targetId,
+            }),
+          }],
+          to: "accept_ack",
+        },
+        {
+          id: "turn_in_run_contract",
+          label: "Here is the trophy.",
+          visible: (ctx) => (
+            String(runContractQuest(ctx.world, ctx.actorId)?.state?.node || "") === "return"
+            && canTurnInRunContract(ctx.world, ctx.actorId)
+          ),
+          emits: [{
+            name: "dialog:reported",
+            payload: (ctx) => ({
+              questId: RUN_CONTRACT_QUEST_ID,
+              playerId: ctx.actorId,
+              speakerId: ctx.targetId,
+            }),
+          }],
+          to: "report_ack",
+        },
+        { id: "leave", label: "Goodbye.", close: true },
+      ],
+    },
+    accept_ack: {
+      text: (ctx) => {
+        const vars = runContractQuest(ctx.world, ctx.actorId)?.vars?.data || {};
+        return `Good. Enter ${String(vars.entranceLabel || "the marked dungeon")} and find ${String(vars.bossName || "the target")} on floor ${Number(vars.bossDepth || 1) | 0}. Bring the relic back to me, not merely to town.`;
+      },
+      choices: [{ id: "leave", label: "I'll return with it.", close: true }],
+    },
+    report_ack: {
+      text: "This will hang where everyone can see it. Here's your pay — the town keeps its word.",
+      choices: [{ id: "leave", label: "Goodbye.", close: true }],
+    },
+  },
+});
 
 registerDialog({
   id: "townfolk:enchantress",

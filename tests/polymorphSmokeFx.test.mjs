@@ -14,5 +14,8 @@ Deno.test("polymorph smoke emits only for successful scroll transformations", ()
 
   world.emit("polymorph:after", { at: { x: 2, y: 3 }, trigger: "scroll", reason: "scroll_polymorph" });
   assertEquals(particles.length, 16);
+  for (const particle of particles) {
+    if (particle.x < 1.89 || particle.x > 2.11) throw new Error(`particle x ${particle.x} is not centered on tile 2`);
+    if (particle.y < 2.91 || particle.y > 3.09) throw new Error(`particle y ${particle.y} is not centered on tile 3`);
+  }
 });
-

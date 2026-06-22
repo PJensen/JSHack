@@ -778,6 +778,8 @@ function projectCombatUi(world, id, rec, playerFactionKey) {
 	rec.hp = 0;
 	rec.maxHp = 0;
 	rec.isPet = false;
+	rec.isNpc = false;
+	rec.displayName = String(world.get(id, NamedIdentity)?.name || "").trim();
 	rec.showHealthBar = false;
 
 	/** @type {any} */ const vit = /** @type any */ (world.get(id, Vitality));
@@ -791,6 +793,7 @@ function projectCombatUi(world, id, rec, playerFactionKey) {
 	const factionKey = String(world.get(id, Faction)?.key || '').trim().toLowerCase();
 	const isPet = world.has(id, Pet) || factionKey === 'pet';
 	rec.isPet = isPet;
+	rec.isNpc = factionKey === 'townfolk';
 	if (isPet) {
 		rec.showHealthBar = true;
 		return;

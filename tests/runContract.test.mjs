@@ -18,6 +18,7 @@ import {
   RUN_CONTRACT_QUEST_ID,
 } from "../src/rules/quests/definitions/runContract.js";
 import { recordDeathApplied } from "../src/rules/utils/deathApplied.js";
+import { inventoryHasIdentity } from "../src/rules/utils/townEconomy.js";
 
 function setupWorld(seed = 0xC0FFEE) {
   const world = new World({ seed });
@@ -31,6 +32,10 @@ function setupWorld(seed = 0xC0FFEE) {
   world.add(playerId, Position, { x: 0, y: 0 });
   world.add(playerId, Inventory, { capacity: 12 });
 
+  const masonId = world.create();
+  world.add(masonId, NamedIdentity, { name: "Mason", identity: "townfolk_mason" });
+  world.add(masonId, Position, { x: 2, y: 2 });
+
   const dsId = world.create();
   world.add(dsId, DungeonState, {
     currentDepth: 0,
@@ -39,13 +44,14 @@ function setupWorld(seed = 0xC0FFEE) {
     floorEntityIds: [playerId],
   });
 
-  return { world, playerId, dsId };
+  return { world, playerId, masonId, dsId };
 }
 
-function setDepth(world, dsId, depth, downStair = { x: 5, y: 5 }) {
+function setDepth(world, dsId, depth, downStair = { x: 5, y: 5 }, activeTemplateId = "") {
   world.set(dsId, DungeonState, {
     currentDepth: depth,
     profileType: depth === 0 ? "overworld" : "default",
+    activeTemplateId,
     downStairPositions: depth > 0 ? [downStair] : [],
     floorEntityIds: [1],
   });
@@ -74,17 +80,24 @@ Deno.test("run contract spec is deterministic for the same seed", () => {
   assertEquals(a.relicTitle, b.relicTitle);
 });
 
-Deno.test("run contract progresses from boss kill to relic return", () => {
-  const { world, playerId, dsId } = setupWorld(0x1234ABCD);
+Deno.test("run contract is accepted from and turned in to the mason in its authored dungeon", () => {
+  const { world, playerId, masonId, dsId } = setupWorld(0x1234ABCD);
   const qid = ensureRunContractQuest(world, { playerId });
   assert(qid > 0, "run contract should instantiate");
 
   let quest = getQuestRecord(world, RUN_CONTRACT_QUEST_ID, playerId);
   assert(quest, "quest record should exist");
+  assertEquals(quest.state.node, "offer");
+  assertEquals(quest.bindings.giver, masonId);
+  world.emit("dialog:accepted", { questId: RUN_CONTRACT_QUEST_ID, playerId, speakerId: masonId });
+  quest = getQuestRecord(world, RUN_CONTRACT_QUEST_ID, playerId);
+  assertEquals(quest.state.node, "hunt");
   const spec = quest.vars?.data;
   assert(spec, "quest spec should exist");
 
-  setDepth(world, dsId, Number(spec.bossDepth || 1) | 0);
+  setDepth(world, dsId, Number(spec.bossDepth || 1) | 0, { x: 5, y: 5 }, "wrong_authored_region");
+  assertEquals(ensureRunContractTargets(world), 0, "boss should not leak into a different authored region on the same depth");
+  setDepth(world, dsId, Number(spec.bossDepth || 1) | 0, { x: 5, y: 5 }, spec.entranceTemplateId);
   const bossId = ensureRunContractTargets(world);
   assert(bossId > 0, "boss target should spawn on its seeded floor");
   assertEquals(findObjective(world, "boss"), bossId);
@@ -111,12 +124,13 @@ Deno.test("run contract progresses from boss kill to relic return", () => {
   assertEquals(quest.vars.data.relicRecovered, true);
 
   setDepth(world, dsId, 0);
-  world.emit("dungeon:transitioned", { depth: 0 });
+  world.emit("dialog:reported", { questId: RUN_CONTRACT_QUEST_ID, playerId, speakerId: masonId });
 
   quest = getQuestRecord(world, RUN_CONTRACT_QUEST_ID, playerId);
   assertEquals(quest.state.status, "complete");
   assertEquals(quest.vars.data.relicDelivered, true);
   assertEquals(quest.vars.data.progress, 2);
+  assertEquals(inventoryHasIdentity(world, playerId, spec.relicItemId, 1), false);
   assert(Array.isArray(quest.vars.data.checklist), "quest checklist should be preserved");
   assertEquals(quest.vars.data.checklist.every((entry) => entry.done === true), true);
 });

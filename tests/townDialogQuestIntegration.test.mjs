@@ -20,6 +20,37 @@ import { getQuestRecord, instantiateQuest, STARTER_PRIEST_FETCH_QUEST_ID } from 
 import { RAT_INFESTATION_QUEST_ID } from "../src/rules/quests/definitions/ratInfestation.js";
 import { DoorKey } from "../src/rules/components/DoorKey.js";
 import { RAT_CELLAR_LOCK_ID } from "../src/rules/data/questLocks.js";
+import { ensureRunContractQuest, RUN_CONTRACT_QUEST_ID } from "../src/rules/quests/definitions/runContract.js";
+
+Deno.test("mason clearly offers the authored-dungeon trophy contract", () => {
+  const world = new World({ seed: 0x7a0f4 });
+  world.setScheduler(composeScheduler("scripts"));
+  installDialogRuntime(world);
+  installQuestRuntime(world);
+
+  const player = world.create();
+  world.add(player, Player);
+  world.add(player, Inventory, { capacity: 8 });
+  const mason = world.create();
+  world.add(mason, NamedIdentity, { name: "Mason", identity: "townfolk_mason" });
+  world.add(mason, Position, { x: 4, y: 4 });
+
+  assert(ensureRunContractQuest(world, { playerId: player }) > 0);
+  const opened = [];
+  world.on("dialog:opened", (payload) => opened.push(payload));
+  world.emit("dialog:openRequest", { actorId: player, targetId: mason, dialogId: "townfolk:mason" });
+
+  assert(opened.length > 0, "mason dialog should open");
+  assertEquals(opened.at(-1).choices.some((choice) => choice.id === "accept_run_contract"), true);
+  assert(String(opened.at(-1).text || "").includes("floor"));
+  const sessionId = opened.at(-1).sessionId;
+  world.emit("dialog:choose", { sessionId, choiceId: "accept_run_contract" });
+  world.tick(0);
+
+  const quest = getQuestRecord(world, RUN_CONTRACT_QUEST_ID, player);
+  assertEquals(quest?.state?.node, "hunt");
+  assert(String(quest?.vars?.data?.entranceTemplateId || "").length > 0);
+});
 
 Deno.test("priest dialog runs the starter fetch quest from offer to turn-in", () => {
   const world = new World({ seed: 91 });

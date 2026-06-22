@@ -14,8 +14,8 @@ export function spawnPolymorphSmoke(fx, at, random = Math.random) {
     const speed = 0.12 + random() * 0.42;
     const violet = i % 3 === 0;
     fx.pool.spawn(new Particle({
-      x: x + 0.5 + (random() - 0.5) * 0.22,
-      y: y + 0.5 + (random() - 0.5) * 0.18,
+      x: x + (random() - 0.5) * 0.22,
+      y: y + (random() - 0.5) * 0.18,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed - 0.28 - random() * 0.18,
       ax: 0,
@@ -41,4 +41,3 @@ export function createPolymorphSmokeExtension({ fx }) {
     });
   }, { key: POLYMORPH_SMOKE_EXTENSION_KEY });
 }
-

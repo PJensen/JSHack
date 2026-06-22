@@ -480,6 +480,14 @@ export function renderEquipment(panel, equippedBySlot, playerName, scrollOfIdent
 
     row.appendChild(slot);
     row.appendChild(name);
+    if (rowData.item?.coating?.kind) {
+      const dot = document.createElement('span');
+      dot.textContent = '\u2022';
+      dot.style.color = rowData.item.coating.color || '#66dd66';
+      dot.style.fontSize = '14px';
+      dot.title = `${humanize(rowData.item.coating.kind)} coated`;
+      row.appendChild(dot);
+    }
     if (rowData.blocked) {
       const blocked = document.createElement('span');
       blocked.textContent = rowData.reason ? `Blocked: ${rowData.reason}` : 'Blocked';
