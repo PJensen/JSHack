@@ -8,10 +8,14 @@ import { Equipment } from '../src/rules/components/Equipment.js';
 import { ItemInfo } from '../src/rules/components/ItemInfo.js';
 import { NamedIdentity } from '../src/rules/components/NamedIdentity.js';
 import { DungeonState } from '../src/rules/components/DungeonState.js';
+import { QuestDefRef } from '../src/rules/components/QuestDefRef.js';
+import { QuestState } from '../src/rules/components/QuestState.js';
 import { transitionToDepth, clearFloorCache } from '../src/rules/environment/dungeon/transition.js';
 import { initDungeon } from '../src/rules/environment/dungeon/index.js';
 import { clearAll } from '../src/rules/environment/dungeon/tileMap.js';
 import { addToInventory, inventoryItems } from '../src/rules/utils/inventoryFacade.js';
+import { instantiateQuest } from '../src/rules/quests/runtime.js';
+import { RAT_INFESTATION_QUEST_ID } from '../src/rules/quests/definitions/ratInfestation.js';
 
 async function setup() {
   clearAll();
@@ -131,4 +135,37 @@ Deno.test("equipment references survive two round-trips", async () => {
   const eq = world.get(pid, Equipment);
   assert(eq.weapon === items[0], `equipped weapon should still reference original item`);
   assert(world.isAlive(items[0]), `equipped item should be alive`);
+});
+
+Deno.test("completed rat quest remains complete across floor round-trips", async () => {
+  const { world, pid } = await setup();
+  const questId = instantiateQuest(world, RAT_INFESTATION_QUEST_ID, {
+    player: pid,
+    giver: 99,
+    target: 99,
+  }, { accepted: true, killCount: 5, reported: true }, { node: "complete", status: "complete" });
+
+  await transitionToDepth(world, 1, { x: 5, y: 5 });
+  await transitionToDepth(world, 0, { x: 5, y: 5 });
+
+  assert(world.isAlive(questId), "completed quest entity should remain world-persistent");
+  assert(world.get(questId, QuestState)?.status === "complete", "completed quest status should not reset");
+  const ratQuests = [...world.query(QuestDefRef)]
+    .filter(([, ref]) => ref.id === RAT_INFESTATION_QUEST_ID);
+  assert(ratQuests.length === 1, `expected one rat quest entity, got ${ratQuests.length}`);
+});
+
+Deno.test("restoring overworld snapshot does not duplicate generated gems", async () => {
+  const { world } = await setup();
+  const countGroundGems = () => [...world.query(Position, NamedIdentity)]
+    .filter(([, , named]) => String(named.identity || "").startsWith("gem_")).length;
+
+  await transitionToDepth(world, 1, { x: 5, y: 5 });
+  await transitionToDepth(world, 0, { x: 5, y: 5 });
+  const baseline = countGroundGems();
+  await transitionToDepth(world, 1, { x: 5, y: 5 });
+  await transitionToDepth(world, 0, { x: 5, y: 5 });
+
+  assert(baseline > 0, "expected overworld gem stock for the transition regression");
+  assert(countGroundGems() <= baseline, `repeat return duplicated ground gems from ${baseline} to ${countGroundGems()}`);
 });

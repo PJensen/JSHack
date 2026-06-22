@@ -5,6 +5,7 @@ import { DungeonState } from '../../components/DungeonState.js';
 import { DungeonEntrance } from '../../components/DungeonEntrance.js';
 import { Position } from '../../components/Position.js';
 import { Player } from '../../components/Player.js';
+import { QuestDefRef } from '../../components/QuestDefRef.js';
 import { Pet } from '../../components/Pet.js';
 import { PetState } from '../../components/PetState.js';
 import { MonsterSpawner } from '../../components/MonsterSpawner.js';
@@ -328,6 +329,7 @@ export async function transitionToDepth(world, newDepth, destinationPos, opts = 
   for (const [id] of world.query(Player)) _permanentIds.add(id);
   for (const [id] of world.query(Pet)) _permanentIds.add(id);
   for (const [id] of world.query(DungeonState)) _permanentIds.add(id);
+  for (const [id] of world.query(QuestDefRef)) _permanentIds.add(id);
   for (const id of stairPursuerIds) _permanentIds.add(id);
   // Walk full hierarchy: InventoryRoot, inventory items, equipment, etc.
   for (const root of [..._permanentIds]) {
@@ -463,6 +465,12 @@ export async function transitionToDepth(world, newDepth, destinationPos, opts = 
   const cachedFloor = _floorEntityCache.get(restoredPlaneKey) ?? _loadPersistedFloor(worldSeed, restoredPlaneKey);
   const normalizedSnapshot = normalizeInventorySnapshot(cachedFloor?.snapshot);
   if (normalizedSnapshot?.v === 1 && normalizedSnapshot.comps) {
+    // Generation is required to rebuild the tile map, but its entities are
+    // placeholders when a cached floor snapshot exists. Capture every generated
+    // floor-local entity, including children/helpers omitted from entityIds, so
+    // a successful restore can remove the complete placeholder graph.
+    const generatedFloorIds = Array.from(world.alive)
+      .filter((eid) => !_permanentIds.has(eid));
     /** @type {number[]} */
     const createdIds = [];
     try {
@@ -530,8 +538,8 @@ export async function transitionToDepth(world, newDepth, destinationPos, opts = 
       });
       if (!hasStairAnchor) throw new Error('restored floor missing stair anchor');
 
-      for (const eid of generatedEntityIds) {
-        try { world.destroy(eid); } catch {} // ECS: entity may already be destroyed
+      for (const eid of generatedFloorIds) {
+        try { if (world.isAlive(eid)) destroySubtree(world, eid); } catch {}
       }
 
       entityIds = restoredIds;
