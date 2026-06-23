@@ -315,9 +315,9 @@ export function createPinnedSpellDock(mobileLayoutMq) {
 
     // Gesture: tap = cast, hold = open fan picker
     function onPressStart() {
-      if (slot.entry?.kind === 'item-use') return;
       slot.isPressing = true;
       slot.isHold = false;
+      if (slot.entry?.kind === 'item-use') return;
       slot.holdTimer = setTimeout(() => {
         slot.isHold = true;
         openFanForSlot(i);
