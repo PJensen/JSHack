@@ -1,0 +1,48 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "a59f2fce8c59",
+  "session_id": "019ef6ab-66e0-7b52-8bee-e2d640be6bf3",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-23T22:51:57.224231433Z",
+  "branch": "master",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "src/display/ui/spellDock.js",
+    "tests/spellDockItemUse.test.mjs"
+  ],
+  "agent": "Codex",
+  "model": "gpt-5.5",
+  "turn_id": "df31719fd918",
+  "token_usage": {
+    "input_tokens": 125465,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1285760,
+    "output_tokens": 4527,
+    "api_call_count": 19
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-23T22:51:57.193009545Z",
+    "agent_lines": 82,
+    "agent_removed": 1,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 82,
+    "total_lines_changed": 83,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 865,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".github/agents/Dungeon Generation and BSP Expert.agent.md": 582,
+        ".github/agents/VFX Agent.agent.md": 283
+      }
+    }
+  ]
+}
