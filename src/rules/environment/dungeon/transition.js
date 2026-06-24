@@ -416,8 +416,11 @@ export async function transitionToDepth(world, newDepth, destinationPos, opts = 
 
   for (let i = 0; i < generatedRegions.length; i++) {
     const region = generatedRegions[i];
+    const isRequested = region.regionKey === destinationRegionKey || i === 0;
     const regionPriorDownStairs = (newDepth > 0 && region.templateId)
-      ? [{ x: region.anchorX, y: region.anchorY }]
+      ? ((isRequested && priorDownStairPositions?.length > 0)
+        ? priorDownStairPositions
+        : [{ x: region.anchorX, y: region.anchorY }])
       : priorDownStairPositions;
     const result = await generateFloor(world, worldSeed, newDepth, tombstoneRepo, onProgress, regionPriorDownStairs, {
       dungeonType: opts.dungeonType ?? null,
@@ -427,7 +430,6 @@ export async function transitionToDepth(world, newDepth, destinationPos, opts = 
     });
     generatedEntityIds.push(...result.entityIds);
     newDownStairPositions.push(...(result.downStairPositions || []));
-    const isRequested = region.regionKey === destinationRegionKey || i === 0;
     if (isRequested) {
       spawnX = result.spawnX;
       spawnY = result.spawnY;

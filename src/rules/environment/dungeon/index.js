@@ -295,13 +295,31 @@ export async function generateFloor(world, worldSeed, depth, tombstoneRepo = nul
       // Multiple down-stairs in the same chunk snap to successive rooms from the end
       // of the room list so each stair occupies a distinct room.
       for (const stair of floorPlan.downStairs) {
-        if (stair.chunkX === cx && stair.chunkY === cy && chunkData.rooms.length > 0) {
+        if (stair.chunkX === cx && stair.chunkY === cy) {
           const key = `${cx},${cy}`;
           const placed = _downPlacedPerChunk.get(key) ?? 0;
-          const roomIdx = Math.max(0, chunkData.rooms.length - 1 - placed);
-          const room = chunkData.rooms[roomIdx];
-          const lx = (room.x - cx * CHUNK_SIZE) + Math.floor(room.w / 2);
-          const ly = (room.y - cy * CHUNK_SIZE) + Math.floor(room.h / 2);
+          let lx = stair.localX;
+          let ly = stair.localY;
+          if (chunkData.rooms.length > 0) {
+            const roomIdx = Math.max(0, chunkData.rooms.length - 1 - placed);
+            const room = chunkData.rooms[roomIdx];
+            lx = (room.x - cx * CHUNK_SIZE) + Math.floor(room.w / 2);
+            ly = (room.y - cy * CHUNK_SIZE) + Math.floor(room.h / 2);
+          } else {
+            const targetX = lx;
+            const targetY = ly;
+            let nearestDistance = Infinity;
+            for (let y = 0; y < CHUNK_SIZE; y++) {
+              for (let x = 0; x < CHUNK_SIZE; x++) {
+                if (chunkData.tiles[y * CHUNK_SIZE + x] !== TILE_FLOOR) continue;
+                const distance = manhattanScalar(x, y, targetX, targetY);
+                if (distance >= nearestDistance) continue;
+                nearestDistance = distance;
+                lx = x;
+                ly = y;
+              }
+            }
+          }
           chunkData.tiles[ly * CHUNK_SIZE + lx] = TILE_STAIR_DOWN;
           downStairPositions.push({ x: cx * CHUNK_SIZE + lx, y: cy * CHUNK_SIZE + ly });
           _downPlacedPerChunk.set(key, placed + 1);
@@ -335,7 +353,10 @@ export async function generateFloor(world, worldSeed, depth, tombstoneRepo = nul
               // Horizontal then vertical.
               const xLo = Math.min(lx, rcx), xHi = Math.max(lx, rcx);
               for (let x = xLo; x <= xHi; x++) {
-                chunkData.tiles[ly * CHUNK_SIZE + x] = TILE_FLOOR;
+                const tileIndex = ly * CHUNK_SIZE + x;
+                if (chunkData.tiles[tileIndex] !== TILE_STAIR_DOWN) {
+                  chunkData.tiles[tileIndex] = TILE_FLOOR;
+                }
                 if (ly > 0 && chunkData.tiles[(ly - 1) * CHUNK_SIZE + x] === TILE_VOID)
                   chunkData.tiles[(ly - 1) * CHUNK_SIZE + x] = TILE_WALL;
                 if (ly < CHUNK_SIZE - 1 && chunkData.tiles[(ly + 1) * CHUNK_SIZE + x] === TILE_VOID)
@@ -343,7 +364,10 @@ export async function generateFloor(world, worldSeed, depth, tombstoneRepo = nul
               }
               const yLo = Math.min(ly, rcy), yHi = Math.max(ly, rcy);
               for (let y = yLo; y <= yHi; y++) {
-                chunkData.tiles[y * CHUNK_SIZE + rcx] = TILE_FLOOR;
+                const tileIndex = y * CHUNK_SIZE + rcx;
+                if (chunkData.tiles[tileIndex] !== TILE_STAIR_DOWN) {
+                  chunkData.tiles[tileIndex] = TILE_FLOOR;
+                }
                 if (rcx > 0 && chunkData.tiles[y * CHUNK_SIZE + rcx - 1] === TILE_VOID)
                   chunkData.tiles[y * CHUNK_SIZE + rcx - 1] = TILE_WALL;
                 if (rcx < CHUNK_SIZE - 1 && chunkData.tiles[y * CHUNK_SIZE + rcx + 1] === TILE_VOID)
