@@ -1,9 +1,13 @@
 import { startLoop, stopLoop, setLoopVolume } from "./audioEngine.js";
 import { resolve } from "./sounds.js";
+import { defineExtension } from "../../lib/ecs-js/index.js";
+import { FountainDried } from "../../events/FountainDried.js";
+import { FountainRefilled } from "../../events/FountainRefilled.js";
 
 const FOUNTAIN_AUDIBLE_RADIUS_TILES = 7;
 const FOUNTAIN_LOOP_GAIN = 0.24;
 const AMBIENT_LOOP_BUS = "ambient:loop";
+const FOUNTAIN_AMBIENT_EVENTS_KEY = Symbol.for("jshack:display:fountainAmbientEvents");
 
 /**
  * @param {{ x:number, y:number }} a
@@ -58,21 +62,17 @@ export function createFountainAmbientController({
   }
 
   function installListeners() {
-    world?.on?.("fountain:dry", ({ targetId }) => {
-      if (targetId != null) dryFountains.add(targetId);
-    });
-    world?.on?.("fountain:destroyed", ({ targetId }) => {
-      if (targetId != null) dryFountains.add(targetId);
-    });
-    world?.on?.("fountain:refilled", ({ targetId }) => {
-      if (targetId != null) dryFountains.delete(targetId);
-    });
-    world?.on?.("dungeon:transitioned", () => {
-      dryFountains.clear();
-      if (!fountainUrl || !loopActive) return;
-      stopLoopFn(fountainUrl, { fadeOut: 0.35 });
-      loopActive = false;
-    });
+    world.install(defineExtension("jshack:display:fountainAmbientEvents", (installedWorld) => {
+      const offDry = installedWorld.on(FountainDried, ({ targetId }) => dryFountains.add(targetId));
+      const offRefilled = installedWorld.on(FountainRefilled, ({ targetId }) => dryFountains.delete(targetId));
+      const offTransition = installedWorld.on("dungeon:transitioned", () => {
+        dryFountains.clear();
+        if (!fountainUrl || !loopActive) return;
+        stopLoopFn(fountainUrl, { fadeOut: 0.35 });
+        loopActive = false;
+      });
+      return () => { offDry(); offRefilled(); offTransition(); };
+    }, { key: FOUNTAIN_AMBIENT_EVENTS_KEY }));
   }
 
   /**

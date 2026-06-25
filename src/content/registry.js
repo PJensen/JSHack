@@ -1,5 +1,6 @@
 // src/content/registry.js
-// Central content registry. All defineItem() / defineMonster() calls
+// Central content registry. All defineItem() / defineMonster() /
+// defineInteractable() calls
 // register their compiled outputs here. installContent() reads from here
 // and wires everything into the existing engine registries.
 
@@ -8,6 +9,9 @@ const _items = new Map();
 
 /** @type {Map<string, object>} id → compiled MonsterDef-compatible object */
 const _monsters = new Map();
+
+/** @type {Map<string, object>} action → compiled interaction definition */
+const _interactables = new Map();
 
 /** @type {Map<string, { glyph: string, fg: string, glow?: string, baseScale?: number }>} */
 const _palettes = new Map();
@@ -35,6 +39,17 @@ export function registerMonster(id, compiledDef) {
 
 export function getContentMonster(id) { return _monsters.get(id) || null; }
 export function allContentMonsters() { return _monsters; }
+
+// ── Interactables ───────────────────────────────────────────────────
+
+export function registerInteractable(action, compiledDef) {
+  if (_interactables.has(action)) {
+    throw new Error(`[content] Duplicate interactable definition: "${action}"`);
+  }
+  _interactables.set(action, compiledDef);
+}
+
+export function allContentInteractables() { return _interactables; }
 
 // ── Palette ────────────────────────────────────────────────────────
 
@@ -103,6 +118,7 @@ export function allContentAbilities() { return _abilities; }
 export function clearContentRegistry() {
   _items.clear();
   _monsters.clear();
+  _interactables.clear();
   _palettes.clear();
   _presentations.clear();
   _abilities.clear();

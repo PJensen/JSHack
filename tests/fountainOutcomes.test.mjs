@@ -13,6 +13,12 @@ import { DungeonState } from "../src/rules/components/DungeonState.js";
 import { Inventory } from "../src/rules/components/Inventory.js";
 import { Material } from "../src/rules/components/Material.js";
 import { MaterialState } from "../src/rules/components/MaterialState.js";
+import { FountainState } from "../src/rules/components/FountainState.js";
+import { FountainDrinkResolved } from "../src/events/FountainDrinkResolved.js";
+import { FountainDipResolved } from "../src/events/FountainDipResolved.js";
+import { FountainDried } from "../src/events/FountainDried.js";
+import "../src/content/interactables/index.js";
+import { installContent } from "../src/content/install.js";
 import { interactionSystem } from "../src/rules/systems/interactionSystem.js";
 import {
   addToInventory,
@@ -25,6 +31,8 @@ import {
   TILE_FLOOR,
   TILE_SHALLOW_WATER,
 } from "../src/rules/environment/dungeon/constants.js";
+
+installContent();
 
 // Helper: create a test world with a player and fountain at known positions.
 function makeWorld(seed, fountainCharges = 20) {
@@ -45,8 +53,9 @@ function makeWorld(seed, fountainCharges = 20) {
   world.add(fountain, Position, { x: 6, y: 5 });
   world.add(fountain, Interactable, {
     action: "fountain",
-    params: { chargesRemaining: fountainCharges, primaryEffect: "heal" },
+    params: null,
   });
+  world.add(fountain, FountainState, { initialized: true, chargesRemaining: fountainCharges, maxCharges: Math.max(1, fountainCharges), primaryEffect: "heal", cooldownTurns: 201, dryUntilStep: -1 });
 
   return { world, actor, fountain };
 }
@@ -54,7 +63,7 @@ function makeWorld(seed, fountainCharges = 20) {
 // Drink once and return the event payload.
 function drinkOnce(world, actor, fountain) {
   const events = [];
-  world.on("fountain:drink", (e) => events.push(e));
+  world.on(FountainDrinkResolved, (e) => events.push(e));
   world.add(actor, InteractIntent, { targetId: fountain, mode: "drink" });
   interactionSystem(world);
   return events[0] || null;
@@ -97,11 +106,12 @@ Deno.test("fountain: mana outcome restores mana", () => {
     world.add(fountain, Position, { x: 6, y: 5 });
     world.add(fountain, Interactable, {
       action: "fountain",
-      params: { chargesRemaining: 20, primaryEffect: "mana" },
+      params: null,
     });
+  world.add(fountain, FountainState, { initialized: true, chargesRemaining: 20, maxCharges: Math.max(1, 20), primaryEffect: "mana", cooldownTurns: 201, dryUntilStep: -1 });
 
     const events = [];
-    world.on("fountain:drink", (e) => events.push(e));
+    world.on(FountainDrinkResolved, (e) => events.push(e));
     world.add(actor, InteractIntent, { targetId: fountain, mode: "drink" });
     interactionSystem(world);
 
@@ -166,7 +176,7 @@ Deno.test("fountain: curse outcome curses an inventory item", () => {
     addToInventory(world, actor, item);
 
     const events = [];
-    world.on("fountain:drink", (e) => events.push(e));
+    world.on(FountainDrinkResolved, (e) => events.push(e));
     world.add(actor, InteractIntent, { targetId: fountain, mode: "drink" });
     interactionSystem(world);
 
@@ -208,7 +218,7 @@ Deno.test("fountain: teleport outcome moves the player", () => {
   world.on("teleported", (event) => teleports.push(event));
   const event = drinkOnce(world, actor, fountain);
   assertEquals(teleports.length, 1, "fountain teleport should use the canonical presentation event");
-  assertEquals(teleports[0].source, "fountain:drink");
+  assertEquals(teleports[0].source, "fountain");
   if (event.from && event.to) {
     const pos = world.get(actor, Position);
     assertEquals(pos.x, event.to.x, "player x should match teleport destination");
@@ -248,14 +258,15 @@ Deno.test("fountain: wish outcome spawns a loot item", () => {
     world.add(fountain, Position, { x: 6, y: 5 });
     world.add(fountain, Interactable, {
       action: "fountain",
-      params: { chargesRemaining: 20, primaryEffect: "heal" },
+      params: null,
     });
+  world.add(fountain, FountainState, { initialized: true, chargesRemaining: 20, maxCharges: Math.max(1, 20), primaryEffect: "heal", cooldownTurns: 201, dryUntilStep: -1 });
 
     const ds = world.create();
     world.add(ds, DungeonState, { worldSeed: seed, currentDepth: 3, floorEntityIds: [fountain] });
 
     const events = [];
-    world.on("fountain:drink", (e) => events.push(e));
+    world.on(FountainDrinkResolved, (e) => events.push(e));
     world.add(actor, InteractIntent, { targetId: fountain, mode: "drink" });
     interactionSystem(world);
 
@@ -274,8 +285,8 @@ Deno.test("fountain: wish outcome spawns a loot item", () => {
 Deno.test("fountain: charge decremented after each drink", () => {
   const { world, actor, fountain } = makeWorld(42, 3);
   const events = [];
-  world.on("fountain:drink", (e) => events.push(e));
-  world.on("fountain:dry", (e) => events.push(e));
+  world.on(FountainDrinkResolved, (e) => events.push(e));
+  world.on(FountainDried, (e) => events.push(e));
 
   for (let i = 0; i < 4; i++) {
     world.step = i + 1;
@@ -284,10 +295,10 @@ Deno.test("fountain: charge decremented after each drink", () => {
   }
 
   // After 3 drinks (or fewer if gush destroyed it), fountain should be dry or gone.
-  const inter = world.get(fountain, Interactable);
-  if (world.isAlive(fountain) && inter) {
+  const state = world.get(fountain, FountainState);
+  if (world.isAlive(fountain) && state) {
     assertEquals(
-      inter.params?.chargesRemaining | 0,
+      state.chargesRemaining | 0,
       0,
       "fountain should have 0 charges after 3 uses",
     );
@@ -327,14 +338,15 @@ Deno.test("fountain: all 11 outcome types are reachable", () => {
     world.add(fountain, Position, { x: 6, y: 5 });
     world.add(fountain, Interactable, {
       action: "fountain",
-      params: { chargesRemaining: 20, primaryEffect: primary },
+      params: null,
     });
+  world.add(fountain, FountainState, { initialized: true, chargesRemaining: 20, maxCharges: Math.max(1, 20), primaryEffect: primary, cooldownTurns: 201, dryUntilStep: -1 });
 
     const ds = world.create();
     world.add(ds, DungeonState, { worldSeed: seed, currentDepth: 3, floorEntityIds: [fountain] });
 
     const events = [];
-    world.on("fountain:drink", (e) => events.push(e));
+    world.on(FountainDrinkResolved, (e) => events.push(e));
     world.add(actor, InteractIntent, { targetId: fountain, mode: "drink" });
     interactionSystem(world);
 
@@ -381,8 +393,9 @@ function makeDipWorld(seed, charges = 20, itemBeatitude = "uncursed", itemSpec =
   world.add(fountain, Position, { x: 6, y: 5 });
   world.add(fountain, Interactable, {
     action: "fountain",
-    params: { chargesRemaining: charges, primaryEffect: "heal" },
+    params: null,
   });
+  world.add(fountain, FountainState, { initialized: true, chargesRemaining: charges, maxCharges: Math.max(1, charges), primaryEffect: "heal", cooldownTurns: 201, dryUntilStep: -1 });
 
   return { world, actor, fountain, item };
 }
@@ -390,7 +403,7 @@ function makeDipWorld(seed, charges = 20, itemBeatitude = "uncursed", itemSpec =
 // Dip once and return the event payload.
 function dipOnce(world, actor, fountain, itemId) {
   const events = [];
-  world.on("fountain:dip", (e) => events.push(e));
+  world.on(FountainDipResolved, (e) => events.push(e));
   world.add(actor, InteractIntent, { targetId: fountain, mode: "dip", itemId });
   interactionSystem(world);
   return events[0] || null;
@@ -474,16 +487,15 @@ Deno.test("dip: creature outcome spawns a monster", () => {
 Deno.test("dip: uses a fountain charge", () => {
   const { world, actor, fountain, item } = makeDipWorld(42, 3);
   dipOnce(world, actor, fountain, item);
-  const inter = world.get(fountain, Interactable);
-  const charges = Number(inter?.params?.chargesRemaining || 0);
+  const charges = world.get(fountain, FountainState).chargesRemaining;
   assert(charges < 3, `expected charges to decrease, got ${charges}`);
 });
 
 Deno.test("dip: dry fountain blocks dip", () => {
   const { world, actor, fountain, item } = makeDipWorld(42, 0);
   const events = [];
-  world.on("fountain:dip", (e) => events.push(e));
-  world.on("fountain:dry", (e) => events.push({ ...e, _type: "dry" }));
+  world.on(FountainDipResolved, (e) => events.push(e));
+  world.on(FountainDried, (e) => events.push({ ...e, _type: "dry" }));
   world.add(actor, InteractIntent, { targetId: fountain, mode: "dip", itemId: item });
   interactionSystem(world);
   assertEquals(events.filter(e => !e._type).length, 0, "no dip event should fire on dry fountain");

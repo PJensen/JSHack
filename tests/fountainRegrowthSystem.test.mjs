@@ -4,6 +4,8 @@ import { DungeonState } from "../src/rules/components/DungeonState.js";
 import { Interactable } from "../src/rules/components/Interactable.js";
 import { Position } from "../src/rules/components/Position.js";
 import { fountainRegrowthSystem } from "../src/rules/systems/fountainRegrowthSystem.js";
+import { FountainState } from "../src/rules/components/FountainState.js";
+import { FountainRefilled } from "../src/events/FountainRefilled.js";
 
 Deno.test("fountainRegrowthSystem refills dry fountains and emits structured sound payload", () => {
   const world = new World({ seed: 1337 });
@@ -23,17 +25,25 @@ Deno.test("fountainRegrowthSystem refills dry fountains and emits structured sou
       primaryEffect: "heal",
     },
   });
+  world.add(fountainId, FountainState, {
+    initialized: true,
+    chargesRemaining: 0,
+    maxCharges: 3,
+    cooldownTurns: 233,
+    dryUntilStep: 250,
+    primaryEffect: "heal",
+  });
 
   const refilled = [];
   const sounds = [];
-  world.on("fountain:refilled", (ev) => refilled.push(ev));
+  world.on(FountainRefilled, (ev) => refilled.push(ev));
   world.on("ambient:sound", (ev) => sounds.push(ev));
 
   fountainRegrowthSystem(world);
 
-  const inter = world.get(fountainId, Interactable);
-  assertEquals(Number(inter?.params?.chargesRemaining || 0), 3);
-  assertEquals(Number(inter?.params?.dryUntilStep || -1), -1);
+  const state = world.get(fountainId, FountainState);
+  assertEquals(state.chargesRemaining, 3);
+  assertEquals(state.dryUntilStep, -1);
   assertEquals(refilled.length, 1);
   assertEquals(sounds.length, 1);
   assertEquals(sounds[0].source, "fountain");

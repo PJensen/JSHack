@@ -17,6 +17,8 @@ import { createDeathEssenceFxController } from "../fx/deathEssenceFxController.j
 import { startShake } from "../camera/shake.js";
 import { startZoomPunch } from "../camera/zoomPunch.js";
 import { installFloatTextWiring } from "../ui/wiring/floatTextWiring.js";
+import { createFountainPresentationExtension } from "../ui/wiring/fountainPresentationExtension.js";
+import { createFountainUiExtension } from "../ui/wiring/fountainUiExtension.js";
 import { installEventUiWiring } from "../ui/wiring/eventUiWiring.js";
 import { createDeathVfxController } from "../fx/deathVfxController.js";
 import { createTeleportFxController } from "../fx/teleportFxController.js";
@@ -157,6 +159,8 @@ export function setupDisplayRuntime({
   });
 
   const { goreTick } = installFloatTextWiring({ world, ftext, fx, getPosition, isVisibleAt, isPet, isPlayer, getFxTime });
+  world.install(createFountainPresentationExtension({ ftext, fx, getPosition, isVisibleAt }));
+  world.install(createFountainUiExtension({ getPlayerEntity, getItemInfo, resolveItemDisplayName }));
   installContentVfxWiring({ world, ftext, fx, getPosition, isVisibleAt });
   installEventUiWiring({
     world,

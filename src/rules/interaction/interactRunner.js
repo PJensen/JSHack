@@ -17,6 +17,7 @@
 
 import { INTERACT_PAYLOADS } from "../content/interaction/interactPayloads.js";
 import { resolveActionMenu } from "../content/interaction/actionMenus.js";
+import { InteractionChoicePrompted } from "../../events/InteractionChoicePrompted.js";
 
 /**
  * @param {any} world
@@ -64,13 +65,16 @@ export function createInteractContext(world, actor, targetId, params, intent) {
 export function runInteractHooks(action, world, actor, targetId, params, intent) {
   // If the action has a multi-option menu and no mode was chosen yet,
   // emit the chooser event and bail — the UI will re-dispatch with a mode.
-  const menu = resolveActionMenu(action, world, targetId);
+  const payload = INTERACT_PAYLOADS[action];
+  const authoredActions = payload?.actions;
+  const menu = authoredActions
+    ? (typeof authoredActions === "function" ? authoredActions(world, targetId) : authoredActions)
+    : resolveActionMenu(action, world, targetId);
   if (menu?.length && !intent?.mode) {
-    world.emit?.("action:choose", { actor, targetId, action, options: menu });
+    world.emit(new InteractionChoicePrompted({ actor, targetId, action, options: menu }));
     return true;
   }
 
-  const payload = INTERACT_PAYLOADS[action];
   if (!payload) return false;
 
   const ctx = createInteractContext(world, actor, targetId, params, intent);

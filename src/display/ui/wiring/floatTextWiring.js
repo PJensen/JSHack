@@ -7,8 +7,10 @@ import { Particle } from "../../passes/vfx/particles/particlePool.js";
 import { normalizeStatusEvent } from "../../../shared/events/statusEvent.js";
 import { installGoreWiring, isGoreDisabled } from "./goreEngine.js";
 import { installPetUiBridge } from "./petUiBridge.js";
+import { defineExtension } from "../../../lib/ecs-js/index.js";
 
-const _installed = Symbol.for('jshack:display:floatTextWiring:installed');
+const FLOAT_TEXT_WIRING_KEY = Symbol.for('jshack:display:floatTextWiring');
+const FLOAT_TEXT_CONTROLLERS = new WeakMap();
 
 // ── Cooldown gate for non-damage float text ──────────────────────────
 // Prevents spammy repeated messages (e.g. "out of stamina" every failed swing).
@@ -21,30 +23,6 @@ function _throttle(tag, cooldownMs = 3000) {
   if (now - last < cooldownMs) return false;
   _cooldowns.set(tag, now);
   return true;
-}
-
-/** Radial particle burst around a fountain for drink outcomes. */
-function _fountainBurst(fx, pos, hexColor, count) {
-  const cr = parseInt(hexColor.slice(1, 3), 16);
-  const cg = parseInt(hexColor.slice(3, 5), 16);
-  const cb = parseInt(hexColor.slice(5, 7), 16);
-  for (let i = 0; i < count; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const speed = 0.5 + Math.random() * 1.0;
-    fx.pool.spawn(new Particle({
-      x: pos.x,
-      y: pos.y - 0.15,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed - 0.4,
-      ax: 0,
-      ay: 1.2,
-      life: 0.4 + Math.random() * 0.4,
-      size0: 0.18,
-      size1: 0.04,
-      r: cr, g: cg, b: cb,
-      a0: 0.85,
-    }));
-  }
 }
 
 const _staminaLines = [
@@ -130,9 +108,7 @@ function spawnSpectralShimmerTrail(fx, from, to) {
  *   isPlayer?: (id: number) => boolean,
  * }} deps
  */
-export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibleAt, isPet, isPlayer, getFxTime }) {
-  if (/** @type {any} */ (world)[_installed]) return { goreTick() {} };
-  /** @type {any} */ (world)[_installed] = true;
+function installFloatTextListeners({ world, ftext, fx, getPosition, isVisibleAt, isPet, isPlayer, getFxTime }) {
   const canShowAt = (x, y) => (
     Number.isFinite(Number(x))
     && Number.isFinite(Number(y))
@@ -912,93 +888,6 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
     });
   });
 
-  // ── Fountain VFX ───────────────────────────────────────────────────
-
-  world.on('fountain:drink', (ev) => {
-    const pos = getPosition(Number(ev.targetId || 0));
-    if (!pos || !canShowAt(pos.x, pos.y)) return;
-
-    const eff = String(ev.effect || '');
-    if (eff === 'heal' || eff === 'mana') {
-      const col = eff === 'heal' ? '#44ff88' : '#6699ff';
-      ftext.addHeal(pos.x, pos.y - 0.45, ev.amount || 0, { color: col });
-      _fountainBurst(fx, pos, col, 8);
-    } else if (eff === 'buff' || eff === 'see_invisible') {
-      const col = eff === 'see_invisible' ? '#bb88ff' : '#ffdd44';
-      const label = eff === 'see_invisible' ? 'SIXTH SENSE!' : 'BLESSED!';
-      ftext.addStatus(pos.x, pos.y - 0.45, label, { color: col, life: 1.2, scaleStart: 1.3, scaleEnd: 1.0 });
-      _fountainBurst(fx, pos, col, 12);
-    } else if (eff === 'gold') {
-      _fountainBurst(fx, pos, '#ffcc00', 10);
-    } else if (eff === 'curse') {
-      ftext.addStatus(pos.x, pos.y - 0.45, 'CURSED!', { color: '#aa33cc', life: 1.3, scaleStart: 1.4, scaleEnd: 1.0 });
-      _fountainBurst(fx, pos, '#6622aa', 14);
-    } else if (eff === 'poison') {
-      ftext.addDamage(pos.x, pos.y - 0.45, ev.amount || 0, { color: '#88ff33' });
-      _fountainBurst(fx, pos, '#66cc22', 8);
-    } else if (eff === 'creature') {
-      if (ev.spawnedName) {
-        ftext.addStatus(pos.x, pos.y - 0.45, 'SOMETHING STIRS!', { color: '#ff4466', life: 1.4, scaleStart: 1.5, scaleEnd: 1.0 });
-        _fountainBurst(fx, pos, '#ff2244', 16);
-      }
-    } else if (eff === 'teleport') {
-      ftext.addStatus(pos.x, pos.y - 0.45, 'WARPED!', { color: '#44ddff', life: 1.2, scaleStart: 1.3, scaleEnd: 1.0 });
-      _fountainBurst(fx, pos, '#22bbee', 14);
-    } else if (eff === 'gush') {
-      ftext.addStatus(pos.x, pos.y - 0.45, 'ERUPTION!', { color: '#3399ff', life: 1.5, scaleStart: 1.6, scaleEnd: 1.0 });
-      _fountainBurst(fx, pos, '#2277dd', 24);
-    } else if (eff === 'wish') {
-      ftext.addStatus(pos.x, pos.y - 0.45, 'A BOON!', { color: '#ffee88', life: 1.8, scaleStart: 1.8, scaleEnd: 1.0 });
-      _fountainBurst(fx, pos, '#ffdd44', 20);
-      _fountainBurst(fx, pos, '#ffffff', 12);
-    }
-  });
-
-  world.on('fountain:dip', (ev) => {
-    const pos = getPosition(Number(ev.targetId || 0));
-    if (!pos || !canShowAt(pos.x, pos.y)) return;
-
-    const eff = String(ev.effect || '');
-    if (eff === 'uncurse') {
-      ftext.addStatus(pos.x, pos.y - 0.45, 'CLEANSED', { color: '#88ccff', life: 1.2, scaleStart: 1.3, scaleEnd: 1.0 });
-      _fountainBurst(fx, pos, '#88ccff', 10);
-    } else if (eff === 'bless') {
-      ftext.addStatus(pos.x, pos.y - 0.45, 'BLESSED', { color: '#ffee88', life: 1.4, scaleStart: 1.4, scaleEnd: 1.0 });
-      _fountainBurst(fx, pos, '#ffdd44', 14);
-    } else if (eff === 'curse') {
-      ftext.addStatus(pos.x, pos.y - 0.45, 'CURSED!', { color: '#aa33cc', life: 1.3, scaleStart: 1.4, scaleEnd: 1.0 });
-      _fountainBurst(fx, pos, '#6622aa', 14);
-    } else if (eff === 'rust') {
-      ftext.addStatus(pos.x, pos.y - 0.45, 'CORRODED!', { color: '#cc6633', life: 1.2, scaleStart: 1.3, scaleEnd: 1.0 });
-      _fountainBurst(fx, pos, '#aa4422', 10);
-    } else if (eff === 'blessedResist') {
-      ftext.addStatus(pos.x, pos.y - 0.45, 'RESISTED', { color: '#ffee88', life: 1.0, scaleStart: 1.2, scaleEnd: 1.0 });
-      _fountainBurst(fx, pos, '#ffdd44', 8);
-    } else if (eff === 'resist') {
-      ftext.addStatus(pos.x, pos.y - 0.45, 'NO EFFECT', { color: '#88aacc', life: 1.0, scaleStart: 1.1, scaleEnd: 1.0 });
-      _fountainBurst(fx, pos, '#6688aa', 6);
-    } else if (eff === 'waterlogged') {
-      ftext.addStatus(pos.x, pos.y - 0.45, 'WATERLOGGED', { color: '#6aa7d8', life: 1.1, scaleStart: 1.2, scaleEnd: 1.0 });
-      _fountainBurst(fx, pos, '#4f89b8', 8);
-    } else if (eff === 'soggy') {
-      ftext.addStatus(pos.x, pos.y - 0.45, 'SOGGY', { color: '#8fa36b', life: 1.1, scaleStart: 1.2, scaleEnd: 1.0 });
-      _fountainBurst(fx, pos, '#70834e', 8);
-    } else if (eff === 'swollen') {
-      ftext.addStatus(pos.x, pos.y - 0.45, 'SWOLLEN', { color: '#b3895d', life: 1.1, scaleStart: 1.2, scaleEnd: 1.0 });
-      _fountainBurst(fx, pos, '#946a40', 8);
-    } else if (eff === 'diluted') {
-      ftext.addStatus(pos.x, pos.y - 0.45, 'DILUTED', { color: '#7ba8c9', life: 1.1, scaleStart: 1.2, scaleEnd: 1.0 });
-      _fountainBurst(fx, pos, '#5c88a9', 8);
-    } else if (eff === 'creature') {
-      if (ev.spawnedName) {
-        ftext.addStatus(pos.x, pos.y - 0.45, 'SOMETHING STIRS!', { color: '#ff4466', life: 1.4, scaleStart: 1.5, scaleEnd: 1.0 });
-        _fountainBurst(fx, pos, '#ff2244', 16);
-      }
-    } else if (eff === 'wet' || eff === 'nothing') {
-      _fountainBurst(fx, pos, '#5588bb', 6);
-    }
-  });
-
   world.on('inventory:gold-gained', ({ ownerId, delta, count }) => {
     const qty = Math.max(0, Number(delta ?? count ?? 0) | 0);
     if (qty <= 0) return;
@@ -1753,4 +1642,13 @@ export function installFloatTextWiring({ world, ftext, fx, getPosition, isVisibl
 
   const _goreTick = goreCtrl.tick;
   return { goreTick(dt) { _goreTick(dt); tickHarvestCounter(dt); } };
+}
+
+export function installFloatTextWiring(deps) {
+  const { world } = deps;
+  if (!world || typeof world.install !== 'function') return { goreTick() {} };
+  world.install(defineExtension('jshack:display:floatTextWiring', (installedWorld) => {
+    FLOAT_TEXT_CONTROLLERS.set(installedWorld, installFloatTextListeners({ ...deps, world: installedWorld }));
+  }, { key: FLOAT_TEXT_WIRING_KEY }));
+  return FLOAT_TEXT_CONTROLLERS.get(world) || { goreTick() {} };
 }

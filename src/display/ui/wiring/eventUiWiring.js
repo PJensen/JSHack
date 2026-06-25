@@ -5,8 +5,9 @@
 import { TrapDodgePrompted } from "../../../events/TrapDodgePrompted.js";
 import { TrapDodgeResolved } from "../../../events/TrapDodgeResolved.js";
 import { TrapDodgeUiEnabled } from "../../../events/TrapDodgeUiEnabled.js";
+import { defineExtension } from "../../../lib/ecs-js/index.js";
 
-const _installed = Symbol.for('jshack:display:eventUiWiring:installed');
+const EVENT_UI_WIRING_KEY = Symbol.for('jshack:display:eventUiWiring');
 
 /**
  * Install event-driven UI wiring listeners.
@@ -22,7 +23,7 @@ const _installed = Symbol.for('jshack:display:eventUiWiring:installed');
  *   dispatchRulesAction: (action:any) => void,
  * }} deps
  */
-export function installEventUiWiring({
+function installEventUiListeners({
   world,
   ftext,
   getActiveSpellId,
@@ -33,8 +34,6 @@ export function installEventUiWiring({
   resolveItemDisplayName,
   dispatchRulesAction,
 }) {
-  if (/** @type {any} */ (world)[_installed]) return;
-  /** @type {any} */ (world)[_installed] = true;
   world.emit(new TrapDodgeUiEnabled({ enabled: true }));
 
   world.on(TrapDodgePrompted, (event) => {
@@ -149,42 +148,6 @@ export function installEventUiWiring({
     } catch (e) { console.debug('[eventUiWiring] dispatch ui:altarOfferPrompt:', e); }
   });
 
-  // Fountain dip item chooser: present inventory so player can choose which item to dip.
-  world.on('fountain:dipPrompt', ({ actor, targetId, items }) => {
-    const pe = getPlayerEntity();
-    if (!pe || pe.id !== actor) return;
-    if (!Array.isArray(items)) return;
-    const dippableItems = [];
-    for (const iid of items) {
-      const info = getItemInfo(Number(iid || 0));
-      if (!info) continue;
-      dippableItems.push({
-        id: iid,
-        type: info.type || 'item',
-        name: resolveItemDisplayName(Number(iid || 0)),
-        count: info.count || 1,
-        rarityName: info.rarityName || 'common',
-        value: info.value || 0,
-      });
-    }
-    try {
-      window.dispatchEvent(new CustomEvent('ui:fountainDipPrompt', {
-        detail: { fountainId: targetId, items: dippableItems },
-      }));
-    } catch (e) { console.debug('[eventUiWiring] dispatch ui:fountainDipPrompt:', e); }
-  });
-
-  // Generic action chooser: multi-action interactables (fountain drink/dip, etc.)
-  world.on('action:choose', ({ actor, targetId, action, options }) => {
-    const pe = getPlayerEntity();
-    if (!pe || pe.id !== actor) return;
-    try {
-      window.dispatchEvent(new CustomEvent('ui:actionChooser', {
-        detail: { targetId, action, options },
-      }));
-    } catch (e) { console.debug('[eventUiWiring] dispatch ui:actionChooser:', e); }
-  });
-
   // Harvest updates: refresh inventory UI after gather actions.
   // Deferred so the tick's command queue (component adds) flushes first.
   world.on('harvest:picked', ({ actor, count, kind }) => {
@@ -210,4 +173,14 @@ export function installEventUiWiring({
     const label = qty === 1 ? entry.one : entry.many;
     try { ftext.addStatus(pe.pos.x, pe.pos.y - 0.3, `+${qty} ${label}`, { color: entry.color, life: 1.0 }); } catch (e) { console.debug('[eventUiWiring] ftext failed:', e); }
   });
+}
+
+export function createEventUiWiringExtension(deps) {
+  return defineExtension("jshack:display:eventUiWiring", (world) => {
+    installEventUiListeners({ ...deps, world });
+  }, { key: EVENT_UI_WIRING_KEY });
+}
+
+export function installEventUiWiring(deps) {
+  deps?.world?.install(createEventUiWiringExtension(deps));
 }

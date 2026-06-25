@@ -22,6 +22,11 @@ import { Consumable } from "../src/rules/components/Consumable.js";
 import { FoodDecay } from "../src/rules/components/FoodDecay.js";
 import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
 import { ObjectState } from "../src/rules/components/ObjectState.js";
+import { FountainState } from "../src/rules/components/FountainState.js";
+import { FountainDrinkResolved } from "../src/events/FountainDrinkResolved.js";
+import { FountainDried } from "../src/events/FountainDried.js";
+import { FountainRefilled } from "../src/events/FountainRefilled.js";
+import { InteractionChoicePrompted } from "../src/events/InteractionChoicePrompted.js";
 import { DungeonState } from "../src/rules/components/DungeonState.js";
 import { Devotion } from "../src/rules/components/Devotion.js";
 import { Owner } from "../src/rules/components/Owner.js";
@@ -1589,13 +1594,14 @@ Deno.test("fountain has finite uses and becomes dry", () => {
   const fountain = world.create();
   world.add(fountain, Interactable, {
     action: "fountain",
-    params: { chargesRemaining: 2, primaryEffect: "heal" },
+    params: null,
   });
+  world.add(fountain, FountainState, { initialized: true, chargesRemaining: 2, maxCharges: Math.max(1, 2), primaryEffect: "heal", cooldownTurns: 201, dryUntilStep: -1 });
 
   const drinks = [];
   const dry = [];
-  world.on("fountain:drink", (e) => drinks.push(e));
-  world.on("fountain:dry", (e) => dry.push(e));
+  world.on(FountainDrinkResolved, (e) => drinks.push(e));
+  world.on(FountainDried, (e) => dry.push(e));
 
   world.add(actor, InteractIntent, { targetId: fountain, mode: "drink" });
   interactionSystem(world);
@@ -1604,9 +1610,8 @@ Deno.test("fountain has finite uses and becomes dry", () => {
   world.add(actor, InteractIntent, { targetId: fountain, mode: "drink" });
   interactionSystem(world);
 
-  const inter = world.get(fountain, Interactable);
   assert(
-    (inter?.params?.chargesRemaining | 0) === 0,
+    world.get(fountain, FountainState).chargesRemaining === 0,
     "fountain should have no charges left",
   );
   assert(
@@ -1624,19 +1629,21 @@ Deno.test("dry fountain does not emit Drink / Dip chooser", () => {
   world.add(actor, Vitality, { maxHp: 20, hp: 10 });
   world.add(fountain, Interactable, {
     action: "fountain",
-    params: {
-      chargesRemaining: 0,
-      maxCharges: 2,
-      primaryEffect: "heal",
-      cooldownTurns: 201,
-      dryUntilStep: 205,
-    },
+    params: null,
+  });
+  world.add(fountain, FountainState, {
+    initialized: true,
+    chargesRemaining: 0,
+    maxCharges: 2,
+    primaryEffect: "heal",
+    cooldownTurns: 201,
+    dryUntilStep: 205,
   });
 
   const chooser = [];
   const dry = [];
-  world.on("action:choose", (e) => chooser.push(e));
-  world.on("fountain:dry", (e) => dry.push(e));
+  world.on(InteractionChoicePrompted, (e) => chooser.push(e));
+  world.on(FountainDried, (e) => dry.push(e));
 
   world.add(actor, InteractIntent, { targetId: fountain });
   interactionSystem(world);
@@ -1659,11 +1666,12 @@ Deno.test("fountain beneficial effect is stable per fountain", () => {
   const fountain = world.create();
   world.add(fountain, Interactable, {
     action: "fountain",
-    params: { chargesRemaining: 20, primaryEffect: "mana" },
+    params: null,
   });
+  world.add(fountain, FountainState, { initialized: true, chargesRemaining: 20, maxCharges: Math.max(1, 20), primaryEffect: "mana", cooldownTurns: 201, dryUntilStep: -1 });
 
   const drinks = [];
-  world.on("fountain:drink", (e) => drinks.push(e));
+  world.on(FountainDrinkResolved, (e) => drinks.push(e));
 
   for (let i = 0; i < 12; i++) {
     world.step = i;
@@ -1692,22 +1700,24 @@ Deno.test("dry fountain refills after cooldown and can be used again", () => {
   const fountain = world.create();
   world.add(fountain, Interactable, {
     action: "fountain",
-    params: {
-      chargesRemaining: 0,
-      maxCharges: 2,
-      primaryEffect: "heal",
-      cooldownTurns: 201,
-      dryUntilStep: 205,
-    },
+    params: null,
+  });
+  world.add(fountain, FountainState, {
+    initialized: true,
+    chargesRemaining: 0,
+    maxCharges: 2,
+    primaryEffect: "heal",
+    cooldownTurns: 201,
+    dryUntilStep: 205,
   });
   world.add(fountain, Position, { x: 8, y: 8 });
 
   const drinks = [];
   const dry = [];
   const refilled = [];
-  world.on("fountain:drink", (e) => drinks.push(e));
-  world.on("fountain:dry", (e) => dry.push(e));
-  world.on("fountain:refilled", (e) => refilled.push(e));
+  world.on(FountainDrinkResolved, (e) => drinks.push(e));
+  world.on(FountainDried, (e) => dry.push(e));
+  world.on(FountainRefilled, (e) => refilled.push(e));
 
   world.step = 204;
   world.add(actor, InteractIntent, { targetId: fountain, mode: "drink" });
@@ -1731,9 +1741,8 @@ Deno.test("dry fountain refills after cooldown and can be used again", () => {
     drinks.length === 1,
     "fountain should be drinkable again after refill",
   );
-  const inter = world.get(fountain, Interactable);
   assert(
-    (inter?.params?.chargesRemaining | 0) === 1,
+    world.get(fountain, FountainState).chargesRemaining === 1,
     "one charge should remain after the first post-refill drink",
   );
 });

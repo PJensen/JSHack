@@ -1,5 +1,8 @@
 import { isGoreDisabled } from "../../../ui/wiring/goreEngine.js";
 import { evaluatePattern } from "../../../lighting/sources/temporalPatterns.js";
+import { defineExtension } from "../../../../lib/ecs-js/index.js";
+import { FountainDried } from "../../../../events/FountainDried.js";
+import { FountainRefilled } from "../../../../events/FountainRefilled.js";
 
 const INSTALLED_KEY = Symbol.for("jshack:display:statusEmitters:installed");
 
@@ -85,37 +88,36 @@ export function createStatusEmitterController({ world, fx }) {
   };
 
   function installListeners() {
-    if (!world || world[INSTALLED_KEY]) return;
-    world[INSTALLED_KEY] = true;
-
-    world.on("fountain:dry", ({ targetId }) => {
+    world.install(defineExtension("jshack:display:statusEmitterEvents", (installedWorld) => {
+    installedWorld.on(FountainDried, ({ targetId }) => {
       const id = Number(targetId || 0);
       if (!(id > 0)) return;
       dryFountains.add(id);
       fountainEmitters.delete(id);
       fx.removeEmitter(`fountain:${id}`);
     });
-    world.on("spawned", ({ id, kind }) => {
+    installedWorld.on("spawned", ({ id, kind }) => {
       if (String(kind || "") !== "fountain") return;
       dryFountains.delete(Number(id || 0));
     });
-    world.on("fountain:refilled", ({ targetId }) => {
+    installedWorld.on(FountainRefilled, ({ targetId }) => {
       const id = Number(targetId || 0);
       if (!(id > 0)) return;
       dryFountains.delete(id);
     });
-    world.on("familiar:fired", ({ id }) => {
+    installedWorld.on("familiar:fired", ({ id }) => {
       const fid = Number(id || 0);
       if (!(fid > 0)) return;
       familiarCooldowns.add(fid);
       familiarEmitters.delete(fid);
       fx.removeEmitter(`fam:${fid}`);
     });
-    world.on("familiar:ready", ({ id }) => {
+    installedWorld.on("familiar:ready", ({ id }) => {
       const fid = Number(id || 0);
       if (!(fid > 0)) return;
       familiarCooldowns.delete(fid);
     });
+    }, { key: INSTALLED_KEY }));
   }
 
   function step(dtSec, view, fxTime) {

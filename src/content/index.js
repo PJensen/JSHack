@@ -2,12 +2,12 @@
 // Public API for the content authoring DSL.
 //
 // Content authors import from here:
-//   import { defineItem, defineMonster } from '../content/index.js';
+//   import { defineItem, defineMonster, defineInteractable } from '../content/index.js';
 //
 // Engine startup calls installContent() once after all content is loaded:
 //   import { installContent } from '../content/index.js';
 
-export { defineItem, defineMonster } from './define.js';
+export { defineItem, defineMonster, defineInteractable } from './define.js';
 export { installContent } from './install.js';
 export { installContentVfxWiring } from './vfxWiring.js';
 export { ScriptCtx, compileHook } from './scriptCtx.js';

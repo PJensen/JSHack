@@ -3,16 +3,21 @@
 // Call installContent() once at game startup, after all content files
 // have been imported (so their defineItem/defineMonster calls have run).
 
-import { allContentItems, allContentMonsters, allContentPalettes } from './registry.js';
+import { allContentItems, allContentMonsters, allContentInteractables, allContentPalettes } from './registry.js';
 import { registerCatalogItem } from '../rules/data/itemCatalog.js';
 import { registerMonsterDef } from '../rules/data/monsters.js';
 import { registerPaletteEntries } from '../display/palette/base.js';
+import { registerInteractPayload } from '../rules/content/interaction/interactPayloads.js';
 
 /**
  * Install all DSL-defined content into the engine's existing registries.
  * Safe to call multiple times (idempotent per id — skips already-registered).
  */
 export function installContent() {
+  for (const [action, def] of allContentInteractables()) {
+    registerInteractPayload(action, def);
+  }
+
   // ── Items → unified catalog ───────────────────────────────────
   for (const [id, def] of allContentItems()) {
     registerCatalogItem(id, def, { override: true });

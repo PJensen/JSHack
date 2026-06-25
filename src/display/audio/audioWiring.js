@@ -18,6 +18,9 @@ import {
 import { combatSoundId } from "./combatPack.js";
 import { resolveCombatFamily } from "./combatSoundResolver.js";
 import { createAudioWiringExtension } from "./audioWiringExtension.js";
+import { defineExtension } from "../../lib/ecs-js/index.js";
+import { FountainDrinkResolved } from "../../events/FountainDrinkResolved.js";
+import { FountainDipResolved } from "../../events/FountainDipResolved.js";
 export { resolveInteractionSoundId } from "./audioWiringExtension.js";
 
 export const ALERT_SOUND_BY_IDENTITY = Object.freeze({
@@ -526,7 +529,7 @@ export function resolveCraftingResultSoundId(kind) {
  *   getReferenceZoomScale?: () => number,
  * }} deps
  */
-export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosition, getPosition, getIdentity, getDepth, getZoomScale, getReferenceZoomScale }) {
+function installAudioListeners({ world, isPlayer, getItemInfo, getPlayerPosition, getPosition, getIdentity, getDepth, getZoomScale, getReferenceZoomScale }) {
   const recentSearchPulses = new Map();
 
   const warmupIds = [
@@ -1118,14 +1121,14 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
     sfxAt(BONE_CHIME_SOUND_ID, pos, pp(), { priority: 1 }, zg());
   });
 
-  world.on('fountain:drink', ({ targetId, effect }) => {
+  world.on(FountainDrinkResolved, ({ targetId, effect }) => {
     const pos = targetId != null ? getPosition(targetId) : null;
     sfxAt("fountain:sip", pos, pp(), null, zg());
     if (effect === "gush") sfxAt("water:magic", pos, pp(), { priority: 1 }, zg());
     if (effect === "teleport") sfx("teleported", { priority: 1 });
   });
 
-  world.on('fountain:dip', ({ targetId, effect }) => {
+  world.on(FountainDipResolved, ({ targetId, effect }) => {
     const pos = targetId != null ? getPosition(targetId) : null;
     sfxAt("fountain:sip", pos, pp(), null, zg());
   });
@@ -1354,4 +1357,14 @@ export function installAudioWiring({ world, isPlayer, getItemInfo, getPlayerPosi
       sfx(key);
     }
   });
+}
+
+const AUDIO_LISTENERS_KEY = Symbol.for("jshack:display:audioListeners");
+
+export function installAudioWiring(deps) {
+  const { world } = deps;
+  if (!world || typeof world.install !== "function") return;
+  world.install(defineExtension("jshack:display:audioListeners", (installedWorld) => {
+    installAudioListeners({ ...deps, world: installedWorld });
+  }, { key: AUDIO_LISTENERS_KEY }));
 }

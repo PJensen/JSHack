@@ -44,7 +44,7 @@ import { EntranceProfile } from "../../rules/components/EntranceProfile.js";
 import { GroundStackOrder } from "../../rules/components/GroundStackOrder.js";
 import { Facing } from "../../rules/components/Facing.js";
 import { AggroState } from "../../rules/components/AggroState.js";
-import { Interactable } from "../../rules/components/Interactable.js";
+import { FountainState } from "../../rules/components/FountainState.js";
 import { AudioEmitter } from "../../rules/components/AudioEmitter.js";
 import { LightEmitter } from "../../rules/components/LightEmitter.js";
 import { HarvestNode } from "../../rules/components/HarvestNode.js";
@@ -231,9 +231,7 @@ function makePerceptionEcho(src, extraTags, at, kindOverride = undefined) {
  */
 function projectInteractableDisplayTags(world, id, kind, rec) {
 	if (String(kind || "").toLowerCase() !== "fountain") return;
-	const inter = world.get(id, Interactable);
-	const params = (inter?.params && typeof inter.params === "object") ? inter.params : null;
-	const charges = Number(params?.chargesRemaining);
+	const charges = Number(world.get(id, FountainState)?.chargesRemaining);
 	if (Number.isFinite(charges) && charges <= 0 && !rec.tags.includes("inactive")) {
 		rec.tags.push("inactive");
 	}

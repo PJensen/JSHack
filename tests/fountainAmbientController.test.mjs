@@ -1,5 +1,8 @@
 import { assert, assertAlmostEquals, assertEquals } from "jsr:@std/assert";
 import { createFountainAmbientController, computeFountainLoopVolume } from "../src/display/audio/fountainAmbientController.js";
+import { World } from "../src/lib/ecs-js/index.js";
+import { FountainDried } from "../src/events/FountainDried.js";
+import { FountainRefilled } from "../src/events/FountainRefilled.js";
 
 Deno.test("computeFountainLoopVolume fades from the basin to silence", () => {
   assertAlmostEquals(computeFountainLoopVolume(0), 0.24, 1e-10);
@@ -10,14 +13,10 @@ Deno.test("computeFountainLoopVolume fades from the basin to silence", () => {
 });
 
 Deno.test("fountain ambient controller starts, updates, and stops the loop around active fountains", () => {
-  const handlers = new Map();
+  const world = new World();
   const calls = [];
   const controller = createFountainAmbientController({
-    world: {
-      on(event, cb) {
-        handlers.set(event, cb);
-      },
-    },
+    world,
     resolveFn(id) {
       assertEquals(id, "fountain");
       return { url: "./assets/audio/ambient_fountain.mp3", bus: "ambient" };
@@ -50,14 +49,14 @@ Deno.test("fountain ambient controller starts, updates, and stops the loop aroun
   assertEquals(calls[1]?.type, "set");
   assert(calls[1]?.volume < 0.72);
 
-  handlers.get("fountain:dry")?.({ targetId: 7 });
+  world.emit(new FountainDried({ targetId: 7 }));
   controller.syncWorldView({
     player: { pos: { x: 10, y: 10 } },
     entities: [{ id: 7, kind: "fountain", pos: { x: 11, y: 10 } }],
   });
   assertEquals(calls[2]?.type, "stop");
 
-  handlers.get("fountain:refilled")?.({ targetId: 7 });
+  world.emit(new FountainRefilled({ targetId: 7 }));
   controller.syncWorldView({
     player: { pos: { x: 10, y: 10 } },
     entities: [{ id: 7, kind: "fountain", pos: { x: 11, y: 10 } }],
@@ -66,14 +65,10 @@ Deno.test("fountain ambient controller starts, updates, and stops the loop aroun
 });
 
 Deno.test("fountain ambient controller ignores inactive fountains from world view state", () => {
-  const handlers = new Map();
+  const world = new World();
   const calls = [];
   const controller = createFountainAmbientController({
-    world: {
-      on(event, cb) {
-        handlers.set(event, cb);
-      },
-    },
+    world,
     resolveFn() {
       return { url: "./assets/audio/ambient_fountain.mp3", bus: "ambient" };
     },

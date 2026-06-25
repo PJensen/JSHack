@@ -2,6 +2,7 @@ import { defineArchetype } from "../../lib/ecs-js/archetype.js";
 import { Position } from "../components/Position.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Interactable } from "../components/Interactable.js";
+import { FountainState } from "../components/FountainState.js";
 import { Collider } from "../components/Collider.js";
 import { Material } from "../components/Material.js";
 import { Inventory } from "../components/Inventory.js";
@@ -429,6 +430,7 @@ export const ChurchFont = defineArchetype(
   [Material, { kind: "stone" }],
   [Collider, { solid: true, blocksSight: false }],
   [Interactable, { action: "fountain", params: null }],
+  [FountainState],
   [AudioEmitter, { emitters: [{ profile: "church", interior: true }] }],
   [LightEmitter, { radius: 2.8, baseColor: "#aae1ff", temporalPattern: "breathe", shadowSoftness: 6 }],
 );
@@ -825,5 +827,6 @@ export const Fountain = defineArchetype(
   [Material, { kind: "stone" }],
   [Collider, { solid: true, blocksSight: false }],
   [Interactable, { action: "fountain", params: null }],
+  [FountainState],
   [LightEmitter, { radius: 3.5, baseColor: "#78aadc", temporalPattern: "breathe", shadowSoftness: 6 }],
 );

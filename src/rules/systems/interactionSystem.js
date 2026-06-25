@@ -1,10 +1,11 @@
 // src/rules/systems/interactionSystem.js
 //
 // Thin dispatch layer. All interaction logic lives in:
-//   src/rules/content/interaction/interactPayloads.js  (hook definitions)
+//   src/content/interactables/                         (authored definitions)
+//   src/rules/content/interaction/interactPayloads.js  (legacy definitions)
 //   src/rules/interaction/interactRunner.js             (context + hook runner)
 //
-// To add a new interactable: add a key + hook payload to interactPayloads.js.
+// To add a new interactable: author it with defineInteractable().
 // This file never needs to change.
 
 import { Interactable } from "../components/Interactable.js";

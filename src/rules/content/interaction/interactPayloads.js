@@ -1,6 +1,6 @@
 // src/rules/content/interaction/interactPayloads.js
 //
-// All interactable hook payloads, keyed by Interactable.action string.
+// Legacy engine interaction payloads, keyed by Interactable.action string.
 //
 // Each payload may define:
 //   beforeInteract(ctx)  — gates and pre-checks; call ctx.cancel() to abort
@@ -9,8 +9,8 @@
 //
 // ctx shape: see interactRunner.js
 //
-// This file is the single authoritative registry of what every interactable
-// thing in the world does. Adding a new interaction = adding a new key here.
+// New authored interactions register through defineInteractable() and
+// installContent(). Existing entries migrate out of this file feature by feature.
 
 import { DoorState } from "../../components/DoorState.js";
 import { Collider } from "../../components/Collider.js";
@@ -27,7 +27,6 @@ import {
   removeFromInventory,
 } from "../../utils/inventoryFacade.js";
 import { Vitality } from "../../components/Vitality.js";
-import { Mana } from "../../components/Mana.js";
 import { Stamina } from "../../components/Stamina.js";
 import { ShopInventory } from "../../components/ShopInventory.js";
 import { HarvestNode } from "../../components/HarvestNode.js";
@@ -68,7 +67,7 @@ import { resolveLootTable, materializeDrop } from "../../data/lootResolver.js";
 import { spawnHazard } from "../../utils/hazardSpawn.js";
 import { dealDamage } from "../../utils/dealDamage.js";
 import { getCatalogItem } from "../../data/itemCatalog.js";
-import { Ashes, GoldStack } from "../../archetypes/Items.js";
+import { Ashes } from "../../archetypes/Items.js";
 import { Encumbrance } from "../../components/Encumbrance.js";
 import {
   brewAtAlchemyBench,
@@ -82,24 +81,18 @@ import { cookAtFire, cookRecipeAtFire, emitCookingFireOpen } from "../cooking/co
 import { emitAnvilOpen, forgeAtAnvil } from "../smithing/anvilGame.js";
 import { createItemById } from "../../utils/itemFactory.js";
 import { actorHasDoorKey, getDoorLockId, setDoorState } from "../../utils/doorAccess.js";
-import { effectiveMaxHp, effectiveMaxMana, effectiveMaxStamina } from "../../utils/passiveBonuses.js";
+import { effectiveMaxStamina } from "../../utils/passiveBonuses.js";
 import { buildNoticeBoardPayload } from "../../quests/localGenerator.js";
 import { GroundStackOrder } from "../../components/GroundStackOrder.js";
 import { HazardArea } from "../../components/HazardArea.js";
 import { HydraulicsLink } from "../../components/HydraulicsLink.js";
-import { setPortcullisRaised, setLinkedPortcullisState } from "../../utils/hydraulicsUtils.js";
-import { isWalkable, forEachLoadedTile, setTile, getTile } from "../../environment/dungeon/tileMap.js";
+import { setLinkedPortcullisState } from "../../utils/hydraulicsUtils.js";
+import { isWalkable, setTile, getTile } from "../../environment/dungeon/tileMap.js";
 import { TILE_SHALLOW_WATER, TILE_FLOOR } from "../../environment/dungeon/constants.js";
-import { ActiveEffects } from "../../components/ActiveEffects.js";
 import { ensureActiveEffects } from "../../utils/effects.js";
 import { upsertTimedEffect } from "../../utils/effectSemantics.js";
-import { spawnMonsterEntity } from "../../utils/spawnMonsterEntity.js";
-import { findNearestValidTileAround } from "../../utils/queries.js";
 import { isEntityOnCurrentFloor } from "../../utils/floorEntities.js";
 import { SoundEmitter } from "../../components/SoundEmitter.js";
-import {
-  applyWaterExposure,
-} from "../../utils/waterExposure.js";
 import { shopDispositionTerms } from "../../utils/disposition.js";
 import { LockpickPrompted } from "../../../events/LockpickPrompted.js";
 import { LockpickResolved } from "../../../events/LockpickResolved.js";
@@ -124,7 +117,6 @@ const CATALOG_ARCHETYPES = {
 };
 
 const HARVEST_SEED_SALT = 0x48415256;
-const SEED_DROP_SALT = 0x5345ED01;
 const HARVEST_BONUS_DROP_SALT = 0x48B0A5D1;
 
 const SEED_ITEM_IDS = Object.freeze({
@@ -147,106 +139,11 @@ const HARVEST_EXHAUSTED_IDENTITY = Object.freeze({
   moonleaf:      "harvest_node_bare",
   ember_root:    "harvest_node_bare",
 });
-const FOUNTAIN_MIN_CHARGES = 2;
-const FOUNTAIN_MAX_CHARGES = 4;
-const FOUNTAIN_COOLDOWN_MIN = 201;
-const FOUNTAIN_COOLDOWN_MAX = 259;
 const LOCKPICK_ITEM_ID = "lockpick";
 const GEM_VENDOR_LOCK_ID_PART = "gem_vendor";
 
 function isLockpickableDoor(world, doorId) {
   return getDoorLockId(world, doorId).includes(GEM_VENDOR_LOCK_ID_PART);
-}
-
-function deriveFountainCooldownTurns(world, targetId, params) {
-  const explicit = Number(params?.cooldownTurns);
-  if (Number.isFinite(explicit) && explicit > 0) return explicit | 0;
-
-  const seed =
-    ((world.seed >>> 0) ^ (((targetId | 0) * 0xc2b2ae35) >>> 0) ^ 0xF0CD) >>> 0;
-  const r = mulberry32(seed);
-  const span = FOUNTAIN_COOLDOWN_MAX - FOUNTAIN_COOLDOWN_MIN + 1;
-  let turns = FOUNTAIN_COOLDOWN_MIN + Math.floor(r() * span);
-  // "200 some odd": enforce odd cooldown length.
-  if ((turns & 1) === 0) turns += 1;
-  if (turns > FOUNTAIN_COOLDOWN_MAX) turns -= 2;
-  return turns;
-}
-
-function ensureFountainState(world, targetId) {
-  const inter = world.get(targetId, Interactable);
-  if (!inter) return null;
-
-  const params = (inter.params && typeof inter.params === "object")
-    ? { ...inter.params }
-    : {};
-
-  let charges = Number(params.chargesRemaining);
-  let maxCharges = Number(params.maxCharges);
-  let primaryEffect = String(params.primaryEffect || "");
-  let cooldownTurns = Number(params.cooldownTurns);
-  let dryUntilStep = Number(params.dryUntilStep);
-  let changed = false;
-
-  if (primaryEffect !== "heal" && primaryEffect !== "mana") {
-    const modeSeed =
-      ((world.seed >>> 0) ^ (((targetId | 0) * 0x85ebca6b) >>> 0) ^ 0xF0AD) >>>
-      0;
-    primaryEffect = mulberry32(modeSeed)() < 0.5 ? "heal" : "mana";
-    changed = true;
-  }
-
-  if (!Number.isFinite(charges) || charges < 0) {
-    const seed =
-      ((world.seed >>> 0) ^ (((targetId | 0) * 0x9e3779b9) >>> 0) ^ 0xF017) >>>
-      0;
-    const r = mulberry32(seed);
-    const span = FOUNTAIN_MAX_CHARGES - FOUNTAIN_MIN_CHARGES + 1;
-    charges = FOUNTAIN_MIN_CHARGES + Math.floor(r() * span);
-    changed = true;
-  }
-
-  if (!Number.isFinite(maxCharges) || maxCharges <= 0) {
-    maxCharges = Math.max(1, charges | 0);
-    changed = true;
-  }
-  if (!Number.isFinite(charges) || charges > maxCharges) {
-    charges = maxCharges;
-    changed = true;
-  }
-
-  if (!Number.isFinite(cooldownTurns) || cooldownTurns <= 0) {
-    cooldownTurns = deriveFountainCooldownTurns(world, targetId, params);
-    changed = true;
-  }
-  if (!Number.isFinite(dryUntilStep)) {
-    dryUntilStep = -1;
-    changed = true;
-  }
-
-  charges = Math.max(0, charges | 0);
-  if (charges !== Number(params.chargesRemaining)) {
-    changed = true;
-  }
-
-  if (changed) {
-    params.chargesRemaining = charges;
-    params.maxCharges = maxCharges;
-    params.primaryEffect = primaryEffect;
-    params.cooldownTurns = cooldownTurns;
-    params.dryUntilStep = dryUntilStep;
-    world.set(targetId, Interactable, { action: inter.action, params });
-  }
-
-  return {
-    inter,
-    params,
-    charges,
-    maxCharges,
-    primaryEffect,
-    cooldownTurns,
-    dryUntilStep,
-  };
 }
 
 const FIERY_WEAPON_AFFIXES = new Set(["flaming", "firestorm1"]);
@@ -407,164 +304,6 @@ function toggleFloodArea(world, cx, cy, radius, toFlood) {
     }
   }
   return changed;
-}
-
-function setFountainState(world, targetId, updates) {
-  const inter = world.get(targetId, Interactable);
-  if (!inter) return;
-  const params = (inter.params && typeof inter.params === "object")
-    ? { ...inter.params }
-    : {};
-  if (updates && typeof updates === "object") {
-    for (const [k, v] of Object.entries(updates)) params[k] = v;
-  }
-  params.chargesRemaining = Math.max(
-    0,
-    Number(params.chargesRemaining || 0) | 0,
-  );
-  if (
-    !Number.isFinite(Number(params.maxCharges)) ||
-    Number(params.maxCharges) <= 0
-  ) {
-    params.maxCharges = Math.max(1, params.chargesRemaining | 0);
-  }
-  world.set(targetId, Interactable, { action: inter.action, params });
-}
-
-function _fountainPrimary(world, actor, targetId, primaryEffect, vit, r) {
-  if (primaryEffect === "heal") {
-    const fountainCap = effectiveMaxHp(world, actor, vit);
-    const healAmt = Math.max(1, Math.floor(fountainCap * (0.2 + r() * 0.2)));
-    const newHp = Math.min(fountainCap, vit.hp + healAmt);
-    world.set(actor, Vitality, { maxHp: vit.maxHp, hp: newHp });
-    world.emit?.("fountain:drink", {
-      actor, targetId, effect: "heal", amount: healAmt,
-    });
-  } else {
-    const mana = world.get(actor, Mana);
-    if (mana && mana.maxMana > 0) {
-      const maxM = effectiveMaxMana(world, actor, mana);
-      const amt = Math.max(1, Math.floor(maxM * 0.3));
-      world.set(actor, Mana, { ...mana, mana: Math.min(maxM, mana.mana + amt) });
-      world.emit?.("fountain:drink", {
-        actor, targetId, effect: "mana", amount: amt,
-      });
-    } else {
-      world.emit?.("fountain:drink", {
-        actor, targetId, effect: "nothing", amount: 0,
-      });
-    }
-  }
-}
-
-/**
- * Dip an inventory item into a fountain.
- * Outcome table loosely inspired by NetHack — weighted random.
- *
- *  0.00–0.30  uncurse (if cursed → uncursed)
- *  0.30–0.50  bless   (if uncursed → blessed)
- *  0.50–0.65  curse   (uncursed/blessed → cursed)
- *  0.65–0.80  nothing (water ripples, no effect)
- *  0.80–0.90  rust    (metallic items take damage — placeholder event)
- *  0.90–1.00  spawn water creature (nymph or snake)
- */
-function _fountainDip(ctx) {
-  const { world, actor, targetId, intent } = ctx;
-  const itemId = intent?.itemId | 0;
-  if (!(itemId > 0) || !world.isAlive(itemId)) return;
-
-  const state = ensureFountainState(world, targetId);
-  const charges = Number(state?.charges || 0);
-  if (charges <= 0) return;
-
-  const fSeed = combatSeed(world.seed, world.step, actor | 0, targetId | 0, 0xD1B5);
-  const r = mulberry32(fSeed);
-  const roll = r();
-
-  const beat = world.get(itemId, Beatitude);
-  const prevState = String(beat?.state || "uncursed");
-  const ni = world.get(itemId, NamedIdentity);
-  const itemName = ni?.name || "the item";
-
-  if (roll < 0.30) {
-    // ── Uncurse ──────────────────────────────────────────────────
-    if (prevState === "cursed") {
-      world.set(itemId, Beatitude, { state: "uncursed" });
-      world.emit?.("fountain:dip", { actor, targetId, itemId, effect: "uncurse", itemName });
-    } else {
-      world.emit?.("fountain:dip", { actor, targetId, itemId, effect: "nothing", itemName });
-    }
-  } else if (roll < 0.50) {
-    // ── Bless ────────────────────────────────────────────────────
-    if (prevState === "uncursed") {
-      world.set(itemId, Beatitude, { state: "blessed" });
-      world.emit?.("fountain:dip", { actor, targetId, itemId, effect: "bless", itemName });
-    } else {
-      world.emit?.("fountain:dip", { actor, targetId, itemId, effect: "nothing", itemName });
-    }
-  } else if (roll < 0.65) {
-    // ── Curse ────────────────────────────────────────────────────
-    if (prevState !== "cursed") {
-      world.set(itemId, Beatitude, { state: "cursed" });
-      world.emit?.("fountain:dip", { actor, targetId, itemId, effect: "curse", itemName });
-    } else {
-      world.emit?.("fountain:dip", { actor, targetId, itemId, effect: "nothing", itemName });
-    }
-  } else if (roll < 0.80) {
-    // ── Nothing ──────────────────────────────────────────────────
-    world.emit?.("fountain:dip", { actor, targetId, itemId, effect: "nothing", itemName });
-  } else if (roll < 0.90) {
-    // ── Water damage to the dipped item ──────────────────────────
-    const exposure = applyWaterExposure(world, itemId, {
-      actor,
-      sourceId: targetId,
-      waterType: "plain",
-    });
-    world.emit?.("fountain:dip", {
-      actor,
-      targetId,
-      itemId,
-      effect: String(exposure?.effect || "wet"),
-      itemName,
-      stacks: Number(exposure?.stacks || 0) | 0,
-      ruined: exposure?.ruined === true,
-    });
-  } else {
-    // ── Spawn water creature ─────────────────────────────────────
-    const fPos = world.get(targetId, Position);
-    let spawnedName = null;
-    if (fPos) {
-      const tile = findNearestValidTileAround(world, fPos, { maxDistance: 2 });
-      if (tile) {
-        const isNymph = r() < 0.5;
-        const def = isNymph
-          ? { name: "Water Nymph", identity: "nymph", maxHp: 14, baseHp: 14, attack: 2, defense: 1, damageDice: "1d4", faction: "enemy", speed: 3 }
-          : { name: "Water Snake", identity: "cave_snake", maxHp: 10, baseHp: 10, attack: 3, defense: 0, damageDice: "1d6", faction: "enemy", speed: 2 };
-        const eid = spawnMonsterEntity(world, { ...def, x: tile.x, y: tile.y });
-        if (eid > 0) spawnedName = def.name;
-      }
-    }
-    world.emit?.("fountain:dip", { actor, targetId, itemId, effect: "creature", spawnedName, itemName });
-  }
-
-  // ── Charge bookkeeping (same as drink) ─────────────────────────
-  const nextCharges = Math.max(0, charges - 1);
-  if (nextCharges <= 0) {
-    const cooldownTurns = Math.max(1, Number(state?.cooldownTurns || 1) | 0);
-    const dryUntilStep = (Number(world.step || 0) | 0) + cooldownTurns;
-    setFountainState(world, targetId, {
-      chargesRemaining: 0,
-      maxCharges: Math.max(1, Number(state?.maxCharges || 1) | 0),
-      primaryEffect: String(state?.primaryEffect || "heal"),
-      cooldownTurns,
-      dryUntilStep,
-    });
-    world.emit?.("fountain:dry", {
-      actor, targetId, chargesRemaining: 0, cooldownTurns, dryUntilStep,
-    });
-  } else {
-    setFountainState(world, targetId, { chargesRemaining: nextCharges });
-  }
 }
 
 function setWorkstationActive(world, targetId, fallbackState) {
@@ -1267,294 +1006,6 @@ export const INTERACT_PAYLOADS = {
         world.emit?.("well:drink", { actor, targetId, amount: next - prev });
       } else {
         world.emit?.("well:drink", { actor, targetId, amount: 0 });
-      }
-    },
-  },
-
-  // ── Fountain ───────────────────────────────────────────────────────────────
-  // Multi-action: menu gate in interactRunner shows Drink / Dip chooser.
-  // When intent.mode arrives, dispatch to the appropriate branch below.
-
-  fountain: {
-    beforeInteract(ctx) {
-      const { world, actor, targetId, intent } = ctx;
-      const mode = String(intent?.mode || "");
-      if (!mode || mode === "drink") {
-        const state = ensureFountainState(world, targetId);
-        const charges = Number(state?.charges || 0);
-        const cooldownTurns = Math.max(1, Number(state?.cooldownTurns || 1) | 0);
-        const dryUntilStep = Number(state?.dryUntilStep ?? -1);
-        if (charges <= 0) {
-          world.emit?.("fountain:dry", {
-            actor,
-            targetId,
-            chargesRemaining: 0,
-            cooldownTurns,
-            dryUntilStep: dryUntilStep >= 0
-              ? dryUntilStep
-              : ((Number(world.step || 0) | 0) + cooldownTurns),
-          });
-          ctx.cancel("FOUNTAIN_DRY", "The fountain has run dry.");
-          return;
-        }
-      }
-      if (mode === "drink") {
-        if (!world.get(actor, Vitality)) {
-          ctx.cancel("NO_VITALITY", "Actor has no vitality component.");
-          return;
-        }
-      } else if (mode === "dip") {
-        // Phase 1: no item yet — emit prompt so the UI can ask which item.
-        if (!(intent?.itemId > 0)) {
-          const items = inventoryItems(world, actor).filter(
-            iid => world.isAlive(iid),
-          );
-          world.emit?.("fountain:dipPrompt", { actor, targetId, items });
-          ctx.cancel("DIP_PROMPT", "");
-          return;
-        }
-        // Phase 2: item selected — validate charges.
-        const state = ensureFountainState(world, targetId);
-        const charges = Number(state?.charges || 0);
-        if (charges <= 0) {
-          world.emit?.("fountain:dry", { actor, targetId, chargesRemaining: 0 });
-          ctx.cancel("FOUNTAIN_DRY", "The fountain has run dry.");
-        }
-      }
-    },
-    onInteract(ctx) {
-      const { world, actor, targetId, intent } = ctx;
-      const mode = String(intent?.mode || "");
-
-      // ── Dip ────────────────────────────────────────────────────────
-      if (mode === "dip") {
-        _fountainDip(ctx);
-        return;
-      }
-
-      // ── Drink (default) ────────────────────────────────────────────
-      const state = ensureFountainState(world, targetId);
-      const charges = Number(state?.charges || 0);
-      const primaryEffect = String(state?.primaryEffect || "heal");
-      if (charges <= 0) return;
-
-      const vit = world.get(actor, Vitality);
-      const fSeed = combatSeed(
-        world.seed,
-        world.step,
-        actor | 0,
-        targetId | 0,
-        0xF0C5,
-      );
-      const r = mulberry32(fSeed);
-
-      // ── Weighted outcome table ─────────────────────────────────────
-      // Outcomes are cumulative-weight bands.  Each drink is a pull of
-      // the slot machine — mostly good, sometimes weird, rarely great.
-      //
-      //  0.00–0.30  primary (heal or mana restore)
-      //  0.30–0.42  attribute buff (lucky / keen_eye / bear_vigor)
-      //  0.42–0.52  see invisible (temporary)
-      //  0.52–0.60  nothing (stale water)
-      //  0.60–0.68  gold bubbles up
-      //  0.68–0.75  curse a random inventory item
-      //  0.75–0.82  poison
-      //  0.82–0.88  spawn water creature (nymph or snake)
-      //  0.88–0.93  teleport
-      //  0.93–0.97  gushing flood (creates water around the fountain)
-      //  0.97–1.00  wish (rare loot drop)
-      const roll = r();
-
-      if (roll < 0.30) {
-        // ── Primary: heal or mana ──────────────────────────────────
-        _fountainPrimary(world, actor, targetId, primaryEffect, vit, r);
-      } else if (roll < 0.42) {
-        // ── Attribute buff ─────────────────────────────────────────
-        const buffs = ["lucky", "keen_eye", "bear_vigor"];
-        const pick = buffs[Math.floor(r() * buffs.length)];
-        const turns = 30 + Math.floor(r() * 40);
-        const ae = ensureActiveEffects(world, actor);
-        if (ae) {
-          upsertTimedEffect(ae.effects, { key: pick, turnsLeft: turns, potency: 1 });
-        }
-        world.emit?.("fountain:drink", {
-          actor, targetId, effect: "buff", buff: pick, turns,
-        });
-      } else if (roll < 0.52) {
-        // ── See invisible ──────────────────────────────────────────
-        const turns = 40 + Math.floor(r() * 60);
-        const ae = ensureActiveEffects(world, actor);
-        if (ae) {
-          upsertTimedEffect(ae.effects, { key: "esp_sense", turnsLeft: turns, potency: 1 });
-        }
-        world.emit?.("fountain:drink", {
-          actor, targetId, effect: "see_invisible", turns,
-        });
-      } else if (roll < 0.60) {
-        // ── Nothing ────────────────────────────────────────────────
-        world.emit?.("fountain:drink", {
-          actor, targetId, effect: "nothing", amount: 0,
-        });
-      } else if (roll < 0.68) {
-        // ── Gold bubbles up ────────────────────────────────────────
-        const fPos = world.get(targetId, Position);
-        const goldAmt = 8 + Math.floor(r() * 25);
-        if (fPos) {
-          const gid = createFrom(world, GoldStack, { x: fPos.x, y: fPos.y });
-          if (gid > 0) {
-            try { world.add(gid, Position, { x: fPos.x, y: fPos.y }); } catch { /* already has Position */ }
-            const gi = world.get(gid, ItemInfo);
-            if (gi) world.set(gid, ItemInfo, { ...gi, count: goldAmt });
-          }
-        }
-        world.emit?.("fountain:drink", {
-          actor, targetId, effect: "gold", amount: goldAmt,
-        });
-      } else if (roll < 0.75) {
-        // ── Curse a random inventory item ──────────────────────────
-        const items = inventoryItems(world, actor);
-        const curseable = items.filter(iid => {
-          if (!world.isAlive(iid)) return false;
-          const b = world.get(iid, Beatitude);
-          return !b || String(b.state) !== "cursed";
-        });
-        let cursedName = null;
-        if (curseable.length > 0) {
-          const pick = curseable[Math.floor(r() * curseable.length)];
-          world.set(pick, Beatitude, { state: "cursed" });
-          const ni = world.get(pick, NamedIdentity);
-          cursedName = ni?.name || "an item";
-        }
-        world.emit?.("fountain:drink", {
-          actor, targetId, effect: "curse", cursedName,
-        });
-      } else if (roll < 0.82) {
-        // ── Poison ─────────────────────────────────────────────────
-        const dmgAmt = Math.max(1, Math.floor(vit.maxHp * (0.05 + r() * 0.05)));
-        dealDamage(world, {
-          target: actor, amount: dmgAmt, type: "poison",
-          source: targetId, cause: "fountain",
-        });
-        world.emit?.("fountain:drink", {
-          actor, targetId, effect: "poison", amount: dmgAmt,
-        });
-      } else if (roll < 0.88) {
-        // ── Spawn water creature ───────────────────────────────────
-        const fPos = world.get(targetId, Position);
-        let spawnedName = null;
-        if (fPos) {
-          const tile = findNearestValidTileAround(world, fPos, { maxDistance: 2 });
-          if (tile) {
-            const isNymph = r() < 0.5;
-            const def = isNymph
-              ? { name: "Water Nymph", identity: "nymph", maxHp: 14, baseHp: 14, attack: 2, defense: 1, damageDice: "1d4", faction: "enemy", speed: 3 }
-              : { name: "Water Snake", identity: "cave_snake", maxHp: 10, baseHp: 10, attack: 3, defense: 0, damageDice: "1d6", faction: "enemy", speed: 2 };
-            const eid = spawnMonsterEntity(world, { ...def, x: tile.x, y: tile.y });
-            if (eid > 0) spawnedName = def.name;
-          }
-        }
-        world.emit?.("fountain:drink", {
-          actor, targetId, effect: "creature", spawnedName,
-        });
-      } else if (roll < 0.93) {
-        // ── Teleport ───────────────────────────────────────────────
-        const pos = world.get(actor, Position);
-        if (pos) {
-          const from = { x: pos.x | 0, y: pos.y | 0 };
-          const candidates = [];
-          forEachLoadedTile((x, y) => {
-            if (!isWalkable(x, y)) return;
-            const dx = x - from.x, dy = y - from.y;
-            if (dx * dx + dy * dy < 36) return; // min distance 6
-            candidates.push({ x, y });
-          });
-          if (candidates.length > 0) {
-            const to = candidates[Math.floor(r() * candidates.length)];
-            world.set(actor, Position, { x: to.x, y: to.y });
-            world.emit("moved", { id: actor, from, to });
-            world.emit("teleported", { id: actor, from, to, source: "fountain:drink" });
-            world.emit?.("fountain:drink", {
-              actor, targetId, effect: "teleport", from, to,
-            });
-          } else {
-            world.emit?.("fountain:drink", {
-              actor, targetId, effect: "nothing", amount: 0,
-            });
-          }
-        }
-      } else if (roll < 0.97) {
-        // ── Gushing flood ──────────────────────────────────────────
-        // Fountain erupts: converts nearby walkable tiles to shallow water.
-        const fPos = world.get(targetId, Position);
-        let tilesFlooded = 0;
-        if (fPos) {
-          const cx = fPos.x | 0, cy = fPos.y | 0;
-          for (let dy = -2; dy <= 2; dy++) {
-            for (let dx = -2; dx <= 2; dx++) {
-              if (dx * dx + dy * dy > 5) continue; // rough circle r~2
-              const tx = cx + dx, ty = cy + dy;
-              const t = getTile(tx, ty);
-              if (t !== TILE_SHALLOW_WATER && isWalkable(tx, ty)) {
-                setTile(tx, ty, TILE_SHALLOW_WATER);
-                tilesFlooded++;
-              }
-            }
-          }
-        }
-        world.emit?.("fountain:drink", {
-          actor, targetId, effect: "gush", tilesFlooded,
-        });
-      } else {
-        // ── Wish: rare loot drop ───────────────────────────────────
-        const fPos = world.get(targetId, Position);
-        let wishedItem = null;
-        if (fPos) {
-          let depth = 1;
-          for (const [, ds] of world.query(DungeonState)) {
-            depth = Math.max(1, Number(ds?.currentDepth ?? 1));
-          }
-          const lootRng = createRng(
-            (world.seed ^ (targetId * 0xBEEF) ^ (world.step * 0x1337)) >>> 0,
-          );
-          const drops = resolveLootTable("chest:magic", lootRng, depth, 0, {});
-          if (drops.length > 0) {
-            const drop = drops[0];
-            const eid = materializeDrop(world, drop, { x: fPos.x, y: fPos.y });
-            if (eid > 0) {
-              const ni = world.get(eid, NamedIdentity);
-              wishedItem = ni?.name || "something";
-            }
-          }
-        }
-        world.emit?.("fountain:drink", {
-          actor, targetId, effect: "wish", wishedItem,
-        });
-      }
-
-      // ── Charge bookkeeping ─────────────────────────────────────
-      const nextCharges = Math.max(0, charges - 1);
-      if (nextCharges <= 0) {
-        const cooldownTurns = Math.max(
-          1,
-          Number(state?.cooldownTurns || 1) | 0,
-        );
-        const dryUntilStep = (Number(world.step || 0) | 0) + cooldownTurns;
-        setFountainState(world, targetId, {
-          chargesRemaining: 0,
-          maxCharges: Math.max(1, Number(state?.maxCharges || 1) | 0),
-          primaryEffect,
-          cooldownTurns,
-          dryUntilStep,
-        });
-        world.emit?.("fountain:dry", {
-          actor,
-          targetId,
-          chargesRemaining: 0,
-          cooldownTurns,
-          dryUntilStep,
-        });
-      } else {
-        setFountainState(world, targetId, { chargesRemaining: nextCharges });
       }
     },
   },
@@ -2347,6 +1798,15 @@ export const INTERACT_PAYLOADS = {
     },
   },
 };
+
+export function registerInteractPayload(action, payload) {
+  const key = String(action || "");
+  if (!key) throw new Error("registerInteractPayload: action is required");
+  if (!payload || typeof payload !== "object") throw new Error(`registerInteractPayload: invalid payload for "${key}"`);
+  if (INTERACT_PAYLOADS[key] === payload) return;
+  if (INTERACT_PAYLOADS[key]) throw new Error(`registerInteractPayload: duplicate action "${key}"`);
+  INTERACT_PAYLOADS[key] = payload;
+}
 
 // ─── Altar offer helper ───────────────────────────────────────────────────────
 

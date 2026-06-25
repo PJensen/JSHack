@@ -1,9 +1,9 @@
 // src/content/define.js
-// Content DSL builders: defineItem() and defineMonster().
+// Content DSL builders: defineItem(), defineMonster(), and defineInteractable().
 // Each call compiles a single definition object into engine-compatible
 // registrations (catalog entry, palette entry, monster def, hooks).
 
-import { registerItem, registerMonster, registerPalette, registerPresentation, registerAbility } from './registry.js';
+import { registerItem, registerMonster, registerInteractable, registerPalette, registerPresentation, registerAbility } from './registry.js';
 import { registerMonsterDef } from '../rules/data/monsters.js';
 import { compileHook, ScriptCtx } from './scriptCtx.js';
 import { createWorldFacade } from './worldFacade.js';
@@ -26,6 +26,24 @@ const ITEM_HOOK_MAP = {
   beforeThrow: 'before_throw',
   afterThrow:  'after_throw',
 };
+
+export function defineInteractable(action, def) {
+  if (!action || typeof action !== 'string') throw new Error('[defineInteractable] action is required');
+  if (!def || typeof def !== 'object') throw new Error(`[defineInteractable "${action}"] definition is required`);
+  const hasHook = ['beforeInteract', 'onInteract', 'afterInteract'].some((name) => typeof def[name] === 'function');
+  if (!hasHook) throw new Error(`[defineInteractable "${action}"] requires at least one interaction hook`);
+  if (def.actions != null && !Array.isArray(def.actions) && typeof def.actions !== 'function') {
+    throw new Error(`[defineInteractable "${action}"] actions must be an array or function`);
+  }
+  const compiled = Object.freeze({
+    beforeInteract: typeof def.beforeInteract === 'function' ? def.beforeInteract : null,
+    onInteract: typeof def.onInteract === 'function' ? def.onInteract : null,
+    afterInteract: typeof def.afterInteract === 'function' ? def.afterInteract : null,
+    actions: def.actions || null,
+  });
+  registerInteractable(action, compiled);
+  return action;
+}
 
 /**
  * Compile DSL hook functions into catalog-compatible hook entries.

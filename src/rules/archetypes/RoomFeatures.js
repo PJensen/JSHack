@@ -15,6 +15,7 @@ import { HydraulicsLink } from "../components/HydraulicsLink.js";
 import { Vitality } from "../components/Vitality.js";
 import { AudioEmitter } from "../components/AudioEmitter.js";
 import { LightEmitter } from "../components/LightEmitter.js";
+import { FountainState } from "../components/FountainState.js";
 
 // --- Interactive features ---
 
@@ -25,6 +26,7 @@ export const Fountain = defineArchetype(
   [Material, { kind: "stone" }],
   [Collider, { solid: true, blocksSight: false }],
   [Interactable, { action: "fountain", params: null }],
+  [FountainState],
   [LightEmitter, { radius: 3.5, baseColor: "#78aadc", temporalPattern: "breathe", shadowSoftness: 6 }],
 );
 
