@@ -16,6 +16,9 @@ import { createStatusFacade } from "../../utils/statusFacade.js";
 import { getEffectiveVisionRange } from "../../utils/blind.js";
 import { isIdentified } from "../../data/identification.js";
 import { inventoryContains } from "../../utils/inventoryFacade.js";
+import { inventoryItems } from "../../utils/inventoryFacade.js";
+import { findNearestValidTileAround } from "../../utils/queries.js";
+import { forEachLoadedTile, getTile, isWalkable } from "../../environment/dungeon/tileMap.js";
 
 /**
  * @param {string} text
@@ -39,6 +42,11 @@ function createDeterministicRng(seed) {
   return Object.freeze({
     next() {
       return nextFn();
+    },
+    float(min = 0, max = 1) {
+      const lo = Math.min(Number(min), Number(max));
+      const hi = Math.max(Number(min), Number(max));
+      return lo + nextFn() * (hi - lo);
     },
     int(min, max) {
       const lo = Math.min(min | 0, max | 0);
@@ -136,8 +144,15 @@ export function createFacets(init) {
     get(entityId, Comp) {
       return world.get(entityId | 0, Comp);
     },
+    first(Comp) {
+      for (const [id, value] of world.query(Comp)) return { id, value };
+      return null;
+    },
     inventory(entityId) {
       return /** @type any */ (world.get(entityId | 0, Inventory));
+    },
+    inventoryItems(entityId) {
+      return inventoryItems(world, entityId | 0);
     },
     itemInfo(entityId) {
       return /** @type any */ (world.get(entityId | 0, ItemInfo));
@@ -216,6 +231,24 @@ export function createFacets(init) {
       }
       ids.sort((a, b) => a - b);
       return ids;
+    },
+    nearestValidTileAround(entityId, maxDistance = 2) {
+      const pos = world.get(entityId | 0, Position);
+      if (!pos) return null;
+      return findNearestValidTileAround(world, pos, { maxDistance: Math.max(1, Number(maxDistance) | 0) });
+    },
+    loadedWalkableTiles() {
+      const tiles = [];
+      forEachLoadedTile((x, y) => {
+        if (isWalkable(x, y)) tiles.push({ x: x | 0, y: y | 0 });
+      });
+      return tiles;
+    },
+    tile(x, y) {
+      return getTile(Number(x) | 0, Number(y) | 0);
+    },
+    isWalkable(x, y) {
+      return isWalkable(Number(x) | 0, Number(y) | 0);
     },
   });
 
@@ -358,6 +391,72 @@ export function createFacets(init) {
     destroy(entityId) {
       return tx.queueMutation({ type: "destroy", entityId: entityId | 0 });
     },
+    patchComponent(entityId, Component, patch) {
+      return tx.queueMutation({
+        type: "patchComponent",
+        entityId: entityId | 0,
+        Component,
+        patch: (patch && typeof patch === "object") ? { ...patch } : {},
+      });
+    },
+    setPosition(entityId, point) {
+      return tx.queueMutation({
+        type: "setPosition",
+        entityId: entityId | 0,
+        x: Number(point?.x),
+        y: Number(point?.y),
+      });
+    },
+    setTiles(changes) {
+      return tx.queueMutation({
+        type: "setTiles",
+        changes: Array.isArray(changes) ? changes.map((change) => ({ ...change })) : [],
+      });
+    },
+    record(Component, data) {
+      const receipt = {};
+      tx.queueMutation({
+        type: "recordFact",
+        Component,
+        data: (data && typeof data === "object") ? { ...data } : {},
+        receipt,
+      });
+      return receipt;
+    },
+    waterExposure(entityId, options = {}) {
+      const receipt = {};
+      tx.queueMutation({
+        type: "waterExposure",
+        entityId: entityId | 0,
+        actorId: Number(options.actorId || actor) | 0,
+        sourceId: Number(options.sourceId || target) | 0,
+        waterType: String(options.waterType || "plain"),
+        receipt,
+      });
+      return receipt;
+    },
+    spawnGold(at, count) {
+      const receipt = {};
+      tx.queueMutation({
+        type: "spawnGold",
+        x: Number(at?.x),
+        y: Number(at?.y),
+        count: Number(count || 1) | 0,
+        receipt,
+      });
+      return receipt;
+    },
+    materializeDrop(drop, at) {
+      const receipt = {};
+      tx.queueMutation({
+        type: "materializeDrop",
+        drop,
+        x: Number(at?.x),
+        y: Number(at?.y),
+        receipt,
+      });
+      return receipt;
+    },
     queue(op) {
       return tx.queueMutation(op);
     },
@@ -365,10 +464,19 @@ export function createFacets(init) {
 
   const io = Object.freeze({
     emit(event, payload = {}) {
+      if (event && typeof event === "object") {
+        eventBuffer.push({ instance: event });
+        return true;
+      }
       eventBuffer.push({
         event: String(event || ""),
         payload: /** @type any */ ({ ...payload }),
       });
+      return true;
+    },
+    emitAfter(factory) {
+      if (typeof factory !== "function") throw new Error("emitAfter requires a factory");
+      eventBuffer.push({ factory });
       return true;
     },
     message(text, type = "system") {

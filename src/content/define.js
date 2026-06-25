@@ -31,15 +31,28 @@ export function defineInteractable(action, def) {
   if (!action || typeof action !== 'string') throw new Error('[defineInteractable] action is required');
   if (!def || typeof def !== 'object') throw new Error(`[defineInteractable "${action}"] definition is required`);
   const hasHook = ['beforeInteract', 'onInteract', 'afterInteract'].some((name) => typeof def[name] === 'function');
-  if (!hasHook) throw new Error(`[defineInteractable "${action}"] requires at least one interaction hook`);
+  const verbs = (def.verbs && typeof def.verbs === 'object') ? { ...def.verbs } : null;
+  if (!hasHook && !verbs) throw new Error(`[defineInteractable "${action}"] requires hooks or verb rules`);
   if (def.actions != null && !Array.isArray(def.actions) && typeof def.actions !== 'function') {
     throw new Error(`[defineInteractable "${action}"] actions must be an array or function`);
+  }
+  if (verbs) {
+    for (const [verb, rule] of Object.entries(verbs)) {
+      if (!rule || typeof rule !== 'object' || typeof rule.apply !== 'function') {
+        throw new Error(`[defineInteractable "${action}"] verb "${verb}" is not a rule`);
+      }
+      if (String(rule.verb || '') !== verb) {
+        throw new Error(`[defineInteractable "${action}"] verb key "${verb}" does not match rule verb "${rule.verb}"`);
+      }
+    }
   }
   const compiled = Object.freeze({
     beforeInteract: typeof def.beforeInteract === 'function' ? def.beforeInteract : null,
     onInteract: typeof def.onInteract === 'function' ? def.onInteract : null,
     afterInteract: typeof def.afterInteract === 'function' ? def.afterInteract : null,
     actions: def.actions || null,
+    defaultVerb: String(def.defaultVerb || ''),
+    verbs: verbs ? Object.freeze(verbs) : null,
   });
   registerInteractable(action, compiled);
   return action;

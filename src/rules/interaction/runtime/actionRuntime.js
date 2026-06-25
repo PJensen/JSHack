@@ -55,7 +55,7 @@ export function executeInteraction(world, spec) {
   const publicParams = sanitizePublicParams(params);
 
   const tx = new RuleActionContext(world);
-  /** @type {Array<{ event: string, payload: Record<string, unknown> }>} */
+  /** @type {Array<{ event?: string, payload?: Record<string, unknown>, instance?: object, factory?: Function }>} */
   const eventBuffer = [];
   /** @type {Array<{ step: string, data?: unknown }>} */
   const breadcrumbs = [];
@@ -74,6 +74,38 @@ export function executeInteraction(world, spec) {
     warnings,
   });
   const helpers = facets.fx;
+  const trace = Object.freeze({
+    rule(ruleId) {
+      breadcrumbs.push({ step: "rule", data: { ruleId: String(ruleId || "") } });
+    },
+    considered(candidateId) {
+      breadcrumbs.push({ step: "considered", data: { candidateId: String(candidateId || "") } });
+    },
+    weight(candidateId, weight) {
+      breadcrumbs.push({
+        step: "weight",
+        data: { candidateId: String(candidateId || ""), weight: Number(weight || 0) },
+      });
+    },
+    skipped(candidateId, reason) {
+      breadcrumbs.push({
+        step: "skipped",
+        data: { candidateId: String(candidateId || ""), reason: String(reason || "") },
+      });
+    },
+    selected(candidateId, data = {}) {
+      breadcrumbs.push({
+        step: "selected",
+        data: { candidateId: String(candidateId || ""), ...(data || {}) },
+      });
+    },
+    rejected(ruleId, reason) {
+      breadcrumbs.push({
+        step: "rejected",
+        data: { ruleId: String(ruleId || ""), reason: String(reason || "") },
+      });
+    },
+  });
 
   const ctx = {
     schemaVersion: INTERACTION_CTX_SCHEMA_VERSION,
@@ -93,6 +125,7 @@ export function executeInteraction(world, spec) {
     rng: facets.rng,
     stats: facets.stats,
     status: facets.status,
+    trace,
     helpers,
     fx: helpers,
     _breadcrumbs: breadcrumbs,
@@ -156,19 +189,20 @@ export function executeInteraction(world, spec) {
   let emittedEvents = 0;
   for (let i = 0; i < eventBuffer.length; i++) {
     const ev = eventBuffer[i];
-    if (!ev || !ev.event) continue;
-    try {
-      world.emit?.(ev.event, ev.payload);
+    if (!ev) continue;
+    if (ev.factory) {
+      world.emit(ev.factory());
       emittedEvents += 1;
-    } catch (error) {
-      warnings.push({
-        code: "event:emit-failed",
-        detail: {
-          event: ev.event,
-          message: String(error?.message || error || "emit failed"),
-        },
-      });
+      continue;
     }
+    if (ev.instance) {
+      world.emit(ev.instance);
+      emittedEvents += 1;
+      continue;
+    }
+    if (!ev.event) continue;
+    world.emit(ev.event, ev.payload);
+    emittedEvents += 1;
   }
 
   return buildInteractionResult(ctx, {

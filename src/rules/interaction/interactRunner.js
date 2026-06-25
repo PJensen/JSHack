@@ -18,6 +18,8 @@
 import { INTERACT_PAYLOADS } from "../content/interaction/interactPayloads.js";
 import { resolveActionMenu } from "../content/interaction/actionMenus.js";
 import { InteractionChoicePrompted } from "../../events/InteractionChoicePrompted.js";
+import { executeVerbRule } from "../kernel/verbRule.js";
+import { getAuthoredInteractable } from "./interactableRegistry.js";
 
 /**
  * @param {any} world
@@ -65,7 +67,7 @@ export function createInteractContext(world, actor, targetId, params, intent) {
 export function runInteractHooks(action, world, actor, targetId, params, intent) {
   // If the action has a multi-option menu and no mode was chosen yet,
   // emit the chooser event and bail — the UI will re-dispatch with a mode.
-  const payload = INTERACT_PAYLOADS[action];
+  const payload = getAuthoredInteractable(action) || INTERACT_PAYLOADS[action];
   const authoredActions = payload?.actions;
   const menu = authoredActions
     ? (typeof authoredActions === "function" ? authoredActions(world, targetId) : authoredActions)
@@ -82,6 +84,24 @@ export function runInteractHooks(action, world, actor, targetId, params, intent)
   if (typeof payload.beforeInteract === "function") {
     payload.beforeInteract(ctx);
     if (ctx.cancelled) return true;
+  }
+
+  if (payload.verbs) {
+    const verb = String(intent?.mode || payload.defaultVerb || Object.keys(payload.verbs)[0] || "");
+    const rule = payload.verbs[verb];
+    if (!rule) return false;
+    const result = executeVerbRule(world, rule, {
+      actor,
+      primary: Number(intent?.itemId || targetId) | 0,
+      target: targetId,
+      params: {
+        action,
+        intent,
+        forceOutcomeId: String(intent?.forceOutcomeId || ""),
+      },
+    });
+    world.emit("interaction:result", result);
+    return true;
   }
 
   if (typeof payload.onInteract === "function") {

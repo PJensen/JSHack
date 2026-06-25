@@ -7,7 +7,7 @@ import { allContentItems, allContentMonsters, allContentInteractables, allConten
 import { registerCatalogItem } from '../rules/data/itemCatalog.js';
 import { registerMonsterDef } from '../rules/data/monsters.js';
 import { registerPaletteEntries } from '../display/palette/base.js';
-import { registerInteractPayload } from '../rules/content/interaction/interactPayloads.js';
+import { registerAuthoredInteractable } from '../rules/interaction/interactableRegistry.js';
 
 /**
  * Install all DSL-defined content into the engine's existing registries.
@@ -15,7 +15,7 @@ import { registerInteractPayload } from '../rules/content/interaction/interactPa
  */
 export function installContent() {
   for (const [action, def] of allContentInteractables()) {
-    registerInteractPayload(action, def);
+    registerAuthoredInteractable(action, def);
   }
 
   // ── Items → unified catalog ───────────────────────────────────

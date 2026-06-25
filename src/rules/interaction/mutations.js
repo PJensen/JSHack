@@ -8,6 +8,7 @@
 // - Allowed importer in rules code: src/rules/utils/actionContexts.js only.
 
 import { attach } from "../../lib/ecs-js/index.js";
+import { createFrom } from "../../lib/ecs-js/archetype.js";
 import { ActiveEffects } from "../components/ActiveEffects.js";
 import { CorpseAdaptation } from "../components/CorpseAdaptation.js";
 import { DerivedExpression } from "../components/DerivedExpression.js";
@@ -17,15 +18,18 @@ import { addToInventory, inventoryContains, removeFromInventory } from "../utils
 import { ItemInfo } from "../components/ItemInfo.js";
 import { Material } from "../components/Material.js";
 import { Position } from "../components/Position.js";
+import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Potion } from "../components/Potion.js";
 import { TemporarySpawn } from "../components/TemporarySpawn.js";
+import { Lifespan } from "../components/Lifespan.js";
+import { GoldStack } from "../archetypes/Items.js";
 
 import { DamageSpec } from "../components/DamageSpec.js";
 import { Brain } from "../components/Brain.js";
 import { Beatitude } from "../components/Beatitude.js";
 import { creatureTypeFromTags } from "../components/CreatureType.js";
 import { markExplored } from "../environment/dungeon/exploredMap.js";
-import { forEachLoadedTile } from "../environment/dungeon/tileMap.js";
+import { forEachLoadedTile, setTile } from "../environment/dungeon/tileMap.js";
 import { materializeSpawn } from "../environment/dungeon/populate.js";
 import { dealDamage } from "../utils/dealDamage.js";
 import { applyHealing } from "../utils/applyHealing.js";
@@ -41,6 +45,8 @@ import { recordShopClaim } from "../utils/shopClaims.js";
 import { recordShopDebt } from "../utils/shopDebt.js";
 import { attachEntityToCurrentFloor } from "../utils/floorEntities.js";
 import { invalidateTileQueryCache } from "../utils/tileQueryCache.js";
+import { applyWaterExposure } from "../utils/waterExposure.js";
+import { materializeDrop } from "../data/lootResolver.js";
 
 /**
  * @param {any} world
@@ -62,6 +68,63 @@ function isEffectImmune(world, entityId, effectKey) {
  */
 export function applyMutation(world, op, resolvers = {}) {
   switch (op.type) {
+    case "patchComponent": {
+      const current = world.get(op.entityId, op.Component);
+      if (!current) throw new Error(`patchComponent: entity ${op.entityId} is missing ${op.Component?.name || "component"}`);
+      world.set(op.entityId, op.Component, { ...current, ...(op.patch || {}) });
+      break;
+    }
+    case "setPosition": {
+      const point = { x: Number(op.x) | 0, y: Number(op.y) | 0 };
+      if (world.has(op.entityId, Position)) world.set(op.entityId, Position, point);
+      else world.add(op.entityId, Position, point);
+      break;
+    }
+    case "setTiles": {
+      const changes = Array.isArray(op.changes) ? op.changes : [];
+      for (let i = 0; i < changes.length; i++) {
+        const change = changes[i];
+        setTile(Number(change.x) | 0, Number(change.y) | 0, Number(change.tile) | 0);
+      }
+      break;
+    }
+    case "recordFact": {
+      const id = world.create();
+      world.add(id, op.Component, {
+        ...(op.data || {}),
+        step: Number(op.data?.step ?? world.step ?? 0) | 0,
+      });
+      world.add(id, Lifespan, { turnsLeft: 1, onExpiry: "remove", expiryEvent: "" });
+      if (op.receipt) op.receipt.entityId = id;
+      break;
+    }
+    case "waterExposure": {
+      const result = applyWaterExposure(world, op.entityId, {
+        actor: op.actorId,
+        sourceId: op.sourceId,
+        waterType: op.waterType,
+      });
+      if (op.receipt) Object.assign(op.receipt, result || {});
+      break;
+    }
+    case "spawnGold": {
+      const id = createFrom(world, GoldStack, { x: Number(op.x) | 0, y: Number(op.y) | 0 });
+      if (!world.has(id, Position)) {
+        world.add(id, Position, { x: Number(op.x) | 0, y: Number(op.y) | 0 });
+      }
+      const info = world.get(id, ItemInfo);
+      if (info) world.set(id, ItemInfo, { ...info, count: Math.max(1, Number(op.count || 1) | 0) });
+      if (op.receipt) op.receipt.entityId = id;
+      break;
+    }
+    case "materializeDrop": {
+      const id = materializeDrop(world, op.drop, { x: Number(op.x) | 0, y: Number(op.y) | 0 });
+      if (op.receipt) {
+        op.receipt.entityId = id;
+        op.receipt.name = id > 0 ? String(world.get(id, NamedIdentity)?.name || "something") : null;
+      }
+      break;
+    }
     case "damage": {
       dealDamage(world, {
         target: op.entityId,
@@ -611,7 +674,14 @@ export function applyMutation(world, op, resolvers = {}) {
  * @typedef {{ type: 'materializeSpawn', spawn: { kind: string, x?: number, y?: number, params?: Record<string, unknown> }, emitEvent?: boolean }} MaterializeSpawnOp
  * @typedef {{ type: 'destroy', entityId: number }} DestroyOp
  * @typedef {{ type: 'setItemCooldown', entityId: number, turns: number }} SetItemCooldownOp
- * @typedef {DamageOp | HealOp | PushEffectOp | UpsertTimedEffectOp | AppendDamageChannelsOp | PatchItemInfoOp | AttachEnchantmentOp | SetBeatitudeOp | RemoveTimedEffectsByKeyOp | SetMaterialOp | SpawnItemOp | SpawnMonsterOp | LearnSpellOp | RecordShopDebtOp | RecordShopClaimOp | ConsumeOp | DropFromInventoryOp | NutritionOp | AddCorpseAdaptationOp | RevealLoadedMapOp | SpawnHazardOp | MaterializeSpawnOp | DestroyOp | SetItemCooldownOp} MutationOp
+ * @typedef {{ type: 'patchComponent', entityId: number, Component: any, patch: Record<string, unknown> }} PatchComponentOp
+ * @typedef {{ type: 'setPosition', entityId: number, x: number, y: number }} SetPositionOp
+ * @typedef {{ type: 'setTiles', changes: Array<{x:number,y:number,tile:number}> }} SetTilesOp
+ * @typedef {{ type: 'recordFact', Component: any, data: Record<string, unknown>, receipt?: Record<string, unknown> }} RecordFactOp
+ * @typedef {{ type: 'waterExposure', entityId: number, actorId: number, sourceId: number, waterType: string, receipt?: Record<string, unknown> }} WaterExposureOp
+ * @typedef {{ type: 'spawnGold', x: number, y: number, count: number, receipt?: Record<string, unknown> }} SpawnGoldOp
+ * @typedef {{ type: 'materializeDrop', drop: any, x: number, y: number, receipt?: Record<string, unknown> }} MaterializeDropOp
+ * @typedef {DamageOp | HealOp | PushEffectOp | UpsertTimedEffectOp | AppendDamageChannelsOp | PatchItemInfoOp | AttachEnchantmentOp | SetBeatitudeOp | RemoveTimedEffectsByKeyOp | SetMaterialOp | SpawnItemOp | SpawnMonsterOp | LearnSpellOp | RecordShopDebtOp | RecordShopClaimOp | ConsumeOp | DropFromInventoryOp | NutritionOp | AddCorpseAdaptationOp | RevealLoadedMapOp | SpawnHazardOp | MaterializeSpawnOp | DestroyOp | SetItemCooldownOp | PatchComponentOp | SetPositionOp | SetTilesOp | RecordFactOp | WaterExposureOp | SpawnGoldOp | MaterializeDropOp} MutationOp
  */
 
 export class ActionTransaction {

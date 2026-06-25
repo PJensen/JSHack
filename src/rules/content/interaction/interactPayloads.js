@@ -1799,15 +1799,6 @@ export const INTERACT_PAYLOADS = {
   },
 };
 
-export function registerInteractPayload(action, payload) {
-  const key = String(action || "");
-  if (!key) throw new Error("registerInteractPayload: action is required");
-  if (!payload || typeof payload !== "object") throw new Error(`registerInteractPayload: invalid payload for "${key}"`);
-  if (INTERACT_PAYLOADS[key] === payload) return;
-  if (INTERACT_PAYLOADS[key]) throw new Error(`registerInteractPayload: duplicate action "${key}"`);
-  INTERACT_PAYLOADS[key] = payload;
-}
-
 // ─── Altar offer helper ───────────────────────────────────────────────────────
 
 function _altarExecuteOffer(world, actor, targetId, itemId) {

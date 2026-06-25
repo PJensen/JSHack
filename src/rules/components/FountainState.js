@@ -5,10 +5,10 @@ import { defineComponent } from "../../lib/ecs-js/index.js";
  * Zero-valued fields are initialized deterministically on first interaction.
  */
 export const FountainState = defineComponent("FountainState", {
-  initialized: false,
-  chargesRemaining: 0,
-  maxCharges: 0,
-  primaryEffect: "",
-  cooldownTurns: 0,
+  initialized: true,
+  chargesRemaining: 3,
+  maxCharges: 3,
+  primaryEffect: "heal",
+  cooldownTurns: 221,
   dryUntilStep: -1,
 });
