@@ -1,0 +1,28 @@
+{
+  "cli_version": "0.6.3",
+  "checkpoint_id": "2f75a8349eb4",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "src/rules/environment/dungeon/index.js",
+    "src/rules/environment/dungeon/transition.js",
+    "src/rules/environment/dungeon/underworldRegions.js",
+    "tests/dungeonDepthRegression.test.mjs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/2f/75a8349eb4/0/metadata.json",
+      "transcript": "/2f/75a8349eb4/0/full.jsonl",
+      "content_hash": "/2f/75a8349eb4/0/content_hash.txt",
+      "prompt": "/2f/75a8349eb4/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 141209,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 3059840,
+    "output_tokens": 11606,
+    "api_call_count": 35
+  }
+}
