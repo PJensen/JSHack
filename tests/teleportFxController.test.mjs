@@ -4,6 +4,7 @@ import {
   createTeleportFxController,
   teleportVeilAlpha,
 } from "../src/display/fx/teleportFxController.js";
+import { Teleported } from "../src/events/Teleported.js";
 
 Deno.test("player teleport snaps the camera and reveals through an opaque veil", () => {
   const world = new World({ seed: 1 });
@@ -12,7 +13,7 @@ Deno.test("player teleport snaps the camera and reveals through an opaque veil",
 
   world.emit("teleported", { id: 8, to: { x: 40, y: 50 } });
   assertEquals(cam.x, 1, "non-player teleports should not move the camera");
-  world.emit("teleported", { id: 7, to: { x: 12, y: -4 } });
+  world.emit(new Teleported({ id: 7, to: { x: 12, y: -4 } }));
 
   assertEquals(cam, { x: 12, y: -4, targetX: 12, targetY: -4 });
   assert(fx.active);
@@ -21,4 +22,3 @@ Deno.test("player teleport snaps the camera and reveals through an opaque veil",
   assertEquals(fx.active, false);
   assertEquals(teleportVeilAlpha(1), 0);
 });
-

@@ -21,6 +21,7 @@ import { createAudioWiringExtension } from "./audioWiringExtension.js";
 import { defineExtension } from "../../lib/ecs-js/index.js";
 import { FountainDrinkResolved } from "../../events/FountainDrinkResolved.js";
 import { FountainDipResolved } from "../../events/FountainDipResolved.js";
+import { Teleported } from "../../events/Teleported.js";
 export { resolveInteractionSoundId } from "./audioWiringExtension.js";
 
 export const ALERT_SOUND_BY_IDENTITY = Object.freeze({
@@ -1199,12 +1200,14 @@ function installAudioListeners({ world, isPlayer, getItemInfo, getPlayerPosition
     sfxAt("status:frozen", pos, pp(), null, zg());
   });
 
-  world.on('teleported', (payload) => {
+  const onTeleported = (payload) => {
     const { id, from, to } = payload || {};
     if (!shouldPlayTeleportSound(payload, isPlayer)) return;
     const pos = to || from || (id != null ? getPosition(id) : null);
     sfxAt("teleported", pos, pp(), { priority: 1 }, zg());
-  });
+  };
+  world.on(Teleported, onTeleported);
+  world.on('teleported', onTeleported);
 
   world.on('pet:teleported', ({ petId, id, from, to }) => {
     // Pet catch-up teleports are housekeeping, not a player-facing teleport cast.

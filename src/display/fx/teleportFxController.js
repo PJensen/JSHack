@@ -1,4 +1,5 @@
 import { defineExtension } from "../../lib/ecs-js/index.js";
+import { Teleported } from "../../events/Teleported.js";
 import { jumpTo } from "../camera/utils.js";
 
 const TELEPORT_FX_EXTENSION_KEY = Symbol.for("jshack:display:teleportFx");
@@ -15,15 +16,19 @@ export function teleportVeilAlpha(elapsed) {
 export function createTeleportFxController({ world, cam, isPlayer }) {
   let elapsed = Infinity;
 
+  function onTeleported({ id, to }) {
+    const actorId = Number(id || 0) | 0;
+    if (!(actorId > 0) || (typeof isPlayer === "function" && !isPlayer(actorId))) return;
+    const x = Number(to?.x);
+    const y = Number(to?.y);
+    if (Number.isFinite(x) && Number.isFinite(y)) jumpTo(cam, { x, y });
+    elapsed = 0;
+  }
+
   const extension = defineExtension("jshack:display:teleportFx", (installedWorld) => {
-    return installedWorld.on("teleported", ({ id, to }) => {
-      const actorId = Number(id || 0) | 0;
-      if (!(actorId > 0) || (typeof isPlayer === "function" && !isPlayer(actorId))) return;
-      const x = Number(to?.x);
-      const y = Number(to?.y);
-      if (Number.isFinite(x) && Number.isFinite(y)) jumpTo(cam, { x, y });
-      elapsed = 0;
-    });
+    const offTyped = installedWorld.on(Teleported, onTeleported);
+    const offLegacy = installedWorld.on("teleported", onTeleported);
+    return () => { offTyped(); offLegacy(); };
   }, { key: TELEPORT_FX_EXTENSION_KEY });
 
   world.install(extension);
@@ -49,4 +54,3 @@ export function createTeleportFxController({ world, cam, isPlayer }) {
     },
   };
 }
-

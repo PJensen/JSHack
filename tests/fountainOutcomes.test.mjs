@@ -17,6 +17,7 @@ import { FountainState } from "../src/rules/components/FountainState.js";
 import { FountainDrinkResolved } from "../src/events/FountainDrinkResolved.js";
 import { FountainDipResolved } from "../src/events/FountainDipResolved.js";
 import { FountainDried } from "../src/events/FountainDried.js";
+import { Teleported } from "../src/events/Teleported.js";
 import "../src/content/interactables/index.js";
 import { installContent } from "../src/content/install.js";
 import { interactionSystem } from "../src/rules/systems/interactionSystem.js";
@@ -215,7 +216,7 @@ Deno.test("fountain: teleport outcome moves the player", () => {
   assert(hit, "should find a seed that produces teleport");
   const { world, actor, fountain } = makeWorld(hit.seed);
   const teleports = [];
-  world.on("teleported", (event) => teleports.push(event));
+  world.on(Teleported, (event) => teleports.push(event));
   const event = drinkOnce(world, actor, fountain);
   assertEquals(teleports.length, 1, "fountain teleport should use the canonical presentation event");
   assertEquals(teleports[0].source, "fountain");

@@ -15,6 +15,7 @@ import { FountainDried } from "../../../events/FountainDried.js";
 import { FountainDipPrompted } from "../../../events/FountainDipPrompted.js";
 import { FountainDrinkResolved } from "../../../events/FountainDrinkResolved.js";
 import { FountainDipResolved } from "../../../events/FountainDipResolved.js";
+import { Teleported } from "../../../events/Teleported.js";
 
 const ACTIONS = Object.freeze([
   Object.freeze({ mode: "drink", label: "Drink" }),
@@ -202,7 +203,7 @@ const drinkTable = chanceTable("fountain.drink", [
       const origin = { x: from.x | 0, y: from.y | 0 };
       ctx.mutate.setPosition(ctx.actor, to);
       ctx.io.emit("moved", { id: ctx.actor, from: origin, to });
-      ctx.io.emit("teleported", { id: ctx.actor, from: origin, to, source: "fountain" });
+      ctx.io.emit(new Teleported({ id: ctx.actor, from: origin, to, source: "fountain" }));
       return finish(ctx, "teleport", new FountainDrinkResolved({
         actor: ctx.actor, targetId: ctx.target, effect: "teleport", from: origin, to,
       }));
