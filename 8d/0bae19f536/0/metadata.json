@@ -3,7 +3,7 @@
   "checkpoint_id": "8d0bae19f536",
   "session_id": "019f1443-2e25-7431-9ee3-6ebbfc559008",
   "strategy": "manual-commit",
-  "created_at": "2026-06-29T16:52:52.634650901Z",
+  "created_at": "2026-06-29T16:52:53.443825322Z",
   "branch": "master",
   "checkpoints_count": 1,
   "files_touched": [
@@ -18,39 +18,18 @@
   "agent": "Codex",
   "model": "gpt-5.5",
   "turn_id": "91979f6d7a7b",
-  "token_usage": {
-    "input_tokens": 191605,
-    "cache_creation_tokens": 0,
-    "cache_read_tokens": 1534720,
-    "output_tokens": 11119,
-    "api_call_count": 22
-  },
+  "checkpoint_transcript_start": 188,
+  "transcript_lines_at_start": 188,
   "initial_attribution": {
-    "calculated_at": "2026-06-29T16:52:52.61109506Z",
-    "agent_lines": 198,
+    "calculated_at": "2026-06-29T16:52:53.418935677Z",
+    "agent_lines": 0,
     "agent_removed": 0,
     "human_added": 0,
     "human_modified": 0,
     "human_removed": 0,
-    "total_committed": 198,
-    "total_lines_changed": 198,
-    "agent_percentage": 100,
+    "total_committed": 0,
+    "total_lines_changed": 0,
+    "agent_percentage": 0,
     "metric_version": 2
-  },
-  "prompt_attributions": [
-    {
-      "checkpoint_number": 1,
-      "user_lines_added": 907,
-      "user_lines_removed": 0,
-      "agent_lines_added": 0,
-      "agent_lines_removed": 0,
-      "user_added_per_file": {
-        ".github/agents/Dungeon Generation and BSP Expert.agent.md": 582,
-        ".github/agents/VFX Agent.agent.md": 283,
-        "src/display/lighting/sources/temporalPatterns.js": 17,
-        "src/display/passes/vfx/particles/statusEmitterController.js": 13,
-        "src/rules/utils/riftRuntime.js": 12
-      }
-    }
-  ]
+  }
 }
