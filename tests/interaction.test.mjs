@@ -27,6 +27,9 @@ import { FountainDrinkResolved } from "../src/events/FountainDrinkResolved.js";
 import { FountainDried } from "../src/events/FountainDried.js";
 import { FountainRefilled } from "../src/events/FountainRefilled.js";
 import { InteractionChoicePrompted } from "../src/events/InteractionChoicePrompted.js";
+import { SarcophagusInteractionResolved } from "../src/events/SarcophagusInteractionResolved.js";
+import { sarcophagusOpenRule } from "../src/content/interactables/crypt/index.js";
+import { executeVerbRule } from "../src/rules/kernel/verbRule.js";
 import { DungeonState } from "../src/rules/components/DungeonState.js";
 import { Devotion } from "../src/rules/components/Devotion.js";
 import { Owner } from "../src/rules/components/Owner.js";
@@ -825,20 +828,29 @@ Deno.test("alchemy bench opens minigame data, brews legitimate poison, and consu
 // ── Sarcophagus ───────────────────────────────────────────────────────────────
 
 Deno.test("sarcophagus: spawns skeleton on first interaction", () => {
+  clearAll();
+  loadChunk(0, 0, new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR));
   const world = new World({ seed: 42 });
 
   const actor = world.create();
+  world.add(actor, Vitality, { maxHp: 40, hp: 40 });
+  world.add(actor, Position, { x: 4, y: 5 });
   const sarc = world.create();
   world.add(sarc, Interactable, { action: "openSarcophagus", params: null });
   world.add(sarc, Position, { x: 5, y: 5 });
+  world.add(sarc, Collider, { solid: true, blocksSight: false });
 
   const events = [];
-  world.on("sarcophagus:opened", (e) => events.push(e));
+  world.on(SarcophagusInteractionResolved, (e) => events.push(e));
 
-  world.add(actor, InteractIntent, { targetId: sarc });
-  interactionSystem(world);
+  executeVerbRule(world, sarcophagusOpenRule, {
+    actor,
+    primary: sarc,
+    target: sarc,
+    params: { forceOutcomeId: "skeleton" },
+  });
 
-  assert(events.length === 1, "should emit sarcophagus:opened");
+  assert(events.length === 1, "should emit sarcophagus interaction event");
   assert(events[0].targetId === sarc, "event should reference the sarcophagus");
 
   let skeletonFound = false;
@@ -862,15 +874,22 @@ Deno.test("sarcophagus: spawns skeleton on first interaction", () => {
 });
 
 Deno.test("sarcophagus: becomes inert after opening (one-time use)", () => {
+  clearAll();
+  loadChunk(0, 0, new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR));
   const world = new World({ seed: 43 });
 
   const actor = world.create();
   const sarc = world.create();
   world.add(sarc, Interactable, { action: "openSarcophagus", params: null });
   world.add(sarc, Position, { x: 3, y: 3 });
+  world.add(sarc, Collider, { solid: true, blocksSight: false });
 
-  world.add(actor, InteractIntent, { targetId: sarc });
-  interactionSystem(world);
+  executeVerbRule(world, sarcophagusOpenRule, {
+    actor,
+    primary: sarc,
+    target: sarc,
+    params: { forceOutcomeId: "empty" },
+  });
 
   assert(
     !world.has(sarc, Interactable),
@@ -879,7 +898,7 @@ Deno.test("sarcophagus: becomes inert after opening (one-time use)", () => {
 
   // Second interaction should be a no-op (no Interactable component).
   const events = [];
-  world.on("sarcophagus:opened", (e) => events.push(e));
+  world.on(SarcophagusInteractionResolved, (e) => events.push(e));
   world.add(actor, InteractIntent, { targetId: sarc });
   interactionSystem(world);
 

@@ -22,6 +22,7 @@ import { defineExtension } from "../../lib/ecs-js/index.js";
 import { FountainDrinkResolved } from "../../events/FountainDrinkResolved.js";
 import { FountainDipResolved } from "../../events/FountainDipResolved.js";
 import { Teleported } from "../../events/Teleported.js";
+import { UrnInteractionResolved } from "../../events/UrnInteractionResolved.js";
 export { resolveInteractionSoundId } from "./audioWiringExtension.js";
 
 export const ALERT_SOUND_BY_IDENTITY = Object.freeze({
@@ -1048,8 +1049,8 @@ function installAudioListeners({ world, isPlayer, getItemInfo, getPlayerPosition
     sfxAt("chest:open", pos, pp(), { priority: 1 }, zg());
   });
 
-  world.on('urn:broken', ({ targetId }) => {
-    const pos = targetId != null ? getPosition(targetId) : null;
+  world.on(UrnInteractionResolved, ({ targetId, at }) => {
+    const pos = at || (targetId != null ? getPosition(targetId) : null);
     sfxAt(URN_BROKEN_SOUND_ID, pos, pp(), { priority: 1 }, zg());
   });
 

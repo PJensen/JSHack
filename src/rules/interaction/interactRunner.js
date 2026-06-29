@@ -97,6 +97,7 @@ export function runInteractHooks(action, world, actor, targetId, params, intent)
       params: {
         action,
         intent,
+        interactableParams: params,
         forceOutcomeId: String(intent?.forceOutcomeId || ""),
       },
     });

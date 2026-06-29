@@ -39,7 +39,6 @@ import { Beatitude } from "../../components/Beatitude.js";
 import { Owner } from "../../components/Owner.js";
 import { Interactable } from "../../components/Interactable.js";
 import { ObjectState } from "../../components/ObjectState.js";
-import { DungeonState } from "../../components/DungeonState.js";
 import { DungeonEntrance } from "../../components/DungeonEntrance.js";
 import { Tombstone as TombstoneComponent } from "../../components/Tombstone.js";
 import { createFrom } from "../../../lib/ecs-js/archetype.js";
@@ -59,15 +58,11 @@ import {
   WildHerbs,
 } from "../../archetypes/Food.js";
 import { LumberBundle } from "../../archetypes/TownGoods.js";
-import { Monster } from "../../archetypes/Creatures.js";
-import { equipMonster } from "../../environment/dungeon/populate.js";
 import { combatSeed, mulberry32 } from "../../utils/rng.js";
 import { createRng } from "../../../lib/ecs-js/rng.js";
-import { resolveLootTable, materializeDrop } from "../../data/lootResolver.js";
 import { spawnHazard } from "../../utils/hazardSpawn.js";
 import { dealDamage } from "../../utils/dealDamage.js";
 import { getCatalogItem } from "../../data/itemCatalog.js";
-import { Ashes } from "../../archetypes/Items.js";
 import { Encumbrance } from "../../components/Encumbrance.js";
 import {
   brewAtAlchemyBench,
@@ -1514,58 +1509,6 @@ export const INTERACT_PAYLOADS = {
     },
   },
 
-  // ── Urns ───────────────────────────────────────────────────────────────────
-
-  breakUrn: {
-    onInteract(ctx) {
-      const { world, actor, targetId } = ctx;
-      const pos = world.get(targetId, Position);
-      if (pos) {
-        // Resolve bonus loot from the urn table (jewelry / gem).
-        const urnSeed = ((world.seed >>> 0) ^ (((targetId | 0) * 0x9e3779b9) >>> 0) ^ 0xA5E5) >>> 0;
-        const rng = createRng(urnSeed);
-        let depth = 1;
-        for (const [, ds] of world.query(DungeonState)) { depth = ds.currentDepth || 1; break; }
-        const drops = resolveLootTable("urn:contents", rng, depth);
-
-        // Ashes always present at stack bottom.
-        const ashId = createFrom(world, Ashes, {});
-        world.add(ashId, Position, { x: pos.x, y: pos.y });
-
-        // Materialize all drops, then stamp GroundStackOrder sorted by value
-        // so the most valuable item renders on top and appears first in pickup.
-        const dropEntities = [];
-        for (const drop of drops) {
-          const eid = materializeDrop(world, drop, pos);
-          if (eid != null) dropEntities.push(eid);
-        }
-        dropEntities.sort((a, b) => {
-          const va = Number(world.get(a, ItemInfo)?.value || 0);
-          const vb = Number(world.get(b, ItemInfo)?.value || 0);
-          return va - vb; // ascending: least valuable first, most valuable last
-        });
-        for (let i = 0; i < dropEntities.length; i++) {
-          world.add(dropEntities[i], GroundStackOrder, { seq: i + 1 });
-          const dp = world.get(dropEntities[i], Position);
-          if (dp) {
-            world.emit?.("item:dropped", {
-              itemId: dropEntities[i],
-              actor,
-              source: "urn",
-              origin: { x: pos.x, y: pos.y },
-              at: { x: dp.x, y: dp.y },
-              targetId,
-            });
-          }
-        }
-      }
-      world.emit?.("urn:broken", { actor, targetId });
-      try {
-        world.destroy(targetId);
-      } catch {}
-    },
-  },
-
   // ── Webs ───────────────────────────────────────────────────────────────────
 
   clearWeb: {
@@ -1615,151 +1558,6 @@ export const INTERACT_PAYLOADS = {
       try {
         world.destroy(targetId);
       } catch {}
-    },
-  },
-
-  // ── Sarcophagus ────────────────────────────────────────────────────────────
-  //
-  // One-time interaction: disturbing the sarcophagus awakens its occupant.
-  // Removes Interactable so it cannot be triggered again.
-
-  openSarcophagus: {
-    onInteract(ctx) {
-      const { world, actor, targetId, params } = ctx;
-      const pos = world.get(targetId, Position);
-      if (!pos) return;
-
-      const depth = ((params?.depth) | 0) || 1;
-
-      // Scale the undead guardian by depth tier.
-      let name,
-        identity,
-        maxHp,
-        accuracyDerived,
-        damagePowerDerived,
-        evadeDerived,
-        naturalDamageDice,
-        count;
-      if (depth >= 13) {
-        name = "Skeleton Lord";
-        identity = "skeleton_lord";
-        maxHp = 50;
-        accuracyDerived = 20;
-        damagePowerDerived = 20;
-        evadeDerived = 12;
-        naturalDamageDice = "2d8";
-        count = 2;
-      } else if (depth >= 9) {
-        name = "Skeleton Champion";
-        identity = "skeleton_champion";
-        maxHp = 35;
-        accuracyDerived = 14;
-        damagePowerDerived = 14;
-        evadeDerived = 8;
-        naturalDamageDice = "2d6";
-        count = 2;
-      } else if (depth >= 5) {
-        name = "Skeleton Warrior";
-        identity = "skeleton_warrior";
-        maxHp = 20;
-        accuracyDerived = 8;
-        damagePowerDerived = 8;
-        evadeDerived = 4;
-        naturalDamageDice = "1d8";
-        count = 1;
-      } else {
-        // ~33% chance of a skeleton archer at low depths
-        const seed = combatSeed(world.seed, world.step, targetId, 0x5A5C);
-        const isArcher = mulberry32(seed)() < 0.33;
-        if (isArcher) {
-          name = "Skeleton Archer";
-          identity = "skeleton_archer";
-          maxHp = 6;
-          accuracyDerived = 2;
-          damagePowerDerived = 2;
-          evadeDerived = 0;
-          naturalDamageDice = "1d4";
-          count = 1;
-        } else {
-          name = "Skeleton";
-          identity = "skeleton";
-          maxHp = 12;
-          accuracyDerived = 4;
-          damagePowerDerived = 4;
-          evadeDerived = 2;
-          naturalDamageDice = "1d6";
-          count = 1;
-        }
-      }
-
-      // Build list of adjacent offsets, excluding the player's tile.
-      const actorPos = world.get(actor, Position);
-      const ADJACENT = [
-        { dx: 1, dy: 0 },
-        { dx: -1, dy: 0 },
-        { dx: 0, dy: 1 },
-        { dx: 0, dy: -1 },
-      ];
-      const safeSlots = actorPos
-        ? ADJACENT.filter(o => pos.x + o.dx !== actorPos.x || pos.y + o.dy !== actorPos.y)
-        : ADJACENT;
-
-      for (let i = 0; i < count; i++) {
-        const pool = safeSlots.length > 0 ? safeSlots : ADJACENT;
-        const { dx, dy } = pool[i % pool.length];
-        const eid = createFrom(world, Monster, {
-          x: pos.x + dx,
-          y: pos.y + dy,
-          name,
-          identity,
-          faction: "enemy",
-          maxHp,
-          accuracyDerived,
-          damagePowerDerived,
-          evadeDerived,
-          naturalDamageDice,
-          speed: 1,
-        });
-        if (identity === "skeleton_archer") {
-          equipMonster(world, eid, { ranged: "bow_short", ammo: "arrows" });
-        }
-      }
-
-      world.emit?.("sarcophagus:opened", {
-        actor,
-        targetId,
-        depth,
-        spawned: count,
-      });
-    },
-    afterInteract(ctx) {
-      const { world, targetId, params } = ctx;
-      const depth = ((params?.depth) | 0) || 1;
-
-      // Make the sarcophagus walkable so the player can step onto it.
-      try {
-        world.mutate(targetId, Collider, c => { c.solid = false; });
-      } catch {}
-
-      // Convert to a lootable container — stock burial goods inside.
-      try { world.remove(targetId, Interactable); } catch {}
-      if (!world.has(targetId, Inventory)) {
-        world.add(targetId, Inventory, { capacity: 20 });
-      }
-      const pos = world.get(targetId, Position);
-      if (pos) {
-        const sarcSeed = ((world.seed >>> 0) ^ (((targetId | 0) * 0x9e3779b9) >>> 0) ^ 0x5A5C) >>> 0;
-        const rng = createRng(sarcSeed);
-        const drops = resolveLootTable("sarcophagus:contents", rng, depth);
-        const dummyPos = { x: 0, y: 0 };
-        for (const drop of drops) {
-          const eid = materializeDrop(world, drop, dummyPos);
-          if (eid != null) {
-            try { world.remove(eid, Position); } catch {}
-            addToInventory(world, targetId, eid);
-          }
-        }
-      }
     },
   },
 

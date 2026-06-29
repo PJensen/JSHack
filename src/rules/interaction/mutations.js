@@ -19,6 +19,7 @@ import { ItemInfo } from "../components/ItemInfo.js";
 import { Material } from "../components/Material.js";
 import { Position } from "../components/Position.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
+import { Inventory } from "../components/Inventory.js";
 import { Potion } from "../components/Potion.js";
 import { TemporarySpawn } from "../components/TemporarySpawn.js";
 import { Lifespan } from "../components/Lifespan.js";
@@ -74,6 +75,18 @@ export function applyMutation(world, op, resolvers = {}) {
       world.set(op.entityId, op.Component, { ...current, ...(op.patch || {}) });
       break;
     }
+    case "removeComponent": {
+      if (!op.Component || !world.has(op.entityId, op.Component)) break;
+      try { world.remove(op.entityId, op.Component); } catch {}
+      break;
+    }
+    case "ensureInventory": {
+      if (world.has(op.entityId, Inventory)) break;
+      try {
+        world.add(op.entityId, Inventory, { capacity: Math.max(0, Number(op.capacity || 20) | 0) });
+      } catch {}
+      break;
+    }
     case "setPosition": {
       const point = { x: Number(op.x) | 0, y: Number(op.y) | 0 };
       if (world.has(op.entityId, Position)) world.set(op.entityId, Position, point);
@@ -122,6 +135,24 @@ export function applyMutation(world, op, resolvers = {}) {
       if (op.receipt) {
         op.receipt.entityId = id;
         op.receipt.name = id > 0 ? String(world.get(id, NamedIdentity)?.name || "something") : null;
+      }
+      break;
+    }
+    case "materializeDropToInventory": {
+      const ownerId = op.ownerId | 0;
+      if (!(ownerId > 0) || !world.isAlive(ownerId)) break;
+      if (!world.has(ownerId, Inventory)) {
+        try { world.add(ownerId, Inventory, { capacity: Math.max(0, Number(op.capacity || 20) | 0) }); } catch {}
+      }
+      const id = materializeDrop(world, op.drop, { x: Number(op.x) | 0, y: Number(op.y) | 0 });
+      if (id > 0) {
+        try { world.remove(id, Position); } catch {}
+        addToInventory(world, ownerId, id);
+        if (op.receipt) {
+          op.receipt.count = Math.max(0, Number(op.receipt.count || 0) | 0) + 1;
+          op.receipt.lastEntityId = id;
+          op.receipt.lastName = String(world.get(id, NamedIdentity)?.name || "something");
+        }
       }
       break;
     }
@@ -675,13 +706,16 @@ export function applyMutation(world, op, resolvers = {}) {
  * @typedef {{ type: 'destroy', entityId: number }} DestroyOp
  * @typedef {{ type: 'setItemCooldown', entityId: number, turns: number }} SetItemCooldownOp
  * @typedef {{ type: 'patchComponent', entityId: number, Component: any, patch: Record<string, unknown> }} PatchComponentOp
+ * @typedef {{ type: 'removeComponent', entityId: number, Component: any }} RemoveComponentOp
+ * @typedef {{ type: 'ensureInventory', entityId: number, capacity: number }} EnsureInventoryOp
  * @typedef {{ type: 'setPosition', entityId: number, x: number, y: number }} SetPositionOp
  * @typedef {{ type: 'setTiles', changes: Array<{x:number,y:number,tile:number}> }} SetTilesOp
  * @typedef {{ type: 'recordFact', Component: any, data: Record<string, unknown>, receipt?: Record<string, unknown> }} RecordFactOp
  * @typedef {{ type: 'waterExposure', entityId: number, actorId: number, sourceId: number, waterType: string, receipt?: Record<string, unknown> }} WaterExposureOp
  * @typedef {{ type: 'spawnGold', x: number, y: number, count: number, receipt?: Record<string, unknown> }} SpawnGoldOp
  * @typedef {{ type: 'materializeDrop', drop: any, x: number, y: number, receipt?: Record<string, unknown> }} MaterializeDropOp
- * @typedef {DamageOp | HealOp | PushEffectOp | UpsertTimedEffectOp | AppendDamageChannelsOp | PatchItemInfoOp | AttachEnchantmentOp | SetBeatitudeOp | RemoveTimedEffectsByKeyOp | SetMaterialOp | SpawnItemOp | SpawnMonsterOp | LearnSpellOp | RecordShopDebtOp | RecordShopClaimOp | ConsumeOp | DropFromInventoryOp | NutritionOp | AddCorpseAdaptationOp | RevealLoadedMapOp | SpawnHazardOp | MaterializeSpawnOp | DestroyOp | SetItemCooldownOp | PatchComponentOp | SetPositionOp | SetTilesOp | RecordFactOp | WaterExposureOp | SpawnGoldOp | MaterializeDropOp} MutationOp
+ * @typedef {{ type: 'materializeDropToInventory', drop: any, ownerId: number, x: number, y: number, capacity?: number, receipt?: Record<string, unknown> }} MaterializeDropToInventoryOp
+ * @typedef {DamageOp | HealOp | PushEffectOp | UpsertTimedEffectOp | AppendDamageChannelsOp | PatchItemInfoOp | AttachEnchantmentOp | SetBeatitudeOp | RemoveTimedEffectsByKeyOp | SetMaterialOp | SpawnItemOp | SpawnMonsterOp | LearnSpellOp | RecordShopDebtOp | RecordShopClaimOp | ConsumeOp | DropFromInventoryOp | NutritionOp | AddCorpseAdaptationOp | RevealLoadedMapOp | SpawnHazardOp | MaterializeSpawnOp | DestroyOp | SetItemCooldownOp | PatchComponentOp | RemoveComponentOp | EnsureInventoryOp | SetPositionOp | SetTilesOp | RecordFactOp | WaterExposureOp | SpawnGoldOp | MaterializeDropOp | MaterializeDropToInventoryOp} MutationOp
  */
 
 export class ActionTransaction {

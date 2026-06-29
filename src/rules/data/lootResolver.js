@@ -8,7 +8,7 @@ import { getCatalogItem, isCatalogEquipment } from './itemCatalog.js';
 import { getGem, pickGem, buildGemItemParams } from './gems.js';
 import { createFrom } from '../../lib/ecs-js/archetype.js';
 import { buildCatalogItem } from './itemCatalogLoader.js';
-import { GoldStack, HealthPotion, ArrowsStack, FireArrowsStack, PiercingArrowsStack, BodkinArrowsStack, BluntHeadArrowsStack, ScrollOfMapping, GemItem, Bone } from '../archetypes/Items.js';
+import { GoldStack, HealthPotion, ArrowsStack, FireArrowsStack, PiercingArrowsStack, BodkinArrowsStack, BluntHeadArrowsStack, ScrollOfMapping, GemItem, Bone, Ashes } from '../archetypes/Items.js';
 import { Ration, IronRation, WildBerries, WildHerbs } from '../archetypes/Food.js';
 import { Position } from '../components/Position.js';
 import { ItemInfo } from '../components/ItemInfo.js';
@@ -38,6 +38,7 @@ function getArchetypeMap() {
     BluntHeadArrowsStack,
     ScrollOfMapping,
     Bone,
+    Ashes,
     Ration,
     IronRation,
     WildBerries,

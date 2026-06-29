@@ -53,6 +53,10 @@ function createDeterministicRng(seed) {
       const hi = Math.max(min | 0, max | 0);
       return lo + Math.floor(nextFn() * (hi - lo + 1));
     },
+    choice(values) {
+      if (!Array.isArray(values) || values.length <= 0) return undefined;
+      return values[Math.floor(nextFn() * values.length)];
+    },
     chance(pct) {
       const n = Number(pct || 0);
       if (!(n > 0)) return false;
@@ -399,6 +403,20 @@ export function createFacets(init) {
         patch: (patch && typeof patch === "object") ? { ...patch } : {},
       });
     },
+    removeComponent(entityId, Component) {
+      return tx.queueMutation({
+        type: "removeComponent",
+        entityId: entityId | 0,
+        Component,
+      });
+    },
+    ensureInventory(entityId, capacity = 20) {
+      return tx.queueMutation({
+        type: "ensureInventory",
+        entityId: entityId | 0,
+        capacity: Number(capacity || 20) | 0,
+      });
+    },
     setPosition(entityId, point) {
       return tx.queueMutation({
         type: "setPosition",
@@ -453,6 +471,20 @@ export function createFacets(init) {
         drop,
         x: Number(at?.x),
         y: Number(at?.y),
+        receipt,
+      });
+      return receipt;
+    },
+    materializeDropToInventory(drop, ownerId, at, options = {}) {
+      const receipt = {};
+      const opts = (options && typeof options === "object") ? options : {};
+      tx.queueMutation({
+        type: "materializeDropToInventory",
+        drop,
+        ownerId: ownerId | 0,
+        x: Number(at?.x),
+        y: Number(at?.y),
+        capacity: Number(opts.capacity || 20) | 0,
         receipt,
       });
       return receipt;

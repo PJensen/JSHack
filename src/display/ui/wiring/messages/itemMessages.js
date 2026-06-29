@@ -2,6 +2,8 @@
  * Item pickup, equip, drink, potion, scroll, wand, corpse-trait, food wiring.
  * Lines ~332-376, ~1408-1492, ~1685-1739, ~2070-2137, ~2431-2479 from original.
  */
+import { UrnInteractionResolved } from "../../../../events/UrnInteractionResolved.js";
+
 export function installItemMessages(ctx) {
   const { world, log, nameOfEntity, nameOfItem, bracketizeName, richEntity, playerEntity,
           compGet, compHas, canSeeAt, ItemInfo, NamedIdentity, Position, Player, Pet, Owner, Devotion, Encumbrance } = ctx;
@@ -418,7 +420,7 @@ export function installItemMessages(ctx) {
     log(`You try to remove ${label}, but it is welded to you!`, 'danger');
   });
 
-  world.on('urn:broken', () => {
+  world.on(UrnInteractionResolved, () => {
     log('The urn shatters, scattering ashes on the floor.', 'system');
   });
 
