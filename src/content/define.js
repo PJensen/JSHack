@@ -36,6 +36,9 @@ export function defineInteractable(action, def) {
   if (def.actions != null && !Array.isArray(def.actions) && typeof def.actions !== 'function') {
     throw new Error(`[defineInteractable "${action}"] actions must be an array or function`);
   }
+  if (def.affordance != null && typeof def.affordance !== 'object' && typeof def.affordance !== 'function') {
+    throw new Error(`[defineInteractable "${action}"] affordance must be an object or function`);
+  }
   if (verbs) {
     for (const [verb, rule] of Object.entries(verbs)) {
       if (!rule || typeof rule !== 'object' || typeof rule.apply !== 'function') {
@@ -51,6 +54,7 @@ export function defineInteractable(action, def) {
     onInteract: typeof def.onInteract === 'function' ? def.onInteract : null,
     afterInteract: typeof def.afterInteract === 'function' ? def.afterInteract : null,
     actions: def.actions || null,
+    affordance: def.affordance || null,
     defaultVerb: String(def.defaultVerb || ''),
     verbs: verbs ? Object.freeze(verbs) : null,
   });

@@ -19,12 +19,12 @@ export { getInventoryDefaultAction };
 
 import {
   ensureRoot, ensurePanel, ensureGroundTooltip, ensureItemTooltip,
-  ensureStairTooltip, ensureTrapTooltip, ensureTombstoneTooltip,
+  ensureStairTooltip, ensureInteractableTooltip, ensureTrapTooltip, ensureTombstoneTooltip,
   ensureDevNoticeTooltip, ensureTileKeyTooltip, ensureSpellGestureHint,
   ensureVirtualJoystick, ensureGestureDebugLayer, ensureMessageTicker,
   ensureDeathScreen,
   show, hide, setItemTooltip,
-  renderGroundTooltip, renderStairTooltip, renderTrapTooltip,
+  renderGroundTooltip, renderStairTooltip, renderInteractableTooltip, renderTrapTooltip,
   renderTombstoneTooltip, renderDevNoticeTooltip, renderTileKeyTooltip,
   renderMessageTicker, renderMessageMore, renderDeathScreen,
   drawGestureDebug, buildLightningShadow,
@@ -72,6 +72,7 @@ export function initOverlays() {
   const groundTip = ensureGroundTooltip(root);
   setItemTooltip(ensureItemTooltip(root));
   const stairTip = ensureStairTooltip(root);
+  const interactableTip = ensureInteractableTooltip(root);
   const trapTip = ensureTrapTooltip(root);
   const tombstoneTip = ensureTombstoneTooltip(root);
   const devNoticeTip = ensureDevNoticeTooltip(root);
@@ -1198,7 +1199,7 @@ export function initOverlays() {
   const TOOLTIP_FOCUS_Z = 860;
   /** @param {HTMLDivElement} active */
   function focusGameplayTooltip(active) {
-    const tooltips = [groundTip, stairTip, trapTip];
+    const tooltips = [groundTip, stairTip, interactableTip, trapTip];
     for (const tip of tooltips) {
       if (tip === active) {
         tip.style.display = 'block';
@@ -1232,6 +1233,18 @@ export function initOverlays() {
   });
   window.addEventListener('ui:hideStairTooltip', () => {
     stairTip.style.display = 'none';
+  });
+
+  // Authored interactable tooltip lifecycle
+  window.addEventListener('ui:showInteractableTooltip', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    const d = e?.detail || {};
+    renderInteractableTooltip(interactableTip, d);
+    focusGameplayTooltip(interactableTip);
+  });
+  window.addEventListener('ui:hideInteractableTooltip', () => {
+    interactableTip.style.display = 'none';
   });
 
   // Trap tooltip lifecycle

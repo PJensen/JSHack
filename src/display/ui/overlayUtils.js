@@ -450,13 +450,9 @@ export function renderStairTooltip(tip, detail) {
   tip.innerHTML = '';
   const dir = detail?.direction || 'down';
   const isReturn = dir === 'return';
-  const isRift = dir === 'rift';
-  const isRiftReturn = dir === 'riftReturn';
   const label = isReturn
     ? 'Return Portal'
-    : (isRift
-      ? 'Rift Portal'
-      : (isRiftReturn ? 'Rift Exit' : (dir === 'down' ? 'Descend Stairs' : 'Ascend Stairs')));
+    : (dir === 'down' ? 'Descend Stairs' : 'Ascend Stairs');
 
   const title = document.createElement('div');
   title.textContent = label;
@@ -468,18 +464,14 @@ export function renderStairTooltip(tip, detail) {
   hint.style.fontSize = '10px';
   hint.textContent = isReturn
     ? 'Tap to return'
-    : (isRift
-      ? 'Tap to enter the rift'
-      : (isRiftReturn ? 'Tap to exit the rift' : `Tap to ${dir === 'down' ? 'descend' : 'ascend'}`));
+    : `Tap to ${dir === 'down' ? 'descend' : 'ascend'}`;
   tip.appendChild(hint);
 
   const action = document.createElement('button');
   action.type = 'button';
   action.textContent = isReturn
     ? 'Return'
-    : (isRift
-      ? 'Enter Rift'
-      : (isRiftReturn ? 'Exit Rift' : (dir === 'down' ? 'Descend' : 'Ascend')));
+    : (dir === 'down' ? 'Descend' : 'Ascend');
   Object.assign(action.style, {
     marginTop: '5px',
     minHeight: '34px',
@@ -498,6 +490,77 @@ export function renderStairTooltip(tip, detail) {
   action.onclick = () => {
     window.dispatchEvent(new CustomEvent('ui:requestStairTraverse', {
       detail: { stairId: detail?.stairId, direction: dir }
+    }));
+    tip.style.display = 'none';
+  };
+  tip.appendChild(action);
+}
+
+// --- Authored interactable tooltip -----------------------------------------
+/** @param {HTMLElement} root */
+export function ensureInteractableTooltip(root) {
+  const tip = document.createElement('div');
+  tip.id = 'interactable-tooltip';
+  Object.assign(tip.style, {
+    position: 'fixed',
+    left: '50%',
+    top: '25%',
+    transform: 'translate(-50%, -50%)',
+    minWidth: '112px', maxWidth: '50vw', pointerEvents: 'none', display: 'none',
+    background: 'rgba(14,18,26,0.96)', color: '#dbeaff', borderRadius: '7px',
+    border: '1px solid #33435f', boxShadow: '0 10px 30px rgba(0,0,0,0.55)',
+    fontFamily: 'monospace', padding: '6px 8px', zIndex: 850,
+    textAlign: 'center', cursor: 'pointer'
+  });
+  root.appendChild(tip);
+  return tip;
+}
+
+/** @param {HTMLDivElement} tip @param {{targetId?:number, action?:string, mode?:string, title?:string, hint?:string, label?:string}} detail */
+export function renderInteractableTooltip(tip, detail) {
+  tip.innerHTML = '';
+  const titleText = String(detail?.title || detail?.label || 'Interact');
+  const hintText = String(detail?.hint || '');
+  const labelText = String(detail?.label || titleText);
+
+  const title = document.createElement('div');
+  title.textContent = titleText;
+  Object.assign(title.style, { fontWeight: 'bold', fontSize: '12px', marginBottom: '2px' });
+  tip.appendChild(title);
+
+  if (hintText) {
+    const hint = document.createElement('div');
+    hint.style.opacity = '0.8';
+    hint.style.fontSize = '10px';
+    hint.textContent = hintText;
+    tip.appendChild(hint);
+  }
+
+  const action = document.createElement('button');
+  action.type = 'button';
+  action.textContent = labelText;
+  Object.assign(action.style, {
+    marginTop: '5px',
+    minHeight: '34px',
+    minWidth: '80px',
+    borderRadius: '7px',
+    border: '1px solid #6aa7da',
+    background: '#234463',
+    color: '#e9f7ff',
+    fontFamily: 'monospace',
+    fontSize: '11px',
+    fontWeight: 'bold',
+    cursor: 'pointer',
+    padding: '0 10px',
+    pointerEvents: 'auto',
+  });
+  action.onclick = () => {
+    window.dispatchEvent(new CustomEvent('ui:requestInteractableAction', {
+      detail: {
+        targetId: detail?.targetId,
+        action: detail?.action,
+        mode: detail?.mode || '',
+      }
     }));
     tip.style.display = 'none';
   };

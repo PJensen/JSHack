@@ -3,6 +3,11 @@ import { RiftPortal } from "../../../rules/components/RiftPortal.js";
 import { RiftEnterRequested } from "../../../events/RiftEnterRequested.js";
 
 defineInteractable("riftPortal", {
+  affordance: {
+    title: "Rift Portal",
+    hint: "Tap to enter the rift",
+    label: "Enter Rift",
+  },
   onInteract(ctx) {
     const portal = ctx.world.get(ctx.targetId, RiftPortal);
     if (!portal?.riftId) {

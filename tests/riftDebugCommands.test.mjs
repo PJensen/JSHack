@@ -23,6 +23,7 @@ import { clearAll as clearTileMap, setTile } from "../src/rules/environment/dung
 import { TILE_FLOOR } from "../src/rules/environment/dungeon/constants.js";
 import { clearFloorCache } from "../src/rules/environment/dungeon/transition.js";
 import { playerEntity } from "../src/rules/utils/queries.js";
+import { resolveInteractableAffordance } from "../src/rules/interaction/interactableAffordance.js";
 
 function floorPatch(cx = 5, cy = 5, radius = 4) {
   for (let y = cy - radius; y <= cy + radius; y++) {
@@ -110,6 +111,19 @@ Deno.test("create rift 0 resolves a deterministic default level count", () => {
   const levelsB = [...b.query(RiftState)][0][1].levels;
   assertEquals(levelsA, levelsB);
   assert(levelsA >= 2 && levelsA <= 5, `expected default rift levels in [2,5], got ${levelsA}`);
+});
+
+Deno.test("rift portal exposes authored generic interactable affordance", () => {
+  installContent();
+  const { world } = makeWorld(0);
+  commandMap(world).get("create").handler("rift 2");
+  const [portalId] = [...world.query(RiftPortal)][0];
+
+  const affordance = resolveInteractableAffordance(world, portalId);
+  assertEquals(affordance?.targetId, portalId);
+  assertEquals(affordance?.action, "riftPortal");
+  assertEquals(affordance?.title, "Rift Portal");
+  assertEquals(affordance?.label, "Enter Rift");
 });
 
 Deno.test("rift portal interaction emits only a rift enter request", () => {

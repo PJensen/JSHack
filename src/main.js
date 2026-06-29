@@ -129,7 +129,6 @@ import { Anatomy, HEARING_TIERS } from "./rules/components/Anatomy.js";
 import { Status } from "./rules/components/Status.js";
 import { getDeityInstance } from "./rules/systems/deitySystem.js";
 import { DungeonState } from "./rules/components/DungeonState.js";
-import { RiftState } from "./rules/components/RiftState.js";
 import { getTownEconomyData } from "./rules/systems/townSimulationSystem.js";
 import { CastSpellIntent } from "./rules/components/Intents/CastSpellIntent.js";
 import { Channeling } from "./rules/components/Channeling.js";
@@ -137,6 +136,7 @@ import { Interactable } from "./rules/components/Interactable.js";
 import { TombstoneRepository } from "./rules/repositories/TombstoneRepository.js";
 import { installTombstoneDeathListener } from "./rules/systems/tombstoneSystem.js";
 import { Tombstone as TombstoneComponent } from "./rules/components/Tombstone.js";
+import { resolveInteractableAffordance } from "./rules/interaction/interactableAffordance.js";
 import { installDeathShareWiring } from "./main/wiring/deathShareWiring.js";
 import { installProofWiring } from "./main/proof/proofWiring.js";
 import { postVerifiedScore } from "./shared/tombstoneApi.js";
@@ -1218,12 +1218,11 @@ function findNearestTraversalTarget(world, x, y) {
   let nearest = null;
   let nearestDist = Infinity;
   for (const [eid, pos, ni] of world.query(Position, NamedIdentity)) {
-    if (ni.identity !== 'stair_down' && ni.identity !== 'stair_up' && ni.identity !== 'return_portal' && ni.identity !== 'rift_portal') continue;
+    if (ni.identity !== 'stair_down' && ni.identity !== 'stair_up' && ni.identity !== 'return_portal') continue;
     const dist = chebyshevScalar(pos.x, pos.y, x, y);
     if (dist > 0) continue;
     const prefer = dist < nearestDist
-      || (dist === nearestDist && ni.identity === 'return_portal' && nearest?.identity !== 'return_portal')
-      || (dist === nearestDist && ni.identity === 'rift_portal' && nearest?.identity !== 'return_portal' && nearest?.identity !== 'rift_portal');
+      || (dist === nearestDist && ni.identity === 'return_portal' && nearest?.identity !== 'return_portal');
     if (prefer) {
       nearestDist = dist;
       nearest = { id: eid, identity: ni.identity };
@@ -1232,17 +1231,20 @@ function findNearestTraversalTarget(world, x, y) {
   return nearest;
 }
 
-function currentRiftTraversalDirection(identity) {
+function traversalDirection(identity) {
   if (identity === 'stair_down') return 'down';
   if (identity === 'return_portal') return 'return';
-  if (identity === 'rift_portal') return 'rift';
-  if (identity !== 'stair_up') return 'down';
-  for (const [, state] of world.query(RiftState)) {
-    if (!state?.inside) continue;
-    if ((Number(state.currentLevel || 0) | 0) <= 1) return 'riftReturn';
-    break;
+  return identity === 'stair_up' ? 'up' : 'down';
+}
+
+function findInteractableAffordanceAt(world, x, y) {
+  for (const [eid, pos, inter] of world.query(Position, Interactable)) {
+    if (!inter) continue;
+    if ((pos.x | 0) !== (x | 0) || (pos.y | 0) !== (y | 0)) continue;
+    const affordance = resolveInteractableAffordance(world, eid);
+    if (affordance) return affordance;
   }
-  return 'up';
+  return null;
 }
 
 // ---- Input setup (display/input → rules/display) ---------------------------
@@ -2247,7 +2249,7 @@ world.on('moved', ({ id, to }) => {
   const nearestTarget = findNearestTraversalTarget(world, to.x, to.y);
 
   if (nearestTarget) {
-    const direction = currentRiftTraversalDirection(nearestTarget.identity);
+    const direction = traversalDirection(nearestTarget.identity);
     try {
       window.dispatchEvent(new CustomEvent('ui:showStairTooltip', {
         detail: { stairId: nearestTarget.id, direction }
@@ -2255,6 +2257,17 @@ world.on('moved', ({ id, to }) => {
     } catch (e) { console.debug('[main] dispatch ui:showStairTooltip:', e); }
   } else {
     try { window.dispatchEvent(new CustomEvent('ui:hideStairTooltip')); } catch (e) { console.debug('[main] dispatch ui:hideStairTooltip:', e); }
+  }
+
+  const affordance = findInteractableAffordanceAt(world, to.x, to.y);
+  if (affordance) {
+    try {
+      window.dispatchEvent(new CustomEvent('ui:showInteractableTooltip', {
+        detail: affordance,
+      }));
+    } catch (e) { console.debug('[main] dispatch ui:showInteractableTooltip:', e); }
+  } else {
+    try { window.dispatchEvent(new CustomEvent('ui:hideInteractableTooltip')); } catch (e) { console.debug('[main] dispatch ui:hideInteractableTooltip:', e); }
   }
 
   // Trap tooltip: show when standing on an armed trap
@@ -2575,6 +2588,36 @@ addEventListener('ui:requestActionSelect', (ev) => {
 
   const rulesHandler = makeRulesDispatcher(world, () => pe.id);
   rulesHandler({ type: 'rules.actionSelect', payload: { targetId, mode } });
+});
+
+// When user confirms a single authored interactable affordance.
+addEventListener('ui:requestInteractableAction', (ev) => {
+  if (isSimUiBlocked()) return;
+  /** @type {CustomEvent} */ // @ts-ignore
+  const e = ev;
+  const targetId = Number(e?.detail?.targetId || 0);
+  const action = String(e?.detail?.action || "");
+  const mode = String(e?.detail?.mode || "");
+  if (!Number.isInteger(targetId) || targetId <= 0) return;
+  if (!action) return;
+
+  const pe = playerEntity(world);
+  if (!pe) return;
+
+  const pPos = world.get(pe.id, Position);
+  const tPos = world.get(targetId, Position);
+  if (!pPos || !tPos) return;
+  const dist = Math.max(Math.abs((pPos.x | 0) - (tPos.x | 0)), Math.abs((pPos.y | 0) - (tPos.y | 0)));
+  if (dist > 1) {
+    try { messageLog.log({ text: 'You are too far away.', type: 'system' }); } catch (err) { console.debug('[main] messageLog failed:', err); }
+    return;
+  }
+
+  const inter = world.get(targetId, Interactable);
+  if (!inter || inter.action !== action) return;
+
+  const rulesHandler = makeRulesDispatcher(world, () => pe.id);
+  rulesHandler({ type: 'rules.interact', payload: { targetId, mode } });
 });
 
 // When user selects an item to dip in a fountain

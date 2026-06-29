@@ -13,7 +13,6 @@ import { ThrowIntent } from "../../rules/components/Intents/ThrowIntent.js";
 import { InteractIntent } from "../../rules/components/Intents/InteractIntent.js";
 import { SearchIntent } from "../../rules/components/Intents/SearchIntent.js";
 import { Interactable } from "../../rules/components/Interactable.js";
-import { RiftPortal } from "../../rules/components/RiftPortal.js";
 import { itemsAt } from "../../rules/utils/queries.js";
 import { inventoryItems } from "../../rules/utils/inventoryFacade.js";
 import { statusStrength } from "../../rules/utils/statusFacade.js";
@@ -26,7 +25,6 @@ import { getEffectiveVisionRange } from "../../rules/utils/blind.js";
 import { getEntityFacingConeDegrees, getNormalizedEntityFacing } from "../../rules/utils/facing.js";
 import { updateFOV, isVisible as isTileVisible } from "../../rules/environment/dungeon/exploredMap.js";
 import { classifyAttackDirection } from "../../rules/utils/attackActionPolicy.js";
-import { RiftEnterRequested } from "../../events/RiftEnterRequested.js";
 
 /**
  * Create a rules dispatcher bound to a world and an actor resolver.
@@ -351,23 +349,14 @@ export function makeRulesDispatcher(world, getActorId, opts = {}) {
         const explicitDirection = String(action?.payload?.direction || "").trim().toLowerCase();
 
         if (explicitTargetId > 0) {
-          if (explicitDirection === "rift") {
-            const portal = world?.get?.(explicitTargetId, RiftPortal);
-            if (portal) {
-              world?.emit?.(new RiftEnterRequested({
-                actor: actorId,
-                portalId: explicitTargetId,
-                riftId: portal.riftId,
-              }));
-            }
-          } else if (explicitDirection === "return") {
+          if (explicitDirection === "return") {
             world?.emit?.("portal:return", {
               actor: actorId,
               targetId: explicitTargetId,
               portalId: explicitTargetId,
             });
           } else {
-            const direction = (explicitDirection === "up" || explicitDirection === "riftreturn") ? "up" : "down";
+            const direction = explicitDirection === "up" ? "up" : "down";
             world?.emit?.("stair:traverse", {
               actor: actorId,
               targetId: explicitTargetId,
@@ -399,12 +388,11 @@ export function makeRulesDispatcher(world, getActorId, opts = {}) {
         let nearestDist = Infinity;
         for (const [id, pos, ni] of world.query(Position, NamedIdentity)) {
           const ident = String(ni?.identity || "");
-          if (ident !== "stair_down" && ident !== "stair_up" && ident !== "return_portal" && ident !== "rift_portal") continue;
+          if (ident !== "stair_down" && ident !== "stair_up" && ident !== "return_portal") continue;
           const dist = chebyshevScalar(pos.x, pos.y, actorPos.x, actorPos.y);
           if (dist > 0) continue;
           const prefer = dist < nearestDist
-            || (dist === nearestDist && ident === "return_portal" && nearest?.identity !== "return_portal")
-            || (dist === nearestDist && ident === "rift_portal" && nearest?.identity !== "return_portal" && nearest?.identity !== "rift_portal");
+            || (dist === nearestDist && ident === "return_portal" && nearest?.identity !== "return_portal");
           if (prefer) {
             nearestDist = dist;
             nearest = { id: Number(id || 0) | 0, identity: ident };
@@ -417,15 +405,6 @@ export function makeRulesDispatcher(world, getActorId, opts = {}) {
             targetId: nearest.id,
             portalId: nearest.id,
           });
-        } else if (nearest.identity === "rift_portal") {
-          const portal = world?.get?.(nearest.id, RiftPortal);
-          if (portal) {
-            world?.emit?.(new RiftEnterRequested({
-              actor: actorId,
-              portalId: nearest.id,
-              riftId: portal.riftId,
-            }));
-          }
         } else {
           world?.emit?.("stair:traverse", {
             actor: actorId,
@@ -535,6 +514,14 @@ export function makeRulesDispatcher(world, getActorId, opts = {}) {
         const modeStr = String(mode || "").trim();
         if (!modeStr) break;
         world?.add?.(actorId, InteractIntent, { targetId, mode: modeStr });
+        world?.tick?.(1);
+        break;
+      }
+      case "rules.interact": {
+        const { targetId = 0, mode = "" } = action.payload || {};
+        if (!Number.isInteger(targetId) || targetId <= 0) break;
+        const modeStr = String(mode || "").trim();
+        world?.add?.(actorId, InteractIntent, modeStr ? { targetId, mode: modeStr } : { targetId });
         world?.tick?.(1);
         break;
       }
