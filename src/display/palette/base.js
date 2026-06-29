@@ -136,6 +136,7 @@ export const basePalette = {
   scroll_enchant_venom_ward: { glyph: "?", fg: "#aaddaa", glow: "#77aa77", baseScale: S_SCROLL },
   scroll_enchant_fortified:  { glyph: "?", fg: "#c8ccd0", glow: "#8890a0", baseScale: S_SCROLL },
   return_portal: { glyph: "O", fg: "#7bd6ff", glow: "#3f98bb" },
+  rift_portal: { glyph: "◇", fg: "#d67bff", glow: "#7b3fbb" },
   // Aliases to match rules identity so they render on the ground
   book_lightning: { glyph: "?", fg: "#ffff66", glow: "#ffff66", baseScale: 0.7 },
   book_meteor: { glyph: "?", fg: "#ff704d", glow: "#ff704d", baseScale: 0.7 },

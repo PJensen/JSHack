@@ -12,12 +12,19 @@ import { Vitality } from "../../rules/components/Vitality.js";
 import { Player } from "../../rules/components/Player.js";
 import { Pet } from "../../rules/components/Pet.js";
 import { PetState } from "../../rules/components/PetState.js";
+import { RiftPortal } from "../../rules/components/RiftPortal.js";
+import { RiftState } from "../../rules/components/RiftState.js";
 import { getUnderworldRegionTemplate } from "../../rules/environment/dungeon/underworldRegions.js";
 import { DoorKey } from "../../rules/components/DoorKey.js";
 import { hasItem, inventoryItems } from "../../rules/utils/inventoryFacade.js";
 import { defineExtension } from "../../lib/ecs-js/index.js";
 import { LockpickPrompted } from "../../events/LockpickPrompted.js";
 import { LockpickResolved } from "../../events/LockpickResolved.js";
+import { RiftEnterRequested } from "../../events/RiftEnterRequested.js";
+import { RiftEntered } from "../../events/RiftEntered.js";
+import { RiftCloseRequested } from "../../events/RiftCloseRequested.js";
+import { RiftExited } from "../../events/RiftExited.js";
+import { destroyActiveRift, activeRiftRecord, riftPlaneId } from "../../rules/utils/riftRuntime.js";
 
 const RETURN_PORTAL_IDENTITY = 'return_portal';
 const STAIR_TRANSITION_COOLDOWN_MS = 220;
@@ -79,6 +86,13 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
       returnTicket,
       homecomingLanding: opts?.homecomingLanding === true,
       source: typeof opts?.source === "string" ? opts.source : "",
+      planeId: typeof opts?.planeId === "string" ? opts.planeId : "",
+      planeSeed: Number(opts?.planeSeed || 0) >>> 0,
+      riftId: typeof opts?.riftId === "string" ? opts.riftId : "",
+      riftLevel: Math.max(0, Number(opts?.riftLevel || 0) | 0),
+      riftEnter: opts?.riftEnter === true,
+      riftExit: opts?.riftExit === true,
+      riftClose: opts?.riftClose === true,
     };
   }
 
@@ -197,6 +211,8 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
         currentState = state;
         break;
       }
+      const currentPlaneId = String(currentState?.activePlaneId || "");
+      const currentRift = activeRiftRecord(world);
 
       let newDepth = currentDepth;
       if (Number.isFinite(pending.targetDepth)) {
@@ -208,11 +224,40 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
       } else if (pending.direction === 'up') {
         newDepth = currentDepth - 1;
       }
-      const activeTemplateId = String(pending.entrance?.templateId || currentState?.activeTemplateId || "");
+      if (
+        currentRift?.state?.inside
+        && currentPlaneId === currentRift.state.planeId
+        && (pending.direction === "down" || pending.direction === "up")
+      ) {
+        if (pending.direction === "down") {
+          if (currentDepth >= Math.max(1, Number(currentRift.state.levels || 1) | 0)) return;
+          pending.planeId = currentRift.state.planeId;
+          pending.planeSeed = currentRift.state.seed;
+          pending.riftId = currentRift.state.riftId;
+          pending.riftLevel = newDepth;
+          pending.riftEnter = true;
+        } else if (currentDepth <= 1) {
+          newDepth = Math.max(0, Number(currentRift.state.originDepth || 0) | 0);
+          pending.targetPos = { x: currentRift.state.originX | 0, y: currentRift.state.originY | 0 };
+          pending.planeId = "";
+          pending.planeSeed = 0;
+          pending.riftId = currentRift.state.riftId;
+          pending.riftExit = true;
+        } else {
+          pending.planeId = currentRift.state.planeId;
+          pending.planeSeed = currentRift.state.seed;
+          pending.riftId = currentRift.state.riftId;
+          pending.riftLevel = newDepth;
+          pending.riftEnter = true;
+        }
+      }
+      const activeTemplateId = pending.planeId
+        ? ""
+        : String(pending.entrance?.templateId || currentState?.activeTemplateId || "");
       const activeTemplate = getUnderworldRegionTemplate(activeTemplateId);
       const templateFloors = Math.max(1, Number(activeTemplate?.floors ?? 0) | 0);
       if (pending.direction === 'down' && activeTemplate && currentDepth >= templateFloors) return;
-      if (newDepth < 0 || newDepth === currentDepth) return;
+      if (newDepth < 0 || (newDepth === currentDepth && String(pending.planeId || "") === currentPlaneId)) return;
 
       const hasTargetPos = Number.isFinite(pending.targetPos?.x) && Number.isFinite(pending.targetPos?.y);
       if (hasTargetPos) {
@@ -220,7 +265,12 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
           world,
           newDepth,
           { x: pending.targetPos.x | 0, y: pending.targetPos.y | 0 },
-          { tombstoneRepo, validateDestination: pending.validateTargetPos === true },
+          {
+            tombstoneRepo,
+            validateDestination: pending.validateTargetPos === true,
+            planeId: pending.planeId,
+            planeSeed: pending.planeSeed,
+          },
         );
         if (pending.fragActorsAtTarget) {
           const pe = playerEntity();
@@ -239,6 +289,8 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
           templateId: activeTemplateId,
           anchorX: activeTemplateId ? (Number(pending.entrance?.anchorX ?? currentState?.regionAnchorX ?? pending.stairPos?.x ?? 0) | 0) : undefined,
           anchorY: activeTemplateId ? (Number(pending.entrance?.anchorY ?? currentState?.regionAnchorY ?? pending.stairPos?.y ?? 0) | 0) : undefined,
+          planeId: pending.planeId,
+          planeSeed: pending.planeSeed,
         });
       }
 
@@ -259,6 +311,60 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
       }
 
       onTransitioned();
+      if (pending.riftEnter && pending.riftId) {
+        for (const [id, state] of world.query(RiftState)) {
+          if (String(state?.riftId || "") !== pending.riftId) continue;
+          world.set(id, RiftState, {
+            ...state,
+            inside: true,
+            currentLevel: pending.riftLevel || newDepth,
+            planeId: pending.planeId,
+          });
+          world.emit(new RiftEntered({
+            actor: playerEntity()?.id || 0,
+            riftId: pending.riftId,
+            level: pending.riftLevel || newDepth,
+            levels: state.levels,
+            seed: state.seed,
+          }));
+          break;
+        }
+      }
+      if (pending.riftExit && pending.riftId) {
+        for (const [id, state] of world.query(RiftState)) {
+          if (String(state?.riftId || "") !== pending.riftId) continue;
+          world.set(id, RiftState, {
+            ...state,
+            inside: false,
+            currentLevel: 0,
+          });
+          world.emit(new RiftExited({
+            actor: playerEntity()?.id || 0,
+            riftId: pending.riftId,
+            originDepth: state.originDepth,
+            originX: state.originX,
+            originY: state.originY,
+          }));
+          break;
+        }
+      }
+      if (pending.riftClose && pending.riftId) {
+        const rec = activeRiftRecord(world);
+        if (rec?.state && String(rec.state.riftId || "") === pending.riftId) {
+          world.emit(new RiftExited({
+            actor: playerEntity()?.id || 0,
+            riftId: pending.riftId,
+            originDepth: rec.state.originDepth,
+            originX: rec.state.originX,
+            originY: rec.state.originY,
+          }));
+        }
+        destroyActiveRift(world, {
+          actor: playerEntity()?.id || 0,
+          riftId: pending.riftId,
+          reason: "closed",
+        });
+      }
       if (pending.source) {
         const pe = playerEntity();
         try {
@@ -332,6 +438,7 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
     const offPortal = installedWorld.on('portal:return', ({ portalId }) => {
       const pid = Number(portalId) | 0;
       if (!(pid > 0)) return;
+      if (world.has(pid, RiftPortal)) return;
       const ni = world.get(pid, NamedIdentity);
       if (ni?.identity !== RETURN_PORTAL_IDENTITY) return;
       const inter = world.get(pid, Interactable);
@@ -352,6 +459,48 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
       queueDepth(currentDepth + 1, { targetPos: { x: x | 0, y: y | 0 }, validateTargetPos: true });
     });
 
+    const offRiftEnter = installedWorld.on(RiftEnterRequested, (event) => {
+      const portalId = Number(event.portalId || 0) | 0;
+      if (!(portalId > 0)) return;
+      const portal = world.get(portalId, RiftPortal);
+      if (!portal) return;
+      const riftId = String(event.riftId || portal.riftId || "");
+      if (!riftId || riftId !== String(portal.riftId || "")) return;
+      const rec = activeRiftRecord(world);
+      if (!rec?.state || String(rec.state.riftId || "") !== riftId) return;
+      if (rec.state.inside) return;
+      queueDepth(1, {
+        planeId: riftPlaneId(riftId),
+        planeSeed: portal.seed,
+        riftId,
+        riftLevel: 1,
+        riftEnter: true,
+        source: "rift:enter",
+      });
+    });
+
+    const offRiftClose = installedWorld.on(RiftCloseRequested, (event) => {
+      const rec = activeRiftRecord(world);
+      if (!rec?.state) return;
+      const riftId = String(event.riftId || rec.state.riftId || "");
+      if (riftId !== String(rec.state.riftId || "")) return;
+      if (!rec.state.inside) {
+        destroyActiveRift(world, {
+          actor: event.actor,
+          riftId,
+          reason: "closed",
+        });
+        return;
+      }
+      queueDepth(rec.state.originDepth, {
+        targetPos: { x: rec.state.originX | 0, y: rec.state.originY | 0 },
+        fragActorsAtTarget: true,
+        source: "rift:close",
+        riftId,
+        riftClose: true,
+      });
+    });
+
     const offTransitioned = installedWorld.on("dungeon:transitioned", () => {
       destroyReturnPortals();
     });
@@ -362,6 +511,8 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
       offDepth();
       offPortal();
       offPit();
+      offRiftEnter();
+      offRiftClose();
       offTransitioned();
     };
   }, { key: TRANSITION_WIRING_EXTENSION_KEY });

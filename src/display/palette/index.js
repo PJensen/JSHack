@@ -8,7 +8,7 @@ import { equipmentPalette } from './equipment.js';
 const _CORPSE_SKIP_PREFIXES = [
   'player', 'corpse_',
   'floor', 'grass', 'water', 'mountain', 'tree', 'wall', 'door', 'stair',
-  'church_', 'potion_', 'spellbook_', 'book_', 'scroll_', 'return_', 'ammo_',
+  'church_', 'potion_', 'spellbook_', 'book_', 'scroll_', 'return_', 'rift_', 'ammo_',
   'food_', 'reagent_', 'ore_', 'material_', 'gem_', 'trap_',
 ];
 const _CORPSE_SKIP_KEYS = new Set([

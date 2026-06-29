@@ -10,6 +10,8 @@ export const DungeonState = defineComponent('DungeonState', {
   profileType: 'default', // floor profile id: 'overworld','default','catacombs','caves','grottos','arenas'
   activeTemplateId: '',
   activeRegionKey: '',
+  activePlaneId: '',
+  activePlaneSeed: 0,
   regionAnchorX: 0,
   regionAnchorY: 0,
   floorEntityIds: [],    // all entity IDs created for this floor

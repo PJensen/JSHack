@@ -2,6 +2,7 @@
 // Handles level transitions (ascending/descending stairs).
 
 import { DungeonState } from '../../components/DungeonState.js';
+import { RiftState } from '../../components/RiftState.js';
 import { DungeonEntrance } from '../../components/DungeonEntrance.js';
 import { Position } from '../../components/Position.js';
 import { Player } from '../../components/Player.js';
@@ -38,7 +39,19 @@ const MAX_MEMORY_FLOORS = 5;
 const PURSUIT_RADIUS = 4;
 const MAX_PURSUERS = 8;
 
+function _planeKey(depth, planeId = "") {
+  const id = String(planeId || "");
+  if (id) return `${id}:z${Math.max(0, Number(depth || 0) | 0)}`;
+  return _depthPlaneKey(depth);
+}
+
+function _planeRegionKey(depth, planeId = "") {
+  const key = _planeKey(depth, planeId);
+  return String(planeId || "") ? `${key}:region` : "";
+}
+
 function _stateRegionKey(ds, fallbackDepth = 0) {
+  if (ds?.activePlaneId) return _planeRegionKey(Number(ds?.currentDepth ?? fallbackDepth) | 0, ds.activePlaneId);
   if (ds?.activeRegionKey) return String(ds.activeRegionKey);
   return floorRegionKey(
     Number(ds?.currentDepth ?? fallbackDepth) | 0,
@@ -289,7 +302,7 @@ function _buildSnapshotRegistry(world) {
  * @param {import('../../../lib/ecs-js/index.js').World} world
  * @param {number} newDepth
  * @param {{x: number, y: number}} destinationPos - world coords for player placement
- * @param {{direction?: 'up'|'down', stairPos?: {x:number,y:number}|null, tombstoneRepo?: Object, validateDestination?: boolean, onProgress?: (progress: { phase: 'chunks', depth: number, processed: number, total: number, cx?: number, cy?: number }) => void}} [opts]
+ * @param {{direction?: 'up'|'down', stairPos?: {x:number,y:number}|null, tombstoneRepo?: Object, validateDestination?: boolean, onProgress?: (progress: { phase: 'chunks', depth: number, processed: number, total: number, cx?: number, cy?: number }) => void, planeId?: string, planeSeed?: number}} [opts]
  */
 export async function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
   // Find dungeon state
@@ -303,11 +316,15 @@ export async function transitionToDepth(world, newDepth, destinationPos, opts = 
 
   // Compute worldSeed early — needed for floor cache persistence keys.
   const worldSeed = ds ? ds.worldSeed : (world.seed >>> 0);
+  const currentPlaneId = String(ds?.activePlaneId || "");
+  const targetPlaneId = String(opts.planeId || "");
+  const currentPlaneSeed = Number(ds?.activePlaneSeed || 0) >>> 0 || worldSeed;
+  const targetPlaneSeed = Number(opts.planeSeed || 0) >>> 0 || worldSeed;
 
   // Save explored map for the current floor before clearing
   const currentDepth = ds ? ds.currentDepth : 0;
   const currentRegionKey = _stateRegionKey(ds, currentDepth);
-  const currentPlaneKey = _depthPlaneKey(currentDepth);
+  const currentPlaneKey = _planeKey(currentDepth, currentPlaneId);
   const requestedTemplateId = String(opts.templateId || "");
   const requestedAnchorX = Number.isFinite(Number(opts.anchorX))
     ? (Number(opts.anchorX) | 0)
@@ -315,14 +332,18 @@ export async function transitionToDepth(world, newDepth, destinationPos, opts = 
   const requestedAnchorY = Number.isFinite(Number(opts.anchorY))
     ? (Number(opts.anchorY) | 0)
     : (newDepth > currentDepth ? (Number(opts.stairPos?.y || ds?.regionAnchorY || 0) | 0) : (Number(ds?.regionAnchorY || opts.stairPos?.y || 0) | 0));
-  const destinationRegionKey = floorRegionKey(newDepth, requestedAnchorX, requestedAnchorY, requestedTemplateId);
-  const destinationPlaneKey = _depthPlaneKey(newDepth);
+  const destinationRegionKey = targetPlaneId
+    ? _planeRegionKey(newDepth, targetPlaneId)
+    : floorRegionKey(newDepth, requestedAnchorX, requestedAnchorY, requestedTemplateId);
+  const destinationPlaneKey = _planeKey(newDepth, targetPlaneId);
   const stairPursuerIds = _collectStairPursuers(world, currentDepth, newDepth, opts.stairPos || null);
-  const residentRegions = _collectResidentRegions(world, newDepth, {
-    templateId: requestedTemplateId,
-    anchorX: requestedAnchorX,
-    anchorY: requestedAnchorY,
-  });
+  const residentRegions = targetPlaneId
+    ? []
+    : _collectResidentRegions(world, newDepth, {
+      templateId: requestedTemplateId,
+      anchorX: requestedAnchorX,
+      anchorY: requestedAnchorY,
+    });
 
   // Build the permanent-entity set once and reuse it for both snapshot saving
   // and the destroy phase. This prevents picked-up floor items (whose entity IDs
@@ -331,6 +352,7 @@ export async function transitionToDepth(world, newDepth, destinationPos, opts = 
   for (const [id] of world.query(Player)) _permanentIds.add(id);
   for (const [id] of world.query(Pet)) _permanentIds.add(id);
   for (const [id] of world.query(DungeonState)) _permanentIds.add(id);
+  for (const [id] of world.query(RiftState)) _permanentIds.add(id);
   for (const [id] of world.query(QuestDefRef)) _permanentIds.add(id);
   for (const id of stairPursuerIds) _permanentIds.add(id);
   // Walk full hierarchy: InventoryRoot, inventory items, equipment, etc.
@@ -359,7 +381,7 @@ export async function transitionToDepth(world, newDepth, destinationPos, opts = 
       snapshot: serializeEntities(world, floorIds, { note: `floor_${currentPlaneKey}` }),
       order: floorIds.slice(),
     };
-    _persistFloor(worldSeed, currentPlaneKey, entry);
+    _persistFloor(currentPlaneSeed, currentPlaneKey, entry);
     _floorEntityCache.set(currentPlaneKey, entry);
     _evictMemoryFloors(newDepth);
   }
@@ -422,7 +444,7 @@ export async function transitionToDepth(world, newDepth, destinationPos, opts = 
         ? priorDownStairPositions
         : [{ x: region.anchorX, y: region.anchorY }])
       : priorDownStairPositions;
-    const result = await generateFloor(world, worldSeed, newDepth, tombstoneRepo, onProgress, regionPriorDownStairs, {
+    const result = await generateFloor(world, targetPlaneSeed, newDepth, tombstoneRepo, onProgress, regionPriorDownStairs, {
       dungeonType: opts.dungeonType ?? null,
       templateId: region.templateId,
       anchorX: region.anchorX,
@@ -434,10 +456,10 @@ export async function transitionToDepth(world, newDepth, destinationPos, opts = 
       spawnX = result.spawnX;
       spawnY = result.spawnY;
       newProfileType = result.profileType || "default";
-      newRegionKey = result.regionKey || region.regionKey;
-      newTemplateId = result.activeTemplateId || region.templateId || "";
-      newRegionAnchorX = Number(result.regionAnchorX || region.anchorX || 0) | 0;
-      newRegionAnchorY = Number(result.regionAnchorY || region.anchorY || 0) | 0;
+      newRegionKey = targetPlaneId ? destinationRegionKey : (result.regionKey || region.regionKey);
+      newTemplateId = targetPlaneId ? "" : (result.activeTemplateId || region.templateId || "");
+      newRegionAnchorX = targetPlaneId ? 0 : (Number(result.regionAnchorX || region.anchorX || 0) | 0);
+      newRegionAnchorY = targetPlaneId ? 0 : (Number(result.regionAnchorY || region.anchorY || 0) | 0);
     }
   }
   let entityIds = generatedEntityIds;
@@ -445,7 +467,9 @@ export async function transitionToDepth(world, newDepth, destinationPos, opts = 
   const restoredPlaneKey = destinationPlaneKey;
 
   if (ds) {
-    const regionKeys = generatedRegions.map((region) => region.regionKey || floorRegionKey(newDepth, region.anchorX, region.anchorY, region.templateId));
+    const regionKeys = targetPlaneId
+      ? [destinationRegionKey]
+      : generatedRegions.map((region) => region.regionKey || floorRegionKey(newDepth, region.anchorX, region.anchorY, region.templateId));
     const destroyedTiles = {};
     const wetTiles = {};
     for (const key of regionKeys) {
@@ -466,7 +490,7 @@ export async function transitionToDepth(world, newDepth, destinationPos, opts = 
     }
   }
 
-  const cachedFloor = _floorEntityCache.get(restoredPlaneKey) ?? _loadPersistedFloor(worldSeed, restoredPlaneKey);
+  const cachedFloor = _floorEntityCache.get(restoredPlaneKey) ?? _loadPersistedFloor(targetPlaneSeed, restoredPlaneKey);
   const normalizedSnapshot = normalizeInventorySnapshot(cachedFloor?.snapshot);
   if (normalizedSnapshot?.v === 1 && normalizedSnapshot.comps) {
     // Generation is required to rebuild the tile map, but its entities are
@@ -611,6 +635,8 @@ export async function transitionToDepth(world, newDepth, destinationPos, opts = 
       r.profileType = newProfileType || 'default';
       r.activeTemplateId = newTemplateId || "";
       r.activeRegionKey = restoredRegionKey;
+      r.activePlaneId = targetPlaneId;
+      r.activePlaneSeed = targetPlaneSeed;
       r.regionAnchorX = Number(newRegionAnchorX || 0) | 0;
       r.regionAnchorY = Number(newRegionAnchorY || 0) | 0;
       r.floorEntityIds = entityIds;

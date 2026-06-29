@@ -14,6 +14,7 @@ import { addToInventory, inventoryItems } from "../../rules/utils/inventoryFacad
 import { getAllMonsters } from "../../rules/data/monsters.js";
 import { markExplored } from "../../rules/environment/dungeon/exploredMap.js";
 import { spawnDebugMonsterNearPlayer } from "./spawnDebugMonster.js";
+import { createDebugRift, activeRiftRecord, currentPlaneId, destroyActiveRift } from "../../rules/utils/riftRuntime.js";
 import { WeatherState } from "../../rules/components/WeatherState.js";
 import { Equipment, GEAR_SLOTS } from "../../rules/components/Equipment.js";
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
@@ -28,6 +29,7 @@ import { ProcPackageNode } from "../../rules/components/ProcPackageNode.js";
 import { getParent } from "../../lib/ecs-js/hierarchy.js";
 import { setTile, getTile } from "../../rules/environment/dungeon/tileMap.js";
 import { dealDamage } from "../../rules/utils/dealDamage.js";
+import { RiftCloseRequested } from "../../events/RiftCloseRequested.js";
 import {
   TILE_FLOOR,
   TILE_WALL,
@@ -348,6 +350,37 @@ export function registerBuiltinCommands(console, { world, messageLog, lightingEn
     const result = spawnDebugMonsterNearPlayer(world, monsterId);
     if (!result.ok) return result.error;
     return `Spawned ${result.name} at (${result.x}, ${result.y})`;
+  });
+
+  // ---- create rift [levels] ----
+  console.registerCommand('create', 'create rift [levels] — spawn a debug rift portal', (argsStr) => {
+    const parts = String(argsStr || '').split(/\s+/).filter(Boolean);
+    if (String(parts[0] || '').toLowerCase() !== 'rift') return 'Usage: create rift [levels]';
+    const requested = Number.parseInt(parts[1] || '0', 10);
+    if (!Number.isFinite(requested) || requested < 0) return 'Usage: create rift [levels] (levels >= 0)';
+    const result = createDebugRift(world, requested);
+    if (!result.ok) return result.error;
+    return `Created rift ${result.riftId} seed=${(result.seed >>> 0).toString(16)} levels=${result.levels} portal=#${result.portalId} @ (${result.x}, ${result.y})`;
+  });
+
+  // ---- close rift ----
+  console.registerCommand('close', 'close rift — close the active debug rift', (argsStr) => {
+    const parts = String(argsStr || '').split(/\s+/).filter(Boolean);
+    if (String(parts[0] || '').toLowerCase() !== 'rift') return 'Usage: close rift';
+    const rec = activeRiftRecord(world);
+    if (!rec?.state) return 'No active rift.';
+    const pe = playerEntity(world);
+    const plane = currentPlaneId(world);
+    if (!rec.state.inside && plane !== rec.state.planeId) {
+      const riftId = rec.state.riftId;
+      destroyActiveRift(world, { actor: pe?.id || 0, riftId, reason: "closed" });
+      return `Closed rift ${riftId}.`;
+    }
+    world.emit(new RiftCloseRequested({
+      actor: pe?.id || 0,
+      riftId: rec.state.riftId,
+    }));
+    return `Closing rift ${rec.state.riftId}; returning to origin...`;
   });
 
   // ---- chicken [hen|rooster|chick] ----
