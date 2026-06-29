@@ -1,0 +1,60 @@
+{
+  "cli_version": "0.7.7",
+  "checkpoint_id": "6490c6c05f12",
+  "session_id": "019f00a0-2b9d-7762-926a-0096ef5e6ddf",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-29T13:34:01.049858337Z",
+  "branch": "master",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "src/content/define.js",
+    "src/content/interactables/rift/index.js",
+    "src/display/ui/overlay.js",
+    "src/display/ui/overlayUtils.js",
+    "src/main.js",
+    "src/main/input/rulesDispatch.js",
+    "src/rules/interaction/interactableAffordance.js",
+    "tests/riftDebugCommands.test.mjs",
+    "tests/rulesDispatchContextActions.test.mjs"
+  ],
+  "agent": "Codex",
+  "model": "gpt-5.5",
+  "turn_id": "6f160c23a084",
+  "checkpoint_transcript_start": 1284,
+  "transcript_lines_at_start": 1284,
+  "token_usage": {
+    "input_tokens": 158187,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 5360896,
+    "output_tokens": 13517,
+    "api_call_count": 38
+  },
+  "session_metrics": {
+    "turn_count": 9
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-29T13:34:00.793798566Z",
+    "agent_lines": 234,
+    "agent_removed": 79,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 234,
+    "total_lines_changed": 313,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 865,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".github/agents/Dungeon Generation and BSP Expert.agent.md": 582,
+        ".github/agents/VFX Agent.agent.md": 283
+      }
+    }
+  ]
+}
