@@ -10,6 +10,7 @@ import { Collider } from "../src/rules/components/Collider.js";
 import { Interactable } from "../src/rules/components/Interactable.js";
 import { Inventory } from "../src/rules/components/Inventory.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
+import { HazardArea } from "../src/rules/components/HazardArea.js";
 import { UrnInteractionResolved } from "../src/events/UrnInteractionResolved.js";
 import { SarcophagusInteractionResolved } from "../src/events/SarcophagusInteractionResolved.js";
 import { inventoryItems } from "../src/rules/utils/inventoryFacade.js";
@@ -138,6 +139,35 @@ Deno.test("sarcophagus authored rule: burial loot stocks inventory and removes i
   assert(inventoryItems(world, sarc).length >= 2, "burial loot should be stocked inside");
   assertEquals(events[0]?.outcome, "burial-loot");
   assert(events[0]?.lootCount >= 2, "event should report loot count");
+});
+
+Deno.test("sarcophagus authored rule: spore-cloud outcome creates poison spores", () => {
+  loadFloor();
+  const world = new World({ seed: 16 });
+  world.step = 8;
+  const actor = makeActor(world);
+  const sarc = makeTarget(world, "sarcophagus");
+  world.add(sarc, Interactable, { action: "openSarcophagus", params: { depth: 6 } });
+  const events = [];
+  world.on(SarcophagusInteractionResolved, (event) => events.push(event));
+
+  executeVerbRule(world, sarcophagusOpenRule, {
+    actor,
+    primary: sarc,
+    target: sarc,
+    params: { interactableParams: { depth: 6 }, forceOutcomeId: "spore-cloud" },
+  });
+
+  assertEquals(world.has(sarc, Interactable), false);
+  assertEquals(events[0]?.outcome, "spore-cloud");
+  const hazard = [...world.query(HazardArea, NamedIdentity, Position)].find(([, h, ni, pos]) =>
+    h.kind === "poison"
+    && h.medium === "air"
+    && ni.identity === "venom_spores"
+    && pos.x === 6
+    && pos.y === 5
+  );
+  assert(hazard, "spore cloud should create a poison air hazard on the sarcophagus");
 });
 
 Deno.test("authored runner passes static interactable params into crypt rules", () => {

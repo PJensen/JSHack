@@ -262,6 +262,32 @@ const sarcophagusOpenTable = chanceTable("crypt.sarcophagus.open", [
     },
   },
   {
+    id: "spore-cloud",
+    weight: 5,
+    apply(ctx) {
+      const pos = positionOf(ctx);
+      const depth = depthOf(ctx);
+      openSarcophagus(ctx);
+      ctx.mutate.spawnHazard({
+        x: pos.x,
+        y: pos.y,
+        kind: "poison",
+        medium: "air",
+        turnsLeft: ctx.rng.int(3, 5),
+        radius: 1,
+        tickDamage: 1 + Math.floor(Math.min(10, depth) / 5),
+        damageType: "poison",
+        cause: "sarcophagus:spore-cloud",
+        sourceId: ctx.target,
+        sourceKind: "sarcophagus",
+        identity: "venom_spores",
+        name: "Venom Spores",
+        meta: { source: "sarcophagus" },
+      });
+      return finishSarcophagus(ctx, "spore-cloud", pos, depth);
+    },
+  },
+  {
     id: "empty",
     weight: 6,
     apply(ctx) {
