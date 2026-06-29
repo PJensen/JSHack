@@ -480,7 +480,11 @@ registerDialog({
         const quest = barkeepQuest(ctx.world, ctx.actorId);
         const state = quest?.state;
         if (!state) return barkeepAmbientText(ctx, "What'll it be?");
+        const vars = quest?.vars?.data || {};
         if (String(state.status || "") === "complete") {
+          if (String(vars.resolution || "") === "genocide") {
+            return "Cellar's quiet now. Too quiet. Haven't heard a scratch, squeak, or floorboard shift since you read that scroll.";
+          }
           return "Cellar's been quiet since you cleared those rats. Drinks are on me.";
         }
         if (String(state.node || "") === "offer") {
@@ -492,6 +496,9 @@ registerDialog({
           return `You've got ${kills} of ${REQUIRED_RAT_KILLS} so far. Keep at it.`;
         }
         if (String(state.node || "") === "report") {
+          if (String(vars.resolution || "") === "genocide") {
+            return "You did what? I wanted the rats gone, not... whatever that silence is. Still, a deal's a deal.";
+          }
           return "You got them all? Good. I owe you one.";
         }
         return barkeepAmbientText(ctx, "What'll it be?");
@@ -519,7 +526,12 @@ registerDialog({
         },
         {
           id: "turn_in_rats",
-          label: "The rats are dead.",
+          label: (ctx) => {
+            const quest = barkeepQuest(ctx.world, ctx.actorId);
+            const vars = quest?.vars?.data || {};
+            if (String(vars.resolution || "") === "genocide") return "There are no rats anymore.";
+            return "The rats are dead.";
+          },
           visible: (ctx) => {
             const quest = barkeepQuest(ctx.world, ctx.actorId);
             return String(quest?.state?.status || "active") === "active"
@@ -572,7 +584,14 @@ registerDialog({
       ],
     },
     report_ack: {
-      text: "That's a load off my mind. Here — take the reward I set aside, 150 gold, and a hot meal on the house.",
+      text: (ctx) => {
+        const quest = barkeepQuest(ctx.world, ctx.actorId);
+        const vars = quest?.vars?.data || {};
+        if (String(vars.resolution || "") === "genocide") {
+          return "That's a cold kind of answer. Here — take the reward I set aside, 150 gold, and a hot meal. Maybe keep that scroll-work out of the common room.";
+        }
+        return "That's a load off my mind. Here — take the reward I set aside, 150 gold, and a hot meal on the house.";
+      },
       choices: [
         { id: "leave", label: "Cheers.", close: true },
       ],

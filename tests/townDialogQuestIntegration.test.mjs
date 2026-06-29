@@ -260,3 +260,61 @@ Deno.test("barkeep rat quest turn-in grants promised Mirror Bow reward", () => {
   assert(inventoryHasIdentity(world, player, "food_stew", 1), "turn-in should give the meal directly");
   assertEquals(completed.at(-1)?.rewardItemIds, ["bow_mirror"]);
 });
+
+Deno.test("barkeep rat quest genocide turn-in records the world outcome", () => {
+  const world = new World({ seed: 94 });
+  world.setScheduler(composeScheduler("scripts"));
+  installDialogRuntime(world);
+  installQuestRuntime(world);
+
+  const player = world.create();
+  world.add(player, Player);
+  world.add(player, Inventory, { capacity: 12 });
+  world.add(player, Position, { x: 3, y: 3 });
+
+  const barkeep = world.create();
+  world.add(barkeep, NamedIdentity, { name: "Barkeep", identity: "townfolk_barkeep" });
+  world.add(barkeep, Position, { x: 12, y: 7 });
+
+  instantiateQuest(world, RAT_INFESTATION_QUEST_ID, {
+    player,
+    giver: barkeep,
+    target: barkeep,
+  }, {
+    accepted: true,
+    killCount: 1,
+    reported: false,
+    ratsGenocided: true,
+    resolution: "genocide",
+    worldOutcome: "rats_erased",
+    objective: "Return to the barkeep.",
+    rewardItemIds: ["bow_mirror"],
+    rewardGold: 150,
+  }, { node: "report" });
+  world.tick(0);
+
+  const opened = [];
+  const completed = [];
+  world.on("dialog:opened", (payload) => opened.push(payload));
+  world.on("quest:completed", (payload) => completed.push(payload));
+
+  world.emit("dialog:openRequest", { actorId: player, targetId: barkeep, dialogId: "townfolk:barkeep" });
+  assert(opened.length > 0, "barkeep dialog should open");
+  assert(String(opened.at(-1).text || "").includes("whatever that silence is"));
+  assertEquals(
+    opened.at(-1).choices.some((choice) => choice.id === "turn_in_rats" && choice.label === "There are no rats anymore."),
+    true,
+  );
+
+  const sessionId = opened.at(-1).sessionId;
+  world.emit("dialog:choose", { sessionId, choiceId: "turn_in_rats" });
+  world.tick(0);
+
+  assert(inventoryHasIdentity(world, player, "bow_mirror", 1), "genocide turn-in should still grant the promised Mirror Bow");
+  assertEquals(completed.at(-1)?.resolution, "genocide");
+  assertEquals(completed.at(-1)?.worldOutcome, "rats_erased");
+
+  const quest = getQuestRecord(world, RAT_INFESTATION_QUEST_ID, player);
+  assertEquals(quest?.state?.status, "complete");
+  assertEquals(quest?.vars?.data?.completionText, "The cellar fell silent after rat-kind was erased from the run.");
+});

@@ -28,6 +28,9 @@ const DUNGEON_RAT_INFESTATION_COUNT = 10;
 
 const RAT_HOOKS_KEY = Symbol.for("jshack:quests:ratInfestation");
 
+// Later Rat King pass: prefer a farthest-room boss spawn first. A locked
+// back-half cellar needs reachability proof before it touches generation.
+
 function isRat(world, entityId) {
   const ni = world.get(entityId, NamedIdentity);
   return String(ni?.identity || "") === "rat";
@@ -219,6 +222,11 @@ export const RatInfestationQuest = registerQuest({
     rewardItemIds: REWARD_ITEM_IDS,
     rewardGold: REWARD_GOLD,
     rewardGranted: false,
+    ratsGenocided: false,
+    resolution: "",
+    worldOutcome: "",
+    objective: "",
+    completionText: "",
   },
   nodes: {
     offer: {
@@ -234,6 +242,11 @@ export const RatInfestationQuest = registerQuest({
               setVar("killCount", 0),
               setVar("rewardItemIds", REWARD_ITEM_IDS),
               setVar("rewardGold", REWARD_GOLD),
+              setVar("ratsGenocided", false),
+              setVar("resolution", ""),
+              setVar("worldOutcome", ""),
+              setVar("objective", "Clear the tavern cellar"),
+              setVar("completionText", ""),
               (ctx) => {
                 const giverId = Number(ctx.bind.giver || 0);
                 const playerId = Number(ctx.bind.player || 0) | 0;
@@ -318,6 +331,9 @@ export const RatInfestationQuest = registerQuest({
             },
             actions: [
               incVar("killCount", 1),
+              setVar("resolution", "culled_rats"),
+              setVar("worldOutcome", "rats_culled"),
+              setVar("objective", "Return to the barkeep."),
               emit("quest:progress", ratProgressPayload),
               emit("quest:advanced", (ctx) => ({
                 questId: RAT_INFESTATION_QUEST_ID,
@@ -340,6 +356,29 @@ export const RatInfestationQuest = registerQuest({
             to: "hunt",
           },
         ],
+        "scroll:genocide:success": [
+          {
+            guard: (ctx) => {
+              const actor = Number(ctx.payload?.actor || 0) | 0;
+              return String(ctx.payload?.identity || "") === "rat"
+                && Number(ctx.bind.player || 0) === actor;
+            },
+            actions: [
+              setVar("ratsGenocided", true),
+              setVar("resolution", "genocide"),
+              setVar("worldOutcome", "rats_erased"),
+              setVar("objective", "Return to the barkeep."),
+              setVar("completionText", "The cellar fell silent after rat-kind was erased from the run."),
+              emit("quest:advanced", (ctx) => ({
+                questId: RAT_INFESTATION_QUEST_ID,
+                playerId: ctx.bind.player,
+                giverId: ctx.bind.giver,
+                objective: "Return to the barkeep.",
+              })),
+            ],
+            to: "report",
+          },
+        ],
       },
     },
     report: {
@@ -354,6 +393,12 @@ export const RatInfestationQuest = registerQuest({
             actions: [
               setVar("reported", true),
               setVar("rewardGranted", true),
+              setVar("completionText", (ctx) => {
+                if (String(ctx.vars?.resolution || "") === "genocide") {
+                  return "The cellar fell silent after rat-kind was erased from the run.";
+                }
+                return "The tavern cellar is clear, at least for now.";
+              }),
               (ctx) => {
                 const playerId = Number(ctx.bind.player || 0) | 0;
                 if (playerId > 0) {
@@ -374,6 +419,8 @@ export const RatInfestationQuest = registerQuest({
                 title: "Rat Infestation",
                 rewardGold: REWARD_GOLD,
                 rewardItemIds: REWARD_ITEM_IDS,
+                resolution: String(ctx.vars?.resolution || "culled_rats"),
+                worldOutcome: String(ctx.vars?.worldOutcome || "rats_culled"),
                 at: (() => {
                   const p = ctx.world.get(Number(ctx.bind.player || 0) | 0, Position);
                   return p ? { x: Number(p.x) | 0, y: Number(p.y) | 0 } : null;
