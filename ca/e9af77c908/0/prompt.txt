@@ -1,0 +1,1 @@
+bumping into the rift does nothing, look at the existing dungeon entrace UX, it shows a "Descend" modal, I think we need something similar, maybe a little bespoke, "Enter Rift" -- and maybe the smae for the return trip.
