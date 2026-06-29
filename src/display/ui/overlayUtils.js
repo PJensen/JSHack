@@ -450,9 +450,13 @@ export function renderStairTooltip(tip, detail) {
   tip.innerHTML = '';
   const dir = detail?.direction || 'down';
   const isReturn = dir === 'return';
+  const isRift = dir === 'rift';
+  const isRiftReturn = dir === 'riftReturn';
   const label = isReturn
     ? 'Return Portal'
-    : (dir === 'down' ? 'Descend Stairs' : 'Ascend Stairs');
+    : (isRift
+      ? 'Rift Portal'
+      : (isRiftReturn ? 'Rift Exit' : (dir === 'down' ? 'Descend Stairs' : 'Ascend Stairs')));
 
   const title = document.createElement('div');
   title.textContent = label;
@@ -464,14 +468,18 @@ export function renderStairTooltip(tip, detail) {
   hint.style.fontSize = '10px';
   hint.textContent = isReturn
     ? 'Tap to return'
-    : `Tap to ${dir === 'down' ? 'descend' : 'ascend'}`;
+    : (isRift
+      ? 'Tap to enter the rift'
+      : (isRiftReturn ? 'Tap to exit the rift' : `Tap to ${dir === 'down' ? 'descend' : 'ascend'}`));
   tip.appendChild(hint);
 
   const action = document.createElement('button');
   action.type = 'button';
   action.textContent = isReturn
     ? 'Return'
-    : (dir === 'down' ? 'Descend' : 'Ascend');
+    : (isRift
+      ? 'Enter Rift'
+      : (isRiftReturn ? 'Exit Rift' : (dir === 'down' ? 'Descend' : 'Ascend')));
   Object.assign(action.style, {
     marginTop: '5px',
     minHeight: '34px',

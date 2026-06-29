@@ -129,6 +129,7 @@ import { Anatomy, HEARING_TIERS } from "./rules/components/Anatomy.js";
 import { Status } from "./rules/components/Status.js";
 import { getDeityInstance } from "./rules/systems/deitySystem.js";
 import { DungeonState } from "./rules/components/DungeonState.js";
+import { RiftState } from "./rules/components/RiftState.js";
 import { getTownEconomyData } from "./rules/systems/townSimulationSystem.js";
 import { CastSpellIntent } from "./rules/components/Intents/CastSpellIntent.js";
 import { Channeling } from "./rules/components/Channeling.js";
@@ -1217,17 +1218,31 @@ function findNearestTraversalTarget(world, x, y) {
   let nearest = null;
   let nearestDist = Infinity;
   for (const [eid, pos, ni] of world.query(Position, NamedIdentity)) {
-    if (ni.identity !== 'stair_down' && ni.identity !== 'stair_up' && ni.identity !== 'return_portal') continue;
+    if (ni.identity !== 'stair_down' && ni.identity !== 'stair_up' && ni.identity !== 'return_portal' && ni.identity !== 'rift_portal') continue;
     const dist = chebyshevScalar(pos.x, pos.y, x, y);
     if (dist > 0) continue;
     const prefer = dist < nearestDist
-      || (dist === nearestDist && ni.identity === 'return_portal' && nearest?.identity !== 'return_portal');
+      || (dist === nearestDist && ni.identity === 'return_portal' && nearest?.identity !== 'return_portal')
+      || (dist === nearestDist && ni.identity === 'rift_portal' && nearest?.identity !== 'return_portal' && nearest?.identity !== 'rift_portal');
     if (prefer) {
       nearestDist = dist;
       nearest = { id: eid, identity: ni.identity };
     }
   }
   return nearest;
+}
+
+function currentRiftTraversalDirection(identity) {
+  if (identity === 'stair_down') return 'down';
+  if (identity === 'return_portal') return 'return';
+  if (identity === 'rift_portal') return 'rift';
+  if (identity !== 'stair_up') return 'down';
+  for (const [, state] of world.query(RiftState)) {
+    if (!state?.inside) continue;
+    if ((Number(state.currentLevel || 0) | 0) <= 1) return 'riftReturn';
+    break;
+  }
+  return 'up';
 }
 
 // ---- Input setup (display/input → rules/display) ---------------------------
@@ -2232,9 +2247,7 @@ world.on('moved', ({ id, to }) => {
   const nearestTarget = findNearestTraversalTarget(world, to.x, to.y);
 
   if (nearestTarget) {
-    const direction = nearestTarget.identity === 'stair_down'
-      ? 'down'
-      : (nearestTarget.identity === 'stair_up' ? 'up' : 'return');
+    const direction = currentRiftTraversalDirection(nearestTarget.identity);
     try {
       window.dispatchEvent(new CustomEvent('ui:showStairTooltip', {
         detail: { stairId: nearestTarget.id, direction }

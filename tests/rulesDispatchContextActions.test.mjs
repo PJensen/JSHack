@@ -6,9 +6,11 @@ import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 import { Interactable } from "../src/rules/components/Interactable.js";
 import { Inventory } from "../src/rules/components/Inventory.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
+import { RiftPortal } from "../src/rules/components/RiftPortal.js";
 import { PickupIntent } from "../src/rules/components/Intents/PickupIntent.js";
 import { InteractIntent } from "../src/rules/components/Intents/InteractIntent.js";
 import { addToInventory } from "../src/rules/utils/inventoryFacade.js";
+import { RiftEnterRequested } from "../src/events/RiftEnterRequested.js";
 
 Deno.test("rulesDispatch: openPickupChooser picks nearby scattered item", () => {
   const world = new World({ seed: 101 });
@@ -99,4 +101,49 @@ Deno.test("rulesDispatch: traverseStairs emits explicit return-portal traversal"
   assertEquals(returns[0]?.actor, actor);
   assertEquals(returns[0]?.targetId, 77);
   assertEquals(returns[0]?.portalId, 77);
+});
+
+Deno.test("rulesDispatch: traverseStairs emits explicit rift portal traversal", () => {
+  const world = new World({ seed: 105 });
+  const actor = world.create();
+  world.add(actor, Position, { x: 1, y: 1 });
+
+  const portal = world.create();
+  world.add(portal, Position, { x: 1, y: 1 });
+  world.add(portal, NamedIdentity, { name: "Rift Portal", identity: "rift_portal" });
+  world.add(portal, RiftPortal, { riftId: "rift:test", seed: 123, levels: 3 });
+
+  const requests = [];
+  world.on(RiftEnterRequested, (ev) => requests.push(ev));
+
+  const dispatch = makeRulesDispatcher(world, () => actor);
+  dispatch({ type: "rules.traverseStairs", payload: { targetId: portal, direction: "rift" } });
+
+  assertEquals(requests.length, 1);
+  assertEquals(requests[0]?.actor, actor);
+  assertEquals(requests[0]?.portalId, portal);
+  assertEquals(requests[0]?.riftId, "rift:test");
+});
+
+Deno.test("rulesDispatch: traverseStairs finds underfoot rift portal without touching return portals", () => {
+  const world = new World({ seed: 106 });
+  const actor = world.create();
+  world.add(actor, Position, { x: 2, y: 2 });
+
+  const portal = world.create();
+  world.add(portal, Position, { x: 2, y: 2 });
+  world.add(portal, NamedIdentity, { name: "Rift Portal", identity: "rift_portal" });
+  world.add(portal, RiftPortal, { riftId: "rift:underfoot", seed: 456, levels: 2 });
+
+  const requests = [];
+  const returns = [];
+  world.on(RiftEnterRequested, (ev) => requests.push(ev));
+  world.on("portal:return", (ev) => returns.push(ev));
+
+  const dispatch = makeRulesDispatcher(world, () => actor);
+  dispatch({ type: "rules.traverseStairs" });
+
+  assertEquals(requests.length, 1);
+  assertEquals(requests[0]?.portalId, portal);
+  assertEquals(returns.length, 0);
 });
