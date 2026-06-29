@@ -78,6 +78,8 @@ const MOUNTAIN_TILES = new Set([
 
 const FOREST_TILES = new Set([TILE_TREE, TILE_PINE_FOREST, TILE_PALM_FOREST, TILE_MANGROVE]);
 const STRUCTURE_TILES = new Set([TILE_FLOOR, TILE_WALL, TILE_DOOR, TILE_FARMLAND, TILE_FENCE, TILE_COBBLESTONE]);
+const HARD_WATER_TILES = new Set([TILE_WATER_DEEP, TILE_KELP_FOREST, TILE_CORAL_REEF]);
+const STRUCTURAL_STAMP_TILES = new Set(["floor", "wall", "door", "stair_down", "stair_up"]);
 
 const BUILDING_PLANS = Object.freeze([
   Object.freeze({ key: "well_plaza", district: "civic_core", coreDx: 0, coreDy: 0, wants: ["flat"], roles: [] }),
@@ -230,13 +232,13 @@ function footprint(def, anchorX, anchorY, margin = 0) {
   return keys;
 }
 
-function spawnsCanLand(chunks, def, anchorX, anchorY, exactFootprint, occupied) {
+function spawnsCanLand(chunks, def, anchorX, anchorY, exactFootprint, occupied, canLand = canBuildOn) {
   for (const spawn of def.spawns || []) {
     const x = anchorX + (Number(spawn.dx) | 0);
     const y = anchorY + (Number(spawn.dy) | 0);
     const key = xyKey(x, y);
     if (exactFootprint.has(key)) continue;
-    if (occupied.has(key) || !canBuildOn(chunks, x, y)) return false;
+    if (occupied.has(key) || !canLand(chunks, x, y)) return false;
   }
   return true;
 }
@@ -405,17 +407,63 @@ function canBuildOn(chunks, x, y) {
   return NATURAL_BUILDABLE.has(getWorldTile(chunks, x, y));
 }
 
+function terrainFitScore(chunks, def, anchorX, anchorY) {
+  let wet = 0;
+  let rough = 0;
+  let natural = 0;
+  let structuralWet = 0;
+  let total = 0;
+  for (const tile of def.tiles || []) {
+    const x = anchorX + (Number(tile.dx) | 0);
+    const y = anchorY + (Number(tile.dy) | 0);
+    const existing = getWorldTile(chunks, x, y);
+    total++;
+    if (STRUCTURE_TILES.has(existing)) return null;
+    if (HARD_WATER_TILES.has(existing)) return null;
+    if (WET_TILES.has(existing)) {
+      wet++;
+      if (STRUCTURAL_STAMP_TILES.has(tile.tile)) structuralWet++;
+    }
+    if (MOUNTAIN_TILES.has(existing)) rough++;
+    if (NATURAL_BUILDABLE.has(existing)) natural++;
+  }
+  if (structuralWet > 2) return null;
+  if (wet > Math.max(3, Math.floor(total * 0.16))) return null;
+  return natural * 2 - wet * 18 - rough * 5;
+}
+
+function canSpawnNearBuilding(chunks, x, y) {
+  const tile = getWorldTile(chunks, x, y);
+  return !WET_TILES.has(tile) && !MOUNTAIN_TILES.has(tile) && !STRUCTURE_TILES.has(tile);
+}
+
+function carveBuildingPad(chunks, def, anchorX, anchorY, protectedTiles) {
+  const pad = footprint(def, anchorX, anchorY, 2);
+  const exact = footprint(def, anchorX, anchorY, 0);
+  for (const key of pad) {
+    if (exact.has(key) || protectedTiles.has(key)) continue;
+    const [x, y] = key.split(",").map(Number);
+    const tile = getWorldTile(chunks, x, y);
+    if (STRUCTURE_TILES.has(tile) || HARD_WATER_TILES.has(tile)) continue;
+    if (WET_TILES.has(tile) || MOUNTAIN_TILES.has(tile) || FOREST_TILES.has(tile) || WATER_EDGE_TILES.has(tile)) {
+      setChunkTile(chunks, x, y, TILE_GRASS);
+    }
+  }
+}
+
 function placeBuilding(chunks, bounds, plan, district, occupied, protectedTiles, seed, townCenter = null) {
   const baseDef = BUILDING_DEFS[plan.defKey || plan.key];
   if (!baseDef) return null;
   const rng = mulberry((seed ^ hashKey(plan.key)) >>> 0);
   let best = null;
+  let bestRadius = Infinity;
   const searchRadius = Number.isFinite(plan.searchRadius) ? Math.max(0, Number(plan.searchRadius) | 0) : (plan.resource ? 36 : 16);
   const targetX = district.x + (Number(plan.coreDx) | 0);
   const targetY = district.y + (Number(plan.coreDy) | 0);
   const facingTarget = plan.key === "well_plaza" ? null : townCenter;
   const rotations = plan.rotations || ALL_ROTATIONS;
   for (let r = 0; r <= searchRadius; r++) {
+    if (best && r > bestRadius + 2) break;
     for (let dy = -r; dy <= r; dy++) {
       for (let dx = -r; dx <= r; dx++) {
         if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
@@ -424,24 +472,31 @@ function placeBuilding(chunks, bounds, plan, district, occupied, protectedTiles,
         if (anchorX < bounds.minX + 8 || anchorX > bounds.maxX - 8 || anchorY < bounds.minY + 8 || anchorY > bounds.maxY - 8) continue;
         for (const rotation of rotations) {
           const def = rotateBuildingDef(baseDef, rotation);
-          if (!canPlaceBuilding(chunks, anchorX, anchorY, def, (x, y) => occupied.has(xyKey(x, y)) || !canBuildOn(chunks, x, y))) continue;
+          if (!canPlaceBuilding(chunks, anchorX, anchorY, def, (x, y) => occupied.has(xyKey(x, y)))) continue;
+          const terrainFit = terrainFitScore(chunks, def, anchorX, anchorY);
+          if (terrainFit === null) continue;
           const exact = footprint(def, anchorX, anchorY, 0);
-          if (!spawnsCanLand(chunks, def, anchorX, anchorY, exact, occupied)) continue;
+          if (!spawnsCanLand(chunks, def, anchorX, anchorY, exact, occupied, canSpawnNearBuilding)) continue;
           const dist = Math.max(Math.abs(anchorX - targetX), Math.abs(anchorY - targetY));
           const doorOffset = doorOffsetForDef(def);
           const doorDist = Math.abs(anchorX + doorOffset.dx - district.x) + Math.abs(anchorY + doorOffset.dy - district.y);
           const score = wantsScore(chunks, anchorX, anchorY, plan.wants || [])
+            + terrainFit
             - dist * 4
             - doorDist * 1.5
             + doorFacingScore(def, anchorX, anchorY, facingTarget)
             + rng() * 0.01;
-          if (!best || score > best.score) best = { def, anchorX, anchorY, rotation, score };
+          if (!best || score > best.score) {
+            best = { def, anchorX, anchorY, rotation, score };
+            bestRadius = r;
+          }
         }
       }
     }
   }
   if (!best) return null;
 
+  carveBuildingPad(chunks, best.def, best.anchorX, best.anchorY, protectedTiles);
   const stamped = stampBuilding(chunks, best.def, best.anchorX, best.anchorY);
   const exact = footprint(best.def, best.anchorX, best.anchorY, 0);
   const margin = footprint(best.def, best.anchorX, best.anchorY, 1);
