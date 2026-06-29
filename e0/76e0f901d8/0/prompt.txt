@@ -1,0 +1,274 @@
+Added this worker:
+
+```
+export default {
+  async fetch(req, env) {
+    if (req.method === "OPTIONS") return cors();
+
+    const url = new URL(req.url);
+
+    try {
+      if (url.pathname === "/mail/send" && req.method === "POST")
+        return send(req, env);
+
+      if (url.pathname === "/mail/inbox" && req.method === "GET")
+        return inbox(url, env);
+
+      if (url.pathname === "/mail/outbox" && req.method === "GET")
+        return outbox(url, env);
+
+      if (url.pathname === "/mail/open" && req.method === "POST")
+        return open(req, env);
+
+      if (url.pathname === "/mail/claim" && req.method === "POST")
+        return claim(req, env);
+
+      return json({ ok: false, error: "not found" }, 404);
+    } catch (err) {
+      return json({ ok: false, error: String(err?.message ?? err) }, 500);
+    }
+  },
+};
+
+async function send(req, env) {
+  const mail = await req.json();
+
+  const id = crypto.randomUUID();
+  const now = Date.now();
+
+  await env.DB.prepare(`
+    INSERT INTO mail (
+      id,
+      to_phone,
+      from_phone,
+      subject,
+      body,
+      gold,
+      items,
+      status,
+      created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'sent', ?)
+  `)
+    .bind(
+      id,
+      cleanPhone(mail.toPhone),
+      cleanPhone(mail.fromPhone),
+      String(mail.subject ?? "").slice(0, 120),
+      String(mail.body ?? "").slice(0, 4000),
+      clampInt(mail.gold, 0, 999999),
+      JSON.stringify(Array.isArray(mail.items) ? mail.items : []),
+      now
+    )
+    .run();
+
+  return json({ ok: true, id });
+}
+
+async function inbox(url, env) {
+  const phone = cleanPhone(url.searchParams.get("phone"));
+
+  const rows = await env.DB.prepare(`
+    SELECT
+      id,
+      from_phone AS fromPhone,
+      subject,
+      body,
+      gold,
+      items,
+      status,
+      created_at AS createdAt,
+      opened_at AS openedAt,
+      claimed_at AS claimedAt
+    FROM mail
+    WHERE to_phone = ?
+      AND claimed_at IS NULL
+    ORDER BY created_at DESC
+    LIMIT 100
+  `)
+    .bind(phone)
+    .all();
+
+  return json({
+    ok: true,
+    mail: rows.results.map(rowFromDb),
+  });
+}
+
+async function outbox(url, env) {
+  const phone = cleanPhone(url.searchParams.get("phone"));
+
+  const rows = await env.DB.prepare(`
+    SELECT
+      id,
+      to_phone AS toPhone,
+      subject,
+      body,
+      gold,
+      items,
+      status,
+      created_at AS createdAt,
+      opened_at AS openedAt,
+      claimed_at AS claimedAt
+    FROM mail
+    WHERE from_phone = ?
+    ORDER BY created_at DESC
+    LIMIT 100
+  `)
+    .bind(phone)
+    .all();
+
+  return json({
+    ok: true,
+    mail: rows.results.map(rowFromDb),
+  });
+}
+
+async function open(req, env) {
+  const { id } = await req.json();
+
+  await env.DB.prepare(`
+    UPDATE mail
+    SET
+      status = CASE
+        WHEN status = 'sent' THEN 'opened'
+        ELSE status
+      END,
+      opened_at = COALESCE(opened_at, ?)
+    WHERE id = ?
+      AND claimed_at IS NULL
+  `)
+    .bind(Date.now(), String(id))
+    .run();
+
+  return json({ ok: true });
+}
+
+async function claim(req, env) {
+  const { id } = await req.json();
+
+  const mail = await env.DB.prepare(`
+    SELECT
+      id,
+      gold,
+      items,
+      claimed_at AS claimedAt
+    FROM mail
+    WHERE id = ?
+  `)
+    .bind(String(id))
+    .first();
+
+  if (!mail) return json({ ok: false, error: "mail not found" }, 404);
+  if (mail.claimedAt) return json({ ok: false, error: "already claimed" }, 409);
+
+  await env.DB.prepare(`
+    UPDATE mail
+    SET
+      status = 'claimed',
+      opened_at = COALESCE(opened_at, ?),
+      claimed_at = ?
+    WHERE id = ?
+      AND claimed_at IS NULL
+  `)
+    .bind(Date.now(), Date.now(), String(id))
+    .run();
+
+  return json({
+    ok: true,
+    gold: mail.gold,
+    items: safeJson(mail.items, []),
+  });
+}
+
+function rowFromDb(row) {
+  return {
+    ...row,
+    items: safeJson(row.items, []),
+  };
+}
+
+function cleanPhone(value) {
+  return String(value ?? "").replace(/[^\d+]/g, "").slice(0, 32);
+}
+
+function clampInt(value, min, max) {
+  const n = Number.parseInt(value ?? 0, 10);
+  if (!Number.isFinite(n)) return min;
+  return Math.max(min, Math.min(max, n));
+}
+
+function safeJson(value, fallback) {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+}
+
+function json(obj, status = 200) {
+  return new Response(JSON.stringify(obj), {
+    status,
+    headers: {
+      "Content-Type": "application/json",
+      ...corsHeaders(),
+    },
+  });
+}
+
+function cors() {
+  return new Response(null, {
+    status: 204,
+    headers: corsHeaders(),
+  });
+}
+
+function corsHeaders() {
+  return {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+  };
+}
+```
+
+hosted at the following location:
+
+https://snail.jensen-petej.workers.dev/
+
+your job is to make an interactable mailbox inside the town.
+
+allow players to check their mailbox
+first time interacting with the mailbox asks phone number
+second time interacting with mailbox does not ask phone number. (stored in local storage)
+
+phone numbers are canonicalized by stripping everything but numbers.
+
+interacting with mailbox pops a two tab modal
+
+1.  inbox
+2. outbox
+
+allows players to send gold and items between each other.
+
+NOTE: this is just an MVP feature and not intended to rise to the level of expert perfect implementation; 
+
+NOTE: mailbox is an interactable thing (We've recentl improved these)
+NOTE: do our best to retain the precise item instance, (e.g.) carry enchantments, etc.
+
+You see what I'm building towards. Pick the perfect glyph for mailbox add to base.js
+
+/plan plan first -- then we'll build
+
+---
+
+no -- use the actual e-mail glyph please. not bulletin board.
+
+---
+
+do it -- 
+
+honor interactable re-design as best as you can
+honor cloud domain as best as you can
+
+both were very recent improvements. make it so! start building!
