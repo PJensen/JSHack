@@ -8,6 +8,7 @@ import { DungeonEntrance } from "../../rules/components/DungeonEntrance.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 import { Position } from "../../rules/components/Position.js";
 import { Interactable } from "../../rules/components/Interactable.js";
+import { LightEmitter } from "../../rules/components/LightEmitter.js";
 import { Vitality } from "../../rules/components/Vitality.js";
 import { Player } from "../../rules/components/Player.js";
 import { Pet } from "../../rules/components/Pet.js";
@@ -158,6 +159,17 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
     const portalId = world.create();
     world.add(portalId, Position, { x: portalPos.x, y: portalPos.y });
     world.add(portalId, NamedIdentity, { name: 'Return Portal', identity: RETURN_PORTAL_IDENTITY });
+    world.add(portalId, LightEmitter, {
+      radius: 3.6,
+      shadowSoftness: 4,
+      temporalPattern: "portal",
+      phaseSeed: ((portalPos.x & 0xffff) << 8) ^ (portalPos.y & 0xffff),
+      intensity: 0.88,
+      intensityScale: 1,
+      colorShiftScale: 0.65,
+      voidStrength: null,
+      baseColor: [112, 214, 255],
+    });
     world.add(portalId, Interactable, {
       action: 'returnPortal',
       params: {

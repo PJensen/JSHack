@@ -106,6 +106,20 @@ function pulse(t, id) {
 }
 
 /**
+ * Portal — stable blue ring with a slow breathing tide and soft edge shimmer.
+ * Calmer than a rift, suited to return portals and controlled transitions.
+ * Range: ~0.76 - 1.04.
+ */
+function portal(t, id) {
+  const p = id * 0.61;
+  const tide = 0.88 + 0.11 * Math.sin(t * 0.82 + p);
+  const edge = 0.03 * Math.sin(t * 5.4 + p * 1.7)
+    + 0.02 * Math.sin(t * 8.2 + p * 0.4);
+  const shimmer = Math.max(0, edge);
+  return out(tide + edge, -0.04 - shimmer * 0.10, 0.02 + shimmer * 0.04, 0.07 + shimmer * 0.12);
+}
+
+/**
  * Storm — fast crackling with random spikes. Electric, dangerous.
  * Good for storm magic, lightning enchantments, charged objects.
  * Range: ~0.63 – 1.15.
@@ -121,6 +135,22 @@ function storm(t, id) {
   // Cool white shift during spikes
   const s = spike > 0.1 ? 0.08 : 0;
   return out(v, -s * 0.5, -s * 0.2, s * 0.3);
+}
+
+/**
+ * Rift — slow breathing core with crackling storm veins. It keeps the
+ * Morrowind-like supernatural swell without harsh per-frame noise.
+ * Range: ~0.67 - 1.17.
+ */
+function rift(t, id) {
+  const p = id * 0.73;
+  const breath = 0.86 + 0.16 * Math.sin(t * 0.72 + p);
+  const vein = 0.07 * Math.sin(t * 7.1 + p * 1.9)
+    + 0.05 * Math.sin(t * 12.7 + p * 0.6);
+  const gate = Math.sin(t * 1.37 + p * 1.3) > 0.62 ? 0.10 * Math.sin(t * 18.0 + p) : 0;
+  const v = breath + vein + Math.max(0, gate);
+  const flare = Math.max(0, vein + gate);
+  return out(v, -0.05 - flare * 0.20, -0.08 - flare * 0.12, 0.08 + flare * 0.24);
 }
 
 /**
@@ -331,7 +361,9 @@ const PATTERNS = {
   breathe,
   occult,
   pulse,
+  portal,
   storm,
+  rift,
   biolum,
   heartbeat,
   candle,

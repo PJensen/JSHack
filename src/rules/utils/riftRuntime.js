@@ -2,6 +2,7 @@ import { Position } from "../components/Position.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Interactable } from "../components/Interactable.js";
 import { DungeonState } from "../components/DungeonState.js";
+import { LightEmitter } from "../components/LightEmitter.js";
 import { RiftPortal } from "../components/RiftPortal.js";
 import { RiftState } from "../components/RiftState.js";
 import { playerEntity, findNearestValidTileAround } from "./queries.js";
@@ -105,6 +106,17 @@ export function createDebugRift(world, requestedLevels = 0) {
   const riftId = resolveRiftId(seed, portalId);
   world.add(portalId, Position, { x: portalPos.x | 0, y: portalPos.y | 0 });
   world.add(portalId, NamedIdentity, { name: "Rift Portal", identity: RIFT_PORTAL_IDENTITY });
+  world.add(portalId, LightEmitter, {
+    radius: 4.2,
+    shadowSoftness: 3,
+    temporalPattern: "rift",
+    phaseSeed: seed & 0xffff,
+    intensity: 0.92,
+    intensityScale: 1,
+    colorShiftScale: 0.85,
+    voidStrength: null,
+    baseColor: [182, 106, 255],
+  });
   world.add(portalId, Interactable, {
     action: RIFT_PORTAL_ACTION,
     params: { riftId },

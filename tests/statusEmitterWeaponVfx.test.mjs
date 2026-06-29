@@ -119,3 +119,61 @@ Deno.test("status emitter controller removes weapon profile emitters when profil
   controller.step(0.016, { entities: [] }, 1.1);
   assert(harness.removed.includes("wpvfx:storm_weapon:weapon:3"));
 });
+
+Deno.test("status emitter controller gives rift portals low-rate motes and light", () => {
+  const world = makeWorld();
+  const harness = makeFxHarness();
+  const controller = createStatusEmitterController({ world, fx: harness.fx });
+
+  controller.step(0.25, {
+    entities: [
+      {
+        id: 11,
+        kind: "rift_portal",
+        pos: { x: 6, y: 4 },
+        tags: [],
+      },
+    ],
+  }, 2.0);
+
+  const emitter = harness.ensured.find((rec) => rec.key === "rift:11");
+  assert(emitter, "rift portal should create a continuous particle emitter");
+  assertEquals(emitter.cfg.rate, 7);
+
+  const lastStep = harness.stepCalls[harness.stepCalls.length - 1];
+  assert(lastStep.origins.some((origin) => origin.key === "rift:11"));
+  const lights = controller.getActiveLights();
+  assertEquals(lights.length, 1);
+  assert(lights[0].radius > 1.5 && lights[0].radius < 3);
+
+  controller.step(0.016, { entities: [] }, 2.1);
+  assert(harness.removed.includes("rift:11"));
+});
+
+Deno.test("status emitter controller gives return portals calmer motes and light", () => {
+  const world = makeWorld();
+  const harness = makeFxHarness();
+  const controller = createStatusEmitterController({ world, fx: harness.fx });
+
+  controller.step(0.25, {
+    entities: [
+      {
+        id: 12,
+        kind: "return_portal",
+        pos: { x: 2, y: 8 },
+        tags: [],
+      },
+    ],
+  }, 2.0);
+
+  const emitter = harness.ensured.find((rec) => rec.key === "portal:12");
+  assert(emitter, "return portal should create a continuous particle emitter");
+  assertEquals(emitter.cfg.rate, 5);
+
+  const lights = controller.getActiveLights();
+  assertEquals(lights.length, 1);
+  assert(lights[0].radius > 1.3 && lights[0].radius < 2.2);
+
+  controller.step(0.016, { entities: [] }, 2.1);
+  assert(harness.removed.includes("portal:12"));
+});

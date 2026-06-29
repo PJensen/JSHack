@@ -26,6 +26,8 @@ export function createStatusEmitterController({ world, fx }) {
   const furnaceEmitters = new Set();
   const cookFireEmitters = new Set();
   const torchEmitters = new Set();
+  const returnPortalEmitters = new Set();
+  const riftPortalEmitters = new Set();
   const familiarEmitters = new Set();
   const weaponProfileEmitterKeys = new Set();
   const familiarCooldowns = new Set();
@@ -85,6 +87,8 @@ export function createStatusEmitterController({ world, fx }) {
     cooking_fire: { tracker: cookFireEmitters, prefix: "cfire", cfg: { continuous: true, rate: 14, angle: -Math.PI / 2, spread: Math.PI / 3, speed: 0.65, speedJitter: 0.3, ax: 0, ay: -0.05, life: 0.9, lifeJitter: 0.3, size: 0.35, sizeEnd: 0.04, color: "#ff8800", alpha0: 0.75, alpha1: 0.0, offsetX: 0, offsetY: 0 } },
     torch: { tracker: torchEmitters, prefix: "torch", cfg: { continuous: true, rate: 10, angle: -Math.PI / 2, spread: Math.PI / 6, speed: 0.5, speedJitter: 0.4, ax: 0, ay: -0.9, life: 0.6, lifeJitter: 0.3, size: 0.22, sizeEnd: 0.03, color: "#ffaa33", alpha0: 0.85, alpha1: 0.0, offsetX: 0, offsetY: -0.2 } },
     familiar: { tracker: familiarEmitters, prefix: "fam", cfg: { continuous: true, rate: 8, angle: -Math.PI / 2, spread: Math.PI / 3, speed: 0.45, speedJitter: 0.25, ax: 0, ay: -0.15, life: 0.55, lifeJitter: 0.2, size: 0.18, sizeEnd: 0.03, color: "#ff6600", alpha0: 0.7, alpha1: 0.0, offsetX: -0.2, offsetY: -0.1 } },
+    return_portal: { tracker: returnPortalEmitters, prefix: "portal", cfg: { continuous: true, rate: 5, angle: 0, spread: Math.PI * 2, speed: 0.12, speedJitter: 0.35, ax: 0, ay: -0.03, life: 1.25, lifeJitter: 0.22, size: 0.14, sizeEnd: 0.04, color: "#7bd6ff", alpha0: 0.62, alpha1: 0.0, offsetX: 0, offsetY: 0 } },
+    rift_portal: { tracker: riftPortalEmitters, prefix: "rift", cfg: { continuous: true, rate: 7, angle: 0, spread: Math.PI * 2, speed: 0.18, speedJitter: 0.45, ax: 0, ay: -0.05, life: 1.45, lifeJitter: 0.28, size: 0.16, sizeEnd: 0.04, color: "#d16bff", alpha0: 0.72, alpha1: 0.0, offsetX: 0, offsetY: 0 } },
   };
 
   function installListeners() {
@@ -221,6 +225,16 @@ export function createStatusEmitterController({ world, fx }) {
         origins.push({ key, x: e.pos.x, y: e.pos.y });
         if (e.kind === "familiar") {
           lightProbes.push({ kind: "familiar_ready", id: e.id, x: e.pos.x, y: e.pos.y });
+        } else if (e.kind === "return_portal") {
+          const phase = (fxTime * 0.82) + (e.id * 0.61);
+          const wobbleX = Math.sin(phase * 1.2) * 0.04;
+          const wobbleY = Math.cos(phase * 1.5) * 0.04;
+          lightProbes.push({ kind: "return_portal", id: e.id, x: e.pos.x + wobbleX, y: e.pos.y + wobbleY });
+        } else if (e.kind === "rift_portal") {
+          const phase = (fxTime * 0.72) + (e.id * 0.73);
+          const wobbleX = Math.sin(phase * 1.7) * 0.08;
+          const wobbleY = Math.cos(phase * 1.3) * 0.08;
+          lightProbes.push({ kind: "rift_portal", id: e.id, x: e.pos.x + wobbleX, y: e.pos.y + wobbleY });
         }
       }
     }
@@ -277,6 +291,17 @@ export function createStatusEmitterController({ world, fx }) {
         const id = Number(p.id || 0) | 0;
         const f = 0.90 + 0.10 * Math.sin(_fxTime * 6.4 + id * 0.43);
         out.push({ x: p.x + 0.5, y: p.y + 0.5, radius: 1.7 * f, color: [255, 160, 80], flicker: f });
+      } else if (p.kind === "return_portal") {
+        const id = Number(p.id || 0) | 0;
+        const f = 0.88 + 0.10 * Math.sin(_fxTime * 0.82 + id * 0.61)
+          + 0.03 * Math.sin(_fxTime * 5.4 + id * 1.04);
+        out.push({ x: p.x + 0.5, y: p.y + 0.5, radius: 1.85 * f, color: [112, 214, 255], flicker: f });
+      } else if (p.kind === "rift_portal") {
+        const id = Number(p.id || 0) | 0;
+        const breath = 0.86 + 0.14 * Math.sin(_fxTime * 0.72 + id * 0.73);
+        const storm = 0.08 * Math.sin(_fxTime * 9.5 + id * 1.31);
+        const f = Math.max(0.68, breath + storm);
+        out.push({ x: p.x + 0.5, y: p.y + 0.5, radius: 2.25 * f, color: [190, 105, 255], flicker: f });
       }
     }
     return out;

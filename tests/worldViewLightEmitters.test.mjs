@@ -2,6 +2,7 @@ import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";
 import { buildWorldView } from "../src/bridge/schema/worldView.js";
 import { collectLightSources } from "../src/display/lighting/sources/index.js";
+import { getPatternNames } from "../src/display/lighting/sources/temporalPatterns.js";
 import { Position } from "../src/rules/components/Position.js";
 import { LightEmitter } from "../src/rules/components/LightEmitter.js";
 
@@ -98,4 +99,54 @@ Deno.test("collectLightSources consumes authored light emitters", () => {
   assert(lights.some((light) => light.kind === "void" && light.x === 8.5 && light.radius === 2.8));
   assert(lights.some((light) => light.kind === "void" && light.voidStrength > 0 && light.voidStrength < 0.65));
   assertEquals(lights.filter((light) => light.kind === "void" && light.x === 8.5).length, 1);
+});
+
+Deno.test("portal temporal patterns are available for authored portal lighting", () => {
+  assert(getPatternNames().includes("portal"));
+  assert(getPatternNames().includes("rift"));
+
+  const lights = collectLightSources({
+    turn: 1,
+    player: null,
+    lightEmitters: [{
+      id: 43,
+      pos: { x: 2, y: 6 },
+      radius: 3.6,
+      shadowSoftness: 4,
+      temporalPattern: "portal",
+      phaseSeed: 11,
+      intensity: 0.88,
+      intensityScale: 1,
+      colorShiftScale: 0.65,
+      voidStrength: null,
+      baseColor: [112, 214, 255],
+    }, {
+      id: 44,
+      pos: { x: 4, y: 6 },
+      radius: 4.2,
+      shadowSoftness: 3,
+      temporalPattern: "rift",
+      phaseSeed: 19,
+      intensity: 0.92,
+      intensityScale: 1,
+      colorShiftScale: 0.85,
+      voidStrength: null,
+      baseColor: [182, 106, 255],
+    }],
+    entities: [
+      { id: 43, kind: "return_portal", pos: { x: 2, y: 6 }, tags: [] },
+      { id: 44, kind: "rift_portal", pos: { x: 4, y: 6 }, tags: [] },
+    ],
+  }, { fxTime: 1, dt: 0.016 });
+
+  const portalLight = lights.find((entry) => entry.x === 2.5 && entry.y === 6.5);
+  assert(portalLight, "return portal authored light should be collected");
+  assertEquals(portalLight.softness, 4);
+  assert(Array.isArray(portalLight.color) && portalLight.color[2] > portalLight.color[0], "portal light should stay blue");
+
+  const light = lights.find((entry) => entry.x === 4.5 && entry.y === 6.5);
+  assert(light, "rift authored light should be collected");
+  assertEquals(light.softness, 3);
+  assert(light.flicker > 0.55 && light.flicker < 1.3, "rift light should breathe without extreme spikes");
+  assert(Array.isArray(light.color) && light.color[2] > light.color[0], "rift light should stay violet-blue");
 });

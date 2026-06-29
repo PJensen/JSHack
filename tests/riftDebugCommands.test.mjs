@@ -12,6 +12,7 @@ import { Position } from "../src/rules/components/Position.js";
 import { DungeonState } from "../src/rules/components/DungeonState.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { Interactable } from "../src/rules/components/Interactable.js";
+import { LightEmitter } from "../src/rules/components/LightEmitter.js";
 import { RiftPortal } from "../src/rules/components/RiftPortal.js";
 import { RiftState } from "../src/rules/components/RiftState.js";
 import { RiftEnterRequested } from "../src/events/RiftEnterRequested.js";
@@ -126,6 +127,18 @@ Deno.test("rift portal exposes authored generic interactable affordance", () => 
   assertEquals(affordance?.label, "Enter Rift");
 });
 
+Deno.test("debug rift portal carries authored breathing storm light", () => {
+  const { world } = makeWorld(0);
+  commandMap(world).get("create").handler("rift 2");
+  const [portalId] = [...world.query(RiftPortal)][0];
+  const light = world.get(portalId, LightEmitter);
+
+  assert(light, "rift portal should project an authored light");
+  assertEquals(light.temporalPattern, "rift");
+  assertEquals(light.baseColor, [182, 106, 255]);
+  assert(light.radius >= 4, "rift light should be visible beyond the portal tile");
+});
+
 Deno.test("rift portal interaction emits only a rift enter request", () => {
   installContent();
   const { world, player } = makeWorld(0);
@@ -140,6 +153,43 @@ Deno.test("rift portal interaction emits only a rift enter request", () => {
   assertEquals(requested.length, 1);
   assertEquals(requested[0].riftId, portal.riftId);
   assertEquals(returns.length, 0);
+});
+
+Deno.test("homecoming return portal carries authored calm portal light", async () => {
+  clearFloorCache();
+  const originalNow = Date.now;
+  let now = 20_000;
+  Date.now = () => now;
+
+  try {
+    const { world } = makeWorld(1);
+    const controller = createTransitionController({
+      world,
+      playerEntity: () => playerEntity(world),
+      tombstoneRepo: null,
+      onTransitioned() {},
+    });
+    controller.install();
+
+    world.emit("dungeon:teleport-depth", {
+      targetDepth: 0,
+      source: "hearthstone",
+      returnTicket: { depth: 1, x: 5, y: 5 },
+    });
+    await controller.flush();
+
+    const portal = [...world.query(NamedIdentity)].find(([, identity]) => identity?.identity === "return_portal");
+    assert(portal, "homecoming should leave a return portal");
+    const light = world.get(portal[0], LightEmitter);
+    assert(light, "return portal should project an authored light");
+    assertEquals(light.temporalPattern, "portal");
+    assertEquals(light.baseColor, [112, 214, 255]);
+    assert(light.radius >= 3, "return portal light should read at tile scale");
+  } finally {
+    Date.now = originalNow;
+    clearFloorCache();
+    clearTileMap();
+  }
 });
 
 Deno.test("rift enter and close use a detached plane and return to origin", async () => {
