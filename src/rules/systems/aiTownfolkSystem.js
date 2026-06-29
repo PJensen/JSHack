@@ -54,6 +54,7 @@ import { nearestPerceivedHostile } from "../utils/perception.js";
 import { getQuestRecord } from "../quests/runtime.js";
 import { RAT_INFESTATION_QUEST_ID } from "../quests/definitions/ratInfestation.js";
 import { getTownState, getWeather } from "../utils/townStateAccess.js";
+import { isAsleep, putActorToSleep, tryWakeActor } from "../utils/sleep.js";
 
 const TOWNFOLK_RADIUS = 40;
 const MAX_STUCK_TURNS = 5;
@@ -1675,6 +1676,10 @@ function handleScheduledTownfolk(world, id, pos, job) {
   if (Number.isFinite(target.deliverX)) job.deliverX = target.deliverX;
   if (Number.isFinite(target.deliverY)) job.deliverY = target.deliverY;
 
+  if (target.kind !== "sleep" && isAsleep(world, id)) {
+    tryWakeActor(world, id, { reason: "scheduled_wake", intensity: 999 });
+  }
+
   // Let active delivery complete before schedule override
   if (!phaseChanged && job.state === TOWNFOLK_STATES.delivering && job.carrying) {
     handleDelivering(world, id, pos, job);
@@ -1726,7 +1731,16 @@ function handleScheduledTownfolk(world, id, pos, job) {
 
   job.state = target.state;
   job.stuckTurns = 0;
-  if (target.kind === "sleep" || target.kind === "home") return;
+  if (target.kind === "sleep") {
+    putActorToSleep(world, id, {
+      reason: "scheduled_rest",
+      wakeDifficulty: 6,
+      wakeRadius: 1,
+      wakeOnDamage: true,
+    });
+    return;
+  }
+  if (target.kind === "home") return;
   if (job.workTurns > 0) {
     job.workTurns--;
     return;

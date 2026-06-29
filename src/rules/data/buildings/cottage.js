@@ -39,7 +39,7 @@ export default {
     { "dx": 1, "dy": -2, "kind": "home_bed" }
   ],
   "waypoints": [
-    { "dx": 2, "dy": 0, "name": "shop_door" },
-    { "dx": 2, "dy": -2, "name": "vendor_work" }
+    { "dx": 2, "dy": 0, "name": "front_door" },
+    { "dx": 2, "dy": -2, "name": "resident_home" }
   ]
 };

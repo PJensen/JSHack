@@ -38,6 +38,8 @@ import { Unpaid } from "../src/rules/components/Unpaid.js";
 import { HarvestNode } from "../src/rules/components/HarvestNode.js";
 import { Material } from "../src/rules/components/Material.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
+import { SleepState } from "../src/rules/components/SleepState.js";
+import { isAsleep } from "../src/rules/utils/sleep.js";
 
 // ── helpers ────────────────────────────────────────────────────────
 
@@ -625,6 +627,33 @@ Deno.test("scheduled townfolk sleeps at home before dawn", () => {
   assertEquals(job.state, TOWNFOLK_STATES.sleeping);
   assertEquals(job.targetX, 7);
   assertEquals(job.targetY, 5);
+  assert(isAsleep(world, npc), "scheduled sleeper should enter canonical SleepState");
+  assertEquals(world.get(npc, SleepState)?.wakeDifficulty, 6);
+});
+
+Deno.test("scheduled townfolk wakes when the sleep phase ends", () => {
+  const world = makeWorld(141);
+  world.step = 151; // breakfast phase
+
+  const npc = addTownfolk(world, 7, 5, "villager", {
+    scheduleEnabled: true,
+    homeX: 6, homeY: 5,
+    bedX: 7, bedY: 5,
+    pubX: 10, pubY: 10,
+  });
+  world.add(npc, SleepState, {
+    asleep: true,
+    wakeDifficulty: 6,
+    wakeRadius: 1,
+    wakeOnDamage: true,
+  });
+
+  aiTownfolkSystem(world);
+
+  const job = world.get(npc, TownfolkJob);
+  assertEquals(job.lastPhase, "breakfast");
+  assertEquals(job.routineKind, "home");
+  assertEquals(isAsleep(world, npc), false);
 });
 
 Deno.test("shop customer pulls vendor to stall during shop hours", () => {
