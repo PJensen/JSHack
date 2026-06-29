@@ -1,0 +1,9 @@
+I feel like town placement has too many constraints on it; this leads to an inordinate amount of time being spent placing buildings during startup -- instead of attacking it as an optimization problem, I think we can relax the constraints just a bit by placing buildings and carving grass around them.
+
+we're trying to "fit" things arent' we" I feel like as long as they're not in the middle of water, we'd be fine to slam the buildings down more harshly, and address the fit issue by carving a perimiter offset.
+
+tell me if I'm wrong.
+
+---
+
+do it -- with an eye towards (hopefully) greatly improving startup performance.
