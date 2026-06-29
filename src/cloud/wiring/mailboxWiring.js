@@ -8,6 +8,7 @@ import { Player } from "../../rules/components/Player.js";
 import { MailboxOpenRequested } from "../../events/MailboxOpenRequested.js";
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
+import { ObjectState } from "../../rules/components/ObjectState.js";
 import { Position } from "../../rules/components/Position.js";
 import { Weight } from "../../rules/components/Weight.js";
 import {
@@ -199,6 +200,12 @@ function normalizeMailRows(rows) {
   }));
 }
 
+function setMailboxState(world, targetId, state) {
+  const id = Number(targetId || 0) | 0;
+  if (!(id > 0) || !world.isAlive(id) || !world.has(id, ObjectState)) return;
+  world.set(id, ObjectState, { state: String(state || "empty") });
+}
+
 /**
  * @param {{ world: import("../../lib/ecs-js/index.js").World }} deps
  */
@@ -210,6 +217,7 @@ export function installMailboxWiring({ world }) {
   let _busy = false;
   let _lastInbox = [];
   let _lastOutbox = [];
+  let _mailboxId = 0;
 
   function playerId() {
     return Number(playerEntity(world)?.id || 0) | 0;
@@ -228,19 +236,23 @@ export function installMailboxWiring({ world }) {
     });
   }
 
-  async function refresh() {
+  async function refresh(options = {}) {
     if (!_phone) {
+      setMailboxState(world, _mailboxId, "empty");
       publish();
       return;
     }
     _busy = true;
+    setMailboxState(world, _mailboxId, "checking");
     publish();
     try {
       const [inbox, outbox] = await Promise.all([getInbox(_phone), getOutbox(_phone)]);
       _lastInbox = normalizeMailRows(inbox?.mail);
       _lastOutbox = normalizeMailRows(outbox?.mail);
+      setMailboxState(world, _mailboxId, options.sent ? "sent" : (_lastInbox.length ? "has_mail" : "empty"));
       publish();
     } catch (err) {
+      setMailboxState(world, _mailboxId, _lastInbox.length ? "has_mail" : "empty");
       publish({ error: String(err?.message || err) });
     } finally {
       _busy = false;
@@ -248,9 +260,10 @@ export function installMailboxWiring({ world }) {
     }
   }
 
-  world.on(MailboxOpenRequested, ({ actor }) => {
+  world.on(MailboxOpenRequested, ({ actor, targetId }) => {
     const id = Number(actor || 0) | 0;
     if (!(id > 0) || !world.has(id, Player)) return;
+    _mailboxId = Number(targetId || 0) | 0;
     uiEvent("ui:openMailbox");
     publish();
     refresh();
@@ -268,6 +281,7 @@ export function installMailboxWiring({ world }) {
     _phone = "";
     _lastInbox = [];
     _lastOutbox = [];
+    setMailboxState(world, _mailboxId, "empty");
     publish();
   });
 
@@ -327,7 +341,7 @@ export function installMailboxWiring({ world }) {
         try { destroySubtree(world, itemId); } catch { try { world.destroy(itemId); } catch {} }
       }
       publish({ notice: "Mail sent." });
-      refresh();
+      refresh({ sent: true });
     }).catch((err) => {
       publish({ error: String(err?.message || err) });
     }).finally(() => {

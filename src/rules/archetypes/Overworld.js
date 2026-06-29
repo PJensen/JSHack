@@ -690,6 +690,7 @@ export const Mailbox = defineArchetype(
   [NamedIdentity, { name: "Mailbox", identity: "mailbox" }],
   [Material, { kind: "metal" }],
   [Collider, { solid: true, blocksSight: false }],
+  [ObjectState, { state: "empty" }],
   [Interactable, { action: "openMailbox", params: null }],
 );
 

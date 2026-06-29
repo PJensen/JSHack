@@ -1119,6 +1119,11 @@ export function buildWorldView(world) {
 				kind = objState.state === "raised" ? "portcullis_raised" : "portcullis";
 			} else if (objState && ident?.identity === "pressure_plinth") {
 				kind = objState.state === "pressed" ? "pressure_plinth_pressed" : "pressure_plinth";
+			} else if (objState && ident?.identity === "mailbox") {
+				kind = objState.state === "checking" ? "mailbox_checking"
+					: objState.state === "has_mail" ? "mailbox_has_mail"
+					: objState.state === "sent" ? "mailbox_sent"
+					: "mailbox";
 			} else if (isPlayer) {
 				kind = ident?.identity || "player";
 			} else {
@@ -1252,6 +1257,11 @@ export function buildWorldView(world) {
 				kind = objState.state === "raised" ? "portcullis_raised" : "portcullis";
 			} else if (objState && ident?.identity === "pressure_plinth") {
 				kind = objState.state === "pressed" ? "pressure_plinth_pressed" : "pressure_plinth";
+			} else if (objState && ident?.identity === "mailbox") {
+				kind = objState.state === "checking" ? "mailbox_checking"
+					: objState.state === "has_mail" ? "mailbox_has_mail"
+					: objState.state === "sent" ? "mailbox_sent"
+					: "mailbox";
 			} else if (isPlayer) {
 				kind = ident?.identity || "player";
 			} else {
