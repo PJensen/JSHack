@@ -1,0 +1,78 @@
+Before integration with an NPC, lets run rift creation through a debug command, "create rift" that way we can test it out, "create rift", "close rift" type of commnads seem ideal.
+
+NOTE: rifts lean heavily on RNG
+NOTE: consider "create rift 0" as having levels perhaps.
+
+---
+
+the only thing we need to dis-ambiguate is the difference between a rift portal and a homecoming portal. I would hate to have them overlap.
+
+---
+
+PLEASE IMPLEMENT THIS PLAN:
+# Debug-First Rift Creation with Portal Separation
+
+## Summary
+
+Add v1 rifts behind debug commands only:
+
+- `create rift [levels]` spawns a nearby rift portal.
+- `create rift 0` uses deterministic random/default level count.
+- `close rift` closes only the active rift portal/ticket; if inside the rift, it returns the player to the rift origin first.
+- Rift portals must not reuse or overlap with homecoming/return portals.
+
+## Key Changes
+
+- Add separate rift identity and component:
+  - Rift portal entity uses `NamedIdentity.identity = "rift_portal"`.
+  - Existing homecoming/return portal remains `return_portal`.
+  - Add `RiftPortal` component with rift id, origin depth/position, level count, and seed.
+  - Do not use `returnPortal` action for rifts; add `riftPortal` interaction/action.
+
+- Add a small rift runtime model:
+  - `RiftState` singleton/component fact tracks active rift id, seed, level count, origin depth/position, current rift level, and portal id.
+  - Concrete typed events: `RiftOpened`, `RiftEntered`, `RiftExited`, `RiftClosed`.
+  - No new `world[...]` simulation state.
+
+- Add detached rift plane support:
+  - Normal dungeon floors keep existing depth/plane cache keys.
+  - Rift floors use explicit keys like `rift:<id>:z<level>`.
+  - Rift transition metadata must never be interpreted as underworld/homecoming portal metadata.
+
+- Add debug commands:
+  - `create rift [levels]`: creates one active rift portal near player; refuses if a rift is already active.
+  - `close rift`: destroys only entities with `RiftPortal` / `rift_portal`; never destroys `return_portal`.
+  - Command output includes rift id, seed, level count, and portal position.
+
+- Add rift portal interaction:
+  - Interacting with `riftPortal` enters rift level 1 through transition wiring.
+  - Returning/closing from rift uses `RiftState.originDepth/originX/originY`, not `return_portal` params.
+  - Homecoming portals and rift portals can coexist without either command/interaction touching the other.
+
+## Test Plan
+
+- Portal separation:
+  - Creating a rift does not create or destroy `return_portal`.
+  - Existing homecoming return portal flow still works when a rift portal exists.
+  - `close rift` removes `rift_portal` only.
+  - `portal:return` ignores rift portals.
+  - `riftPortal` interaction ignores homecoming return portals.
+
+- Rift behavior:
+  - `create rift`, `create rift 0`, and `create rift 3` create valid tickets.
+  - Duplicate `create rift` refuses while active.
+  - Entering a rift transitions to detached rift level 1.
+  - Closing from inside returns to origin before cleanup.
+  - Rift cache keys do not collide with normal dungeon depth cache.
+
+- Guardrails:
+  - New events are concrete `EcsEvent` classes.
+  - RNG comes from deterministic world/rift seed paths, never `Math.random()`.
+  - Run focused rift/transition/debug tests, then `deno test --allow-read --no-check`.
+
+## Assumptions
+
+- Rift portals are visually/mechanically distinct from homecoming return portals from v1.
+- `create rift` spawns a rift portal instead of instantly entering.
+- Numeric argument is level count; `0` means random/default.
+- V1 has no NPC integration or reward objective yet.

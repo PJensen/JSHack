@@ -1,0 +1,70 @@
+{
+  "cli_version": "0.7.7",
+  "checkpoint_id": "7d10e4f6eb11",
+  "session_id": "019f00a0-2b9d-7762-926a-0096ef5e6ddf",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-29T13:19:11.100036564Z",
+  "branch": "master",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "src/content/interactables/index.js",
+    "src/content/interactables/rift/index.js",
+    "src/display/palette/base.js",
+    "src/display/palette/index.js",
+    "src/events/RiftCloseRequested.js",
+    "src/events/RiftClosed.js",
+    "src/events/RiftEnterRequested.js",
+    "src/events/RiftEntered.js",
+    "src/events/RiftExited.js",
+    "src/events/RiftOpened.js",
+    "src/main/debug/consoleCommands.js",
+    "src/main/wiring/transitionWiring.js",
+    "src/rules/components/DungeonState.js",
+    "src/rules/components/RiftPortal.js",
+    "src/rules/components/RiftState.js",
+    "src/rules/components/index.js",
+    "src/rules/environment/dungeon/transition.js",
+    "src/rules/utils/riftRuntime.js",
+    "tests/riftDebugCommands.test.mjs"
+  ],
+  "agent": "Codex",
+  "model": "gpt-5.5",
+  "turn_id": "c9bc4ebded10",
+  "checkpoint_transcript_start": 707,
+  "transcript_lines_at_start": 707,
+  "token_usage": {
+    "input_tokens": 438832,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 9811328,
+    "output_tokens": 28596,
+    "api_call_count": 57
+  },
+  "session_metrics": {
+    "turn_count": 9
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-29T13:19:10.921671599Z",
+    "agent_lines": 707,
+    "agent_removed": 21,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 707,
+    "total_lines_changed": 728,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 865,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".github/agents/Dungeon Generation and BSP Expert.agent.md": 582,
+        ".github/agents/VFX Agent.agent.md": 283
+      }
+    }
+  ]
+}
