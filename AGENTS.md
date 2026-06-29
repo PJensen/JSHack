@@ -62,10 +62,16 @@ Deeper docs:
   existing formatting and keep diffs limited to the requested functional edits.
 - **Search before writing.** Extend existing patterns. Do exactly what was
   asked; no opportunistic content wiring or unrelated cleanup.
-- **Run the full runtime suite after every task.** Before handing work back,
-  run `deno test --allow-read --no-check` and do not leave known failing tests
-  unreported. Focused tests are useful during development, but they do not
-  replace the full suite.
+- **Verify in proportion to the change.** Run focused tests and guardrails that
+  cover the touched behavior. Do not run the full runtime suite by default; it
+  is allowed only when explicitly requested or when the change genuinely needs
+  broad regression coverage. Always report what was run and any known or
+  observed failures.
+- **Content authoring comes first.** When adding content-facing behavior,
+  prefer small authored definitions, generic affordances, and reusable engine
+  surfaces over bespoke wiring. If a feature needs UI or interaction glue, ask
+  whether `defineInteractable()`, content DSLs, or an existing canonical
+  pipeline should own it before adding one-off main/display code.
 
 ---
 
@@ -171,14 +177,15 @@ deno test --allow-read tests/movementRefactored.test.mjs
 deno test --allow-read tests/contentCatalogCanonical.test.mjs
 ```
 
-Full runtime suite:
-
-```bash
-deno test --allow-read --no-check
-```
+Prefer the smallest meaningful verification set: changed test files, adjacent
+behavior tests, architecture guardrails, and targeted audit tools. If you do run
+broad runtime coverage, use `deno test --allow-read --no-check` and treat
+pre-existing failures as baseline debt to report, not as permission to obscure
+new failures.
 
 Plain `deno test --allow-read` may fail during type-check on non-game packaging
-scripts before tests run. Use `--no-check` when you need runtime coverage.
+scripts before tests run. Use `--no-check` for runtime coverage when type-check
+is not the thing being tested.
 
 ### Fast Greps
 
@@ -246,6 +253,21 @@ not push tags onto entity records; tag projection belongs in the bridge.
 ---
 
 ## Patterns That Matter
+
+### Content-First Engine Work
+
+The architecture exists to make strange rules cheap to author. Before adding a
+new one-off interaction, modal, command, or UI bridge, look for the content
+surface that should own it:
+
+- `defineInteractable()` for object affordances, verbs, prompts, and hooks.
+- Content DSL/catalog files for canonical item, monster, spell, and feature
+  authoring.
+- Existing rules pipelines for spawn, damage, use/apply, status, inventory, and
+  transitions.
+
+The standard is not "least code today." The standard is whether the next weird
+rule becomes small, explicit, composable, deterministic, and inspectable.
 
 ### Listener Installers
 
@@ -342,4 +364,4 @@ bounds, parity, layer boundaries, canonical paths.
 - [ ] Spawn paths use canonical constructors/materializers.
 - [ ] Event wiring checked with `tools/event-bus-explorer.mjs`.
 - [ ] Agent health checked with `tools/agent-health.mjs`.
-- [ ] Full runtime suite passed with `deno test --allow-read --no-check`.
+- [ ] Focused tests and relevant guardrails were run and reported.
