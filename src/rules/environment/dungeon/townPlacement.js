@@ -648,7 +648,7 @@ function addCivicFixtures(chunks, center, buildings) {
   const chestPos = cottage?.waypoints.vendor_work || cottage?.spawns.home_bed || null;
   if (chestPos) addChunkSpawn(chunks, chestPos.x + 1, chestPos.y, "home_chest");
   addChunkSpawn(chunks, center.x - 2, center.y, "message_board");
-  addChunkSpawn(chunks, center.x - 3, center.y, "mailbox");
+  addChunkSpawn(chunks, center.x, center.y - 3, "mailbox");
   if (tavern) addChunkSpawn(chunks, tavern.door.x, tavern.door.y + 2, "lantern_post");
 }
 

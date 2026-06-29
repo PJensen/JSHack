@@ -189,6 +189,7 @@ Deno.test("overworld procedurally stamps the required town economy", async () =>
   assertEquals(countKind(chunks, "church_sign"), 1, "churchyard district should anchor on a church");
   assertEquals(countKind(chunks, "home_sign"), 1, "civic core should expose a home sign");
   assertEquals(countKind(chunks, "message_board"), 1, "town should have a bulletin board");
+  assertEquals(countKind(chunks, "mailbox"), 1, "town should have a mailbox");
   assertEquals(countKind(chunks, "fountain"), 1, "civic core should include a fountain plaza");
 
   assert(countKind(chunks, "crop_wheat") >= 12, "farm should plant wheat");

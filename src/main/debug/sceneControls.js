@@ -11,6 +11,13 @@ import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 
 const _installed = Symbol.for('sceneControls');
 
+function isEditableTarget(target) {
+  if (!target || typeof target !== "object") return false;
+  const el = /** @type {HTMLElement} */ (target);
+  const tag = String(el.tagName || "").toUpperCase();
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.isContentEditable === true;
+}
+
 /**
  * Install keyboard-driven scene debug controls (zoom, camera, shake, save-delete).
  * @param {{ world: import('../../lib/ecs-js/index.js').World, cam: object, TILE_PX: number, defaultZoomScale?: number, messageLog: { log(msg: object): void }, runtimeConfig: { debug?: boolean } }} deps
@@ -20,6 +27,7 @@ export function installSceneControls({ world, cam, TILE_PX, defaultZoomScale = T
   /** @type {any} */ (world)[_installed] = true;
 
   addEventListener("keydown", (e) => {
+    if (isEditableTarget(e.target)) return;
     const { key, code } = e;
     const deleteSaveHotkey = e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey && (code === "Backspace" || key === "Backspace");
     const zoomIn  = key === "+" || key === "=" || code === "Equal" || code === "NumpadAdd";
