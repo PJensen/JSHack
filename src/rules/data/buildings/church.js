@@ -520,6 +520,11 @@ export default {
       "kind": "church_altar"
     },
     {
+      "dx": 0,
+      "dy": -4,
+      "kind": "home_bed"
+    },
+    {
       "dx": -4,
       "dy": -1,
       "kind": "torch"

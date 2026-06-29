@@ -520,6 +520,11 @@ export default {
       "kind": "pillar"
     },
     {
+      "dx": -8,
+      "dy": 1,
+      "kind": "home_bed"
+    },
+    {
       "dx": -4,
       "dy": 1,
       "kind": "smithy_sign"

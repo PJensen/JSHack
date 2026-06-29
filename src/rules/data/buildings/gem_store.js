@@ -60,6 +60,7 @@ export default {
     { "dx": -2, "dy": -4, "kind": "gem_display_case" },
     { "dx": 0, "dy": -4, "kind": "gem_display_case" },
     { "dx": 2, "dy": -4, "kind": "gem_display_case" },
+    { "dx": 3, "dy": -1, "kind": "home_bed" },
     { "dx": 2, "dy": 1, "kind": "gem_shop_sign" }
   ],
   "waypoints": [

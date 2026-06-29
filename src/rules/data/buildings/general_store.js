@@ -70,6 +70,7 @@ export default {
     { "dx": -2, "dy": -2, "kind": "general_store_item" },
     { "dx":  0, "dy": -2, "kind": "general_store_item" },
     { "dx":  3, "dy": -2, "kind": "general_store_item" },
+    { "dx":  3, "dy": -1, "kind": "home_bed" },
     { "dx":  2, "dy":  1, "kind": "general_store_sign" }
   ],
   "waypoints": [

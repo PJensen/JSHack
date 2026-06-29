@@ -89,6 +89,7 @@ export default {
     { "dx": 2, "dy":  1, "kind": "tavern_bench" },
     { "dx": 5, "dy":  1, "kind": "tavern_bench" },
     { "dx": 6, "dy":  1, "kind": "tavern_bench" },
+    { "dx": 7, "dy":  2, "kind": "home_bed" },
     { "dx": -1, "dy": -1, "kind": "tavern_sign" }
   ],
   "waypoints": [

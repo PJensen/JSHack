@@ -503,11 +503,12 @@ function indexChestPositions(chunks, buildings) {
 
 function addTownfolkForBuilding(chunks, building, roles, tavernDoor, chestPositions) {
   for (const role of roles) {
-    const home = (role === "enchantress" ? (building.waypoints.enchantress_work || building.waypoints.vendor_work) : null)
+    const bed = building.spawns.home_bed
       || building.waypoints.resident_home
-      || building.waypoints.vendor_work
-      || building.waypoints.farmer_work
+      || building.waypoints.front_door
       || building.door;
+    const home = building.waypoints.resident_home
+      || bed;
     const work = (role === "enchantress" ? (building.waypoints.enchantress_work || building.waypoints.vendor_work) : null)
       || building.waypoints.vendor_work
       || building.waypoints.farmer_work
@@ -520,8 +521,8 @@ function addTownfolkForBuilding(chunks, building, roles, tavernDoor, chestPositi
       townfolkId: role,
       homeX: home.x,
       homeY: home.y,
-      bedX: home.x,
-      bedY: home.y,
+      bedX: bed.x,
+      bedY: bed.y,
       workX: work.x,
       workY: work.y,
       pubX: tavernDoor?.x ?? work.x,

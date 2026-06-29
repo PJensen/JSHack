@@ -200,6 +200,26 @@ Deno.test("overworld procedurally stamps the required town economy", async () =>
   assert(countKind(chunks, "townfolk") >= 8, "buildings should open town professions");
 });
 
+Deno.test("scheduled townfolk receive real bed coordinates when buildings author beds", async () => {
+  const { chunks } = await generateOverworldChunks(SEED);
+  const townfolk = spawnsOfKind(chunks, "townfolk");
+  const byRole = new Map(townfolk.map((spawn) => [spawn.params?.townfolkId, spawn]));
+
+  for (const role of ["general_vendor", "book_vendor", "gem_vendor", "barkeep", "priest", "smith", "fisher"]) {
+    const spawn = byRole.get(role);
+    assert(spawn, `expected ${role} townfolk spawn`);
+    assertEquals(spawn.params?.scheduleEnabled, true, `${role} should use the town schedule`);
+    assert(
+      Number.isFinite(spawn.params?.bedX) && Number.isFinite(spawn.params?.bedY),
+      `${role} should have finite bed coordinates`,
+    );
+    assert(
+      spawn.params.bedX !== spawn.params.workX || spawn.params.bedY !== spawn.params.workY,
+      `${role} should not sleep at their work counter`,
+    );
+  }
+});
+
 Deno.test("overworld places named curiosity landmarks outside the town core", async () => {
   const { chunks, townPlan } = await generateOverworldChunks(SEED);
   const landmarks = landmarkSpawns(chunks);

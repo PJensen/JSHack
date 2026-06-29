@@ -79,6 +79,7 @@ export default {
     { "dx": -1, "dy": -2, "kind": "alchemy_shop_item" },
     { "dx": 1, "dy": -2, "kind": "alchemy_shop_item" },
     { "dx": 2, "dy": -1, "kind": "alchemy_shop_item" },
+    { "dx": 4, "dy": -1, "kind": "home_bed" },
     { "dx": 1, "dy": 1, "kind": "apothecary_sign" }
   ],
   "waypoints": [
