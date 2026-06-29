@@ -6,7 +6,7 @@ import {
   validateBundle,
   serializeBundle,
   deserializeBundle,
-} from "../src/shared/proofBundle.js";
+} from "../src/cloud/proof/proofBundle.js";
 
 // ---------------------------------------------------------------------------
 // createEmptyBundle

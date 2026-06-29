@@ -1,7 +1,7 @@
 // display/ui/overlayUtils.js
 // Shared utilities, panel management, tooltips, and standalone UI widgets.
 
-import { getHighscoreVersionLabel, getHighscores } from '../../shared/tombstoneApi.js';
+import { getHighscoreVersionLabel, getHighscores } from '../../cloud/tombstones/client.js';
 
 export const PANEL_Z_BASE = 1200;
 export let _panelZCounter = PANEL_Z_BASE;

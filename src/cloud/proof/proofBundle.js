@@ -1,4 +1,4 @@
-// shared/proofBundle.js
+// cloud/proof/proofBundle.js
 // Proof bundle format, validation, and serialization for cryptographic high score verification.
 // Pure synchronous module — no crypto, no async. Safe for import anywhere.
 

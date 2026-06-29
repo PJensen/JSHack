@@ -46,7 +46,6 @@ import { clearSpatialIndex } from '../../utils/spatialIndex.js';
 import { manhattanScalar } from '../../utils/distance.js';
 import { generateOverworldChunks } from './overworld.js';
 import { WeatherState } from '../../components/WeatherState.js';
-import { getCachedHighscores } from '../../../shared/tombstoneApi.js';
 import { floorRegionKey, getUnderworldRegionTemplate } from './underworldRegions.js';
 
 // Cooperative yield: returns a promise resolved on next animation frame
@@ -78,6 +77,7 @@ const _yieldFrame = () => {
  */
 export async function generateFloor(world, worldSeed, depth, tombstoneRepo = null, onProgress = null, priorDownStairPositions = null, opts = {}) {
   const _yield = onProgress ? _yieldFrame : null;
+  const highscoreProvider = typeof opts.getHighscores === 'function' ? opts.getHighscores : null;
   // Yield every N chunks to keep UI responsive without slowing gen too much.
   const _YIELD_EVERY = 2;
   if (depth === 0) {
@@ -109,7 +109,7 @@ export async function generateFloor(world, worldSeed, depth, tombstoneRepo = nul
         const graveRng = createRng(((worldSeed >>> 0) ^ 0x47524156) >>> 0);
         const records = [];
 
-        const highscores = getCachedHighscores();
+        const highscores = highscoreProvider ? highscoreProvider() : null;
         const maxGlobalPinned = Math.min(5, graveSpawns.length);
         if (Array.isArray(highscores) && highscores.length > 0) {
           const top = highscores.slice(0, maxGlobalPinned);
@@ -467,7 +467,10 @@ export async function initDungeon(world, opts = {}) {
   clearPerceptionMemory();
   clearSpatialIndex(world);
 
-  const { spawnX, spawnY, entityIds, downStairPositions, profileType, regionKey, activeTemplateId, regionAnchorX, regionAnchorY } = await generateFloor(world, worldSeed, depth, tombstoneRepo, onProgress, null, { dungeonType: opts.dungeonType ?? null });
+  const { spawnX, spawnY, entityIds, downStairPositions, profileType, regionKey, activeTemplateId, regionAnchorX, regionAnchorY } = await generateFloor(world, worldSeed, depth, tombstoneRepo, onProgress, null, {
+    dungeonType: opts.dungeonType ?? null,
+    getHighscores: typeof opts.getHighscores === 'function' ? opts.getHighscores : null,
+  });
 
   // Create dungeon state singleton
   const dsId = world.create();

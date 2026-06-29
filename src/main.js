@@ -137,9 +137,9 @@ import { TombstoneRepository } from "./rules/repositories/TombstoneRepository.js
 import { installTombstoneDeathListener } from "./rules/systems/tombstoneSystem.js";
 import { Tombstone as TombstoneComponent } from "./rules/components/Tombstone.js";
 import { resolveInteractableAffordance } from "./rules/interaction/interactableAffordance.js";
-import { installDeathShareWiring } from "./main/wiring/deathShareWiring.js";
-import { installProofWiring } from "./main/proof/proofWiring.js";
-import { postVerifiedScore } from "./shared/tombstoneApi.js";
+import { installDeathShareWiring } from "./cloud/wiring/deathShareWiring.js";
+import { installProofWiring } from "./cloud/wiring/proofWiring.js";
+import { postVerifiedScore } from "./cloud/tombstones/client.js";
 import { forEachInRadius } from "./rules/utils/spatialIndex.js";
 import { chebyshevScalar, manhattanScalar } from "./rules/utils/distance.js";
 import { buildBlocksVisionMap, blockedCallback } from "./rules/utils/vision.js";
@@ -171,7 +171,7 @@ import {
   buildNoticeBoardPayload,
   ensureLocalGeneratedQuest,
 } from "./rules/quests/localGenerator.js";
-import { postCharacterCreated, getHighscores } from "./shared/tombstoneApi.js";
+import { postCharacterCreated, getCachedHighscores, getHighscores } from "./cloud/tombstones/client.js";
 import { Traits } from "./rules/components/Traits.js";
 import { Polymorph } from "./rules/components/Polymorph.js";
 import { resolvePolymorph } from "./rules/systems/polymorphSystem.js";
@@ -341,7 +341,7 @@ initializeRunItemState(world, {
 bootAdvance(_pendingSavegame ? "Prepared saved item state" : "Prepared run-specific item state");
 
 // Initialize tombstone system
-const tombstoneRepo = new TombstoneRepository();
+const tombstoneRepo = new TombstoneRepository(null, { getHighscores: getCachedHighscores });
 installTombstoneDeathListener(world, tombstoneRepo);
 installDeathShareWiring({ world });
 const _proofWiring = installProofWiring({ world });
@@ -973,6 +973,7 @@ if (!_willShowCharCreation) {
   spawnPos = await initDungeon(world, {
     startDepth: _startDepth,
     tombstoneRepo,
+    getHighscores: getCachedHighscores,
     dungeonType: runtimeConfig.dungeonType,
     onProgress: (progress) => {
       if (!progress) return;
@@ -1090,6 +1091,7 @@ async function _finalizeNewGame(classData) {
       spawnPos = await initDungeon(world, {
         startDepth: _startDepth,
         tombstoneRepo,
+        getHighscores: getCachedHighscores,
         dungeonType: runtimeConfig.dungeonType,
         onProgress: typeof classData?.onProgress === "function" ? classData.onProgress : undefined,
       });
@@ -1102,6 +1104,7 @@ async function _finalizeNewGame(classData) {
       spawnPos = await initDungeon(world, {
         startDepth: _startDepth,
         tombstoneRepo,
+        getHighscores: getCachedHighscores,
         dungeonType: runtimeConfig.dungeonType,
         onProgress: typeof classData?.onProgress === "function" ? classData.onProgress : undefined,
       });
@@ -2073,6 +2076,7 @@ const transitionCtrl = createTransitionController({
   world,
   playerEntity: () => playerEntity(world),
   tombstoneRepo,
+  getHighscores: getCachedHighscores,
   onTransitioned: () => {
     _cachedView = null;
     _cachedStep = -1;

@@ -44,9 +44,10 @@ export function canTraverseDungeonEntrance(world, actorId, entrance) {
  * @param {object} deps.world
  * @param {() => ({id:number, pos:{x:number,y:number}}|null)} deps.playerEntity
  * @param {object} deps.tombstoneRepo
+ * @param {() => any[]|null} [deps.getHighscores]
  * @param {() => void} deps.onTransitioned  callback after floor change (invalidate caches)
  */
-export function createTransitionController({ world, playerEntity, tombstoneRepo, onTransitioned }) {
+export function createTransitionController({ world, playerEntity, tombstoneRepo, getHighscores, onTransitioned }) {
   /** @type {object|null} */
   let _pending = null;
   let _inFlight = false;
@@ -267,6 +268,7 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
           { x: pending.targetPos.x | 0, y: pending.targetPos.y | 0 },
           {
             tombstoneRepo,
+            getHighscores,
             validateDestination: pending.validateTargetPos === true,
             planeId: pending.planeId,
             planeSeed: pending.planeSeed,
@@ -286,6 +288,7 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
           direction,
           stairPos: pending.stairPos || null,
           tombstoneRepo,
+          getHighscores,
           templateId: activeTemplateId,
           anchorX: activeTemplateId ? (Number(pending.entrance?.anchorX ?? currentState?.regionAnchorX ?? pending.stairPos?.x ?? 0) | 0) : undefined,
           anchorY: activeTemplateId ? (Number(pending.entrance?.anchorY ?? currentState?.regionAnchorY ?? pending.stairPos?.y ?? 0) | 0) : undefined,

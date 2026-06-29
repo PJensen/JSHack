@@ -1,6 +1,6 @@
 import { Player } from "../../rules/components/Player.js";
 import { Score } from "../../rules/components/Score.js";
-import { getRuntimeVersionMeta, postDeathTombstone } from "../../shared/tombstoneApi.js";
+import { getRuntimeVersionMeta, postDeathTombstone } from "../tombstones/client.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 import { DungeonState } from "../../rules/components/DungeonState.js";
 import { ItemInfo } from "../../rules/components/ItemInfo.js";

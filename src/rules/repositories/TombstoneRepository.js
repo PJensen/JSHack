@@ -1,5 +1,4 @@
 import { createStorageAdapter } from './storage/storageFactory.js';
-import { getCachedHighscores } from '../../shared/tombstoneApi.js';
 
 const STORAGE_PREFIX = 'jshack.tombstones.depth.';
 const MAX_TOMBSTONES_PER_DEPTH = 20; // Prevent unbounded growth
@@ -21,8 +20,9 @@ export class TombstoneRepository {
   /**
    * @param {Object} [storageAdapter] - Optional storage adapter (auto-detected if not provided)
    */
-  constructor(storageAdapter = null) {
+  constructor(storageAdapter = null, opts = {}) {
     this._storage = storageAdapter || createStorageAdapter();
+    this._getHighscores = typeof opts.getHighscores === 'function' ? opts.getHighscores : null;
   }
 
   /**
@@ -68,7 +68,7 @@ export class TombstoneRepository {
    */
   getRandomForDepth(depth, count, rng) {
     const targetCount = Math.max(0, Number(count || 0) | 0);
-    const highscores = getCachedHighscores();
+    const highscores = this._getHighscores ? this._getHighscores() : null;
     if (Array.isArray(highscores) && highscores.length > 0) {
       // Partition: depth-matching first (when API returns depth), then rest
       const depthMatch = [];

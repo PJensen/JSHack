@@ -302,7 +302,7 @@ function _buildSnapshotRegistry(world) {
  * @param {import('../../../lib/ecs-js/index.js').World} world
  * @param {number} newDepth
  * @param {{x: number, y: number}} destinationPos - world coords for player placement
- * @param {{direction?: 'up'|'down', stairPos?: {x:number,y:number}|null, tombstoneRepo?: Object, validateDestination?: boolean, onProgress?: (progress: { phase: 'chunks', depth: number, processed: number, total: number, cx?: number, cy?: number }) => void, planeId?: string, planeSeed?: number}} [opts]
+ * @param {{direction?: 'up'|'down', stairPos?: {x:number,y:number}|null, tombstoneRepo?: Object, getHighscores?: () => any[]|null, validateDestination?: boolean, onProgress?: (progress: { phase: 'chunks', depth: number, processed: number, total: number, cx?: number, cy?: number }) => void, planeId?: string, planeSeed?: number}} [opts]
  */
 export async function transitionToDepth(world, newDepth, destinationPos, opts = {}) {
   // Find dungeon state
@@ -446,6 +446,7 @@ export async function transitionToDepth(world, newDepth, destinationPos, opts = 
       : priorDownStairPositions;
     const result = await generateFloor(world, targetPlaneSeed, newDepth, tombstoneRepo, onProgress, regionPriorDownStairs, {
       dungeonType: opts.dungeonType ?? null,
+      getHighscores: typeof opts.getHighscores === 'function' ? opts.getHighscores : null,
       templateId: region.templateId,
       anchorX: region.anchorX,
       anchorY: region.anchorY,

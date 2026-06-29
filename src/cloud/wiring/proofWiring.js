@@ -1,14 +1,14 @@
-// main/proof/proofWiring.js
+// cloud/wiring/proofWiring.js
 // Wires the game proof recorder into the ECS lifecycle.
 // Follows the same Symbol-guarded install pattern as deathShareWiring.js.
 
-import { createGameProof } from "./gameProof.js";
+import { createGameProof } from "../proof/gameProof.js";
 import { Player } from "../../rules/components/Player.js";
 import { Score } from "../../rules/components/Score.js";
 import { DungeonState } from "../../rules/components/DungeonState.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 import { getClass } from "../../rules/data/classes.js";
-import { getRuntimeVersionMeta } from "../../shared/tombstoneApi.js";
+import { getRuntimeVersionMeta } from "../tombstones/client.js";
 
 const INSTALLED_KEY = Symbol.for("jshack:proof:wiring:installed");
 

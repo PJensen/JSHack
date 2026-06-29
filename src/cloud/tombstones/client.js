@@ -1,4 +1,4 @@
-// shared/tombstoneApi.js
+// cloud/tombstones/client.js
 // Remote tombstone worker API – captures character creation and death telemetry.
 // Calls are fire-and-forget; callers should .catch() any errors they wish to log.
 

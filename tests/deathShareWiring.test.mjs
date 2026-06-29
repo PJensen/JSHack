@@ -1,6 +1,6 @@
 import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";
-import { installDeathShareWiring } from "../src/main/wiring/deathShareWiring.js";
+import { installDeathShareWiring } from "../src/cloud/wiring/deathShareWiring.js";
 import { Player } from "../src/rules/components/Player.js";
 import { Score } from "../src/rules/components/Score.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";

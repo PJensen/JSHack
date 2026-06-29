@@ -1,4 +1,4 @@
-// shared/proofVerify.js
+// cloud/proof/proofVerify.js
 // Hash chain verifier for proof bundles.
 // Works in both Deno and browser (uses Web Crypto API).
 // No game engine imports — pure async crypto.

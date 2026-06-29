@@ -1,6 +1,6 @@
 import { assertEquals, assert } from "jsr:@std/assert";
-import { createGameProof } from "../src/main/proof/gameProof.js";
-import { verifyHashChain } from "../src/shared/proofVerify.js";
+import { createGameProof } from "../src/cloud/proof/gameProof.js";
+import { verifyHashChain } from "../src/cloud/proof/proofVerify.js";
 
 // ---------------------------------------------------------------------------
 // gameProof basics

@@ -26,6 +26,10 @@ function refsDisplay(spec) {
   return spec.includes("/display/") || spec.startsWith("../display/") || spec.startsWith("./display/");
 }
 
+function refsCloud(spec) {
+  return spec.includes("/cloud/") || spec.startsWith("../cloud/") || spec.startsWith("./cloud/");
+}
+
 Deno.test("separation: rules layer does not import display layer", async () => {
   const violations = [];
   for await (const file of walkJsFiles("src/rules")) {
@@ -35,6 +39,17 @@ Deno.test("separation: rules layer does not import display layer", async () => {
     }
   }
   assert(violations.length === 0, `rules/display boundary violations:\n${violations.join("\n")}`);
+});
+
+Deno.test("separation: rules layer does not import cloud layer", async () => {
+  const violations = [];
+  for await (const file of walkJsFiles("src/rules")) {
+    const src = await Deno.readTextFile(file);
+    for (const spec of importSpecifiers(src)) {
+      if (refsCloud(spec)) violations.push(`${file} -> ${spec}`);
+    }
+  }
+  assert(violations.length === 0, `rules/cloud boundary violations:\n${violations.join("\n")}`);
 });
 
 Deno.test("separation: display layer does not import rules layer", async () => {

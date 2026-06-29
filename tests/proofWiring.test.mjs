@@ -1,7 +1,7 @@
 import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";
-import { installProofWiring } from "../src/main/proof/proofWiring.js";
-import { verifyHashChain } from "../src/shared/proofVerify.js";
+import { installProofWiring } from "../src/cloud/wiring/proofWiring.js";
+import { verifyHashChain } from "../src/cloud/proof/proofVerify.js";
 import { Player } from "../src/rules/components/Player.js";
 import { Score } from "../src/rules/components/Score.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";

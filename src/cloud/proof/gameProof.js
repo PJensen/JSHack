@@ -1,9 +1,9 @@
-// main/proof/gameProof.js
+// cloud/proof/gameProof.js
 // Session recorder with async SHA-256 hash chain.
 // Records every player action and maintains a tamper-evident hash chain.
-// Async crypto is kept in the main/ layer (never in rules/).
+// Async crypto is kept in the cloud layer (never in rules/).
 
-import { createEmptyBundle, canonicalizeAction } from "../../shared/proofBundle.js";
+import { createEmptyBundle, canonicalizeAction } from "./proofBundle.js";
 
 const _encoder = new TextEncoder();
 

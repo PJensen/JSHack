@@ -3,7 +3,7 @@
 // Data is passed in by main.js via showCharCreation(opts).
 import { versionLoaded, getVersionState } from '../../shared/version.js';
 import { pickRandomCharacterName } from '../../shared/utils/characterNames.js';
-import { getHighscoreVersionLabel, getHighscores } from '../../shared/tombstoneApi.js';
+import { getHighscoreVersionLabel, getHighscores } from '../../cloud/tombstones/client.js';
 import { ORACULAR_MESSAGES, formatOracularMessageHtml } from '../../shared/data/hints.js';
 import { play, preload, startLoop, stopLoop } from '../audio/audioEngine.js';
 
