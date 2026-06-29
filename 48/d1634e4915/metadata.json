@@ -32,15 +32,15 @@
     "api_call_count": 55
   },
   "combined_attribution": {
-    "calculated_at": "2026-06-29T17:23:20.678809405Z",
+    "calculated_at": "2026-06-29T17:26:43.421306318Z",
     "agent_lines": 209,
     "agent_removed": 2,
-    "human_added": 0,
+    "human_added": 1,
     "human_modified": 0,
-    "human_removed": 0,
-    "total_committed": 209,
-    "total_lines_changed": 211,
-    "agent_percentage": 100,
+    "human_removed": 1,
+    "total_committed": 210,
+    "total_lines_changed": 213,
+    "agent_percentage": 99.06103286384976,
     "metric_version": 2
   }
 }
