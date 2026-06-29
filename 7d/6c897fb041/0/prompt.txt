@@ -1,5 +1,0 @@
-why is everyone in the town wide awake at midnight, they're all roaming around, being busy,  do they not have beds?  why does "cottage.js" have "vendor_work" -- I don't get it -- anyway -- do one light pass improving the overworld simulation with particular attention to day/night cycle and ensuring everyone is doing what they're supposed to be doing at each hour of the day.
-
----
-
-we have a full blown sleep state for monsters -- I see no reason why we could not apply that to NPCs -- know what I mean? especially since sleeping has some decent VFX bolted on
