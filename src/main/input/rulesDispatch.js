@@ -25,6 +25,7 @@ import { getEffectiveVisionRange } from "../../rules/utils/blind.js";
 import { getEntityFacingConeDegrees, getNormalizedEntityFacing } from "../../rules/utils/facing.js";
 import { updateFOV, isVisible as isTileVisible } from "../../rules/environment/dungeon/exploredMap.js";
 import { classifyAttackDirection } from "../../rules/utils/attackActionPolicy.js";
+import { resolveInteractableAffordance } from "../../rules/interaction/interactableAffordance.js";
 
 /**
  * Create a rules dispatcher bound to a world and an actor resolver.
@@ -369,7 +370,7 @@ export function makeRulesDispatcher(world, getActorId, opts = {}) {
         const actorPos = world?.get?.(actorId, Position);
         if (!actorPos) break;
 
-        // Contextual Enter behavior: pickup first, traverse when no pickup exists.
+        // Contextual Enter behavior: pickup first, interact, then traverse.
         const underfoot = itemsAt(world, actorPos.x, actorPos.y);
         if (Array.isArray(underfoot) && underfoot.length > 0) {
           const nonCurrency = underfoot.filter((id) => {
@@ -383,6 +384,19 @@ export function makeRulesDispatcher(world, getActorId, opts = {}) {
           }
           break;
         }
+
+        let didInteract = false;
+        for (const [id, pos, inter] of world.query(Position, Interactable)) {
+          if (!inter) continue;
+          if ((pos.x | 0) !== (actorPos.x | 0) || (pos.y | 0) !== (actorPos.y | 0)) continue;
+          const targetId = Number(id || 0) | 0;
+          if (!resolveInteractableAffordance(world, targetId)) continue;
+          world?.add?.(actorId, InteractIntent, { targetId });
+          world?.tick?.(1);
+          didInteract = true;
+          break;
+        }
+        if (didInteract) break;
 
         let nearest = null;
         let nearestDist = Infinity;

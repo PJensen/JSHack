@@ -6,9 +6,12 @@ import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 import { Interactable } from "../src/rules/components/Interactable.js";
 import { Inventory } from "../src/rules/components/Inventory.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
+import { RiftPortal } from "../src/rules/components/RiftPortal.js";
 import { PickupIntent } from "../src/rules/components/Intents/PickupIntent.js";
 import { InteractIntent } from "../src/rules/components/Intents/InteractIntent.js";
 import { addToInventory } from "../src/rules/utils/inventoryFacade.js";
+import { installContent } from "../src/content/install.js";
+import "../src/content/interactables/index.js";
 
 Deno.test("rulesDispatch: openPickupChooser picks nearby scattered item", () => {
   const world = new World({ seed: 101 });
@@ -84,8 +87,39 @@ Deno.test("rulesDispatch: traverseStairs picks up underfoot item before traversi
   assertEquals(tickCount, 1);
 });
 
-Deno.test("rulesDispatch: traverseStairs emits explicit return-portal traversal", () => {
+Deno.test("rulesDispatch: traverseStairs interacts with same-tile authored affordance before traversing", () => {
+  installContent();
   const world = new World({ seed: 104 });
+  const actor = world.create();
+  world.add(actor, Position, { x: 4, y: 4 });
+
+  const portal = world.create();
+  world.add(portal, Position, { x: 4, y: 4 });
+  world.add(portal, Interactable, { action: "riftPortal", params: {} });
+  world.add(portal, RiftPortal, { riftId: "test-rift" });
+
+  const stair = world.create();
+  world.add(stair, Position, { x: 4, y: 4 });
+  world.add(stair, NamedIdentity, { identity: "stair_down", name: "stairs down" });
+
+  const traversals = [];
+  world.on("stair:traverse", (ev) => traversals.push(ev));
+
+  let tickCount = 0;
+  world.tick = () => { tickCount += 1; };
+
+  const dispatch = makeRulesDispatcher(world, () => actor);
+  dispatch({ type: "rules.traverseStairs" });
+
+  const interact = world.get(actor, InteractIntent);
+  assertEquals(!!interact, true);
+  assertEquals(interact.targetId, portal);
+  assertEquals(traversals.length, 0);
+  assertEquals(tickCount, 1);
+});
+
+Deno.test("rulesDispatch: traverseStairs emits explicit return-portal traversal", () => {
+  const world = new World({ seed: 105 });
   const actor = world.create();
   world.add(actor, Position, { x: 1, y: 1 });
 
@@ -102,7 +136,7 @@ Deno.test("rulesDispatch: traverseStairs emits explicit return-portal traversal"
 });
 
 Deno.test("rulesDispatch: interact queues a generic interact intent", () => {
-  const world = new World({ seed: 105 });
+  const world = new World({ seed: 106 });
   const actor = world.create();
   world.add(actor, Position, { x: 1, y: 1 });
 
@@ -123,7 +157,7 @@ Deno.test("rulesDispatch: interact queues a generic interact intent", () => {
 });
 
 Deno.test("rulesDispatch: interact preserves optional mode", () => {
-  const world = new World({ seed: 106 });
+  const world = new World({ seed: 107 });
   const actor = world.create();
   world.add(actor, Position, { x: 2, y: 2 });
 
