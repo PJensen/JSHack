@@ -80,6 +80,7 @@ export {
   ApothecarySign,
   BookShopSign,
   GemDisplayCase,
+  Mailbox,
   GraveTombstone,
   TownBell,
 } from './Overworld.js';

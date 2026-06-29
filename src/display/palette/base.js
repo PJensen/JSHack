@@ -258,6 +258,7 @@ export const basePalette = {
   book_shop_sign: { glyph: "📖", fg: "#d4a76a", glow: "#8b6914" },
   gem_display_case: { glyph: "◇", fg: "#d7f3ff", glow: "#75b8d2" },
   message_board: { glyph: "🪧", fg: "#d8c08a", glow: "#8b6f3f" },
+  mailbox: { glyph: "✉", fg: "#d8e8ff", glow: "#6f96c8", baseScale: 0.9 },
   berry_bush: { glyph: "❀", fg: "#8b4ea9", glow: "#5a2d75" },
   herb_patch: { glyph: "✿", fg: "#63a85f", glow: "#3e6b3c" },
   fishing_spot: { glyph: "◌", fg: "#7fe6ff", glow: "#1b9fc2", baseScale: 0.8 },

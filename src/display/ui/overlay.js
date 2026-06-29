@@ -10,6 +10,7 @@ import { renderEnchantingBench } from './enchantingBenchOverlay.js';
 import { renderCookingFire } from './cookingFireOverlay.js';
 import { renderDialog } from './dialogOverlay.js';
 import { renderLockPicking } from './lockPickingOverlay.js';
+import { renderMailbox } from './mailboxOverlay.js';
 import { renderMonsterChooser } from './monsterChooserOverlay.js';
 import { playDeathJingle } from '../fx/deathJingle.js';
 import { readInputMode } from '../input/inputSettings.js';
@@ -51,6 +52,7 @@ export function initOverlays() {
   const settingsPanel = ensurePanel('settings');
   const questJournal = ensurePanel('quests');
   const townBoard = ensurePanel('townBoard');
+  const mailbox = ensurePanel('mailbox');
   const log = ensurePanel('messageLog');
   const pick = ensurePanel('pickup');
   const usePanel = ensurePanel('use');
@@ -365,6 +367,15 @@ export function initOverlays() {
   window.addEventListener('ui:openTownBoard', () => {
     hideCharMenuPanels();
     show(townBoard);
+  });
+  window.addEventListener('ui:openMailbox', () => {
+    hideCharMenuPanels();
+    show(mailbox);
+  });
+  window.addEventListener('ui:mailboxData', (ev) => {
+    /** @type {CustomEvent} */ // @ts-ignore
+    const e = ev;
+    renderMailbox(mailbox, e?.detail || {});
   });
   // Toggle inventory panel open/close
   window.addEventListener('ui:toggleInventory', () => {

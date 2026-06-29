@@ -138,6 +138,7 @@ import { installTombstoneDeathListener } from "./rules/systems/tombstoneSystem.j
 import { Tombstone as TombstoneComponent } from "./rules/components/Tombstone.js";
 import { resolveInteractableAffordance } from "./rules/interaction/interactableAffordance.js";
 import { installDeathShareWiring } from "./cloud/wiring/deathShareWiring.js";
+import { installMailboxWiring } from "./cloud/wiring/mailboxWiring.js";
 import { installProofWiring } from "./cloud/wiring/proofWiring.js";
 import { postVerifiedScore } from "./cloud/tombstones/client.js";
 import { forEachInRadius } from "./rules/utils/spatialIndex.js";
@@ -344,6 +345,7 @@ bootAdvance(_pendingSavegame ? "Prepared saved item state" : "Prepared run-speci
 const tombstoneRepo = new TombstoneRepository(null, { getHighscores: getCachedHighscores });
 installTombstoneDeathListener(world, tombstoneRepo);
 installDeathShareWiring({ world });
+installMailboxWiring({ world });
 const _proofWiring = installProofWiring({ world });
 world.on("proof:ready", ({ bundle }) => {
   postVerifiedScore(bundle).catch(() => {});

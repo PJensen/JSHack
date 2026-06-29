@@ -684,6 +684,15 @@ export const MessageBoard = defineArchetype(
   [Interactable, { action: "readTownBulletin", params: null }],
 );
 
+export const Mailbox = defineArchetype(
+  "Mailbox",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Mailbox", identity: "mailbox" }],
+  [Material, { kind: "metal" }],
+  [Collider, { solid: true, blocksSight: false }],
+  [Interactable, { action: "openMailbox", params: null }],
+);
+
 // ── Graveyard ────────────────────────────────────────────────────
 export const GraveTombstone = defineArchetype(
   "GraveTombstone",
