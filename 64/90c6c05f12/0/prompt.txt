@@ -1,7 +1,0 @@
-I really really dislike what you're doing here -- we worked our tail off to improve interactables, and here we are doing bespoke wiring for what is essentially the simplest possible modal one can imagine.
-
-My intuition is that an interactable should have the generic ability to float an arbitrary tool-tip -- t this fragile wiring.
-
-defineInteractable <-- here, can float a modal
-
-right?! dont you think --- otherwise, we'll forever be hand wiring this garbage; and no closer to being able to easily author new content.
