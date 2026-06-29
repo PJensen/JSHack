@@ -1,0 +1,15 @@
+we need to improve the VFX for portals and rifts
+
+1. we have a particle system
+2. we have decent glyph fx
+3. we have a good/great lighing engine
+
+NOTE: we have a narrow  CPU budget for these things; so be considerate about what we're doing.
+
+a rift can use storm type lighting, or breathing.
+
+think about: morrowwind (as a conceptual anchor)
+
+---
+
+hey -- determinism does not apply to VFX
