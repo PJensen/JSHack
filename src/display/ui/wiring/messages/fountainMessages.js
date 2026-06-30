@@ -2,6 +2,7 @@ import { defineExtension } from "../../../../lib/ecs-js/index.js";
 import { FountainDrinkResolved } from "../../../../events/FountainDrinkResolved.js";
 import { FountainDipResolved } from "../../../../events/FountainDipResolved.js";
 import { FountainDried } from "../../../../events/FountainDried.js";
+import { FountainPurified } from "../../../../events/FountainPurified.js";
 
 const FOUNTAIN_MESSAGES_KEY = Symbol.for("jshack:display:fountainMessages");
 
@@ -21,6 +22,7 @@ export function createFountainMessagesExtension({ log, nameOfEntity }) {
       else if (effect === "teleport") log("The water tastes like static. The world lurches!", "danger");
       else if (effect === "gush") log("The fountain erupts! Water gushes everywhere!", "danger");
       else if (effect === "wish") log(event.wishedItem ? `A spirit grants you ${event.wishedItem}!` : "A spirit stirs, then sinks away.", "system");
+      else if (effect === "blessing") log("The fountain's consecrated water settles a blessing over you.", "system");
       else log("You take a sip. The water tastes faintly of copper.", "system");
     });
     const offDip = world.on(FountainDipResolved, (event) => {
@@ -49,6 +51,9 @@ export function createFountainMessagesExtension({ log, nameOfEntity }) {
     const offDry = world.on(FountainDried, ({ actor }) => {
       if (nameOfEntity(actor) === "You") log("You bend over the fountain. Dry as bone.", "system");
     });
-    return () => { offDrink(); offDip(); offDry(); };
+    const offPurified = world.on(FountainPurified, ({ actor, itemName }) => {
+      if (nameOfEntity(actor) === "You") log(`You pour ${itemName} into the basin. The fountain answers with warm light.`, "system");
+    });
+    return () => { offDrink(); offDip(); offDry(); offPurified(); };
   }, { key: FOUNTAIN_MESSAGES_KEY });
 }

@@ -70,7 +70,7 @@ export function runInteractHooks(action, world, actor, targetId, params, intent)
   const payload = getAuthoredInteractable(action) || INTERACT_PAYLOADS[action];
   const authoredActions = payload?.actions;
   const menu = authoredActions
-    ? (typeof authoredActions === "function" ? authoredActions(world, targetId) : authoredActions)
+    ? (typeof authoredActions === "function" ? authoredActions(world, targetId, { actor, intent, params }) : authoredActions)
     : resolveActionMenu(action, world, targetId);
   if (menu?.length && !intent?.mode) {
     world.emit(new InteractionChoicePrompted({ actor, targetId, action, options: menu }));

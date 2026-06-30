@@ -9,6 +9,7 @@ export const FountainState = defineComponent("FountainState", {
   chargesRemaining: 3,
   maxCharges: 3,
   primaryEffect: "heal",
+  blessed: false,
   cooldownTurns: 221,
   dryUntilStep: -1,
 });

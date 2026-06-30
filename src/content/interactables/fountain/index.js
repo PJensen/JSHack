@@ -6,8 +6,11 @@ import { Mana } from "../../../rules/components/Mana.js";
 import { Position } from "../../../rules/components/Position.js";
 import { Beatitude } from "../../../rules/components/Beatitude.js";
 import { DungeonState } from "../../../rules/components/DungeonState.js";
+import { LightEmitter } from "../../../rules/components/LightEmitter.js";
+import { NamedIdentity } from "../../../rules/components/NamedIdentity.js";
 import { TILE_SHALLOW_WATER } from "../../../rules/environment/dungeon/constants.js";
 import { resolveLootTable } from "../../../rules/data/lootResolver.js";
+import { inventoryItems } from "../../../rules/utils/inventoryFacade.js";
 import { defineVerbRule } from "../../../rules/kernel/verbRule.js";
 import { chanceTable } from "../../../rules/kernel/chanceTable.js";
 import { RuleResult } from "../../../rules/kernel/RuleResult.js";
@@ -15,15 +18,60 @@ import { FountainDried } from "../../../events/FountainDried.js";
 import { FountainDipPrompted } from "../../../events/FountainDipPrompted.js";
 import { FountainDrinkResolved } from "../../../events/FountainDrinkResolved.js";
 import { FountainDipResolved } from "../../../events/FountainDipResolved.js";
+import { FountainPurified } from "../../../events/FountainPurified.js";
 import { Teleported } from "../../../events/Teleported.js";
 
+const HOLY_WATER_ID = "potion_holy_water";
 const ACTIONS = Object.freeze([
   Object.freeze({ mode: "drink", label: "Drink" }),
   Object.freeze({ mode: "dip", label: "Dip" }),
 ]);
+const PURIFY_ACTION = Object.freeze({ mode: "purify", label: "Purify" });
 
 function stateOf(ctx) {
   return ctx.query.get(ctx.target, FountainState);
+}
+
+function findHolyWater(world, actor) {
+  const actorId = Number(actor || 0) | 0;
+  if (!(actorId > 0)) return 0;
+  for (const itemId of inventoryItems(world, actorId)) {
+    const named = world.get(itemId, NamedIdentity);
+    if (String(named?.identity || "") === HOLY_WATER_ID) return itemId | 0;
+  }
+  return 0;
+}
+
+function holyWaterInInventory(ctx) {
+  for (const itemId of ctx.query.inventoryItems(ctx.actor)) {
+    if (ctx.query.identity(itemId) === HOLY_WATER_ID) return itemId | 0;
+  }
+  return 0;
+}
+
+function finishBlessedDrink(ctx) {
+  ctx.mutate.upsertTimedEffect(ctx.actor, {
+    key: "blessed",
+    turnsLeft: 80,
+    potency: 1,
+    stacks: 1,
+    sourceId: ctx.target,
+  });
+  ctx.mutate.record(FountainOutcomeApplied, {
+    actor: ctx.actor,
+    fountain: ctx.target,
+    item: 0,
+    verb: ctx.verb,
+    outcome: "blessing",
+    ruleId: String(ctx.params.ruleId || ""),
+  });
+  ctx.io.emit(new FountainDrinkResolved({
+    actor: ctx.actor,
+    targetId: ctx.target,
+    effect: "blessing",
+    turns: 80,
+  }));
+  return RuleResult.handled({ outcomeId: "blessing" });
 }
 
 function finish(ctx, outcomeId, event, item = 0) {
@@ -357,7 +405,11 @@ export const fountainDrinkRule = defineVerbRule({
     }
     return RuleResult.unhandled({ ruleId: "fountain.drink" });
   },
-  apply: (ctx) => drinkTable.resolve(ctx),
+  apply(ctx) {
+    const state = stateOf(ctx);
+    if (state?.blessed) return finishBlessedDrink(ctx);
+    return drinkTable.resolve(ctx);
+  },
 });
 
 export const fountainDipRule = defineVerbRule({
@@ -392,15 +444,76 @@ export const fountainDipRule = defineVerbRule({
   apply: (ctx) => dipTable.resolve(ctx),
 });
 
+export const fountainPurifyRule = defineVerbRule({
+  id: "fountain.purify",
+  verb: "purify",
+  when(ctx) {
+    const state = stateOf(ctx);
+    return !!state
+      && state.chargesRemaining > 0
+      && !state.blessed
+      && holyWaterInInventory(ctx) > 0;
+  },
+  otherwise(ctx) {
+    const state = stateOf(ctx);
+    if (state && state.chargesRemaining <= 0) {
+      ctx.io.emit(new FountainDried({
+        actor: ctx.actor,
+        targetId: ctx.target,
+        cooldownTurns: state.cooldownTurns,
+        dryUntilStep: state.dryUntilStep,
+      }));
+    }
+    return RuleResult.unhandled({ ruleId: "fountain.purify" });
+  },
+  apply(ctx) {
+    const itemId = holyWaterInInventory(ctx);
+    if (!(itemId > 0)) return RuleResult.unhandled({ ruleId: "fountain.purify" });
+    ctx.mutate.consume(itemId, ctx.actor);
+    ctx.mutate.patchComponent(ctx.target, FountainState, {
+      blessed: true,
+      chargesRemaining: Math.max(1, Number(stateOf(ctx)?.chargesRemaining || 0) | 0),
+      dryUntilStep: -1,
+    });
+    if (ctx.query.has(ctx.target, LightEmitter)) {
+      ctx.mutate.patchComponent(ctx.target, LightEmitter, {
+        radius: 5.2,
+        baseColor: "#fff0aa",
+        temporalPattern: "holy",
+        shadowSoftness: 4,
+        colorShiftScale: 0.45,
+      });
+    }
+    ctx.mutate.record(FountainOutcomeApplied, {
+      actor: ctx.actor,
+      fountain: ctx.target,
+      item: itemId,
+      verb: ctx.verb,
+      outcome: "purify",
+      ruleId: String(ctx.params.ruleId || ""),
+    });
+    ctx.io.emit(new FountainPurified({
+      actor: ctx.actor,
+      targetId: ctx.target,
+      itemId,
+      itemName: ctx.query.name(itemId) || "holy water",
+    }));
+    return RuleResult.handled({ outcomeId: "purify" });
+  },
+});
+
 defineInteractable("fountain", {
   defaultVerb: "drink",
-  actions(world, targetId) {
+  actions(world, targetId, ctx = {}) {
     const state = world.get(targetId, FountainState);
-    return state?.chargesRemaining > 0 ? ACTIONS : [];
+    if (!state || state.chargesRemaining <= 0) return [];
+    if (state.blessed || !(findHolyWater(world, ctx.actor) > 0)) return ACTIONS;
+    return Object.freeze([...ACTIONS, PURIFY_ACTION]);
   },
   verbs: {
     drink: fountainDrinkRule,
     dip: fountainDipRule,
+    purify: fountainPurifyRule,
   },
 });
 

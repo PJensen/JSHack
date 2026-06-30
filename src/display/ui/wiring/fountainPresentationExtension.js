@@ -2,6 +2,7 @@ import { defineExtension } from "../../../lib/ecs-js/index.js";
 import { Particle } from "../../passes/vfx/particles/particlePool.js";
 import { FountainDrinkResolved } from "../../../events/FountainDrinkResolved.js";
 import { FountainDipResolved } from "../../../events/FountainDipResolved.js";
+import { FountainPurified } from "../../../events/FountainPurified.js";
 
 const FOUNTAIN_PRESENTATION_KEY = Symbol.for("jshack:display:fountainPresentation");
 
@@ -31,6 +32,7 @@ const DRINK_STATUS = Object.freeze({
   teleport: ["WARPED!", "#44ddff", 14],
   gush: ["ERUPTION!", "#3399ff", 24],
   wish: ["A BOON!", "#ffee88", 20],
+  blessing: ["BLESSED", "#ffee88", 14],
 });
 
 const DIP_STATUS = Object.freeze({
@@ -75,6 +77,13 @@ export function createFountainPresentationExtension({ ftext, fx, getPosition, is
         burst(fx, pos, spec[1], spec[2]);
       } else if (["wet", "nothing"].includes(event.effect)) burst(fx, pos, "#5588bb", 6);
     });
-    return () => { offDrink(); offDip(); };
+    const offPurified = world.on(FountainPurified, (event) => {
+      const pos = getPosition(event.targetId);
+      if (!canShow(pos)) return;
+      ftext.addStatus(pos.x, pos.y - 0.45, "PURIFIED", { color: "#ffee88", life: 1.4, scaleStart: 1.5, scaleEnd: 1 });
+      burst(fx, pos, "#ffee88", 18);
+      burst(fx, pos, "#ffffff", 10);
+    });
+    return () => { offDrink(); offDip(); offPurified(); };
   }, { key: FOUNTAIN_PRESENTATION_KEY });
 }
