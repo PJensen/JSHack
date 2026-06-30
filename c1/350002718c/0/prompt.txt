@@ -1,0 +1,19 @@
+I wonder about conditional interactions, conditional VFX
+
+(e.g) drinking from fountain on a full moon
+(e.g.) fountain has more pronounced glow on full moon
+(e.g.) drinking from fountain while already blessed
+
+I wonder if we can use lighting of auras -- (e.g.) if you get a fighting bonus while fighing near a shrine show an aura using the lighting engine -- (e.g.) when beserking showing a reddish compact reddish aura around the actor 
+
+I wonder if it's time to finally add leveling -- XP is can be loosely based on spirit scoring -- warning: I worry that "leveling" adds administrative layer, and forces by hand on a bunch of other decisions -- I don't think I'm ready to decide. I do know that once you add leveling - it's very hardto back away, and it sets the project on rails forever after.
+
+I wonder more about conditional interactions, interact with fountain while holding holy water exposes the "purify" verb -- the actor dumps the holy water into the fountain making the fountain blessed, giving special lighting, and offering a blessing forever after -- or something like that.
+
+Altnernatively: we could continue working on architectural cleanup ;-)
+
+---
+
+I like the shape of what you outlind, this should open the door to even more rich design space. see if you can nail it being a minimalist and really leveraging the existing architecture; I think we have more than enough.
+
+NOTE: to the side digging will be being worked on, no surprises.

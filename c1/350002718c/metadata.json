@@ -1,0 +1,31 @@
+{
+  "cli_version": "0.7.7",
+  "checkpoint_id": "c1350002718c",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "src/content/interactables/fountain/index.js",
+    "src/display/ui/wiring/fountainPresentationExtension.js",
+    "src/display/ui/wiring/messages/fountainMessages.js",
+    "src/events/FountainPurified.js",
+    "src/rules/components/FountainState.js",
+    "src/rules/interaction/interactRunner.js",
+    "tests/fountainRuleAuthoring.test.mjs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/c1/350002718c/0/metadata.json",
+      "transcript": "/c1/350002718c/0/full.jsonl",
+      "content_hash": "/c1/350002718c/0/content_hash.txt",
+      "prompt": "/c1/350002718c/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 210571,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 3540736,
+    "output_tokens": 12748,
+    "api_call_count": 38
+  }
+}

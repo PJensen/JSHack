@@ -1,0 +1,56 @@
+{
+  "cli_version": "0.7.7",
+  "checkpoint_id": "c1350002718c",
+  "session_id": "019f19e5-c65c-7511-819c-d32f8034697d",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-30T19:07:01.341806724Z",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "src/content/interactables/fountain/index.js",
+    "src/display/ui/wiring/fountainPresentationExtension.js",
+    "src/display/ui/wiring/messages/fountainMessages.js",
+    "src/events/FountainPurified.js",
+    "src/rules/components/FountainState.js",
+    "src/rules/interaction/interactRunner.js",
+    "tests/fountainRuleAuthoring.test.mjs"
+  ],
+  "agent": "Codex",
+  "model": "gpt-5.5",
+  "turn_id": "e678ad6ade59",
+  "token_usage": {
+    "input_tokens": 210571,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 3540736,
+    "output_tokens": 12748,
+    "api_call_count": 38
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-30T19:07:01.259896864Z",
+    "agent_lines": 238,
+    "agent_removed": 6,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 238,
+    "total_lines_changed": 244,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 865,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".github/agents/Dungeon Generation and BSP Expert.agent.md": 582,
+        ".github/agents/VFX Agent.agent.md": 283
+      }
+    }
+  ]
+}
