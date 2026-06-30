@@ -3150,6 +3150,7 @@ const {
   cloudFx,
   surfaceAreaFx,
   spiritWispFx,
+  sparksFx,
   bumpFx,
   meleeSlashFx,
   aggroFx,
@@ -5490,7 +5491,7 @@ function render(worldView) {
   _rpStage("lighting");
   if (PERF.quality !== 'low') {
     const _lights = collectLightSources(worldView, { quality: PERF.quality, fxTime: _fxTime, dt: _dtSec });
-    collectFxLights(_lights, { boltFx, spellAreaFx, projectileFx, cloudFx, surfaceAreaFx, statusEmitterFx, spiritWispFx });
+    collectFxLights(_lights, { boltFx, spellAreaFx, projectileFx, cloudFx, surfaceAreaFx, statusEmitterFx, spiritWispFx, sparksFx });
     const _ambient = computeAmbient(worldView);
     const _roofMask = worldView.isOverworld ? isRoofed : null;
     const _shelterInterior = collectShelterInteriorKeys(worldView);
@@ -5806,6 +5807,7 @@ function frame(now) {
   if (PERF.particleCapacity > 0) {
     statusEmitterFx.step(dtSec, view, _fxTime);
   }
+  sparksFx.tick(dtSec);
 
   applyHallucinationSway({ cam, view, fxTime: _fxTime });
 

@@ -78,6 +78,24 @@ Deno.test("messageWiring logs homecoming flavor text for player", () => {
   assert(messageLog.entries[0].text.includes("home"), "homecoming should mention home");
 });
 
+Deno.test("messageWiring bridges direct system message events", () => {
+  const world = new World({ seed: 42 });
+  const playerId = world.create();
+  world.add(playerId, Player, {});
+
+  const messageLog = createMessageLog();
+  installWithDeps(world, messageLog, playerId);
+
+  world.emit("message", { text: "No target in range.", type: "system" });
+  world.emit("log:message", { text: "The water tastes like stone.", type: "system" });
+
+  assertEquals(messageLog.entries.length, 2);
+  assertEquals(messageLog.entries[0].text, "No target in range.");
+  assertEquals(messageLog.entries[0].type, "system");
+  assertEquals(messageLog.entries[1].text, "The water tastes like stone.");
+  assertEquals(messageLog.entries[1].type, "system");
+});
+
 Deno.test("messageWiring ignores non-homecoming depth teleports", () => {
   const world = new World({ seed: 42 });
   const playerId = world.create();

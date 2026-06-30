@@ -948,7 +948,7 @@ export function collectLightSources(view, opts = {}) {
  */
 export function collectFxLights(out, fxSources) {
   // Query each FX controller for active light sources
-  const controllers = [fxSources.boltFx, fxSources.spellAreaFx, fxSources.projectileFx, fxSources.cloudFx, fxSources.surfaceAreaFx, fxSources.statusEmitterFx, fxSources.spiritWispFx];
+  const controllers = [fxSources.boltFx, fxSources.spellAreaFx, fxSources.projectileFx, fxSources.cloudFx, fxSources.surfaceAreaFx, fxSources.statusEmitterFx, fxSources.spiritWispFx, fxSources.sparksFx];
   for (let c = 0; c < controllers.length; c++) {
     const fx = controllers[c];
     if (fx && typeof fx.getActiveLights === 'function') {

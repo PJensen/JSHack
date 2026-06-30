@@ -17,14 +17,22 @@ const MESSAGE_WIRING_KEY = Symbol.for("jshack:display:messageWiring");
 export function installMessageWiring(opts) {
   const { world, messageLog, playerEntity } = opts;
   if (!world || !messageLog || typeof playerEntity !== "function") return;
-  world.install(defineExtension("jshack:display:messageWiring", (installedWorld) => {
-    const ctx = createMessageContext({ ...opts, world: installedWorld });
+  world.install(defineExtension("jshack:display:messageWiring", (world) => {
+    const ctx = createMessageContext({ ...opts, world });
     installSpellMessages(ctx);
     installCombatMessages(ctx);
     installCreatureMessages(ctx);
     installItemMessages(ctx);
     installEnvironmentMessages(ctx);
     installEconomyMessages(ctx);
-    installedWorld.install(createFountainMessagesExtension(ctx));
+    world.on("message", ({ text, type }) => {
+      if (!text) return;
+      ctx.log(String(text), type || "system");
+    });
+    world.on("log:message", ({ text, type }) => {
+      if (!text) return;
+      ctx.log(String(text), type || "system");
+    });
+    world.install(createFountainMessagesExtension(ctx));
   }, { key: MESSAGE_WIRING_KEY }));
 }

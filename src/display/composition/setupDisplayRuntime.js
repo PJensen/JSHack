@@ -7,6 +7,7 @@ import { createSpellAreaFxController } from "../fx/spellAreaFx.js";
 import { createCloudFxController } from "../fx/cloudFx.js";
 import { createSurfaceAreaFxController } from "../fx/surfaceAreaFx.js";
 import { createSpiritWispFxController } from "../fx/spiritWispFx.js";
+import { createSparksFxController } from "../fx/sparksFxController.js";
 import { createStatusPresentationDelayController } from "../fx/statusPresentationDelayController.js";
 import { createBumpFxController } from "../fx/bumpFxController.js";
 import { createRecoilFxController } from "../fx/recoilFxController.js";
@@ -124,6 +125,9 @@ export function setupDisplayRuntime({
   });
   spiritWispFx.installListeners();
 
+  const sparksFx = createSparksFxController({ world, fx, getPosition, isVisibleAt });
+  sparksFx.installListeners();
+
   const bumpFx = createBumpFxController();
   bumpFx.installListeners({ world, getPosition, isPlayer });
 
@@ -199,5 +203,5 @@ export function setupDisplayRuntime({
   const worldAmbientFx = createWorldAmbientController();
   const biomeAmbientFx = createBiomeAmbientController();
 
-  return { statusEmitterFx, statusPresentationDelayFx, boltFx, delayedDeathFx, projectileFx, spellAreaFx, cloudFx, surfaceAreaFx, spiritWispFx, bumpFx, meleeSlashFx, aggroFx, recoilFx, hitstopFx, deathEssenceFx, deathVfx, teleportFx, fountainAmbientFx, localEmitterAmbientFx, worldAmbientFx, biomeAmbientFx, ftext, goreTick };
+  return { statusEmitterFx, statusPresentationDelayFx, boltFx, delayedDeathFx, projectileFx, spellAreaFx, cloudFx, surfaceAreaFx, spiritWispFx, sparksFx, bumpFx, meleeSlashFx, aggroFx, recoilFx, hitstopFx, deathEssenceFx, deathVfx, teleportFx, fountainAmbientFx, localEmitterAmbientFx, worldAmbientFx, biomeAmbientFx, ftext, goreTick };
 }
