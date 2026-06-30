@@ -18,14 +18,7 @@
       "metadata": "/c1/350002718c/0/metadata.json",
       "transcript": "/c1/350002718c/0/full.jsonl",
       "content_hash": "/c1/350002718c/0/content_hash.txt",
-      "prompt": "/c1/350002718c/0/prompt.txt"
+      "prompt": ""
     }
-  ],
-  "token_usage": {
-    "input_tokens": 210571,
-    "cache_creation_tokens": 0,
-    "cache_read_tokens": 3540736,
-    "output_tokens": 12748,
-    "api_call_count": 38
-  }
+  ]
 }
