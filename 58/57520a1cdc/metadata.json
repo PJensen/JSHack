@@ -1,0 +1,31 @@
+{
+  "cli_version": "0.7.7",
+  "checkpoint_id": "5857520a1cdc",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "src/display/composition/setupDisplayRuntime.js",
+    "src/display/fx/sparksFxController.js",
+    "src/display/lighting/sources/index.js",
+    "src/display/ui/wiring/messageWiring.js",
+    "src/main.js",
+    "tests/messageWiring.test.mjs",
+    "tests/sparksFx.test.mjs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/58/57520a1cdc/0/metadata.json",
+      "transcript": "/58/57520a1cdc/0/full.jsonl",
+      "content_hash": "/58/57520a1cdc/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 235775,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 2630912,
+    "output_tokens": 9853,
+    "api_call_count": 26
+  }
+}
