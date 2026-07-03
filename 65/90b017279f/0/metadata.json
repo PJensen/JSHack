@@ -3,46 +3,19 @@
   "checkpoint_id": "6590b017279f",
   "session_id": "019f28dd-d03e-7891-8579-fc2e3f8cc011",
   "strategy": "manual-commit",
-  "created_at": "2026-07-03T16:50:48.909935452Z",
+  "created_at": "2026-07-03T16:50:50.145929792Z",
   "branch": "master",
   "checkpoints_count": 1,
-  "files_touched": [
-    "src/display/ui/mailboxOverlay.js",
-    "src/display/ui/overlay.js"
-  ],
+  "save_step_count": 1,
+  "files_touched": [],
   "agent": "Codex",
   "model": "gpt-5.5",
   "turn_id": "f7f587ef8b0b",
   "token_usage": {
-    "input_tokens": 172271,
+    "input_tokens": 172649,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 5424768,
-    "output_tokens": 16146,
-    "api_call_count": 43
-  },
-  "initial_attribution": {
-    "calculated_at": "2026-07-03T16:50:48.87185721Z",
-    "agent_lines": 31,
-    "agent_removed": 10,
-    "human_added": 0,
-    "human_modified": 0,
-    "human_removed": 0,
-    "total_committed": 31,
-    "total_lines_changed": 41,
-    "agent_percentage": 100,
-    "metric_version": 2
-  },
-  "prompt_attributions": [
-    {
-      "checkpoint_number": 1,
-      "user_lines_added": 865,
-      "user_lines_removed": 0,
-      "agent_lines_added": 0,
-      "agent_lines_removed": 0,
-      "user_added_per_file": {
-        ".github/agents/Dungeon Generation and BSP Expert.agent.md": 582,
-        ".github/agents/VFX Agent.agent.md": 283
-      }
-    }
-  ]
+    "cache_read_tokens": 5593088,
+    "output_tokens": 16371,
+    "api_call_count": 44
+  }
 }
