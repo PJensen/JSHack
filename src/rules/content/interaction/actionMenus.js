@@ -12,18 +12,25 @@
 // Single-action interactables (doors, wells, signs, etc.) need no entry here —
 // they bypass the menu and dispatch directly.
 
+import { isAltarOfferingActive } from "../../utils/altarOfferingState.js";
+
 export const ACTION_MENUS = {
-  prayAltar: Object.freeze([
-    Object.freeze({ mode: "pray", label: "Pray" }),
-    Object.freeze({ mode: "offer", label: "Offer" }),
-  ]),
+  prayAltar: (world, targetId) => {
+    const active = isAltarOfferingActive(world, targetId);
+    return [
+      { mode: "pray", label: "Pray" },
+      active
+        ? { mode: "offer", label: "Offer (already active)", disabled: true }
+        : { mode: "offer", label: "Offer" },
+    ];
+  },
 };
 
 /**
  * @param {string} action
  * @param {any} world
  * @param {number} targetId
- * @returns {Array<{mode:string,label:string}>|null}
+ * @returns {Array<{mode:string,label:string,disabled?:boolean}>|null}
  */
 export function resolveActionMenu(action, world, targetId) {
   const entry = ACTION_MENUS[action];

@@ -16,6 +16,7 @@ import { Stamina } from "../src/rules/components/Stamina.js";
 import { Player } from "../src/rules/components/Player.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
+import { Beatitude } from "../src/rules/components/Beatitude.js";
 import { HazardArea } from "../src/rules/components/HazardArea.js";
 import { Potion } from "../src/rules/components/Potion.js";
 import { Consumable } from "../src/rules/components/Consumable.js";
@@ -1142,6 +1143,48 @@ Deno.test("altar: only one offering per altar per day", () => {
   assertEquals(world.get(altar, AltarOfferingState)?.lastOfferedDay, 1);
 });
 
+Deno.test("altar: active offering disables Offer action until it expires", () => {
+  const world = new World({ seed: 51021 });
+
+  const actor = world.create();
+  const altar = world.create();
+  world.add(altar, Interactable, { action: "prayAltar", params: null });
+  world.add(actor, Inventory, { items: [], capacity: 10, weightLimit: null });
+
+  const itemId = world.create();
+  world.add(itemId, ItemInfo, {
+    type: "potion",
+    slot: "bag",
+    weight: 1,
+    value: 50,
+    description: "active",
+    count: 1,
+    bonuses: {},
+    rarity: 1,
+    rarityName: "common",
+    affixes: [],
+  });
+  addToInventory(world, actor, itemId);
+
+  world.add(actor, InteractIntent, { targetId: altar, mode: "offer", itemId });
+  interactionSystem(world);
+
+  const chooser = [];
+  world.on(InteractionChoicePrompted, (e) => chooser.push(e));
+  world.add(actor, InteractIntent, { targetId: altar });
+  interactionSystem(world);
+
+  const offer = chooser[0]?.options?.find((opt) => opt.mode === "offer");
+  assertEquals(offer?.disabled, true);
+
+  world.step = TURNS_PER_DAY;
+  world.add(actor, InteractIntent, { targetId: altar });
+  interactionSystem(world);
+
+  const nextOffer = chooser[1]?.options?.find((opt) => opt.mode === "offer");
+  assertEquals(nextOffer?.disabled, false);
+});
+
 Deno.test("altar: offered item kind is projected on top of the altar", () => {
   const world = new World({ seed: 5103 });
 
@@ -1156,6 +1199,7 @@ Deno.test("altar: offered item kind is projected on top of the altar", () => {
 
   const itemId = world.create();
   world.add(itemId, NamedIdentity, { name: "Ruby", identity: "gem_ruby" });
+  world.add(itemId, Beatitude, { state: "blessed" });
   world.add(itemId, ItemInfo, {
     type: "gem",
     slot: "bag",
@@ -1179,6 +1223,15 @@ Deno.test("altar: offered item kind is projected on top of the altar", () => {
   assertEquals(offering.kind, "gem_ruby");
   assertEquals(offering.pos.x, 5);
   assert(offering.pos.y < 5, "offering should render visually atop the altar");
+  assert(offering.tags.includes("sunlight"), "blessed offering should alter altar light character");
+
+  world.step = TURNS_PER_DAY;
+  const expiredView = buildWorldView(world);
+  assertEquals(
+    expiredView.entities.some((entity) => entity.tags?.includes("altar_offering")),
+    false,
+    "offering overlay should expire at the next day boundary",
+  );
 });
 
 Deno.test("altar: on-offered script hook runs before the item entity is destroyed", () => {

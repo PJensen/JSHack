@@ -12,7 +12,10 @@ export const AltarOfferingState = defineComponent(
     offeredItemKind: "",
     offeredItemName: "",
     offeredItemIdentity: "",
+    beatitudeState: "",
+    value: 0,
     offeredAtTurn: -1,
+    expiresAtTurn: -1,
   },
   {
     validate(rec) {
@@ -20,7 +23,10 @@ export const AltarOfferingState = defineComponent(
       rec.offeredItemKind = String(rec.offeredItemKind || "");
       rec.offeredItemName = String(rec.offeredItemName || "");
       rec.offeredItemIdentity = String(rec.offeredItemIdentity || "");
+      rec.beatitudeState = String(rec.beatitudeState || "");
+      rec.value = Number.isFinite(rec.value) ? Math.max(0, Math.min(1, Number(rec.value))) : 0;
       rec.offeredAtTurn = Number.isFinite(rec.offeredAtTurn) ? (rec.offeredAtTurn | 0) : -1;
+      rec.expiresAtTurn = Number.isFinite(rec.expiresAtTurn) ? (rec.expiresAtTurn | 0) : -1;
       return true;
     },
   },

@@ -9,6 +9,7 @@ export class InteractionChoicePrompted extends EcsEvent {
     this.options = Object.freeze((Array.isArray(payload.options) ? payload.options : []).map((option) => Object.freeze({
       mode: String(option?.mode || ""),
       label: String(option?.label || ""),
+      disabled: option?.disabled === true,
     })));
     Object.freeze(this);
   }

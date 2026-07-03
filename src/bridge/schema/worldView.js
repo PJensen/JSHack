@@ -46,6 +46,7 @@ import { Facing } from "../../rules/components/Facing.js";
 import { AggroState } from "../../rules/components/AggroState.js";
 import { FountainState } from "../../rules/components/FountainState.js";
 import { AltarOfferingState } from "../../rules/components/AltarOfferingState.js";
+import { isAltarOfferingActive } from "../../rules/utils/altarOfferingState.js";
 import { AudioEmitter } from "../../rules/components/AudioEmitter.js";
 import { LightEmitter } from "../../rules/components/LightEmitter.js";
 import { HarvestNode } from "../../rules/components/HarvestNode.js";
@@ -837,6 +838,7 @@ function projectProcStateTags(world, id, rec) {
 
 function projectAltarOfferingOverlays(world, out) {
 	for (const [altarId, state, pos] of world.query(AltarOfferingState, Position)) {
+		if (!isAltarOfferingActive(world, altarId)) continue;
 		let base = null;
 		for (let i = 0; i < out.length; i++) {
 			if ((Number(out[i]?.id || 0) | 0) === (altarId | 0)) {
@@ -847,11 +849,25 @@ function projectAltarOfferingOverlays(world, out) {
 		if (!base) continue;
 		const kind = String(state?.offeredItemKind || "");
 		if (!kind) continue;
+		const tags = ["altar_offering"];
+		const beatitude = String(state?.beatitudeState || "").toLowerCase();
+		const value = Math.max(0, Math.min(1, Number(state?.value || 0)));
+		if (beatitude === "blessed") {
+			tags.push("sunlight", "legendary_glowing");
+		} else if (beatitude === "cursed") {
+			tags.push("shadow_glowing");
+		} else if (value >= 0.75) {
+			tags.push("epic_glowing");
+		} else if (value >= 0.35) {
+			tags.push("rare_glowing");
+		} else {
+			tags.push("glowing");
+		}
 		out.push({
 			id: -Math.abs(altarId | 0),
 			kind,
 			pos: { x: pos.x, y: pos.y - 0.22 },
-			tags: ["altar_offering"],
+			tags,
 			layer: Math.max(0, (Number(base.layer || 300) | 0) + 1),
 			hp: 0,
 			maxHp: 0,

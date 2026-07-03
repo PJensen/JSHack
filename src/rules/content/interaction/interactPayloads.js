@@ -93,7 +93,10 @@ import { LockpickPrompted } from "../../../events/LockpickPrompted.js";
 import { LockpickResolved } from "../../../events/LockpickResolved.js";
 import { BedSleepRequested } from "../../../events/BedSleepRequested.js";
 import { AltarOfferingState } from "../../components/AltarOfferingState.js";
-import { TURNS_PER_DAY } from "../../data/calendar.js";
+import {
+  altarOfferingDay,
+  altarOfferingExpiresAtTurn,
+} from "../../utils/altarOfferingState.js";
 import { runEntityScript, ScriptVerb } from "../../scripting.js";
 
 // Maps catalog item IDs → archetypes for harvest yield entity creation.
@@ -1609,7 +1612,7 @@ export const INTERACT_PAYLOADS = {
 // ─── Altar offer helper ───────────────────────────────────────────────────────
 
 function _altarExecuteOffer(world, actor, targetId, itemId) {
-  const currentDay = Math.floor(Math.max(0, Number(world.step || 0)) / TURNS_PER_DAY) | 0;
+  const currentDay = altarOfferingDay(world);
   const altarState = world.get(targetId, AltarOfferingState);
   if (altarState && (Number(altarState.lastOfferedDay ?? -1) | 0) === currentDay) {
     world.emit?.("altar:offerFailed", {
@@ -1658,7 +1661,10 @@ function _altarExecuteOffer(world, actor, targetId, itemId) {
     offeredItemKind,
     offeredItemName: itemName,
     offeredItemIdentity: itemIdentity,
+    beatitudeState,
+    value,
     offeredAtTurn: Number(world.step || 0) | 0,
+    expiresAtTurn: altarOfferingExpiresAtTurn(world),
   };
   if (altarState) world.set(targetId, AltarOfferingState, nextAltarState);
   else world.add(targetId, AltarOfferingState, nextAltarState);

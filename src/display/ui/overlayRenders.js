@@ -1135,7 +1135,7 @@ export function renderAltarOfferChooser(panel, items, altarId) {
 
 /**
  * @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel
- * @param {{ targetId: number, action: string, options: Array<{mode:string,label:string}> }} data
+ * @param {{ targetId: number, action: string, options: Array<{mode:string,label:string,disabled?:boolean}> }} data
  */
 export function renderActionChooser(panel, data) {
   const el = /** @type {HTMLDivElement} */ (/** @type {any} */ (panel)._inner);
@@ -1156,13 +1156,20 @@ export function renderActionChooser(panel, data) {
   list.style.gap = '4px';
   el.appendChild(list);
 
+  const enabledIndexes = [];
   const rows = options.map((opt, idx) => {
     const row = createChooserRow();
     const label = document.createElement('span');
     label.textContent = opt.label || opt.mode;
     row.appendChild(label);
-    row.addEventListener('mouseenter', () => setSel(idx));
-    row.addEventListener('click', () => confirmSelected());
+    if (opt.disabled) {
+      row.style.opacity = '0.48';
+      row.style.cursor = 'not-allowed';
+    } else {
+      enabledIndexes.push(idx);
+      row.addEventListener('mouseenter', () => setSel(idx));
+      row.addEventListener('click', () => confirmSelected());
+    }
     list.appendChild(row);
     return row;
   });
@@ -1176,10 +1183,28 @@ export function renderActionChooser(panel, data) {
 
   const { getSel, setSel } = createSimpleSel(rows, options.length);
 
+  function firstEnabled() {
+    return enabledIndexes.length ? enabledIndexes[0] : 0;
+  }
+
+  function lastEnabled() {
+    return enabledIndexes.length ? enabledIndexes[enabledIndexes.length - 1] : Math.max(0, options.length - 1);
+  }
+
+  function moveEnabled(delta) {
+    if (!enabledIndexes.length) return;
+    const current = getSel();
+    let pos = enabledIndexes.indexOf(current);
+    if (pos < 0) pos = delta < 0 ? enabledIndexes.length : -1;
+    pos = Math.max(0, Math.min(enabledIndexes.length - 1, pos + delta));
+    setSel(enabledIndexes[pos]);
+  }
+
   function confirmSelected() {
     const i = getSel();
     const opt = options[i];
     if (!opt) return;
+    if (opt.disabled) return;
     pulseRow(rows[i], 'use');
     window.dispatchEvent(new CustomEvent('ui:requestActionSelect', {
       detail: { targetId, action, mode: opt.mode },
@@ -1187,15 +1212,15 @@ export function renderActionChooser(panel, data) {
     hide(panel);
   }
 
-  setSel(0);
+  setSel(firstEnabled());
 
   installKeyHandler(panel, (e) => {
     if (panel.style.display !== 'block') return;
     const k = e.key;
-    if (k === 'ArrowUp') { setSel(getSel() - 1); e.preventDefault(); }
-    else if (k === 'ArrowDown') { setSel(getSel() + 1); e.preventDefault(); }
-    else if (k === 'Home') { setSel(0); e.preventDefault(); }
-    else if (k === 'End') { setSel(options.length - 1); e.preventDefault(); }
+    if (k === 'ArrowUp') { moveEnabled(-1); e.preventDefault(); }
+    else if (k === 'ArrowDown') { moveEnabled(1); e.preventDefault(); }
+    else if (k === 'Home') { setSel(firstEnabled()); e.preventDefault(); }
+    else if (k === 'End') { setSel(lastEnabled()); e.preventDefault(); }
     else if (k === 'Enter') { confirmSelected(); e.preventDefault(); }
     else if (k === 'Escape') { hide(panel); e.preventDefault(); }
   });
