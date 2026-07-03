@@ -1,16 +1,3 @@
-small handful of UX work items.
-
-1. the "mail" ux is a bit awkward on mobile,  currently left aligned with no easy way to close it. I was thinking we could design a centered window with an obvious close button on each tab. this is our primary focus.
-
-2. bumping into an altar from the left or right on mobile forces an offering of whatever item happens to be under your finger because inventory opens right away and the player is still mid tap.
-2.1. we should only allow one offering per day per altar
-2.2. the offered item glyph should appear rendered atop the shrine.
-2.3. we should consider adding "on_offered" handler -- I know we have special handling for offering a dead pet, but I was thinking about making it (offering handler) canon across the engine. this opens up a whole new design dimension, if you offer something under a specific set of circumstances, something special happens -- we can dream stuff up.
-
-do as much as you possibly can in one-shot.
-
----
-
-interacting with an altar now does nothing but pray apparently, that wasnt the point. the point was that when players bumped it, they automatically offered the item that was directly undrer their finger.
-
-my reccommendation is to tweak the UX to popup an "offer" verb first that way they can control what happens -- otherwise, seems directionally right-ish.
+NOTE: offering is show, but, re-interacting still shows offer, we can either disallow any action, or, disable "offer" while one is active.
+NOTE: if you look how user made campfires expire, that might inspire you as it relates to offers expiring.
+NOTE: an ative offering might want to change the lighing character of the altar -- up to you, could be tricky to give it a vibe that matches the offering quality somehow.

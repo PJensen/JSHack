@@ -5,6 +5,7 @@
   "branch": "master",
   "checkpoints_count": 2,
   "files_touched": [
+    "VERSION",
     "src/bridge/schema/worldView.js",
     "src/main.js",
     "src/main/wiring/savegameSerializationRegistry.js",
@@ -23,12 +24,5 @@
       "content_hash": "/80/9c3392c74d/0/content_hash.txt",
       "prompt": "/80/9c3392c74d/0/prompt.txt"
     }
-  ],
-  "token_usage": {
-    "input_tokens": 340626,
-    "cache_creation_tokens": 0,
-    "cache_read_tokens": 8556928,
-    "output_tokens": 21651,
-    "api_call_count": 61
-  }
+  ]
 }
