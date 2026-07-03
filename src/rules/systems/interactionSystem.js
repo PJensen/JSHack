@@ -12,6 +12,7 @@ import { Interactable } from "../components/Interactable.js";
 import { InteractIntent } from "../components/Intents/InteractIntent.js";
 import { runInteractHooks } from "../interaction/interactRunner.js";
 import { isEntityOnCurrentFloor } from "../utils/floorEntities.js";
+import { defineExtension } from "../../lib/ecs-js/index.js";
 
 /**
  * Dispatch a single interaction between actor and targetId.
@@ -48,23 +49,24 @@ export function interactionSystem(world) {
 
 // ─── Bump-interact event listener ────────────────────────────────────────────
 
-const BUMP_INTERACT_INSTALLED = Symbol.for("jshack.bumpInteract");
-
 /**
  * Install a one-time bump:interact listener for movement-triggered interactions
  * (e.g. walking into a door). This bypasses the intent queue so bump actions
  * resolve immediately during movement.
- *
- * @param {any} world
  */
-export function installBumpInteractListener(world) {
-  if (!world || world[BUMP_INTERACT_INSTALLED]) return;
-  world[BUMP_INTERACT_INSTALLED] = true;
+export const bumpInteractListenerExtension = defineExtension("jshack:rules:bumpInteract", (world) => {
   world.on("bump:interact", /** @param {{actor:number,target:number}} ev */ (ev) => {
     try {
-      InteractionSystem(world, ev.actor, ev.target);
+      InteractionSystem(world, ev.actor, ev.target, { source: "bump" });
     } catch (e) {
       console.error("[interactionSystem] bump dispatch failed:", e);
     }
   });
+});
+
+/**
+ * @param {any} world
+ */
+export function installBumpInteractListener(world) {
+  world?.install?.(bumpInteractListenerExtension);
 }

@@ -14,6 +14,7 @@ import { InteractIntent } from "../../rules/components/Intents/InteractIntent.js
 import { MeleeAttackIntent } from "../../rules/components/Intents/MeleeAttackIntent.js";
 import { AttackDirectionIntent } from "../../rules/components/Intents/AttackDirectionIntent.js";
 import { Interactable } from "../../rules/components/Interactable.js";
+import { AltarOfferingState } from "../../rules/components/AltarOfferingState.js";
 import { Mana } from "../../rules/components/Mana.js";
 import { CombatLog as MessageLog } from "../../rules/components/MessageLog.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
@@ -38,6 +39,7 @@ import { Weight } from "../../rules/components/Weight.js";
 const CHEST_FIRST_COMPONENTS = Object.freeze([
   Inventory,
   Interactable,
+  AltarOfferingState,
   NamedIdentity,
   Position,
 ]);

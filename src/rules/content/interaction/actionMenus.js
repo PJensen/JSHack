@@ -12,7 +12,12 @@
 // Single-action interactables (doors, wells, signs, etc.) need no entry here —
 // they bypass the menu and dispatch directly.
 
-export const ACTION_MENUS = {};
+export const ACTION_MENUS = {
+  prayAltar: Object.freeze([
+    Object.freeze({ mode: "pray", label: "Pray" }),
+    Object.freeze({ mode: "offer", label: "Offer" }),
+  ]),
+};
 
 /**
  * @param {string} action

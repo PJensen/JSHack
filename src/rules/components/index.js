@@ -105,6 +105,7 @@ export { Lifespan } from './Lifespan.js';
 export { Interactable } from './Interactable.js';
 export { FountainState } from './FountainState.js';
 export { FountainOutcomeApplied } from './FountainOutcomeApplied.js';
+export { AltarOfferingState } from './AltarOfferingState.js';
 export { KnockbackPending } from './KnockbackPending.js';
 export { SoundEmitter } from './SoundEmitter.js';
 export { AudioEmitter } from './AudioEmitter.js';

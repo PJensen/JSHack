@@ -4992,7 +4992,8 @@ function render(worldView) {
 
     // Size-class scaling — small creatures render smaller, big ones bigger
     const sizeScale = SIZE_CLASS_SCALE[e.sizeClass] || 1;
-    const entityScale = flyingPresentation.glyphScale * sizeScale;
+    const entityScale = flyingPresentation.glyphScale * sizeScale *
+      (hasTag(e, 'altar_offering') ? (e.itemScale || 1) : 1);
     const entityRotation = recoilOff.rotation || 0;
 
     // Build tag set once — avoids 20+ O(n) .includes() scans per actor

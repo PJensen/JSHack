@@ -45,6 +45,7 @@ import { GroundStackOrder } from "../../rules/components/GroundStackOrder.js";
 import { Facing } from "../../rules/components/Facing.js";
 import { AggroState } from "../../rules/components/AggroState.js";
 import { FountainState } from "../../rules/components/FountainState.js";
+import { AltarOfferingState } from "../../rules/components/AltarOfferingState.js";
 import { AudioEmitter } from "../../rules/components/AudioEmitter.js";
 import { LightEmitter } from "../../rules/components/LightEmitter.js";
 import { HarvestNode } from "../../rules/components/HarvestNode.js";
@@ -834,6 +835,47 @@ function projectProcStateTags(world, id, rec) {
 	}
 }
 
+function projectAltarOfferingOverlays(world, out) {
+	for (const [altarId, state, pos] of world.query(AltarOfferingState, Position)) {
+		let base = null;
+		for (let i = 0; i < out.length; i++) {
+			if ((Number(out[i]?.id || 0) | 0) === (altarId | 0)) {
+				base = out[i];
+				break;
+			}
+		}
+		if (!base) continue;
+		const kind = String(state?.offeredItemKind || "");
+		if (!kind) continue;
+		out.push({
+			id: -Math.abs(altarId | 0),
+			kind,
+			pos: { x: pos.x, y: pos.y - 0.22 },
+			tags: ["altar_offering"],
+			layer: Math.max(0, (Number(base.layer || 300) | 0) + 1),
+			hp: 0,
+			maxHp: 0,
+			isPet: false,
+			showHealthBar: false,
+			aggroLevel: "",
+			aggroTargetId: 0,
+			aggroTargetReason: "",
+			threatState: "",
+			targetLocked: false,
+			procStates: null,
+			equipBadges: null,
+			stackSeq: 0,
+			facing: null,
+			weaponVfx: null,
+			sizeClass: "",
+			itemScale: 0.72,
+			rotation: 0,
+			visualOff: _zeroOff,
+			offeredItemName: String(state?.offeredItemName || ""),
+		});
+	}
+}
+
 /**
  * Project actor-facing for display-only overlays (directional marker, etc.).
  * @param {import('../../lib/ecs-js/index.js').World} world
@@ -1549,6 +1591,8 @@ export function buildWorldView(world) {
 			_view.entities.push(makePerceptionEcho(rec, ["thermal_sensed"], rec.pos));
 		}
 	}
+	projectAltarOfferingOverlays(world, _view.entities);
+
 	_view.entities.sort((a, b) => (
 		(a.layer - b.layer) ||
 		(a.pos.y - b.pos.y) ||

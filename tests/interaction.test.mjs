@@ -23,6 +23,8 @@ import { FoodDecay } from "../src/rules/components/FoodDecay.js";
 import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
 import { ObjectState } from "../src/rules/components/ObjectState.js";
 import { FountainState } from "../src/rules/components/FountainState.js";
+import { AltarOfferingState } from "../src/rules/components/AltarOfferingState.js";
+import { ScriptRef } from "../src/rules/components/ScriptRef.js";
 import { FountainDrinkResolved } from "../src/events/FountainDrinkResolved.js";
 import { FountainDried } from "../src/events/FountainDried.js";
 import { FountainRefilled } from "../src/events/FountainRefilled.js";
@@ -49,7 +51,10 @@ import {
   WildBerries,
   WildHerbs,
 } from "../src/rules/archetypes/Food.js";
-import { interactionSystem } from "../src/rules/systems/interactionSystem.js";
+import {
+  installBumpInteractListener,
+  interactionSystem,
+} from "../src/rules/systems/interactionSystem.js";
 import { useItemSystem } from "../src/rules/systems/useItemSystem.js";
 import { fountainRegrowthSystem } from "../src/rules/systems/fountainRegrowthSystem.js";
 import {
@@ -57,6 +62,9 @@ import {
   getDeityInstance,
   initDeity,
 } from "../src/rules/systems/deitySystem.js";
+import { buildWorldView } from "../src/bridge/schema/worldView.js";
+import { TURNS_PER_DAY } from "../src/rules/data/calendar.js";
+import { registerScript, ScriptVerb } from "../src/rules/scripting.js";
 import {
   addToInventory,
   getStackCount,
@@ -907,7 +915,7 @@ Deno.test("sarcophagus: becomes inert after opening (one-time use)", () => {
 
 // ── Altar — two-phase offering ────────────────────────────────────────────────
 
-Deno.test("altar: phase 1 emits offer prompt with inventory items", () => {
+Deno.test("altar: phase 1 emits Pray / Offer action chooser", () => {
   const world = new World({ seed: 50 });
 
   const actor = world.create();
@@ -931,17 +939,71 @@ Deno.test("altar: phase 1 emits offer prompt with inventory items", () => {
   });
   addToInventory(world, actor, itemId);
 
-  const prompts = [];
-  world.on("altar:offerPrompt", (e) => prompts.push(e));
+  const chooser = [];
+  world.on(InteractionChoicePrompted, (e) => chooser.push(e));
 
   world.add(actor, InteractIntent, { targetId: altar });
   interactionSystem(world);
 
-  assert(prompts.length === 1, "should emit altar:offerPrompt");
+  assertEquals(chooser.length, 1, "should emit action chooser");
+  assertEquals(chooser[0].action, "prayAltar");
+  assertEquals(chooser[0].options.map((opt) => opt.mode), ["pray", "offer"]);
+});
+
+Deno.test("altar: Offer verb emits offer prompt with inventory items", () => {
+  const world = new World({ seed: 5001 });
+
+  const actor = world.create();
+  const altar = world.create();
+  world.add(altar, Interactable, { action: "prayAltar", params: null });
+  world.add(actor, Inventory, { items: [], capacity: 10, weightLimit: null });
+
+  const itemId = world.create();
+  world.add(itemId, ItemInfo, {
+    type: "potion",
+    slot: "bag",
+    weight: 1,
+    value: 50,
+    description: "test",
+    count: 1,
+    bonuses: {},
+    rarity: 1,
+    rarityName: "common",
+    affixes: [],
+  });
+  addToInventory(world, actor, itemId);
+
+  const prompts = [];
+  world.on("altar:offerPrompt", (e) => prompts.push(e));
+
+  world.add(actor, InteractIntent, { targetId: altar, mode: "offer" });
+  interactionSystem(world);
+
+  assertEquals(prompts.length, 1, "Offer verb should emit altar:offerPrompt");
   assert(
     prompts[0].items.includes(itemId),
     "prompt should include the offerable item",
   );
+});
+
+Deno.test("altar: Pray verb prays without opening the offer chooser", () => {
+  const world = new World({ seed: 5002 });
+
+  const actor = world.create();
+  const altar = world.create();
+  world.add(altar, Interactable, { action: "prayAltar", params: null });
+  world.add(actor, Inventory, { items: [], capacity: 10, weightLimit: null });
+
+  const prompts = [];
+  const prayers = [];
+  world.on("altar:offerPrompt", (e) => prompts.push(e));
+  world.on("altar:pray", (e) => prayers.push(e));
+
+  world.add(actor, InteractIntent, { targetId: altar, mode: "pray" });
+  interactionSystem(world);
+
+  assertEquals(prompts.length, 0, "Pray verb should not open the offering chooser");
+  assertEquals(prayers.length, 1, "Pray verb should pray at the altar");
 });
 
 Deno.test("altar: phase 2 consumes item and emits altar:offer", () => {
@@ -981,6 +1043,194 @@ Deno.test("altar: phase 2 consumes item and emits altar:offer", () => {
     !inventoryContains(world, actor, itemId),
     "offered item should be removed from inventory",
   );
+  const altarState = world.get(altar, AltarOfferingState);
+  assertEquals(altarState?.lastOfferedDay, 0);
+  assertEquals(altarState?.offeredItemName, "test");
+});
+
+Deno.test("altar: bump interaction opens the verb chooser without offering an item", () => {
+  const world = new World({ seed: 5101 });
+
+  const actor = world.create();
+  const altar = world.create();
+  world.add(altar, Interactable, { action: "prayAltar", params: null });
+  world.add(actor, Inventory, { items: [], capacity: 10, weightLimit: null });
+
+  const itemId = world.create();
+  world.add(itemId, ItemInfo, {
+    type: "potion",
+    slot: "bag",
+    weight: 1,
+    value: 50,
+    description: "test",
+    count: 1,
+    bonuses: {},
+    rarity: 1,
+    rarityName: "common",
+    affixes: [],
+  });
+  addToInventory(world, actor, itemId);
+
+  const chooser = [];
+  const offers = [];
+  world.on(InteractionChoicePrompted, (e) => chooser.push(e));
+  world.on("altar:offer", (e) => offers.push(e));
+  installBumpInteractListener(world);
+
+  world.emit("bump:interact", { actor, target: altar });
+
+  assertEquals(chooser.length, 1, "bump should open the action chooser");
+  assertEquals(chooser[0].options.map((opt) => opt.mode), ["pray", "offer"]);
+  assertEquals(offers.length, 0, "bump should not offer an item");
+  assert(inventoryContains(world, actor, itemId), "bump should not offer an item");
+});
+
+Deno.test("altar: only one offering per altar per day", () => {
+  const world = new World({ seed: 5102 });
+
+  const actor = world.create();
+  const altar = world.create();
+  world.add(altar, Interactable, { action: "prayAltar", params: null });
+  world.add(actor, Inventory, { items: [], capacity: 10, weightLimit: null });
+
+  const first = world.create();
+  world.add(first, ItemInfo, {
+    type: "potion",
+    slot: "bag",
+    weight: 1,
+    value: 50,
+    description: "first",
+    count: 1,
+    bonuses: {},
+    rarity: 1,
+    rarityName: "common",
+    affixes: [],
+  });
+  addToInventory(world, actor, first);
+
+  const second = world.create();
+  world.add(second, ItemInfo, {
+    type: "potion",
+    slot: "bag",
+    weight: 1,
+    value: 50,
+    description: "second",
+    count: 1,
+    bonuses: {},
+    rarity: 1,
+    rarityName: "common",
+    affixes: [],
+  });
+  addToInventory(world, actor, second);
+
+  const failures = [];
+  world.on("altar:offerFailed", (e) => failures.push(e));
+
+  world.add(actor, InteractIntent, { targetId: altar, mode: "offer", itemId: first });
+  interactionSystem(world);
+  world.add(actor, InteractIntent, { targetId: altar, mode: "offer", itemId: second });
+  interactionSystem(world);
+
+  assertEquals(failures[0]?.reason, "already_offered_today");
+  assert(inventoryContains(world, actor, second), "same-day rejected item should remain owned");
+
+  world.step = TURNS_PER_DAY;
+  world.add(actor, InteractIntent, { targetId: altar, mode: "offer", itemId: second });
+  interactionSystem(world);
+
+  assert(!inventoryContains(world, actor, second), "next-day offering should be accepted");
+  assertEquals(world.get(altar, AltarOfferingState)?.lastOfferedDay, 1);
+});
+
+Deno.test("altar: offered item kind is projected on top of the altar", () => {
+  const world = new World({ seed: 5103 });
+
+  const actor = world.create();
+  const altar = world.create();
+  world.add(actor, Player, {});
+  world.add(actor, Position, { x: 5, y: 6 });
+  world.add(altar, Interactable, { action: "prayAltar", params: null });
+  world.add(altar, Position, { x: 5, y: 5 });
+  world.add(altar, NamedIdentity, { name: "Altar", identity: "altar" });
+  world.add(actor, Inventory, { items: [], capacity: 10, weightLimit: null });
+
+  const itemId = world.create();
+  world.add(itemId, NamedIdentity, { name: "Ruby", identity: "gem_ruby" });
+  world.add(itemId, ItemInfo, {
+    type: "gem",
+    slot: "bag",
+    weight: 1,
+    value: 50,
+    description: "Ruby",
+    count: 1,
+    bonuses: {},
+    rarity: 1,
+    rarityName: "common",
+    affixes: [],
+  });
+  addToInventory(world, actor, itemId);
+
+  world.add(actor, InteractIntent, { targetId: altar, mode: "offer", itemId });
+  interactionSystem(world);
+
+  const view = buildWorldView(world);
+  const offering = view.entities.find((entity) => entity.tags?.includes("altar_offering"));
+  assert(offering, "WorldView should include an altar offering overlay");
+  assertEquals(offering.kind, "gem_ruby");
+  assertEquals(offering.pos.x, 5);
+  assert(offering.pos.y < 5, "offering should render visually atop the altar");
+});
+
+Deno.test("altar: on-offered script hook runs before the item entity is destroyed", () => {
+  const world = new World({ seed: 5104 });
+
+  const actor = world.create();
+  const altar = world.create();
+  world.add(altar, Interactable, { action: "prayAltar", params: null });
+  world.add(altar, ScriptRef, { ref: "test:altar:on_offered" });
+  world.add(actor, Inventory, { items: [], capacity: 10, weightLimit: null });
+
+  const itemId = world.create();
+  world.add(itemId, NamedIdentity, { name: "Ruby", identity: "gem_ruby" });
+  world.add(itemId, ItemInfo, {
+    type: "gem",
+    slot: "bag",
+    weight: 1,
+    value: 50,
+    description: "Ruby",
+    count: 1,
+    bonuses: {},
+    rarity: 1,
+    rarityName: "common",
+    affixes: [],
+  });
+  addToInventory(world, actor, itemId);
+
+  const calls = [];
+  registerScript("test:altar:on_offered", {
+    [ScriptVerb.AltarOffered]: (scriptWorld, ctx) => {
+      calls.push({
+        actor: ctx.actor,
+        targetId: ctx.targetId,
+        itemId: ctx.itemId,
+        itemAlive: scriptWorld.isAlive(ctx.itemId),
+        identity: scriptWorld.get(ctx.itemId, NamedIdentity)?.identity,
+      });
+    },
+  });
+
+  world.add(actor, InteractIntent, { targetId: altar, mode: "offer", itemId });
+  interactionSystem(world);
+
+  assertEquals(calls.length, 1);
+  assertEquals(calls[0], {
+    actor,
+    targetId: altar,
+    itemId,
+    itemAlive: true,
+    identity: "gem_ruby",
+  });
+  assert(!world.isAlive(itemId), "offered item should still be consumed after the hook");
 });
 
 Deno.test("altar: offer fails gracefully when item is not in inventory", () => {

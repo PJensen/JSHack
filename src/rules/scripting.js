@@ -18,6 +18,7 @@ export const ScriptVerb = Object.freeze({
   ItemThrow: "item:throw",
   TrapTrigger: "trap:trigger",
   ItemApply: "item:apply",
+  AltarOffered: "altar:offered",
 });
 
 /**

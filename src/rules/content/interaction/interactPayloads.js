@@ -92,6 +92,9 @@ import { shopDispositionTerms } from "../../utils/disposition.js";
 import { LockpickPrompted } from "../../../events/LockpickPrompted.js";
 import { LockpickResolved } from "../../../events/LockpickResolved.js";
 import { BedSleepRequested } from "../../../events/BedSleepRequested.js";
+import { AltarOfferingState } from "../../components/AltarOfferingState.js";
+import { TURNS_PER_DAY } from "../../data/calendar.js";
+import { runEntityScript, ScriptVerb } from "../../scripting.js";
 
 // Maps catalog item IDs → archetypes for harvest yield entity creation.
 const CATALOG_ARCHETYPES = {
@@ -1024,6 +1027,12 @@ export const INTERACT_PAYLOADS = {
         return;
       }
 
+      if (String(intent?.mode || "").toLowerCase() === "pray") {
+        world.emit?.("prayer", { actor, distress: null, altarBonus: true });
+        world.emit?.("altar:pray", { actor, targetId });
+        return;
+      }
+
       // Phase 1 — collect offerable items and prompt the UI.
       const offerableItems = [];
       const eq = world.get(actor, Equipment);
@@ -1600,6 +1609,17 @@ export const INTERACT_PAYLOADS = {
 // ─── Altar offer helper ───────────────────────────────────────────────────────
 
 function _altarExecuteOffer(world, actor, targetId, itemId) {
+  const currentDay = Math.floor(Math.max(0, Number(world.step || 0)) / TURNS_PER_DAY) | 0;
+  const altarState = world.get(targetId, AltarOfferingState);
+  if (altarState && (Number(altarState.lastOfferedDay ?? -1) | 0) === currentDay) {
+    world.emit?.("altar:offerFailed", {
+      actor,
+      targetId,
+      itemId,
+      reason: "already_offered_today",
+    });
+    return;
+  }
   if (!inventoryContains(world, actor, itemId)) {
     world.emit?.("altar:offerFailed", {
       actor,
@@ -1630,11 +1650,18 @@ function _altarExecuteOffer(world, actor, targetId, itemId) {
   );
   const itemName = ident?.name || info?.name || info?.description || "item";
   const itemIdentity = String(ident?.identity || "");
+  const offeredItemKind = itemIdentity || String(info?.type || "default");
   const beatitudeState = String(beatitude?.state || "").toLowerCase();
   removeFromInventory(world, actor, itemId);
-  try {
-    world.destroy(itemId);
-  } catch {}
+  const nextAltarState = {
+    lastOfferedDay: currentDay,
+    offeredItemKind,
+    offeredItemName: itemName,
+    offeredItemIdentity: itemIdentity,
+    offeredAtTurn: Number(world.step || 0) | 0,
+  };
+  if (altarState) world.set(targetId, AltarOfferingState, nextAltarState);
+  else world.add(targetId, AltarOfferingState, nextAltarState);
   // Emit altar:offer so the deity system records the offering and emits altar:offered.
   world.emit?.("altar:offer", {
     actor,
@@ -1646,6 +1673,19 @@ function _altarExecuteOffer(world, actor, targetId, itemId) {
     beatitudeState,
     value,
   });
+  runEntityScript(world, targetId, ScriptVerb.AltarOffered, {
+    actor,
+    targetId,
+    itemId,
+    itemName,
+    itemIdentity,
+    offeredItemKind,
+    value,
+    beatitudeState,
+  });
+  try {
+    world.destroy(itemId);
+  } catch {}
   world.emit?.("prayer", {
     actor,
     distress: null,
