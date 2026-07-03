@@ -1,0 +1,67 @@
+{
+  "cli_version": "0.7.7",
+  "checkpoint_id": "809c3392c74d",
+  "session_id": "019f28dd-d03e-7891-8579-fc2e3f8cc011",
+  "strategy": "manual-commit",
+  "created_at": "2026-07-03T16:58:39.895063238Z",
+  "branch": "master",
+  "checkpoints_count": 2,
+  "save_step_count": 3,
+  "files_touched": [
+    "src/bridge/schema/worldView.js",
+    "src/main.js",
+    "src/main/wiring/savegameSerializationRegistry.js",
+    "src/rules/components/AltarOfferingState.js",
+    "src/rules/components/index.js",
+    "src/rules/content/interaction/actionMenus.js",
+    "src/rules/content/interaction/interactPayloads.js",
+    "src/rules/scripting.js",
+    "src/rules/systems/interactionSystem.js",
+    "tests/interaction.test.mjs"
+  ],
+  "agent": "Codex",
+  "model": "gpt-5.5",
+  "turn_id": "24dd82b3b558",
+  "token_usage": {
+    "input_tokens": 340626,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 8556928,
+    "output_tokens": 21651,
+    "api_call_count": 61
+  },
+  "session_metrics": {
+    "turn_count": 2
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-07-03T16:58:39.843991299Z",
+    "agent_lines": 390,
+    "agent_removed": 17,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 390,
+    "total_lines_changed": 407,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 865,
+      "user_lines_removed": 0,
+      "agent_lines_added": 326,
+      "agent_lines_removed": 13,
+      "user_added_per_file": {
+        ".github/agents/Dungeon Generation and BSP Expert.agent.md": 582,
+        ".github/agents/VFX Agent.agent.md": 283
+      }
+    }
+  ]
+}
