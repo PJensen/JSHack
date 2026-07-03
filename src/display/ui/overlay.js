@@ -372,6 +372,9 @@ export function initOverlays() {
     hideCharMenuPanels();
     show(mailbox);
   });
+  window.addEventListener('ui:closeMailbox', () => {
+    hide(mailbox);
+  });
   window.addEventListener('ui:mailboxData', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;

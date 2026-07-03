@@ -27,19 +27,25 @@ function dispatch(name, detail = {}) {
   window.dispatchEvent(new CustomEvent(name, { detail }));
 }
 
+function closeMailbox(panel) {
+  panel.style.display = "none";
+}
+
 function ensureStyles() {
   if (document.getElementById("mailboxOverlayStyles")) return;
   const style = document.createElement("style");
   style.id = "mailboxOverlayStyles";
   style.textContent = `
-    .mailbox-panel { width: min(720px, calc(100vw - 24px)); max-height: min(760px, calc(100vh - 24px)); overflow: auto; }
+    .mailbox-panel { position: absolute; inset: 0; display: grid; place-items: center; padding: 12px; box-sizing: border-box; }
+    .mailbox-window { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(720px, calc(100vw - 24px)); max-height: min(760px, calc(100vh - 24px)); overflow: auto; box-sizing: border-box; border: 1px solid #3a4a61; border-radius: 8px; background: #0b0e16; box-shadow: 0 18px 48px rgba(0,0,0,0.68); padding: 14px; }
     .mailbox-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
     .mailbox-title { font-size: 20px; font-weight: 700; }
     .mailbox-sub { opacity: 0.75; font-size: 12px; }
-    .mailbox-tabs { display: flex; gap: 6px; margin: 10px 0; }
+    .mailbox-tabs { display: grid; grid-template-columns: 1fr 1fr auto; gap: 6px; margin: 10px 0; }
     .mailbox-tabs button, .mailbox-actions button, .mailbox-row button, .mailbox-phone button { cursor: pointer; }
     .mailbox-tabs button { padding: 7px 10px; border: 1px solid #526070; background: #202733; color: #eaf2ff; border-radius: 6px; }
     .mailbox-tabs button.active { background: #38506f; border-color: #7fa6d8; }
+    .mailbox-close { min-width: 44px; min-height: 36px; border: 1px solid #7f91a8 !important; background: #151d2a !important; color: #ffffff !important; font-weight: 700; }
     .mailbox-status { min-height: 20px; margin: 6px 0; color: #d8e8ff; font-size: 13px; }
     .mailbox-error { color: #ffb0a8; }
     .mailbox-notice { color: #a8ffc8; }
@@ -57,6 +63,11 @@ function ensureStyles() {
     .mailbox-item-list { display: grid; gap: 4px; max-height: 180px; overflow: auto; padding: 6px; border: 1px solid #3f4b5a; border-radius: 6px; }
     .mailbox-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
     .mailbox-phone { display: grid; gap: 10px; }
+    @media (max-width: 520px) {
+      .mailbox-window { max-height: calc(100vh - 18px); padding: 12px; }
+      .mailbox-head { align-items: start; }
+      .mailbox-actions { justify-content: flex-end; }
+    }
   `;
   document.head.appendChild(style);
 }
@@ -76,9 +87,12 @@ function attachmentText(mail) {
   return parts.join(", ");
 }
 
-function renderPhone(panel, state) {
+function renderPhone(panel, state, host = panel) {
   const box = el("div", "mailbox-phone");
-  box.appendChild(el("div", "mailbox-title", "Mailbox"));
+  const head = el("div", "mailbox-head");
+  head.appendChild(el("div", "mailbox-title", "Mailbox"));
+  head.appendChild(button("Close", () => closeMailbox(panel), "mailbox-close"));
+  box.appendChild(head);
   box.appendChild(el("div", "mailbox-sub", "Enter your phone number to check town mail."));
   const phone = input("tel", "Phone number");
   const submit = button("Save phone", () => {
@@ -87,7 +101,7 @@ function renderPhone(panel, state) {
   box.appendChild(phone);
   box.appendChild(submit);
   if (state?.error) box.appendChild(el("div", "mailbox-status mailbox-error", state.error));
-  panel.appendChild(box);
+  host.appendChild(box);
   setTimeout(() => phone.focus(), 0);
 }
 
@@ -194,8 +208,10 @@ export function renderMailbox(panel, state = {}) {
   panel._mailboxState = state;
   panel.classList.add("mailbox-panel");
   panel.innerHTML = "";
+  const windowEl = el("div", "mailbox-window");
+  panel.appendChild(windowEl);
   if (state.needsPhone) {
-    renderPhone(panel, state);
+    renderPhone(panel, state, windowEl);
     return;
   }
   const tab = panel._mailboxTab || "inbox";
@@ -206,9 +222,10 @@ export function renderMailbox(panel, state = {}) {
   const actions = el("div", "mailbox-actions");
   actions.appendChild(button("Refresh", () => dispatch("ui:mailboxRefresh")));
   actions.appendChild(button("Change phone", () => dispatch("ui:mailboxForgetPhone")));
+  actions.appendChild(button("Close", () => closeMailbox(panel), "mailbox-close"));
   head.appendChild(title);
   head.appendChild(actions);
-  panel.appendChild(head);
+  windowEl.appendChild(head);
 
   const tabs = el("div", "mailbox-tabs");
   const inbox = button("Inbox", () => {
@@ -221,7 +238,8 @@ export function renderMailbox(panel, state = {}) {
   }, tab === "outbox" ? "active" : "");
   tabs.appendChild(inbox);
   tabs.appendChild(outbox);
-  panel.appendChild(tabs);
+  tabs.appendChild(button("Close", () => closeMailbox(panel), "mailbox-close"));
+  windowEl.appendChild(tabs);
 
   const status = el("div", "mailbox-status");
   if (state.busy) status.textContent = "Contacting mailbox...";
@@ -232,6 +250,6 @@ export function renderMailbox(panel, state = {}) {
     status.className = "mailbox-status mailbox-notice";
     status.textContent = state.notice;
   }
-  panel.appendChild(status);
-  panel.appendChild(tab === "outbox" ? renderOutbox(panel, state) : renderInbox(panel, state));
+  windowEl.appendChild(status);
+  windowEl.appendChild(tab === "outbox" ? renderOutbox(panel, state) : renderInbox(panel, state));
 }
