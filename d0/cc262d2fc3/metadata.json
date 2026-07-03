@@ -1,0 +1,32 @@
+{
+  "cli_version": "0.7.7",
+  "checkpoint_id": "d0cc262d2fc3",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "src/bridge/schema/worldView.js",
+    "src/display/ui/overlayRenders.js",
+    "src/events/InteractionChoicePrompted.js",
+    "src/rules/components/AltarOfferingState.js",
+    "src/rules/content/interaction/actionMenus.js",
+    "src/rules/content/interaction/interactPayloads.js",
+    "src/rules/utils/altarOfferingState.js",
+    "tests/interaction.test.mjs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/d0/cc262d2fc3/0/metadata.json",
+      "transcript": "/d0/cc262d2fc3/0/full.jsonl",
+      "content_hash": "/d0/cc262d2fc3/0/content_hash.txt",
+      "prompt": "/d0/cc262d2fc3/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 135987,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 3839104,
+    "output_tokens": 9390,
+    "api_call_count": 28
+  }
+}
