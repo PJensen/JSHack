@@ -1,0 +1,33 @@
+{
+  "cli_version": "0.7.7",
+  "checkpoint_id": "1483de0ceb81",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "src/rules/data/buildings/apothecary.js",
+    "src/rules/data/buildings/book_shop.js",
+    "src/rules/data/buildings/gem_store.js",
+    "src/rules/data/buildings/general_store.js",
+    "src/rules/environment/dungeon/townPlacement.js",
+    "src/rules/environment/dungeon/transition.js",
+    "src/rules/utils/factionHostility.js",
+    "tests/ringOfConflict.test.mjs",
+    "tests/shopDoorKeys.test.mjs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/14/83de0ceb81/0/metadata.json",
+      "transcript": "/14/83de0ceb81/0/full.jsonl",
+      "content_hash": "/14/83de0ceb81/0/content_hash.txt",
+      "prompt": "/14/83de0ceb81/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 125788,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 2550912,
+    "output_tokens": 10162,
+    "api_call_count": 27
+  }
+}
