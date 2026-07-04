@@ -34,6 +34,16 @@ function getWorldTile(chunks, x, y) {
   return chunk.tiles[ly * CHUNK_SIZE + lx];
 }
 
+function getWorldRoofed(chunks, x, y) {
+  const cx = Math.floor(x / CHUNK_SIZE);
+  const cy = Math.floor(y / CHUNK_SIZE);
+  const chunk = chunks.find((c) => c.chunkX === cx && c.chunkY === cy);
+  if (!chunk?.roofed) return false;
+  const lx = x - cx * CHUNK_SIZE;
+  const ly = y - cy * CHUNK_SIZE;
+  return chunk.roofed[ly * CHUNK_SIZE + lx] === 1;
+}
+
 function spawnsOfKind(chunks, kind) {
   const out = [];
   for (const chunk of chunks) {
@@ -201,12 +211,29 @@ Deno.test("overworld procedurally stamps the required town economy", async () =>
   assert(countKind(chunks, "townfolk") >= 8, "buildings should open town professions");
 });
 
-Deno.test("scheduled townfolk receive real bed coordinates when buildings author beds", async () => {
+Deno.test("scheduled townfolk receive roofed home bed coordinates", async () => {
   const { chunks } = await generateOverworldChunks(SEED);
   const townfolk = spawnsOfKind(chunks, "townfolk");
   const byRole = new Map(townfolk.map((spawn) => [spawn.params?.townfolkId, spawn]));
 
-  for (const role of ["general_vendor", "book_vendor", "gem_vendor", "barkeep", "priest", "smith", "fisher"]) {
+  const expectedRoles = [
+    "alchemist",
+    "barkeep",
+    "book_vendor",
+    "enchantress",
+    "farmer",
+    "fisher",
+    "gem_vendor",
+    "general_vendor",
+    "herbalist",
+    "miner",
+    "priest",
+    "smith",
+    "villager",
+    "woodcutter",
+  ];
+
+  for (const role of expectedRoles) {
     const spawn = byRole.get(role);
     assert(spawn, `expected ${role} townfolk spawn`);
     assertEquals(spawn.params?.scheduleEnabled, true, `${role} should use the town schedule`);
@@ -217,6 +244,15 @@ Deno.test("scheduled townfolk receive real bed coordinates when buildings author
     assert(
       spawn.params.bedX !== spawn.params.workX || spawn.params.bedY !== spawn.params.workY,
       `${role} should not sleep at their work counter`,
+    );
+    assertEquals(
+      getWorldTile(chunks, spawn.params.bedX, spawn.params.bedY),
+      TILE_FLOOR,
+      `${role} bed should be on an interior floor tile`,
+    );
+    assert(
+      getWorldRoofed(chunks, spawn.params.bedX, spawn.params.bedY),
+      `${role} bed should be under a roof`,
     );
   }
 });

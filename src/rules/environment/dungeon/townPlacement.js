@@ -533,35 +533,45 @@ const ROLE_DELIVERY_CHEST = {
   fisher: "tavern_chest",
 };
 
-const SHOPKEEPER_HOME_ROLES = new Set(["alchemist", "gem_vendor", "book_vendor", "general_vendor"]);
+const DEDICATED_COTTAGE_HOME_ROLES = new Set([
+  "alchemist",
+  "book_vendor",
+  "enchantress",
+  "farmer",
+  "gem_vendor",
+  "general_vendor",
+]);
 
-function shopkeeperHomeRole(building) {
-  const role = String(building?.shop?.vendorRole || "");
-  return SHOPKEEPER_HOME_ROLES.has(role) ? role : "";
+function dedicatedHomeRoles(building) {
+  const plan = BUILDING_PLANS.find((entry) => entry.key === building?.key);
+  const roles = Array.isArray(plan?.roles) ? plan.roles : [];
+  return roles.filter((role) => DEDICATED_COTTAGE_HOME_ROLES.has(role));
 }
 
-function addShopkeeperCottages(chunks, bounds, buildings, occupied, protectedTiles, seed, townCenter) {
+function addDedicatedHomeCottages(chunks, bounds, buildings, occupied, protectedTiles, seed, townCenter) {
   const homes = new Map();
-  const shopBuildings = buildings.filter((building) => shopkeeperHomeRole(building));
-  for (const shop of shopBuildings) {
-    const role = shopkeeperHomeRole(shop);
+  const homeRequests = buildings.flatMap((building) =>
+    dedicatedHomeRoles(building).map((role) => ({ building, role }))
+  );
+  for (const request of homeRequests) {
+    const { building, role } = request;
     const placed = placeBuilding(
       chunks,
       bounds,
       {
-        key: `${shop.key}_keeper_cottage`,
+        key: `${building.key}_${role}_home`,
         defKey: "cottage",
-        district: shop.district,
+        district: building.district,
         coreDx: 4,
         coreDy: 5,
         wants: ["flat"],
         roles: [],
         searchRadius: 14,
       },
-      shop.door || townCenter,
+      building.door || townCenter,
       occupied,
       protectedTiles,
-      seed ^ hashKey(`${shop.key}:${role}:home`),
+      seed ^ hashKey(`${building.key}:${role}:home`),
       townCenter,
     );
     if (!placed) continue;
@@ -866,12 +876,12 @@ export async function applyTownPlacement(chunks, bounds, seed, tick = null) {
   }
 
   const tavern = buildings.find((b) => b.key === "tavern");
-  const shopkeeperHomes = addShopkeeperCottages(chunks, bounds, buildings, occupied, protectedTiles, seed, plan.center);
+  const dedicatedHomes = addDedicatedHomeCottages(chunks, bounds, buildings, occupied, protectedTiles, seed, plan.center);
   const chestPositions = indexChestPositions(chunks, buildings);
   if (_tick) await _tick(`Settling ${buildings.length} townsfolk into homes`);
   for (const building of buildings) {
     const def = BUILDING_PLANS.find((entry) => entry.key === building.key);
-    addTownfolkForBuilding(chunks, building, def?.roles || [], tavern?.door || null, chestPositions, shopkeeperHomes);
+    addTownfolkForBuilding(chunks, building, def?.roles || [], tavern?.door || null, chestPositions, dedicatedHomes);
   }
 
   if (_tick) await _tick(`Raising civic fixtures (well, signs, fountain)`);
