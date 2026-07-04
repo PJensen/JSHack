@@ -533,6 +533,44 @@ const ROLE_DELIVERY_CHEST = {
   fisher: "tavern_chest",
 };
 
+const SHOPKEEPER_HOME_ROLES = new Set(["alchemist", "gem_vendor", "book_vendor", "general_vendor"]);
+
+function shopkeeperHomeRole(building) {
+  const role = String(building?.shop?.vendorRole || "");
+  return SHOPKEEPER_HOME_ROLES.has(role) ? role : "";
+}
+
+function addShopkeeperCottages(chunks, bounds, buildings, occupied, protectedTiles, seed, townCenter) {
+  const homes = new Map();
+  const shopBuildings = buildings.filter((building) => shopkeeperHomeRole(building));
+  for (const shop of shopBuildings) {
+    const role = shopkeeperHomeRole(shop);
+    const placed = placeBuilding(
+      chunks,
+      bounds,
+      {
+        key: `${shop.key}_keeper_cottage`,
+        defKey: "cottage",
+        district: shop.district,
+        coreDx: 4,
+        coreDy: 5,
+        wants: ["flat"],
+        roles: [],
+        searchRadius: 14,
+      },
+      shop.door || townCenter,
+      occupied,
+      protectedTiles,
+      seed ^ hashKey(`${shop.key}:${role}:home`),
+      townCenter,
+    );
+    if (!placed) continue;
+    homes.set(role, placed);
+    buildings.push(placed);
+  }
+  return homes;
+}
+
 function findChestDropTile(chunks, chest) {
   if (!chest) return null;
   for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
@@ -556,13 +594,22 @@ function indexChestPositions(chunks, buildings) {
   return out;
 }
 
-function addTownfolkForBuilding(chunks, building, roles, tavernDoor, chestPositions) {
+function addTownfolkForBuilding(chunks, building, roles, tavernDoor, chestPositions, shopkeeperHomes = null) {
   for (const role of roles) {
-    const bed = building.spawns.home_bed
+    const homeBuilding = shopkeeperHomes?.get(role) || null;
+    const bed = homeBuilding?.spawns.home_bed
+      || homeBuilding?.waypoints.resident_home
+      || homeBuilding?.waypoints.front_door
+      || homeBuilding?.door
+      || building.spawns.home_bed
       || building.waypoints.resident_home
       || building.waypoints.front_door
       || building.door;
-    const home = building.waypoints.resident_home
+    const home = homeBuilding?.waypoints.resident_home
+      || homeBuilding?.spawns.home_bed
+      || homeBuilding?.waypoints.front_door
+      || homeBuilding?.door
+      || building.waypoints.resident_home
       || bed;
     const work = (role === "enchantress" ? (building.waypoints.enchantress_work || building.waypoints.vendor_work) : null)
       || building.waypoints.vendor_work
@@ -819,11 +866,12 @@ export async function applyTownPlacement(chunks, bounds, seed, tick = null) {
   }
 
   const tavern = buildings.find((b) => b.key === "tavern");
+  const shopkeeperHomes = addShopkeeperCottages(chunks, bounds, buildings, occupied, protectedTiles, seed, plan.center);
   const chestPositions = indexChestPositions(chunks, buildings);
   if (_tick) await _tick(`Settling ${buildings.length} townsfolk into homes`);
   for (const building of buildings) {
     const def = BUILDING_PLANS.find((entry) => entry.key === building.key);
-    addTownfolkForBuilding(chunks, building, def?.roles || [], tavern?.door || null, chestPositions);
+    addTownfolkForBuilding(chunks, building, def?.roles || [], tavern?.door || null, chestPositions, shopkeeperHomes);
   }
 
   if (_tick) await _tick(`Raising civic fixtures (well, signs, fountain)`);

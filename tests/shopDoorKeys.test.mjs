@@ -60,6 +60,14 @@ function isDoorOnRoomPerimeter(pos, room) {
     || pos.y === room.y + room.h - 1;
 }
 
+function isInRoom(pos, room) {
+  return pos && room
+    && pos.x >= room.x
+    && pos.x < room.x + room.w
+    && pos.y >= room.y
+    && pos.y < room.y + room.h;
+}
+
 Deno.test("matching shop key unlocks and opens the locked shop door", async () => {
   const world = new World({ seed: 7 });
   const actor = world.create();
@@ -529,6 +537,111 @@ Deno.test("restored overworld shop retains witness and unpaid ownership links", 
   shopkeeperSystem(world);
 
   assert(!world.has(playerId, MoveIntent), "restored visible vendor should block an unpaid exit");
+});
+
+Deno.test("held unpaid stock remaps to restored shopkeeper after dungeon round-trip", async () => {
+  clearAll();
+  clearFloorCache();
+  const world = new World({ seed: 0xC0FFEE });
+  configureWorld(world);
+  await initDungeon(world, { startDepth: 0 });
+
+  const playerId = world.create();
+  world.add(playerId, Player, {});
+  world.add(playerId, Inventory, { capacity: 20 });
+  world.add(playerId, Position, { x: 0, y: 0 });
+
+  let originalBookVendorId = 0;
+  for (const [id, named] of world.query(NamedIdentity)) {
+    if (named.identity === "townfolk_book_vendor") {
+      originalBookVendorId = id;
+      break;
+    }
+  }
+  assert(originalBookVendorId > 0, "expected original book vendor");
+
+  let heldItemId = 0;
+  for (const [itemId, unpaid] of world.query(Unpaid)) {
+    if (unpaid.shopkeeperId !== originalBookVendorId) continue;
+    heldItemId = itemId;
+    break;
+  }
+  assert(heldItemId > 0, "expected book stock owned by the original vendor");
+  addToInventory(world, playerId, heldItemId);
+
+  await transitionToDepth(world, 1, { x: 0, y: 0 });
+  await transitionToDepth(world, 0, { x: 0, y: 0 });
+
+  const restoredUnpaid = world.get(heldItemId, Unpaid);
+  assert(restoredUnpaid, "held stock should remain unpaid after transition");
+  assert(restoredUnpaid.shopkeeperId !== originalBookVendorId, "held stock should remap away from the destroyed vendor id");
+
+  const restoredBookVendorId = restoredUnpaid.shopkeeperId;
+  let shopRoom = null;
+  for (const [, room] of world.query(RoomMetadata)) {
+    if (room.roomType === "shop" && room.shopkeeperId === restoredBookVendorId) {
+      shopRoom = room;
+      break;
+    }
+  }
+  assert(shopRoom, "restored shop room should reference the remapped vendor");
+
+  let doorId = 0;
+  for (const [id, pos] of world.query(Position, DoorState)) {
+    if (!isDoorOnRoomPerimeter(pos, shopRoom)) continue;
+    doorId = id;
+    break;
+  }
+  assert(doorId > 0, "expected restored shop door");
+  world.set(doorId, DoorState, { open: true, locked: false });
+  world.set(doorId, Collider, { solid: false, blocksSight: false });
+
+  const doorPos = world.get(doorId, Position);
+  world.set(playerId, Position, { x: doorPos.x, y: doorPos.y });
+  let exitDx = 0;
+  let exitDy = 0;
+  for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+    const next = { x: doorPos.x + dx, y: doorPos.y + dy };
+    if (isInRoom(next, shopRoom)) continue;
+    exitDx = dx;
+    exitDy = dy;
+    break;
+  }
+  assert(exitDx !== 0 || exitDy !== 0, "expected shop door to border an exterior tile");
+
+  const blocked = [];
+  world.on("shop:exit-blocked", (ev) => blocked.push(ev));
+  world.add(playerId, MoveIntent, { dx: exitDx, dy: exitDy });
+  world.tick(1);
+
+  assertEquals(blocked.length, 1, "restored shopkeeper should block held unpaid stock");
+  assertEquals(blocked[0].shopkeeperId, restoredBookVendorId);
+  assertEquals(world.get(playerId, Position), doorPos, "scheduled movement should keep the player inside the restored shop");
+});
+
+Deno.test("overworld shopkeepers sleep in cottage homes outside their shops", async () => {
+  clearAll();
+  clearFloorCache();
+  const world = new World({ seed: 0xC0FFEE });
+  await generateFloor(world, world.seed >>> 0, 0);
+
+  const shopkeeperRoles = new Set(["alchemist", "gem_vendor", "book_vendor", "general_vendor"]);
+  let checked = 0;
+  for (const [id, job] of world.query(TownfolkJob)) {
+    if (!shopkeeperRoles.has(job.role)) continue;
+    let shopRoom = null;
+    for (const [, room] of world.query(RoomMetadata)) {
+      if (room.roomType === "shop" && room.shopkeeperId === id) {
+        shopRoom = room;
+        break;
+      }
+    }
+    assert(shopRoom, `expected shop room for ${job.role}`);
+    assert(!isInRoom({ x: job.homeX, y: job.homeY }, shopRoom), `${job.role} home should be outside the shop`);
+    assert(!isInRoom({ x: job.bedX, y: job.bedY }, shopRoom), `${job.role} bed should be outside the shop`);
+    checked++;
+  }
+  assert(checked >= 4, "expected all overworld shopkeepers to be checked");
 });
 
 Deno.test("overworld herbalist does not get the apothecary key", async () => {

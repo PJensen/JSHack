@@ -71,7 +71,6 @@ export default {
     { "dx": -2, "dy": -2, "kind": "book_shop_item" },
     { "dx": 0,  "dy": -2, "kind": "book_shop_item" },
     { "dx": 2,  "dy": -2, "kind": "book_shop_item" },
-    { "dx": 3,  "dy": -1, "kind": "home_bed" },
     { "dx": 2,  "dy": 1,  "kind": "book_shop_sign" }
   ],
   "waypoints": [

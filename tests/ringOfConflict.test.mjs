@@ -70,9 +70,9 @@ Deno.test("hasEquippedTag returns false when no tagged item equipped", () => {
 
 // ── Faction hostility ───────────────────────────────────────────────────────
 
-Deno.test("enemy faction is hostile to enemy faction", () => {
-  assert(areFactionsHostile("enemy", "enemy"),
-    "enemy-enemy should be hostile (Ring of Conflict support)");
+Deno.test("enemy faction is not self-hostile without an explicit conflict source", () => {
+  assert(!areFactionsHostile("enemy", "enemy"),
+    "enemy-enemy should not create ambient infighting");
 });
 
 Deno.test("player faction is still not self-hostile", () => {

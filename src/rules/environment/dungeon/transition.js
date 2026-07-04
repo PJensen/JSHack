@@ -538,7 +538,6 @@ export async function transitionToDepth(world, newDepth, destinationPos, opts = 
         });
       }
       for (const [eid] of world.query(Unpaid)) {
-        if (!_restoredSet.has(eid)) continue;
         world.mutate(eid, Unpaid, r => {
           if (r.shopkeeperId) r.shopkeeperId = oldToNew.get(r.shopkeeperId) ?? r.shopkeeperId;
         });
