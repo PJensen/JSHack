@@ -137,7 +137,7 @@ const ROLE_GOSSIP = Object.freeze({
   ]),
   enchantress: Object.freeze([
     "the enchantress keeps asking after spider glands and grave dust",
-    "the apothecary's got a second lamp burning late into the night",
+    "the enchanter's window keeps glowing long after market bells",
     "folk say she can make a trinket remember fire",
   ]),
   gem_vendor: Object.freeze([

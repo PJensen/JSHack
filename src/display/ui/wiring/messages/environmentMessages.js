@@ -209,6 +209,7 @@ export function installEnvironmentMessages(ctx) {
       if (inter?.identity === 'house_sign') log('"Home." You\u2019ve earned the rest. Resupply and prepare for the next descent.', 'system');
       else if (inter?.identity === 'smithy_sign') log('A soot-stained sign reads: "THE BLACK SMITH \u2014 Ore In, Steel Out."', 'system');
       else if (inter?.identity === 'apothecary_sign') log('Neat lettering on glass: "The Apothecary \u2014 Cures, Salves & Things Best Not Named."', 'system');
+      else if (inter?.identity === 'enchanter_shop_sign') log('Silver script flickers: "Enchanter \u2014 Charms, Wards & Awakened Things."', 'system');
       else if (inter?.identity === 'gem_shop_sign') log('A polished sign gleams: "Gem Dealer \u2014 Cuts, Settings & Appraisals."', 'system');
       else if (inter?.identity === 'tombstone') log('The weathered stone reads: "Rest eternal, faithful soul."', 'system');
       else if (inter?.name) log(`Sign reads: "${inter.name}"`, 'system');

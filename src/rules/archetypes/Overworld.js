@@ -665,6 +665,15 @@ export const GeneralStoreSign = defineArchetype(
   [Interactable, { action: "readText", params: { textId: "general_store_sign" } }],
 );
 
+export const EnchanterShopSign = defineArchetype(
+  "EnchanterShopSign",
+  [Position, (p) => ({ x: p.x, y: p.y })],
+  [NamedIdentity, { name: "Enchanter Shop Sign", identity: "enchanter_shop_sign" }],
+  [Material, { kind: "wood" }],
+  [Collider, { solid: false, blocksSight: false }],
+  [Interactable, { action: "readText", params: { textId: "enchanter_shop_sign" } }],
+);
+
 export const GemDisplayCase = defineArchetype(
   "GemDisplayCase",
   [Position, (p) => ({ x: p.x, y: p.y })],

@@ -373,6 +373,7 @@ Deno.test("procedural building stamps do not overlap destructively", async () =>
       well_plaza: "fountain",
       graveyard: "grave_tombstone",
       apothecary: "apothecary_sign",
+      enchanter_shop: "enchanter_shop_sign",
       gem_store: "gem_shop_sign",
       book_shop: "book_shop_sign",
       general_store: "general_store_sign",

@@ -254,6 +254,7 @@ export const basePalette = {
   herb_chest:    { glyph: "]", fg: "#66bb6a", glow: "#2e7d32" },
   tavern_chest:   { glyph: "]", fg: "#d7a15d", glow: "#8f5225" },
   apothecary_sign: { glyph: "⚗", fg: "#b39ddb", glow: "#7e57c2" },
+  enchanter_shop_sign: { glyph: "✧", fg: "#d8b8ff", glow: "#7f5ac8" },
   gem_shop_sign: { glyph: "💎", fg: "#bdefff", glow: "#68bde2" },
   book_shop_sign: { glyph: "📖", fg: "#d4a76a", glow: "#8b6914" },
   gem_display_case: { glyph: "◇", fg: "#d7f3ff", glow: "#75b8d2" },

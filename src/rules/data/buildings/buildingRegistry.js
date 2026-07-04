@@ -4,6 +4,7 @@ import cottage from './cottage.js';
 import wellPlaza from './well_plaza.js';
 import smithy from './smithy.js';
 import apothecary from './apothecary.js';
+import enchanterShop from './enchanter_shop.js';
 import church from './church.js';
 import gemStore from './gem_store.js';
 import bookShop from './book_shop.js';
@@ -31,6 +32,7 @@ export const BUILDING_DEFS = {
   well_plaza: wellPlaza,
   smithy,
   apothecary,
+  enchanter_shop: enchanterShop,
   church,
   gem_store: gemStore,
   book_shop: bookShop,
@@ -42,7 +44,7 @@ export const BUILDING_DEFS = {
 
 export const BUILDING_POOL = [
   'tavern', 'windmill', 'cottage', 'well_plaza', 'smithy',
-  'apothecary', 'church', 'gem_store', 'book_shop', 'herbalist_hut', 'general_store',
+  'apothecary', 'enchanter_shop', 'church', 'gem_store', 'book_shop', 'herbalist_hut', 'general_store',
   'farm', 'graveyard'
 ];
 

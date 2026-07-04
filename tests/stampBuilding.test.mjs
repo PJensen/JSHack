@@ -3,6 +3,7 @@ import { assertEquals } from "jsr:@std/assert";
 import { CHUNK_SIZE, TILE_GRASS } from "../src/rules/environment/dungeon/constants.js";
 import { stampBuilding } from "../src/rules/environment/dungeon/stampBuilding.js";
 import apothecaryDef from "../src/rules/data/buildings/apothecary.js";
+import enchanterShopDef from "../src/rules/data/buildings/enchanter_shop.js";
 import gemStoreDef from "../src/rules/data/buildings/gem_store.js";
 import herbalistHutDef from "../src/rules/data/buildings/herbalist_hut.js";
 
@@ -22,6 +23,8 @@ Deno.test("stampBuilding resolves shop metadata from authored building JSON", ()
   assertEquals(apoth.shop?.vendorRole, "alchemist");
   assertEquals(apoth.shop?.door, { x: 20, y: 30 });
   assertEquals(apoth.shop?.work, { x: 17, y: 27 });
+  assertEquals(apoth.spawns.enchanting_bench, undefined);
+  assertEquals(apoth.waypoints.enchantress_work, undefined);
   assertEquals(apoth.shop?.room, {
     name: "shop",
     roomType: "shop",
@@ -31,6 +34,22 @@ Deno.test("stampBuilding resolves shop metadata from authored building JSON", ()
     h: 6,
     x: 15,
     y: 25,
+  });
+
+  const enchant = stampBuilding(makeChunks(), enchanterShopDef, 28, 36);
+  assertEquals(enchant.shop?.vendorRole, "enchantress");
+  assertEquals(enchant.shop?.door, { x: 28, y: 36 });
+  assertEquals(enchant.shop?.work, { x: 27, y: 33 });
+  assertEquals(enchant.spawns.enchanting_bench, { x: 27, y: 33 });
+  assertEquals(enchant.shop?.room, {
+    name: "shop",
+    roomType: "shop",
+    dx: -3,
+    dy: -5,
+    w: 8,
+    h: 6,
+    x: 25,
+    y: 31,
   });
 
   const gem = stampBuilding(makeChunks(), gemStoreDef, 40, 50);
@@ -52,6 +71,6 @@ Deno.test("stampBuilding resolves shop metadata from authored building JSON", ()
   assertEquals(hut.shop, null);
   assertEquals(hut.waypoints.front_door, { x: 18, y: 28 });
   assertEquals(hut.waypoints.resident_home, { x: 18, y: 26 });
-  assertEquals(hut.waypoints.herb_work, { x: 19, y: 25 });
-  assertEquals(hut.spawns.home_bed, { x: 15, y: 23 });
+  assertEquals(hut.waypoints.herb_work, { x: 19, y: 26 });
+  assertEquals(hut.spawns.home_bed, { x: 17, y: 25 });
 });
