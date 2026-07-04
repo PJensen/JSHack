@@ -805,10 +805,10 @@ function setIdle(job, world) {
 }
 
 function setReturning(job) {
-  if (job.carrying && (job.deliverX || job.deliverY)) {
+  if (job.carrying && ((job.deliverX || job.deliverY) || deliveryChestForJob(null, job) > 0)) {
     job.state = TOWNFOLK_STATES.delivering;
-    job.targetX = job.deliverX;
-    job.targetY = job.deliverY;
+    job.targetX = job.deliverX || job.homeX;
+    job.targetY = job.deliverY || job.homeY;
   } else {
     job.state = TOWNFOLK_STATES.returning;
     job.targetX = job.homeX;
@@ -1387,9 +1387,48 @@ function findChestNear(world, x, y) {
   let chestId = 0;
   forEachInRadius(world, x, y, 1, (eid) => {
     if (chestId) return;
-    if (world.has(eid, Inventory)) chestId = eid;
+    if (!world.has(eid, Inventory)) return;
+    const ni = world.get(eid, NamedIdentity);
+    const identity = String(ni?.identity || "");
+    const name = String(ni?.name || "");
+    if (identity.endsWith("_chest") || identity === "chest" || name.endsWith(" Chest")) chestId = eid;
   });
   return chestId;
+}
+
+function deliveryChestForJob(world, job) {
+  const storage = _cachedStorage || (world ? findTownContainers(world) : null);
+  if (!storage) return 0;
+  switch (job.workSiteKind) {
+    case "haul_flour":
+    case "haul_firewood":
+    case "fetch_water":
+    case "fish":
+      return storage.tavern || 0;
+    case "haul_lumber":
+      return storage.smithy || 0;
+    default:
+      break;
+  }
+
+  switch (job.carrying) {
+    case "crops":
+    case "flour":
+      return storage.mill || 0;
+    case "ore":
+      return storage.smithy || 0;
+    case "wood":
+    case "lumber":
+    case "firewood":
+      return storage.lumber || 0;
+    case "herbs":
+      return storage.herb || 0;
+    case "water":
+    case "fish":
+      return storage.tavern || 0;
+    default:
+      return 0;
+  }
 }
 
 function handleDelivering(world, id, pos, job) {
@@ -1397,8 +1436,10 @@ function handleDelivering(world, id, pos, job) {
     setIdle(job, world);
     return;
   }
-  if (nearPoint(pos, job.deliverX, job.deliverY, 1)) {
-    const chestId = findChestNear(world, job.deliverX, job.deliverY);
+  const deliveryX = job.deliverX || job.targetX;
+  const deliveryY = job.deliverY || job.targetY;
+  if (nearPoint(pos, deliveryX, deliveryY, 1)) {
+    const chestId = findChestNear(world, deliveryX, deliveryY) || deliveryChestForJob(world, job);
     const moved = chestId ? depositCarriedItems(world, id, chestId, job) : 0;
     if (!moved && carriedItemCount(world, id, job) <= 0) {
       job.carrying = "";
@@ -1477,10 +1518,19 @@ function getRoleWorkTarget(world, job) {
       return { x: job.workX, y: job.workY, kind: "mine", state: TOWNFOLK_STATES.working, radius: 1 };
     }
     case TOWNFOLK_ROLES.smith:
-      if (townState?.lowMaterials) {
+      {
+        const storage = _cachedStorage;
+        const smith = storage.smithy > 0 ? countInventoryByIdentity(world, storage.smithy) : {};
+        const canSmelt = (smith.ore_iron || 0) > 0 && (smith.ore_coal || 0) > 0;
+        const canForge = SMITH_RECIPES.some((recipe) =>
+          (smith.material_iron || 0) >= recipe.iron
+          && (smith.material_lumber || 0) >= recipe.lumber
+        );
+        if (canSmelt || canForge) {
+          return { x: job.workX, y: job.workY, kind: "forge_tools", state: TOWNFOLK_STATES.working, radius: 1 };
+        }
         return { x: job.workAuxX, y: job.workAuxY, kind: "inspect", state: TOWNFOLK_STATES.working, radius: 1 };
       }
-      return { x: job.workX, y: job.workY, kind: "forge_tools", state: TOWNFOLK_STATES.working, radius: 1 };
     case TOWNFOLK_ROLES.priest:
       if ((workBeat % 2) === 0) {
         return { x: job.workX, y: job.workY, kind: "minister", state: TOWNFOLK_STATES.working, radius: 1 };

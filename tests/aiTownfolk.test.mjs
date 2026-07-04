@@ -1069,6 +1069,63 @@ Deno.test("villager hauls flour from the mill chest into the tavern chest", () =
   assertEquals(job.state, TOWNFOLK_STATES.returning, "villager should head home after delivery");
 });
 
+Deno.test("delivery falls back to the intended storage chest when the drop tile has no adjacent chest", () => {
+  const world = makeWorld(122);
+
+  const millChest = world.create();
+  world.add(millChest, Position, { x: 20, y: 20 });
+  world.add(millChest, Inventory, { capacity: 30 });
+  world.add(millChest, ItemNamedIdentity, { name: "Mill Chest", identity: "mill_chest" });
+
+  const farmer = addTownfolk(world, 8, 5, "farmer", {
+    state: TOWNFOLK_STATES.delivering,
+    carrying: "crops",
+    deliverX: 8,
+    deliverY: 5,
+    homeX: 6,
+    homeY: 5,
+  });
+  addToInventory(world, farmer, createItemById(world, "food_wheat"));
+
+  aiTownfolkSystem(world);
+
+  assertEquals(countInventory(world, millChest, "food_wheat"), 1, "farmer crop delivery should reach the mill chest");
+  assertEquals(countInventory(world, farmer, "food_wheat"), 0, "farmer should empty carried crops");
+});
+
+Deno.test("carrying townfolk without delivery coordinates still deposit into economy storage", () => {
+  const world = makeWorld(124);
+
+  const millChest = world.create();
+  world.add(millChest, Position, { x: 20, y: 20 });
+  world.add(millChest, Inventory, { capacity: 30 });
+  world.add(millChest, ItemNamedIdentity, { name: "Mill Chest", identity: "mill_chest" });
+
+  const farmer = addTownfolk(world, 8, 5, "farmer", {
+    state: TOWNFOLK_STATES.working,
+    workTurns: 0,
+    workSiteKind: "harvest_crop",
+    homeX: 8,
+    homeY: 5,
+    workX: 8,
+    workY: 5,
+  });
+  addToInventory(world, farmer, createItemById(world, "food_wheat"));
+  const job = world.get(farmer, TownfolkJob);
+  job.carrying = "crops";
+  job.carryCount = 1;
+  job.deliverX = 0;
+  job.deliverY = 0;
+
+  aiTownfolkSystem(world);
+
+  assertEquals(job.state, TOWNFOLK_STATES.delivering, "worker should keep delivery state without explicit coordinates");
+  aiTownfolkSystem(world);
+
+  assertEquals(countInventory(world, millChest, "food_wheat"), 1, "carried crops should reach the mill fallback");
+  assertEquals(countInventory(world, farmer, "food_wheat"), 0, "farmer should empty carried crops");
+});
+
 Deno.test("fisher delivers raw fish into the tavern chest", () => {
   const world = makeWorld(120);
   setTile(8, 5, TILE_FLOOR);
@@ -1166,6 +1223,37 @@ Deno.test("scheduled barkeep can cook beside a solid cooking fire", () => {
   assert(cooked, "barkeep should cook without standing on the fire tile");
   assertEquals(countInventory(world, tavernChest, "food_stew"), 1, "tavern chest should receive stew");
   assertEquals(countInventory(world, tavernChest, "water_bucket"), 1, "water bucket should still be present after cooking");
+});
+
+Deno.test("scheduled smith forges when material stores are low but inputs are available", () => {
+  const world = makeWorld(123);
+  world.step = 216;
+
+  const smithyChest = world.create();
+  world.add(smithyChest, Position, { x: 8, y: 5 });
+  world.add(smithyChest, Inventory, { capacity: 30 });
+  world.add(smithyChest, ItemNamedIdentity, { name: "Smithy Chest", identity: "smithy_chest" });
+  addToInventory(world, smithyChest, createItemById(world, "ore_iron"));
+  addToInventory(world, smithyChest, createItemById(world, "ore_coal"));
+  addToInventory(world, smithyChest, createItemById(world, "material_lumber"));
+
+  const smith = addTownfolk(world, 8, 5, "smith", {
+    scheduleEnabled: true,
+    homeX: 8,
+    homeY: 5,
+    bedX: 8,
+    bedY: 5,
+    workX: 8,
+    workY: 5,
+    workAuxX: 9,
+    workAuxY: 5,
+  });
+
+  aiTownfolkSystem(world);
+
+  const job = world.get(smith, TownfolkJob);
+  assertEquals(job.workSiteKind, "forge_tools", "smith should choose production instead of inspecting during a shortage");
+  assertEquals(countInventory(world, smithyChest, "tool_kitchen_knife"), 1, "smith should forge the first needed town tool");
 });
 
 import { GrowthStage } from "../src/rules/components/GrowthStage.js";

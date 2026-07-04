@@ -528,6 +528,7 @@ function hashKey(key) {
 }
 
 const ROLE_DELIVERY_CHEST = {
+  farmer: "mill_chest",
   woodcutter: "lumber_chest",
   miner: "smithy_chest",
   herbalist: "herb_chest",
