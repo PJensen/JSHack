@@ -517,6 +517,14 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
         if (ch.fadeLeft <= 0) _fishingChannels.delete(actorId);
         continue;
       }
+      if (Number(ch.durationLeft || 0) > 0) {
+        ch.durationLeft = Math.max(0, Number(ch.durationLeft || 0) - dt);
+        if (ch.durationLeft <= 0) {
+          ch.fading = true;
+          ch.fadeMax = 0.35;
+          ch.fadeLeft = Math.max(Number(ch.fadeLeft || 0), ch.fadeMax);
+        }
+      }
       if (!fx?.pool || ch.rippleClock > 0) continue;
       ch.rippleClock = 0.07 + Math.random() * 0.05;
       const a = Math.random() * Math.PI * 2;
@@ -2802,7 +2810,7 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
       current.endFlash = Math.max(Number(current.endFlash || 0), 0.16);
     });
 
-    function startFishingChannelFx({ actor, x, y, turns }) {
+    function startFishingChannelFx({ actor, x, y, turns, durationSec }) {
       const a = Number(actor || 0) | 0;
       const tx = Number(x);
       const ty = Number(y);
@@ -2812,6 +2820,7 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
         x: Math.floor(tx),
         y: Math.floor(ty),
         turns: Math.max(1, Number(turns || 12) | 0),
+        durationLeft: Math.max(0, Number(durationSec || 0)),
         startedAtStep: currentStep(),
         phase: Math.random() * Math.PI * 2,
         fading: false,
@@ -2823,6 +2832,10 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
 
     world.on("fishing:cast", (ev) => {
       startFishingChannelFx(ev || {});
+    });
+
+    world.on("townfolk:fished", (ev) => {
+      startFishingChannelFx({ ...(ev || {}), turns: 6, durationSec: 1.1 });
     });
 
     world.on("channeling:start", ({ actor, spellId, x, y, castTime }) => {

@@ -19,6 +19,8 @@ import { identify, isIdentified } from "../../rules/data/identification.js";
 import { requiresIdentification, getUnidentifiedName } from "../../rules/data/itemAppearances.js";
 import { groupDisplayItems } from "../ui/itemGrouping.js";
 import { calculateShopDebt, clearShopDebt, shopDebtRecords } from "../../rules/utils/shopDebt.js";
+import { currentDepth } from "../../rules/utils/worldAccess.js";
+import { getTownPhase } from "../../rules/data/calendar.js";
 
 const INSTALLED = Symbol.for("jshack:main:shopWiring:installed");
 const API_KEY = Symbol.for("jshack:main:shopWiring:api");
@@ -223,12 +225,20 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     return activeShopSession.mode === "checkout" && activeShopSession.shopkeeperId === sid;
   }
 
+  function isShopOpenNow() {
+    return currentDepth(world, 1) > 0 || getTownPhase(world.step) === "work";
+  }
+
   world.on("shop:open", ({ actor, targetId, buyMarkup, sellDiscount, vendorKind }) => {
     const pe = playerEntity(world);
     if (!pe || actor !== pe.id) return;
     if (!isPlayerAdjacentToEntity(Number(targetId) || 0)) return;
     const sid = Number(targetId) || 0;
     if (sid > 0 && activeShopSession.shopkeeperId === sid) return;
+    if (!isShopOpenNow()) {
+      log("The shop is closed.");
+      return;
+    }
     log("You approach the shopkeeper.");
     const shop = world.get(targetId, ShopInventory);
     const markup = buyMarkup ?? shop?.buyMarkup ?? 1.0;

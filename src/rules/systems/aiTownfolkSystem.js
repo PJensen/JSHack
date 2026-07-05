@@ -553,6 +553,15 @@ function findFishableShoreSpot(cx, cy, radius = 12) {
   return best;
 }
 
+function findAdjacentFishableTile(x, y) {
+  for (const dir of CARDINAL_DIRS) {
+    const tx = (x + dir.dx) | 0;
+    const ty = (y + dir.dy) | 0;
+    if (isFishableTile(getTile(tx, ty))) return { x: tx, y: ty };
+  }
+  return null;
+}
+
 function activateWorkstation(world, identity, fallbackState, duration = 4) {
   const feature = findTownFeature(world, identity);
   if (!(feature?.id > 0)) return;
@@ -1384,7 +1393,8 @@ function handleWorking(world, id, pos, job) {
     case "fish": {
       carryCreated(world, id, "food_raw_fish");
       setCarry(job, "fish");
-      world.emit("townfolk:fished", { actor: id, x: pos.x, y: pos.y, itemId: "food_raw_fish" });
+      const water = findAdjacentFishableTile(pos.x, pos.y) || pos;
+      world.emit("townfolk:fished", { actor: id, x: water.x, y: water.y, itemId: "food_raw_fish" });
       world.emit("townfolk:carrying", { actor: id, resource: "fish" });
       setReturning(job);
       return;
@@ -1488,6 +1498,10 @@ function handleWorking(world, id, pos, job) {
 
 function handleReturning(world, id, pos, job) {
   if (nearPoint(pos, job.homeX, job.homeY, 2)) {
+    if (job.carrying) {
+      const chestId = deliveryChestForJob(world, job);
+      if (chestId > 0) depositCarriedItems(world, id, chestId, job);
+    }
     setIdle(job, world);
     if (job.carrying) world.emit("townfolk:delivered", { actor: id, resource: job.carrying });
     job.carrying = "";

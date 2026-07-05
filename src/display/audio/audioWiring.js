@@ -1345,9 +1345,11 @@ function installAudioListeners({ world, isPlayer, getItemInfo, getPlayerPosition
     sfxAt("torch:ignite", pos, pp(), null, zg());
   });
 
-  world.on('shop:open', ({ targetId, actor }) => {
-    sfx("shop:enter"); // One-time entry chime
-  });
+  if (typeof addEventListener === "function") {
+    addEventListener("ui:openShop", () => {
+      sfx("shop:enter"); // One-time accepted entry chime
+    });
+  }
 
   // Generic audio event — play any registered sound by key
   world.on('audio:play', (payload) => {

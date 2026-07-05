@@ -137,6 +137,13 @@ Deno.test("audio wiring accepts all authored generic audio payload keys", () => 
   assert(resolveAudioPlayKey({ sound: "status:frozen" }) === "status:frozen");
 });
 
+Deno.test("shop chime is wired to accepted UI open, not raw shop open", async () => {
+  const source = await Deno.readTextFile("src/display/audio/audioWiring.js");
+  assert(source.includes('addEventListener("ui:openShop"'), "accepted UI open should trigger shop chime");
+  assert(!source.includes("world.on('shop:open'"), "raw shop:open should not trigger shop chime");
+  assert(!source.includes('world.on("shop:open"'), "raw shop:open should not trigger shop chime");
+});
+
 Deno.test("audio wiring maps interaction outcomes to door and lantern sounds", () => {
   assert(resolveInteractionSoundId({ action: "toggleDoor", result: "opened" }) === "door:open");
   assert(resolveInteractionSoundId({ action: "toggleDoor", result: "closed" }) === "door:close");

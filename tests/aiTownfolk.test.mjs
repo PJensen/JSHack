@@ -1116,6 +1116,30 @@ Deno.test("herbalist keeps gathering until the satchel is full before returning 
   assertEquals(job.carryCount, 1);
 });
 
+Deno.test("returning herbalist deposits carried herbs into the herb chest", () => {
+  const world = makeWorld(193);
+
+  const herbChest = world.create();
+  world.add(herbChest, Position, { x: 5, y: 5 });
+  world.add(herbChest, Inventory, { capacity: 30 });
+  world.add(herbChest, ItemNamedIdentity, { name: "Herb Chest", identity: "herb_chest" });
+
+  const herbalist = addTownfolk(world, 6, 5, "herbalist", {
+    state: TOWNFOLK_STATES.returning,
+    homeX: 6,
+    homeY: 5,
+    workSiteKind: "harvest_herb",
+    carrying: "herbs",
+    carryCount: 1,
+  });
+  addToInventory(world, herbalist, createItemById(world, "food_wild_herbs"));
+
+  aiTownfolkSystem(world);
+
+  assertEquals(countInventory(world, herbChest, "food_wild_herbs"), 1, "herb chest should receive carried herbs");
+  assertEquals(countInventory(world, herbalist, "food_wild_herbs"), 0, "herbalist should empty carried herbs");
+});
+
 Deno.test("villager hauls flour from the mill chest into the tavern chest", () => {
   const world = makeWorld(20);
 
@@ -1234,9 +1258,14 @@ Deno.test("fisher delivers raw fish into the tavern chest", () => {
     homeY: 5,
   });
 
+  const fished = [];
+  world.on("townfolk:fished", (ev) => fished.push(ev));
+
   aiTownfolkSystem(world);
 
   assertEquals(countInventory(world, fisher, "food_raw_fish"), 1, "fisher should carry a catch");
+  assertEquals(fished[0]?.x, 9, "fisher should cast into adjacent water");
+  assertEquals(fished[0]?.y, 5, "fisher should cast into adjacent water");
   let job = world.get(fisher, TownfolkJob);
   assertEquals(job.state, TOWNFOLK_STATES.delivering);
 

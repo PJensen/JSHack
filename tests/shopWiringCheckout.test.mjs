@@ -2,6 +2,7 @@ import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";
 import { installShopWiring } from "../src/main/wiring/shopWiring.js";
 import { Equipment } from "../src/rules/components/Equipment.js";
+import { DungeonState } from "../src/rules/components/DungeonState.js";
 import { Inventory } from "../src/rules/components/Inventory.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
@@ -11,6 +12,55 @@ import { ShopInventory } from "../src/rules/components/ShopInventory.js";
 import { Unpaid } from "../src/rules/components/Unpaid.js";
 import { addToInventory, inventoryContains } from "../src/rules/utils/inventoryFacade.js";
 import { calculateShopDebt, recordShopDebt } from "../src/rules/utils/shopDebt.js";
+
+Deno.test("shop wiring blocks overworld after-hours inventory but allows dungeon shops", () => {
+  const priorWindow = globalThis.window;
+  // @ts-ignore Deno test runtime does not always define window, but wiring uses it.
+  globalThis.window = globalThis;
+
+  const world = new World({ seed: 0x5150 });
+  world.step = 0;
+
+  const dungeonId = world.create();
+  world.add(dungeonId, DungeonState, { currentDepth: 0, profileType: "overworld", floorEntityIds: [] });
+
+  const playerId = world.create();
+  world.add(playerId, Player, {});
+  world.add(playerId, Position, { x: 2, y: 2 });
+  world.add(playerId, Inventory, { capacity: 20 });
+
+  const shopkeeperId = world.create();
+  world.add(shopkeeperId, Position, { x: 3, y: 2 });
+  world.add(shopkeeperId, Inventory, { capacity: 20 });
+  world.add(shopkeeperId, ShopInventory, { buyMarkup: 1.3, sellDiscount: 0.5 });
+
+  const openEvents = [];
+  const onOpen = (ev) => openEvents.push(ev?.detail || null);
+  addEventListener("ui:openShop", onOpen);
+
+  try {
+    installShopWiring({
+      world,
+      playerEntity: (w) => {
+        const pos = w.get(playerId, Position);
+        return pos ? { id: playerId, pos: { x: pos.x, y: pos.y } } : null;
+      },
+      log: () => {},
+      bracketizeName: (s) => s,
+    });
+
+    world.emit("shop:open", { actor: playerId, targetId: shopkeeperId, buyMarkup: 1.3, sellDiscount: 0.5 });
+    assertEquals(openEvents.length, 0, "overworld shop should stay closed outside work hours");
+
+    world.set(dungeonId, DungeonState, { currentDepth: 1, profileType: "default", floorEntityIds: [] });
+    world.emit("shop:open", { actor: playerId, targetId: shopkeeperId, buyMarkup: 1.3, sellDiscount: 0.5 });
+    assertEquals(openEvents.length, 1, "dungeon shop should be open at any hour");
+  } finally {
+    removeEventListener("ui:openShop", onOpen);
+    // @ts-ignore restore test global
+    globalThis.window = priorWindow;
+  }
+});
 
 Deno.test("shop checkout return works while blocked at exit even when not adjacent", () => {
   const priorWindow = globalThis.window;

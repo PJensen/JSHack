@@ -314,6 +314,9 @@ const tileReaction = {
     }
 
     world.emit(reaction.event, { actor, x: ctx.nx, y: ctx.ny });
+    if (reaction.audioKey) {
+      world.emit("audio:play", { key: reaction.audioKey, at: { x: ctx.nx, y: ctx.ny }, sourceId: actor });
+    }
   },
 };
 

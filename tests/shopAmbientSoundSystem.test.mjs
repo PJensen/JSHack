@@ -48,6 +48,38 @@ Deno.test("shopAmbientSoundSystem is deterministic for same seed + step + layout
   assertEquals(b.source, "shop");
 });
 
+Deno.test("shopAmbientSoundSystem stays quiet after hours on the overworld", () => {
+  const world = new World({ seed: 8110 });
+  world.step = 0;
+  const dungeonId = world.create();
+  world.add(dungeonId, DungeonState, { worldSeed: 8110, currentDepth: 0, profileType: "overworld", floorEntityIds: [] });
+
+  const player = world.create();
+  world.add(player, Player);
+  world.add(player, Position, { x: 4, y: 4 });
+
+  const shopkeeperId = world.create();
+  const shop = world.create();
+  world.add(shop, RoomMetadata, {
+    roomType: "shop",
+    x: 3,
+    y: 3,
+    w: 4,
+    h: 4,
+    shopkeeperId,
+  });
+
+  const ambient = [];
+  const speech = [];
+  world.on("ambient:sound", (ev) => ambient.push(ev));
+  world.on("npc:dialogue", (ev) => speech.push(ev));
+
+  shopAmbientSoundSystem(world);
+
+  assertEquals(ambient.length, 0, "closed overworld shops should emit no ambient sound");
+  assertEquals(speech.length, 0, "closed overworld shops should emit no greeting");
+});
+
 Deno.test("shopAmbientSoundSystem respects per-location cooldown across turns", () => {
   const world = new World({ seed: 8112 });
   const dungeonId = world.create();

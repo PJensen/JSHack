@@ -10,6 +10,7 @@
 //   costDefault — fallback cost if costField is absent
 //   result      — the TILE_* constant the tile becomes after the reaction
 //   event       — event name emitted on success (payload: { actor, x, y })
+//   audioKey    — (optional) audio:play key emitted on success
 //   backfill    — (optional) TILE_* to replace adjacent TILE_VOID with
 //
 // To add a new tile interaction, just add a row — no system code changes needed.
@@ -29,6 +30,7 @@ import {
  *   costDefault: number,
  *   result: number,
  *   event: string,
+ *   audioKey?: string,
  *   backfill?: number,
  * }} TileReaction
  */
@@ -51,6 +53,7 @@ export const TILE_REACTIONS = [
     costDefault: 10,
     result: TILE_GRASS,
     event: "tile:chopped",
+    audioKey: "action:wood_chop",
   },
 ];
 

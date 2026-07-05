@@ -3,6 +3,7 @@ import { playerEntity } from "../utils/queries.js";
 import { createRng } from "../../lib/ecs-js/rng.js";
 import { chebyshevScalar } from "../utils/distance.js";
 import { currentDepth } from "../utils/worldAccess.js";
+import { getTownPhase } from "../data/calendar.js";
 
 const SHOP_AMBIENT_STATE_KEY = Symbol.for("jshack:shopAmbientSoundSystem:state");
 const COOLDOWN_TURNS = 10;
@@ -96,6 +97,7 @@ export function shopAmbientSoundSystem(world) {
   const playerPos = _player.pos;
 
   const depthNow = currentDepth(world, 0);
+  if (depthNow === 0 && getTownPhase(world.step) !== "work") return;
   const currentTurn = world.step | 0;
 
   for (const [entityId, metadata] of world.query(RoomMetadata)) {

@@ -272,7 +272,9 @@ Deno.test("bumpResolvers: player with chop weapon chops tree", () => {
     world.add(actor, Stamina, { maxStamina: 100, stamina: 100, staminaRegen: 2, regenCooldown: 0 });
 
     let chopEvent = false;
+    const audio = [];
     world.on("tile:chopped", () => { chopEvent = true; });
+    world.on("audio:play", (ev) => audio.push(ev));
 
     const ctx = makeBumpCtx(world, { nx: 4, ny: 3, mdx: 1, mdy: 0, target: 0 });
     const handled = resolveBump(world, actor, ctx);
@@ -280,6 +282,9 @@ Deno.test("bumpResolvers: player with chop weapon chops tree", () => {
     assert(handled, "tile reaction should be handled");
     assert(chopEvent, "tile:chopped event should fire");
     assertEquals(getTile(4, 3), TILE_GRASS, "tree should become grass");
+    assertEquals(audio.length, 1, "chopping should emit one audio event");
+    assertEquals(audio[0].key, "action:wood_chop");
+    assertEquals(audio[0].at, { x: 4, y: 3 });
   } finally { clearAll(); }
 });
 
