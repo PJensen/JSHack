@@ -39,6 +39,7 @@ import {
   getDestroyedTileLedger, getDestroyedTileRecord,
   destroyedTileKey, getDungeonStateRecord,
 } from "../utils/destroyedTiles.js";
+import { removeFromInventory } from "../utils/inventoryFacade.js";
 import { Unpaid } from "../components/Unpaid.js";
 import { ItemInfo } from "../components/ItemInfo.js";
 import { appraiseItemValue } from "../utils/shopAppraisal.js";
@@ -106,6 +107,20 @@ const ROLE_TO_TOOL_ID = Object.freeze({
   woodcutter: "tool_hatchet",
   miner: "iron_pickaxe",
 });
+const PRODUCTIVE_WORK_KINDS = new Set([
+  "chop",
+  "mine",
+  "harvest_crop",
+  "plant_crop",
+  "harvest_herb",
+  "mill",
+  "forge_tools",
+  "cook",
+  "fish",
+  "brew",
+  "repair",
+]);
+const TOOL_WEAR_TAG = "town_tool_worn";
 
 function ensureCarryInventory(world, id) {
   const inv = world.get(id, Inventory);
@@ -130,6 +145,91 @@ function actorHasIdentity(world, id, identity) {
     if (itemIdentity(world, Number(eq[slot] || 0)) === identity) return true;
   }
   return false;
+}
+
+function findActorIdentityItem(world, id, identity) {
+  const carried = findFirstInventoryItemByIdentity(world, id, identity);
+  if (carried > 0) return carried;
+  const eq = world.get(id, Equipment);
+  if (!eq) return 0;
+  for (const slot of ["weapon", "offhand"]) {
+    const itemId = Number(eq[slot] || 0) | 0;
+    if (itemIdentity(world, itemId) === identity) return itemId;
+  }
+  return 0;
+}
+
+function actorToolState(world, id, identity) {
+  const itemId = findActorIdentityItem(world, id, identity);
+  if (!(itemId > 0)) return { itemId: 0, worn: false };
+  const info = world.get(itemId, ItemInfo);
+  return { itemId, worn: Array.isArray(info?.tags) && info.tags.includes(TOOL_WEAR_TAG) };
+}
+
+function inventoryToolState(world, ownerId, identity) {
+  const itemId = findFirstInventoryItemByIdentity(world, ownerId, identity);
+  if (!(itemId > 0)) return { itemId: 0, worn: false };
+  const info = world.get(itemId, ItemInfo);
+  return { itemId, worn: Array.isArray(info?.tags) && info.tags.includes(TOOL_WEAR_TAG) };
+}
+
+function wearActorTool(world, actorId, identity) {
+  const { itemId, worn } = actorToolState(world, actorId, identity);
+  if (!(itemId > 0)) return false;
+  const info = world.get(itemId, ItemInfo);
+  if (!info) return false;
+  if (!worn) {
+    world.set(itemId, ItemInfo, {
+      ...info,
+      tags: [...new Set([...(Array.isArray(info.tags) ? info.tags : []), TOOL_WEAR_TAG])],
+    });
+    return false;
+  }
+
+  const eq = world.get(actorId, Equipment);
+  if (eq) {
+    const next = { ...eq };
+    if ((next.weapon | 0) === itemId) next.weapon = 0;
+    if ((next.offhand | 0) === itemId) next.offhand = 0;
+    world.set(actorId, Equipment, next);
+  }
+  removeFromInventory(world, actorId, itemId);
+  try { world.destroy(itemId); } catch {}
+  world.emit("townfolk:needs_tool", { actor: actorId, tool: identity });
+  return true;
+}
+
+function wearInventoryTool(world, ownerId, identity, actorId = 0) {
+  const { itemId, worn } = inventoryToolState(world, ownerId, identity);
+  if (!(itemId > 0)) return false;
+  const info = world.get(itemId, ItemInfo);
+  if (!info) return false;
+  if (!worn) {
+    world.set(itemId, ItemInfo, {
+      ...info,
+      tags: [...new Set([...(Array.isArray(info.tags) ? info.tags : []), TOOL_WEAR_TAG])],
+    });
+    return false;
+  }
+  removeFromInventory(world, ownerId, itemId);
+  try { world.destroy(itemId); } catch {}
+  world.emit("townfolk:needs_tool", { actor: actorId, tool: identity });
+  return true;
+}
+
+function townFeedbackActive(world) {
+  return !!getTownState(world);
+}
+
+function equipToolFromStorage(world, actorId, identity) {
+  const storage = _cachedStorage;
+  if (!(storage?.smithy > 0)) return false;
+  const itemId = transferFirstIdentity(world, storage.smithy, actorId, identity);
+  if (!(itemId > 0)) return false;
+  if (!world.has(actorId, Equipment)) world.add(actorId, Equipment, {});
+  const eq = world.get(actorId, Equipment);
+  if (eq && !eq.weapon) world.set(actorId, Equipment, { ...eq, weapon: itemId });
+  return true;
 }
 
 function carryIdentities(job) {
@@ -817,6 +917,24 @@ function setReturning(job) {
   job.stuckTurns = 0;
 }
 
+function laborDelayForTownState(world, actorId, job, targetKind) {
+  if (!PRODUCTIVE_WORK_KINDS.has(String(targetKind || ""))) return 0;
+  const townState = getTownState(world);
+  const readiness = Math.max(35, Number(townState?.laborReadiness || 100) | 0);
+  let delay = readiness >= 95 ? 0 : readiness >= 75 ? 1 : readiness >= 55 ? 2 : 3;
+  if (getWeather(world) === "rain" && isStormShelterRole(job.role)) delay++;
+  if (job.role === TOWNFOLK_ROLES.woodcutter && actorToolState(world, actorId, ROLE_TO_TOOL_ID.woodcutter).itemId > 0) delay = Math.max(0, delay - 1);
+  if (job.role === TOWNFOLK_ROLES.miner && actorToolState(world, actorId, ROLE_TO_TOOL_ID.miner).itemId > 0) delay = Math.max(0, delay - 1);
+  if (job.role === TOWNFOLK_ROLES.barkeep && inventoryToolState(world, _cachedStorage?.tavern || 0, "tool_kitchen_knife").itemId > 0) delay = Math.max(0, delay - 1);
+  return delay;
+}
+
+function shouldPauseForLabor(world, actorId, job, targetKind) {
+  const delay = laborDelayForTownState(world, actorId, job, targetKind);
+  if (delay <= 0) return false;
+  return (((world.step | 0) + actorId) % (delay + 1)) !== 0;
+}
+
 function handleIdle(world, id, pos, job) {
   if (job.idleTurns > 0) {
     job.idleTurns--;
@@ -1014,11 +1132,12 @@ function handleWorking(world, id, pos, job) {
 
   switch (job.workSiteKind) {
     case "chop": {
-      if (!actorHasIdentity(world, id, ROLE_TO_TOOL_ID.woodcutter)) {
+      if (!actorHasIdentity(world, id, ROLE_TO_TOOL_ID.woodcutter) && !equipToolFromStorage(world, id, ROLE_TO_TOOL_ID.woodcutter)) {
         world.emit("townfolk:needs_tool", { actor: id, tool: ROLE_TO_TOOL_ID.woodcutter });
         setIdle(job, world);
         return;
       }
+      const tool = actorToolState(world, id, ROLE_TO_TOOL_ID.woodcutter);
       let treeId = 0;
       forEachInRadius(world, pos.x, pos.y, 1, (eid) => {
         if (treeId) return;
@@ -1032,7 +1151,13 @@ function handleWorking(world, id, pos, job) {
         world.emit("townfolk:chopped", { actor: id, x: pos.x, y: pos.y });
         carryCreated(world, id, "material_lumber");
         carryCreated(world, id, "fuel_firewood");
-        setCarry(job, "wood", 2);
+        let carried = 2;
+        if (townFeedbackActive(world) && !tool.worn) {
+          carryCreated(world, id, "material_lumber");
+          carried++;
+        }
+        if (townFeedbackActive(world)) wearActorTool(world, id, ROLE_TO_TOOL_ID.woodcutter);
+        setCarry(job, "wood", carried);
         world.emit("townfolk:carrying", { actor: id, resource: "wood" });
         setReturning(job);
         return;
@@ -1109,11 +1234,12 @@ function handleWorking(world, id, pos, job) {
       return;
     }
     case "mine": {
-      if (!actorHasIdentity(world, id, ROLE_TO_TOOL_ID.miner)) {
+      if (!actorHasIdentity(world, id, ROLE_TO_TOOL_ID.miner) && !equipToolFromStorage(world, id, ROLE_TO_TOOL_ID.miner)) {
         world.emit("townfolk:needs_tool", { actor: id, tool: ROLE_TO_TOOL_ID.miner });
         setIdle(job, world);
         return;
       }
+      const tool = actorToolState(world, id, ROLE_TO_TOOL_ID.miner);
       // Find adjacent ore node and actually deplete it
       let oreId = 0;
       let oreItemId = "ore_iron";
@@ -1127,6 +1253,8 @@ function handleWorking(world, id, pos, job) {
       });
       if (oreId) depleteNode(world, oreId);
       carryCreated(world, id, oreItemId);
+      if (townFeedbackActive(world) && !tool.worn) carryCreated(world, id, oreItemId);
+      if (townFeedbackActive(world)) wearActorTool(world, id, ROLE_TO_TOOL_ID.miner);
       world.emit("townfolk:mined", { actor: id, x: pos.x, y: pos.y });
       setCarry(job, "ore");
       world.emit("townfolk:carrying", { actor: id, resource: "ore" });
@@ -1237,6 +1365,9 @@ function handleWorking(world, id, pos, job) {
       consumeInventoryIdentity(world, tavern, "food_flour", 1);
       consumeInventoryIdentity(world, tavern, "fuel_firewood", 1);
       createInventoryItem(world, tavern, "food_stew");
+      const knife = inventoryToolState(world, tavern, "tool_kitchen_knife");
+      if (townFeedbackActive(world) && knife.itemId > 0 && !knife.worn) createInventoryItem(world, tavern, "food_stew");
+      if (townFeedbackActive(world) && knife.itemId > 0) wearInventoryTool(world, tavern, "tool_kitchen_knife", id);
       activateWorkstation(world, "cooking_fire", "lit", 4);
       world.emit("townfolk:cooked", { actor: id, x: pos.x, y: pos.y, itemId: "food_stew" });
       setReturning(job);
@@ -1711,6 +1842,10 @@ function emitRoleWork(world, id, pos, job, target) {
     || target.kind === "haul_firewood"
     || target.kind === "haul_lumber"
   ) {
+    if (shouldPauseForLabor(world, id, job, target.kind)) {
+      job.workTurns = 1;
+      return;
+    }
     job.workSiteKind = target.kind;
     job.workTurns = 0;
     handleWorking(world, id, pos, job);

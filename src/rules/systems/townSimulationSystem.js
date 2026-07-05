@@ -17,6 +17,7 @@ import { queryPositionFaction } from "../utils/queries.js";
 
 const PULSE_BASE = 12;
 const LOW_FOOD_THRESHOLD = 4;
+const LOW_FUEL_THRESHOLD = 2;
 const LOW_MATERIAL_THRESHOLD = 3;
 const LOW_MEDICINE_THRESHOLD = 3;
 
@@ -24,6 +25,7 @@ export function getTownEconomyData(world) {
   for (const [, ts] of world.query(TownState)) {
     return {
       food: ts.foodStores,
+      fuel: ts.fuelStores,
       materials: ts.materialStores,
       medicine: ts.medicineStores,
       morale: ts.morale,
@@ -128,20 +130,45 @@ function pulseIndustry(world, state, storage, weather) {
       produced = true;
       world.emit?.("town:produced", { chain: "tavern_fish", itemId: "food_stew" });
     }
-    const preparedMeals = Number(tavern.food_stew || 0) + Number(tavern.food_ration || 0);
-    if ((tavern.food_stew || 0) >= 1 && preparedMeals > 1) {
-      consumeInventoryIdentity(world, storage.tavern, "food_stew", 1);
-      produced = true;
-      world.emit?.("town:fed", { itemId: "food_stew" });
-    } else if ((tavern.food_ration || 0) >= 1 && preparedMeals > 1) {
-      consumeInventoryIdentity(world, storage.tavern, "food_ration", 1);
-      produced = true;
-      world.emit?.("town:fed", { itemId: "food_ration" });
-    }
+    const fed = consumeTownMeal(world, storage, countInventoryByIdentity(world, storage.tavern));
+    if (fed) produced = true;
   }
 
   state.lastPulseStep = step;
   state.nextPulseStep = step + pulseDelay + (produced ? 0 : 4);
+}
+
+function consumeTownMeal(world, storage, tavernStock) {
+  const preparedMeals = Number(tavernStock.food_stew || 0) + Number(tavernStock.food_ration || 0);
+  if ((tavernStock.food_stew || 0) >= 1 && preparedMeals > 1) {
+    consumeInventoryIdentity(world, storage.tavern, "food_stew", 1);
+    world.emit?.("town:fed", { itemId: "food_stew", quality: "prepared" });
+    return true;
+  }
+  if ((tavernStock.food_ration || 0) >= 1 && preparedMeals > 1) {
+    consumeInventoryIdentity(world, storage.tavern, "food_ration", 1);
+    world.emit?.("town:fed", { itemId: "food_ration", quality: "prepared" });
+    return true;
+  }
+
+  const millStock = storage.mill > 0 ? countInventoryByIdentity(world, storage.mill) : {};
+  const herbStock = storage.herb > 0 ? countInventoryByIdentity(world, storage.herb) : {};
+  const fallbackFoods = [
+    [storage.tavern, tavernStock, "food_raw_fish"],
+    [storage.tavern, tavernStock, "food_flour"],
+    [storage.mill, millStock, "food_flour"],
+    [storage.mill, millStock, "food_wheat"],
+    [storage.mill, millStock, "food_carrot"],
+    [storage.mill, millStock, "food_corn"],
+    [storage.herb, herbStock, "food_wild_herbs"],
+  ];
+  for (const [ownerId, stock, itemId] of fallbackFoods) {
+    if (!(ownerId > 0) || Number(stock[itemId] || 0) <= 0) continue;
+    consumeInventoryIdentity(world, ownerId, itemId, 1);
+    world.emit?.("town:fed", { itemId, quality: "raw" });
+    return true;
+  }
+  return false;
 }
 
 export function townSimulationSystem(world) {
@@ -164,11 +191,15 @@ export function townSimulationSystem(world) {
   const threatLevel = hostileThreatNearTown(world, anchor);
 
   const foodStores = (mill.food_wheat || 0)
+    + (mill.food_carrot || 0)
+    + (mill.food_corn || 0)
     + (mill.food_flour || 0)
     + (tavern.food_flour || 0)
     + (tavern.food_raw_fish || 0)
     + (tavern.food_stew || 0)
     + (tavern.food_ration || 0);
+  const fuelStores = (lumber.fuel_firewood || 0)
+    + (tavern.fuel_firewood || 0);
   const materialStores = (smith.ore_iron || 0)
     + (smith.ore_coal || 0)
     + (smith.material_iron || 0)
@@ -176,8 +207,7 @@ export function townSimulationSystem(world) {
     + (smith.iron_pickaxe || 0)
     + (smith.tool_hatchet || 0)
     + (smith.tool_kitchen_knife || 0)
-    + (lumber.material_lumber || 0)
-    + (lumber.fuel_firewood || 0);
+    + (lumber.material_lumber || 0);
   const medicineStores = (herb.food_wild_herbs || 0)
     + (herb.reagent_thorn_pod || 0)
     + (herb.reagent_venom_frond || 0)
@@ -185,8 +215,12 @@ export function townSimulationSystem(world) {
     + (herb.reagent_ember_root || 0)
     + shopStock;
   const lowFood = foodStores < LOW_FOOD_THRESHOLD;
+  const lowFuel = fuelStores < LOW_FUEL_THRESHOLD;
   const lowMaterials = materialStores < LOW_MATERIAL_THRESHOLD;
   const lowMedicine = medicineStores < LOW_MEDICINE_THRESHOLD;
+  const preparedMeals = Number(tavern.food_stew || 0) + Number(tavern.food_ration || 0);
+  const rawMeals = foodStores - preparedMeals;
+  const foodQuality = preparedMeals > 0 ? "prepared" : rawMeals > 0 ? "raw" : "none";
 
   const morale = clamp(
     62
@@ -196,29 +230,42 @@ export function townSimulationSystem(world) {
       - threatLevel * 8
       - (weather === "heavy_rain" ? 10 : weather === "rain" ? 4 : 0)
       - (lowFood ? 12 : 0)
+      - (lowFuel ? 6 : 0)
       - (lowMaterials ? 6 : 0)
       - (lowMedicine ? 8 : 0),
     0,
     100,
+  );
+  const laborReadiness = clamp(
+    (foodQuality === "prepared" ? 100 : foodQuality === "raw" ? 72 : 42)
+      + Math.floor((morale - 50) / 4)
+      - (lowFuel ? 8 : 0),
+    35,
+    110,
   );
 
   const prevThreat = Number(state.threatLevel || 0);
   const prevWeather = String(state.weather || "clear");
   const shortagesChanged =
     !!state.lowFood !== lowFood
+    || !!state.lowFuel !== lowFuel
     || !!state.lowMaterials !== lowMaterials
     || !!state.lowMedicine !== lowMedicine;
 
   world.set(stateId, TownState, {
     ...state,
     foodStores,
+    fuelStores,
     materialStores,
     medicineStores,
     repairBacklog,
     threatLevel,
     morale,
     weather,
+    foodQuality,
+    laborReadiness,
     lowFood,
+    lowFuel,
     lowMaterials,
     lowMedicine,
   });
@@ -226,6 +273,7 @@ export function townSimulationSystem(world) {
   if (shortagesChanged) {
     world.emit?.("town:shortage", {
       food: lowFood,
+      fuel: lowFuel,
       materials: lowMaterials,
       medicine: lowMedicine,
     });

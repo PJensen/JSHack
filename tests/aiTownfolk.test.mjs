@@ -19,6 +19,7 @@ import { AttackIntent }   from "../src/rules/components/Intents/AttackIntent.js"
 import { DungeonState }   from "../src/rules/components/DungeonState.js";
 import { ObjectState } from "../src/rules/components/ObjectState.js";
 import { TownfolkJob, TOWNFOLK_STATES, TOWNFOLK_ROLES } from "../src/rules/components/TownfolkJob.js";
+import { TownState } from "../src/rules/components/TownState.js";
 import { ThreatMemory, THREAT_MEMORY_LEVELS } from "../src/rules/components/ThreatMemory.js";
 import { AggroState, AGGRO_LEVELS } from "../src/rules/components/AggroState.js";
 import { Inventory } from "../src/rules/components/Inventory.js";
@@ -160,7 +161,10 @@ function countInventory(world, ownerId, identity) {
   let total = 0;
   for (const itemId of inventoryItems(world, ownerId)) {
     const ni = world.get(itemId, ItemNamedIdentity);
-    if (ni?.identity === identity) total++;
+    if (ni?.identity === identity) {
+      const info = world.get(itemId, ItemInfo);
+      total += Math.max(1, Number(info?.count || 1) | 0);
+    }
   }
   return total;
 }
@@ -449,6 +453,53 @@ Deno.test("woodcutter chops adjacent TreeNode entity on work completion", () => 
   assertEquals(countInventory(world, npc, "fuel_firewood"), 1, "woodcutter should carry firewood");
   const job = world.get(npc, TownfolkJob);
   assertEquals(job.state, TOWNFOLK_STATES.returning, "should be returning with wood");
+});
+
+Deno.test("town feedback makes a sharp hatchet increase wood output before wearing", () => {
+  clearAll();
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
+  tiles.fill(TILE_FLOOR);
+  loadChunk(0, 0, tiles);
+
+  const world = new World({ seed: 108 });
+  const dsId = world.create();
+  world.add(dsId, DungeonState, {
+    worldSeed: 108, currentDepth: 0, profileType: "overworld",
+    floorEntityIds: [], downStairPositions: [],
+  });
+  const player = world.create();
+  world.add(player, Player);
+  world.add(player, Position, { x: 5, y: 5 });
+  const town = world.create();
+  world.add(town, TownState, { foodQuality: "prepared", laborReadiness: 100 });
+
+  const tree = world.create();
+  world.add(tree, Position, { x: 8, y: 5 });
+  world.add(tree, NamedIdentity, { name: "Tree", identity: "tree_harvest" });
+  world.add(tree, Material, { kind: "wood" });
+  world.add(tree, Collider, { solid: true, blocksSight: true });
+  world.add(tree, HarvestNode, {
+    kind: "tree", ready: true, regrowTurns: 350, regrowCountdown: 0,
+    yield: "material_lumber", yieldMin: 1, yieldMax: 1, requiresTool: "chop",
+  });
+
+  const npc = addTownfolk(world, 7, 5, "woodcutter", {
+    state: TOWNFOLK_STATES.working,
+    workTurns: 0,
+    workSiteKind: "chop",
+    targetX: 7,
+    targetY: 5,
+    homeX: 3,
+    homeY: 5,
+  });
+
+  aiTownfolkSystem(world);
+
+  assertEquals(countInventory(world, npc, "material_lumber"), 2, "sharp hatchet should increase lumber output");
+  assertEquals(countInventory(world, npc, "fuel_firewood"), 1);
+  const hatchet = inventoryItems(world, npc).find((itemId) => world.get(itemId, ItemNamedIdentity)?.identity === "tool_hatchet");
+  assert(hatchet > 0, "worn hatchet should remain after first feedback use");
+  assert(world.get(hatchet, ItemInfo).tags.includes("town_tool_worn"), "tool wear should be recorded on the physical hatchet");
 });
 
 Deno.test("mason repairs destroyed tile on work completion", () => {
@@ -792,6 +843,38 @@ Deno.test("scheduled farmer can work a solid millstone from an adjacent tile", (
   assert(milled, "farmer should mill grain from beside the millstone");
   assertEquals(countInventory(world, millChest, "food_flour"), 1, "mill chest should receive flour");
   assertEquals(world.get(millstone, ObjectState)?.state, "working", "millstone should animate as active");
+});
+
+Deno.test("low labor readiness delays scheduled production instead of harvesting immediately", () => {
+  const world = makeWorld(126);
+  world.step = 216;
+  const town = world.create();
+  world.add(town, TownState, { foodQuality: "none", laborReadiness: 35 });
+
+  const crop = world.create();
+  world.add(crop, Position, { x: 8, y: 5 });
+  world.add(crop, NamedIdentity, { name: "Wheat", identity: "crop_wheat" });
+  world.add(crop, Material, { kind: "wood" });
+  world.add(crop, Collider, { solid: true, blocksSight: false });
+  world.add(crop, HarvestNode, {
+    kind: "wheat", ready: true, regrowTurns: 200, regrowCountdown: 0,
+    yield: "food_wheat", yieldMin: 1, yieldMax: 1,
+    replantable: true, needsPlanting: false,
+  });
+
+  const farmer = addTownfolk(world, 7, 5, "farmer", {
+    scheduleEnabled: true,
+    workX: 8,
+    workY: 5,
+    workAuxX: 7,
+    workAuxY: 5,
+  });
+  if (((world.step | 0) + farmer) % 4 === 0) world.step++;
+
+  aiTownfolkSystem(world);
+
+  assertEquals(world.get(crop, HarvestNode).ready, true, "starving labor should miss this production beat");
+  assertEquals(countInventory(world, farmer, "food_wheat"), 0);
 });
 
 Deno.test("scheduled townfolk heads to the pub after work", () => {
@@ -1186,6 +1269,36 @@ Deno.test("barkeep cooks stew from tavern chest ingredients", () => {
   assertEquals(countInventory(world, tavernChest, "food_stew"), 1, "barkeep should turn ingredients into stew");
   assertEquals(countInventory(world, tavernChest, "tool_kitchen_knife"), 1, "kitchen knife should remain as a reusable tool");
   assertEquals(countInventory(world, tavernChest, "water_bucket"), 1, "water bucket should remain as reusable kitchen gear");
+});
+
+Deno.test("town feedback makes a sharp kitchen knife stretch tavern cooking before wearing", () => {
+  const world = makeWorld(122);
+  const town = world.create();
+  world.add(town, TownState, { foodQuality: "prepared", laborReadiness: 100 });
+
+  const tavernChest = world.create();
+  world.add(tavernChest, Position, { x: 8, y: 5 });
+  world.add(tavernChest, Inventory, { capacity: 30 });
+  world.add(tavernChest, ItemNamedIdentity, { name: "Tavern Chest", identity: "tavern_chest" });
+  addToInventory(world, tavernChest, createItemById(world, "food_flour"));
+  addToInventory(world, tavernChest, createItemById(world, "water_bucket"));
+  addToInventory(world, tavernChest, createItemById(world, "fuel_firewood"));
+  addToInventory(world, tavernChest, createItemById(world, "tool_kitchen_knife"));
+
+  addTownfolk(world, 8, 5, "barkeep", {
+    state: TOWNFOLK_STATES.working,
+    workTurns: 0,
+    workSiteKind: "cook",
+    homeX: 6,
+    homeY: 5,
+  });
+
+  aiTownfolkSystem(world);
+
+  assertEquals(countInventory(world, tavernChest, "food_stew"), 2, "sharp knife should stretch one flour and firewood into extra servings");
+  const knife = inventoryItems(world, tavernChest).find((itemId) => world.get(itemId, ItemNamedIdentity)?.identity === "tool_kitchen_knife");
+  assert(knife > 0, "knife should remain after first feedback use");
+  assert(world.get(knife, ItemInfo).tags.includes("town_tool_worn"), "tool wear should be recorded on the physical knife");
 });
 
 Deno.test("scheduled barkeep can cook beside a solid cooking fire", () => {

@@ -83,7 +83,7 @@ Deno.test("townSimulationSystem mills grain, forges tools, cooks tavern meals, a
   townSimulationSystem(world);
 
   assertEquals(countInventory(world, mill, "food_wheat"), 0);
-  assertEquals(countInventory(world, mill, "food_flour"), 1);
+  assertEquals(countInventory(world, mill, "food_flour"), 0, "town should consume fallback flour after preserving the tavern stew reserve");
   assertEquals(countInventory(world, smithy, "ore_iron"), 0);
   assertEquals(countInventory(world, smithy, "ore_coal"), 0);
   assertEquals(countInventory(world, smithy, "tool_hatchet"), 1);
@@ -93,7 +93,10 @@ Deno.test("townSimulationSystem mills grain, forges tools, cooks tavern meals, a
 
   const state = world.get(stateId, TownState);
   assert(state, "TownState should exist");
-  assertEquals(state.foodStores, 2);
+  assertEquals(state.foodStores, 1);
+  assertEquals(state.fuelStores, 0);
+  assertEquals(state.foodQuality, "prepared");
+  assert(state.laborReadiness < 100, "fuel shortage should drag labor readiness even when a prepared meal exists");
   assertEquals(state.materialStores, 1);
   assertEquals(state.lowMedicine, true);
 });
@@ -127,6 +130,41 @@ Deno.test("townSimulationSystem keeps a visible tavern meal reserve instead of d
   townSimulationSystem(world);
 
   assertEquals(countInventory(world, tavern, "food_stew"), 1, "town should keep at least one prepared meal on hand");
+});
+
+Deno.test("townSimulationSystem substitutes raw food when prepared meal reserve is protected", () => {
+  const world = new World({ seed: 106 });
+  world.step = 24;
+
+  const ds = world.create();
+  world.add(ds, DungeonState, {
+    worldSeed: 106,
+    currentDepth: 0,
+    profileType: "overworld",
+    floorEntityIds: [],
+    downStairPositions: [],
+  });
+
+  const ws = world.create();
+  world.add(ws, WeatherState, { current: "clear", turnsRemaining: 20, transitionCooldown: 0 });
+
+  const mill = addStorage(world, "Mill Chest", "mill_chest", 8, 8);
+  const tavern = addStorage(world, "Tavern Chest", "tavern_chest", 9, 8);
+  seedInventory(world, tavern, "food_stew", 1);
+  seedInventory(world, mill, "food_wheat", 1);
+
+  const stateId = world.create();
+  world.add(stateId, TownState, { nextPulseStep: 0 });
+
+  let fed = null;
+  world.on("town:fed", (event) => { fed = event; });
+
+  townSimulationSystem(world);
+
+  assertEquals(countInventory(world, tavern, "food_stew"), 1, "prepared reserve should remain visible");
+  assertEquals(countInventory(world, mill, "food_wheat"), 0, "shortage feeding should fall back to raw stores");
+  assertEquals(fed?.itemId, "food_flour");
+  assertEquals(fed?.quality, "raw");
 });
 
 Deno.test("townSimulationSystem cooks fish into tavern stew", () => {
