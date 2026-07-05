@@ -1,0 +1,36 @@
+{
+  "cli_version": "0.7.7",
+  "checkpoint_id": "cd8b28447543",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "src/display/audio/audioWiring.js",
+    "src/display/fx/spellAreaFx.js",
+    "src/main/wiring/shopWiring.js",
+    "src/rules/data/bumpResolvers.js",
+    "src/rules/data/tileReactions.js",
+    "src/rules/systems/aiTownfolkSystem.js",
+    "src/rules/systems/shopAmbientSoundSystem.js",
+    "tests/aiTownfolk.test.mjs",
+    "tests/audioWiring.test.mjs",
+    "tests/bumpResolvers.test.mjs",
+    "tests/shopAmbientSoundSystem.test.mjs",
+    "tests/shopWiringCheckout.test.mjs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/cd/8b28447543/0/metadata.json",
+      "transcript": "/cd/8b28447543/0/full.jsonl",
+      "content_hash": "/cd/8b28447543/0/content_hash.txt",
+      "prompt": "/cd/8b28447543/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 332615,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 7467136,
+    "output_tokens": 17649,
+    "api_call_count": 51
+  }
+}
