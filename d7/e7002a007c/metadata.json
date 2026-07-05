@@ -3,7 +3,7 @@
   "checkpoint_id": "d7e7002a007c",
   "strategy": "manual-commit",
   "branch": "master",
-  "checkpoints_count": 1,
+  "checkpoints_count": 2,
   "files_touched": [
     "src/rules/environment/dungeon/underworldRegions.js"
   ],
@@ -13,13 +13,19 @@
       "transcript": "/d7/e7002a007c/0/full.jsonl",
       "content_hash": "/d7/e7002a007c/0/content_hash.txt",
       "prompt": "/d7/e7002a007c/0/prompt.txt"
+    },
+    {
+      "metadata": "/d7/e7002a007c/1/metadata.json",
+      "transcript": "/d7/e7002a007c/1/full.jsonl",
+      "content_hash": "/d7/e7002a007c/1/content_hash.txt",
+      "prompt": "/d7/e7002a007c/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 64283,
+    "input_tokens": 81546,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 134272,
-    "output_tokens": 1456,
-    "api_call_count": 7
+    "cache_read_tokens": 158592,
+    "output_tokens": 2082,
+    "api_call_count": 9
   }
 }
