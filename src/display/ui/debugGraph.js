@@ -10,7 +10,7 @@
 // All state is closure-scoped: multiple graphs coexist independently.
 
 /**
- * @typedef {{key: string, color: string, label: string}} SeriesDef
+ * @typedef {{key: string, color: string, label: string, shortLabel?: string}} SeriesDef
  *
  * @typedef {object} DebugGraphConfig
  * @property {string} id - Canvas element id
@@ -25,6 +25,7 @@
  * @property {(() => object|null)|null} [sampler=null] - Poll function; return null = unavailable
  * @property {string|null} [unavailableMessage=null] - Shown when sampler returns null
  * @property {boolean} [normalizedY=false] - true → Y axis fixed 0..1; false → auto-scale
+ * @property {number} [valueDecimals=2] - Decimal places for current values
  */
 
 /**
@@ -44,6 +45,7 @@ export function createDebugGraph(config) {
     sampleInterval = 500,
     unavailableMessage = null,
     normalizedY = false,
+    valueDecimals = 2,
   } = config;
 
   let sampler = config.sampler ?? null;
@@ -195,9 +197,10 @@ export function createDebugGraph(config) {
       const s = series[i];
       ctx.fillStyle = s.color;
       ctx.textAlign = 'center';
-      const val = (latest[s.key] ?? 0).toFixed(2);
-      const abbr = s.label.slice(0, 2).toLowerCase();
-      ctx.fillText(`${abbr}:${val}`, gx + labelW * (i + 0.5), h - 8);
+      const decimals = Math.max(0, Number(valueDecimals || 0) | 0);
+      const val = (latest[s.key] ?? 0).toFixed(decimals);
+      const label = String(s.shortLabel || s.label || s.key);
+      ctx.fillText(`${label}:${val}`, gx + labelW * (i + 0.5), h - 8);
     }
 
     ctx.globalAlpha = 1.0;

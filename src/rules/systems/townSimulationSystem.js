@@ -28,6 +28,7 @@ export function getTownEconomyData(world) {
       fuel: ts.fuelStores,
       materials: ts.materialStores,
       medicine: ts.medicineStores,
+      labor: ts.laborReadiness,
       morale: ts.morale,
     };
   }

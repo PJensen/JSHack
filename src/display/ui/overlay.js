@@ -268,18 +268,21 @@ export function initOverlays() {
   const economyGraph = createDebugGraph({
     id: 'economy-graph-layer',
     title: 'Town Economy',
-    width: 240,
+    width: 320,
     height: 160,
     zIndex: 910,
     series: [
-      { key: 'food',      color: '#44cc44', label: 'Food' },
-      { key: 'materials', color: '#ff8800', label: 'Materials' },
-      { key: 'medicine',  color: '#aa44ff', label: 'Medicine' },
-      { key: 'morale',    color: '#ffcc00', label: 'Morale' },
+      { key: 'food',      color: '#44cc44', label: 'Food',      shortLabel: 'Food' },
+      { key: 'fuel',      color: '#ff8844', label: 'Fuel',      shortLabel: 'Fuel' },
+      { key: 'materials', color: '#d8a04a', label: 'Materials', shortLabel: 'Mats' },
+      { key: 'medicine',  color: '#aa44ff', label: 'Medicine',  shortLabel: 'Meds' },
+      { key: 'labor',     color: '#44aaff', label: 'Labor',     shortLabel: 'Labor' },
+      { key: 'morale',    color: '#ffcc00', label: 'Morale',    shortLabel: 'Morale' },
     ],
     maxPoints: 60,
     sampleInterval: 1000,
     normalizedY: false,
+    valueDecimals: 0,
     unavailableMessage: 'Not on overworld',
   });
   debugGraphStack.appendChild(economyGraph.canvas);
