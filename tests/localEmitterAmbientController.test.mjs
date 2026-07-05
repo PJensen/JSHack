@@ -1,16 +1,19 @@
 import { assert, assertAlmostEquals, assertEquals } from "jsr:@std/assert";
-import { createLocalEmitterAmbientController, computeCookingFireLoopVolume, computeHolySiteLoopVolume, computeTorchLoopVolume } from "../src/display/audio/localEmitterAmbientController.js";
+import { createLocalEmitterAmbientController, computeCookingFireLoopVolume, computeHolySiteLoopVolume, computeTorchLoopVolume, computeWoodcutterLoopVolume } from "../src/display/audio/localEmitterAmbientController.js";
 
 Deno.test("local emitter loop curves fall off by radius", () => {
   assertAlmostEquals(computeCookingFireLoopVolume(1), 0.14, 1e-10);
   assertAlmostEquals(computeHolySiteLoopVolume(1), 0.1, 1e-10);
   assertAlmostEquals(computeTorchLoopVolume(1), 0.12, 1e-10);
+  assertAlmostEquals(computeWoodcutterLoopVolume(1), 0.16, 1e-10);
   assertEquals(computeCookingFireLoopVolume(8), 0);
   assertEquals(computeHolySiteLoopVolume(7), 0);
   assertEquals(computeTorchLoopVolume(6), 0);
+  assertEquals(computeWoodcutterLoopVolume(10), 0);
   assert(computeCookingFireLoopVolume(3) < computeCookingFireLoopVolume(2));
   assert(computeHolySiteLoopVolume(3) < computeHolySiteLoopVolume(2));
   assert(computeTorchLoopVolume(3) < computeTorchLoopVolume(2));
+  assert(computeWoodcutterLoopVolume(3) < computeWoodcutterLoopVolume(2));
 });
 
 Deno.test("local emitter controller follows nearest cooking fire and torch sources", () => {
@@ -103,6 +106,50 @@ Deno.test("local emitter controller prefers explicit audio emitters over identit
   });
   assertEquals(calls[0]?.type, "start");
   assertEquals(calls[0]?.url, "./assets/audio/ambient:torch_flames.mp3");
+});
+
+Deno.test("local emitter controller follows active woodcutter work loops", () => {
+  const calls = [];
+  const controller = createLocalEmitterAmbientController({
+    resolveFn(id) {
+      return { url: `./assets/audio/${id}.mp3`, bus: "ambient" };
+    },
+    startLoopFn(url, opts) {
+      calls.push({ type: "start", url, opts });
+    },
+    stopLoopFn(url, opts) {
+      calls.push({ type: "stop", url, opts });
+    },
+    setLoopVolumeFn(url, volume, opts) {
+      calls.push({ type: "set", url, volume, opts });
+    },
+  });
+
+  controller.syncWorldView({
+    player: { pos: { x: 10, y: 10 } },
+    audioEmitters: [{ profile: "woodcutter", pos: { x: 12, y: 10 }, interior: false }],
+    entities: [],
+  });
+  assertEquals(calls[0]?.type, "start");
+  assertEquals(calls[0]?.url, "./assets/audio/ambient:woodcutter.mp3");
+  assertEquals(calls[0]?.opts?.bus, "ambient:loop");
+
+  controller.syncWorldView({
+    player: { pos: { x: 10, y: 10 } },
+    audioEmitters: [{ profile: "woodcutter", pos: { x: 15, y: 10 }, interior: false }],
+    entities: [],
+  });
+  assertEquals(calls[1]?.type, "set");
+  assertEquals(calls[1]?.url, "./assets/audio/ambient:woodcutter.mp3");
+  assert(calls[1]?.volume < calls[0]?.opts?.volume);
+
+  controller.syncWorldView({
+    player: { pos: { x: 10, y: 10 } },
+    audioEmitters: [],
+    entities: [],
+  });
+  assertEquals(calls[2]?.type, "stop");
+  assertEquals(calls[2]?.url, "./assets/audio/ambient:woodcutter.mp3");
 });
 
 Deno.test("local emitter controller keeps church holy-site loop inside shelter and LOS", () => {

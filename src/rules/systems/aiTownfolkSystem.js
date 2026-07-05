@@ -1149,6 +1149,7 @@ function handleWorking(world, id, pos, job) {
         const col = world.get(treeId, Collider);
         if (col) world.set(treeId, Collider, { solid: false, blocksSight: false });
         world.emit("townfolk:chopped", { actor: id, x: pos.x, y: pos.y });
+        world.emit("audio:play", { key: "action:wood_chop", at: { x: pos.x | 0, y: pos.y | 0 }, sourceId: id });
         carryCreated(world, id, "material_lumber");
         carryCreated(world, id, "fuel_firewood");
         let carried = 2;

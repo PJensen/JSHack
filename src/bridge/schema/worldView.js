@@ -48,6 +48,7 @@ import { FountainState } from "../../rules/components/FountainState.js";
 import { AltarOfferingState } from "../../rules/components/AltarOfferingState.js";
 import { isAltarOfferingActive } from "../../rules/utils/altarOfferingState.js";
 import { AudioEmitter } from "../../rules/components/AudioEmitter.js";
+import { TownfolkJob, TOWNFOLK_ROLES, TOWNFOLK_STATES } from "../../rules/components/TownfolkJob.js";
 import { LightEmitter } from "../../rules/components/LightEmitter.js";
 import { HarvestNode } from "../../rules/components/HarvestNode.js";
 import { canonicalStatusKey } from "../../rules/utils/effectSemantics.js";
@@ -1106,6 +1107,17 @@ export function buildWorldView(world) {
 				interior: spec?.interior === true,
 			});
 		}
+	}
+
+	for (const [id, pos, job] of world.query(Position, TownfolkJob)) {
+		if (job.role !== TOWNFOLK_ROLES.woodcutter) continue;
+		if (job.state !== TOWNFOLK_STATES.working || job.workSiteKind !== "chop") continue;
+		_view.audioEmitters.push({
+			id,
+			profile: "woodcutter",
+			pos: { x: pos.x | 0, y: pos.y | 0 },
+			interior: false,
+		});
 	}
 
 	for (const [id, pos, light] of world.query(Position, LightEmitter)) {

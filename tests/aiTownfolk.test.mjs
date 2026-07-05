@@ -440,7 +440,9 @@ Deno.test("woodcutter chops adjacent TreeNode entity on work completion", () => 
   });
 
   let chopped = false;
+  const audio = [];
   world.on("townfolk:chopped", () => { chopped = true; });
+  world.on("audio:play", (payload) => audio.push(payload));
 
   aiTownfolkSystem(world);
 
@@ -449,6 +451,9 @@ Deno.test("woodcutter chops adjacent TreeNode entity on work completion", () => 
   const col = world.get(tree, Collider);
   assertEquals(col.solid, false, "chopped tree stump should be walkable");
   assert(chopped, "townfolk:chopped event should fire");
+  assertEquals(audio.length, 1, "woodcutter chop should emit one action sound");
+  assertEquals(audio[0].key, "action:wood_chop");
+  assertEquals(audio[0].at, { x: 7, y: 5 });
   assertEquals(countInventory(world, npc, "material_lumber"), 1, "woodcutter should carry lumber");
   assertEquals(countInventory(world, npc, "fuel_firewood"), 1, "woodcutter should carry firewood");
   const job = world.get(npc, TownfolkJob);

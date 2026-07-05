@@ -93,6 +93,8 @@ Deno.test("sounds registry adopts descriptive weather filenames", () => {
   const holySite = resolve("ambient:holy_site");
   const smithy = resolve("ambient:smithy");
   const torchFlames = resolve("ambient:torch_flames");
+  const woodChop = resolve("action:wood_chop");
+  const woodcutter = resolve("ambient:woodcutter");
   const ringing = resolve("ears:ringing");
   const metalDrop = resolve("item:drop:weapon:metal");
   const meteorImpact = resolve("spell:impact:meteor");
@@ -125,6 +127,8 @@ Deno.test("sounds registry adopts descriptive weather filenames", () => {
   assertExists(holySite);
   assertExists(smithy);
   assertExists(torchFlames);
+  assertExists(woodChop);
+  assertExists(woodcutter);
   assertExists(ringing);
   assertExists(metalDrop);
   assertExists(meteorImpact);
@@ -156,6 +160,11 @@ Deno.test("sounds registry adopts descriptive weather filenames", () => {
   assertEquals(holySite.file, "ambient_holy_site.mp3");
   assertEquals(smithy.file, "ambient_smithy.mp3");
   assertEquals(torchFlames.file, "ambient_torch_flames.mp3");
+  assertEquals(woodChop.file, "action_wood_chop.mp3");
+  assertEquals(woodChop.bus, "ambient");
+  assert(woodChop.randomPitch > 0);
+  assertEquals(woodcutter.file, "ambient_woodcutter.mp3");
+  assertEquals(woodcutter.bus, "ambient");
   assert(ringing.files?.includes("status_deafened.mp3"));
   assert(ringing.files?.includes("status_deafened_2.mp3"));
   assertEquals(metalDrop.file, "drop_weapon_metal.mp3");

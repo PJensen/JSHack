@@ -5,10 +5,12 @@ import { hasLOS } from "../../shared/math/gridLOS.js";
 const COOKING_FIRE_AUDIBLE_RADIUS_TILES = 8;
 const HOLY_SITE_AUDIBLE_RADIUS_TILES = 7;
 const TORCH_AUDIBLE_RADIUS_TILES = 6;
+const WOODCUTTER_AUDIBLE_RADIUS_TILES = 10;
 const AMBIENT_LOOP_BUS = "ambient:loop";
 const COOKING_FIRE_LOOP_GAIN = 0.14;
 const HOLY_SITE_LOOP_GAIN = 0.1;
 const TORCH_LOOP_GAIN = 0.12;
+const WOODCUTTER_LOOP_GAIN = 0.16;
 const HOLY_SITE_IDENTITIES = new Set([
   "altar",
   "shrine",
@@ -66,6 +68,10 @@ export function computeTorchLoopVolume(distanceTiles) {
   return radialGain(distanceTiles, TORCH_AUDIBLE_RADIUS_TILES, TORCH_LOOP_GAIN);
 }
 
+export function computeWoodcutterLoopVolume(distanceTiles) {
+  return radialGain(distanceTiles, WOODCUTTER_AUDIBLE_RADIUS_TILES, WOODCUTTER_LOOP_GAIN);
+}
+
 /**
  * @param {{
  *   startLoopFn?: typeof startLoop,
@@ -83,12 +89,15 @@ export function createLocalEmitterAmbientController({
   const cookingSound = resolveFn("ambient:cooking_fire");
   const holySiteSound = resolveFn("ambient:holy_site");
   const torchSound = resolveFn("ambient:torch_flames");
+  const woodcutterSound = resolveFn("ambient:woodcutter");
   const cookingUrl = cookingSound?.url || null;
   const holySiteUrl = holySiteSound?.url || null;
   const torchUrl = torchSound?.url || null;
+  const woodcutterUrl = woodcutterSound?.url || null;
   let cookingActive = false;
   let holySiteActive = false;
   let torchActive = false;
+  let woodcutterActive = false;
 
   function stopCooking() {
     if (!cookingUrl || !cookingActive) return;
@@ -106,6 +115,12 @@ export function createLocalEmitterAmbientController({
     if (!holySiteUrl || !holySiteActive) return;
     stopLoopFn(holySiteUrl, { fadeOut: 0.3 });
     holySiteActive = false;
+  }
+
+  function stopWoodcutter() {
+    if (!woodcutterUrl || !woodcutterActive) return;
+    stopLoopFn(woodcutterUrl, { fadeOut: 0.3 });
+    woodcutterActive = false;
   }
 
   /**
@@ -126,12 +141,14 @@ export function createLocalEmitterAmbientController({
       stopCooking();
       stopHolySite();
       stopTorch();
+      stopWoodcutter();
       return;
     }
 
     let nearestCooking = Infinity;
     let nearestHolySite = Infinity;
     let nearestTorch = Infinity;
+    let nearestWoodcutter = Infinity;
     if (explicitSources) {
       for (let i = 0; i < explicitSources.length; i++) {
         const source = explicitSources[i];
@@ -140,6 +157,7 @@ export function createLocalEmitterAmbientController({
         if (source.profile === "cooking_fire") nearestCooking = Math.min(nearestCooking, dist);
         else if (source.profile === "holy_site") nearestHolySite = Math.min(nearestHolySite, dist);
         else if (source.profile === "torch") nearestTorch = Math.min(nearestTorch, dist);
+        else if (source.profile === "woodcutter") nearestWoodcutter = Math.min(nearestWoodcutter, dist);
       }
     } else for (let i = 0; i < entities.length; i++) {
       const entity = entities[i];
@@ -168,6 +186,7 @@ export function createLocalEmitterAmbientController({
     const cookingVolume = computeCookingFireLoopVolume(nearestCooking);
     const holySiteVolume = computeHolySiteLoopVolume(nearestHolySite);
     const torchVolume = computeTorchLoopVolume(nearestTorch);
+    const woodcutterVolume = computeWoodcutterLoopVolume(nearestWoodcutter);
 
     if (cookingVolume > 0.001 && cookingUrl) {
       if (!cookingActive) {
@@ -200,6 +219,17 @@ export function createLocalEmitterAmbientController({
       }
     } else {
       stopTorch();
+    }
+
+    if (woodcutterVolume > 0.001 && woodcutterUrl) {
+      if (!woodcutterActive) {
+        startLoopFn(woodcutterUrl, { bus: AMBIENT_LOOP_BUS, volume: woodcutterVolume, fadeIn: 0.25 });
+        woodcutterActive = true;
+      } else {
+        setLoopVolumeFn(woodcutterUrl, woodcutterVolume, { ramp: 0.1 });
+      }
+    } else {
+      stopWoodcutter();
     }
   }
 
