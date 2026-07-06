@@ -1148,7 +1148,7 @@ async function _finalizeNewGame(classData) {
     applyDebugCommands({ world, runtimeConfig });
     ensureRunState(world, {
       difficulty: classData?.difficulty === "hard" ? "hard" : "normal",
-      deathMode: classData?.difficulty === "hard" ? DEATH_MODES.permadeath : DEATH_MODES.dropBackpack,
+      deathMode: DEATH_MODES.permadeath,
     });
 
     // Capture character creation entry conditions for telemetry.
