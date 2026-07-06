@@ -122,6 +122,7 @@ import { installCentipedeBodyCascade } from "../rules/utils/centipedeMovement.js
 import { perceptionMemorySystem } from "../rules/systems/perceptionMemorySystem.js";
 import { installEnchantingOpenRequestListener } from "../rules/content/enchanting/benchGame.js";
 import { tombstoneSystem } from "../rules/systems/tombstoneSystem.js";
+import { treasureGuardianListenerExtension, treasureGuardianSystem } from "../rules/systems/treasureGuardianSystem.js";
 
 /**
  * @param {World} world
@@ -171,6 +172,7 @@ export function configureWorld(world) {
   world.install(trapDodgePromptExtension);
   // Material reactions consume semantic reaction events (water splash/dip, etc.).
   world.install(materialReactionListenersExtension);
+  world.install(treasureGuardianListenerExtension);
   // Polymorph requests (e.g. mimic reveal on touch).
   installPolymorphListener(world);
   installCurseHooks(world);
@@ -299,8 +301,9 @@ export function configureWorld(world) {
   registerSystem(districtConditionSystem, 'effects');
   registerSystem(workstationStateSystem, 'effects');
   registerSystem(hydraulicsSystem, 'effects');
+  registerSystem(treasureGuardianSystem, 'effects');
   // Spawners tick in the effects phase
-  registerSystem(monsterSpawnerSystem, 'effects');
+  registerSystem(monsterSpawnerSystem, 'effects', { after: [treasureGuardianSystem] });
   // Deity mood ticks in the effects phase (after combat results are emitted)
   registerSystem(deitySystem, 'effects');
   registerSystem(scoreSystem, 'effects', { after: [deitySystem] });

@@ -30,6 +30,7 @@ export function toMonsterSpawnParams(def, depth) {
     maxMana: Number.isFinite(def.maxMana) ? Number(def.maxMana) : 0,
     manaRegen: Number.isFinite(def.manaRegen) ? Number(def.manaRegen) : 0,
     creatureType: creatureTypeFromTags(def.tags || []),
+    guardianRole: def.guardianRole ? { ...def.guardianRole } : null,
     sleep: typeof def.sleep === "string"
       ? def.sleep
       : (def.sleep && typeof def.sleep === "object" ? { ...def.sleep } : null),

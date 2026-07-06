@@ -449,6 +449,7 @@ export function applyMutation(world, op, resolvers = {}) {
         maxMana: Number.isFinite(op.maxMana) ? Number(op.maxMana) : Number(def.maxMana || 0),
         manaRegen: Number.isFinite(op.manaRegen) ? Number(op.manaRegen) : Number(def.manaRegen || 0),
         creatureType: creatureTypeFromTags(def.tags || []),
+        guardianRole: def.guardianRole ? { ...def.guardianRole } : null,
       });
 
       if (op.emitEvent !== false) {

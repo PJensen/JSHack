@@ -317,6 +317,48 @@ export const CLASS_DEFS = {
       'smite',           // core: ranged holy damage
     ],
   },
+
+  valkyrie: {
+    id: 'valkyrie',
+    name: 'Valkyrie',
+    description: 'Death-aware and fate-bound. Reads the shape of battle and draws strength from those who fall nearby.',
+    deityId: 'seraphine',
+    stats: {
+      maxHp: 27,
+      maxMana: 45,
+      manaRegen: 0.11,
+      maxStamina: 105,
+      staminaRegen: 3.15,
+      intelligence: 10,
+      dexterity: 14,
+      visionRange: 6,
+      luck: 2,
+    },
+    equipment: {
+      weapon: 'sword_plain',
+      armor: 'leather_armor',
+      offhand: null,
+      feet: 'boots_leather',
+    },
+    inventoryItems: [
+      { itemId: 'hearthstone', count: 1 },
+      { itemId: 'potion_health', count: 2 },
+      { itemId: 'potion_mana', count: 3 },
+      { itemId: 'potion_holy_water', count: 1 },
+      { itemId: 'lockpick', count: 5 },
+      { itemId: 'scroll_identify', count: 4 },
+    ],
+    startingSpells: [
+      'holy_strike',
+      'smite',
+    ],
+    fate: {
+      deathAware: true,
+      nearbyDeathPower: true,
+      corpseDisposition: 'chooser',
+      draugrDisposition: 'judgment',
+    },
+  },
 };
 
 /** @param {string} id */

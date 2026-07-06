@@ -258,6 +258,59 @@ defineMonster('wight', {
   lootTable: 'drop:wight',
 });
 
+defineMonster('draugr', {
+  name: 'Draugr',
+  glyph: '💀',
+  color: '#8fa6b0',
+  glow: '#4d6570',
+  tags: ['undead', 'haunting', 'territorial', 'guardian'],
+  goreType: 'none',
+  tier: 1,
+  rare: true,
+  minDepth: 4,
+  intelligence: 6,
+  visionRange: 6,
+  aggro: 'passive',
+  faction: 'neutral',
+  hp: 30,
+  hpPerLevel: 2,
+  attack: 4,
+  defense: 3,
+  damageDice: '1d8',
+  sizeClass: 'M',
+  massKg: 70,
+  wielding: [
+    'sword_plain',
+    'iron_mace',
+    'flail',
+  ],
+  equipped: ['chain_armor', 'leather_armor', 'helm_iron'],
+  resistances: {
+    kinetic: { DR: 3, bluntMult: 1.25, pierceMult: 0.7, slashMult: 0.85 },
+    chemical: { toxMult: 0 },
+  },
+  speed: 1,
+  guardianRole: { role: 'bound_property_guardian', radius: 6, peacefulUntilDisturbed: true },
+  hooks: {
+    onHit: [drainAndWeakenOnHit({
+      chancePct: 35,
+      seedSalt: 0xdead0d06,
+      divisor: 3,
+      cooldownTurns: 4,
+      weakenedTurns: 3,
+      weakenedPotency: 1,
+    })],
+  },
+  specials: ['Territorial guardian', 'Angered when its bound property is disturbed', 'Siphon strike (35%, 4-turn cooldown)'],
+  description: 'A specific dead owner who refuses to leave a house, grave, chest, weapon, or family holding. It watches the thing it kept.',
+  lootTable: 'drop:wight',
+  meta: {
+    guardian: true,
+    boundTo: ['house', 'chest', 'grave', 'weapon', 'family_property'],
+    angerTrigger: 'bound_property_touched',
+  },
+});
+
 defineMonster('skeletal_marksman', {
   name: 'Skeletal Marksman',
   glyph: 's',

@@ -5,10 +5,10 @@ import { DEITY_DEFS } from '../src/rules/data/deities.js';
 import { getCatalogItem } from '../src/rules/data/itemCatalog.js';
 import { getSpell } from "../src/rules/data/spells.js";
 
-Deno.test("CLASS_DEFS has exactly 6 classes", () => {
+Deno.test("CLASS_DEFS has exactly 10 classes", () => {
   const ids = listClassIds();
-  assertEquals(ids.length, 9);
-  for (const id of ['druid', 'warden', 'outlaw', 'cleric', 'archeologist', 'warlock', 'mage', 'mireborn', 'pilgrim']) {
+  assertEquals(ids.length, 10);
+  for (const id of ['druid', 'warden', 'outlaw', 'cleric', 'archeologist', 'warlock', 'mage', 'mireborn', 'pilgrim', 'valkyrie']) {
     assert(ids.includes(id), `missing class: ${id}`);
   }
 });
@@ -60,6 +60,17 @@ Deno.test("cleric starts with holy_strike and smite as class spells", () => {
   assert(cleric.startingSpells.includes("holy_strike"), "cleric should start with holy_strike");
   assert(cleric.startingSpells.includes("smite"), "cleric should start with smite");
   assertEquals(cleric.startingSpells.length, 2, "cleric should start with exactly 2 spells");
+});
+
+Deno.test("valkyrie is fate-oriented and death-aware", () => {
+  const valkyrie = getClass('valkyrie');
+  assert(valkyrie, 'valkyrie should be a class');
+  assertEquals(valkyrie.deityId, 'seraphine');
+  assertEquals(valkyrie.fate.deathAware, true);
+  assertEquals(valkyrie.fate.nearbyDeathPower, true);
+  assertEquals(valkyrie.fate.draugrDisposition, 'judgment');
+  assert(valkyrie.startingSpells.includes('holy_strike'), 'valkyrie should start with holy_strike');
+  assert(valkyrie.startingSpells.includes('smite'), 'valkyrie should start with smite');
 });
 
 Deno.test("warden has highest maxHp", () => {

@@ -138,3 +138,7 @@ export { GroundStackOrder } from './GroundStackOrder.js';
 export { CentipedeSegment } from './CentipedeSegment.js';
 export { CorpseAdaptation } from './CorpseAdaptation.js';
 export { HydraulicsLink } from './HydraulicsLink.js';
+export { TreasureGuardian } from './TreasureGuardian.js';
+export { GuardedTreasure } from './GuardedTreasure.js';
+export { Landvaettir, LANDVAETTIR_DISPOSITIONS } from './Landvaettir.js';
+export { Hamingja } from './Hamingja.js';

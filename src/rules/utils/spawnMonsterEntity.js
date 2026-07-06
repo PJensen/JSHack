@@ -7,6 +7,7 @@ import { ItemInfo } from "../components/ItemInfo.js";
 import { Mana } from "../components/Mana.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { ScriptState } from "../components/ScriptState.js";
+import { TreasureGuardian } from "../components/TreasureGuardian.js";
 import { getCatalogItem } from "../data/itemCatalog.js";
 import { getMonster } from "../data/monsters.js";
 import { resolveSleepProfile, resolveSleepScheduleNow } from "../data/sleepProfiles.js";
@@ -213,6 +214,7 @@ function applyAuthoredSleep(world, entityId, params, def) {
  *   mana?: number,
  *   manaRegen?: number,
  *   sleep?: false|string|{ pattern?: string, context?: string, chance?: number }|null,
+ *   guardianRole?: { radius?: number, role?: string, peacefulUntilDisturbed?: boolean }|null,
  *   equipment?: {
  *     ranged?: string,
  *     ammo?: string,
@@ -278,6 +280,21 @@ export function spawnMonsterEntity(world, params = {}) {
   applyAuthoredSleep(world, id, p, mdef);
   if (mdef?._contentState) {
     try { world.add(id, ScriptState, { data: { ...mdef._contentState } }); } catch {}
+  }
+  const guardianRole = (p.guardianRole && typeof p.guardianRole === "object")
+    ? p.guardianRole
+    : (mdef?.guardianRole || null);
+  if (guardianRole && typeof guardianRole === "object") {
+    world.add(id, TreasureGuardian, {
+      treasureId: 0,
+      homeX: Number.isFinite(p.x) ? (Number(p.x) | 0) : 0,
+      homeY: Number.isFinite(p.y) ? (Number(p.y) | 0) : 0,
+      radius: Number.isFinite(guardianRole.radius) ? Math.max(0, Number(guardianRole.radius) | 0) : 6,
+      peacefulUntilDisturbed: guardianRole.peacefulUntilDisturbed !== false,
+      disturbed: false,
+      disturbedBy: 0,
+      role: String(guardianRole.role || "treasure_guardian"),
+    });
   }
 
   return id;

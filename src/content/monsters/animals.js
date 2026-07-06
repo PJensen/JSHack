@@ -589,12 +589,13 @@ defineMonster('dragon', {
     thermal: { igniteC: Infinity, burnMult: 0 },
   },
   speed: 2,
+  guardianRole: { role: 'hoard_guardian', radius: 8, peacefulUntilDisturbed: true },
   sleep: "ancient",
   hooks: {
     onHit: [statusEffectOnHit(20, 0xdead0004, { key: "burn", turnsLeft: 5, potency: 4 }, "proc:burning")],
   },
-  specials: ["Burn 20%", "Resists polymorph"],
-  description: 'Scales like hammered bronze. The apex predator of the deep.',
+  specials: ["Burn 20%", "Resists polymorph", "Guards nearby treasure until disturbed"],
+  description: 'Scales like hammered bronze. The apex predator of the deep, content to sleep on a hoard until someone touches it.',
   lootTable: 'drop:dragon',
 });
 
@@ -749,6 +750,43 @@ defineMonster('chick', {
   aiHints: { farmAnimal: true },
   specials: ['Passive', 'Sleeps at night'],
   description: 'A downy chick that trails the flock and settles with it after dark.',
+});
+
+defineMonster('ratatoskr', {
+  name: 'Ratatoskr',
+  glyph: '🐿️',
+  color: '#d28a45',
+  glow: '#8a5224',
+  scale: 0.7,
+  tags: ['beast', 'squirrel', 'unique', 'messenger', 'overworld'],
+  tier: 0,
+  rare: true,
+  intelligence: 8,
+  visionRange: 7,
+  aggro: 'passive',
+  faction: 'neutral',
+  solid: false,
+  blocksSight: false,
+  sleep: 'diurnal',
+  hp: 6,
+  hpPerLevel: 0,
+  attack: 0,
+  defense: 2,
+  damageDice: '1d1',
+  sizeClass: 'XS',
+  massKg: 1,
+  resistances: { kinetic: { DR: 0 } },
+  speed: 3,
+  lootTable: 'drop:beast',
+  corpseDropChance: 0,
+  aiHints: { rareMessenger: true, distantOutdoorRegions: true },
+  specials: ['Unique', 'Passive', 'Outdoor messenger', 'Carries rumors, insults, quest state, or items'],
+  description: 'A diminutive squirrel who darts between distant outdoor places carrying rumors, insults, errands, and things that should not have crossed the map so quickly.',
+  meta: {
+    unique: true,
+    outdoorOnly: true,
+    messengerRoles: ['rumor', 'insult', 'quest_state', 'item'],
+  },
 });
 
 defineMonster('wild_elk', {

@@ -504,6 +504,9 @@ export function defineMonster(id, def) {
   if (def.disabled) monsterDef.disabled = def.disabled;
   if (def.minDepth != null) monsterDef.minDepth = def.minDepth;
   if (def.equipment) monsterDef.equipment = def.equipment;
+  if (def.guardianRole && typeof def.guardianRole === "object") {
+    monsterDef.guardianRole = { ...def.guardianRole };
+  }
 
   // Corpse eating
   if (def.corpseEat) monsterDef.corpseEat = def.corpseEat;

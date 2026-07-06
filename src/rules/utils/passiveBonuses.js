@@ -1,5 +1,6 @@
 import { ItemInfo } from "../components/ItemInfo.js";
 import { Equipment, NON_AMMO_GEAR_SLOTS } from "../components/Equipment.js";
+import { Hamingja } from "../components/Hamingja.js";
 import { getAffixPassiveRefs } from "../data/affixes.js";
 import { runScript, ScriptVerb } from "../scripting.js";
 
@@ -149,26 +150,30 @@ export function resolvePassiveBonuses(world, entityId) {
   const acc = createPassiveBonusBag();
   if (!(id > 0) || !world?.isAlive?.(id)) return Object.freeze(acc);
 
-  const eq = world.get(id, Equipment);
-  if (!eq) return Object.freeze(acc);
   const touched = new Set();
+  const eq = world.get(id, Equipment);
 
-  for (let i = 0; i < NON_AMMO_GEAR_SLOTS.length; i++) {
-    const slot = NON_AMMO_GEAR_SLOTS[i];
-    const itemId = Number(eq[slot] || 0) | 0;
-    if (!(itemId > 0) || !world.isAlive(itemId)) continue;
-    const info = world.get(itemId, ItemInfo);
-    if (!info) continue;
-    applyItemBonuses(acc, touched, info.bonuses);
-    runAffixPassives(world, acc, touched, id, itemId, info.affixes);
+  if (eq) {
+    for (let i = 0; i < NON_AMMO_GEAR_SLOTS.length; i++) {
+      const slot = NON_AMMO_GEAR_SLOTS[i];
+      const itemId = Number(eq[slot] || 0) | 0;
+      if (!(itemId > 0) || !world.isAlive(itemId)) continue;
+      const info = world.get(itemId, ItemInfo);
+      if (!info) continue;
+      applyItemBonuses(acc, touched, info.bonuses);
+      runAffixPassives(world, acc, touched, id, itemId, info.affixes);
+    }
+
+    const keys = Object.keys(PASSIVE_BONUS_DEFAULTS);
+    for (let i = 0; i < keys.length; i++) {
+      const key = keys[i];
+      if (touched.has(key)) continue;
+      addPassiveBonus(acc, key, eq[key]);
+    }
   }
 
-  const keys = Object.keys(PASSIVE_BONUS_DEFAULTS);
-  for (let i = 0; i < keys.length; i++) {
-    const key = keys[i];
-    if (touched.has(key)) continue;
-    addPassiveBonus(acc, key, eq[key]);
-  }
+  const hamingja = world.get(id, Hamingja);
+  if (hamingja) addPassiveBonus(acc, "luck", hamingja.luck);
 
   return Object.freeze(acc);
 }

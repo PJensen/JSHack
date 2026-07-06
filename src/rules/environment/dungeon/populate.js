@@ -2292,6 +2292,7 @@ export function materializeSpawn(world, spawn) {
         maxMana: p.maxMana,
         manaRegen: p.manaRegen,
         creatureType: p.creatureType,
+        guardianRole: p.guardianRole,
         sleep: p.sleep,
       });
       return id;
