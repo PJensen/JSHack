@@ -1641,15 +1641,21 @@ Deno.test("millstone mills wheat into flour", () => {
     action: "millGrain",
     params: { idleState: "idle", activeState: "working", activeDuration: 4 },
   });
+  world.add(millstone, Position, { x: 11, y: 12 });
   world.add(millstone, ObjectState, { state: "idle" });
 
   const milled = [];
+  const audio = [];
   world.on("mill:milled", (e) => milled.push(e));
+  world.on("audio:play", (e) => audio.push(e));
 
   world.add(actor, InteractIntent, { targetId: millstone });
   interactionSystem(world);
 
   assert(milled.length === 1, "millstone should emit a milling event");
+  assertEquals(audio.length, 1, "player milling should emit one grind sound");
+  assertEquals(audio[0].key, "action:millstone_grind");
+  assertEquals(audio[0].at, { x: 11, y: 12 });
   assert(
     world.get(millstone, ObjectState)?.state === "working",
     "millstone should enter working state",
@@ -1659,6 +1665,45 @@ Deno.test("millstone mills wheat into flour", () => {
       world.get(id, NamedIdentity)?.identity === "food_flour"
     ),
     "actor should receive flour",
+  );
+});
+
+Deno.test("millstone mills corn into cornmeal", () => {
+  const world = new World({ seed: 75 });
+  const actor = world.create();
+  world.add(actor, Inventory, { items: [], capacity: 20, weightLimit: null });
+
+  const corn = world.create();
+  world.add(corn, NamedIdentity, { name: "Corn", identity: "food_corn" });
+  world.add(corn, ItemInfo, {
+    type: "food",
+    weight: 1,
+    value: 8,
+    count: 1,
+  });
+  addToInventory(world, actor, corn);
+
+  const millstone = world.create();
+  world.add(millstone, Interactable, {
+    action: "millGrain",
+    params: { idleState: "idle", activeState: "working", activeDuration: 4 },
+  });
+  world.add(millstone, ObjectState, { state: "idle" });
+
+  const milled = [];
+  world.on("mill:milled", (e) => milled.push(e));
+
+  world.add(actor, InteractIntent, { targetId: millstone });
+  interactionSystem(world);
+
+  assert(milled.length === 1, "millstone should emit a milling event");
+  assertEquals(milled[0].inputIdentity, "food_corn");
+  assertEquals(milled[0].outputIdentity, "food_cornmeal");
+  assert(
+    inventoryItems(world, actor).some((id) =>
+      world.get(id, NamedIdentity)?.identity === "food_cornmeal"
+    ),
+    "actor should receive cornmeal",
   );
 });
 

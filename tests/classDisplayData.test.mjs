@@ -12,6 +12,7 @@ Deno.test("valkyrie class has character creation presentation data", () => {
   const valkyrie = buildClassDisplayData().find((entry) => entry.id === "valkyrie");
   assert(valkyrie, "valkyrie should appear in character creation display data");
   assertEquals(valkyrie.name, "Valkyrie");
+  assertEquals(valkyrie.glyph, "@");
   assertEquals(valkyrie.icon, "🪽");
   assert(valkyrie.description.length > 0);
   assert(valkyrie.deityName.length > 0);

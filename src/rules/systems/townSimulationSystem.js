@@ -9,6 +9,7 @@ import {
   findTownContainers,
 } from "../utils/townEconomy.js";
 import { SMITH_RECIPES, chooseSmithRecipe } from "../data/smithRecipes.js";
+import { chooseMillingRecipe } from "../data/millingRecipes.js";
 import { clamp } from "../../shared/math/math.js";
 import { chebyshevScalar } from "../utils/distance.js";
 import { currentDepth } from "../utils/worldAccess.js";
@@ -89,11 +90,12 @@ function pulseIndustry(world, state, storage, weather) {
 
   if (storage.mill > 0) {
     const mill = countInventoryByIdentity(world, storage.mill);
-    if ((mill.food_wheat || 0) >= 1) {
-      consumeInventoryIdentity(world, storage.mill, "food_wheat", 1);
-      createInventoryItem(world, storage.mill, "food_flour");
+    const millingRecipe = chooseMillingRecipe(mill);
+    if (millingRecipe) {
+      consumeInventoryIdentity(world, storage.mill, millingRecipe.inputIdentity, 1);
+      createInventoryItem(world, storage.mill, millingRecipe.outputIdentity);
       produced = true;
-      world.emit?.("town:produced", { chain: "mill", itemId: "food_flour" });
+      world.emit?.("town:produced", { chain: "mill", itemId: millingRecipe.outputIdentity });
     }
   }
 

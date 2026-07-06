@@ -191,14 +191,15 @@ export function installEconomyMessages(ctx) {
   });
 
   // === Mill events ===
-  world.on('mill:milled', ({ actor }) => {
+  world.on('mill:milled', ({ actor, outputIdentity }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    log('You grind wheat into fresh flour at the millstone.', 'system');
+    if (outputIdentity === 'food_cornmeal') log('You grind corn into fresh cornmeal at the millstone.', 'system');
+    else log('You grind wheat into fresh flour at the millstone.', 'system');
   });
 
   world.on('mill:failed', ({ actor, reason }) => {
     if (nameOfEntity(actor) !== 'You') return;
-    if (reason === 'missing_wheat') { log('You need wheat before the millstone can do any work.', 'system'); return; }
+    if (reason === 'missing_grain' || reason === 'missing_wheat') { log('You need wheat or corn before the millstone can do any work.', 'system'); return; }
     if (reason === 'no_inventory') { log('You need some way to carry the flour.', 'system'); return; }
     log('The millstone grinds to a halt.', 'system');
   });

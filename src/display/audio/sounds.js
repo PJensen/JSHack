@@ -79,6 +79,7 @@ const SOUNDS = {
   "action:search_found": { file: "action_search_found.mp3", bus: "ambient", maxVoices: 2, randomPitch: 8, volume: 0.95 },
   "action:secret_found": { file: "action_secret_found.mp3", bus: "ambient", maxVoices: 1, randomPitch: 8, volume: 0.95 },
   "action:wood_chop": { file: "action_wood_chop.mp3", bus: "ambient", maxVoices: 3, randomPitch: 55, volume: 0.95 },
+  "action:millstone_grind": { file: "action_millstone_grind.mp3", bus: "ambient", maxVoices: 3, randomPitch: 18, volume: 0.9 },
   "fountain":         { file: "ambient_fountain.mp3",      bus: "ambient" },
   "ambient:bone_chime": { file: "ambient_bone_chime.mp3",  bus: "ambient", maxVoices: 2, randomPitch: 10 },
   "church:bell":      { file: "ambient_church_bells.mp3",  bus: "ambient", maxVoices: 1 },

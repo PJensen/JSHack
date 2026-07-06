@@ -526,7 +526,7 @@ export default {
     },
     {
       "dx": -4,
-      "dy": 1,
+      "dy": -1,
       "kind": "smithy_sign"
     },
     {

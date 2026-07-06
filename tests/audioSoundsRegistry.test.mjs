@@ -94,6 +94,7 @@ Deno.test("sounds registry adopts descriptive weather filenames", () => {
   const smithy = resolve("ambient:smithy");
   const torchFlames = resolve("ambient:torch_flames");
   const woodChop = resolve("action:wood_chop");
+  const millstoneGrind = resolve("action:millstone_grind");
   const woodcutter = resolve("ambient:woodcutter");
   const ringing = resolve("ears:ringing");
   const metalDrop = resolve("item:drop:weapon:metal");
@@ -163,6 +164,9 @@ Deno.test("sounds registry adopts descriptive weather filenames", () => {
   assertEquals(woodChop.file, "action_wood_chop.mp3");
   assertEquals(woodChop.bus, "ambient");
   assert(woodChop.randomPitch > 0);
+  assertEquals(millstoneGrind.file, "action_millstone_grind.mp3");
+  assertEquals(millstoneGrind.bus, "ambient");
+  assert(millstoneGrind.randomPitch > 0);
   assertEquals(woodcutter.file, "ambient_woodcutter.mp3");
   assertEquals(woodcutter.bus, "ambient");
   assert(ringing.files?.includes("status_deafened.mp3"));

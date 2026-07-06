@@ -50,6 +50,7 @@ import {
 import { getTownPhase } from "../data/calendar.js";
 import { actorHasDoorKey, setDoorState } from "../utils/doorAccess.js";
 import { SMITH_RECIPES, chooseSmithRecipe } from "../data/smithRecipes.js";
+import { chooseMillingRecipe } from "../data/millingRecipes.js";
 import { CARDINAL_DIRS } from "../utils/directions.js";
 import { nearestPerceivedHostile } from "../utils/perception.js";
 import { getQuestRecord } from "../quests/runtime.js";
@@ -1328,11 +1329,19 @@ function handleWorking(world, id, pos, job) {
       const storage = _cachedStorage;
       if (storage.mill > 0) depositCarriedItems(world, id, storage.mill, job);
       const stock = storage.mill > 0 ? countInventoryByIdentity(world, storage.mill) : {};
-      if ((stock.food_wheat || 0) > 0 && storage.mill > 0) {
-        consumeInventoryIdentity(world, storage.mill, "food_wheat", 1);
-        createInventoryItem(world, storage.mill, "food_flour");
+      const millingRecipe = chooseMillingRecipe(stock);
+      if (millingRecipe && storage.mill > 0) {
+        consumeInventoryIdentity(world, storage.mill, millingRecipe.inputIdentity, 1);
+        createInventoryItem(world, storage.mill, millingRecipe.outputIdentity);
         activateWorkstation(world, "millstone", "working");
-        world.emit("townfolk:milled", { actor: id, x: pos.x, y: pos.y });
+        world.emit("audio:play", { key: "action:millstone_grind", at: { x: pos.x | 0, y: pos.y | 0 }, sourceId: id });
+        world.emit("townfolk:milled", {
+          actor: id,
+          x: pos.x,
+          y: pos.y,
+          inputIdentity: millingRecipe.inputIdentity,
+          outputIdentity: millingRecipe.outputIdentity,
+        });
       }
       job.carrying = "";
       job.carryCount = 0;
@@ -1801,6 +1810,7 @@ function emitRoleWork(world, id, pos, job, target) {
       world.emit("townfolk:tended", { actor: id, x: pos.x, y: pos.y });
       break;
     case "mill":
+      world.emit("audio:play", { key: "action:millstone_grind", at: { x: pos.x | 0, y: pos.y | 0 }, sourceId: id });
       world.emit("townfolk:milled", { actor: id, x: pos.x, y: pos.y });
       break;
     case "forge_tools":

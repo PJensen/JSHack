@@ -127,6 +127,12 @@ defineItem('food_flour', {
   tags: ['cooking_ingredient'],
 });
 
+defineItem('food_cornmeal', {
+  name: 'Cornmeal', type: 'ingredient', material: 'organic', rarity: 'common', value: 9, weight: 0.6,
+  description: 'Fresh-ground cornmeal, coarse and golden.',
+  tags: ['cooking_ingredient'],
+});
+
 defineItem('food_stew', {
   name: 'Town Stew', type: 'food', material: 'organic', rarity: 'common', value: 14, weight: 0.8,
   nutrition: 220, shelfLife: 1440,

@@ -258,6 +258,7 @@ export const basePalette = {
   enchanter_shop_sign: { glyph: "✧", fg: "#d8b8ff", glow: "#7f5ac8" },
   gem_shop_sign: { glyph: "💎", fg: "#bdefff", glow: "#68bde2" },
   book_shop_sign: { glyph: "📖", fg: "#d4a76a", glow: "#8b6914" },
+  general_store_sign: { glyph: "⚖", fg: "#d8c08a", glow: "#8b6f3f" },
   gem_display_case: { glyph: "◇", fg: "#d7f3ff", glow: "#75b8d2" },
   message_board: { glyph: "🪧", fg: "#d8c08a", glow: "#8b6f3f" },
   mailbox: { glyph: "📪", fg: "#d8e8ff", glow: "#6f96c8", baseScale: 0.9 },
@@ -477,6 +478,7 @@ export const basePalette = {
   ore_stone: { glyph: "▪", fg: "#878b90", glow: "#50565c", baseScale: 0.6 },
   // Town economy goods
   food_flour:      { glyph: "%", fg: "#e8dcc0", glow: "#b8ac90", baseScale: 0.65 },
+  food_cornmeal:   { glyph: "%", fg: "#e8c860", glow: "#b89030", baseScale: 0.65 },
   food_stew:       { glyph: "%", fg: "#c88a4a", glow: "#8a5a2a", baseScale: 0.65 },
   fuel_firewood:   { glyph: "≡", fg: "#a07040", glow: "#6a4828", baseScale: 0.65 },
   material_lumber: { glyph: "≡", fg: "#b88a52", glow: "#7c5222", baseScale: 0.65 },

@@ -98,6 +98,7 @@ import {
   altarOfferingExpiresAtTurn,
 } from "../../utils/altarOfferingState.js";
 import { runEntityScript, ScriptVerb } from "../../scripting.js";
+import { chooseMillingRecipe, getMillableInputIdentities } from "../../data/millingRecipes.js";
 
 // Maps catalog item IDs → archetypes for harvest yield entity creation.
 const CATALOG_ARCHETYPES = {
@@ -779,16 +780,20 @@ export const INTERACT_PAYLOADS = {
         });
         return;
       }
-      const wheatCount = getStackCount(world, actor, "food_wheat");
-      if (wheatCount <= 0) {
+      const millCounts = {};
+      for (const identity of getMillableInputIdentities()) {
+        millCounts[identity] = getStackCount(world, actor, identity);
+      }
+      const recipe = chooseMillingRecipe(millCounts);
+      if (!recipe) {
         world.emit?.("mill:failed", {
           actor,
           targetId,
-          reason: "missing_wheat",
+          reason: "missing_grain",
         });
         return;
       }
-      if (!consumeIdentityUnits(world, actor, "food_wheat", 1)) {
+      if (!consumeIdentityUnits(world, actor, recipe.inputIdentity, 1)) {
         world.emit?.("mill:failed", {
           actor,
           targetId,
@@ -796,13 +801,20 @@ export const INTERACT_PAYLOADS = {
         });
         return;
       }
-      const itemId = giveCraftedItem(world, actor, "food_flour");
+      const itemId = giveCraftedItem(world, actor, recipe.outputIdentity);
       setWorkstationActive(world, targetId, "working");
+      const pos = world.get(targetId, Position);
+      world.emit?.("audio:play", {
+        key: "action:millstone_grind",
+        at: pos ? { x: pos.x | 0, y: pos.y | 0 } : undefined,
+        sourceId: targetId,
+      });
       world.emit?.("mill:milled", {
         actor,
         targetId,
         itemId,
-        outputIdentity: "food_flour",
+        inputIdentity: recipe.inputIdentity,
+        outputIdentity: recipe.outputIdentity,
       });
     },
   },

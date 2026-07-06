@@ -360,6 +360,12 @@ Deno.test("terrain heuristics bias resource buildings toward useful landscape", 
   assertEquals(getWorldTile(chunks, farmCrop.x, farmCrop.y), TILE_FARMLAND, "farm crops must sit on stamped farmland");
 });
 
+Deno.test("smithy sign uses authored offset", () => {
+  const smithy = BUILDING_DEFS.smithy;
+  const sign = smithy.spawns.find((spawn) => spawn.kind === "smithy_sign");
+  assertEquals(sign, { dx: -4, dy: -1, kind: "smithy_sign" });
+});
+
 Deno.test("procedural building stamps do not overlap destructively", async () => {
   const { chunks } = await generateOverworldChunks(SEED);
   const structureTiles = new Set([TILE_FLOOR, TILE_WALL, TILE_DOOR, TILE_STAIR_DOWN, TILE_FARMLAND, TILE_FENCE]);

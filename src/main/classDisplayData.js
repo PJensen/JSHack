@@ -18,6 +18,7 @@ export function buildClassDisplayData() {
     return {
       id: cls.id,
       name: cls.name,
+      glyph: cls.glyph || cls.id[0] || "?",
       icon: cls.icon || cls.name[0],
       description: cls.description,
       deityName: deity?.name ?? cls.deityId,

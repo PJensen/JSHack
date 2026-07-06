@@ -804,13 +804,18 @@ Deno.test("scheduled farmer alternates between field and mill during work hours"
   world.set(farmer, Position, { x: 4, y: 4 });
 
   let milled = false;
+  const audio = [];
   world.on("townfolk:milled", () => { milled = true; });
+  world.on("audio:play", (payload) => audio.push(payload));
 
   aiTownfolkSystem(world);
 
   const job = world.get(farmer, TownfolkJob);
   assertEquals(job.workSiteKind, "mill");
   assert(milled, "farmer should work the mill during the late work beat");
+  assertEquals(audio.length, 1, "farmer mill work should emit one grind sound");
+  assertEquals(audio[0].key, "action:millstone_grind");
+  assertEquals(audio[0].at, { x: 4, y: 4 });
   assertEquals(job.state, TOWNFOLK_STATES.returning, "farmer should leave the mill after processing goods");
 });
 

@@ -34,6 +34,7 @@ Deno.test("palette includes shock trap and special weapon glyph keys", () => {
     "herb_chest",
     "tavern_chest",
     "enchanter_shop_sign",
+    "general_store_sign",
     "flayed_man",
     "hanging_chains",
     "book_drain_life",

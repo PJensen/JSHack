@@ -331,6 +331,7 @@ export const CLASS_DEFS = {
     id: 'valkyrie',
     name: 'Valkyrie',
     icon: '🪽',
+    glyph: '@',
     description: 'Death-aware and fate-bound. Reads the shape of battle and draws strength from those who fall nearby.',
     deityId: 'seraphine',
     stats: {
