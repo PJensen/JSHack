@@ -160,8 +160,8 @@ import { evaluateSound, thresholdForTier } from "./rules/utils/sound.js";
 import { updateFOV, isVisible as isTileVisible, isExplored as isTileExplored, setFovDisabled } from "./rules/environment/dungeon/exploredMap.js";
 import { getTile, isWalkable, isOpaque, isFlyable, isRoofed, forEachLoadedTile } from "./rules/environment/dungeon/tileMap.js";
 import { mulberry32 } from "./lib/ecs-js/rng.js";
-import { getClass, listClassIds } from "./rules/data/classes.js";
-import { getDeity } from "./rules/data/deities.js";
+import { getClass } from "./rules/data/classes.js";
+import { buildClassDisplayData } from "./main/classDisplayData.js";
 import { showCharCreation } from "./display/ui/charCreation.js";
 import { installPluralizationExtensions } from "./shared/utils/pluralization.js";
 import { pickRandomSeed } from "./shared/utils/funSeeds.js";
@@ -5834,24 +5834,7 @@ if (_savegameLoaded) {
   await bootPaint("Opening character creation...", _bootDoneUnits);
   finishBoot();
 
-  const displayOrder = listClassIds();
-  const idxDruid = displayOrder.indexOf('druid');
-  const idxWarden = displayOrder.indexOf('warden');
-  if (idxDruid !== -1 && idxWarden !== -1) {
-    [displayOrder[idxDruid], displayOrder[idxWarden]] = [displayOrder[idxWarden], displayOrder[idxDruid]];
-  }
-
-  const classDisplayData = displayOrder.map(id => {
-    const cls = getClass(id);
-    const deity = getDeity(cls.deityId);
-    return {
-      id: cls.id,
-      name: cls.name,
-      description: cls.description,
-      deityName: deity?.name ?? cls.deityId,
-      deityAlignment: deity?.alignment ?? '',
-    };
-  });
+  const classDisplayData = buildClassDisplayData();
 
   showCharCreation({
     classes: classDisplayData,

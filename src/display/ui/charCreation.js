@@ -9,7 +9,7 @@ import { play, preload, startLoop, stopLoop } from '../audio/audioEngine.js';
 
 /**
  * @param {{
- *   classes: Array<{ id: string, name: string, description: string, deityName: string, deityAlignment: string }>,
+ *   classes: Array<{ id: string, name: string, icon?: string, description: string, deityName: string, deityAlignment: string }>,
  *   defaultSeed?: number,
  *   onConfirm: (result: { name: string, classId: string, seed: number, difficulty: string, onProgress?: (progress: any) => void }) => void,
  * }} opts
@@ -47,12 +47,6 @@ function parseSeed(raw) {
   if (/^[0-9]+$/.test(s)) return parseInt(s, 10) >>> 0;
   return null;
 }
-
-const CLASS_ICONS = {
-  druid: '🌿', warden: '🛡️', outlaw: '🗡️', cleric: '✨',
-  archeologist: '⛏️', warlock: '🔮', mage: '🔥',
-  mireborn: '🪷', pilgrim: '🙏',
-};
 
 export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm }) {
   let classIndex = Math.floor(Math.random() * classes.length);
@@ -683,7 +677,7 @@ export function showCharCreation({ classes, defaultSeed = 0xC0FFEE, onConfirm })
       marginBottom: '6px',
       filter: 'saturate(0.85) brightness(0.92)',
     });
-    icon.textContent = CLASS_ICONS[cls.id] ?? cls.name[0];
+    icon.textContent = cls.icon || cls.name[0];
 
     const name = document.createElement('div');
     Object.assign(name.style, {

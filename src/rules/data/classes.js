@@ -5,6 +5,7 @@ export const CLASS_DEFS = {
   warden: {
     id: 'warden',
     name: 'Warden',
+    icon: '🛡️',
     description: 'A brute devoted to slaughter. Every kill is an offering.',
     deityId: 'molkhar',
     stats: {
@@ -39,6 +40,7 @@ export const CLASS_DEFS = {
   druid: {
     id: 'druid',
     name: 'Druid',
+    icon: '🌿',
     description: 'A guardian of nature. Communes with the wild, heals the wounded.',
     deityId: 'gaia',
     stats: {
@@ -73,6 +75,7 @@ export const CLASS_DEFS = {
   outlaw: {
     id: 'outlaw',
     name: 'Outlaw',
+    icon: '🗡️',
     description: 'Quick, slippery, unreliable. Loki loves a good con.',
     deityId: 'loki',
     stats: {
@@ -115,6 +118,7 @@ export const CLASS_DEFS = {
   archeologist: {
     id: 'archeologist',
     name: 'Archeologist',
+    icon: '⛏️',
     description: 'A scholar of ruins. Digs deep, identifies relics, and trusts in luck.',
     deityId: 'gaia',
     stats: {
@@ -149,6 +153,7 @@ export const CLASS_DEFS = {
   warlock: {
     id: 'warlock',
     name: 'Warlock',
+    icon: '🔮',
     description: 'A dark conjurer bound to forces beyond the veil. Commands the dead and channels hellfire through a familiar.',
     deityId: 'molkhar',
     stats: {
@@ -184,6 +189,7 @@ export const CLASS_DEFS = {
   mage: {
     id: 'mage',
     name: 'Mage',
+    icon: '🔥',
     description: 'Pure elemental destruction. Glass cannon — lowest HP, highest mana.',
     deityId: 'loki',
     stats: {
@@ -219,6 +225,7 @@ export const CLASS_DEFS = {
   mireborn: {
     id: 'mireborn',
     name: 'Mireborn',
+    icon: '🪷',
     description: 'Swamp-born and thick-skinned. Poisons, entangles, and outlasts.',
     deityId: 'gaia',
     stats: {
@@ -254,6 +261,7 @@ export const CLASS_DEFS = {
   pilgrim: {
     id: 'pilgrim',
     name: 'Pilgrim',
+    icon: '🙏',
     description: 'Wandering ascetic. Starts with almost nothing — rewards exploration and patience.',
     deityId: 'seraphine',
     stats: {
@@ -286,6 +294,7 @@ export const CLASS_DEFS = {
   cleric: {
     id: 'cleric',
     name: 'Cleric',
+    icon: '✨',
     description: 'Devoted to Seraphine. Shields the faithful, smites the wicked.',
     deityId: 'seraphine',
     stats: {
@@ -321,6 +330,7 @@ export const CLASS_DEFS = {
   valkyrie: {
     id: 'valkyrie',
     name: 'Valkyrie',
+    icon: '🪽',
     description: 'Death-aware and fate-bound. Reads the shape of battle and draws strength from those who fall nearby.',
     deityId: 'seraphine',
     stats: {
