@@ -1,0 +1,25 @@
+{
+  "cli_version": "0.7.7",
+  "checkpoint_id": "b0bde39be995",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "src/display/audio/sounds.js"
+  ],
+  "sessions": [
+    {
+      "metadata": "/b0/bde39be995/0/metadata.json",
+      "transcript": "/b0/bde39be995/0/full.jsonl",
+      "content_hash": "/b0/bde39be995/0/content_hash.txt",
+      "prompt": "/b0/bde39be995/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 167942,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1718784,
+    "output_tokens": 6885,
+    "api_call_count": 20
+  }
+}
