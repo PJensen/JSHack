@@ -1,0 +1,33 @@
+{
+  "cli_version": "0.7.7",
+  "checkpoint_id": "a1fd6e719c0f",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 3,
+  "files_touched": [
+    "src/bridge/schema/weaponVfxResolver.js",
+    "src/display/fx/meleeSlashFx.js",
+    "src/rules/data/affixes.js",
+    "src/rules/data/weaponVisualAffinity.js",
+    "src/rules/environment/dungeon/underworldRegions.js",
+    "src/rules/systems/combatSystem.js",
+    "tests/combat.test.mjs",
+    "tests/weaponVisualAffinity.test.mjs",
+    "tests/worldViewWeaponVfxProfiles.test.mjs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/a1/fd6e719c0f/0/metadata.json",
+      "transcript": "/a1/fd6e719c0f/0/full.jsonl",
+      "content_hash": "/a1/fd6e719c0f/0/content_hash.txt",
+      "prompt": "/a1/fd6e719c0f/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 340635,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 7279616,
+    "output_tokens": 27244,
+    "api_call_count": 52
+  }
+}
