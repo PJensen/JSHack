@@ -38,6 +38,7 @@ export const basePalette = {
   player_mireborn: { glyph: "@", fg: "#40c8a0", glow: "#208060" },
   player_mage:     { glyph: "@", fg: "#ff8833", glow: "#cc5500" },
   player_pilgrim:  { glyph: "@", fg: "#f0f0ff", glow: "#aaaadd" },
+  player_valkyrie: { glyph: "@", fg: "#d7e3f1", glow: "#8f9fb2" },
   monster: { glyph: "m", fg: "#ffb0a0", glow: "#f66" },  // fallback
   // Tiles
   floor: { glyph: ".", fg: "#446", glow: "#224", bg: "#1a1c28" },

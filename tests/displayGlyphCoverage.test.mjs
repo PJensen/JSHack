@@ -3,6 +3,7 @@ import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";
 import { buildPalette } from "../src/display/palette/index.js";
 import { buildCatalogItem } from "../src/rules/data/itemCatalogLoader.js";
+import { listClassIds } from "../src/rules/data/classes.js";
 import { createPlayer } from "../src/rules/archetypes/Player.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { Position } from "../src/rules/components/Position.js";
@@ -40,6 +41,15 @@ Deno.test("palette includes shock trap and special weapon glyph keys", () => {
     "book_drain_life",
   ]) {
     assert(palette[key], `missing palette key: ${key}`);
+  }
+});
+
+Deno.test("palette includes in-game player glyphs for every class identity", () => {
+  const palette = buildPalette();
+  for (const classId of listClassIds()) {
+    const key = `player_${classId}`;
+    assert(palette[key], `missing palette key: ${key}`);
+    assertEquals(palette[key].glyph, "@");
   }
 });
 
