@@ -174,6 +174,72 @@ Deno.test("combatSystem: flail melee events carry weaponFamily through attack an
   assertEquals(damaged[0].weaponFamily, WEAPON_FAMILIES.flail);
 });
 
+function firstMeleeOutcomeEvent(kind) {
+  for (let seed = 1; seed <= 512; seed++) {
+    const world = new World({ seed });
+    const weapon = makeEquip(world, {
+      id: 'flametongue',
+      name: 'Flametongue',
+      slot: 'weapon',
+      bonuses: { accuracy: kind === 'miss' ? -80 : (kind === 'dodge' ? 1000 : 80), damagePower: 4, slashPenetration: 3 },
+      affixes: ['flaming'],
+      damageType: 'slash',
+    });
+    world.set(weapon, ItemInfo, { ...world.get(weapon, ItemInfo), damageDice: '1d8' });
+
+    const defenderEq = {};
+    if (kind === 'dodge') {
+      defenderEq.ring1 = makeEquip(world, {
+        id: 'evasion_ring',
+        name: 'Evasion Ring',
+        slot: 'ring',
+        bonuses: { evade: 100 },
+      });
+    }
+    if (kind === 'parry') {
+      const parryWeapon = makeEquip(world, {
+        id: 'parry_sword',
+        name: 'Parry Sword',
+        slot: 'weapon',
+        bonuses: {},
+        damageType: 'slash',
+      });
+      world.set(parryWeapon, ItemInfo, { ...world.get(parryWeapon, ItemInfo), damageDice: '1d6' });
+      defenderEq.weapon = parryWeapon;
+    }
+
+    const attacker = makeActor(world, 'Attacker', { weapon }, 20);
+    const defender = makeActor(world, 'Defender', defenderEq, 30);
+    world.add(attacker, Position, { x: 1, y: 1 });
+    world.add(defender, Position, { x: 1, y: 2 });
+    equipmentSystem(world);
+    if (kind === 'dodge') {
+      world.get(defender, Equipment).evadeDerived = 500;
+    }
+
+    const events = [];
+    if (kind === 'hit') world.on('damaged', (ev) => events.push(ev));
+    if (kind === 'miss') world.on('status', (ev) => { if (ev.kind === 'miss') events.push(ev); });
+    if (kind === 'dodge') world.on('combat:dodge', (ev) => events.push(ev));
+    if (kind === 'parry') world.on('combat:parry', (ev) => events.push(ev));
+
+    world.add(attacker, AttackIntent, { targetId: defender });
+    combatSystem(world);
+    if (events.length > 0) return events[0];
+  }
+  return null;
+}
+
+Deno.test("combatSystem: melee swing outcome payloads carry visual affinity profiles", () => {
+  for (const kind of ['hit', 'miss', 'dodge', 'parry']) {
+    const event = firstMeleeOutcomeEvent(kind);
+    assert(event, `expected ${kind} event`);
+    assertEquals(event.impactProfile?.elementTint, 'fire', `${kind} should carry fire tint`);
+    assertEquals(event.impactProfile?.swingStyle, 'flame', `${kind} should carry flame swing style`);
+    assertEquals(event.impactProfile?.visualAffinity?.id, 'fire', `${kind} should carry resolved affinity`);
+  }
+});
+
 Deno.test("d20 combat with affix triggers: fierce, vamp, thorns", () => {
   const world = new World({ seed: 123 });
   installAffixTriggers(world);

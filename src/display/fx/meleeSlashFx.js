@@ -145,6 +145,13 @@ const ELEMENT_TINTS = {
   frost:    [140, 200, 255],  // icy blue
   acid:     [180, 255, 40],   // caustic yellow-green
   electric: [160, 180, 255],  // crackling blue-white
+  blood:    [220, 70, 70],
+  soul:     [185, 120, 255],
+  void:     [130, 80, 210],
+  shadow:   [110, 90, 160],
+  holy:     [255, 244, 190],
+  arcane:   [105, 185, 255],
+  magic:    [105, 185, 255],
 };
 
 // ── Damage colour shift ───────────────────────────────────────────────────
@@ -172,6 +179,11 @@ function resolveBaseColor(weaponClass, elementTint) {
     case 'dagger':      return COL_DAGGER;
     default:            return COL_DEFAULT;
   }
+}
+
+function isFlameStyle(swingStyle) {
+  const key = String(swingStyle || '').toLowerCase();
+  return key === 'flame' || key === 'fire';
 }
 
 function damageColorShift(baseColor, amount, critical) {
@@ -316,7 +328,7 @@ export function createMeleeSlashFxController() {
 
   // ── Spawn helpers ─────────────────────────────────────────────────────
 
-  function spawnSweep(x, y, facingVec, impactVec, weaponClass, profileRef, weaponLengthCm, elementTint, amount, critical, attackerId, offhand) {
+  function spawnSweep(x, y, facingVec, impactVec, weaponClass, profileRef, weaponLengthCm, elementTint, swingStyle, amount, critical, attackerId, offhand) {
     const n = nextSwing(attackerId, offhand);
     const baseAngle = resolveBaseAngle(facingVec, impactVec);
     const isAxe = (weaponClass === 'axe' || weaponClass === 'morningstar');
@@ -347,10 +359,11 @@ export function createMeleeSlashFxController() {
       style: 'sweep',
     });
     fx.weaponProfile = profile;
+    fx.swingStyle = swingStyle || null;
     return fx;
   }
 
-  function spawnStab(x, y, facingVec, impactVec, weaponClass, profileRef, weaponLengthCm, elementTint, amount, critical, attackerId, offhand) {
+  function spawnStab(x, y, facingVec, impactVec, weaponClass, profileRef, weaponLengthCm, elementTint, swingStyle, amount, critical, attackerId, offhand) {
     const n = nextSwing(attackerId, offhand);
     const baseAngle = resolveBaseAngle(facingVec, impactVec);
     const profile = resolveWeaponProfile(weaponClass || 'dagger', profileRef, weaponLengthCm);
@@ -377,10 +390,11 @@ export function createMeleeSlashFxController() {
       style: 'stab',
     });
     fx.weaponProfile = profile;
+    fx.swingStyle = swingStyle || null;
     return fx;
   }
 
-  function spawnImpact(x, y, facingVec, impactVec, weaponClass, profileRef, weaponLengthCm, elementTint, amount, critical, attackerId) {
+  function spawnImpact(x, y, facingVec, impactVec, weaponClass, profileRef, weaponLengthCm, elementTint, swingStyle, amount, critical, attackerId) {
     const n = nextSwing(attackerId);
     const baseAngle = resolveBaseAngle(facingVec, impactVec);
     const profile = resolveWeaponProfile(weaponClass, profileRef, weaponLengthCm);
@@ -408,41 +422,46 @@ export function createMeleeSlashFxController() {
       style: 'impact',
     });
     fx.weaponProfile = profile;
+    fx.swingStyle = swingStyle || null;
     return fx;
   }
 
-  function spawnParry(x, y, attackerPos) {
+  function spawnParry(x, y, attackerPos, elementTint = null, swingStyle = null) {
     const dx = (attackerPos?.x ?? x) - x;
     const dy = (attackerPos?.y ?? y) - y;
     const angle = Math.atan2(dy, dx);
 
-    return new MeleeSlashFx({
+    const fx = new MeleeSlashFx({
       x, y,
       startAngle: angle - Math.PI * 0.5,
       sweepAngle: Math.PI,  // 180° spread for the spark fan
       radius: 0.5,
       ttl: PARRY_TTL,
-      color: COL_PARRY,
+      color: elementTint ? resolveBaseColor('weapon', elementTint) : COL_PARRY,
       lineWidth: 0.10,
       style: 'parry',
     });
+    fx.swingStyle = swingStyle || null;
+    return fx;
   }
 
-  function spawnWhiff(x, y, attackerPos) {
+  function spawnWhiff(x, y, attackerPos, elementTint = null, swingStyle = null) {
     const dx = x - (attackerPos?.x ?? x);
     const dy = y - (attackerPos?.y ?? y);
     const angle = Math.atan2(dy, dx);
 
-    return new MeleeSlashFx({
+    const fx = new MeleeSlashFx({
       x, y,
       startAngle: angle - Math.PI * 0.4,
       sweepAngle: Math.PI * 0.8,  // 144° ghostly sweep
       radius: 0.65,
       ttl: WHIFF_TTL,
-      color: COL_WHIFF,
+      color: elementTint ? resolveBaseColor('weapon', elementTint) : COL_WHIFF,
       lineWidth: 0.08,
       style: 'whiff',
     });
+    fx.swingStyle = swingStyle || null;
+    return fx;
   }
 
   // ── Public API ────────────────────────────────────────────────────────
@@ -483,6 +502,27 @@ export function createMeleeSlashFxController() {
   }
 
   // ── Draw routines ─────────────────────────────────────────────────────
+
+  function drawFlameTongues(ctx, fx, points, scale = 1) {
+    if (!isFlameStyle(fx.swingStyle)) return;
+    const t = fx.progress;
+    const alpha = fx.alpha;
+    for (let i = 0; i < points.length; i++) {
+      const p = points[i];
+      const wobble = Math.sin(t * 18 + i * 1.7) * 0.025 * scale;
+      const r = (0.055 + 0.025 * ((i % 3) / 2)) * scale * (1 - t * 0.35);
+      ctx.fillStyle = `rgba(255,190,70,${(0.40 * alpha).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(p.x + wobble, p.y - r * 0.35, r * 1.45, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = `rgba(255,82,24,${(0.34 * alpha).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y - r * 2.4);
+      ctx.quadraticCurveTo(p.x + r * 1.2 + wobble, p.y - r * 0.2, p.x, p.y + r * 0.7);
+      ctx.quadraticCurveTo(p.x - r * 1.0 + wobble, p.y - r * 0.2, p.x, p.y - r * 2.4);
+      ctx.fill();
+    }
+  }
 
   function drawSweep(ctx, fx) {
     const t = fx.progress;
@@ -529,6 +569,15 @@ export function createMeleeSlashFxController() {
       ctx.arc(ex, ey, 0.08, 0, Math.PI * 2);
       ctx.fill();
     }
+
+    const flamePoints = [];
+    for (let i = 0; i < 4; i++) {
+      const p = i / 3;
+      const angle = fx.startAngle + currentSweep * p;
+      const r = rootR + span * (0.58 + 0.10 * ((i + 1) % 2));
+      flamePoints.push({ x: fx.x + Math.cos(angle) * r, y: fx.y + Math.sin(angle) * r });
+    }
+    drawFlameTongues(ctx, fx, flamePoints, 1.0);
   }
 
   function drawStab(ctx, fx) {
@@ -579,6 +628,11 @@ export function createMeleeSlashFxController() {
       ctx.arc(x1, y1, 0.06, 0, Math.PI * 2);
       ctx.fill();
     }
+
+    drawFlameTongues(ctx, fx, [
+      { x: x1, y: y1 },
+      { x: x0 + (x1 - x0) * 0.68, y: y0 + (y1 - y0) * 0.68 },
+    ], 0.85);
   }
 
   function drawImpact(ctx, fx) {
@@ -640,6 +694,14 @@ export function createMeleeSlashFxController() {
       ctx.arc(fx.x, fx.y, 0.15 * (1 - t / 0.3), 0, Math.PI * 2);
       ctx.fill();
     }
+
+    const flamePoints = [];
+    for (let i = 0; i < 5; i++) {
+      const p = i / 4;
+      const angle = fx.startAngle + fx.sweepAngle * p;
+      flamePoints.push({ x: fx.x + Math.cos(angle) * (rootR + span * 0.74), y: fx.y + Math.sin(angle) * (rootR + span * 0.74) });
+    }
+    drawFlameTongues(ctx, fx, flamePoints, 0.9);
   }
 
   function drawParry(ctx, fx) {
@@ -676,6 +738,8 @@ export function createMeleeSlashFxController() {
       ctx.arc(fx.x, fx.y, 0.12 * (1 - t * 0.5), 0, Math.PI * 2);
       ctx.fill();
     }
+
+    drawFlameTongues(ctx, fx, [{ x: fx.x, y: fx.y }], 0.75);
   }
 
   function drawWhiff(ctx, fx) {
@@ -703,6 +767,14 @@ export function createMeleeSlashFxController() {
     ctx.arc(fx.x, fx.y, R, fx.startAngle, fx.startAngle + currentSweep, currentSweep < 0);
     ctx.stroke();
     ctx.setLineDash([]);
+
+    const flamePoints = [];
+    for (let i = 0; i < 3; i++) {
+      const p = i / 2;
+      const angle = fx.startAngle + currentSweep * p;
+      flamePoints.push({ x: fx.x + Math.cos(angle) * R, y: fx.y + Math.sin(angle) * R });
+    }
+    drawFlameTongues(ctx, fx, flamePoints, 0.7);
   }
 
   // ── Event wiring ──────────────────────────────────────────────────────
@@ -735,17 +807,18 @@ export function createMeleeSlashFxController() {
       const attackKind = impactProfile.attackKind || 'strike';
       const facingVec = impactProfile.facingVector || null;
       const elementTint = impactProfile.elementTint || null;
+      const swingStyle = impactProfile.swingStyle || null;
       const profileRef = impactProfile.weaponVfxProfile || null;
       const weaponLengthCm = Number(impactProfile.weaponLengthCm || 0) || null;
 
       let fxEntry;
       if (attackKind === 'stab') {
-        fxEntry = spawnStab(ox, oy, facingVec, impactVector, weaponClass, profileRef, weaponLengthCm, elementTint, amount, critical, a, offhand);
+        fxEntry = spawnStab(ox, oy, facingVec, impactVector, weaponClass, profileRef, weaponLengthCm, elementTint, swingStyle, amount, critical, a, offhand);
       } else if (attackKind === 'blunt') {
-        fxEntry = spawnImpact(ox, oy, facingVec, impactVector, weaponClass, profileRef, weaponLengthCm, elementTint, amount, critical, a);
+        fxEntry = spawnImpact(ox, oy, facingVec, impactVector, weaponClass, profileRef, weaponLengthCm, elementTint, swingStyle, amount, critical, a);
       } else {
         // slash / strike → sweep
-        fxEntry = spawnSweep(ox, oy, facingVec, impactVector, weaponClass, profileRef, weaponLengthCm, elementTint, amount, critical, a, offhand);
+        fxEntry = spawnSweep(ox, oy, facingVec, impactVector, weaponClass, profileRef, weaponLengthCm, elementTint, swingStyle, amount, critical, a, offhand);
       }
 
       if (offhand) {
@@ -756,7 +829,7 @@ export function createMeleeSlashFxController() {
     });
 
     // Parry spark — at the contact point between the two fighters
-    world.on('combat:parry', ({ defender, attacker, at }) => {
+    world.on('combat:parry', ({ defender, attacker, at, impactProfile }) => {
       const dId = Number(defender || 0) | 0;
       const aId = Number(attacker || 0) | 0;
       const defPos = at || getPosition(dId);
@@ -765,7 +838,7 @@ export function createMeleeSlashFxController() {
 
       const ox = atkPos ? atkPos.x + (defPos.x - atkPos.x) * 0.6 : defPos.x;
       const oy = atkPos ? atkPos.y + (defPos.y - atkPos.y) * 0.6 : defPos.y;
-      _active.push(spawnParry(ox, oy, atkPos));
+      _active.push(spawnParry(ox, oy, atkPos, impactProfile?.elementTint || null, impactProfile?.swingStyle || null));
     });
 
     // Miss whiff — awkward swing through air on a failed to-hit roll
@@ -780,11 +853,11 @@ export function createMeleeSlashFxController() {
 
       const ox = atkPos ? atkPos.x + (defPos.x - atkPos.x) * 0.6 : defPos.x;
       const oy = atkPos ? atkPos.y + (defPos.y - atkPos.y) * 0.6 : defPos.y;
-      _active.push(spawnWhiff(ox, oy, atkPos));
+      _active.push(spawnWhiff(ox, oy, atkPos, ev?.impactProfile?.elementTint || null, ev?.impactProfile?.swingStyle || null));
     });
 
     // Dodge whiff — originates from the attacker's swing
-    world.on('combat:dodge', ({ defender, attacker, at }) => {
+    world.on('combat:dodge', ({ defender, attacker, at, impactProfile }) => {
       const dId = Number(defender || 0) | 0;
       const aId = Number(attacker || 0) | 0;
       const defPos = at || getPosition(dId);
@@ -793,7 +866,7 @@ export function createMeleeSlashFxController() {
 
       const ox = atkPos ? atkPos.x + (defPos.x - atkPos.x) * 0.6 : defPos.x;
       const oy = atkPos ? atkPos.y + (defPos.y - atkPos.y) * 0.6 : defPos.y;
-      _active.push(spawnWhiff(ox, oy, atkPos));
+      _active.push(spawnWhiff(ox, oy, atkPos, impactProfile?.elementTint || null, impactProfile?.swingStyle || null));
     });
   }
 

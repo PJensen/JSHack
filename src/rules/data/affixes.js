@@ -736,6 +736,7 @@ function normalizeAffixRecord(id, spec) {
     slots: Object.freeze(slots),
     weight: Number(spec?.weight || 0),
     elementTint: spec?.elementTint || null,
+    visualAffinity: spec?.visualAffinity || null,
     passiveRefs: Object.freeze(passiveRefs),
     triggerScripts: Object.freeze(Object.fromEntries(
       Object.entries(triggerScripts).map(([trigger, refs]) => [trigger, Object.freeze(refs.slice())]),
@@ -799,6 +800,7 @@ export function listAffixIds() { return Array.from(AFFIX_REGISTRY.keys()); }
 export function getAffixName(id) { return String(getAffix(id)?.name || id || ""); }
 export function getAffixDescription(id) { return String(getAffix(id)?.description || ""); }
 export function getAffixElementTint(id) { return getAffix(id)?.elementTint || null; }
+export function getAffixVisualAffinity(id) { return getAffix(id)?.visualAffinity || null; }
 export function getAffixWeight(id) { return Number(getAffix(id)?.weight || 0); }
 export function getAffixPassiveRefs(id) {
   const refs = getAffix(id)?.passiveRefs;

@@ -53,7 +53,7 @@ export const UNDERWORLD_REGION_TEMPLATES = {
     targetDepth: 1,
     roomTarget: 6,
     content: {
-      monsters: [{ id: "skeleton", count: 12 }],
+      monsters: [{ id: "skeleton", count: 12 }, { id: "gelatinous_cube", count: 2 }],
       traps: ["spike_trap", "arrow_trap"],
       features: ["urn", "urn", "sarcophagus"],
       chests: [{ lootTable: "chest:basic" }],
@@ -70,7 +70,7 @@ export const UNDERWORLD_REGION_TEMPLATES = {
       monsterFilter: (def) => {
         const id = String(def?.id || "");
         const tags = Array.isArray(def?.tags) ? def.tags : [];
-        return id === "skeleton" || tags.includes("undead") || tags.includes("skeletal");
+        return id === "skeleton" || tags.includes("undead") || tags.includes("skeletal") || tags.includes("aberration");
       },
     },
   },

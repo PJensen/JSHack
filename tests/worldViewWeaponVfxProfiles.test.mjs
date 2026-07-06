@@ -9,6 +9,7 @@ import { ItemInfo } from "../src/rules/components/ItemInfo.js";
 import { Equipment } from "../src/rules/components/Equipment.js";
 import { Brain } from "../src/rules/components/Brain.js";
 import { buildCatalogItem } from "../src/rules/data/itemCatalogLoader.js";
+import { attachGemSocketNodes } from "../src/rules/data/gemSocketAffixes.js";
 import "../src/content/items/sunsword.js";
 import { installContent } from "../src/content/install.js";
 installContent();
@@ -143,4 +144,26 @@ Deno.test("worldView projects dedicated holy carry VFX for sunsword", () => {
   assertEquals(playerView.weaponVfx[0].id, "holy_weapon");
   assertEquals(playerView.weaponVfx[0].slot, "weapon");
   assert(playerView.tags.includes("sunlight"), "expected sunlight tag to remain projected for sunsword");
+});
+
+Deno.test("worldView projects weapon VFX from shared socket visual affinity", () => {
+  const world = new World({ seed: 35 });
+  const player = world.create();
+  world.add(player, Player, {});
+  world.add(player, Position, { x: 1, y: 1 });
+  world.add(player, NamedIdentity, { name: "Hero", identity: "player" });
+  world.add(player, Brain, { learnedSpellIds: [], itemKnowledgeIdentities: [], seenTiles: new Uint8Array(), intelligence: 10, visionRange: 8 });
+  world.add(player, Equipment, {});
+
+  const sword = createItem(world, { identity: "plain_socket_sword" });
+  attachGemSocketNodes(world, sword, "gem_topaz");
+  world.get(player, Equipment).weapon = sword;
+
+  const view = buildWorldView(world);
+  const playerView = view.entities.find((entity) => entity.id === player);
+  assert(playerView, "expected player in world view");
+  assert(Array.isArray(playerView.weaponVfx), "expected weaponVfx projection for socketed topaz");
+  assertEquals(playerView.weaponVfx.length, 1);
+  assertEquals(playerView.weaponVfx[0].id, "storm_weapon");
+  assertEquals(playerView.weaponVfx[0].slot, "weapon");
 });

@@ -18,7 +18,7 @@ import { mulberry32, rngInt, rollDice, combatSeed, pct } from '../utils/rng.js';
 import { dealDamage } from '../utils/dealDamage.js';
 import { areFactionsHostile } from '../utils/factionHostility.js';
 import { resolveCombatSnapshot } from '../utils/resolveCombatSnapshot.js';
-import { applyWeaponCoatingOnHit, WEAPON_COATING_DEFS } from '../data/weaponCoatings.js';
+import { applyWeaponCoatingOnHit } from '../data/weaponCoatings.js';
 import { createStatusEvent } from '../../shared/events/statusEvent.js';
 import { Beatitude, BUC_CURSED, BUC_BLESSED } from '../components/Beatitude.js';
 import { CreatureType, CREATURE_TYPES } from '../components/CreatureType.js';
@@ -43,9 +43,8 @@ import { runWeaponContentHook } from '../../content/weaponHookBridge.js';
 import { upsertTimedEffect } from '../utils/effectSemantics.js';
 import { ensureActiveEffects } from '../utils/effects.js';
 import { computeImpactVector } from '../utils/projectileKinematics.js';
-import { getAffixElementTint } from '../data/affixes.js';
-import { EFFECT_DEFS } from '../data/effectDefs.js';
 import { resolveWeaponVisualMeta } from '../data/weaponVisuals.js';
+import { resolveWeaponVisualAffinity } from '../data/weaponVisualAffinity.js';
 import { resolvePlayerActiveDeity, scoreDeityStanding } from './deitySystem.js';
 import { forEachInRadius } from '../utils/spatialIndex.js';
 import { resolveWeaponFamily } from '../data/weaponFamilies.js';
@@ -74,6 +73,15 @@ function resolveWeaponClass(world, weaponId, damageType) {
     }).weaponClass;
 }
 
+function resolveWeaponDamageType(world, weaponId) {
+    if (weaponId > 0 && world.isAlive(weaponId)) {
+        const info = world.get(weaponId, ItemInfo);
+        const rawType = String(info?.damageType || 'physical').toLowerCase();
+        if (rawType === 'blunt' || rawType === 'slash' || rawType === 'pierce') return rawType;
+    }
+    return 'physical';
+}
+
 function buildDamageSignature(info, damageType) {
     const bonuses = info?.bonuses || {};
     let blunt = Math.max(0, Number(bonuses.bluntPenetration || 0));
@@ -96,41 +104,6 @@ function buildDamageSignature(info, damageType) {
     };
 }
 
-function resolveElementTint(world, sourceId, weaponId) {
-    // 1. Weapon affixes — first affix with a declared elementTint wins
-    if (weaponId > 0 && world.isAlive(weaponId)) {
-        const info = world.get(weaponId, ItemInfo);
-        if (info) {
-            const affixes = info.affixes;
-            if (Array.isArray(affixes)) {
-                for (let i = 0; i < affixes.length; i++) {
-                    const tint = getAffixElementTint(affixes[i]);
-                    if (tint) return tint;
-                }
-            }
-            // 2. Weapon coating
-            const coating = info.coating;
-            if (coating && (coating.charges | 0) > 0) {
-                const def = WEAPON_COATING_DEFS[coating.kind];
-                if (def?.elementTint) return def.elementTint;
-            }
-        }
-    }
-    // 3. Attacker active effects (spell-based enchants like Ignite Weapons)
-    const ae = world.get(sourceId, ActiveEffects);
-    if (ae && Array.isArray(ae.effects)) {
-        for (let i = 0; i < ae.effects.length; i++) {
-            const e = ae.effects[i];
-            if (!e || !((e.turnsLeft | 0) > 0)) continue;
-            for (let d = 0; d < EFFECT_DEFS.length; d++) {
-                const def = EFFECT_DEFS[d];
-                if (def.elementTint && def.keys.includes(e.key)) return def.elementTint;
-            }
-        }
-    }
-    return null;
-}
-
 function buildMeleeImpactProfile(world, sourceId, weaponId, damageType, offhand, facingVector) {
     const info = (weaponId > 0 && world.isAlive(weaponId)) ? world.get(weaponId, ItemInfo) : null;
     const named = (weaponId > 0 && world.isAlive(weaponId)) ? world.get(weaponId, NamedIdentity) : null;
@@ -147,6 +120,7 @@ function buildMeleeImpactProfile(world, sourceId, weaponId, damageType, offhand,
     const attackKind = damageType === 'pierce'
         ? 'stab'
         : (damageType === 'slash' ? 'slash' : (damageType === 'blunt' ? 'blunt' : 'strike'));
+    const affinity = resolveWeaponVisualAffinity(world, { actorId: sourceId, weaponId });
     return {
         weaponClass,
         weaponLengthCm: visualMeta.weaponLengthCm,
@@ -155,7 +129,9 @@ function buildMeleeImpactProfile(world, sourceId, weaponId, damageType, offhand,
         offhand: !!offhand,
         signature: buildDamageSignature(info, damageType),
         facingVector: facingVector || undefined,
-        elementTint: resolveElementTint(world, sourceId, weaponId),
+        elementTint: affinity?.elementTint || null,
+        swingStyle: affinity?.swingStyle || null,
+        visualAffinity: affinity || null,
     };
 }
 
@@ -327,12 +303,26 @@ function resolveHitRoll(world, {
     const actionTags = Array.isArray(tags) ? [...tags, `relation:${positional.relation}`] : [`relation:${positional.relation}`];
     const attackPos = world.get(source, Position);
     const weaponFamily = resolveEventWeaponFamily(world, weaponId);
+    const attackDamageType = resolveWeaponDamageType(world, weaponId);
+    const attackFacing = getNormalizedEntityFacing(world, source);
+    const attackFacingVector = (attackFacing && Number.isFinite(attackFacing.dx) && Number.isFinite(attackFacing.dy))
+        ? { dx: Number(attackFacing.dx), dy: Number(attackFacing.dy) }
+        : null;
+    const meleeImpactProfile = buildMeleeImpactProfile(
+        world,
+        source,
+        weaponId,
+        attackDamageType,
+        offhand,
+        attackFacingVector,
+    );
     world.emit('combat:melee:attack', {
         attacker: source,
         defender: target,
         weaponId: weaponId || 0,
         weaponFamily,
         offhand: !!offhand,
+        impactProfile: meleeImpactProfile,
         at: attackPos ? { x: attackPos.x, y: attackPos.y } : undefined,
     });
     let attackBonus = atkSnapshot.attackBonus + hitPenalty + positional.attackBonus;
@@ -346,7 +336,13 @@ function resolveHitRoll(world, {
     const isNat1 = d20 === 1;
 
     if (!isCrit && (isNat1 || totalToHit < armorClass)) {
-        world.emit?.('status', createStatusEvent({ id: target, kind: 'miss', source }));
+        world.emit?.('status', {
+            ...createStatusEvent({ id: target, kind: 'miss', source }),
+            weaponId: weaponId || 0,
+            weaponFamily,
+            offhand: !!offhand,
+            impactProfile: meleeImpactProfile,
+        });
         applyPendingDamageProcPhase(world, source, buildProcContext('onMiss', {
             source, target, item: weaponId || 0, damage: 0,
             damageType: 'physical', crit: false, tags: actionTags, scratch: {}, offhand,
@@ -367,6 +363,7 @@ function resolveHitRoll(world, {
                 weaponId: weaponId || 0,
                 weaponFamily,
                 offhand: !!offhand,
+                impactProfile: meleeImpactProfile,
                 at: dpos ? { x: dpos.x, y: dpos.y } : undefined,
             });
             applyPendingDamageProcPhase(world, source, buildProcContext('onMiss', {
@@ -402,6 +399,7 @@ function resolveHitRoll(world, {
                         weaponId: defWeaponId,
                         attackerWeaponId: weaponId || 0,
                         weaponName: world.get(defWeaponId, NamedIdentity)?.name || 'weapon',
+                        impactProfile: meleeImpactProfile,
                         at: dpos ? { x: dpos.x, y: dpos.y } : undefined,
                         dualWield: dualWieldBonus > 0,
                     });
@@ -416,15 +414,11 @@ function resolveHitRoll(world, {
     }
 
     // Base damage from weapon dice (or fallback)
-    let damageType = 'physical';
+    let damageType = attackDamageType;
     let baseDice = null;
     if (weaponId) {
         const info = world.get(weaponId, ItemInfo);
         baseDice = info?.damageDice ? String(info.damageDice) : null;
-        const rawType = String(info?.damageType || 'physical').toLowerCase();
-        if (rawType === 'blunt' || rawType === 'slash' || rawType === 'pierce') {
-            damageType = rawType;
-        }
     }
     if (!baseDice) {
         const isPlayer = world.has(source, Player);
@@ -535,7 +529,6 @@ function resolveHitRoll(world, {
     if (finalDmg > 0) {
         const srcPos = world.get(source, Position);
         const dstPos = world.get(target, Position);
-        const facing = getNormalizedEntityFacing(world, source);
         const result = dealDamage(world, {
             target, amount: finalDmg, source,
             type: damageType, cause: 'melee',
@@ -543,16 +536,7 @@ function resolveHitRoll(world, {
             weaponId,
             armorPenetration,
             impactVector: computeImpactVector(srcPos, dstPos),
-            impactProfile: buildMeleeImpactProfile(
-                world,
-                source,
-                weaponId,
-                damageType,
-                offhand,
-                (facing && Number.isFinite(facing.dx) && Number.isFinite(facing.dy))
-                    ? { dx: Number(facing.dx), dy: Number(facing.dy) }
-                    : null,
-            ),
+            impactProfile: meleeImpactProfile,
             ...(offhand ? { offhand: true } : {}),
         });
         if (result.applied) {

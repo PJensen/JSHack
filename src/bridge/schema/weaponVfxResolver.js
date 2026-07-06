@@ -4,7 +4,8 @@
 import { Equipment } from "../../rules/components/Equipment.js";
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
-import { listWeaponVfxProfiles } from "./weaponVfxProfiles.js";
+import { resolveWeaponVisualAffinity, weaponVfxProfileIdForAffinity } from "../../rules/data/weaponVisualAffinity.js";
+import { getWeaponVfxProfile, listWeaponVfxProfiles } from "./weaponVfxProfiles.js";
 
 const DEFAULT_SLOTS = Object.freeze(["weapon", "offhand"]);
 const PROJECTILE_SLOTS = Object.freeze(["ranged"]);
@@ -91,7 +92,11 @@ function readItemState(world, itemId, slot) {
  * @param {string} slot
  * @returns {import('./weaponVfxProfiles.js').WeaponVfxProfile|null}
  */
-function resolveItemProfile(world, itemId, slot) {
+function resolveItemProfile(world, itemId, slot, actorId = 0) {
+  const affinity = resolveWeaponVisualAffinity(world, { actorId, weaponId: itemId });
+  const affinityProfile = getWeaponVfxProfile(weaponVfxProfileIdForAffinity(affinity));
+  if (affinityProfile) return affinityProfile;
+
   const state = readItemState(world, itemId, slot);
   if (!state) return null;
   const profiles = listWeaponVfxProfiles();
@@ -128,7 +133,7 @@ export function resolveEquippedWeaponVfx(world, entityId, opts = {}) {
     const slot = slots[i];
     const itemId = Number(eq[slot] || 0) | 0;
     if (!(itemId > 0)) continue;
-    const profile = resolveItemProfile(world, itemId, slot);
+    const profile = resolveItemProfile(world, itemId, slot, id);
     if (!profile) continue;
     const handSlot = slot === "weapon" || slot === "offhand";
     out.push({
