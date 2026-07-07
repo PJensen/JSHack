@@ -14,6 +14,7 @@ export const EFFECT_OPERATION_IDS = Object.freeze([
  *   id: string,
  *   keys: string[],
  *   operation: "none" | "damage" | "heal" | "stamina_restore" | "mana_restore",
+ *   operations?: Array<"none" | "damage" | "heal" | "stamina_restore" | "mana_restore">,
  *   statuses: string[],
  *   description?: string,
  * }} EffectDef
@@ -55,6 +56,14 @@ export const EFFECT_DEFS = [
     operation: "heal",
     statuses: ["regen"],
     description: "Regenerating health each turn.",
+  },
+  {
+    id: "town_stew",
+    keys: ["town_stew"],
+    operation: "none",
+    operations: ["heal", "stamina_restore"],
+    statuses: ["town_stew"],
+    description: "Town Stew nourishment. Wounds close and stamina returns.",
   },
   {
     id: "stun",

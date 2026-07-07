@@ -385,6 +385,18 @@ export function validateEffectDefs(EFFECT_DEFS, opts = {}) {
     if (operationIds.size > 0 && !operationIds.has(operation)) {
       throw new Error(`effect def ${id}: unknown operation ${operation}`);
     }
+    if (def.operations != null) {
+      if (!Array.isArray(def.operations) || def.operations.length === 0) {
+        throw new Error(`effect def ${id}: operations must be a non-empty array`);
+      }
+      for (const op of def.operations) {
+        const opId = String(op || '');
+        if (!opId) throw new Error(`effect def ${id}: operations must contain non-empty strings`);
+        if (operationIds.size > 0 && !operationIds.has(opId)) {
+          throw new Error(`effect def ${id}: unknown operation ${opId}`);
+        }
+      }
+    }
 
     if (!Array.isArray(def.statuses)) throw new Error(`effect def ${id}: statuses must be an array`);
     for (const status of def.statuses) {

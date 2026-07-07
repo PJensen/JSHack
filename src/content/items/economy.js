@@ -137,7 +137,7 @@ defineItem('food_stew', {
   name: 'Town Stew', type: 'food', material: 'organic', rarity: 'common', value: 14, weight: 0.8,
   nutrition: 220, shelfLife: 1440,
   description: 'A steaming bowl of tavern stew, rich with grain and herbs.',
-  hooks: { on_use: EAT_ON_USE },
+  hooks: { on_use: createBuffFoodOnUseHook({ key: 'town_stew', turnsLeft: 300, potency: 1 }) },
 });
 
 defineItem('food_hearty_stew', {

@@ -1809,19 +1809,21 @@ function ensureEffectsStack(container) {
   const scaledPx = (px) => `${Math.max(1, Math.round(px * VIS_SCALE))}px`;
 
   function createBadge(spec, total) {
+    const hue = Number.isFinite(Number(spec.hue)) ? Number(spec.hue) : 210;
+    const glyphColor = spec.glyphColor || shadowColor(hue);
     const el = document.createElement('div');
     Object.assign(el.style, {
       position: 'relative', width: scaledPx(58), height: scaledPx(58), borderRadius: scaledPx(8),
       display: 'grid', placeItems: 'center',
       boxShadow: '0 1px 0 rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.04)',
-      outline: `1px solid ${hsla(spec.hue, 0.28)}`,
-      background: hsla(spec.hue, 0.2),
+      outline: `1px solid ${hsla(hue, 0.28)}`,
+      background: hsla(hue, 0.2),
     });
     el.title = `${spec.name} \u2022 ${total} turns`;
 
     const glyph = document.createElement('div');
     glyph.textContent = spec.glyph;
-    Object.assign(glyph.style, { fontSize: scaledPx(28), lineHeight: '1', filter: 'drop-shadow(0 1px 0 rgba(0,0,0,.6))', color: shadowColor(spec.hue) });
+    Object.assign(glyph.style, { fontSize: scaledPx(28), lineHeight: '1', filter: 'drop-shadow(0 1px 0 rgba(0,0,0,.6))', color: glyphColor });
 
     const label = document.createElement('div');
     Object.assign(label.style, { position: 'absolute', left: scaledPx(6), bottom: scaledPx(2), fontSize: scaledPx(10), color: 'rgba(255,255,255,.8)' });
@@ -1869,8 +1871,16 @@ function ensureEffectsStack(container) {
       const turns = Math.max(0, Number(s.turns || 0));
       const stacks = Math.max(1, Number(s.stacks || 1));
       const masked = !!s.masked;
+      const rowSpec = !masked && (s.name || s.glyph || Number.isFinite(Number(s.hue)) || s.glyphColor)
+        ? {
+          name: String(s.name || key.replace(/^./, c => c.toUpperCase())),
+          glyph: String(s.glyph || '\u2728'),
+          hue: Number.isFinite(Number(s.hue)) ? Number(s.hue) : 210,
+          glyphColor: s.glyphColor,
+        }
+        : null;
       const spellFallback = !masked && !VIS[key] && s.spellGlyph ? { name: s.spellName || key, glyph: s.spellGlyph, hue: 210 } : null;
-      const spec = masked ? MASKED_SPEC : (VIS[key] || spellFallback || { name: key.replace(/^./, c => c.toUpperCase()), glyph: '\u2728', hue: 210 });
+      const spec = masked ? MASKED_SPEC : (rowSpec || VIS[key] || spellFallback || { name: key.replace(/^./, c => c.toUpperCase()), glyph: '\u2728', hue: 210 });
       let rec = byKey.get(key);
       if (!rec) {
         const { el, overlay, ticksEl, stacksEl } = createBadge(spec, turns || 1);

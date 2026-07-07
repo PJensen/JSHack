@@ -317,6 +317,39 @@ Deno.test("character data dedupes effect/status aliases into one active effect r
   assertEquals(poisonedRows.length, 1, "poison alias rows should collapse to one canonical poisoned entry");
 });
 
+Deno.test("character data uses town stew glyph metadata for active stew effect", () => {
+  const world = new World({ seed: 101 });
+  const player = world.create();
+  world.add(player, Player, {});
+  world.add(player, Position, { x: 0, y: 0 });
+  world.add(player, Inventory, { items: [], capacity: 20 });
+  world.add(player, Equipment, {});
+  world.add(player, ActiveEffects, { effects: [{ key: "town_stew", turnsLeft: 300, potency: 1, stacks: 1 }] });
+
+  installInventoryDataProvider({
+    world,
+    getActiveSpellId: () => null,
+    isSimUiBlocked: () => false,
+    getMessageLog: () => ({ getEntries: () => [] }),
+    tombstoneRepo: { getAll: () => [] },
+  });
+
+  /** @type {any} */
+  let payload = null;
+  const onCharacterData = (ev) => {
+    payload = ev?.detail || null;
+  };
+  addEventListener("ui:characterData", onCharacterData);
+  dispatchEvent(new CustomEvent("ui:requestCharacterData"));
+  removeEventListener("ui:characterData", onCharacterData);
+
+  const stewRow = (payload?.activeEffects || []).find((entry) => String(entry?.key || "") === "town_stew");
+  assert(stewRow, "expected town stew active effect row");
+  assertEquals(stewRow.name, "Town Stew");
+  assertEquals(stewRow.glyph, "%");
+  assertEquals(stewRow.glyphColor, "#c88a4a");
+});
+
 Deno.test("character data includes calendar payload for the character sheet", () => {
   const world = new World({ seed: 77 });
   const player = world.create();

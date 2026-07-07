@@ -25,11 +25,11 @@ import { hasSpellLineOfSight } from '../utils/spellTargeting.js';
 import { buildBlocksVisionMap, blockedCallback } from '../utils/vision.js';
 import { forEachInRadius } from '../utils/spatialIndex.js';
 
-/** @type {Record<string, { operation:string, statuses:string[] }>} */
+/** @type {Record<string, { operation:string, operations:string[], statuses:string[] }>} */
 const EFFECTS_BY_KEY = buildEffectIndex(EFFECT_DEFS);
 
 /**
- * @param {Array<{keys?:string[], operation?:string, statuses?:string[]}>} defs
+ * @param {Array<{keys?:string[], operation?:string, operations?:string[], statuses?:string[]}>} defs
  */
 function buildEffectIndex(defs) {
     const map = Object.create(null);
@@ -39,8 +39,12 @@ function buildEffectIndex(defs) {
         for (let k = 0; k < keys.length; k++) {
             const key = String(keys[k] || '').toLowerCase();
             if (!key || map[key]) continue;
+            const operations = Array.isArray(def?.operations) && def.operations.length > 0
+                ? def.operations.map((op) => String(op || 'none'))
+                : [String(def?.operation || 'none')];
             map[key] = {
-                operation: String(def?.operation || 'none'),
+                operation: operations[0] || String(def?.operation || 'none'),
+                operations,
                 statuses: Array.isArray(def?.statuses) ? def.statuses : [],
             };
         }
@@ -366,9 +370,13 @@ export function effectSystem(world) {
             const def = EFFECTS_BY_KEY[key];
 
             if (def) {
-                const handledBySpellDamage = (def.operation === 'damage') && applySpellEffectDamage(world, id, e);
-                if (!handledBySpellDamage) {
-                    applyEffectOperation(world, id, vit, def.operation, potency, stacks, key);
+                const operations = Array.isArray(def.operations) && def.operations.length > 0 ? def.operations : [def.operation];
+                for (let oi = 0; oi < operations.length; oi++) {
+                    const operation = String(operations[oi] || 'none');
+                    const handledBySpellDamage = (operation === 'damage') && applySpellEffectDamage(world, id, e);
+                    if (!handledBySpellDamage) {
+                        applyEffectOperation(world, id, vit, operation, potency, stacks, key);
+                    }
                 }
                 for (let i = 0; i < def.statuses.length; i++) {
                     const statusType = String(def.statuses[i] || '');

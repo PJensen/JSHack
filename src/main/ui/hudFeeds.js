@@ -34,6 +34,7 @@ import { getQuestDef } from "../../rules/quests/registry.js";
 import { STARTER_RAT_QUEST_ID } from "../../rules/quests/runtime.js";
 import { REQUIRED_RAT_KILLS } from "../../rules/quests/definitions/ratInfestation.js";
 import { questRewardPreviewText } from "./questRewards.js";
+import { enrichStatusRowDisplay } from "./statusDisplayMetadata.js";
 
 export function formatClockLabel12Hour(turn) {
   const safeTurn = Math.max(0, Number(turn || 0) | 0);
@@ -404,7 +405,7 @@ export function createHudFeeds(world, deps) {
         else statusMap.set(key, { key, turns: Math.max(prev.turns, turns), stacks: Math.max(prev.stacks, stacks), masked: false });
       }
     }
-    const statuses = Array.from(statusMap.values());
+    const statuses = Array.from(statusMap.values()).map(enrichStatusRowDisplay);
     // Enrich statuses with spell glyph/name so display layer never imports rules
     for (const s of statuses) {
       if (s.masked) continue;

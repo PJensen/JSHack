@@ -57,6 +57,7 @@ import { getQuestDef } from "../../rules/quests/registry.js";
 import { buildPalette } from "../../display/palette/index.js";
 import { getItemHooksByIdentity } from "../../rules/content/items/itemHooks.js";
 import { questRewardDetailText } from "./questRewards.js";
+import { enrichStatusRowDisplay } from "./statusDisplayMetadata.js";
 
 const TRAIT_DISPLAY = Object.freeze({
   iron_stomach:  { label: "Iron Stomach",  description: "Halves sickness chance from spoiled food." },
@@ -285,7 +286,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
         else byKey.set(key, { key, turns: Math.max(prev.turns, turns), stacks: Math.max(prev.stacks, stacks) });
       }
     }
-    return Array.from(byKey.values());
+    return Array.from(byKey.values()).map(enrichStatusRowDisplay);
   }
 
   function sumPlayerGold(playerId) {

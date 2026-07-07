@@ -13,6 +13,7 @@ import { Position } from "../src/rules/components/Position.js";
 import { Vitality } from "../src/rules/components/Vitality.js";
 import { Mana } from "../src/rules/components/Mana.js";
 import { Stamina } from "../src/rules/components/Stamina.js";
+import { Hunger } from "../src/rules/components/Hunger.js";
 import { Player } from "../src/rules/components/Player.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
@@ -1619,6 +1620,35 @@ Deno.test("cooked buff food feeds actor and applies long duration effect", () =>
   const regen = world.get(actor, ActiveEffects)?.effects?.find((effect) => effect.key === "regen");
   assert(regen, "hearty stew should apply regen");
   assert(regen.turnsLeft >= 180, "cooked food buff should be long duration");
+});
+
+Deno.test("town stew feeds actor and applies one direct composite effect", () => {
+  const world = new World({ seed: 174 });
+  const actor = world.create();
+  world.add(actor, Inventory, { items: [], capacity: 20, weightLimit: null });
+  world.add(actor, Hunger, { hunger: 250, satiation: 0 });
+  world.add(actor, ActiveEffects, { effects: [] });
+
+  const stew = createItemById(world, "food_stew");
+  addToInventory(world, actor, stew);
+
+  const results = [];
+  world.on("interaction:result", (event) => results.push(event));
+
+  world.add(actor, UseIntent, { itemId: stew, targetId: actor });
+  useItemSystem(world);
+
+  assert(results[0]?.ok === true, "town stew use should succeed");
+  assert(!inventoryContains(world, actor, stew), "town stew should be consumed");
+  assert(!world.isAlive(stew), "consumed town stew entity should be destroyed");
+  assertEquals(world.get(actor, Hunger)?.hunger, 30, "town stew should feed via normal nutrition");
+
+  const effects = world.get(actor, ActiveEffects)?.effects || [];
+  const stewEffects = effects.filter((effect) => effect.key === "town_stew");
+  assertEquals(stewEffects.length, 1, "town stew should create one direct composite effect row");
+  assert(stewEffects[0].turnsLeft >= 300, "town stew should last several hundred turns");
+  assert(!effects.some((effect) => effect.key === "regen"), "town stew should not expose regen as a separate effect");
+  assert(!effects.some((effect) => effect.key === "stamina_restore"), "town stew should not expose stamina restoration as a separate effect");
 });
 
 Deno.test("millstone mills wheat into flour", () => {
