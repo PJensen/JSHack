@@ -11,6 +11,10 @@ const disabledAI = Object.freeze({
   async complete() {
     return null;
   },
+
+  isEnabled() {
+    return false;
+  },
 });
 
 export const AIResource = defineWorldResource("jshack:experimental:ai", {

@@ -26,6 +26,11 @@ function createAIResource() {
         maxTokens: opts.maxTokens,
       });
     },
+
+    isEnabled() {
+      const settings = readAISettings();
+      return settings.enabled === true && !!settings.endpoint && !!settings.model;
+    },
   });
 }
 
