@@ -1,0 +1,31 @@
+{
+  "cli_version": "0.7.7",
+  "checkpoint_id": "9f1b0c689d52",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "src/display/ui/hud.js",
+    "src/display/ui/overlayUtils.js",
+    "src/main/ui/hudFeeds.js",
+    "src/main/ui/inventoryDataProvider.js",
+    "src/main/ui/statusDisplayMetadata.js",
+    "tests/hudEffectDetailsArchitecture.test.mjs",
+    "tests/inventoryDataProvider.test.mjs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/9f/1b0c689d52/0/metadata.json",
+      "transcript": "/9f/1b0c689d52/0/full.jsonl",
+      "content_hash": "/9f/1b0c689d52/0/content_hash.txt",
+      "prompt": "/9f/1b0c689d52/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 93456,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 3654016,
+    "output_tokens": 9865,
+    "api_call_count": 21
+  }
+}
