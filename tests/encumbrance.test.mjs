@@ -32,20 +32,20 @@ function item(world, weight, count = 1) {
 Deno.test("encumbrance derives realistic capacity and graduated load tiers", () => {
   const world = new World({ seed: 1 });
   const id = actor(world);
-  const load = item(world, 26);
+  const load = item(world, 52);
   addToInventory(world, id, load);
 
   encumbranceSystem(world);
   let enc = world.get(id, Encumbrance);
-  assertEquals(enc.limit, 30);
-  assertEquals(enc.hardLimit, 37.5);
+  assertEquals(enc.limit, 60);
+  assertEquals(enc.hardLimit, 75);
   assertEquals(enc.heavilyLoaded, true);
   assertEquals(enc.overloaded, false);
 
   staminaRegenerationSystem(world);
   assertEquals(world.get(id, Stamina).stamina, 52, "burdened actors retain half stamina regeneration");
 
-  world.get(load, ItemInfo).weight = 31;
+  world.get(load, ItemInfo).weight = 61;
   encumbranceSystem(world);
   enc = world.get(id, Encumbrance);
   assertEquals(enc.overloaded, true);
@@ -63,14 +63,14 @@ Deno.test("equipped plate and a greatsword consume carrying capacity", () => {
 
   assertEquals(getCarriedWeight(world, id), 19);
   encumbranceSystem(world);
-  assertEquals(world.get(id, Encumbrance).limit, 39);
+  assertEquals(world.get(id, Encumbrance).limit, 78);
 });
 
 Deno.test("pickup refuses weight beyond the emergency overage", () => {
   const world = new World({ seed: 3 });
   const id = actor(world);
-  addToInventory(world, id, item(world, 30));
-  const rock = item(world, 10);
+  addToInventory(world, id, item(world, 60));
+  const rock = item(world, 20);
   world.add(rock, Position, { x: 0, y: 0 });
   world.add(id, PickupIntent, { targetId: rock, count: 1 });
   const denied = [];
@@ -80,5 +80,5 @@ Deno.test("pickup refuses weight beyond the emergency overage", () => {
 
   assertEquals(inventoryContains(world, id, rock), false);
   assertEquals(denied[0]?.reason, "weight");
-  assertEquals(denied[0]?.limit, 30);
+  assertEquals(denied[0]?.limit, 60);
 });

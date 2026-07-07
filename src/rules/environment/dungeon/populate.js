@@ -240,10 +240,6 @@ const WALL_TORCH_ROOM_CHANCE = 0.22;
 const LARGE_ROOM_EXTRA_TORCH_CHANCE = 0.12;
 const DISPLAY_CONTAINER_IDENTITIES = new Set(["potion_shelf", "gem_display_case"]);
 const DECOR_MIMIC_DISGUISE_POOL = Object.freeze(['chest', 'barrel', 'urn', 'crate', 'sarcophagus']);
-const CATALOG_ITEM_DEFS = Object.freeze(
-  listCatalogItems().filter((def) => typeof def?.id === 'string' && def.id.length > 0)
-);
-
 function isPitTrapLandingViable(worldSeed, floorPlan, x, y) {
   return isPitLandingViable(
     worldSeed,
@@ -256,18 +252,17 @@ function isPitTrapLandingViable(worldSeed, floorPlan, x, y) {
   );
 }
 
-const CATALOG_MIMIC_ITEM_IDS = Object.freeze(
-  CATALOG_ITEM_DEFS.map((def) => def.id)
-);
-const PREMIUM_CATALOG_MIMIC_ITEM_IDS = Object.freeze(
-  CATALOG_ITEM_DEFS
+function catalogMimicItemIds({ premiumOnly = false } = {}) {
+  return listCatalogItems()
     .filter((def) => {
+      if (typeof def?.id !== 'string' || def.id.length <= 0) return false;
+      if (!premiumOnly) return true;
       const rarity = Number(def?.rarity || 1);
       const rarityName = String(def?.rarityName || '').toLowerCase();
       return rarity >= 2 || /rare|epic|legendary|magic/.test(rarityName);
     })
-    .map((def) => def.id)
-);
+    .map((def) => def.id);
+}
 
 function authoredBudgetEntry(entry) {
   if (typeof entry === 'string' || typeof entry === 'function') {
@@ -329,14 +324,16 @@ function pickAuthoredSpawner(rng, depth, pool) {
 }
 
 function pickMimicDisguiseIdentity(rng, { preferPremium = false } = {}) {
-  const hasCatalogItems = CATALOG_MIMIC_ITEM_IDS.length > 0;
-  const hasPremiumCatalogItems = PREMIUM_CATALOG_MIMIC_ITEM_IDS.length > 0;
+  const catalogItemIds = catalogMimicItemIds();
+  const premiumCatalogItemIds = catalogMimicItemIds({ premiumOnly: true });
+  const hasCatalogItems = catalogItemIds.length > 0;
+  const hasPremiumCatalogItems = premiumCatalogItemIds.length > 0;
 
   if (hasCatalogItems) {
     const allowDecorFallback = !preferPremium && rng.next() < 0.10;
     if (!allowDecorFallback) {
       const usePremiumPool = hasPremiumCatalogItems && (preferPremium || rng.next() < 0.45);
-      const pool = usePremiumPool ? PREMIUM_CATALOG_MIMIC_ITEM_IDS : CATALOG_MIMIC_ITEM_IDS;
+      const pool = usePremiumPool ? premiumCatalogItemIds : catalogItemIds;
       return pool[rng.int(0, pool.length - 1)];
     }
   }

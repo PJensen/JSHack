@@ -103,5 +103,5 @@ Deno.test("inventory contract: encumbrance counts equipped items once", () => {
   // Topology migration (ARCH 3): equipped weapons live in slot nodes, not inventory root.
   // inventoryContains only checks inventory root; topology items return false.
   assertEquals(enc?.current, 5, "equipped topology items count toward carried weight");
-  assertEquals(enc?.limit, 30, "carry capacity uses the stamina multiplier");
+  assertEquals(enc?.limit, 60, "carry capacity uses the stamina multiplier");
 });

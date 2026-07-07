@@ -106,7 +106,7 @@ Deno.test("inventory data provider hides equipped gear from bag and exposes char
   assert(bagItems.some((it) => Number(it.id || 0) === boots), "unequipped gear should remain in bagItems");
   assertEquals(Number(inventoryPayload?.equippedBySlot?.weapon?.item?.id || 0), sword);
   assertEquals(inventoryPayload?.encumbrance?.current, 2, "projection should include bag and equipped weight before an effects pass");
-  assertEquals(inventoryPayload?.encumbrance?.limit, 30, "projection should derive capacity without cached Encumbrance state");
+  assertEquals(inventoryPayload?.encumbrance?.limit, 60, "projection should derive capacity without cached Encumbrance state");
 
   /** @type {any} */
   let characterPayload = null;
@@ -120,7 +120,7 @@ Deno.test("inventory data provider hides equipped gear from bag and exposes char
   assert(characterPayload, "expected ui:characterData payload");
   assertEquals(Number(characterPayload?.equippedBySlot?.weapon?.item?.id || 0), sword);
   assertEquals(characterPayload?.stats?.carryWeight, 2);
-  assertEquals(characterPayload?.stats?.carryLimit, 30);
+  assertEquals(characterPayload?.stats?.carryLimit, 60);
 
   /** @type {any} */
   let equipmentPayload = null;
@@ -131,7 +131,7 @@ Deno.test("inventory data provider hides equipped gear from bag and exposes char
   dispatchEvent(new CustomEvent("ui:requestEquipmentData"));
   removeEventListener("ui:equipmentData", onEquipmentData);
   assertEquals(equipmentPayload?.encumbrance?.current, 2);
-  assertEquals(equipmentPayload?.encumbrance?.limit, 30);
+  assertEquals(equipmentPayload?.encumbrance?.limit, 60);
 });
 
 Deno.test("inventory data provider does not emit learned spells as bag items", () => {

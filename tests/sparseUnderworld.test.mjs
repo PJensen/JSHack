@@ -62,7 +62,7 @@ Deno.test("overworld stairs carry authored underworld entrance metadata", async 
   }
 
   assertEquals(tavern.entrance.targetDepth, 1);
-  assertEquals(tavern.entrance.floors, 3);
+  assertEquals(tavern.entrance.floors, 1);
   assertEquals(crypt.entrance.targetDepth, 1);
   assert(tavern.pos.x !== crypt.pos.x || tavern.pos.y !== crypt.pos.y, "starter entrances should be distinct overworld anchors");
   for (const templateId of [
@@ -84,7 +84,7 @@ Deno.test("underworld templates author floor count, population count, and concre
   const bandits = getUnderworldRegionTemplate("bandit_hideout");
   const well = getUnderworldRegionTemplate("old_well");
 
-  assertEquals(tavern.floors, 3);
+  assertEquals(tavern.floors, 1);
   assertEquals(tavern.content.monsters[0].count, 12);
   assertEquals(tavern.content.monsters[0].pool[0], "rat");
   assertEquals(tavern.content.spawners[0].pool[0], "rat");
@@ -97,7 +97,7 @@ Deno.test("underworld templates author floor count, population count, and concre
 
 Deno.test("authored underworld floor count controls generated down-stairs", () => {
   const seed = 0x7272;
-  const opts = { templateId: "tavern_basement", anchorX: 64, anchorY: 64 };
+  const opts = { templateId: "graveyard_crypt", anchorX: 64, anchorY: 64 };
   const first = generateFloorPlan(seed, 1, [{ x: 64, y: 64 }], opts);
   const second = generateFloorPlan(seed, 2, [{ x: 64, y: 64 }], opts);
   const third = generateFloorPlan(seed, 3, [{ x: 64, y: 64 }], opts);
@@ -122,7 +122,7 @@ Deno.test("world view projects entrance floor badge metadata", async () => {
 
   assert(rec, "tavern entrance should be projected");
   assertEquals(rec.entranceBadge.level, 1);
-  assertEquals(rec.entranceBadge.floors, 3);
+  assertEquals(rec.entranceBadge.floors, 1);
   assert(rec.tags.includes("dungeon_entrance"), "entrance should carry display tag");
 });
 

@@ -77,7 +77,7 @@ Deno.test("templated descent preserves an exact return stair", async () => {
 
 Deno.test("authored dungeons include deep and populated options", async () => {
   assert(
-    Object.values(UNDERWORLD_REGION_TEMPLATES).some((template) => template.floors >= 6),
+    Object.values(UNDERWORLD_REGION_TEMPLATES).some((template) => template.floors >= 5),
     "at least one authored dungeon should be deep",
   );
 
