@@ -142,10 +142,12 @@ const HARVEST_EXHAUSTED_IDENTITY = Object.freeze({
   ember_root:    "harvest_node_bare",
 });
 const LOCKPICK_ITEM_ID = "lockpick";
-const GEM_VENDOR_LOCK_ID_PART = "gem_vendor";
+const SHOP_LOCK_ID_PREFIX = "overworld:shop:";
+const LEGACY_SHOP_LOCK_ID_PREFIX = "shop:";
 
 function isLockpickableDoor(world, doorId) {
-  return getDoorLockId(world, doorId).includes(GEM_VENDOR_LOCK_ID_PART);
+  const lockId = getDoorLockId(world, doorId);
+  return lockId.startsWith(SHOP_LOCK_ID_PREFIX) || lockId.startsWith(LEGACY_SHOP_LOCK_ID_PREFIX);
 }
 
 const FIERY_WEAPON_AFFIXES = new Set(["flaming", "firestorm1"]);

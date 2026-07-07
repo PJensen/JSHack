@@ -78,11 +78,11 @@ import { LockpickPrompted } from "../src/events/LockpickPrompted.js";
 import { LockpickResolved } from "../src/events/LockpickResolved.js";
 import { BedSleepRequested } from "../src/events/BedSleepRequested.js";
 
-function makeLockedGemVendorDoor(world) {
+function makeLockedShopDoor(world, role = "gem_vendor") {
   const door = world.create();
   world.add(door, Interactable, { action: "toggleDoor", params: null });
   world.add(door, DoorState, { open: false, locked: true });
-  world.add(door, DoorLock, { lockId: "shop:gem_vendor:10,12" });
+  world.add(door, DoorLock, { lockId: `overworld:shop:${role}:10,12` });
   world.add(door, Collider, { solid: true, blocksSight: true });
   return door;
 }
@@ -151,38 +151,40 @@ Deno.test("locked door stays closed and emits locked event", () => {
   );
 });
 
-Deno.test("locked gem vendor door prompts lockpicking when actor has a lockpick", () => {
-  const world = new World({ seed: 1 });
+Deno.test("locked shop doors prompt lockpicking when actor has a lockpick", () => {
+  for (const role of ["alchemist", "book_vendor", "enchantress", "gem_vendor", "general_vendor"]) {
+    const world = new World({ seed: 1 });
 
-  const actor = world.create();
-  const door = makeLockedGemVendorDoor(world);
-  giveLockpicks(world, actor, 1);
+    const actor = world.create();
+    const door = makeLockedShopDoor(world, role);
+    giveLockpicks(world, actor, 1);
 
-  const prompts = [];
-  const interactions = [];
-  world.on(LockpickPrompted, (event) => prompts.push(event));
-  world.on("interaction", (event) => interactions.push(event));
-  world.add(actor, InteractIntent, { targetId: door });
-  interactionSystem(world);
+    const prompts = [];
+    const interactions = [];
+    world.on(LockpickPrompted, (event) => prompts.push(event));
+    world.on("interaction", (event) => interactions.push(event));
+    world.add(actor, InteractIntent, { targetId: door });
+    interactionSystem(world);
 
-  const ds = world.get(door, DoorState);
-  assertEquals(prompts.length, 1);
-  assertEquals(prompts[0].actor, actor);
-  assertEquals(prompts[0].targetId, door);
-  assertEquals(prompts[0].difficulty, "easy");
-  assertEquals(prompts[0].pins, 4);
-  assertEquals(ds.open, false);
-  assertEquals(ds.locked, true);
-  assertEquals(getStackCount(world, actor, "lockpick"), 1);
-  assertEquals(interactions.some((event) => event.result === "locked"), false);
+    const ds = world.get(door, DoorState);
+    assertEquals(prompts.length, 1, `${role} should prompt lockpicking`);
+    assertEquals(prompts[0].actor, actor);
+    assertEquals(prompts[0].targetId, door);
+    assertEquals(prompts[0].difficulty, "easy");
+    assertEquals(prompts[0].pins, 4);
+    assertEquals(ds.open, false);
+    assertEquals(ds.locked, true);
+    assertEquals(getStackCount(world, actor, "lockpick"), 1);
+    assertEquals(interactions.some((event) => event.result === "locked"), false);
+  }
 });
 
-Deno.test("locked gem vendor door reports missing lockpick instead of opening lockpicking", () => {
+Deno.test("locked shop door reports missing lockpick instead of opening lockpicking", () => {
   const world = new World({ seed: 1 });
 
   const actor = world.create();
   world.add(actor, Inventory, { capacity: 20 });
-  const door = makeLockedGemVendorDoor(world);
+  const door = makeLockedShopDoor(world);
 
   const prompts = [];
   const interactions = [];
@@ -198,40 +200,42 @@ Deno.test("locked gem vendor door reports missing lockpick instead of opening lo
   assert(interactions.some((event) => event.result === "need_lockpick"));
 });
 
-Deno.test("successful lockpick result consumes one lockpick and opens gem vendor door", () => {
-  const world = new World({ seed: 1 });
+Deno.test("successful lockpick result consumes one lockpick and opens shop doors", () => {
+  for (const role of ["alchemist", "book_vendor", "enchantress", "gem_vendor", "general_vendor"]) {
+    const world = new World({ seed: 1 });
 
-  const actor = world.create();
-  const door = makeLockedGemVendorDoor(world);
-  giveLockpicks(world, actor, 2);
+    const actor = world.create();
+    const door = makeLockedShopDoor(world, role);
+    giveLockpicks(world, actor, 2);
 
-  const resolved = [];
-  world.on(LockpickResolved, (event) => resolved.push(event));
-  world.add(actor, InteractIntent, {
-    targetId: door,
-    mode: "lockpickResult",
-    success: true,
-    reason: "unlocked",
-  });
-  interactionSystem(world);
+    const resolved = [];
+    world.on(LockpickResolved, (event) => resolved.push(event));
+    world.add(actor, InteractIntent, {
+      targetId: door,
+      mode: "lockpickResult",
+      success: true,
+      reason: "unlocked",
+    });
+    interactionSystem(world);
 
-  const ds = world.get(door, DoorState);
-  const collider = world.get(door, Collider);
-  assertEquals(ds.open, true);
-  assertEquals(ds.locked, false);
-  assertEquals(collider.solid, false);
-  assertEquals(collider.blocksSight, false);
-  assertEquals(getStackCount(world, actor, "lockpick"), 1);
-  assertEquals(resolved.length, 1);
-  assertEquals(resolved[0].success, true);
-  assertEquals(resolved[0].consumed, 1);
+    const ds = world.get(door, DoorState);
+    const collider = world.get(door, Collider);
+    assertEquals(ds.open, true, `${role} should open after successful lockpick`);
+    assertEquals(ds.locked, false);
+    assertEquals(collider.solid, false);
+    assertEquals(collider.blocksSight, false);
+    assertEquals(getStackCount(world, actor, "lockpick"), 1);
+    assertEquals(resolved.length, 1);
+    assertEquals(resolved[0].success, true);
+    assertEquals(resolved[0].consumed, 1);
+  }
 });
 
-Deno.test("failed lockpick result consumes one lockpick and leaves gem vendor door locked", () => {
+Deno.test("failed lockpick result consumes one lockpick and leaves shop door locked", () => {
   const world = new World({ seed: 1 });
 
   const actor = world.create();
-  const door = makeLockedGemVendorDoor(world);
+  const door = makeLockedShopDoor(world);
   giveLockpicks(world, actor, 1);
 
   const resolved = [];
