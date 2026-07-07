@@ -2014,7 +2014,7 @@ export function renderItemDetails(container, it) {
   }
 
   // --- Item description (consumables, tools, and any content-DSL item) ---
-  const isConsumable = it.type === 'potion' || it.type === 'scroll' || it.type === 'food' || it.type === 'wand' || it.type === 'learn' || it.type === 'book';
+  const isConsumable = it.type === 'potion' || it.type === 'scroll' || it.type === 'food' || it.type === 'wand' || it.type === 'learn' || it.type === 'book' || it.type === 'effect';
   const hasContentStatus = Array.isArray(it.contentStatus) && it.contentStatus.length > 0;
   const consumableDesc = (isConsumable || it.type === 'tool' || hasContentStatus) ? String(it.description || '').trim() : '';
   if (consumableDesc) {

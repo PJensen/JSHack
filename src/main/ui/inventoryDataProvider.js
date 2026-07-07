@@ -270,9 +270,10 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
         if (!key) continue;
         const turns = Math.max(0, Number(entry?.turnsLeft || 0) | 0);
         const stacks = Math.max(1, Number(entry?.stacks || 1) | 0);
+        const potency = Number(entry?.potency || 0);
         const prev = byKey.get(key);
-        if (!prev) byKey.set(key, { key, turns, stacks });
-        else byKey.set(key, { key, turns: Math.max(prev.turns, turns), stacks: Math.max(prev.stacks, stacks) });
+        if (!prev) byKey.set(key, { key, turns, stacks, potency });
+        else byKey.set(key, { key, turns: Math.max(prev.turns, turns), stacks: Math.max(prev.stacks, stacks), potency: Math.max(Number(prev.potency || 0), potency) });
       }
     }
     if (Array.isArray(statusComp?.statuses)) {
@@ -281,9 +282,10 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
         if (!key) continue;
         const turns = Math.max(0, Number(entry?.duration || entry?.turns || 0) | 0);
         const stacks = Math.max(1, Number(entry?.stacks || 1) | 0);
+        const potency = Number(entry?.potency || 0);
         const prev = byKey.get(key);
-        if (!prev) byKey.set(key, { key, turns, stacks });
-        else byKey.set(key, { key, turns: Math.max(prev.turns, turns), stacks: Math.max(prev.stacks, stacks) });
+        if (!prev) byKey.set(key, { key, turns, stacks, potency });
+        else byKey.set(key, { key, turns: Math.max(prev.turns, turns), stacks: Math.max(prev.stacks, stacks), potency: Math.max(Number(prev.potency || 0), potency) });
       }
     }
     return Array.from(byKey.values()).map(enrichStatusRowDisplay);

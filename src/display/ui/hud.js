@@ -2,7 +2,7 @@
 // Minimal HUD with an Active Spell button.
 import { createConcentricGauge } from './concentricGauge.js';
 import { renderItemDetails } from './overlay.js';
-import { rarityStyle } from './overlayUtils.js';
+import { ensureItemTooltip, positionTooltip, rarityStyle } from './overlayUtils.js';
 import { createPinnedItemSlots } from './pinnedItemSlots.js';
 import { createMobileSpellRadial } from './mobileRadial.js';
 import { createPinnedSpellDock } from './spellDock.js';
@@ -1733,8 +1733,10 @@ export function initHUD() {
 function ensureEffectsStack(container) {
   if (container.__effectsStack) return container.__effectsStack;
 
-  /** @type {Map<string, { el: HTMLDivElement, total: number, overlay: HTMLDivElement, ticksEl: HTMLDivElement, stacksEl: HTMLDivElement }>} */
+  /** @type {Map<string, { el: HTMLDivElement, total: number, overlay: HTMLDivElement, ticksEl: HTMLDivElement, stacksEl: HTMLDivElement, status: any }>} */
   const byKey = new Map();
+  let detailTooltip = null;
+  let detailDismiss = null;
 
   // Keyed by canonical Status.type strings from effectDefs statuses[]
   const VIS = {
@@ -1808,6 +1810,64 @@ function ensureEffectsStack(container) {
   const VIS_SCALE = 1.2;
   const scaledPx = (px) => `${Math.max(1, Math.round(px * VIS_SCALE))}px`;
 
+  function consumeBadgeInput(ev) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    if (typeof ev.stopImmediatePropagation === 'function') ev.stopImmediatePropagation();
+  }
+
+  function hideEffectDetails() {
+    if (detailTooltip) detailTooltip.style.display = 'none';
+    if (detailDismiss) {
+      window.removeEventListener('pointerdown', detailDismiss, true);
+      window.removeEventListener('keydown', detailDismiss, true);
+      detailDismiss = null;
+    }
+  }
+
+  function showEffectDetails(anchor, status) {
+    if (!anchor || !status) return;
+    const root = ensureRoot();
+    const tip = document.getElementById('item-tooltip') || ensureItemTooltip(root);
+    detailTooltip = tip;
+    renderItemDetails(tip, {
+      type: 'effect',
+      name: status.name || status.key || 'Effect',
+      glyph: status.glyph || '',
+      glyphColor: status.glyphColor || '#cfe8ff',
+      rarityName: 'common',
+      description: status.description || '',
+      detailLines: Array.isArray(status.detailLines) ? status.detailLines : [],
+      targetEffects: Array.isArray(status.targetEffects) ? status.targetEffects : [],
+    });
+    tip.style.display = 'block';
+    positionTooltip(tip, anchor);
+    if (detailDismiss) {
+      window.removeEventListener('pointerdown', detailDismiss, true);
+      window.removeEventListener('keydown', detailDismiss, true);
+    }
+    detailDismiss = (ev) => {
+      if (ev?.type === 'keydown' && ev.key !== 'Escape') return;
+      hideEffectDetails();
+    };
+    window.addEventListener('pointerdown', detailDismiss, true);
+    window.addEventListener('keydown', detailDismiss, true);
+  }
+
+  function installBadgeInputGuards(el, getStatus) {
+    if (!el || el.__effectBadgeInputGuards) return;
+    el.__effectBadgeInputGuards = true;
+    const open = (ev) => {
+      consumeBadgeInput(ev);
+      showEffectDetails(el, getStatus());
+    };
+    const consume = (ev) => consumeBadgeInput(ev);
+    el.addEventListener('pointerdown', open, { capture: true, passive: false });
+    el.addEventListener('touchstart', open, { capture: true, passive: false });
+    el.addEventListener('pointerup', consume, { capture: true, passive: false });
+    el.addEventListener('click', consume, { capture: true, passive: false });
+  }
+
   function createBadge(spec, total) {
     const hue = Number.isFinite(Number(spec.hue)) ? Number(spec.hue) : 210;
     const glyphColor = spec.glyphColor || shadowColor(hue);
@@ -1818,6 +1878,9 @@ function ensureEffectsStack(container) {
       boxShadow: '0 1px 0 rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.04)',
       outline: `1px solid ${hsla(hue, 0.28)}`,
       background: hsla(hue, 0.2),
+      pointerEvents: 'auto',
+      touchAction: 'none',
+      cursor: 'pointer',
     });
     el.title = `${spec.name} \u2022 ${total} turns`;
 
@@ -1884,10 +1947,12 @@ function ensureEffectsStack(container) {
       let rec = byKey.get(key);
       if (!rec) {
         const { el, overlay, ticksEl, stacksEl } = createBadge(spec, turns || 1);
-        rec = { el, overlay, ticksEl, stacksEl, total: Math.max(1, turns || 1) };
+        rec = { el, overlay, ticksEl, stacksEl, total: Math.max(1, turns || 1), status: s };
+        installBadgeInputGuards(el, () => rec.status);
         byKey.set(key, rec);
         container.appendChild(el);
       }
+      rec.status = s;
       rec.total = Math.max(1, Math.max(rec.total || 1, turns || 1));
       setAngle(rec, turns);
       rec.stacksEl.textContent = stacks >= 9999 ? '\u221E' : `x${stacks}`;

@@ -18,6 +18,7 @@ import { Owner } from "../src/rules/components/Owner.js";
 import { Pet } from "../src/rules/components/Pet.js";
 import { PetState } from "../src/rules/components/PetState.js";
 import { getCalendarDate, TURNS_PER_DAY } from "../src/rules/data/calendar.js";
+import { EFFECT_DEFS } from "../src/rules/data/effectDefs.js";
 import { addToInventory } from "../src/rules/utils/inventoryFacade.js";
 import { clearAll, loadChunk } from "../src/rules/environment/dungeon/tileMap.js";
 import { CHUNK_SIZE, TILE_FLOOR } from "../src/rules/environment/dungeon/constants.js";
@@ -348,6 +349,16 @@ Deno.test("character data uses town stew glyph metadata for active stew effect",
   assertEquals(stewRow.name, "Town Stew");
   assertEquals(stewRow.glyph, "%");
   assertEquals(stewRow.glyphColor, "#c88a4a");
+  assert(Array.isArray(stewRow.detailLines) && stewRow.detailLines.some((line) => String(line).includes("300 turns")));
+  assert(Array.isArray(stewRow.targetEffects), "town stew should expose generated effect detail lines");
+  const stewDef = EFFECT_DEFS.find((def) => def.id === "town_stew");
+  for (const operation of stewDef.operations) {
+    const needle = operation === "heal" ? "HP" : operation === "stamina_restore" ? "stamina" : operation;
+    assert(
+      stewRow.targetEffects.some((line) => String(line).includes(needle)),
+      `town stew details should include operation ${operation}`,
+    );
+  }
 });
 
 Deno.test("character data includes calendar payload for the character sheet", () => {
