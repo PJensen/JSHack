@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.7.7",
+  "checkpoint_id": "1a33ea541982",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 3,
+  "files_touched": [
+    "src/main/resources/AI.js",
+    "src/rules/resources/AI.js"
+  ],
+  "sessions": [
+    {
+      "metadata": "/1a/33ea541982/0/metadata.json",
+      "transcript": "/1a/33ea541982/0/full.jsonl",
+      "content_hash": "/1a/33ea541982/0/content_hash.txt",
+      "prompt": "/1a/33ea541982/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 21097,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1166464,
+    "output_tokens": 5980,
+    "api_call_count": 11
+  }
+}
