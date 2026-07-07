@@ -93,6 +93,23 @@ export const SPELL_DEFS = {
       { kind: 'movement', mode: 'knockback', note: 'Pushes targets away from caster' },
     ],
   },
+  frost_nova: {
+    id: 'frost_nova',
+    name: 'Frost Nova',
+    symbol: '\u2746',       // ❆
+    schools: ['destruction', 'cold'],
+    manaCost: 8,
+    minIntelligence: 0,
+    script: 'frost_nova',
+    targeting: 'self',
+    radius: 2,
+    description: 'Burst a ring of blue ice from your feet, freezing nearby enemies in place.',
+    effects: [
+      { kind: 'damage', element: 'cold', amount: 'distance-scaled, INT-scaled, can crit' },
+      { kind: 'status', status: 'frozen', duration: '3 turns' },
+      { kind: 'status', status: 'rooted', duration: '3 turns, prevents movement' },
+    ],
+  },
   mass_delirium: {
     id: 'mass_delirium',
     name: 'Mass Delirium',

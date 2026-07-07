@@ -7,6 +7,7 @@ import { Particle } from "../passes/vfx/particles/particlePool.js";
 import { RadialFx, BlinkFx, PhaseStrikeFx, SearchPulseFx, ArcSweepFx, SmokeFx } from "./fxEntries.js";
 import { isGoreDisabled } from "../ui/wiring/goreEngine.js";
 import { VoidHoleCast } from "../../events/VoidHoleCast.js";
+import { FrostNovaCast } from "../../events/FrostNovaCast.js";
 
 /**
  * @param {{ world: import('../../lib/ecs-js/index.js').World, cam: object, fx: { pool: { spawn(o:object):void } }, PERF: { quality: string }, getFxTime: () => number, getPosition?: (id:number) => ({x:number,y:number}|null), ftext?: { addDamage: Function, addStatus?: Function }, sculptFloor?: ((x:number,y:number,delta:number,reliefKey?: string|number)=>void), sculptFloorBrush?: ((x:number,y:number,delta:number,radius:number,opts?:object,reliefKey?:string|number)=>void), getActiveReliefKey?: (() => (string|number|null|undefined)) }} deps
@@ -173,6 +174,10 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
   // --- Blastwave state ---
   /** @type {RadialFx[]} */
   const _blastwaveFx = [];
+  /** @type {RadialFx[]} */
+  const _frostNovaFx = [];
+  /** @type {Array<{ x:number, y:number, radius:number, ttl:number, max:number, phase:number }>} */
+  const _frostNovaRemnants = [];
   /** @type {Array<{
    *   holeId:number,
    *   x:number,
@@ -444,6 +449,15 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
     for (let i = _blastwaveFx.length - 1; i >= 0; i--) {
       _blastwaveFx[i].tick(dt);
       if (_blastwaveFx[i].expired) _blastwaveFx.splice(i, 1);
+    }
+    for (let i = _frostNovaFx.length - 1; i >= 0; i--) {
+      _frostNovaFx[i].tick(dt);
+      if (_frostNovaFx[i].expired) _frostNovaFx.splice(i, 1);
+    }
+    for (let i = _frostNovaRemnants.length - 1; i >= 0; i--) {
+      const rem = _frostNovaRemnants[i];
+      rem.ttl -= dt;
+      if (rem.ttl <= 0) _frostNovaRemnants.splice(i, 1);
     }
     for (let i = _voidHoleFx.length - 1; i >= 0; i--) {
       _voidHoleFx[i].tick(dt);
@@ -937,6 +951,43 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
         const cFlashA = 0.7 * (1 - t / 0.16);
         ctx.fillStyle = `rgba(255,255,255,${cFlashA})`;
         ctx.beginPath(); ctx.arc(bw.x, bw.y, 0.45, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+
+  // --- Draw: Frost Nova ---
+  /** @param {CanvasRenderingContext2D} ctx */
+  function drawFrostNova(ctx) {
+    if (!_frostNovaFx.length && !_frostNovaRemnants.length) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const rem of _frostNovaRemnants) {
+      const life = rem.max > 0 ? Math.max(0, Math.min(1, rem.ttl / rem.max)) : 0;
+      const pulse = 0.85 + 0.15 * Math.sin(Number(getFxTime?.() || 0) * 6 + rem.phase);
+      ctx.fillStyle = `rgba(110,205,255,${(0.12 * life * pulse).toFixed(3)})`;
+      ctx.beginPath(); ctx.arc(rem.x, rem.y, rem.radius * (0.85 + (1 - life) * 0.18), 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = `rgba(210,245,255,${(0.20 * life).toFixed(3)})`;
+      ctx.lineWidth = 0.05 + 0.08 * life;
+      ctx.beginPath(); ctx.arc(rem.x, rem.y, rem.radius * (0.62 + (1 - life) * 0.2), 0, Math.PI * 2); ctx.stroke();
+    }
+    for (const nova of _frostNovaFx) {
+      const t = nova.progress;
+      const ringR = t * (nova.radius + 0.7);
+      const ringA = 0.88 * (1 - t * 0.50);
+      ctx.strokeStyle = `rgba(220,250,255,${ringA})`;
+      ctx.lineWidth = Math.max(0.10, 0.30 * (1 - t * 0.62));
+      ctx.beginPath(); ctx.arc(nova.x, nova.y, ringR, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = `rgba(90,190,255,${(ringA * 0.72).toFixed(3)})`;
+      ctx.lineWidth = Math.max(0.06, 0.16 * (1 - t * 0.55));
+      ctx.beginPath(); ctx.arc(nova.x, nova.y, Math.max(0, ringR - 0.24), 0, Math.PI * 2); ctx.stroke();
+      if (t < 0.62) {
+        ctx.fillStyle = `rgba(140,220,255,${(0.22 * (1 - t / 0.62)).toFixed(3)})`;
+        ctx.beginPath(); ctx.arc(nova.x, nova.y, ringR * 0.72, 0, Math.PI * 2); ctx.fill();
+      }
+      if (t < 0.20) {
+        ctx.fillStyle = `rgba(255,255,255,${(0.72 * (1 - t / 0.20)).toFixed(3)})`;
+        ctx.beginPath(); ctx.arc(nova.x, nova.y, 0.50, 0, Math.PI * 2); ctx.fill();
       }
     }
     ctx.restore();
@@ -1734,6 +1785,67 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
             size0: 0.18 + Math.random() * 0.06, size1: 0.03,
             r: 210, g: 225, b: 255,
             a0: 0.85,
+          }));
+        }
+      }
+    });
+
+    world.on(FrostNovaCast, ({ actor, origin, frozen, radius }) => {
+      if (!origin || !Number.isFinite(origin.x)) return;
+      const waveRadius = Math.max(2, Number(radius) || 2);
+      const ttl = Math.max(0.50, Math.min(1.6, 0.26 + waveRadius * 0.07));
+      _frostNovaFx.push(new RadialFx({ x: origin.x, y: origin.y, radius: waveRadius, ttl }));
+      _frostNovaRemnants.push({
+        x: origin.x,
+        y: origin.y,
+        radius: waveRadius + 0.25,
+        ttl: PERF.quality === 'low' ? 0.75 : 1.25,
+        max: PERF.quality === 'low' ? 0.75 : 1.25,
+        phase: Math.random() * Math.PI * 2,
+      });
+      startShake(cam, Math.min(8, 3 + Math.floor(waveRadius / 2)), Math.min(0.32, 0.14 + waveRadius * 0.012));
+
+      const shardCount = PERF.quality === 'low' ? 16 : 28;
+      for (let i = 0; i < shardCount; i++) {
+        const angle = (i / shardCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.28;
+        const spd = 1.25 + Math.random() * Math.max(1.2, waveRadius * 0.24);
+        fx.pool.spawn(new Particle({
+          x: origin.x + (Math.random() - 0.5) * 0.16,
+          y: origin.y + (Math.random() - 0.5) * 0.16,
+          vx: Math.cos(angle) * spd,
+          vy: Math.sin(angle) * spd,
+          life: 0.34 + Math.random() * 0.24,
+          size0: 0.12 + Math.random() * 0.08,
+          size1: 0.02,
+          r: 150 + ((Math.random() * 65) | 0),
+          g: 220 + ((Math.random() * 30) | 0),
+          b: 255,
+          a0: 0.88,
+          rotVel: (Math.random() - 0.5) * 4.0,
+        }));
+      }
+
+      const hits = Array.isArray(frozen) ? frozen : [];
+      const maxHitBursts = PERF.quality === 'low' ? 4 : 10;
+      for (let i = 0; i < Math.min(hits.length, maxHitBursts); i++) {
+        const hit = hits[i];
+        if (!hit || !Number.isFinite(hit.x) || !Number.isFinite(hit.y)) continue;
+        for (let j = 0; j < 5; j++) {
+          const angle = Math.random() * Math.PI * 2;
+          const spd = 0.35 + Math.random() * 0.75;
+          fx.pool.spawn(new Particle({
+            x: hit.x + (Math.random() - 0.5) * 0.20,
+            y: hit.y + (Math.random() - 0.5) * 0.20,
+            vx: Math.cos(angle) * spd,
+            vy: Math.sin(angle) * spd - 0.06,
+            ay: 0.10,
+            life: 0.28 + Math.random() * 0.16,
+            size0: 0.07 + Math.random() * 0.04,
+            size1: 0.01,
+            r: 205,
+            g: 240,
+            b: 255,
+            a0: 0.82,
           }));
         }
       }
@@ -3313,6 +3425,15 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
       const b = _blastwaveFx[i];
       out.push({ x: b.x, y: b.y, radius: (b.radius || 2) * 2 * b.alpha, color: [255, 200, 100] });
     }
+    for (let i = 0; i < _frostNovaFx.length; i++) {
+      const f = _frostNovaFx[i];
+      out.push({ x: f.x, y: f.y, radius: (f.radius || 2) * 2.2 * f.alpha, color: [135, 215, 255] });
+    }
+    for (let i = 0; i < _frostNovaRemnants.length; i++) {
+      const rem = _frostNovaRemnants[i];
+      const life = rem.max > 0 ? Math.max(0, Math.min(1, rem.ttl / rem.max)) : 0;
+      out.push({ x: rem.x, y: rem.y, radius: rem.radius * 1.7 * life, color: [100, 190, 255] });
+    }
     for (let i = 0; i < _voidHoleFx.length; i++) {
       const v = _voidHoleFx[i];
       const drift = 0.96 + 0.04 * Math.sin(fxTime * 2.1 + Number(v.phase || 0));
@@ -3358,5 +3479,5 @@ export function createSpellAreaFxController({ world, cam, fx, PERF, getFxTime, g
     return out;
   }
 
-  return { tick, drawBlink, drawMeteor, drawBlastwave, drawVoidHole, drawFlashHeal, drawSmite, drawPhaseStrike, drawRampage, drawSearchPulse, drawDrainLife, drawEvocation, drawFishing, drawCleave, drawWarCry, drawDivineShield, drawConsecrate, drawSmokeBomb, getActiveLights, installListeners };
+  return { tick, drawBlink, drawMeteor, drawBlastwave, drawFrostNova, drawVoidHole, drawFlashHeal, drawSmite, drawPhaseStrike, drawRampage, drawSearchPulse, drawDrainLife, drawEvocation, drawFishing, drawCleave, drawWarCry, drawDivineShield, drawConsecrate, drawSmokeBomb, getActiveLights, installListeners };
 }

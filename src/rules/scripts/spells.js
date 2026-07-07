@@ -71,6 +71,7 @@ import { resolveScrollEffectDuration } from "../utils/scrollReading.js";
 import { attachEntityToCurrentFloor } from "../utils/floorEntities.js";
 import { ArcaneBarrageCast, MagicMissileCast } from "../../events/ArcaneProjectileCast.js";
 import { FearSpellCast } from "../../events/FearSpellCast.js";
+import { FrostNovaCast } from "../../events/FrostNovaCast.js";
 
 /** @returns {any|null} */
 function _getWeather(world) {
@@ -602,6 +603,55 @@ REGISTRY['blastwave'] = function blastwaveScript(world, actor, spell, intent) {
   }
 
   world.emit('spell:blastwave', { actor, origin: { x: apos.x, y: apos.y }, knockbacks, radius: RADIUS });
+};
+
+// Frost Nova — AoE freeze centered on caster. Damages and roots hostile creatures in range.
+REGISTRY['frost_nova'] = function frostNovaScript(world, actor, spell, intent) {
+  const apos = /** @type any */ (world.get(actor, Position));
+  if (!apos) return;
+
+  const actorFaction = String(world.get(actor, Faction)?.key || 'player');
+  const RADIUS = Math.max(1, Number(spell?.radius || 2) | 0);
+  const BASE_DMG = 4;
+  const FREEZE_TURNS = 3;
+
+  /** @type {Array<{id:number, dist:number, x:number, y:number}>} */
+  const targets = [];
+  for (const [id, pos] of world.query(Position)) {
+    if (id === actor) continue;
+    const fac = /** @type any */ (world.get(id, Faction));
+    if (!fac || !areFactionsHostile(actorFaction, fac.key)) continue;
+    const vit = /** @type any */ (world.get(id, Vitality));
+    if (!vit || (vit.hp | 0) <= 0) continue;
+    const dist = chebyshevScalar(pos.x | 0, pos.y | 0, apos.x | 0, apos.y | 0);
+    if (dist >= 1 && dist <= RADIUS) targets.push({ id, dist, x: pos.x | 0, y: pos.y | 0 });
+  }
+
+  const frozen = [];
+  for (const t of targets) {
+    const dmg = Math.max(1, Math.round(BASE_DMG / t.dist));
+    const result = dealDamage(world, buildSpellDamageSpec(world, actor, t.id, {
+      spell,
+      baseAmount: dmg,
+      type: 'cold',
+      cause: 'spell:frost_nova',
+      at: { x: t.x, y: t.y },
+      salt: t.id,
+    }));
+    if (!result.applied || result.killed) continue;
+
+    const ae = ensureActiveEffectList(world, t.id);
+    if (!ae) continue;
+    upsertTimedEffect(ae.effects, {
+      key: 'frost', turnsLeft: FREEZE_TURNS, potency: 1, stacks: 1, sourceId: actor,
+    });
+    upsertTimedEffect(ae.effects, {
+      key: 'rooted', turnsLeft: FREEZE_TURNS, potency: 1, stacks: 1, sourceId: actor,
+    });
+    frozen.push({ id: t.id, x: t.x, y: t.y });
+  }
+
+  world.emit(new FrostNovaCast({ actor, origin: { x: apos.x, y: apos.y }, frozen, radius: RADIUS }));
 };
 
 // Blink — targeted teleport up to 10 tiles.

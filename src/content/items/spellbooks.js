@@ -12,6 +12,7 @@ const _book = (id, name, rarity, desc) => defineItem(id, {
 _book('book_lightning',     'Spellbook of Lightning',     'rare',   'Grants the ability to cast a lightning spell.');
 _book('book_meteor',        'Spellbook of Meteor',        'epic',   'Grants the ability to cast a meteor spell.');
 _book('book_blastwave',     'Spellbook of Blast Wave',    'magic',  'Grants the ability to cast a blast wave spell.');
+_book('book_frost_nova',    'Spellbook of Frost Nova',    'rare',   'Grants the ability to cast Frost Nova.');
 _book('book_earthshatter',  'Spellbook of Earthshatter',  'magic',  'Grants the ability to cast Earthshatter, cracking the ground to stun nearby foes.');
 _book('book_blink',         'Spellbook of Blink',         'magic',  'Grants the ability to cast Blink.');
 _book('book_frost',         'Spellbook of Frost',         'magic',  'Grants the ability to cast Frost.');

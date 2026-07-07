@@ -23,6 +23,7 @@ import { FountainDrinkResolved } from "../../events/FountainDrinkResolved.js";
 import { FountainDipResolved } from "../../events/FountainDipResolved.js";
 import { Teleported } from "../../events/Teleported.js";
 import { UrnInteractionResolved } from "../../events/UrnInteractionResolved.js";
+import { FrostNovaCast } from "../../events/FrostNovaCast.js";
 export { resolveInteractionSoundId } from "./audioWiringExtension.js";
 
 export const ALERT_SOUND_BY_IDENTITY = Object.freeze({
@@ -1242,6 +1243,10 @@ function installAudioListeners({ world, isPlayer, getItemInfo, getPlayerPosition
       sfxAt(ev, pos, pp(), null, zg());
     });
   }
+
+  world.on(FrostNovaCast, (event) => {
+    sfxAt("spell:frost_nova", event.origin, pp(), null, zg());
+  });
 
   // NOTE: this has been silenced since spell:blink has a bespoke sound
   // world.on('spell:blink', (payload) => {

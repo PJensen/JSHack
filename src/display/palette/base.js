@@ -143,6 +143,7 @@ export const basePalette = {
   book_meteor: { glyph: "?", fg: "#ff704d", glow: "#ff704d", baseScale: 0.7 },
   book_blastwave: { glyph: "?", fg: "#ffa333", glow: "#ffa333", baseScale: 0.7 },
   book_frost: { glyph: "?", fg: "#4da6ff", glow: "#4da6ff", baseScale: 0.7 },
+  book_frost_nova: { glyph: "?", fg: "#8fd6ff", glow: "#66cfff", baseScale: 0.7 },
   book_fear: { glyph: "?", fg: "#bb44dd", glow: "#7722aa", baseScale: 0.7 },
   book_blizzard: { glyph: "?", fg: "#8fd6ff", glow: "#8fd6ff", baseScale: 0.7 },
   book_firestorm: { glyph: "?", fg: "#ff8a3d", glow: "#ff8a3d", baseScale: 0.7 },

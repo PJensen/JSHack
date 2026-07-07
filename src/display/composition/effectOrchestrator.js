@@ -28,6 +28,9 @@ export function drawWorldEffects({ bctx, worldView, glyphAtlas, boltFx, spellAre
   spellAreaFx.drawBlink(bctx);
   spellAreaFx.drawMeteor(bctx);
   spellAreaFx.drawBlastwave(bctx);
+  if (typeof spellAreaFx.drawFrostNova === "function") {
+    spellAreaFx.drawFrostNova(bctx);
+  }
   if (typeof spellAreaFx.drawVoidHole === "function") {
     spellAreaFx.drawVoidHole(bctx);
   }

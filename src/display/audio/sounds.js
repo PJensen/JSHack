@@ -122,6 +122,7 @@ const SOUNDS = {
   "spell:bolt":          { file: "spell_buff.mp3",          bus: "spells" },
   "spell:agony":         { file: "spell_agony.mp3",         bus: "spells", volume: 1.25 },
   "spell:frost":         { file: "spell_frost.mp3",         bus: "spells" },
+  "spell:frost_nova":    { file: "spell_frost.mp3",         bus: "spells" },
   "spell:shadow_bolt":   { file: "spell_agony.mp3",         bus: "spells" },
   "spell:fireball":      { files: ["spell_fire.mp3", "spell_fireball.mp3"], bus: "spells" },
   "spell:meteor":        { file: "spell_meteor_impact.mp3", bus: "spells" },
