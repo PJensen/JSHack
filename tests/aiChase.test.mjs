@@ -450,6 +450,46 @@ Deno.test("goblin first sighting alerts nearby goblins", () => {
   }
 });
 
+Deno.test("neutral alertOnSight monsters emit canonical alert audio without chasing", () => {
+  clearAll();
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(TILE_FLOOR);
+  loadChunk(0, 0, tiles);
+
+  const world = new World({ seed: 0x5151 });
+  const alerts = [];
+
+  const player = world.create();
+  world.add(player, Player);
+  world.add(player, Position, { x: 5, y: 5 });
+  world.add(player, NamedIdentity, { name: 'Hero', identity: 'player' });
+
+  const ratatoskr = world.create();
+  world.add(ratatoskr, Position, { x: 8, y: 5 });
+  world.add(ratatoskr, NamedIdentity, { name: 'Ratatoskr', identity: 'ratatoskr' });
+  world.add(ratatoskr, Faction, { key: 'neutral' });
+  world.add(ratatoskr, Brain, { learnedSpellIds: [], itemKnowledgeIdentities: [], seenTiles: new Uint8Array(), intelligence: 8, visionRange: 7 });
+  world.add(ratatoskr, AggroState, { alertLevel: AGGRO_LEVELS.unaware });
+  world.on("status", (ev) => {
+    if (ev.kind === "alert") alerts.push(ev);
+  });
+
+  world.step = 0;
+  aiChaseSystem(world);
+  assertEquals(alerts.length, 1);
+  assertEquals(alerts[0].id, ratatoskr);
+  assertEquals(alerts[0].at, { x: 8, y: 5 });
+  assertEquals(world.get(ratatoskr, AggroState).alertLevel, AGGRO_LEVELS.unaware);
+  assert(!world.has(ratatoskr, MoveIntent), "neutral Ratatoskr should not chase from sight");
+
+  world.step = 300;
+  aiChaseSystem(world);
+  assertEquals(alerts.length, 1, "Ratatoskr sight alert should still be on cooldown after 300 turns");
+
+  world.step = 320;
+  aiChaseSystem(world);
+  assertEquals(alerts.length, 2);
+});
+
 // Pack courage (safety in numbers) ──────────────────────────────────────────
 
 Deno.test("lone pack creature does not aggro on sight", () => {

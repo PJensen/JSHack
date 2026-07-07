@@ -26,6 +26,8 @@ Deno.test("Ratatoskr is a unique passive outdoor squirrel messenger", () => {
   assert(def.tags.includes("overworld"), "Ratatoskr should be outdoor/overworld content");
   assertEquals(def.faction, "neutral");
   assertEquals(def.aggro, "passive");
+  assertEquals(def.alertOnSight, true);
+  assertEquals(def.sightAlertCooldownTurns, 320);
   assertEquals(def.solid, false);
   assertEquals(def.blocksSight, false);
   assertEquals(def.rare, true);

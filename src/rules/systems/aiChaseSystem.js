@@ -103,6 +103,19 @@ function isSmartPathingMonster(brain, def) {
   return Number(brain?.intelligence ?? def?.intelligence ?? 10) > 3;
 }
 
+function emitSightAlert(world, id, pos, def, aggro) {
+  if (!def?.alertOnSight && !(Number(def?.sightAlertCooldownTurns || 0) > 0)) {
+    world.emit('status', { id, kind: 'alert', at: { x: pos.x | 0, y: pos.y | 0 } });
+    return true;
+  }
+  const step = world.step | 0;
+  if (step < (Number(aggro?.nextSightAlertTurn || 0) | 0)) return false;
+  world.emit('status', { id, kind: 'alert', at: { x: pos.x | 0, y: pos.y | 0 } });
+  const cooldown = Math.max(0, Number(def?.sightAlertCooldownTurns || 0) | 0);
+  if (cooldown > 0) aggro.nextSightAlertTurn = step + cooldown;
+  return true;
+}
+
 /** Returns true when this monster kites — attacks at range while retreating. */
 function resolveIsKiter(world, id, brain) {
   if (Array.isArray(brain?.learnedSpellIds) && brain.learnedSpellIds.length > 0) return true;
@@ -390,16 +403,17 @@ export function aiChaseSystem(world) {
   const conflictActive = playerHasConflict(world, playerId);
 
   forEachInRadius(world, playerPos.x, playerPos.y, ACTIVE_RADIUS, (id, pos) => {
+    const ni = world.get(id, NamedIdentity);
+    const def = ni ? getMonster(String(ni.identity || "")) : null;
     const fac = world.get(id, Faction);
-    if (!fac || fac.key !== "enemy") return;
+    const canChase = !!fac && fac.key === "enemy";
+    if (!canChase && !def?.alertOnSight) return;
 
     const aggro = world.get(id, AggroState);
     if (!aggro) return; // no AggroState = no AI behaviour
     if (sleepPreventsPerception(world, id)) return;
 
     // ── Look up monster def and brain-backed awareness ──────────────
-    const ni = world.get(id, NamedIdentity);
-    const def = ni ? getMonster(String(ni.identity || "")) : null;
     const brain = world.get(id, Brain);
     const intel = Number(brain?.intelligence ?? def?.intelligence ?? 10);
 
@@ -440,9 +454,19 @@ export function aiChaseSystem(world) {
 
     // ── Alert level transitions ─────────────────────────────────────
     if (canSee) {
+      if (!canChase) {
+        emitSightAlert(world, id, pos, def, aggro);
+        return;
+      }
+
       // Passive creatures (e.g. bat, cave_snake, snake) don't aggro from sight
       // while unaware — they are only aggroed by taking damage.
-      if (def?.aggro === "passive" && aggro.alertLevel === AGGRO_LEVELS.unaware) return;
+      if (def?.aggro === "passive" && aggro.alertLevel === AGGRO_LEVELS.unaware) {
+        if (def?.alertOnSight || Number(def?.sightAlertCooldownTurns || 0) > 0) {
+          emitSightAlert(world, id, pos, def, aggro);
+        }
+        return;
+      }
 
       // Safety in numbers: unaware pack creatures won't aggro from sight alone.
       // They need at least one same-species ally within packRadius.
@@ -482,7 +506,7 @@ export function aiChaseSystem(world) {
 
       // ── First sighting: onSeen hooks + pack alerting ────────────
       if (!wasHunting) {
-        world.emit('status', { id, kind: 'alert', at: { x: pos.x | 0, y: pos.y | 0 } });
+        emitSightAlert(world, id, pos, def, aggro);
         // onSeen hooks (e.g. spider leap)
         const onSeenHooks = def?.hooks?.onSeen;
         if (!hasQueuedAction && canActThisTurn && Array.isArray(onSeenHooks) && onSeenHooks.length > 0) {

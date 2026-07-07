@@ -26,6 +26,7 @@ export const SEARCH_TURNS_CURIOUS       = 6;    // turns curious → unaware dow
  * threatState: display/debug summary ("none", "stable", "unstable", "locked").
  * lastKnownMoveDx/Dy: last observed movement direction of the target.
  *   Used by intel ≥ 8 monsters to anticipate escape routes on LOS break.
+ * nextSightAlertTurn: next world step when a non-hunting sight alert may fire.
  * searchTurnsLeft: countdown before downgrading to the next lower tier.
  * retreating: true while the creature is below its retreat HP threshold and
  *             actively fleeing rather than chasing. Cleared when HP recovers.
@@ -48,6 +49,7 @@ export const AggroState = defineComponent("AggroState", {
   lastKnownY:        0,
   lastKnownMoveDx:   0,
   lastKnownMoveDy:   0,
+  nextSightAlertTurn: 0,
   searchTurnsLeft:   0,
   retreating:        false,
   patrolDx:          0,

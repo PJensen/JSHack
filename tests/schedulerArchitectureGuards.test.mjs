@@ -24,12 +24,4 @@ Deno.test("scheduler wires shop ambient sound system into the rules loop", async
     text.includes("registerSystem(shopAmbientSoundSystem, 'effects')"),
     "configureWorld should schedule shopAmbientSoundSystem in effects",
   );
-  assert(
-    text.includes("import { overworldAmbientSystem }"),
-    "configureWorld should import overworldAmbientSystem",
-  );
-  assert(
-    text.includes("registerSystem(overworldAmbientSystem, 'effects')"),
-    "configureWorld should schedule overworldAmbientSystem in effects",
-  );
 });

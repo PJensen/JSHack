@@ -459,6 +459,8 @@ export function defineMonster(id, def) {
   // Optional AI fields
   if (def.visionRange != null) monsterDef.visionRange = def.visionRange;
   if (def.aggro) monsterDef.aggro = def.aggro;
+  if (def.alertOnSight != null) monsterDef.alertOnSight = def.alertOnSight === true;
+  if (def.sightAlertCooldownTurns != null) monsterDef.sightAlertCooldownTurns = Math.max(0, Number(def.sightAlertCooldownTurns || 0) | 0);
   if (def.faction) monsterDef.faction = def.faction;
   if (def.solid != null) monsterDef.solid = def.solid === true;
   if (def.blocksSight != null) monsterDef.blocksSight = def.blocksSight === true;

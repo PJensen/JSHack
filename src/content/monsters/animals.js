@@ -764,6 +764,8 @@ defineMonster('ratatoskr', {
   intelligence: 8,
   visionRange: 7,
   aggro: 'passive',
+  alertOnSight: true,
+  sightAlertCooldownTurns: 320,
   faction: 'neutral',
   solid: false,
   blocksSight: false,

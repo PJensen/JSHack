@@ -19,43 +19,15 @@ function addPlayer(world, x, y) {
   return id;
 }
 
-function addRatatoskr(world, x, y) {
-  const id = world.create();
-  world.add(id, NamedIdentity, { name: "Ratatoskr", identity: "ratatoskr" });
-  world.add(id, Position, { x, y });
-  return id;
-}
-
-Deno.test("overworldAmbientSystem plays Ratatoskr squirrel ambience nearby with 320 turn cooldown", () => {
-  const world = new World({ seed: 0x5151 });
-  const audio = [];
-  addDepth(world, 0);
-  addPlayer(world, 0, 0);
-  const ratatoskr = addRatatoskr(world, 7, 0);
-  world.on("audio:play", (ev) => audio.push(ev));
-
-  world.step = 0;
-  overworldAmbientSystem(world);
-  assertEquals(audio.length, 1);
-  assertEquals(audio[0].key, "ambient:squirrel");
-  assertEquals(audio[0].sourceId, ratatoskr);
-  assertEquals(audio[0].at, { x: 7, y: 0 });
-
-  world.step = 300;
-  overworldAmbientSystem(world);
-  assertEquals(audio.length, 1, "Ratatoskr ambience should still be on cooldown after 300 turns");
-
-  world.step = 320;
-  overworldAmbientSystem(world);
-  assertEquals(audio.length, 2, "Ratatoskr ambience should return after the authored cooldown");
-});
-
-Deno.test("overworldAmbientSystem does not play Ratatoskr ambience outside nearby range", () => {
+Deno.test("overworldAmbientSystem does not own Ratatoskr squirrel audio", () => {
   const world = new World({ seed: 0x5152 });
   const audio = [];
   addDepth(world, 0);
   addPlayer(world, 0, 0);
-  addRatatoskr(world, 8, 0);
+
+  const ratatoskr = world.create();
+  world.add(ratatoskr, NamedIdentity, { name: "Ratatoskr", identity: "ratatoskr" });
+  world.add(ratatoskr, Position, { x: 1, y: 0 });
   world.on("audio:play", (ev) => audio.push(ev));
 
   overworldAmbientSystem(world);

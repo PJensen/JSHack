@@ -41,6 +41,7 @@ export const ALERT_SOUND_BY_IDENTITY = Object.freeze({
   dragon: "creature:alert:large_beast",
   dragon_whelp: "creature:alert:large_beast",
   rat: "rat:alert",
+  ratatoskr: "ambient:squirrel",
   wraith: "spectral:alert",
   carrion_shade: "spectral:alert",
   spectral_snake: "spectral:snake:alert",
