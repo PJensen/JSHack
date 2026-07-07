@@ -1,0 +1,30 @@
+{
+  "cli_version": "0.7.7",
+  "checkpoint_id": "360975e30415",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "src/rules/environment/dungeon/populate.js",
+    "tests/dungeonDepthRegression.test.mjs",
+    "tests/encumbrance.test.mjs",
+    "tests/inventoryContract.test.mjs",
+    "tests/inventoryDataProvider.test.mjs",
+    "tests/sparseUnderworld.test.mjs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/36/0975e30415/0/metadata.json",
+      "transcript": "/36/0975e30415/0/full.jsonl",
+      "content_hash": "/36/0975e30415/0/content_hash.txt",
+      "prompt": "/36/0975e30415/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 169509,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 4526592,
+    "output_tokens": 9473,
+    "api_call_count": 52
+  }
+}
