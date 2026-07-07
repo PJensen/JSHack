@@ -5,11 +5,14 @@ import { playerEntity } from "../utils/queries.js";
 import { combatSeed, mulberry32 } from "../utils/rng.js";
 import { chebyshevScalar } from "../utils/distance.js";
 
-/** @type {WeakMap<object, { nextTick:number }>} */
+/** @type {WeakMap<object, { nextTick:number, squirrelNextTick:number }>} */
 const _stateByWorld = new WeakMap();
 
 const HOME_IDENTITIES = new Set(["bed_home", "house_sign", "berry_bush", "herb_patch", "alchemy_bench"]);
+const RATATOSKR_IDENTITY = "ratatoskr";
 const HOME_SOURCE_DB_AT_1_TILE = 42;
+const RATATOSKR_AUDIBLE_RADIUS = 7;
+const RATATOSKR_SOUND_COOLDOWN_TURNS = 320;
 const HOME_LINES = Object.freeze([
   Object.freeze({
     far: "you catch a faint, homely hush",
@@ -53,11 +56,31 @@ export function overworldAmbientSystem(world) {
   if (!_player) return;
   const ppos = _player.pos;
 
+  let st = _stateByWorld.get(world);
+  if (!st) {
+    st = { nextTick: 0, squirrelNextTick: 0 };
+    _stateByWorld.set(world, st);
+  }
+  const step = world.step | 0;
+
   let nearest = null;
   let nearestPos = null;
   let nearestDist = Infinity;
+  let nearestRatatoskr = null;
+  let nearestRatatoskrPos = null;
+  let nearestRatatoskrDist = Infinity;
   for (const [id, pos, ni] of world.query(Position, NamedIdentity)) {
-    if (!HOME_IDENTITIES.has(String(ni.identity || ""))) continue;
+    const identity = String(ni.identity || "");
+    if (identity === RATATOSKR_IDENTITY) {
+      const dist = chebyshevScalar(pos.x, pos.y, ppos.x, ppos.y);
+      if (dist < nearestRatatoskrDist) {
+        nearestRatatoskrDist = dist;
+        nearestRatatoskr = id;
+        nearestRatatoskrPos = pos;
+      }
+      continue;
+    }
+    if (!HOME_IDENTITIES.has(identity)) continue;
     const dist = chebyshevScalar(pos.x, pos.y, ppos.x, ppos.y);
     if (dist < nearestDist) {
       nearestDist = dist;
@@ -65,14 +88,17 @@ export function overworldAmbientSystem(world) {
       nearestPos = pos;
     }
   }
-  if (!nearest || nearestDist > 4) return;
 
-  let st = _stateByWorld.get(world);
-  if (!st) {
-    st = { nextTick: 0 };
-    _stateByWorld.set(world, st);
+  if (nearestRatatoskr && nearestRatatoskrDist <= RATATOSKR_AUDIBLE_RADIUS && step >= (st.squirrelNextTick | 0)) {
+    world.emit?.("audio:play", {
+      key: "ambient:squirrel",
+      at: { x: Number(nearestRatatoskrPos?.x || 0) | 0, y: Number(nearestRatatoskrPos?.y || 0) | 0 },
+      sourceId: nearestRatatoskr,
+    });
+    st.squirrelNextTick = step + RATATOSKR_SOUND_COOLDOWN_TURNS;
   }
-  const step = world.step | 0;
+
+  if (!nearest || nearestDist > 4) return;
   if (step < st.nextTick) return;
 
   const r = mulberry32(combatSeed(world.seed, step, nearest | 0, nearestDist | 0, 0x484F4D45));

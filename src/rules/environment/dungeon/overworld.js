@@ -825,6 +825,7 @@ async function spawnOverworldCreatures(chunks, townCenter, bounds, worldSeed, ti
     { id: 'heron', biomes: ['COASTAL', 'WETLAND'], count: 2, clusterR: 8 },
     { id: 'sand_crab', biomes: ['COASTAL'], count: 5, clusterR: 4 },
     { id: 'marsh_witch', biomes: ['WETLAND'], count: 1, clusterR: 3 },
+    { id: 'ratatoskr', biomes: ['FOREST', 'GRASSLAND', 'WETLAND'], count: 1, clusterR: 4 },
   ];
 
   const rng = new (function(seed) {

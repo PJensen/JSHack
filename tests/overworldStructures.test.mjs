@@ -1,3 +1,4 @@
+import "./helpers/installContentMonsters.mjs";
 import { assert, assertEquals } from "jsr:@std/assert";
 
 import { BUILDING_DEFS, LANDMARK_DEFS } from "../src/rules/data/buildings/buildingRegistry.js";
@@ -60,7 +61,7 @@ function countKind(chunks, kind) {
 
 function countMonster(chunks, monsterId) {
   return spawnsOfKind(chunks, "monster")
-    .filter((spawn) => spawn.params?.monsterId === monsterId)
+    .filter((spawn) => (spawn.params?.monsterId || spawn.params?.identity) === monsterId)
     .length;
 }
 
@@ -208,6 +209,7 @@ Deno.test("overworld procedurally stamps the required town economy", async () =>
   assert(countMonster(chunks, "chicken_hen") >= 3, "farm should support hens");
   assert(countMonster(chunks, "chicken_rooster") >= 1, "farm should support a rooster");
   assert(countMonster(chunks, "chick") >= 2, "farm should support chicks");
+  assertEquals(countMonster(chunks, "ratatoskr"), 1, "overworld should include unique Ratatoskr");
   assert(countKind(chunks, "townfolk") >= 8, "buildings should open town professions");
 });
 

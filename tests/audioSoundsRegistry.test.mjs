@@ -116,6 +116,7 @@ Deno.test("sounds registry adopts descriptive weather filenames", () => {
   const caveBearAttack = resolve("cave_bear:attack");
   const gemSocket = resolve("item:socket:gem");
   const ratAttack = resolve("rat:attack");
+  const squirrel = resolve("ambient:squirrel");
   assertExists(stairAscend);
   assertExists(stairDescend);
   assertExists(thunder);
@@ -147,6 +148,7 @@ Deno.test("sounds registry adopts descriptive weather filenames", () => {
   assertExists(shieldBlocked);
   assertExists(caveBearAttack);
   assertExists(ratAttack);
+  assertExists(squirrel);
   assertEquals(stairAscend.file, "transition_coating.mp3");
   assertEquals(stairDescend.file, "transition_coating.mp3");
   assertEquals(thunder.file, "weather_lightning_strike.mp3");
@@ -182,6 +184,8 @@ Deno.test("sounds registry adopts descriptive weather filenames", () => {
   assertEquals(caveBearAttack.maxVoices, 1);
   assertEquals(gemSocket.file, "drop_gem.mp3");
   assertEquals(ratAlert.file, "rat_alerted_1.mp3");
+  assertEquals(squirrel.file, "ambient_squirrel.mp3");
+  assertEquals(squirrel.bus, "ambient");
   assertEquals(boneDrop.file, "bone_dropped.mp3");
   assertEquals(searchPing.file, "action_search_ping.mp3");
   assertEquals(searchPing.maxVoices, 2);
