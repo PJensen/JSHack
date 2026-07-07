@@ -5,6 +5,7 @@
   "branch": "master",
   "checkpoints_count": 1,
   "files_touched": [
+    "assets/audio/spell_smoke_bomb.mp3",
     "src/content/items/spellbooks.js",
     "src/display/audio/audioWiring.js",
     "src/display/audio/sounds.js",
@@ -25,14 +26,14 @@
       "metadata": "/3d/0f1a3a2a66/0/metadata.json",
       "transcript": "/3d/0f1a3a2a66/0/full.jsonl",
       "content_hash": "/3d/0f1a3a2a66/0/content_hash.txt",
-      "prompt": "/3d/0f1a3a2a66/0/prompt.txt"
+      "prompt": ""
     }
   ],
   "token_usage": {
-    "input_tokens": 210355,
+    "input_tokens": 6826,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 3464448,
-    "output_tokens": 15231,
-    "api_call_count": 50
+    "cache_read_tokens": 96128,
+    "output_tokens": 282,
+    "api_call_count": 1
   }
 }

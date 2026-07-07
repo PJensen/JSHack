@@ -3,10 +3,11 @@
   "checkpoint_id": "3d0f1a3a2a66",
   "session_id": "019f3cc0-8293-7b50-8e24-6aec01ca59f7",
   "strategy": "manual-commit",
-  "created_at": "2026-07-07T13:34:06.135859131Z",
+  "created_at": "2026-07-07T13:34:06.946652859Z",
   "branch": "master",
   "checkpoints_count": 1,
   "files_touched": [
+    "assets/audio/spell_smoke_bomb.mp3",
     "src/content/items/spellbooks.js",
     "src/display/audio/audioWiring.js",
     "src/display/audio/sounds.js",
@@ -25,36 +26,25 @@
   "agent": "Codex",
   "model": "gpt-5.5",
   "turn_id": "91c056c16bab",
+  "checkpoint_transcript_start": 347,
+  "transcript_lines_at_start": 347,
   "token_usage": {
-    "input_tokens": 210355,
+    "input_tokens": 6826,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 3464448,
-    "output_tokens": 15231,
-    "api_call_count": 50
+    "cache_read_tokens": 96128,
+    "output_tokens": 282,
+    "api_call_count": 1
   },
   "initial_attribution": {
-    "calculated_at": "2026-07-07T13:34:06.101675644Z",
-    "agent_lines": 323,
-    "agent_removed": 4,
+    "calculated_at": "2026-07-07T13:34:06.920606057Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
     "human_added": 0,
     "human_modified": 0,
     "human_removed": 0,
-    "total_committed": 323,
-    "total_lines_changed": 327,
-    "agent_percentage": 100,
+    "total_committed": 0,
+    "total_lines_changed": 0,
+    "agent_percentage": 0,
     "metric_version": 2
-  },
-  "prompt_attributions": [
-    {
-      "checkpoint_number": 1,
-      "user_lines_added": 865,
-      "user_lines_removed": 0,
-      "agent_lines_added": 0,
-      "agent_lines_removed": 0,
-      "user_added_per_file": {
-        ".github/agents/Dungeon Generation and BSP Expert.agent.md": 582,
-        ".github/agents/VFX Agent.agent.md": 283
-      }
-    }
-  ]
+  }
 }
