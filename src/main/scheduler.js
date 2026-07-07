@@ -123,6 +123,7 @@ import { perceptionMemorySystem } from "../rules/systems/perceptionMemorySystem.
 import { installEnchantingOpenRequestListener } from "../rules/content/enchanting/benchGame.js";
 import { tombstoneSystem } from "../rules/systems/tombstoneSystem.js";
 import { treasureGuardianListenerExtension, treasureGuardianSystem } from "../rules/systems/treasureGuardianSystem.js";
+import { experimentalAIExtension } from "./resources/AI.js";
 
 /**
  * @param {World} world
@@ -130,6 +131,7 @@ import { treasureGuardianListenerExtension, treasureGuardianSystem } from "../ru
 export function configureWorld(world) {
   clearSystems();
   installScriptsAPI(world);
+  world.install(experimentalAIExtension);
   installVirtuals(world);
   defineInventoryVirtuals(world);
   defineDerivedStatVirtuals(world);

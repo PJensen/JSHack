@@ -18,6 +18,7 @@ import {
   readInputMode, readWalkInterval, writeInputMode, writeWalkInterval,
   WALK_INTERVAL_MIN, WALK_INTERVAL_MAX,
 } from '../input/inputSettings.js';
+import { DEFAULT_AI_ENDPOINT } from '../../shared/aiSettings.js';
 import { versionLoaded } from '../../shared/version.js';
 import { SAVEGAME_KEY } from '../../shared/savegameKeys.js';
 
@@ -27,7 +28,7 @@ import { SAVEGAME_KEY } from '../../shared/savegameKeys.js';
 
 /**
  * @param {HTMLDivElement & {_inner?:HTMLDivElement}} panel
- * @param {{ identificationEnabled?: boolean, deityDebugPinned?: boolean, allItemIds?: string[], allMonsterIds?: string[], hasPet?: boolean, petAlive?: boolean }} data
+ * @param {{ identificationEnabled?: boolean, deityDebugPinned?: boolean, allItemIds?: string[], allMonsterIds?: string[], hasPet?: boolean, petAlive?: boolean, aiSettings?: { enabled?: boolean, endpoint?: string, apiKey?: string, model?: string } }} data
  * @param {{ canvas: HTMLCanvasElement }} memGraph
  * @param {{ canvas: HTMLCanvasElement }} dtyGraph
  */
@@ -139,6 +140,35 @@ export function renderSettings(panel, data, memGraph, dtyGraph, econGraph, tileI
     button.addEventListener('click', submit);
     row.appendChild(button);
 
+    return row;
+  }
+
+  function makeTextInput(labelText, value, placeholder, inputType, onChange) {
+    const row = document.createElement('label');
+    Object.assign(row.style, {
+      display: 'flex', flexDirection: 'column', gap: '5px',
+      fontSize: '12px', color: '#aac8e8',
+    });
+    const label = document.createElement('span');
+    label.textContent = labelText;
+    const input = document.createElement('input');
+    input.type = inputType || 'text';
+    input.value = String(value || '');
+    input.placeholder = placeholder || '';
+    Object.assign(input.style, {
+      width: '100%', boxSizing: 'border-box',
+      padding: '6px 8px', background: '#101626', color: '#cfe8ff',
+      border: '1px solid #2d3b52', borderRadius: '6px',
+      fontFamily: 'monospace', fontSize: '13px', outline: 'none',
+    });
+    input.addEventListener('change', () => onChange(input.value));
+    input.addEventListener('keydown', (ev) => {
+      if (ev.key !== 'Enter') return;
+      ev.preventDefault();
+      input.blur();
+    });
+    row.appendChild(label);
+    row.appendChild(input);
     return row;
   }
 
@@ -398,6 +428,45 @@ export function renderSettings(panel, data, memGraph, dtyGraph, econGraph, tileI
   content.appendChild(saveRow);
 
   content.appendChild(inputSection);
+
+
+  // --- Experimental AI section ---
+  const aiSettings = data.aiSettings || {};
+  content.appendChild(makeSectionHead('Experimental AI'));
+
+  content.appendChild(makeCheckbox('Enabled', aiSettings.enabled === true, (on) => {
+    window.dispatchEvent(new CustomEvent('ui:setAISettings', { detail: { enabled: on } }));
+  }));
+
+  content.appendChild(makeTextInput(
+    'Endpoint URL',
+    aiSettings.endpoint || DEFAULT_AI_ENDPOINT,
+    DEFAULT_AI_ENDPOINT,
+    'url',
+    (endpoint) => {
+      window.dispatchEvent(new CustomEvent('ui:setAISettings', { detail: { endpoint } }));
+    },
+  ));
+
+  content.appendChild(makeTextInput(
+    'API Key',
+    aiSettings.apiKey || '',
+    'optional bearer token',
+    'password',
+    (apiKey) => {
+      window.dispatchEvent(new CustomEvent('ui:setAISettings', { detail: { apiKey } }));
+    },
+  ));
+
+  content.appendChild(makeTextInput(
+    'Model name',
+    aiSettings.model || '',
+    'model name',
+    'text',
+    (model) => {
+      window.dispatchEvent(new CustomEvent('ui:setAISettings', { detail: { model } }));
+    },
+  ));
 
   // --- Version + Subscribe row ---
   const versionRow = document.createElement('div');

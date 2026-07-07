@@ -47,6 +47,7 @@ import { spawnDebugMonsterNearPlayer } from "../debug/spawnDebugMonster.js";
 import { getGemPricingSnapshot } from "../../rules/data/gemPricing.js";
 import { getSavegameRegistryNames } from "../wiring/savegameSerializationRegistry.js";
 import { isChestIdentity } from "../../shared/chests.js";
+import { readAISettings, writeAISettings } from "../../shared/aiSettings.js";
 import { getPassiveBonuses } from "../../rules/utils/passiveBonuses.js";
 import { QuestDefRef } from "../../rules/components/QuestDefRef.js";
 import { QuestState } from "../../rules/components/QuestState.js";
@@ -891,6 +892,7 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
         facingTurnCostEnabled: isFacingTurnCostEnabled(world),
         allItemIds: listAllItemIds(),
         allMonsterIds: listAllMonsterIds(),
+        aiSettings: readAISettings(),
         hasPet,
         petAlive,
       },
@@ -945,6 +947,10 @@ export function installInventoryDataProvider({ world, getActiveSpellId, isSimUiB
     const enabled = !!ev?.detail?.enabled;
     setFacingTurnCostEnabled(world, enabled);
     try { localStorage.setItem('jshack.facingTurnCost', String(enabled)); } catch {}
+  });
+
+  addEventListener('ui:setAISettings', (ev) => {
+    writeAISettings(ev?.detail || {});
   });
 
   addEventListener('ui:debugGiveItem', (ev) => {
