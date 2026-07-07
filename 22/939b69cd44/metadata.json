@@ -1,0 +1,32 @@
+{
+  "cli_version": "0.7.7",
+  "checkpoint_id": "22939b69cd44",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "src/display/audio/sounds.js",
+    "src/main/scheduler.js",
+    "src/rules/environment/dungeon/overworld.js",
+    "src/rules/systems/overworldAmbientSystem.js",
+    "tests/audioSoundsRegistry.test.mjs",
+    "tests/overworldAmbientSystem.test.mjs",
+    "tests/overworldStructures.test.mjs",
+    "tests/schedulerArchitectureGuards.test.mjs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/22/939b69cd44/0/metadata.json",
+      "transcript": "/22/939b69cd44/0/full.jsonl",
+      "content_hash": "/22/939b69cd44/0/content_hash.txt",
+      "prompt": "/22/939b69cd44/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 226880,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 2794624,
+    "output_tokens": 11638,
+    "api_call_count": 35
+  }
+}
