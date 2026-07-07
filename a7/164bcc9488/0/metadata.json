@@ -1,0 +1,75 @@
+{
+  "cli_version": "0.7.7",
+  "checkpoint_id": "a7164bcc9488",
+  "session_id": "019f3d74-c0b0-7cc3-9468-69f5392653b4",
+  "strategy": "manual-commit",
+  "created_at": "2026-07-07T16:53:46.998801612Z",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "save_step_count": 1,
+  "files_touched": [
+    "src/cloud/llm/openAICompatible.js",
+    "src/display/ui/overlayRenders.js",
+    "src/main/resources/AI.js",
+    "src/main/scheduler.js",
+    "src/main/ui/inventoryDataProvider.js",
+    "src/rules/resources/AI.js",
+    "src/shared/aiSettings.js",
+    "tests/aiResource.test.mjs",
+    "tests/aiSettings.test.mjs",
+    "tests/openAICompatible.test.mjs"
+  ],
+  "agent": "Codex",
+  "model": "gpt-5.5",
+  "turn_id": "e3b210e12213",
+  "token_usage": {
+    "input_tokens": 89060,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1561728,
+    "output_tokens": 12840,
+    "api_call_count": 23
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-07-07T16:53:46.948632409Z",
+    "agent_lines": 370,
+    "agent_removed": 0,
+    "human_added": 2,
+    "human_modified": 76,
+    "human_removed": 0,
+    "total_committed": 410,
+    "total_lines_changed": 448,
+    "agent_percentage": 82.58928571428571,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 865,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".github/agents/Dungeon Generation and BSP Expert.agent.md": 582,
+        ".github/agents/VFX Agent.agent.md": 283
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 904,
+      "user_lines_removed": 38,
+      "agent_lines_added": 447,
+      "agent_lines_removed": 1,
+      "user_added_per_file": {
+        ".github/agents/Dungeon Generation and BSP Expert.agent.md": 582,
+        ".github/agents/VFX Agent.agent.md": 283,
+        "src/display/ui/overlayRenders.js": 39
+      },
+      "user_removed_per_file": {
+        "src/display/ui/overlayRenders.js": 38
+      }
+    }
+  ]
+}
