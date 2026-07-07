@@ -20,6 +20,7 @@ import { Equipment, GEAR_SLOTS } from "../../rules/components/Equipment.js";
 import { ItemInfo } from "../../rules/components/ItemInfo.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
 import { Faction } from "../../rules/components/Faction.js";
+import { TownfolkJob } from "../../rules/components/TownfolkJob.js";
 import { attachProcPackage, listProcPackageIds } from "../../rules/data/procPackages.js";
 import { ensureActiveEffects } from "../../rules/utils/effects.js";
 import { explainDerivedStats } from "../../rules/utils/derivedStats.js";
@@ -66,6 +67,57 @@ function describeItem(world, itemId) {
   const label = info?.name || named?.name || identity;
   const count = Math.max(1, Number(info?.count || 1) | 0);
   return `#${itemId} ${label} <${identity}> x${count}`;
+}
+
+export function formatNpcWorkStatus(world) {
+  const rows = [];
+  for (const [id, job] of world.query(TownfolkJob)) {
+    const pos = world.get(id, Position);
+    const named = world.get(id, NamedIdentity);
+    const x = pos ? String(pos.x | 0) : "?";
+    const y = pos ? String(pos.y | 0) : "?";
+    const targetX = Number.isFinite(Number(job?.targetX)) ? String(Number(job.targetX) | 0) : "?";
+    const targetY = Number.isFinite(Number(job?.targetY)) ? String(Number(job.targetY) | 0) : "?";
+    const carrying = String(job?.carrying || "");
+    const carryCount = Math.max(0, Number(job?.carryCount || 0) | 0);
+    rows.push({
+      id,
+      role: String(job?.role || "unknown"),
+      x,
+      y,
+      status: String(job?.state || "unknown"),
+      workSite: String(job?.workSiteKind || "-"),
+      target: `${targetX}:${targetY}`,
+      workTurns: String(Math.max(0, Number(job?.workTurns || 0) | 0)),
+      carrying: carrying ? `${carrying}:${carryCount}` : "-",
+      name: String(named?.name || named?.identity || "-"),
+    });
+  }
+
+  if (!rows.length) return "No NPC work status found.";
+
+  rows.sort((a, b) => {
+    if (a.role !== b.role) return a.role.localeCompare(b.role);
+    return a.id - b.id;
+  });
+
+  return [
+    "id, role, x, y, status, workSite, target, workTurns, carrying, name",
+    ...rows.map((row) =>
+      [
+        row.id,
+        row.role,
+        row.x,
+        row.y,
+        row.status,
+        row.workSite,
+        row.target,
+        row.workTurns,
+        row.carrying,
+        row.name,
+      ].join(", ")
+    ),
+  ].join("\n");
 }
 
 /**
@@ -433,6 +485,11 @@ export function registerBuiltinCommands(console, { world, messageLog, lightingEn
     return rows
       .map((row) => `#${row.id} ${row.name} <${row.identity}> @ (${row.x}, ${row.y}) HP ${row.hp}${Number.isFinite(row.dist) ? ` d=${row.dist}` : ''}`)
       .join('\n');
+  });
+
+  // ---- npc-work-status ----
+  console.registerCommand('npc-work-status', 'npc-work-status — list town NPC work state', () => {
+    return formatNpcWorkStatus(world);
   });
 
   // ---- inventory [list] ----
