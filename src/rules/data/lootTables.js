@@ -322,6 +322,7 @@ export const LOOT_TABLES = {
       { type: "item", weight: 20, itemId: "book_ignite_weapons" },
       // Dark / warlock
       { type: "item", weight: 18, itemId: "book_shadow_bolt" },
+      { type: "item", weight: 18, itemId: "book_fear" },
       { type: "item", weight: 16, itemId: "book_agony" },
       { type: "item", weight: 14, itemId: "book_mark_of_death" },
       { type: "item", weight: 14, itemId: "book_drain_life" },

@@ -9,6 +9,7 @@
 
 import { Particle } from "../passes/vfx/particles/particlePool.js";
 import { computeMissEndpoint, missSeedFromIds } from "./projectileMiss.js";
+import { FearSpellCast } from "../../events/FearSpellCast.js";
 
 const INSTALLED_KEY = Symbol.for("jshack:display:spiritWisp:installed");
 
@@ -1673,6 +1674,15 @@ export function createSpiritWispFxController(
     world.on("spell:agony", ({ from, at, fizzle }) => {
       if (fizzle || !from || !at) return;
       _trySurge(from.x, from.y, at.x, at.y, 8);
+    });
+    world.on(FearSpellCast, ({ actor, targetId, from, at, fizzle, missed, missTo }) => {
+      if (fizzle || !from || !at) return;
+      const to = missed
+        ? (missTo && Number.isFinite(missTo.x) && Number.isFinite(missTo.y)
+          ? { x: Number(missTo.x), y: Number(missTo.y) }
+          : computeMissEndpoint(from, at, missSeedFromIds(actor, targetId, 0xfea2)))
+        : at;
+      _trySurge(from.x, from.y, to.x, to.y, 10);
     });
     world.on("spell:drain_life:start", ({ from, to, fizzle }) => {
       if (fizzle || !from || !to) return;

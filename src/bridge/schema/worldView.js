@@ -123,6 +123,7 @@ const DISPLAY_STATUS_TAGS = new Set([
 	'shocked',
 	'frozen',
 	'confused',
+	'fear',
 	'weakened',
 	'cursed',
 	'blessed',

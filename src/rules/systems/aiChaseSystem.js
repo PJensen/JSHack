@@ -611,9 +611,12 @@ export function aiChaseSystem(world) {
     // Awareness keeps updating every turn; cadence only gates intent production.
     if (!canActThisTurn || hasQueuedAction) return;
 
-    // ── Retreat: update flag based on current HP ────────────────────
+    // ── Retreat: update flag based on current HP or fear ────────────
+    const feared = statusStrength(world, id, "fear") > 0;
     const retreatThreshold = def?.retreatHpPct ?? 0;
-    if (retreatThreshold > 0 && aggro.alertLevel === AGGRO_LEVELS.hunting) {
+    if (feared && aggro.alertLevel === AGGRO_LEVELS.hunting) {
+      aggro.retreating = true;
+    } else if (retreatThreshold > 0 && aggro.alertLevel === AGGRO_LEVELS.hunting) {
       const vit = world.get(id, Vitality);
       const hpFraction = vit ? vit.hp / Math.max(1, vit.maxHp) : 1;
       aggro.retreating = hpFraction < retreatThreshold;
@@ -649,7 +652,7 @@ export function aiChaseSystem(world) {
     const isKiter = resolveIsKiter(world, id, brain);
     // Kiters (ranged weapon or spells) may shoot even while retreating — their movement
     // logic will hold them at a safe distance rather than fleeing past shoot range.
-    if (aggro.alertLevel === AGGRO_LEVELS.hunting && canSeeRangedTarget && (!aggro.retreating || isKiter)) {
+    if (aggro.alertLevel === AGGRO_LEVELS.hunting && canSeeRangedTarget && (!aggro.retreating || (isKiter && !feared))) {
       const eq = world.get(id, Equipment);
       if (eq && eq.ranged && eq.ammo && world.isAlive(eq.ammo)) {
         const weaponInfo = eq.ranged ? world.get(eq.ranged, ItemInfo) : null;
@@ -711,7 +714,12 @@ export function aiChaseSystem(world) {
     if (aggro.retreating) {
       const dist = chebyshevScalar(pos.x | 0, pos.y | 0, targetX, targetY);
 
-      if (isKiter) {
+      if (feared) {
+        // Fear is panic, not a tactical retreat.
+        dx = -dx;
+        dy = -dy;
+
+      } else if (isKiter) {
         // Kite: hold at shoot distance (≥ 3 tiles) and let spell/ranged fire.
         // Flee only when the player closes to melee range.
         if (dist < 3) { dx = -dx; dy = -dy; }

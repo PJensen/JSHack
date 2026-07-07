@@ -25,7 +25,7 @@ const AUDIO_SPELLS = [
   "agony", "arcane_bolt", "barkskin", "blastwave", "blind", "blink",
   "blizzard", "bloodthirst", "cheap_shot", "cleave", "consecrate",
   "corpses", "dead", "divine_shield", "drain_life", "earthshatter",
-  "entangle", "evocation", "fireball", "firestorm", "flash_heal", "frost",
+  "entangle", "evocation", "fear", "fireball", "firestorm", "flash_heal", "frost",
   "gridbugs", "harmony_ward", "heal", "hearthstone", "homecoming",
   "holy_strike", "ignite_weapons", "iron_flesh", "kitty", "leech_spores",
   "lifetap", "lightning", "mark_of_death", "meteor", "natures_touch",

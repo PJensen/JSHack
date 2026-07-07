@@ -192,6 +192,22 @@ export const SPELL_DEFS = {
       { kind: 'status', status: 'frost', duration: '2-5 turns (longer on lighter targets)' },
     ],
   },
+  fear: {
+    id: 'fear',
+    name: 'Fear',
+    symbol: '\u2620',       // ☠
+    schools: ['shadow', 'mind'],
+    manaCost: 6,
+    minIntelligence: 0,
+    range: 8,
+    script: 'fear',
+    targeting: 'enemy',
+    description: 'Plant a deathly vision in a foe, forcing it to run from you.',
+    effects: [
+      { kind: 'status', status: 'fear', duration: '4-7 turns, INT-scaled' },
+      { kind: 'movement', mode: 'flee', note: 'Target runs away while feared' },
+    ],
+  },
   blizzard: {
     id: 'blizzard',
     name: 'Blizzard',

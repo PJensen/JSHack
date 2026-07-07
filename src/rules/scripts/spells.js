@@ -70,6 +70,7 @@ import { forEachInRadius } from "../utils/spatialIndex.js";
 import { resolveScrollEffectDuration } from "../utils/scrollReading.js";
 import { attachEntityToCurrentFloor } from "../utils/floorEntities.js";
 import { ArcaneBarrageCast, MagicMissileCast } from "../../events/ArcaneProjectileCast.js";
+import { FearSpellCast } from "../../events/FearSpellCast.js";
 
 /** @returns {any|null} */
 function _getWeather(world) {
@@ -2466,6 +2467,152 @@ REGISTRY['agony'] = function agonyScript(world, actor, spell, _intent) {
     from: { x: apos.x, y: apos.y }, at: tpos,
     potency: basePotency, duration: baseDuration,
   });
+};
+
+REGISTRY['fear'] = function fearScript(world, actor, spell, intent) {
+  const apos = /** @type any */ (world.get(actor, Position));
+  if (!apos) return;
+
+  const actorFaction = String(world.get(actor, Faction)?.key || 'player');
+  const MAX_R = Math.max(1, Number(spell.range || 8));
+  const isBlocked = createLOSBlocker(world);
+  const d2 = (x0, y0, x1, y1) => { const dx = x1 - x0, dy = y1 - y0; return dx * dx + dy * dy; };
+
+  let targetId = Number(intent?.targetId || 0) | 0;
+  let tpos = targetId ? /** @type any */ (world.get(targetId, Position)) : null;
+
+  if (!targetId || !tpos) {
+    /** @type {Array<{id:number,x:number,y:number,dist2:number}>} */
+    const candidates = [];
+    for (const [id, p] of world.query(Position)) {
+      if (id === actor) continue;
+      const fac = /** @type any */ (world.get(id, Faction));
+      if (!fac || !areFactionsHostile(actorFaction, fac.key)) continue;
+      const vit = /** @type any */ (world.get(id, Vitality));
+      if (!vit || (vit.hp | 0) <= 0) continue;
+      const dist2v = d2(apos.x, apos.y, p.x, p.y);
+      if (dist2v <= MAX_R * MAX_R) candidates.push({ id, x: p.x, y: p.y, dist2: dist2v });
+    }
+    candidates.sort((a, b) => a.dist2 - b.dist2);
+    let found = null;
+    for (const c of candidates) {
+      if (hasSpellLineOfSight(world, {
+        sourceId: actor,
+        targetId: c.id,
+        sourcePos: apos,
+        targetPos: c,
+        range: MAX_R,
+        isBlocked,
+      })) { found = c; break; }
+    }
+    if (!found) {
+      world.emit(new FearSpellCast({
+        actor,
+        targetId: actor,
+        from: { x: apos.x, y: apos.y },
+        at: { x: apos.x, y: apos.y },
+        fizzle: true,
+        reason: 'no_target',
+      }));
+      return;
+    }
+    targetId = found.id;
+    tpos = { x: found.x, y: found.y };
+  }
+
+  const vit = /** @type any */ (world.get(targetId, Vitality));
+  if (!vit || (vit.hp | 0) <= 0) {
+    world.emit(new FearSpellCast({
+      actor,
+      targetId,
+      from: { x: apos.x, y: apos.y },
+      at: { x: tpos?.x ?? apos.x, y: tpos?.y ?? apos.y },
+      fizzle: true,
+      reason: 'invalid_target',
+    }));
+    return;
+  }
+
+  if (!hasSpellLineOfSight(world, {
+    sourceId: actor,
+    targetId,
+    sourcePos: apos,
+    targetPos: tpos,
+    range: MAX_R,
+    isBlocked,
+  })) {
+    world.emit(new FearSpellCast({
+      actor,
+      targetId,
+      from: { x: apos.x, y: apos.y },
+      at: { x: tpos.x, y: tpos.y },
+      fizzle: true,
+      reason: 'no_los',
+    }));
+    return;
+  }
+
+  const dist = chebyshev(apos, tpos);
+  if (dist > MAX_R) {
+    world.emit(new FearSpellCast({
+      actor,
+      targetId,
+      from: { x: apos.x, y: apos.y },
+      at: { x: tpos.x, y: tpos.y },
+      fizzle: true,
+      reason: 'out_of_range',
+    }));
+    return;
+  }
+
+  const fearFrom = { x: apos.x, y: apos.y };
+  const fearAt = { x: tpos.x, y: tpos.y };
+  const travelDist = Math.hypot(fearAt.x - fearFrom.x, fearAt.y - fearFrom.y) || 1;
+  const projectileDelay = Math.max(0.08, Math.min(0.7, travelDist / 10));
+  const hitChancePct = getSpellHitChancePct(world, actor, targetId);
+  if (!rollSpellHit(world, actor, targetId, spell)) {
+    emitSpellMiss(world, actor, targetId, spell, {
+      cause: 'spell:fear',
+      hitChancePct,
+      at: fearAt,
+    });
+    world.emit(new FearSpellCast({
+      actor,
+      targetId,
+      from: fearFrom,
+      at: fearAt,
+      missed: true,
+      missTo: resolveMissTo(world, actor, targetId, fearFrom, fearAt, 'spell:fear', 0xfea2),
+      projectileDelay,
+    }));
+    return;
+  }
+
+  const intBonus = getSpellIntelligenceBonus(world, actor);
+  const duration = Math.min(7, 4 + Math.floor(intBonus / 6));
+  const fearEffect = {
+    key: 'fear',
+    turnsLeft: duration,
+    potency: 1,
+    stacks: 1,
+    startedAtTurn: world.step,
+    sourceId: actor,
+  };
+  const ae = /** @type any */ (world.get(targetId, ActiveEffects));
+  if (ae && Array.isArray(ae.effects)) {
+    upsertTimedEffect(ae.effects, fearEffect);
+  } else {
+    try { world.add(targetId, ActiveEffects, { effects: [fearEffect] }); } catch {}
+  }
+
+  world.emit(new FearSpellCast({
+    actor,
+    targetId,
+    from: fearFrom,
+    at: fearAt,
+    projectileDelay,
+    duration,
+  }));
 };
 
 // Bog Curse - auto-targeting marsh hex used by overworld witches.

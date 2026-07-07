@@ -15,6 +15,7 @@ _book('book_blastwave',     'Spellbook of Blast Wave',    'magic',  'Grants the 
 _book('book_earthshatter',  'Spellbook of Earthshatter',  'magic',  'Grants the ability to cast Earthshatter, cracking the ground to stun nearby foes.');
 _book('book_blink',         'Spellbook of Blink',         'magic',  'Grants the ability to cast Blink.');
 _book('book_frost',         'Spellbook of Frost',         'magic',  'Grants the ability to cast Frost.');
+_book('book_fear',          'Spellbook of Fear',          'rare',   'Grants the ability to terrify a foe into flight.');
 _book('book_blizzard',      'Spellbook of Blizzard',      'rare',   'Grants the ability to cast Blizzard.');
 _book('book_firestorm',     'Spellbook of Firestorm',     'rare',   'Grants the ability to cast Firestorm.');
 _book('book_heal',          'Spellbook of Healing',       'magic',  'Grants the ability to cast a healing spell.');

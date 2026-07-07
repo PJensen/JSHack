@@ -155,6 +155,13 @@ export const EFFECT_DEFS = [
     description: "Confused. Actions become unpredictable.",
   },
   {
+    id: "fear",
+    keys: ["fear", "feared", "frightened"],
+    operation: "none",
+    statuses: ["fear"],
+    description: "Afraid. Tries to flee from enemies.",
+  },
+  {
     id: "intoxication",
     keys: ["intoxicated", "intoxication", "hangover", "drunk"],
     operation: "none",

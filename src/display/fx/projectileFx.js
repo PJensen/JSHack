@@ -9,6 +9,7 @@ import { normalizedGoreType } from "../ui/wiring/goreEngine.js";
 import { setInputLock } from "../input/inputLock.js";
 import { computeMissEndpoint, missSeedFromIds } from "./projectileMiss.js";
 import { ArcaneBarrageCast, MagicMissileCast } from "../../events/ArcaneProjectileCast.js";
+import { FearSpellCast } from "../../events/FearSpellCast.js";
 
 // Lazy audio imports — must not break projectile VFX if audio fails to load
 let _playTracked = null;
@@ -1542,6 +1543,24 @@ export function createProjectileFxController({ world, cam, fx, getPosition }) {
           ? { x: Number(missTo.x), y: Number(missTo.y) }
           : computeMissEndpoint(from, to, missSeedFromIds(actor, targetId, 0xb01a)))
         : to;
+      spawnTransientProjectile({
+        from,
+        to: end,
+        style: 'shadow_bolt',
+        speed: 10,
+        minDuration: 0.08,
+        maxDuration: 0.7,
+      });
+    });
+
+    world.on(FearSpellCast, ({ actor, targetId, from, at, fizzle, missed, missTo }) => {
+      if (fizzle) return;
+      if (!from || !at) return;
+      const end = missed
+        ? (missTo && Number.isFinite(missTo.x) && Number.isFinite(missTo.y)
+          ? { x: Number(missTo.x), y: Number(missTo.y) }
+          : computeMissEndpoint(from, at, missSeedFromIds(actor, targetId, 0xfea2)))
+        : at;
       spawnTransientProjectile({
         from,
         to: end,

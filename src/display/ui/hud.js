@@ -1755,6 +1755,7 @@ function ensureEffectsStack(container) {
     frozen:       { name: 'Frozen',    glyph: '\u2744\uFE0F',    hue: 200 },
     slowed:       { name: 'Slowed',    glyph: '\u{1F40C}',       hue: 195 },
     confused:     { name: 'Confused',     glyph: '\u{1F635}',       hue: 280 },
+    fear:         { name: 'Fear',      glyph: '\u2620\uFE0F',    hue: 285 },
     hallucinating: { name: 'Hallucinating', glyph: '\u{1F300}',      hue: 210 },
     weakened:     { name: 'Weakened',  glyph: '\u{1FAB6}',       hue: 40  },
     cursed:       { name: 'Cursed',    glyph: '\u{1F52E}',       hue: 270 },

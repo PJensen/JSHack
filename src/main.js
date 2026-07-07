@@ -4432,6 +4432,40 @@ function drawBlindEye(ctx, e, fxTime, scale = 1) {
 }
 
 /**
+ * Draw a skull above feared entities for the duration of the effect.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {{ id:number, pos:{x:number,y:number} }} e
+ * @param {number} fxTime
+ */
+function drawFearSkull(ctx, e, fxTime, scale = 1) {
+  const cx = e.pos.x;
+  const cy = e.pos.y - 0.74 * scale;
+  const pulse = 0.86 + Math.sin(fxTime * 3.2) * 0.14;
+  const dy = cy + Math.sin(fxTime * 2.1) * 0.035 * scale;
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+
+  const haloR = 0.24 * scale;
+  const halo = ctx.createRadialGradient(cx, dy, 0, cx, dy, haloR);
+  halo.addColorStop(0, `rgba(190,60,230,${(0.28 * pulse).toFixed(2)})`);
+  halo.addColorStop(1, 'rgba(90,20,120,0)');
+  ctx.fillStyle = halo;
+  ctx.beginPath();
+  ctx.arc(cx, dy, haloR, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha = 0.92 * pulse;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = `${0.34 * scale}px sans-serif`;
+  ctx.fillText('\u2620\uFE0F', cx, dy);
+
+  ctx.restore();
+}
+
+/**
  * Draw ? marks bubbling up from a confused entity's head — spawn staggered,
  * drift upward with a lazy wobble, grow then fade out.
  * @param {CanvasRenderingContext2D} ctx
@@ -4944,6 +4978,9 @@ function render(worldView) {
       if (PERF.quality !== 'low' && _renderTagSet.has('blinded')) {
         drawBlindEye(bctx, itemRender, _fxTime, finalItemScale);
       }
+      if (PERF.quality !== 'low' && _renderTagSet.has('fear')) {
+        drawFearSkull(bctx, itemRender, _fxTime, finalItemScale);
+      }
       if (PERF.quality !== 'low' && _renderTagSet.has('confused')) {
         drawConfusedMark(bctx, itemRender, _fxTime, finalItemScale);
       }
@@ -5114,6 +5151,9 @@ function render(worldView) {
     }
     if (PERF.quality !== 'low' && _renderTagSet.has('blinded')) {
       drawBlindEye(bctx, renderEntity, _fxTime);
+    }
+    if (PERF.quality !== 'low' && _renderTagSet.has('fear')) {
+      drawFearSkull(bctx, renderEntity, _fxTime, entityScale);
     }
     if (PERF.quality !== 'low' && _renderTagSet.has('confused')) {
       drawConfusedMark(bctx, renderEntity, _fxTime);
