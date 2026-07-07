@@ -281,48 +281,57 @@ Deno.test("dead shopkeeper drops their shop key", async () => {
   assertEquals(world.get(keyId, DoorKey)?.lockId, lockId);
 });
 
-Deno.test("overworld gem vendor gets a keyed locked shop door after generation", async () => {
+Deno.test("overworld shopkeepers get keyed locked shop doors after generation", async () => {
   clearAll();
   const world = new World({ seed: 0xC0FFEE });
   await generateFloor(world, world.seed >>> 0, 0);
 
-  let gemVendorId = 0;
+  const shopkeepers = [
+    ["alchemist", "townfolk_alchemist"],
+    ["book_vendor", "townfolk_book_vendor"],
+    ["enchantress", "townfolk_enchantress"],
+    ["gem_vendor", "townfolk_gem_vendor"],
+    ["general_vendor", "townfolk_general_vendor"],
+  ];
+
+  const idsByIdentity = new Map();
   for (const [id, named] of world.query(NamedIdentity)) {
-    if (named.identity === "townfolk_gem_vendor") {
-      gemVendorId = id;
-      break;
-    }
+    idsByIdentity.set(named.identity, id);
   }
-  assert(gemVendorId > 0, "expected gem vendor to spawn");
 
-  const keyIds = inventoryItems(world, gemVendorId)
-    .filter((itemId) => String(world.get(itemId, DoorKey)?.lockId || "").includes("gem_vendor"));
-  assertEquals(keyIds.length, 1, "gem vendor should have exactly one matching shop key");
+  for (const [role, identity] of shopkeepers) {
+    const shopkeeperId = idsByIdentity.get(identity) || 0;
+    assert(shopkeeperId > 0, `expected ${role} to spawn`);
 
-  let shopRoom = null;
-  for (const [, room] of world.query(RoomMetadata)) {
-    if (room.roomType === "shop" && room.shopkeeperId === gemVendorId) {
-      shopRoom = room;
-      break;
+    const keyIds = inventoryItems(world, shopkeeperId)
+      .filter((itemId) => String(world.get(itemId, DoorKey)?.lockId || "").includes(role));
+    assertEquals(keyIds.length, 1, `${role} should have exactly one matching shop key`);
+
+    let shopRoom = null;
+    for (const [, room] of world.query(RoomMetadata)) {
+      if (room.roomType === "shop" && room.shopkeeperId === shopkeeperId) {
+        shopRoom = room;
+        break;
+      }
     }
-  }
-  assert(shopRoom, "expected gem vendor shop room metadata");
+    assert(shopRoom, `expected ${role} shop room metadata`);
 
-  let shopDoorId = 0;
-  for (const [id, pos] of world.query(Position, DoorState)) {
-    if (isDoorOnRoomPerimeter(pos, shopRoom)) {
-      shopDoorId = id;
-      break;
+    let shopDoorId = 0;
+    for (const [id, pos] of world.query(Position, DoorState)) {
+      if (isDoorOnRoomPerimeter(pos, shopRoom)) {
+        shopDoorId = id;
+        break;
+      }
     }
-  }
-  assert(shopDoorId > 0, "expected a physical gem shop door");
+    assert(shopDoorId > 0, `expected a physical ${role} shop door`);
 
-  const doorState = world.get(shopDoorId, DoorState);
-  const doorLock = world.get(shopDoorId, DoorLock);
-  assertEquals(doorState.open, false);
-  assertEquals(doorState.locked, true);
-  assert(doorLock?.lockId?.includes("gem_vendor"), "expected gem shop door lock to be assigned");
-  assertEquals(world.get(keyIds[0], DoorKey)?.lockId, doorLock.lockId);
+    const doorState = world.get(shopDoorId, DoorState);
+    const doorLock = world.get(shopDoorId, DoorLock);
+    assertEquals(doorState.open, false, `${role} shop door should start closed`);
+    assertEquals(doorState.locked, true, `${role} shop door should start locked`);
+    assert(doorLock?.lockId?.includes(role), `expected ${role} shop door lock to be assigned`);
+    assertEquals(world.get(keyIds[0], DoorKey)?.lockId, doorLock.lockId);
+  }
 });
 
 Deno.test("overworld book vendor gets a keyed locked shop door and owned stock after generation", async () => {
@@ -625,7 +634,7 @@ Deno.test("overworld shopkeepers sleep in cottage homes outside their shops", as
   const world = new World({ seed: 0xC0FFEE });
   await generateFloor(world, world.seed >>> 0, 0);
 
-  const shopkeeperRoles = new Set(["alchemist", "gem_vendor", "book_vendor", "general_vendor"]);
+  const shopkeeperRoles = new Set(["alchemist", "gem_vendor", "book_vendor", "general_vendor", "enchantress"]);
   let checked = 0;
   for (const [id, job] of world.query(TownfolkJob)) {
     if (!shopkeeperRoles.has(job.role)) continue;
@@ -641,7 +650,7 @@ Deno.test("overworld shopkeepers sleep in cottage homes outside their shops", as
     assert(!isInRoom({ x: job.bedX, y: job.bedY }, shopRoom), `${job.role} bed should be outside the shop`);
     checked++;
   }
-  assert(checked >= 4, "expected all overworld shopkeepers to be checked");
+  assert(checked >= 5, "expected all overworld shopkeepers to be checked");
 });
 
 Deno.test("overworld herbalist does not get the apothecary key", async () => {

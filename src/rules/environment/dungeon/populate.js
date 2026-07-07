@@ -352,6 +352,8 @@ const SHOP_KEY_META = {
   gem_vendor:  { label: "Gem Shop Key",  identity: "key_gem_shop",   desc: "the gem shop" },
   alchemist:   { label: "Apothecary Key", identity: "key_apothecary", desc: "the apothecary" },
   book_vendor: { label: "Book Shop Key",  identity: "key_book_shop",  desc: "the book shop" },
+  general_vendor: { label: "General Store Key", identity: "key_general_store", desc: "the general store" },
+  enchantress: { label: "Enchanter Shop Key", identity: "key_enchanter_shop", desc: "the enchanter shop" },
 };
 
 function createShopDoorKey(world, lockId, role) {
@@ -2756,6 +2758,17 @@ export function materializeSpawn(world, spawn) {
         });
         if (spawn.params.shopDoor) {
           assignShopDoorKey(world, id, spawn.params.shopDoorRole || def.role, spawn.params.shopDoor);
+        }
+        if (spawn.params.shopRoom) {
+          const roomEntity = world.create();
+          world.add(roomEntity, RoomMetadata, {
+            roomType: 'shop',
+            x: spawn.params.shopRoom.x,
+            y: spawn.params.shopRoom.y,
+            w: spawn.params.shopRoom.w,
+            h: spawn.params.shopRoom.h,
+            shopkeeperId: id,
+          });
         }
       } else if (def.role === "gem_vendor") {
         world.add(id, Interactable, {
