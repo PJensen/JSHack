@@ -613,7 +613,7 @@ REGISTRY['frost_nova'] = function frostNovaScript(world, actor, spell, intent) {
   const actorFaction = String(world.get(actor, Faction)?.key || 'player');
   const RADIUS = Math.max(1, Number(spell?.radius || 2) | 0);
   const BASE_DMG = 4;
-  const FREEZE_TURNS = 3;
+  const FREEZE_TURNS = 8;
 
   /** @type {Array<{id:number, dist:number, x:number, y:number}>} */
   const targets = [];
