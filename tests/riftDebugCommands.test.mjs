@@ -14,6 +14,7 @@ import { DungeonState } from "../src/rules/components/DungeonState.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { Interactable } from "../src/rules/components/Interactable.js";
 import { LightEmitter } from "../src/rules/components/LightEmitter.js";
+import { AudioEmitter } from "../src/rules/components/AudioEmitter.js";
 import { RiftPortal } from "../src/rules/components/RiftPortal.js";
 import { RiftQuestLink } from "../src/rules/components/RiftQuestLink.js";
 import { RiftState } from "../src/rules/components/RiftState.js";
@@ -93,6 +94,7 @@ Deno.test("debug create/close rift keeps return portals separate", () => {
   const riftPortals = [...world.query(RiftPortal)];
   assertEquals(riftPortals.length, 1);
   const [portalId, portal] = riftPortals[0];
+  const portalPos = world.get(portalId, Position);
   assertEquals(portal.levels, 3);
   assertEquals(world.get(portalId, NamedIdentity)?.identity, "rift_portal");
   assert(world.isAlive(returnPortal), "return portal should coexist with rift portal");
@@ -105,6 +107,8 @@ Deno.test("debug create/close rift keeps return portals separate", () => {
   assertEquals([...world.query(RiftState)].length, 0);
   assert(world.isAlive(returnPortal), "close rift must not destroy return_portal");
   assertEquals(closed.length, 1);
+  assertEquals(closed[0].x, portalPos.x);
+  assertEquals(closed[0].y, portalPos.y);
 });
 
 Deno.test("create rift 0 resolves a deterministic default level count", () => {
@@ -141,6 +145,16 @@ Deno.test("debug rift portal carries authored breathing storm light", () => {
   assertEquals(light.temporalPattern, "rift");
   assertEquals(light.baseColor, [182, 106, 255]);
   assert(light.radius >= 4, "rift light should be visible beyond the portal tile");
+});
+
+Deno.test("debug rift portal carries authored idle audio", () => {
+  const { world } = makeWorld(0);
+  commandMap(world).get("create").handler("rift 2");
+  const [portalId] = [...world.query(RiftPortal)][0];
+  const audio = world.get(portalId, AudioEmitter);
+
+  assert(audio, "rift portal should project authored audio");
+  assertEquals(audio.emitters, [{ profile: "portal_idle", interior: false }]);
 });
 
 Deno.test("rift portal interaction emits only a rift enter request", () => {

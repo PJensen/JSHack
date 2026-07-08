@@ -1111,7 +1111,7 @@ function installAudioListeners({ world, isPlayer, getItemInfo, getPlayerPosition
   });
 
   world.on(RiftClosed, ({ x, y, portalId }) => {
-    const pos = Number.isFinite(Number(x)) && Number.isFinite(Number(y))
+    const pos = x != null && y != null && Number.isFinite(Number(x)) && Number.isFinite(Number(y))
       ? { x: Number(x) | 0, y: Number(y) | 0 }
       : (portalId != null ? getPosition(portalId) : null);
     sfxAt(PORTAL_DESTROYED_SOUND_ID, pos, pp(), { priority: 1 }, zg());

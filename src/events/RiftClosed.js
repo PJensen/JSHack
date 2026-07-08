@@ -7,6 +7,8 @@ export class RiftClosed extends EcsEvent {
     this.riftId = String(payload.riftId || "");
     this.portalId = Number(payload.portalId || 0) | 0;
     this.reason = String(payload.reason || "");
+    this.x = Number.isFinite(Number(payload.x)) ? (Number(payload.x) | 0) : null;
+    this.y = Number.isFinite(Number(payload.y)) ? (Number(payload.y) | 0) : null;
     Object.freeze(this);
   }
 }

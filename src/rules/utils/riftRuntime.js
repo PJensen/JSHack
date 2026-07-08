@@ -3,6 +3,7 @@ import { NamedIdentity } from "../components/NamedIdentity.js";
 import { Interactable } from "../components/Interactable.js";
 import { DungeonState } from "../components/DungeonState.js";
 import { LightEmitter } from "../components/LightEmitter.js";
+import { AudioEmitter } from "../components/AudioEmitter.js";
 import { RiftPortal } from "../components/RiftPortal.js";
 import { RiftQuestLink } from "../components/RiftQuestLink.js";
 import { RiftState } from "../components/RiftState.js";
@@ -98,9 +99,14 @@ export function destroyActiveRift(world, payload = {}) {
   const state = rec.state;
   const riftId = String(payload.riftId || state.riftId || "");
   const portalId = Number(state.portalId || 0) | 0;
+  let closedPos = null;
 
   for (const [id, portal] of world.query(RiftPortal)) {
     if (riftId && String(portal?.riftId || "") !== riftId) continue;
+    if (!closedPos) {
+      const pos = world.get(id, Position);
+      if (pos) closedPos = { x: pos.x | 0, y: pos.y | 0 };
+    }
     destroyRiftQuestLinks(world, { portalId: id, riftId });
     try { world.destroy(id); } catch {}
   }
@@ -112,8 +118,10 @@ export function destroyActiveRift(world, payload = {}) {
     riftId,
     portalId,
     reason: String(payload.reason || "closed"),
+    x: closedPos?.x,
+    y: closedPos?.y,
   }));
-  return { riftId, portalId };
+  return { riftId, portalId, x: closedPos?.x, y: closedPos?.y };
 }
 
 export function createRift(world, spec = {}) {
@@ -151,6 +159,9 @@ export function createRift(world, spec = {}) {
     colorShiftScale: 0.85,
     voidStrength: null,
     baseColor: [182, 106, 255],
+  });
+  world.add(portalId, AudioEmitter, {
+    emitters: [{ profile: "portal_idle", interior: false }],
   });
   world.add(portalId, Interactable, {
     action: RIFT_PORTAL_ACTION,
