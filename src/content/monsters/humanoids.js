@@ -98,7 +98,7 @@ defineMonster('loot_goblin', {
   glyph: 'g',
   color: '#f4d46a',
   glow: '#b88b23',
-  tags: ['humanoid', 'rare'],
+  tags: ['humanoid', 'rare', 'elite'],
   tier: 0,
   rare: true,
   intelligence: 9,

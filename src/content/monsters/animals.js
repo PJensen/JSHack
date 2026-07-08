@@ -758,7 +758,7 @@ defineMonster('ratatoskr', {
   color: '#d28a45',
   glow: '#8a5224',
   scale: 0.7,
-  tags: ['beast', 'squirrel', 'unique', 'messenger', 'overworld'],
+  tags: ['beast', 'squirrel', 'unique', 'messenger', 'overworld', 'rare', 'elite'],
   tier: 0,
   rare: true,
   intelligence: 8,

@@ -24,6 +24,8 @@ Deno.test("Ratatoskr is a unique passive outdoor squirrel messenger", () => {
   assert(def.tags.includes("squirrel"), "Ratatoskr should be tagged as a squirrel");
   assert(def.tags.includes("unique"), "Ratatoskr should be unique content");
   assert(def.tags.includes("overworld"), "Ratatoskr should be outdoor/overworld content");
+  assert(def.tags.includes("rare"), "Ratatoskr should show the rare star glyph fx");
+  assert(def.tags.includes("elite"), "Ratatoskr should carry the elite label tag");
   assertEquals(def.faction, "neutral");
   assertEquals(def.aggro, "passive");
   assertEquals(def.alertOnSight, true);

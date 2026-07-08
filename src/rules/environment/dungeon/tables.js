@@ -45,8 +45,8 @@ export function pickMonster(rng, depth, monsterFilter = null) {
     if (rare && !isGenocided('dragon_whelp')) def = rare;
   }
 
-  // Rare upgrade: any goblin has a 3% chance to be a loot goblin.
-  if (def.id === 'goblin' && rng.next() < 0.03) {
+  // Rare upgrade: goblin-family spawns have a 12% chance to be a loot goblin.
+  if ((def.id === 'goblin' || def.id === 'goblin_archer') && rng.next() < 0.12) {
     const rare = getMonster('loot_goblin');
     if (rare && !isGenocided('loot_goblin')) def = rare;
   }

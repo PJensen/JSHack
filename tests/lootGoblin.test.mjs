@@ -12,6 +12,7 @@ import { Vitality } from "../src/rules/components/Vitality.js";
 import { MoveIntent } from "../src/rules/components/Intents/MoveIntent.js";
 import { LOOT_TABLES } from "../src/rules/data/lootTables.js";
 import { getMonster } from "../src/rules/data/monsters.js";
+import { pickMonster } from "../src/rules/environment/dungeon/tables.js";
 import { aiChaseSystem } from "../src/rules/systems/aiChaseSystem.js";
 import { dealDamage } from "../src/rules/utils/dealDamage.js";
 import { clearAll, loadChunk } from "../src/rules/environment/dungeon/tileMap.js";
@@ -21,8 +22,24 @@ Deno.test("loot_goblin monster definition is present and uses on-damaged spill/b
   const def = getMonster("loot_goblin");
   assert(def, "loot_goblin should exist");
   assert(def.baseHp >= 50, "loot_goblin should have high health");
+  assert(def.tags.includes("rare"), "loot_goblin should be marked rare");
+  assert(def.tags.includes("elite"), "loot_goblin should carry the elite label tag");
   assert((def.retreatHpPct || 0) > 1, "loot_goblin should retreat at all health values");
   assert(Array.isArray(def.hooks?.onDamaged) && def.hooks.onDamaged.length > 0, "loot_goblin should react on damage");
+});
+
+Deno.test("goblin-family spawns can rare-upgrade into loot_goblin", () => {
+  const rng = {
+    choice(arr) {
+      return arr.find((def) => def.id === "goblin_archer") || arr[0];
+    },
+    next() {
+      return 0;
+    },
+  };
+
+  const picked = pickMonster(rng, 3);
+  assertEquals(picked.identity, "loot_goblin");
 });
 
 Deno.test("loot_goblin flees from the player while hunting", () => {
