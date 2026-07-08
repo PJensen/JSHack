@@ -25,7 +25,7 @@ import { RiftEnterRequested } from "../../events/RiftEnterRequested.js";
 import { RiftEntered } from "../../events/RiftEntered.js";
 import { RiftCloseRequested } from "../../events/RiftCloseRequested.js";
 import { RiftExited } from "../../events/RiftExited.js";
-import { destroyActiveRift, activeRiftRecord, riftPlaneId } from "../../rules/utils/riftRuntime.js";
+import { destroyActiveRift, activeRiftRecord, riftPlaneId, riftQuestLinkForPortal } from "../../rules/utils/riftRuntime.js";
 
 const RETURN_PORTAL_IDENTITY = 'return_portal';
 const STAIR_TRANSITION_COOLDOWN_MS = 220;
@@ -250,7 +250,7 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
           pending.riftId = currentRift.state.riftId;
           pending.riftLevel = newDepth;
           pending.riftEnter = true;
-          pending.templateId = String(currentRift.state.templateId || "");
+          pending.templateId = String(currentState?.activeTemplateId || "");
         } else if (currentDepth <= 1) {
           newDepth = Math.max(0, Number(currentRift.state.originDepth || 0) | 0);
           pending.targetPos = { x: currentRift.state.originX | 0, y: currentRift.state.originY | 0 };
@@ -264,7 +264,7 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
           pending.riftId = currentRift.state.riftId;
           pending.riftLevel = newDepth;
           pending.riftEnter = true;
-          pending.templateId = String(currentRift.state.templateId || "");
+          pending.templateId = String(currentState?.activeTemplateId || "");
         }
       }
       const activeTemplateId = pending.planeId
@@ -489,13 +489,14 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
       const rec = activeRiftRecord(world);
       if (!rec?.state || String(rec.state.riftId || "") !== riftId) return;
       if (rec.state.inside) return;
+      const link = riftQuestLinkForPortal(world, portalId)?.link || null;
       queueDepth(1, {
         planeId: riftPlaneId(riftId),
         planeSeed: portal.seed,
         riftId,
         riftLevel: 1,
         riftEnter: true,
-        templateId: String(portal.templateId || rec.state.templateId || ""),
+        templateId: String(link?.templateId || ""),
         source: "rift:enter",
       });
     });

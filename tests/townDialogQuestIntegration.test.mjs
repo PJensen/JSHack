@@ -36,6 +36,7 @@ import {
   PRIEST_RIFT_TEMPLATE_ID,
   PRIEST_RIFT_LEVELS,
 } from "../src/rules/quests/definitions/priestRift.js";
+import { riftQuestLinkForPortal } from "../src/rules/utils/riftRuntime.js";
 
 function floorPatch(cx = 5, cy = 5, radius = 4) {
   for (let y = cy - radius; y <= cy + radius; y++) {
@@ -263,7 +264,8 @@ Deno.test("priest rift dialog opens a three-level crypt rift", () => {
   const portals = [...world.query(RiftPortal)];
   assertEquals(portals.length, 1);
   assertEquals(portals[0][1].levels, PRIEST_RIFT_LEVELS);
-  assertEquals(portals[0][1].templateId, PRIEST_RIFT_TEMPLATE_ID);
+  assertEquals(riftQuestLinkForPortal(world, portals[0][0])?.link?.questId, PRIEST_RIFT_QUEST_ID);
+  assertEquals(riftQuestLinkForPortal(world, portals[0][0])?.link?.templateId, PRIEST_RIFT_TEMPLATE_ID);
 });
 
 Deno.test("priest rift terminal floor spawns boss and death advances quest", () => {

@@ -172,7 +172,7 @@ function createQuestRift(ctx) {
     levels: PRIEST_RIFT_LEVELS,
     seed,
     templateId: PRIEST_RIFT_TEMPLATE_ID,
-    sourceQuestId: PRIEST_RIFT_QUEST_ID,
+    questId: PRIEST_RIFT_QUEST_ID,
     idPrefix: "priest",
   });
   if (!result?.ok) return;

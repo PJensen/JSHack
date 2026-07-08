@@ -4,10 +4,12 @@ import { Interactable } from "../components/Interactable.js";
 import { DungeonState } from "../components/DungeonState.js";
 import { LightEmitter } from "../components/LightEmitter.js";
 import { RiftPortal } from "../components/RiftPortal.js";
+import { RiftQuestLink } from "../components/RiftQuestLink.js";
 import { RiftState } from "../components/RiftState.js";
 import { playerEntity, findNearestValidTileAround } from "./queries.js";
 import { RiftOpened } from "../../events/RiftOpened.js";
 import { RiftClosed } from "../../events/RiftClosed.js";
+import { attach } from "../../lib/ecs-js/hierarchy.js";
 
 export const RIFT_PORTAL_IDENTITY = "rift_portal";
 export const RIFT_PORTAL_ACTION = "riftPortal";
@@ -22,6 +24,30 @@ export function activeRiftRecord(world) {
     if (state?.active) return { id, state };
   }
   return null;
+}
+
+export function riftQuestLinkForPortal(world, portalId) {
+  const pid = Number(portalId || 0) | 0;
+  if (!(pid > 0)) return null;
+  for (const [id, link] of world.query(RiftQuestLink)) {
+    if (Number(link?.portalId || 0) !== pid) continue;
+    return { id, link };
+  }
+  return null;
+}
+
+export function destroyRiftQuestLinks(world, payload = {}) {
+  const portalId = Number(payload.portalId || 0) | 0;
+  const riftId = String(payload.riftId || "");
+  for (const [id, link] of world.query(RiftQuestLink)) {
+    if (portalId > 0 && Number(link?.portalId || 0) === portalId) {
+      try { world.destroy(id); } catch {}
+      continue;
+    }
+    if (riftId && String(link?.riftId || "") === riftId) {
+      try { world.destroy(id); } catch {}
+    }
+  }
 }
 
 export function currentDungeonDepth(world, fallback = 0) {
@@ -75,8 +101,10 @@ export function destroyActiveRift(world, payload = {}) {
 
   for (const [id, portal] of world.query(RiftPortal)) {
     if (riftId && String(portal?.riftId || "") !== riftId) continue;
+    destroyRiftQuestLinks(world, { portalId: id, riftId });
     try { world.destroy(id); } catch {}
   }
+  destroyRiftQuestLinks(world, { portalId, riftId });
   try { world.destroy(rec.id); } catch {}
 
   world.emit(new RiftClosed({
@@ -107,7 +135,7 @@ export function createRift(world, spec = {}) {
   const seed = Number.isFinite(Number(spec.seed)) ? (Number(spec.seed) >>> 0) : resolveSeed(world);
   const levels = resolveLevelCount(world, spec.levels);
   const templateId = String(spec.templateId || "");
-  const sourceQuestId = String(spec.sourceQuestId || "");
+  const questId = String(spec.questId || "");
 
   const portalId = world.create();
   const riftId = String(spec.riftId || "") || resolveRiftId(seed, portalId, String(spec.idPrefix || ""));
@@ -135,9 +163,12 @@ export function createRift(world, spec = {}) {
     originDepth,
     originX: origin.x,
     originY: origin.y,
-    templateId,
-    sourceQuestId,
   });
+  if (templateId || questId) {
+    const linkId = world.create();
+    world.add(linkId, RiftQuestLink, { questId, portalId, riftId, templateId });
+    attach(world, linkId, portalId);
+  }
   for (const [id, ds] of world.query(DungeonState)) {
     const ids = Array.isArray(ds.floorEntityIds) ? ds.floorEntityIds.slice() : [];
     if (!ids.includes(portalId)) ids.push(portalId);
@@ -158,8 +189,6 @@ export function createRift(world, spec = {}) {
     portalId,
     inside: false,
     planeId: riftPlaneId(riftId),
-    templateId,
-    sourceQuestId,
   });
 
   world.emit(new RiftOpened({
@@ -186,7 +215,7 @@ export function createRift(world, spec = {}) {
     x: portalPos.x | 0,
     y: portalPos.y | 0,
     templateId,
-    sourceQuestId,
+    questId,
   };
 }
 

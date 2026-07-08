@@ -123,6 +123,7 @@ export { EntranceState } from './EntranceState.js';
 export { DungeonEntrance } from './DungeonEntrance.js';
 export { RiftPortal } from './RiftPortal.js';
 export { RiftState } from './RiftState.js';
+export { RiftQuestLink } from './RiftQuestLink.js';
 export { DistrictProfile } from './DistrictProfile.js';
 export { DistrictState } from './DistrictState.js';
 export { DistrictRef } from './DistrictRef.js';

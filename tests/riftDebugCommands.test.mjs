@@ -2,6 +2,7 @@ import { assert, assertEquals, assertStringIncludes } from "jsr:@std/assert";
 import "./helpers/installContentCatalog.mjs";
 
 import { World } from "../src/lib/ecs-js/index.js";
+import { getParent } from "../src/lib/ecs-js/hierarchy.js";
 import { registerBuiltinCommands } from "../src/main/debug/consoleCommands.js";
 import { createTransitionController } from "../src/main/wiring/transitionWiring.js";
 import { installContent } from "../src/content/install.js";
@@ -14,6 +15,7 @@ import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { Interactable } from "../src/rules/components/Interactable.js";
 import { LightEmitter } from "../src/rules/components/LightEmitter.js";
 import { RiftPortal } from "../src/rules/components/RiftPortal.js";
+import { RiftQuestLink } from "../src/rules/components/RiftQuestLink.js";
 import { RiftState } from "../src/rules/components/RiftState.js";
 import { RiftEnterRequested } from "../src/events/RiftEnterRequested.js";
 import { RiftCloseRequested } from "../src/events/RiftCloseRequested.js";
@@ -24,7 +26,7 @@ import { clearAll as clearTileMap, setTile } from "../src/rules/environment/dung
 import { TILE_FLOOR } from "../src/rules/environment/dungeon/constants.js";
 import { clearFloorCache } from "../src/rules/environment/dungeon/transition.js";
 import { playerEntity } from "../src/rules/utils/queries.js";
-import { createRift } from "../src/rules/utils/riftRuntime.js";
+import { createRift, riftQuestLinkForPortal } from "../src/rules/utils/riftRuntime.js";
 import { resolveInteractableAffordance } from "../src/rules/interaction/interactableAffordance.js";
 
 function floorPatch(cx = 5, cy = 5, radius = 4) {
@@ -99,6 +101,7 @@ Deno.test("debug create/close rift keeps return portals separate", () => {
   const closedText = close.handler("rift");
   assertStringIncludes(closedText, "Closed rift");
   assertEquals([...world.query(RiftPortal)].length, 0);
+  assertEquals([...world.query(RiftQuestLink)].length, 0);
   assertEquals([...world.query(RiftState)].length, 0);
   assert(world.isAlive(returnPortal), "close rift must not destroy return_portal");
   assertEquals(closed.length, 1);
@@ -261,11 +264,16 @@ Deno.test("authored rift template is used inside detached rift plane", async () 
     const created = createRift(world, {
       levels: 3,
       templateId: "priest_rift_crypt",
-      sourceQuestId: "starter.priest_rift",
+      questId: "starter.priest_rift",
       seed: 0x12345678,
     });
     assertEquals(created.ok, true);
     const [portalId, portal] = [...world.query(RiftPortal)][0];
+    const link = riftQuestLinkForPortal(world, portalId);
+    assertEquals(link?.link?.questId, "starter.priest_rift");
+    assertEquals(link?.link?.templateId, "priest_rift_crypt");
+    assertEquals(link?.link?.portalId, portalId);
+    assertEquals(getParent(world, link?.id || 0), portalId);
 
     const controller = createTransitionController({
       world,
@@ -282,7 +290,7 @@ Deno.test("authored rift template is used inside detached rift plane", async () 
     const state = [...world.query(RiftState)][0][1];
     assertEquals(ds.activePlaneId, `rift:${portal.riftId}`);
     assertEquals(ds.activeTemplateId, "priest_rift_crypt");
-    assertEquals(state.templateId, "priest_rift_crypt");
+    assertEquals(state.levels, 3);
   } finally {
     Date.now = originalNow;
     clearFloorCache();
