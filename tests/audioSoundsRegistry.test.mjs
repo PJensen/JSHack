@@ -67,6 +67,23 @@ Deno.test("sounds registry exposes fountain ambient loop as mp3", () => {
   assertEquals(sound.bus, "ambient");
 });
 
+Deno.test("sounds registry exposes portal lifecycle and idle sounds", () => {
+  const created = resolve("portal:created");
+  const destroyed = resolve("portal:destroyed");
+  const idle = resolve("ambient:portal_idle");
+
+  assertExists(created);
+  assertExists(destroyed);
+  assertExists(idle);
+  assertEquals(created.file, "action_portal_created.mp3");
+  assertEquals(destroyed.file, "action_portal_destroyed.mp3");
+  assertEquals(idle.file, "ambient_portal_idle.mp3");
+  assertEquals(created.bus, "ambient");
+  assertEquals(destroyed.bus, "ambient");
+  assertEquals(idle.bus, "ambient");
+  assertEquals(idle.volume, 0.6);
+});
+
 Deno.test("sounds registry exposes both dungeon loop beds and keeps omen separate", () => {
   const dungeonUrls = resolveUrls("ambient:dungeon");
   const omen = resolve("ambient:omen");

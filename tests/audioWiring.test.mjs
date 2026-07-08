@@ -14,6 +14,8 @@ import {
   FAMILIAR_FIRE_CAST_SOUND_ID,
   FAMILIAR_FIRE_READY_SOUND_ID,
   FOOD_EAT_SOUND_ID,
+  PORTAL_CREATED_SOUND_ID,
+  PORTAL_DESTROYED_SOUND_ID,
   PUSH_STONE_SOUND_ID,
   SEARCH_FOUND_SOUND_ID,
   SEARCH_PING_SOUND_ID,
@@ -90,6 +92,11 @@ Deno.test("audio wiring exposes familiar fire ready and cast sound aliases", () 
 Deno.test("audio wiring exposes food and stone push sound aliases", () => {
   assert(FOOD_EAT_SOUND_ID === "item:consume:food");
   assert(PUSH_STONE_SOUND_ID === "action:move_boulder");
+});
+
+Deno.test("audio wiring exposes portal lifecycle sound aliases", () => {
+  assert(PORTAL_CREATED_SOUND_ID === "portal:created");
+  assert(PORTAL_DESTROYED_SOUND_ID === "portal:destroyed");
 });
 
 Deno.test("audio wiring maps new authored event sounds", () => {
