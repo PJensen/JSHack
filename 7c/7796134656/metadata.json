@@ -22,7 +22,7 @@
       "metadata": "/7c/7796134656/0/metadata.json",
       "transcript": "/7c/7796134656/0/full.jsonl",
       "content_hash": "/7c/7796134656/0/content_hash.txt",
-      "prompt": "/7c/7796134656/0/prompt.txt"
+      "prompt": ""
     },
     {
       "metadata": "/7c/7796134656/1/metadata.json",
@@ -32,10 +32,10 @@
     }
   ],
   "token_usage": {
-    "input_tokens": 275615,
+    "input_tokens": 743,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 3924224,
-    "output_tokens": 21162,
-    "api_call_count": 34
+    "cache_read_tokens": 167296,
+    "output_tokens": 129,
+    "api_call_count": 1
   }
 }
