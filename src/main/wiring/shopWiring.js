@@ -116,6 +116,17 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
       }
     }
 
+    // Ratatoskr-style moving vendors carry their own unpaid stock.
+    for (const itemId of inventoryItems(world, shopkeeperId)) {
+      const unpaid = world.get(itemId, Unpaid);
+      if (!unpaid || unpaid.shopkeeperId !== shopkeeperId) continue;
+      const detail = buildShopItemDetail(itemId, 1.0);
+      if (detail) {
+        detail.buyPrice = unpaid.price;
+        shopItems.push(detail);
+      }
+    }
+
     // Collect unpaid items in player inventory (for bill/checkout)
     const pe = playerEntity(world);
     const playerItems = [];
@@ -229,21 +240,25 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     return currentDepth(world, 1) > 0 || getTownPhase(world.step) === "work";
   }
 
+  function isRatatoskrVendor(vendorKind = activeShopSession.vendorKind) {
+    return String(vendorKind || "") === "ratatoskr";
+  }
+
   world.on("shop:open", ({ actor, targetId, buyMarkup, sellDiscount, vendorKind }) => {
     const pe = playerEntity(world);
     if (!pe || actor !== pe.id) return;
     if (!isPlayerAdjacentToEntity(Number(targetId) || 0)) return;
     const sid = Number(targetId) || 0;
     if (sid > 0 && activeShopSession.shopkeeperId === sid) return;
-    if (!isShopOpenNow()) {
+    const vkind = String(vendorKind || "");
+    if (!isRatatoskrVendor(vkind) && !isShopOpenNow()) {
       log("The shop is closed.");
       return;
     }
-    log("You approach the shopkeeper.");
+    log(isRatatoskrVendor(vkind) ? "You bargain with Ratatoskr." : "You approach the shopkeeper.");
     const shop = world.get(targetId, ShopInventory);
     const markup = buyMarkup ?? shop?.buyMarkup ?? 1.0;
     const discount = sellDiscount ?? shop?.sellDiscount ?? 0.5;
-    const vkind = String(vendorKind || "");
     activeShopSession = {
       shopkeeperId: Number(targetId) || 0,
       buyMarkup: markup,
@@ -262,7 +277,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     const pe = playerEntity(world);
     if (!pe) return;
     if (!isPlayerAdjacentToEntity(Number(shopkeeperId) || 0)) {
-      log("The shopkeeper is too far away.");
+      log(isRatatoskrVendor() ? "Ratatoskr is too far away." : "The shopkeeper is too far away.");
       closeShopUI();
       return;
     }
@@ -274,8 +289,10 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
 
     // Floor shop model: only unpaid floor items from this shopkeeper are purchasable.
     const unpaid = world.get(itemId, Unpaid);
-    if (!unpaid || unpaid.shopkeeperId !== shopkeeperId || !world.has(itemId, Position)) {
-      log("That item is not on this shop floor.");
+    const carriedByShopkeeper = isRatatoskrVendor()
+      && inventoryContains(world, Number(shopkeeperId) || 0, Number(itemId) || 0);
+    if (!unpaid || unpaid.shopkeeperId !== shopkeeperId || (!world.has(itemId, Position) && !carriedByShopkeeper)) {
+      log(isRatatoskrVendor() ? "Ratatoskr is not carrying that." : "That item is not on this shop floor.");
       return;
     }
     const price = unpaid.price;
@@ -314,7 +331,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     const pe = playerEntity(world);
     if (!pe) return;
     if (!isPlayerAdjacentToEntity(Number(shopkeeperId) || 0)) {
-      log("The shopkeeper is too far away.");
+      log(isRatatoskrVendor() ? "Ratatoskr is too far away." : "The shopkeeper is too far away.");
       closeShopUI();
       return;
     }
@@ -331,7 +348,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     }
 
     if (isItemCursed(world, itemId)) {
-      log("The shopkeeper recoils. \"I don't deal in cursed goods.\"");
+      log(isRatatoskrVendor() ? "Ratatoskr chitters. \"I sell curses. I don't buy them. Different branch.\"" : "The shopkeeper recoils. \"I don't deal in cursed goods.\"");
       return;
     }
 
@@ -415,7 +432,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     const pe = playerEntity(world);
     if (!pe) return;
     if (!isActiveCheckoutSessionFor(sid) && !isPlayerAdjacentToEntity(sid)) {
-      log("The shopkeeper is too far away.");
+      log(isRatatoskrVendor() ? "Ratatoskr is too far away." : "The shopkeeper is too far away.");
       closeShopUI();
       return;
     }
@@ -426,7 +443,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     if (!unpaid || unpaid.shopkeeperId !== sid) return;
 
     if (!transferItem(world, itemId, pe.id, sid, { silent: true })) {
-      log("The shopkeeper cannot take that back right now.");
+      log(isRatatoskrVendor() ? "Ratatoskr cannot take that back right now." : "The shopkeeper cannot take that back right now.");
       return;
     }
     const eq = world.get(pe.id, Equipment);
@@ -435,7 +452,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
         if (eq[slot] === itemId) { eq[slot] = null; break; }
       }
     }
-    log(`You return ${bracketizeName(resolveItemDisplayName(world, itemId))} to the shopkeeper.`);
+    log(`You return ${bracketizeName(resolveItemDisplayName(world, itemId))} to ${isRatatoskrVendor() ? "Ratatoskr" : "the shopkeeper"}.`);
 
     const shop = world.get(sid, ShopInventory);
     dispatchShopData(sid, shop?.buyMarkup ?? 1.0, shop?.sellDiscount ?? 0.5, "checkout");

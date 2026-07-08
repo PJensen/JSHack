@@ -38,6 +38,7 @@ import { aiTownfolkSystem, installTownfolkDoorListener, installBellListener } fr
 import { socialAggroSystem } from "../rules/systems/socialAggroSystem.js";
 import { aiScurrySystem } from "../rules/systems/aiScurrySystem.js";
 import { aiFarmAnimalSystem } from "../rules/systems/aiFarmAnimalSystem.js";
+import { ratatoskrSystem } from "../rules/systems/ratatoskrSystem.js";
 import { aiWeaponPickupSystem } from "../rules/systems/aiWeaponPickupSystem.js";
 import { aiScrollPickupSystem, aiScrollUseSystem } from "../rules/systems/aiScrollSystem.js";
 import { aiCorpseEatSystem } from "../rules/systems/aiCorpseEatSystem.js";
@@ -118,6 +119,7 @@ import "../rules/scripts/traps.js";
 import "../rules/scripts/monsters.js";
 import "../rules/data/procPackages.js";
 import "../rules/dialogues/townfolkDialogs.js";
+import "../rules/dialogues/ratatoskrDialog.js";
 import { installGemSocketListener } from "../rules/data/gemSocketAffixes.js";
 import { installCentipedeBodyCascade } from "../rules/utils/centipedeMovement.js";
 import { perceptionMemorySystem } from "../rules/systems/perceptionMemorySystem.js";
@@ -200,6 +202,7 @@ export function configureWorld(world) {
   // aiChaseSystem's existing intent-skip guard then honours.
   registerSystem(aiScurrySystem, 'ai');
   registerSystem(aiFarmAnimalSystem, 'ai');
+  registerSystem(ratatoskrSystem, 'ai');
   registerSystem(aiTownfolkSystem, 'ai');
   registerSystem(socialAggroSystem, 'ai');
   registerSystem(aiChaseSystem, 'ai');

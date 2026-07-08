@@ -135,6 +135,34 @@ export function generateShopItem(world, depth, rng) {
 }
 
 /**
+ * Generate one Ratatoskr cache item from the legendary equipment table.
+ * The caller owns placement and Unpaid pricing.
+ * @param {import('../../lib/ecs-js/index.js').World} world
+ * @param {number} depth
+ * @param {Object} rng
+ * @returns {number|null}
+ */
+export function generateRatatoskrLegendaryItem(world, depth, rng) {
+    const drops = resolveLootTable("sub:equip_legendary", rng, Math.max(8, Number(depth || 0) | 0));
+    const dummyPos = { x: 0, y: 0 };
+    for (const drop of drops) {
+        if (drop.kind === "gold") continue;
+        const eid = materializeDrop(world, drop, dummyPos);
+        if (eid == null) continue;
+        stripPosition(world, eid);
+        const info = world.get(eid, ItemInfo);
+        if (info && info.value > 0) {
+            world.mutate(eid, ItemInfo, r => {
+                r.identified = true;
+                r.value = Math.ceil(r.value * 1.35);
+            });
+        }
+        return eid;
+    }
+    return null;
+}
+
+/**
  * Generate exactly one apothecary floor item entity ID (no Position component).
  * Authored alchemy shops use this for visible floor stock markers.
  * @param {import('../../lib/ecs-js/index.js').World} world

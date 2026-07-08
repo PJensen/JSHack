@@ -782,6 +782,13 @@ defineMonster('ratatoskr', {
   lootTable: 'drop:beast',
   corpseDropChance: 0,
   aiHints: { rareMessenger: true, distantOutdoorRegions: true },
+  state: {
+    ratatoskr: {
+      nextAppearTurn: 45,
+      visits: 0,
+      lastBarkTurn: -9999,
+    },
+  },
   specials: ['Unique', 'Passive', 'Outdoor messenger', 'Carries rumors, insults, quest state, or items'],
   description: 'A diminutive squirrel who darts between distant outdoor places carrying rumors, insults, errands, and things that should not have crossed the map so quickly.',
   meta: {
