@@ -104,7 +104,8 @@ export function openRatatoskrCache(world, actorId, targetId) {
     targetId,
     buyMarkup: 3.0,
     sellDiscount: 0.15,
-    vendorKind: "ratatoskr",
+    vendorKind: "travellingVendor",
+    vendorLabel: "Ratatoskr",
   });
   return true;
 }

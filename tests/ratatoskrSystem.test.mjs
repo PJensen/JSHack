@@ -87,7 +87,8 @@ Deno.test("Ratatoskr dialog opens a legendary unpaid cache", () => {
   assert(sessionId > 0, "Ratatoskr dialog should open");
   world.emit("dialog:choose", { sessionId, choiceId: "open_cache" });
 
-  assertEquals(shops.at(-1)?.vendorKind, "ratatoskr");
+  assertEquals(shops.at(-1)?.vendorKind, "travellingVendor");
+  assertEquals(shops.at(-1)?.vendorLabel, "Ratatoskr");
   const stock = [];
   for (const [itemId, unpaid] of world.query(Unpaid)) {
     if (unpaid.shopkeeperId === ratatoskr) stock.push(itemId);
