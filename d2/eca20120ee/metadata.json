@@ -3,7 +3,7 @@
   "checkpoint_id": "d2eca20120ee",
   "strategy": "manual-commit",
   "branch": "master",
-  "checkpoints_count": 3,
+  "checkpoints_count": 4,
   "files_touched": [
     "src/main/wiring/transitionWiring.js",
     "src/rules/environment/dungeon/transition.js",
@@ -15,6 +15,12 @@
       "transcript": "/d2/eca20120ee/0/full.jsonl",
       "content_hash": "/d2/eca20120ee/0/content_hash.txt",
       "prompt": "/d2/eca20120ee/0/prompt.txt"
+    },
+    {
+      "metadata": "/d2/eca20120ee/1/metadata.json",
+      "transcript": "/d2/eca20120ee/1/full.jsonl",
+      "content_hash": "/d2/eca20120ee/1/content_hash.txt",
+      "prompt": ""
     }
   ],
   "token_usage": {
