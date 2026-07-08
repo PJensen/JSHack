@@ -5067,16 +5067,16 @@ function render(worldView) {
       _healthBarsToDraw.push({ ...renderEntity, _sizeScale: sizeScale });
     }
 
-    // Actor name labels — hostile actors, pets, and town NPCs.
+    // Actor name labels — hostile actors, pets, town NPCs, and tagged named actors.
     if (
       (renderEntity.layer | 0) === 300
-      && (renderEntity.showHealthBar || renderEntity.isNpc)
+      && (renderEntity.showHealthBar || renderEntity.isNpc || renderEntity.showNameLabel)
       && !_renderTagSet.has('memory_recent')
       && !_renderTagSet.has('esp_sensed')
       && !_renderTagSet.has('thermal_sensed')
       && (!worldView?.isVisible || worldView.isVisible(renderEntity.pos.x, renderEntity.pos.y))
     ) {
-      const label = renderEntity.isNpc
+      const label = (renderEntity.isNpc || renderEntity.showNameLabel)
         ? (String(renderEntity.displayName || '').trim() || monsterLabelFromKind(renderEntity.kind))
         : monsterLabelFromKind(renderEntity.kind);
       if (label) {

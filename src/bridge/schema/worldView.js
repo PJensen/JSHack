@@ -77,7 +77,7 @@ import {
 } from "../../rules/environment/dungeon/perceptionMemory.js";
 
 // Reuse view/record objects across frames to reduce allocations/GC churn.
-/** @typedef {{ id:number, kind:string, pos:{x:number,y:number}, tags:string[], layer:number, hp:number, maxHp:number, isPet:boolean, showHealthBar:boolean, facing:{dx:number,dy:number}|null, aggroLevel:string, aggroTargetId:number, aggroTargetReason:string, threatState:string, targetLocked:boolean, weaponVfx:any[]|null, itemScale:number, rotation:number, visualOff:{dx:number,dy:number}, entranceBadge?:{level:number,floors:number,color:string} }} EntityView */
+/** @typedef {{ id:number, kind:string, pos:{x:number,y:number}, tags:string[], layer:number, hp:number, maxHp:number, isPet:boolean, isNpc?:boolean, displayName?:string, showHealthBar:boolean, showNameLabel?:boolean, facing:{dx:number,dy:number}|null, aggroLevel:string, aggroTargetId:number, aggroTargetReason:string, threatState:string, targetLocked:boolean, weaponVfx:any[]|null, itemScale:number, rotation:number, visualOff:{dx:number,dy:number}, entranceBadge?:{level:number,floors:number,color:string} }} EntityView */
 /** @typedef {{ id:number, x:number, y:number }} SolidView */
 /** @typedef {{ x:number, y:number, kind:string, alpha:number, burning?:boolean, smoking?:boolean }} RoofTileView */
 /** @typedef {{ id:number, profile:string, pos:{x:number,y:number}, interior:boolean }} AudioEmitterView */
@@ -220,6 +220,7 @@ function makePerceptionEcho(src, extraTags, at, kindOverride = undefined) {
 		maxHp: 0,
 		isPet: false,
 		showHealthBar: false,
+		showNameLabel: false,
 		facing: null,
 		weaponVfx: null,
 	};
@@ -783,6 +784,7 @@ function projectCombatUi(world, id, rec, playerFactionKey) {
 	rec.isNpc = false;
 	rec.displayName = String(world.get(id, NamedIdentity)?.name || "").trim();
 	rec.showHealthBar = false;
+	rec.showNameLabel = rec.tags.includes("nameplate");
 
 	/** @type {any} */ const vit = /** @type any */ (world.get(id, Vitality));
 	if (!vit) return;
@@ -1226,7 +1228,7 @@ export function buildWorldView(world) {
 			const iScale = itemInfo ? computeItemScale(itemInfo, kind) : 1;
 			const vOff = itemInfo ? computeVisualOffset(id) : _zeroOff;
 			if (!rec) {
-				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer, hp: 0, maxHp: 0, isPet: false, showHealthBar: false, aggroLevel: "", aggroTargetId: 0, aggroTargetReason: "", threatState: "", targetLocked: false, procStates: null, equipBadges: null, stackSeq, facing: null, weaponVfx: null, sizeClass: physSizeClass, itemScale: iScale, rotation: 0, visualOff: vOff };
+				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer, hp: 0, maxHp: 0, isPet: false, showHealthBar: false, showNameLabel: false, aggroLevel: "", aggroTargetId: 0, aggroTargetReason: "", threatState: "", targetLocked: false, procStates: null, equipBadges: null, stackSeq, facing: null, weaponVfx: null, sizeClass: physSizeClass, itemScale: iScale, rotation: 0, visualOff: vOff };
 				_entityRecs.set(id, rec);
 			} else {
 				rec.kind = kind;
@@ -1364,7 +1366,7 @@ export function buildWorldView(world) {
 			/** @type {EntityView|null} */
 			let rec = /** @type any */ (_entityRecs.get(id) || null);
 			if (!rec) {
-				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer, hp: 0, maxHp: 0, isPet: false, showHealthBar: false, aggroLevel: "", aggroTargetId: 0, aggroTargetReason: "", threatState: "", targetLocked: false, procStates: null, stackSeq: stackSeq2, facing: null, weaponVfx: null, sizeClass: physSizeClass2, itemScale: iScale2, rotation: 0, visualOff: vOff2 };
+				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer, hp: 0, maxHp: 0, isPet: false, showHealthBar: false, showNameLabel: false, aggroLevel: "", aggroTargetId: 0, aggroTargetReason: "", threatState: "", targetLocked: false, procStates: null, stackSeq: stackSeq2, facing: null, weaponVfx: null, sizeClass: physSizeClass2, itemScale: iScale2, rotation: 0, visualOff: vOff2 };
 				_entityRecs.set(id, rec);
 			} else {
 				rec.kind = kind;
@@ -1450,7 +1452,7 @@ export function buildWorldView(world) {
 			const petPhysSizeClass = /** @type {string} */ (world.get(id, Physiology)?.sizeClass || '');
 			let rec = /** @type any */ (_entityRecs.get(id) || null);
 			if (!rec) {
-				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer: 300, hp: 0, maxHp: 0, isPet: false, showHealthBar: false, aggroLevel: "", aggroTargetId: 0, aggroTargetReason: "", threatState: "", targetLocked: false, procStates: null, equipBadges: null, stackSeq, facing: null, weaponVfx: null, sizeClass: petPhysSizeClass, itemScale: 1, rotation: 0, visualOff: _zeroOff };
+				rec = { id, kind, pos: { x: pos.x, y: pos.y }, tags: [], layer: 300, hp: 0, maxHp: 0, isPet: false, showHealthBar: false, showNameLabel: false, aggroLevel: "", aggroTargetId: 0, aggroTargetReason: "", threatState: "", targetLocked: false, procStates: null, equipBadges: null, stackSeq, facing: null, weaponVfx: null, sizeClass: petPhysSizeClass, itemScale: 1, rotation: 0, visualOff: _zeroOff };
 				_entityRecs.set(id, rec);
 			} else {
 				rec.kind = kind;

@@ -1,3 +1,4 @@
+import "./helpers/installContentMonsters.mjs";
 import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";
 import { buildWorldView } from "../src/bridge/schema/worldView.js";
@@ -49,6 +50,41 @@ Deno.test("WorldView projects town NPC names for actor nameplates", () => {
   assertEquals(rec.isNpc, true);
   assertEquals(rec.displayName, "Marta the Mason");
   assertEquals(rec.showHealthBar, false, "friendly NPC nameplates should not require hostile health bars");
+});
+
+Deno.test("WorldView projects authored nameplate labels for tagged neutral creatures", () => {
+  resetFloor();
+  const world = new World({ seed: 0x1abe1 });
+
+  const player = world.create();
+  world.add(player, Player, {});
+  world.add(player, Position, { x: 10, y: 10 });
+  world.add(player, NamedIdentity, { name: "Hero", identity: "player" });
+  world.add(player, Facing, { dx: 1, dy: 0 });
+  world.add(player, BaseStats, { perception: 5 });
+  world.add(player, Faction, { key: "player" });
+
+  const chick = world.create();
+  world.add(chick, Position, { x: 11, y: 10 });
+  world.add(chick, NamedIdentity, { name: "Chick", identity: "chick" });
+  world.add(chick, Vitality, { hp: 2, maxHp: 2 });
+  world.add(chick, Faction, { key: "neutral" });
+
+  const ratatoskr = world.create();
+  world.add(ratatoskr, Position, { x: 12, y: 10 });
+  world.add(ratatoskr, NamedIdentity, { name: "Ratatoskr", identity: "ratatoskr" });
+  world.add(ratatoskr, Vitality, { hp: 6, maxHp: 6 });
+  world.add(ratatoskr, Faction, { key: "neutral" });
+
+  const entities = buildWorldView(world).entities;
+  for (const [id, name] of [[chick, "Chick"], [ratatoskr, "Ratatoskr"]]) {
+    const rec = entities.find((entity) => entity.id === id);
+    assert(rec, `${name} should be visible`);
+    assertEquals(rec.displayName, name);
+    assertEquals(rec.showNameLabel, true);
+    assertEquals(rec.showHealthBar, false, `${name} label should not depend on a health bar`);
+    assertEquals(rec.isNpc, false, `${name} should not masquerade as a town NPC`);
+  }
 });
 
 Deno.test("WorldView keeps frozen recent-memory glyph when turning away", () => {
