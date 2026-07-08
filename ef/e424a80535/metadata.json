@@ -1,0 +1,29 @@
+{
+  "cli_version": "0.7.7",
+  "checkpoint_id": "efe424a80535",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "src/display/audio/audioWiring.js",
+    "src/events/RiftClosed.js",
+    "src/rules/utils/riftRuntime.js",
+    "tests/localEmitterAmbientController.test.mjs",
+    "tests/riftDebugCommands.test.mjs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/ef/e424a80535/0/metadata.json",
+      "transcript": "/ef/e424a80535/0/full.jsonl",
+      "content_hash": "/ef/e424a80535/0/content_hash.txt",
+      "prompt": "/ef/e424a80535/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 608105,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 13079424,
+    "output_tokens": 47514,
+    "api_call_count": 110
+  }
+}
