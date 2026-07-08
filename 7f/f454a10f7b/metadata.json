@@ -5,6 +5,7 @@
   "branch": "master",
   "checkpoints_count": 3,
   "files_touched": [
+    "VERSION",
     "src/main/wiring/shopWiring.js",
     "src/rules/dialogues/ratatoskrDialog.js",
     "tests/ratatoskrSystem.test.mjs"
