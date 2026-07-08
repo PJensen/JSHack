@@ -1,0 +1,29 @@
+{
+  "cli_version": "0.7.7",
+  "checkpoint_id": "5125e86bd975",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "src/content/monsters/animals.js",
+    "src/content/monsters/humanoids.js",
+    "src/rules/environment/dungeon/tables.js",
+    "tests/lootGoblin.test.mjs",
+    "tests/norseContent.test.mjs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/51/25e86bd975/0/metadata.json",
+      "transcript": "/51/25e86bd975/0/full.jsonl",
+      "content_hash": "/51/25e86bd975/0/content_hash.txt",
+      "prompt": "/51/25e86bd975/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 147504,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 2846592,
+    "output_tokens": 8463,
+    "api_call_count": 29
+  }
+}
