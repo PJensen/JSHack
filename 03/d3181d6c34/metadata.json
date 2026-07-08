@@ -5,6 +5,7 @@
   "branch": "master",
   "checkpoints_count": 5,
   "files_touched": [
+    "VERSION",
     "src/main/wiring/transitionWiring.js",
     "src/rules/components/RiftPortal.js",
     "src/rules/components/RiftQuestLink.js",
