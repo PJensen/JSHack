@@ -3,10 +3,11 @@
   "checkpoint_id": "efe424a80535",
   "session_id": "019f420b-d645-73f1-b8f7-c7a059622cd3",
   "strategy": "manual-commit",
-  "created_at": "2026-07-08T15:22:46.031964909Z",
+  "created_at": "2026-07-08T15:29:37.013462572Z",
   "branch": "master",
   "checkpoints_count": 1,
   "files_touched": [
+    "VERSION",
     "src/display/audio/audioWiring.js",
     "src/events/RiftClosed.js",
     "src/rules/utils/riftRuntime.js",
@@ -19,15 +20,15 @@
   "checkpoint_transcript_start": 16,
   "transcript_lines_at_start": 16,
   "initial_attribution": {
-    "calculated_at": "2026-07-08T15:22:46.017114733Z",
-    "agent_lines": 0,
-    "agent_removed": 0,
+    "calculated_at": "2026-07-08T15:29:36.995899285Z",
+    "agent_lines": 1,
+    "agent_removed": 1,
     "human_added": 0,
     "human_modified": 0,
     "human_removed": 0,
-    "total_committed": 0,
-    "total_lines_changed": 0,
-    "agent_percentage": 0,
+    "total_committed": 1,
+    "total_lines_changed": 2,
+    "agent_percentage": 100,
     "metric_version": 2
   }
 }

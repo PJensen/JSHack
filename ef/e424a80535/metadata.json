@@ -5,6 +5,7 @@
   "branch": "master",
   "checkpoints_count": 2,
   "files_touched": [
+    "VERSION",
     "src/display/audio/audioWiring.js",
     "src/events/RiftClosed.js",
     "src/rules/utils/riftRuntime.js",
