@@ -7,4 +7,6 @@ export const RiftPortal = defineComponent("RiftPortal", {
   originDepth: 0,
   originX: 0,
   originY: 0,
+  templateId: "",
+  sourceQuestId: "",
 });

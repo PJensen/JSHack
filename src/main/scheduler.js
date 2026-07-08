@@ -112,6 +112,7 @@ import { installQuestRuntime } from "../rules/quests/runtime.js";
 import { installStarterFetchQuestHooks } from "../rules/quests/definitions/graveyardWatch.js";
 import { installRatQuestHooks, ratInfestationDeathSystem } from "../rules/quests/definitions/ratInfestation.js";
 import { installRunContractHooks, runContractDeathSystem } from "../rules/quests/definitions/runContract.js";
+import { installPriestRiftHooks, priestRiftDeathSystem } from "../rules/quests/definitions/priestRift.js";
 // Side-effect: registers script handlers at import time
 import "../rules/scripts/traps.js";
 import "../rules/scripts/monsters.js";
@@ -143,6 +144,7 @@ export function configureWorld(world) {
   installStarterFetchQuestHooks(world);
   installRatQuestHooks(world);
   installRunContractHooks(world);
+  installPriestRiftHooks(world);
 
   installTownfolkDoorListener(world);
   installBellListener(world);
@@ -312,6 +314,7 @@ export function configureWorld(world) {
   registerSystem(monsterDeathHookSystem, 'effects', { after: [scoreSystem] });
   registerSystem(ratInfestationDeathSystem, 'effects', { after: [monsterDeathHookSystem] });
   registerSystem(runContractDeathSystem, 'effects', { after: [ratInfestationDeathSystem] });
+  registerSystem(priestRiftDeathSystem, 'effects', { after: [runContractDeathSystem] });
   registerSystem(deityChallengeSystem, 'effects', { after: [runContractDeathSystem] });
   registerSystem(tombstoneSystem, 'effects', { after: [deityChallengeSystem] });
   registerSystem(perceptionMemorySystem, 'effects');

@@ -12,4 +12,6 @@ export const RiftState = defineComponent("RiftState", {
   portalId: 0,
   inside: false,
   planeId: "",
+  templateId: "",
+  sourceQuestId: "",
 });

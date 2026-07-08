@@ -458,7 +458,7 @@ export async function transitionToDepth(world, newDepth, destinationPos, opts = 
       spawnY = result.spawnY;
       newProfileType = result.profileType || "default";
       newRegionKey = targetPlaneId ? destinationRegionKey : (result.regionKey || region.regionKey);
-      newTemplateId = targetPlaneId ? "" : (result.activeTemplateId || region.templateId || "");
+      newTemplateId = result.activeTemplateId || region.templateId || "";
       newRegionAnchorX = targetPlaneId ? 0 : (Number(result.regionAnchorX || region.anchorX || 0) | 0);
       newRegionAnchorY = targetPlaneId ? 0 : (Number(result.regionAnchorY || region.anchorY || 0) | 0);
     }
@@ -684,6 +684,7 @@ export async function transitionToDepth(world, newDepth, destinationPos, opts = 
     regionKey: restoredRegionKey,
     anchor: { x: Number(newRegionAnchorX || 0) | 0, y: Number(newRegionAnchorY || 0) | 0 },
     profileType: newProfileType || "default",
+    planeId: targetPlaneId,
     pos: destinationPos,
   });
   invalidateTileQueryCache(world);

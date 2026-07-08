@@ -60,8 +60,10 @@ function resolveSeed(world) {
   return (base ^ roll ^ ((step * 0x9e3779b9) >>> 0) ^ 0x52494654) >>> 0;
 }
 
-function resolveRiftId(seed, portalId) {
-  return `${(seed >>> 0).toString(16).padStart(8, "0")}-${Number(portalId || 0) | 0}`;
+function resolveRiftId(seed, portalId, prefix = "") {
+  const p = String(prefix || "").trim();
+  const suffix = `${(seed >>> 0).toString(16).padStart(8, "0")}-${Number(portalId || 0) | 0}`;
+  return p ? `${p}:${suffix}` : suffix;
 }
 
 export function destroyActiveRift(world, payload = {}) {
@@ -86,7 +88,7 @@ export function destroyActiveRift(world, payload = {}) {
   return { riftId, portalId };
 }
 
-export function createDebugRift(world, requestedLevels = 0) {
+export function createRift(world, spec = {}) {
   if (activeRiftRecord(world)) {
     return { ok: false, error: "A rift is already active. Use close rift first." };
   }
@@ -95,15 +97,20 @@ export function createDebugRift(world, requestedLevels = 0) {
   if (!pe) return { ok: false, error: "No player entity found." };
   const originDepth = currentDungeonDepth(world, 0);
   const origin = { x: pe.pos.x | 0, y: pe.pos.y | 0 };
-  const portalPos = findNearestValidTileAround(world, origin, {
+  const requestedPos = Number.isFinite(Number(spec.x)) && Number.isFinite(Number(spec.y))
+    ? { x: Number(spec.x) | 0, y: Number(spec.y) | 0 }
+    : null;
+  const portalPos = requestedPos || findNearestValidTileAround(world, origin, {
     maxDistance: 2,
     exclude: [origin],
   }) || origin;
-  const seed = resolveSeed(world);
-  const levels = resolveLevelCount(world, requestedLevels);
+  const seed = Number.isFinite(Number(spec.seed)) ? (Number(spec.seed) >>> 0) : resolveSeed(world);
+  const levels = resolveLevelCount(world, spec.levels);
+  const templateId = String(spec.templateId || "");
+  const sourceQuestId = String(spec.sourceQuestId || "");
 
   const portalId = world.create();
-  const riftId = resolveRiftId(seed, portalId);
+  const riftId = String(spec.riftId || "") || resolveRiftId(seed, portalId, String(spec.idPrefix || ""));
   world.add(portalId, Position, { x: portalPos.x | 0, y: portalPos.y | 0 });
   world.add(portalId, NamedIdentity, { name: "Rift Portal", identity: RIFT_PORTAL_IDENTITY });
   world.add(portalId, LightEmitter, {
@@ -128,6 +135,8 @@ export function createDebugRift(world, requestedLevels = 0) {
     originDepth,
     originX: origin.x,
     originY: origin.y,
+    templateId,
+    sourceQuestId,
   });
   for (const [id, ds] of world.query(DungeonState)) {
     const ids = Array.isArray(ds.floorEntityIds) ? ds.floorEntityIds.slice() : [];
@@ -149,6 +158,8 @@ export function createDebugRift(world, requestedLevels = 0) {
     portalId,
     inside: false,
     planeId: riftPlaneId(riftId),
+    templateId,
+    sourceQuestId,
   });
 
   world.emit(new RiftOpened({
@@ -174,5 +185,11 @@ export function createDebugRift(world, requestedLevels = 0) {
     originY: origin.y,
     x: portalPos.x | 0,
     y: portalPos.y | 0,
+    templateId,
+    sourceQuestId,
   };
+}
+
+export function createDebugRift(world, requestedLevels = 0) {
+  return createRift(world, { levels: requestedLevels });
 }

@@ -95,6 +95,7 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
       riftEnter: opts?.riftEnter === true,
       riftExit: opts?.riftExit === true,
       riftClose: opts?.riftClose === true,
+      templateId: typeof opts?.templateId === "string" ? opts.templateId : "",
     };
   }
 
@@ -249,6 +250,7 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
           pending.riftId = currentRift.state.riftId;
           pending.riftLevel = newDepth;
           pending.riftEnter = true;
+          pending.templateId = String(currentRift.state.templateId || "");
         } else if (currentDepth <= 1) {
           newDepth = Math.max(0, Number(currentRift.state.originDepth || 0) | 0);
           pending.targetPos = { x: currentRift.state.originX | 0, y: currentRift.state.originY | 0 };
@@ -262,6 +264,7 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
           pending.riftId = currentRift.state.riftId;
           pending.riftLevel = newDepth;
           pending.riftEnter = true;
+          pending.templateId = String(currentRift.state.templateId || "");
         }
       }
       const activeTemplateId = pending.planeId
@@ -284,6 +287,7 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
             validateDestination: pending.validateTargetPos === true,
             planeId: pending.planeId,
             planeSeed: pending.planeSeed,
+            templateId: pending.templateId,
           },
         );
         if (pending.fragActorsAtTarget) {
@@ -306,6 +310,7 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
           anchorY: activeTemplateId ? (Number(pending.entrance?.anchorY ?? currentState?.regionAnchorY ?? pending.stairPos?.y ?? 0) | 0) : undefined,
           planeId: pending.planeId,
           planeSeed: pending.planeSeed,
+          templateId: pending.templateId,
         });
       }
 
@@ -490,6 +495,7 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
         riftId,
         riftLevel: 1,
         riftEnter: true,
+        templateId: String(portal.templateId || rec.state.templateId || ""),
         source: "rift:enter",
       });
     });

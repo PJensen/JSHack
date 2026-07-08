@@ -24,6 +24,7 @@ import { clearAll as clearTileMap, setTile } from "../src/rules/environment/dung
 import { TILE_FLOOR } from "../src/rules/environment/dungeon/constants.js";
 import { clearFloorCache } from "../src/rules/environment/dungeon/transition.js";
 import { playerEntity } from "../src/rules/utils/queries.js";
+import { createRift } from "../src/rules/utils/riftRuntime.js";
 import { resolveInteractableAffordance } from "../src/rules/interaction/interactableAffordance.js";
 
 function floorPatch(cx = 5, cy = 5, radius = 4) {
@@ -241,6 +242,47 @@ Deno.test("rift enter and close use a detached plane and return to origin", asyn
     assertEquals([...world.query(RiftPortal)].length, 0);
     assertEquals(exited.length, 1);
     assertEquals(closed.length, 1);
+  } finally {
+    Date.now = originalNow;
+    clearFloorCache();
+    clearTileMap();
+  }
+});
+
+Deno.test("authored rift template is used inside detached rift plane", async () => {
+  installContent();
+  clearFloorCache();
+  const originalNow = Date.now;
+  let now = 30_000;
+  Date.now = () => now;
+
+  try {
+    const { world } = makeWorld(1);
+    const created = createRift(world, {
+      levels: 3,
+      templateId: "priest_rift_crypt",
+      sourceQuestId: "starter.priest_rift",
+      seed: 0x12345678,
+    });
+    assertEquals(created.ok, true);
+    const [portalId, portal] = [...world.query(RiftPortal)][0];
+
+    const controller = createTransitionController({
+      world,
+      playerEntity: () => playerEntity(world),
+      tombstoneRepo: null,
+      onTransitioned() {},
+    });
+    controller.install();
+
+    world.emit(new RiftEnterRequested({ actor: playerEntity(world).id, portalId, riftId: portal.riftId }));
+    await controller.flush();
+
+    const ds = [...world.query(DungeonState)][0][1];
+    const state = [...world.query(RiftState)][0][1];
+    assertEquals(ds.activePlaneId, `rift:${portal.riftId}`);
+    assertEquals(ds.activeTemplateId, "priest_rift_crypt");
+    assertEquals(state.templateId, "priest_rift_crypt");
   } finally {
     Date.now = originalNow;
     clearFloorCache();

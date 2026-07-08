@@ -9,6 +9,7 @@ import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
 import { Player } from "../src/rules/components/Player.js";
 import { Position } from "../src/rules/components/Position.js";
 import { QuestState } from "../src/rules/components/QuestState.js";
+import { QuestVars } from "../src/rules/components/QuestVars.js";
 import { installQuestRuntime } from "../src/rules/quests/runtime.js";
 import { addToInventory } from "../src/rules/utils/inventoryFacade.js";
 import { consumeInventoryIdentity, inventoryHasIdentity } from "../src/rules/utils/townEconomy.js";
@@ -21,6 +22,26 @@ import { RAT_INFESTATION_QUEST_ID } from "../src/rules/quests/definitions/ratInf
 import { DoorKey } from "../src/rules/components/DoorKey.js";
 import { RAT_CELLAR_LOCK_ID } from "../src/rules/data/questLocks.js";
 import { ensureRunContractQuest, RUN_CONTRACT_QUEST_ID } from "../src/rules/quests/definitions/runContract.js";
+import { RiftPortal } from "../src/rules/components/RiftPortal.js";
+import { RunObjectiveTarget } from "../src/rules/components/RunObjectiveTarget.js";
+import { DeathApplied } from "../src/rules/components/DeathApplied.js";
+import { clearAll as clearTileMap, setTile } from "../src/rules/environment/dungeon/tileMap.js";
+import { TILE_FLOOR } from "../src/rules/environment/dungeon/constants.js";
+import {
+  ensurePriestRiftQuest,
+  ensurePriestRiftTargets,
+  installPriestRiftHooks,
+  priestRiftDeathSystem,
+  PRIEST_RIFT_QUEST_ID,
+  PRIEST_RIFT_TEMPLATE_ID,
+  PRIEST_RIFT_LEVELS,
+} from "../src/rules/quests/definitions/priestRift.js";
+
+function floorPatch(cx = 5, cy = 5, radius = 4) {
+  for (let y = cy - radius; y <= cy + radius; y++) {
+    for (let x = cx - radius; x <= cx + radius; x++) setTile(x, y, TILE_FLOOR);
+  }
+}
 
 Deno.test("mason clearly offers the authored-dungeon trophy contract", () => {
   const world = new World({ seed: 0x7a0f4 });
@@ -166,6 +187,127 @@ Deno.test("priest fetch quest accepts and turns in a book already in inventory",
   });
   assertEquals(world.get(questId, QuestState)?.status, "complete");
   assertEquals(inventoryHasIdentity(world, player, "book_dead", 1), false);
+});
+
+Deno.test("completing the priest book quest creates the rift followup quest", () => {
+  const world = new World({ seed: 95 });
+  installQuestRuntime(world);
+  installPriestRiftHooks(world);
+
+  const player = world.create();
+  world.add(player, Player);
+  world.add(player, Inventory, { capacity: 8 });
+  world.add(player, NamedIdentity, { name: "Hero", identity: "player" });
+  const priest = world.create();
+  world.add(priest, NamedIdentity, { name: "Priest", identity: "townfolk_priest" });
+
+  instantiateQuest(world, STARTER_PRIEST_FETCH_QUEST_ID, {
+    player,
+    giver: priest,
+    target: priest,
+  }, {}, { node: "recover" });
+  const bookId = buildCatalogItem(world, "book_dead", { count: 1 });
+  addToInventory(world, player, bookId);
+
+  world.emit("dialog:reported", {
+    questId: STARTER_PRIEST_FETCH_QUEST_ID,
+    playerId: player,
+    speakerId: priest,
+  });
+
+  assertEquals(getQuestRecord(world, STARTER_PRIEST_FETCH_QUEST_ID, player)?.state?.status, "complete");
+  const riftQuest = getQuestRecord(world, PRIEST_RIFT_QUEST_ID, player);
+  assert(riftQuest, "book completion should chain into the priest rift quest");
+  assertEquals(riftQuest.state?.node, "offer");
+});
+
+Deno.test("priest rift dialog opens a three-level crypt rift", () => {
+  clearTileMap();
+  floorPatch();
+  const world = new World({ seed: 96 });
+  world.setScheduler(composeScheduler("scripts"));
+  installDialogRuntime(world);
+  installQuestRuntime(world);
+
+  const player = world.create();
+  world.add(player, Player);
+  world.add(player, Inventory, { capacity: 8 });
+  world.add(player, Position, { x: 5, y: 5 });
+  world.add(player, NamedIdentity, { name: "Hero", identity: "player" });
+  const priest = world.create();
+  world.add(priest, NamedIdentity, { name: "Priest", identity: "townfolk_priest" });
+  world.add(priest, Position, { x: 6, y: 5 });
+  const dungeon = world.create();
+  world.add(dungeon, DungeonState, {
+    worldSeed: world.seed >>> 0,
+    currentDepth: 0,
+    floorEntityIds: [player, priest],
+    downStairPositions: [],
+  });
+
+  instantiateQuest(world, STARTER_PRIEST_FETCH_QUEST_ID, {
+    player,
+    giver: priest,
+    target: priest,
+  }, {}, { node: "complete", status: "complete" });
+  assert(ensurePriestRiftQuest(world, { playerId: player, giverId: priest }) > 0);
+
+  const opened = [];
+  world.on("dialog:opened", (payload) => opened.push(payload));
+  world.emit("dialog:openRequest", { actorId: player, targetId: priest, dialogId: "townfolk:priest" });
+  assertEquals(opened.at(-1).choices.some((choice) => choice.id === "accept_priest_rift"), true);
+  world.emit("dialog:choose", { sessionId: opened.at(-1).sessionId, choiceId: "accept_priest_rift" });
+
+  const quest = getQuestRecord(world, PRIEST_RIFT_QUEST_ID, player);
+  assertEquals(quest?.state?.node, "cleanse");
+  const portals = [...world.query(RiftPortal)];
+  assertEquals(portals.length, 1);
+  assertEquals(portals[0][1].levels, PRIEST_RIFT_LEVELS);
+  assertEquals(portals[0][1].templateId, PRIEST_RIFT_TEMPLATE_ID);
+});
+
+Deno.test("priest rift terminal floor spawns boss and death advances quest", () => {
+  clearTileMap();
+  floorPatch();
+  const world = new World({ seed: 97 });
+  installQuestRuntime(world);
+
+  const player = world.create();
+  world.add(player, Player);
+  world.add(player, Inventory, { capacity: 8 });
+  world.add(player, Position, { x: 5, y: 5 });
+  world.add(player, NamedIdentity, { name: "Hero", identity: "player" });
+  const priest = world.create();
+  world.add(priest, NamedIdentity, { name: "Priest", identity: "townfolk_priest" });
+  const stair = world.create();
+  world.add(stair, Position, { x: 5, y: 6 });
+  world.add(stair, NamedIdentity, { name: "Down Stairs", identity: "stair_down" });
+  const dungeon = world.create();
+  world.add(dungeon, DungeonState, {
+    worldSeed: world.seed >>> 0,
+    currentDepth: PRIEST_RIFT_LEVELS,
+    activeTemplateId: PRIEST_RIFT_TEMPLATE_ID,
+    activePlaneId: "rift:test",
+    floorEntityIds: [player, stair],
+    downStairPositions: [{ x: 5, y: 6 }],
+  });
+
+  const qid = ensurePriestRiftQuest(world, { playerId: player, giverId: priest, allowBeforeFetchComplete: true });
+  world.set(qid, QuestState, { node: "cleanse", status: "active", t0: 0 });
+  const quest = getQuestRecord(world, PRIEST_RIFT_QUEST_ID, player);
+  world.set(qid, QuestVars, {
+    data: { ...quest.vars.data, accepted: true, riftOpened: true, riftId: "test" },
+  });
+
+  const bossId = ensurePriestRiftTargets(world);
+  assert(bossId > 0, "terminal rift floor should spawn the quest boss");
+  assertEquals(world.get(bossId, RunObjectiveTarget)?.questId, PRIEST_RIFT_QUEST_ID);
+
+  const deathId = world.create();
+  world.add(deathId, DeathApplied, { target: bossId, killer: player, at: world.get(bossId, Position) });
+  priestRiftDeathSystem(world);
+
+  assertEquals(getQuestRecord(world, PRIEST_RIFT_QUEST_ID, player)?.state?.node, "return");
 });
 
 Deno.test("barkeep rat quest acceptance gives starter bow + arrows and announces bats", () => {

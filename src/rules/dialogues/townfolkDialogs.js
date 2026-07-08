@@ -4,6 +4,7 @@ import { registerDialog } from "./registry.js";
 import { STARTER_PRIEST_FETCH_QUEST_ID, getQuestRecord } from "../quests/runtime.js";
 import { RAT_INFESTATION_QUEST_ID, REQUIRED_RAT_KILLS } from "../quests/definitions/ratInfestation.js";
 import { canTurnInStarterFetch } from "../quests/definitions/graveyardWatch.js";
+import { canAcceptPriestRift, ensurePriestRiftQuest, PRIEST_RIFT_QUEST_ID } from "../quests/definitions/priestRift.js";
 import { canTurnInRunContract, RUN_CONTRACT_QUEST_ID } from "../quests/definitions/runContract.js";
 import { getTownState, getWeather } from "../utils/townStateAccess.js";
 import { Vitality } from "../components/Vitality.js";
@@ -225,6 +226,11 @@ function getPlayerObservation(world, playerId, npcRole) {
 
 function priestQuest(world, actorId) {
   return getQuestRecord(world, STARTER_PRIEST_FETCH_QUEST_ID, actorId);
+}
+
+function priestRiftQuest(world, actorId) {
+  ensurePriestRiftQuest(world, { playerId: actorId });
+  return getQuestRecord(world, PRIEST_RIFT_QUEST_ID, actorId);
 }
 
 function smithAmbientText(ctx, fallback) {
@@ -606,6 +612,21 @@ registerDialog({
     root: {
       text: (ctx) => {
         const quest = priestQuest(ctx.world, ctx.actorId);
+        const riftQuest = priestRiftQuest(ctx.world, ctx.actorId);
+        const riftState = riftQuest?.state;
+        const riftVars = riftQuest?.vars?.data || {};
+        if (String(riftState?.status || "") === "complete") {
+          return "The rift is quiet. For now, that is the closest thing to mercy I can offer.";
+        }
+        if (String(riftState?.node || "") === "offer") {
+          return "The book did not end the matter. It named a wound under the world. I can open it shallow and narrow, but you must close what answers.";
+        }
+        if (String(riftState?.node || "") === "cleanse") {
+          return `The rift is open. Go down three levels and kill ${String(riftVars.bossName || "what waits there")}.`;
+        }
+        if (String(riftState?.node || "") === "return") {
+          return "You came back with the rift's silence on you. Tell me it is done.";
+        }
         const state = quest?.state;
         if (!state) return priestAmbientText(ctx, "May the gods watch over you.");
         if (String(state.status || "") === "complete") {
@@ -623,6 +644,42 @@ registerDialog({
         return "May the gods watch over you.";
       },
       choices: [
+        {
+          id: "accept_priest_rift",
+          label: "Open the rift. I will go.",
+          visible: (ctx) => canAcceptPriestRift(ctx.world, ctx.actorId),
+          emits: [
+            {
+              name: "dialog:accepted",
+              payload: (ctx) => ({
+                questId: PRIEST_RIFT_QUEST_ID,
+                playerId: ctx.actorId,
+                speakerId: ctx.targetId,
+              }),
+            },
+          ],
+          to: "rift_ack",
+        },
+        {
+          id: "turn_in_priest_rift",
+          label: "The rift is quiet.",
+          visible: (ctx) => {
+            const quest = priestRiftQuest(ctx.world, ctx.actorId);
+            return String(quest?.state?.status || "active") === "active"
+              && String(quest?.state?.node || "") === "return";
+          },
+          emits: [
+            {
+              name: "dialog:reported",
+              payload: (ctx) => ({
+                questId: PRIEST_RIFT_QUEST_ID,
+                playerId: ctx.actorId,
+                speakerId: ctx.targetId,
+              }),
+            },
+          ],
+          to: "rift_report_ack",
+        },
         {
           id: "accept_priest_fetch",
           label: "I will bring it back.",
@@ -696,6 +753,18 @@ registerDialog({
     },
     report_ack: {
       text: "Good. I will lock it away before sunset. Here — 200 gold and a vial of holy water from the parish stores. You have earned it.",
+      choices: [
+        { id: "leave", label: "Goodbye.", close: true },
+      ],
+    },
+    rift_ack: {
+      text: "Three levels. Compact, crowded, and wrong. Do not chase glory down there; cut out the heart and climb back.",
+      choices: [
+        { id: "leave", label: "I will return.", close: true },
+      ],
+    },
+    rift_report_ack: {
+      text: "Then the book told the truth, and you answered it. Take this. The church has little enough, but it remembers its debts.",
       choices: [
         { id: "leave", label: "Goodbye.", close: true },
       ],
