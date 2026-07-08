@@ -6,11 +6,13 @@ const COOKING_FIRE_AUDIBLE_RADIUS_TILES = 8;
 const HOLY_SITE_AUDIBLE_RADIUS_TILES = 7;
 const TORCH_AUDIBLE_RADIUS_TILES = 6;
 const WOODCUTTER_AUDIBLE_RADIUS_TILES = 10;
+const PORTAL_AUDIBLE_RADIUS_TILES = 8;
 const AMBIENT_LOOP_BUS = "ambient:loop";
 const COOKING_FIRE_LOOP_GAIN = 0.14;
 const HOLY_SITE_LOOP_GAIN = 0.1;
 const TORCH_LOOP_GAIN = 0.12;
 const WOODCUTTER_LOOP_GAIN = 0.16;
+const PORTAL_LOOP_GAIN = 0.6;
 const HOLY_SITE_IDENTITIES = new Set([
   "altar",
   "shrine",
@@ -72,6 +74,10 @@ export function computeWoodcutterLoopVolume(distanceTiles) {
   return radialGain(distanceTiles, WOODCUTTER_AUDIBLE_RADIUS_TILES, WOODCUTTER_LOOP_GAIN);
 }
 
+export function computePortalLoopVolume(distanceTiles) {
+  return radialGain(distanceTiles, PORTAL_AUDIBLE_RADIUS_TILES, PORTAL_LOOP_GAIN);
+}
+
 /**
  * @param {{
  *   startLoopFn?: typeof startLoop,
@@ -90,14 +96,17 @@ export function createLocalEmitterAmbientController({
   const holySiteSound = resolveFn("ambient:holy_site");
   const torchSound = resolveFn("ambient:torch_flames");
   const woodcutterSound = resolveFn("ambient:woodcutter");
+  const portalSound = resolveFn("ambient:portal_idle");
   const cookingUrl = cookingSound?.url || null;
   const holySiteUrl = holySiteSound?.url || null;
   const torchUrl = torchSound?.url || null;
   const woodcutterUrl = woodcutterSound?.url || null;
+  const portalUrl = portalSound?.url || null;
   let cookingActive = false;
   let holySiteActive = false;
   let torchActive = false;
   let woodcutterActive = false;
+  let portalActive = false;
 
   function stopCooking() {
     if (!cookingUrl || !cookingActive) return;
@@ -123,6 +132,12 @@ export function createLocalEmitterAmbientController({
     woodcutterActive = false;
   }
 
+  function stopPortal() {
+    if (!portalUrl || !portalActive) return;
+    stopLoopFn(portalUrl, { fadeOut: 0.3 });
+    portalActive = false;
+  }
+
   /**
    * @param {{
    *   player?: { pos?: { x:number, y:number } } | null,
@@ -142,6 +157,7 @@ export function createLocalEmitterAmbientController({
       stopHolySite();
       stopTorch();
       stopWoodcutter();
+      stopPortal();
       return;
     }
 
@@ -149,6 +165,7 @@ export function createLocalEmitterAmbientController({
     let nearestHolySite = Infinity;
     let nearestTorch = Infinity;
     let nearestWoodcutter = Infinity;
+    let nearestPortal = Infinity;
     if (explicitSources) {
       for (let i = 0; i < explicitSources.length; i++) {
         const source = explicitSources[i];
@@ -158,6 +175,7 @@ export function createLocalEmitterAmbientController({
         else if (source.profile === "holy_site") nearestHolySite = Math.min(nearestHolySite, dist);
         else if (source.profile === "torch") nearestTorch = Math.min(nearestTorch, dist);
         else if (source.profile === "woodcutter") nearestWoodcutter = Math.min(nearestWoodcutter, dist);
+        else if (source.profile === "portal_idle") nearestPortal = Math.min(nearestPortal, dist);
       }
     } else for (let i = 0; i < entities.length; i++) {
       const entity = entities[i];
@@ -187,6 +205,7 @@ export function createLocalEmitterAmbientController({
     const holySiteVolume = computeHolySiteLoopVolume(nearestHolySite);
     const torchVolume = computeTorchLoopVolume(nearestTorch);
     const woodcutterVolume = computeWoodcutterLoopVolume(nearestWoodcutter);
+    const portalVolume = computePortalLoopVolume(nearestPortal);
 
     if (cookingVolume > 0.001 && cookingUrl) {
       if (!cookingActive) {
@@ -230,6 +249,17 @@ export function createLocalEmitterAmbientController({
       }
     } else {
       stopWoodcutter();
+    }
+
+    if (portalVolume > 0.001 && portalUrl) {
+      if (!portalActive) {
+        startLoopFn(portalUrl, { bus: AMBIENT_LOOP_BUS, volume: portalVolume, fadeIn: 0.25 });
+        portalActive = true;
+      } else {
+        setLoopVolumeFn(portalUrl, portalVolume, { ramp: 0.1 });
+      }
+    } else {
+      stopPortal();
     }
   }
 

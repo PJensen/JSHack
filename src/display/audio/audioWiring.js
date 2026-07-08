@@ -24,6 +24,8 @@ import { FountainDipResolved } from "../../events/FountainDipResolved.js";
 import { Teleported } from "../../events/Teleported.js";
 import { UrnInteractionResolved } from "../../events/UrnInteractionResolved.js";
 import { FrostNovaCast } from "../../events/FrostNovaCast.js";
+import { RiftOpened } from "../../events/RiftOpened.js";
+import { RiftClosed } from "../../events/RiftClosed.js";
 export { resolveInteractionSoundId } from "./audioWiringExtension.js";
 
 export const ALERT_SOUND_BY_IDENTITY = Object.freeze({
@@ -502,6 +504,8 @@ export const FAMILIAR_FIRE_READY_SOUND_ID = "torch:ignite";
 export const FAMILIAR_FIRE_CAST_SOUND_ID = "spell:fireball";
 export const FOOD_EAT_SOUND_ID = "item:consume:food";
 export const PUSH_STONE_SOUND_ID = "action:move_boulder";
+export const PORTAL_CREATED_SOUND_ID = "portal:created";
+export const PORTAL_DESTROYED_SOUND_ID = "portal:destroyed";
 export const URN_BROKEN_SOUND_ID = "urn:broken";
 export const TRAP_SOUND_BY_TYPE = Object.freeze({
   snake: "trap:snake",
@@ -1097,6 +1101,25 @@ function installAudioListeners({ world, isPlayer, getItemInfo, getPlayerPosition
 
   world.on('stair:traverse', ({ direction }) => {
     sfx(direction === 'up' ? "stair:ascend" : "stair:descend");
+  });
+
+  world.on(RiftOpened, ({ x, y, portalId }) => {
+    const pos = Number.isFinite(Number(x)) && Number.isFinite(Number(y))
+      ? { x: Number(x) | 0, y: Number(y) | 0 }
+      : (portalId != null ? getPosition(portalId) : null);
+    sfxAt(PORTAL_CREATED_SOUND_ID, pos, pp(), { priority: 1 }, zg());
+  });
+
+  world.on(RiftClosed, ({ x, y, portalId }) => {
+    const pos = Number.isFinite(Number(x)) && Number.isFinite(Number(y))
+      ? { x: Number(x) | 0, y: Number(y) | 0 }
+      : (portalId != null ? getPosition(portalId) : null);
+    sfxAt(PORTAL_DESTROYED_SOUND_ID, pos, pp(), { priority: 1 }, zg());
+  });
+
+  world.on('portal:spawned', ({ at, portalId }) => {
+    const pos = at || (portalId != null ? getPosition(portalId) : null);
+    sfxAt(PORTAL_CREATED_SOUND_ID, pos, pp(), { priority: 1 }, zg());
   });
 
   world.on('shrine:communion', () => {
