@@ -74,6 +74,11 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
     const targetPos = (Number.isFinite(x) && Number.isFinite(y))
       ? { x: Math.floor(x), y: Math.floor(y) }
       : undefined;
+    const sx = Number(opts?.stairPos?.x);
+    const sy = Number(opts?.stairPos?.y);
+    const stairPos = (Number.isFinite(sx) && Number.isFinite(sy))
+      ? { x: Math.floor(sx), y: Math.floor(sy) }
+      : undefined;
     const tDepth = Number(opts?.returnTicket?.depth);
     const tx = Number(opts?.returnTicket?.x);
     const ty = Number(opts?.returnTicket?.y);
@@ -83,6 +88,7 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
     _pending = {
       targetDepth: Math.max(0, Math.floor(depth)),
       targetPos,
+      stairPos,
       fragActorsAtTarget: opts?.fragActorsAtTarget === true,
       validateTargetPos: opts?.validateTargetPos === true,
       returnTicket,
@@ -490,12 +496,14 @@ export function createTransitionController({ world, playerEntity, tombstoneRepo,
       if (!rec?.state || String(rec.state.riftId || "") !== riftId) return;
       if (rec.state.inside) return;
       const link = riftQuestLinkForPortal(world, portalId)?.link || null;
+      const portalPos = world.get(portalId, Position);
       queueDepth(1, {
         planeId: riftPlaneId(riftId),
         planeSeed: portal.seed,
         riftId,
         riftLevel: 1,
         riftEnter: true,
+        stairPos: portalPos ? { x: portalPos.x | 0, y: portalPos.y | 0 } : null,
         templateId: String(link?.templateId || ""),
         source: "rift:enter",
       });

@@ -248,6 +248,32 @@ Deno.test("rift enter and close use a detached plane and return to origin", asyn
     assertEquals(state.currentLevel, 1);
     assertEquals(entered.length, 1);
 
+    const playerPos = world.get(playerEntity(world).id, Position);
+    let returnStairId = 0;
+    for (const [id, ni, pos] of world.query(NamedIdentity, Position)) {
+      if (String(ni?.identity || "") !== "stair_up") continue;
+      if ((pos.x | 0) !== (playerPos.x | 0) || (pos.y | 0) !== (playerPos.y | 0)) continue;
+      returnStairId = id;
+      break;
+    }
+    assert(returnStairId > 0, "rift entrance floor should place a stair_up where the player arrives");
+
+    now += 1_000;
+    world.emit("stair:traverse", {
+      actor: playerEntity(world).id,
+      targetId: returnStairId,
+      direction: "up",
+    });
+    await controller.flush();
+
+    ds = [...world.query(DungeonState)][0][1];
+    state = [...world.query(RiftState)][0][1];
+    assertEquals(ds.currentDepth, 1);
+    assertEquals(ds.activePlaneId, "");
+    assertEquals(state.inside, false);
+    assertEquals(state.currentLevel, 0);
+    assertEquals(exited.length, 1);
+
     now += 1_000;
     world.emit(new RiftCloseRequested({ actor: playerEntity(world).id, riftId: portal.riftId }));
     await controller.flush();
@@ -257,7 +283,6 @@ Deno.test("rift enter and close use a detached plane and return to origin", asyn
     assertEquals(ds.activePlaneId, "");
     assertEquals([...world.query(RiftState)].length, 0);
     assertEquals([...world.query(RiftPortal)].length, 0);
-    assertEquals(exited.length, 1);
     assertEquals(closed.length, 1);
   } finally {
     Date.now = originalNow;

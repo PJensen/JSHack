@@ -416,7 +416,7 @@ export async function transitionToDepth(world, newDepth, destinationPos, opts = 
   // when descending so up-stairs land at the same world coordinates.
   const tombstoneRepo = opts.tombstoneRepo || null;
   const onProgress = typeof opts.onProgress === 'function' ? opts.onProgress : null;
-  const isDescending = newDepth > currentDepth;
+  const isDescending = newDepth > currentDepth || (targetPlaneId && opts.stairPos);
   const priorDownStairPositions = (isDescending && opts.stairPos)
     ? [opts.stairPos]
     : ((isDescending && Array.isArray(ds?.downStairPositions) && ds.downStairPositions.length > 0)
