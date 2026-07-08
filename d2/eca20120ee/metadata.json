@@ -1,0 +1,27 @@
+{
+  "cli_version": "0.7.7",
+  "checkpoint_id": "d2eca20120ee",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 3,
+  "files_touched": [
+    "src/main/wiring/transitionWiring.js",
+    "src/rules/environment/dungeon/transition.js",
+    "tests/riftDebugCommands.test.mjs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/d2/eca20120ee/0/metadata.json",
+      "transcript": "/d2/eca20120ee/0/full.jsonl",
+      "content_hash": "/d2/eca20120ee/0/content_hash.txt",
+      "prompt": "/d2/eca20120ee/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 1097399,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 15852544,
+    "output_tokens": 58134,
+    "api_call_count": 134
+  }
+}
