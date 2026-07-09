@@ -1,0 +1,38 @@
+{
+  "cli_version": "0.7.7",
+  "checkpoint_id": "d8db84518e5d",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "docs/design/RATATOSKR_STATE_MACHINE.md",
+    "src/content/monsters/animals.js",
+    "src/display/audio/audioWiring.js",
+    "src/display/composition/setupDisplayRuntime.js",
+    "src/display/fx/polymorphSmokeFx.js",
+    "src/display/fx/puffFx.js",
+    "src/events/PuffSpawned.js",
+    "src/main/scheduler.js",
+    "src/rules/dialogues/ratatoskrDialog.js",
+    "src/rules/systems/ratatoskrSystem.js",
+    "tests/audioWiring.test.mjs",
+    "tests/polymorphSmokeFx.test.mjs",
+    "tests/puffFx.test.mjs",
+    "tests/ratatoskrSystem.test.mjs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/d8/db84518e5d/0/metadata.json",
+      "transcript": "/d8/db84518e5d/0/full.jsonl",
+      "content_hash": "/d8/db84518e5d/0/content_hash.txt",
+      "prompt": "/d8/db84518e5d/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 138826,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 2478208,
+    "output_tokens": 17236,
+    "api_call_count": 35
+  }
+}
