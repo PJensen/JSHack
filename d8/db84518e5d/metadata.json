@@ -3,8 +3,9 @@
   "checkpoint_id": "d8db84518e5d",
   "strategy": "manual-commit",
   "branch": "master",
-  "checkpoints_count": 4,
+  "checkpoints_count": 8,
   "files_touched": [
+    "VERSION",
     "docs/design/RATATOSKR_STATE_MACHINE.md",
     "src/content/monsters/animals.js",
     "src/display/audio/audioWiring.js",
@@ -32,14 +33,20 @@
       "transcript": "/d8/db84518e5d/1/full.jsonl",
       "content_hash": "/d8/db84518e5d/1/content_hash.txt",
       "prompt": ""
+    },
+    {
+      "metadata": "/d8/db84518e5d/2/metadata.json",
+      "transcript": "/d8/db84518e5d/2/full.jsonl",
+      "content_hash": "/d8/db84518e5d/2/content_hash.txt",
+      "prompt": "/d8/db84518e5d/2/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 138826,
+    "input_tokens": 1660324,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 2478208,
-    "output_tokens": 17236,
-    "api_call_count": 35
+    "cache_read_tokens": 22981888,
+    "output_tokens": 80316,
+    "api_call_count": 197
   },
   "combined_attribution": {
     "calculated_at": "2026-07-09T19:54:16.569575841Z",
