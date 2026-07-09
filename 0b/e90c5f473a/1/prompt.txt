@@ -1,0 +1,11 @@
+on persistent issue I have is on interactable verb menu popup overlays
+
+accidential taps since movement is already tapping
+
+like
+
+I almost feel like interactables need a delay before popping up the menu
+
+---
+
+main.js?v=0.8.996:47 Uncaught SyntaxError: The requested module './main/input/worldTapGate.js' does not provide an export named 'classifyWorldTapConsumption' (at main.js?v=0.8.996:47:10)
