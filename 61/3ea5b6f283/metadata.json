@@ -5,6 +5,7 @@
   "branch": "master",
   "checkpoints_count": 3,
   "files_touched": [
+    "VERSION",
     "src/display/fonts.js",
     "src/display/passes/glyphs/atlas.js",
     "src/display/ui/characterOverlay.js",
