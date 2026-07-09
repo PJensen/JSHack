@@ -24,15 +24,15 @@
       "metadata": "/0b/e90c5f473a/1/metadata.json",
       "transcript": "/0b/e90c5f473a/1/full.jsonl",
       "content_hash": "/0b/e90c5f473a/1/content_hash.txt",
-      "prompt": "/0b/e90c5f473a/1/prompt.txt"
+      "prompt": ""
     }
   ],
   "token_usage": {
-    "input_tokens": 344631,
+    "input_tokens": 174828,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 5594112,
-    "output_tokens": 22071,
-    "api_call_count": 56
+    "cache_read_tokens": 3121792,
+    "output_tokens": 9701,
+    "api_call_count": 19
   },
   "combined_attribution": {
     "calculated_at": "2026-07-09T17:41:28.729991541Z",
