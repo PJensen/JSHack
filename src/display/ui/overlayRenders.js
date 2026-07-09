@@ -12,7 +12,7 @@ import {
   hide, showItemTooltip,
   rarityStyle, getMessageColor,
   UI, createChooserRow, createSimpleSel, installKeyHandler, installDetachableKeyHandler,
-  pulseRow,
+  pulseRow, UX_THEME, dispatchCharacterMenuTabCycle,
 } from './overlayUtils.js';
 import {
   readInputMode, readWalkInterval, writeInputMode, writeWalkInterval,
@@ -33,6 +33,11 @@ import { SAVEGAME_KEY } from '../../shared/savegameKeys.js';
  * @param {{ canvas: HTMLCanvasElement }} dtyGraph
  */
 export function renderSettings(panel, data, memGraph, dtyGraph, econGraph, tileInsp, lightPerfGraph) {
+  const existingDetach = /** @type {any} */ (panel)._settingsDetach;
+  if (typeof existingDetach === 'function') {
+    try { existingDetach(); } catch (e) { console.debug('[overlay] settings detach failed:', e); }
+  }
+
   const el = /** @type {HTMLDivElement} */ (/** @type {any} */(panel)._inner);
   el.innerHTML = '';
 
@@ -49,8 +54,9 @@ export function renderSettings(panel, data, memGraph, dtyGraph, econGraph, tileI
     const head = document.createElement('div');
     head.textContent = label;
     Object.assign(head.style, {
-      fontWeight: 'bold', fontSize: '13px', color: '#7fb8e8',
-      borderBottom: '1px solid #2d3b52', paddingBottom: '4px', marginTop,
+      fontWeight: 'bold', fontSize: '13px',
+      color: UX_THEME.accent,
+      borderBottom: UX_THEME.surfaceBorderSoft, paddingBottom: '4px', marginTop,
     });
     return head;
   }
@@ -69,8 +75,8 @@ export function renderSettings(panel, data, memGraph, dtyGraph, econGraph, tileI
     input.placeholder = placeholder;
     Object.assign(input.style, {
       width: '100%', boxSizing: 'border-box',
-      padding: '6px 8px', background: '#101626', color: '#cfe8ff',
-      border: '1px solid #2d3b52', borderRadius: '6px',
+      padding: '6px 8px', background: UX_THEME.surfaceBg, color: UI.TEXT,
+      border: UI.BORDER, borderRadius: UI.RADIUS,
       fontFamily: 'monospace', fontSize: '13px', outline: 'none',
     });
 
@@ -78,7 +84,7 @@ export function renderSettings(panel, data, memGraph, dtyGraph, econGraph, tileI
     Object.assign(dropdown.style, {
       position: 'absolute', left: '0', right: '0', top: '100%',
       maxHeight: '150px', overflowY: 'auto', overflowX: 'hidden',
-      background: '#0b0e16', border: '1px solid #2d3b52', borderRadius: '0 0 6px 6px',
+      background: UX_THEME.panelBg, border: UI.BORDER, borderRadius: `0 0 ${UI.RADIUS} ${UI.RADIUS}`,
       zIndex: '10', display: 'none',
     });
     markScrollable(dropdown);
@@ -96,9 +102,9 @@ export function renderSettings(panel, data, memGraph, dtyGraph, econGraph, tileI
         opt.textContent = id;
         Object.assign(opt.style, {
           padding: '4px 8px', cursor: 'pointer', fontSize: '12px',
-          color: '#cfe8ff', fontFamily: 'monospace',
+          color: UI.TEXT, fontFamily: 'monospace',
         });
-        opt.addEventListener('pointerenter', () => { opt.style.background = '#173458'; });
+        opt.addEventListener('pointerenter', () => { opt.style.background = UI.SEL_BG; });
         opt.addEventListener('pointerleave', () => { opt.style.background = ''; });
         opt.addEventListener('click', () => {
           input.value = id;
@@ -147,7 +153,7 @@ export function renderSettings(panel, data, memGraph, dtyGraph, econGraph, tileI
     const row = document.createElement('label');
     Object.assign(row.style, {
       display: 'flex', flexDirection: 'column', gap: '5px',
-      fontSize: '12px', color: '#aac8e8',
+      fontSize: '12px', color: UX_THEME.muted,
     });
     const label = document.createElement('span');
     label.textContent = labelText;
@@ -157,8 +163,8 @@ export function renderSettings(panel, data, memGraph, dtyGraph, econGraph, tileI
     input.placeholder = placeholder || '';
     Object.assign(input.style, {
       width: '100%', boxSizing: 'border-box',
-      padding: '6px 8px', background: '#101626', color: '#cfe8ff',
-      border: '1px solid #2d3b52', borderRadius: '6px',
+      padding: '6px 8px', background: UX_THEME.surfaceBg, color: UI.TEXT,
+      border: UI.BORDER, borderRadius: UI.RADIUS,
       fontFamily: 'monospace', fontSize: '13px', outline: 'none',
     });
     input.addEventListener('change', () => onChange(input.value));
@@ -223,7 +229,7 @@ export function renderSettings(panel, data, memGraph, dtyGraph, econGraph, tileI
     radio.name = 'jshack-input-mode';
     radio.value = value;
     radio.checked = checked;
-    Object.assign(radio.style, { width: '16px', height: '16px', accentColor: '#5fb3ff', cursor: 'pointer' });
+    Object.assign(radio.style, { width: '16px', height: '16px', accentColor: UX_THEME.accentBorder, cursor: 'pointer' });
     const txt = document.createElement('span');
     txt.textContent = labelText;
     lbl.appendChild(radio);
@@ -279,7 +285,7 @@ export function renderSettings(panel, data, memGraph, dtyGraph, econGraph, tileI
   Object.assign(speedSlider.style, {
     width: '100%',
     minHeight: '34px',
-    accentColor: '#5fb3ff',
+    accentColor: UX_THEME.accentBorder,
   });
 
   const maxEl = document.createElement('span');
@@ -499,6 +505,15 @@ export function renderSettings(panel, data, memGraph, dtyGraph, econGraph, tileI
   });
 
   el.appendChild(content);
+
+  installDetachableKeyHandler(panel, '_settingsDetach', (e) => {
+    if (panel.style.display !== 'block') return;
+    if (e.key !== 'Tab') return;
+    const target = e.target;
+    if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) return;
+    dispatchCharacterMenuTabCycle('settings', e.shiftKey);
+    e.preventDefault();
+  });
 }
 
 /**
@@ -516,7 +531,7 @@ function makeCheckbox(label, checked, onChange) {
   const cb = document.createElement('input');
   cb.type = 'checkbox';
   cb.checked = checked;
-  Object.assign(cb.style, { width: '16px', height: '16px', accentColor: '#5fb3ff', cursor: 'pointer' });
+  Object.assign(cb.style, { width: '16px', height: '16px', accentColor: UX_THEME.accentBorder, cursor: 'pointer' });
   cb.addEventListener('change', () => onChange(cb.checked));
   const txt = document.createElement('span');
   txt.textContent = label;
@@ -982,8 +997,8 @@ export function renderSpellPicker(panel, spells, activeId, bindSlot) {
     Object.assign(row.style, {
       display: 'flex', alignItems: 'flex-start', gap: '8px',
       flexDirection: 'column',
-      padding: '6px 8px', border: '1px solid #2d3b52', borderRadius: '6px',
-      background: sp.id === activeId ? '#0b1323' : '#0f1421', cursor: 'pointer'
+      padding: '6px 8px', border: sp.id === activeId ? `1px solid ${UX_THEME.accentBorder}` : UI.BORDER, borderRadius: UI.RADIUS,
+      background: sp.id === activeId ? UI.SEL_BG : UI.DEFAULT_BG, cursor: 'pointer'
     });
     const head = document.createElement('div');
     Object.assign(head.style, {

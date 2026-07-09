@@ -117,6 +117,7 @@ import { Material } from "./rules/components/Material.js";
 import { getSpell, describeSpellDetailLines, describeSpellTargetEffects } from "./rules/data/spells.js";
 import { getSpellCooldown } from "./rules/utils/spellCooldowns.js";
 import { buildPalette } from "./display/palette/index.js";
+import { canvasFont, canvasGlyphFont, GAME_ICON_FONT_FAMILY } from "./display/fonts.js";
 import { createGlyphAtlas, drawKind, drawKindForeground, drawKindScaled, drawKindScaledForeground } from "./display/passes/glyphs/atlas.js";
 import { aegisWard as drawAegisWardGlyphFx } from "./display/passes/vfx/glyph/effects/aegisWard.js";
 import { Settings } from "./rules/components/Settings.js";
@@ -2778,8 +2779,56 @@ canvas.addEventListener('pointerdown', (ev) => {
   if (typeof ev.stopImmediatePropagation === 'function') ev.stopImmediatePropagation();
 }, { capture: true });
 
-// Walk-mode tap interaction: if the tapped tile is a valid pickup/interact target,
-// consume the tap and route it through the canonical rules.worldTap path.
+const INTERACTABLE_TAP_DELAY_MS = 260;
+const INTERACTABLE_TAP_SLOP_PX = 14;
+let pendingInteractableTap = null;
+
+function classifyWorldTapConsumption(world, actor, tapX, tapY) {
+  if (!shouldConsumeWorldTap(world, actor, tapX, tapY)) return 'none';
+  const tx = Number(tapX) | 0;
+  const ty = Number(tapY) | 0;
+  const px = Number(actor?.pos?.x) | 0;
+  const py = Number(actor?.pos?.y) | 0;
+  const set = world.get(actor.id, Settings);
+  const pickupRange = Math.max(3, Number(set?.pickupRange ?? 0));
+  const nearbyOffsets = [
+    { x: 0, y: 0 },
+    { x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 },
+    { x: 1, y: 1 }, { x: -1, y: 1 }, { x: 1, y: -1 }, { x: -1, y: -1 },
+  ];
+
+  for (const off of nearbyOffsets) {
+    const cx = tx + (off.x | 0);
+    const cy = ty + (off.y | 0);
+    const dist = Math.max(Math.abs(px - cx), Math.abs(py - cy));
+    if (dist > pickupRange) continue;
+    for (const [, pos] of world.query(Position, ItemInfo)) {
+      if ((pos.x | 0) === cx && (pos.y | 0) === cy) return 'pickup';
+    }
+  }
+
+  return 'interact';
+}
+
+function clearPendingInteractableTap() {
+  if (!pendingInteractableTap) return;
+  const pointerId = pendingInteractableTap.pointerId;
+  clearTimeout(pendingInteractableTap.timer);
+  pendingInteractableTap = null;
+  try {
+    if (typeof canvas.releasePointerCapture === "function") canvas.releasePointerCapture(pointerId);
+  } catch {}
+}
+
+function consumeCanvasTapEvent(ev) {
+  ev.preventDefault();
+  ev.stopPropagation();
+  if (typeof ev.stopImmediatePropagation === 'function') ev.stopImmediatePropagation();
+}
+
+// Walk-mode tap interaction: pickups route immediately through the canonical
+// rules.worldTap path; touch interactables require a short hold so movement taps
+// do not pop the verb surface by accident.
 canvas.addEventListener('pointerdown', (ev) => {
   if (targeting.isActive()) return;
   if (isSimUiBlocked()) return;
@@ -2792,13 +2841,61 @@ canvas.addEventListener('pointerdown', (ev) => {
   const [wx, wy] = cameraClientToWorld(cam, ev.clientX, ev.clientY, canvas);
   const tx = worldToTile(wx);
   const ty = worldToTile(wy);
-  if (!shouldConsumeWorldTap(world, pe, tx, ty)) return;
+  const tapKind = classifyWorldTapConsumption(world, pe, tx, ty);
+  if (tapKind === 'none') return;
 
   const rulesHandler = makeRulesDispatcher(world, () => pe.id);
+  if (tapKind === 'interact' && ev.pointerType !== 'mouse') {
+    clearPendingInteractableTap();
+    pendingInteractableTap = {
+      pointerId: Number(ev.pointerId),
+      clientX: Number(ev.clientX),
+      clientY: Number(ev.clientY),
+      tx,
+      ty,
+      actorId: pe.id,
+      timer: setTimeout(() => {
+        const pending = pendingInteractableTap;
+        pendingInteractableTap = null;
+        if (!pending) return;
+        try {
+          if (typeof canvas.releasePointerCapture === "function") canvas.releasePointerCapture(pending.pointerId);
+        } catch {}
+        if (targeting.isActive() || isSimUiBlocked() || readInputMode() !== 'walk') return;
+        const current = playerEntity(world);
+        if (!current || current.id !== pending.actorId) return;
+        if (classifyWorldTapConsumption(world, current, pending.tx, pending.ty) !== 'interact') return;
+        const delayedRulesHandler = makeRulesDispatcher(world, () => current.id);
+        delayedRulesHandler({ type: 'rules.worldTap', payload: { x: pending.tx, y: pending.ty } });
+      }, INTERACTABLE_TAP_DELAY_MS),
+    };
+    try {
+      if (typeof canvas.setPointerCapture === "function") canvas.setPointerCapture(ev.pointerId);
+    } catch {}
+    consumeCanvasTapEvent(ev);
+    return;
+  }
+
   rulesHandler({ type: 'rules.worldTap', payload: { x: tx, y: ty } });
-  ev.preventDefault();
-  ev.stopPropagation();
-  if (typeof ev.stopImmediatePropagation === 'function') ev.stopImmediatePropagation();
+  consumeCanvasTapEvent(ev);
+}, { capture: true });
+
+canvas.addEventListener('pointermove', (ev) => {
+  if (!pendingInteractableTap) return;
+  if (Number(ev.pointerId) !== pendingInteractableTap.pointerId) return;
+  const dx = Number(ev.clientX) - pendingInteractableTap.clientX;
+  const dy = Number(ev.clientY) - pendingInteractableTap.clientY;
+  if (Math.hypot(dx, dy) > INTERACTABLE_TAP_SLOP_PX) clearPendingInteractableTap();
+}, { capture: true });
+
+canvas.addEventListener('pointerup', (ev) => {
+  if (!pendingInteractableTap) return;
+  if (Number(ev.pointerId) === pendingInteractableTap.pointerId) clearPendingInteractableTap();
+}, { capture: true });
+
+canvas.addEventListener('pointercancel', (ev) => {
+  if (!pendingInteractableTap) return;
+  if (Number(ev.pointerId) === pendingInteractableTap.pointerId) clearPendingInteractableTap();
 }, { capture: true });
 
 function particleWorldToScreen({ x, y, size = 1 }) {
@@ -3749,7 +3846,7 @@ function drawMemoryGlyph(ctx, kind, x, y, alpha = 0.7) {
   ctx.fillStyle = "#9a9a9a";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.font = "900 0.92px monospace";
+  ctx.font = canvasGlyphFont(glyph, '0.92px', 900);
   ctx.fillText(glyph, x, y + 0.01);
   ctx.restore();
 }
@@ -3801,7 +3898,7 @@ function drawGroundLootLabels(ctx, labels, fxTime) {
   ctx.save();
   ctx.textAlign = "center";
   ctx.textBaseline = "bottom";
-  ctx.font = "700 0.20px monospace";
+  ctx.font = canvasFont('0.20px', 700);
   for (let i = 0; i < labels.length; i++) {
     const rec = labels[i];
     if (!rec) continue;
@@ -3827,7 +3924,7 @@ function drawMonsterLabels(ctx, labels, fxTime) {
   ctx.save();
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
-  ctx.font = '600 0.15px monospace';
+  ctx.font = canvasFont('0.15px', 600);
   for (let i = 0; i < labels.length; i++) {
     const rec = labels[i];
     if (!rec) continue;
@@ -4026,7 +4123,7 @@ function drawDungeonEntranceBadge(ctx, entity) {
   ctx.lineWidth = 0.025;
   ctx.stroke();
   ctx.fillStyle = '#111318';
-  ctx.font = '700 0.16px monospace';
+  ctx.font = canvasFont('0.16px', 700);
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(label, x, y + 0.004);
@@ -4425,7 +4522,7 @@ function drawBlindEye(ctx, e, fxTime, scale = 1) {
   ctx.globalAlpha = 0.9 * pulse;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.font = `${0.32 * scale}px sans-serif`;
+  ctx.font = canvasFont(`${0.32 * scale}px`, '', GAME_ICON_FONT_FAMILY);
   ctx.fillText('\u{1F441}\u{FE0F}', cx, dy);
 
   ctx.restore();
@@ -4459,7 +4556,7 @@ function drawFearSkull(ctx, e, fxTime, scale = 1) {
   ctx.globalAlpha = 0.92 * pulse;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.font = `${0.34 * scale}px sans-serif`;
+  ctx.font = canvasFont(`${0.34 * scale}px`, '', GAME_ICON_FONT_FAMILY);
   ctx.fillText('\u2620\uFE0F', cx, dy);
 
   ctx.restore();
@@ -4495,7 +4592,7 @@ function drawConfusedMark(ctx, e, fxTime, scale = 1) {
     const alpha = t < 0.1 ? (t / 0.1) : t > 0.6 ? Math.max(0, (1 - t) / 0.4) : 0.85;
 
     ctx.globalAlpha = alpha;
-    ctx.font = `${(0.14 + sz * 0.1) * scale}px sans-serif`;
+    ctx.font = canvasFont(`${(0.14 + sz * 0.1) * scale}px`);
     ctx.fillStyle = j % 2 === 0 ? '#f0c030' : '#ffe680';
     ctx.fillText('?', cx + wobble, headY - rise);
   }
@@ -4519,7 +4616,7 @@ function drawSleepingMarker(ctx, e, fxTime, scale = 1) {
   ctx.globalCompositeOperation = 'source-over';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.font = `${0.24 * scale}px sans-serif`;
+  ctx.font = canvasFont(`${0.24 * scale}px`, '', GAME_ICON_FONT_FAMILY);
   ctx.lineWidth = 0.035 * scale;
   ctx.strokeStyle = 'rgba(8,12,24,0.82)';
   ctx.fillStyle = 'rgba(190,220,255,0.92)';
@@ -4561,7 +4658,7 @@ function drawQuestBang(ctx, e, fxTime, scale = 1) {
   ctx.fillStyle = 'rgba(255,220,40,0.95)';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.font = `bold ${0.32 * scale}px sans-serif`;
+  ctx.font = canvasFont(`${0.32 * scale}px`, 'bold');
   ctx.fillText('!', cx, dy);
 
   ctx.restore();
@@ -4852,7 +4949,7 @@ function render(worldView) {
     bctx.save();
     bctx.textAlign = 'center';
     bctx.textBaseline = 'middle';
-    bctx.font = '0.32px monospace';
+    bctx.font = canvasFont('0.32px');
     for (let i = 0; i < worldView.engravings.length; i++) {
       const eng = worldView.engravings[i];
       if (eng.pos.x < vx0 || eng.pos.x > vx1 || eng.pos.y < vy0 || eng.pos.y > vy1) continue;

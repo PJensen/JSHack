@@ -2,7 +2,7 @@ import {
   appendCharacterMenuTabs, markScrollable, quickPinKeyForItem,
   decorateButton, humanize, sanitize, bracketize,
   hide, hideItemTooltip, rarityStyle, renderItemDetails,
-  installDetachableKeyHandler, pulseRow, UI, UX_THEME,
+  installDetachableKeyHandler, pulseRow, UI, UX_THEME, dispatchCharacterMenuTabCycle,
 } from './overlayUtils.js';
 import { getInventoryDefaultAction, isInventoryItemEquippable, isInventoryItemUsable } from './inventoryUtils.js';
 
@@ -16,14 +16,37 @@ export function renderInventory(panel, items, ground, slotFilter = '', scrollOfI
   const el = /** @type {HTMLDivElement} */ (/** @type {any} */(panel)._inner);
   el.innerHTML = '';
   el.style.overflowX = 'hidden';
+  el.style.width = 'min(920px, 92vw)';
   appendCharacterMenuTabs(el, 'inventory');
   const pinnedSet = new Set((Array.isArray(pinnedKeys) ? pinnedKeys : []).map((key) => String(key || '')));
+  const header = document.createElement('div');
+  Object.assign(header.style, {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '10px',
+    marginBottom: '10px',
+    paddingRight: '32px',
+  });
   const title = document.createElement('div');
   const filterText = humanize(slotFilter || '');
   title.textContent = filterText ? `Inventory \u00b7 ${filterText}` : 'Inventory';
   title.style.fontWeight = 'bold';
-  title.style.marginBottom = '8px';
-  el.appendChild(title);
+  title.style.fontSize = '15px';
+  const countChip = document.createElement('span');
+  countChip.textContent = `${items.length} item${items.length === 1 ? '' : 's'}`;
+  Object.assign(countChip.style, {
+    flexShrink: '0',
+    padding: '2px 7px',
+    border: UX_THEME.surfaceBorderSoft,
+    borderRadius: '999px',
+    color: UX_THEME.muted,
+    background: 'rgba(23, 20, 17, 0.58)',
+    fontSize: '11px',
+  });
+  header.appendChild(title);
+  header.appendChild(countChip);
+  el.appendChild(header);
 
   // Carry weight bar
   if (encumbrance && encumbrance.limit != null && encumbrance.limit > 0) {
@@ -67,21 +90,40 @@ export function renderInventory(panel, items, ground, slotFilter = '', scrollOfI
     (/** @type {any} */ (panel))._inventorySelectionIndex = 0;
     (/** @type {any} */ (panel))._inventoryScrollTop = 0;
     const empty = document.createElement('div');
-    empty.textContent = '(empty)';
+    empty.textContent = filterText ? `No ${filterText} items.` : 'Your pack is empty.';
+    Object.assign(empty.style, {
+      padding: '18px',
+      border: UI.BORDER,
+      borderRadius: UI.RADIUS,
+      background: UI.DEFAULT_BG,
+      color: UX_THEME.muted,
+      textAlign: 'center',
+    });
     el.appendChild(empty);
     return;
   }
+
+  const compact = window.innerWidth < 760;
+  const layout = document.createElement('div');
+  Object.assign(layout.style, {
+    display: 'grid',
+    gridTemplateColumns: compact ? '1fr' : 'minmax(0, 1.08fr) minmax(260px, 0.92fr)',
+    gap: '10px',
+    alignItems: 'start',
+  });
+  el.appendChild(layout);
 
   // Keyboard-driven list
   const list = document.createElement('div');
   list.style.display = 'flex';
   list.style.flexDirection = 'column';
   list.style.gap = '4px';
-  list.style.maxHeight = '42vh';
+  list.style.maxHeight = compact ? '34vh' : '58vh';
   list.style.overflowY = 'auto';
   list.style.overflowX = 'hidden';
+  list.style.paddingRight = '2px';
   markScrollable(list);
-  el.appendChild(list);
+  layout.appendChild(list);
 
   const savedSelectionKey = String((/** @type {any} */ (panel))._inventorySelectionKey || '');
   const savedSelectionIndex = Number((/** @type {any} */ (panel))._inventorySelectionIndex || 0);
@@ -188,31 +230,29 @@ export function renderInventory(panel, items, ground, slotFilter = '', scrollOfI
   });
 
   const hint = document.createElement('div');
-  hint.style.marginTop = '8px';
+  hint.style.marginTop = '0';
   hint.style.opacity = '0.85';
   hint.style.whiteSpace = 'normal';
   hint.style.overflowWrap = 'anywhere';
   hint.style.wordBreak = 'break-word';
-  el.appendChild(hint);
+  hint.style.fontSize = '11px';
+  hint.style.lineHeight = '1.45';
 
   const detail = document.createElement('div');
   Object.assign(detail.style, {
-    marginTop: '8px',
     padding: '8px',
     border: UI.BORDER,
     borderRadius: UI.RADIUS,
     background: UI.DEFAULT_BG,
     minHeight: '56px',
-    maxHeight: '26vh',
+    maxHeight: compact ? '24vh' : '34vh',
     overflowY: 'auto',
     overflowX: 'hidden',
   });
   markScrollable(detail);
-  el.appendChild(detail);
 
   const actions = document.createElement('div');
   Object.assign(actions.style, {
-    marginTop: '8px',
     padding: '8px',
     border: UI.BORDER,
     borderRadius: UI.RADIUS,
@@ -226,7 +266,18 @@ export function renderInventory(panel, items, ground, slotFilter = '', scrollOfI
     boxSizing: 'border-box',
     overflowX: 'hidden',
   });
-  el.appendChild(actions);
+
+  const side = document.createElement('div');
+  Object.assign(side.style, {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+    minWidth: '0',
+  });
+  side.appendChild(detail);
+  side.appendChild(actions);
+  side.appendChild(hint);
+  layout.appendChild(side);
 
   function triggerApplyForTool(it) {
     const toolId = Number(it?.id || 0);
@@ -257,7 +308,7 @@ export function renderInventory(panel, items, ground, slotFilter = '', scrollOfI
     const applyHint = canApplyTool
       ? (hasApplyTargets ? ` \u00b7 A=${applyVerb}` : ` \u00b7 A=${applyVerb} (no targets)`)
       : '';
-    hint.textContent = `\u2191/\u2193 to select \u00b7 Enter=${enterActionLabel(it)} \u00b7 U=Use \u00b7 E=Equip/Unequip \u00b7 I=Pin \u00b7 ,=Drop \u00b7 T=Throw${applyHint}${groundAction ? ' \u00b7 P=Pickup' : ''} \u00b7 S=Set Spell \u00b7 Esc=Close \u00b7 UNPAID items are stolen`;
+    hint.textContent = `Tab=Next menu \u00b7 Enter=${enterActionLabel(it)} \u00b7 U=Use \u00b7 E=Equip \u00b7 I=Pin \u00b7 ,=Drop \u00b7 T=Throw${applyHint}${groundAction ? ' \u00b7 P=Pickup' : ''} \u00b7 S=Set Spell \u00b7 Esc=Close`;
     detail.innerHTML = '';
     if (it) {
       renderItemDetails(detail, it);
@@ -554,7 +605,8 @@ export function renderInventory(panel, items, ground, slotFilter = '', scrollOfI
   function onKey(e) {
     if (panel.style.display !== 'block') return;
     const k = e.key;
-    if (k === 'ArrowUp') { setSel(sel - 1); e.preventDefault(); }
+    if (k === 'Tab') { dispatchCharacterMenuTabCycle('inventory', e.shiftKey); e.preventDefault(); }
+    else if (k === 'ArrowUp') { setSel(sel - 1); e.preventDefault(); }
     else if (k === 'ArrowDown') { setSel(sel + 1); e.preventDefault(); }
     else if (k === 'Home') { setSel(0); e.preventDefault(); }
     else if (k === 'End') { setSel(items.length - 1); e.preventDefault(); }

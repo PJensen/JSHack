@@ -1,6 +1,8 @@
 // display/passes/glyphs/atlas.js
 // Pre-render glyphs to bitmaps to avoid per-frame text, shadows, and composites.
 
+import { canvasGlyphFont } from "../../fonts.js";
+
 /**
  * Build a glyph atlas for the provided palette.
  * Each entry is a 1x1 world-unit stamp (drawn with ctx scale via camera) using a bitmap.
@@ -38,7 +40,7 @@ export function createGlyphAtlas(palette, opts = {}) {
     g.imageSmoothingEnabled = false;
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    g.font = `900 ${fontPx}px monospace`;
+    g.font = canvasGlyphFont('?', `${fontPx}px`, 900);
     g.fillStyle = '#fff';
     g.fillText('?', sizePx * 0.5, sizePx * 0.5);
     atlas.set('default', { canvas: cnv, fgCanvas: cnv, baseScale: 1 });
@@ -66,7 +68,7 @@ function renderLook(g, look, { sizePx, fontPx, glowLayers, includeBackground }) 
       const lFontPx = Math.round(fontPx * lScale);
       const cx = sizePx * (0.5 + (layer.dx || 0));
       const cy = sizePx * (0.5 + (layer.dy || 0));
-      g.font = `900 ${lFontPx}px monospace`;
+      g.font = canvasGlyphFont(lGlyph, `${lFontPx}px`, 900);
       if (glowLayers > 0) {
         g.globalCompositeOperation = 'lighter';
         g.shadowColor = lGlow;
@@ -89,7 +91,7 @@ function renderLook(g, look, { sizePx, fontPx, glowLayers, includeBackground }) 
   const glyph = look.glyph || '?';
   const fg = look.fg || '#fff';
   const glow = look.glow || 'rgba(102,204,255,0.6)';
-  g.font = `900 ${fontPx}px monospace`;
+  g.font = canvasGlyphFont(glyph, `${fontPx}px`, 900);
 
   if (includeBackground && look.bg) {
     g.fillStyle = look.bg;

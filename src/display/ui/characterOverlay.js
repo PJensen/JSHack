@@ -3,7 +3,7 @@ import {
   decorateButton, humanize, sanitize, bracketize,
   show, hide, hideItemTooltip, rarityStyle, renderItemDetails,
   CHARACTER_SLOT_ORDER, installDetachableKeyHandler, pulseRow,
-  UI,
+  UI, dispatchCharacterMenuTabCycle,
 } from './overlayUtils.js';
 
 /**
@@ -25,6 +25,7 @@ export function renderCharacterSheet(panel, data) {
   const el = /** @type {HTMLDivElement} */ (/** @type {any} */ (panel)._inner);
   el.innerHTML = '';
   el.style.overflowX = 'hidden';
+  el.style.width = 'min(760px, 92vw)';
   appendCharacterMenuTabs(el, 'character');
 
   const playerName = String(data?.playerName || 'Hero').trim() || 'Hero';
@@ -321,7 +322,11 @@ export function renderCharacterSheet(panel, data) {
   function onKey(e) {
     if (panel.style.display !== 'block') return;
     const k = e.key;
-    if (k === 'i' || k === 'I') {
+    if (k === 'Tab') {
+      dispatchCharacterMenuTabCycle('character', e.shiftKey);
+      e.preventDefault();
+    }
+    else if (k === 'i' || k === 'I') {
       window.dispatchEvent(new CustomEvent('ui:openInventory'));
       e.preventDefault();
     }
@@ -345,14 +350,41 @@ export function renderEquipment(panel, equippedBySlot, playerName, scrollOfIdent
   const el = /** @type {HTMLDivElement} */ (/** @type {any} */ (panel)._inner);
   el.innerHTML = '';
   el.style.overflowX = 'hidden';
+  el.style.width = 'min(880px, 92vw)';
   appendCharacterMenuTabs(el, 'equipment');
 
+  const header = document.createElement('div');
+  Object.assign(header.style, {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '10px',
+    marginBottom: '10px',
+    paddingRight: '32px',
+  });
   const title = document.createElement('div');
   const pn = String(playerName || 'Hero').trim() || 'Hero';
   title.textContent = `${pn} \u00b7 Equipment`;
   title.style.fontWeight = 'bold';
-  title.style.marginBottom = '8px';
-  el.appendChild(title);
+  title.style.fontSize = '15px';
+  const equippedCount = CHARACTER_SLOT_ORDER.reduce((count, slot) => {
+    const state = (equippedBySlot && typeof equippedBySlot === 'object') ? (equippedBySlot[slot] || {}) : {};
+    return count + (state?.item ? 1 : 0);
+  }, 0);
+  const countChip = document.createElement('span');
+  countChip.textContent = `${equippedCount}/${CHARACTER_SLOT_ORDER.length} equipped`;
+  Object.assign(countChip.style, {
+    flexShrink: '0',
+    padding: '2px 7px',
+    border: UI.BORDER,
+    borderRadius: '999px',
+    color: '#ad9f8d',
+    background: 'rgba(23, 20, 17, 0.58)',
+    fontSize: '11px',
+  });
+  header.appendChild(title);
+  header.appendChild(countChip);
+  el.appendChild(header);
 
   if (encumbrance?.limit > 0) {
     const carry = document.createElement('div');
@@ -398,39 +430,65 @@ export function renderEquipment(panel, equippedBySlot, playerName, scrollOfIdent
   list.style.display = 'flex';
   list.style.flexDirection = 'column';
   list.style.gap = '4px';
-  list.style.maxHeight = '40vh';
+  const compact = window.innerWidth < 760;
+  list.style.maxHeight = compact ? '34vh' : '56vh';
   list.style.overflowY = 'auto';
   list.style.overflowX = 'hidden';
+  list.style.paddingRight = '2px';
   markScrollable(list);
-  el.appendChild(list);
 
   const detail = document.createElement('div');
   Object.assign(detail.style, {
-    marginTop: '8px',
     padding: '8px',
     border: UI.BORDER,
     borderRadius: UI.RADIUS,
     background: UI.DEFAULT_BG,
     minHeight: '52px',
+    maxHeight: compact ? '24vh' : '34vh',
+    overflowY: 'auto',
+    overflowX: 'hidden',
   });
-  el.appendChild(detail);
+  markScrollable(detail);
 
   const actions = document.createElement('div');
   Object.assign(actions.style, {
-    marginTop: '8px',
+    padding: '8px',
+    border: UI.BORDER,
+    borderRadius: UI.RADIUS,
+    background: UI.DEFAULT_BG,
     display: 'flex',
     flexWrap: 'wrap',
     gap: '8px',
     minHeight: '44px',
     alignItems: 'center',
   });
-  el.appendChild(actions);
 
   const hint = document.createElement('div');
-  hint.style.marginTop = '8px';
   hint.style.opacity = '0.85';
-  hint.textContent = '\u2191/\u2193 select slot \u00b7 Enter=Equip/Unequip \u00b7 I=Open Inventory \u00b7 C=Character Sheet \u00b7 Esc=Close';
-  el.appendChild(hint);
+  hint.style.fontSize = '11px';
+  hint.style.lineHeight = '1.45';
+  hint.textContent = 'Tab=Next menu \u00b7 Enter=Equip/Unequip \u00b7 I=Inventory \u00b7 C=Character \u00b7 Esc=Close';
+
+  const layout = document.createElement('div');
+  Object.assign(layout.style, {
+    display: 'grid',
+    gridTemplateColumns: compact ? '1fr' : 'minmax(0, 1.05fr) minmax(260px, 0.95fr)',
+    gap: '10px',
+    alignItems: 'start',
+  });
+  const side = document.createElement('div');
+  Object.assign(side.style, {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+    minWidth: '0',
+  });
+  side.appendChild(detail);
+  side.appendChild(actions);
+  side.appendChild(hint);
+  layout.appendChild(list);
+  layout.appendChild(side);
+  el.appendChild(layout);
 
   function openInventoryForSlot(slotName) {
     const slotFilter = String(slotName || '').trim().toLowerCase();
@@ -641,7 +699,8 @@ export function renderEquipment(panel, equippedBySlot, playerName, scrollOfIdent
     if (panel.style.display !== 'block') return;
     if (e.target === cb) return;
     const k = e.key;
-    if (k === 'ArrowUp') { const n = findNextVisible(sel, -1); if (n !== null) setSel(n); e.preventDefault(); }
+    if (k === 'Tab') { dispatchCharacterMenuTabCycle('equipment', e.shiftKey); e.preventDefault(); }
+    else if (k === 'ArrowUp') { const n = findNextVisible(sel, -1); if (n !== null) setSel(n); e.preventDefault(); }
     else if (k === 'ArrowDown') { const n = findNextVisible(sel, 1); if (n !== null) setSel(n); e.preventDefault(); }
     else if (k === 'Home') { const n = findNextVisible(-1, 1); if (n !== null) setSel(n); e.preventDefault(); }
     else if (k === 'End') { const n = findNextVisible(rowsData.length, -1); if (n !== null) setSel(n); e.preventDefault(); }

@@ -3,6 +3,8 @@
 import { createConcentricGauge } from './concentricGauge.js';
 import { renderItemDetails } from './overlay.js';
 import { ensureItemTooltip, positionTooltip, rarityStyle, UX_THEME } from './overlayUtils.js';
+import { UI_ACTION_GLYPHS, UI_PET_STATE_GLYPHS } from './iconGlyphs.js';
+import { GAME_TEXT_FONT_FAMILY } from '../fonts.js';
 import { createPinnedItemSlots } from './pinnedItemSlots.js';
 import { createMobileSpellRadial } from './mobileRadial.js';
 import { createPinnedSpellDock } from './spellDock.js';
@@ -785,35 +787,8 @@ export function initHUD() {
   });
   const petHoldRing = attachButtonHoldRing(petBtn);
 
-  const ACTION_ICONS = Object.freeze({
-    character: '@',
-    bag: '\u{1F392}',         // 🎒
-    cast: '\u2726',           // ✦
-    spells: '\u{1F4D6}',      // 📖
-    shoot: '\u{1F3F9}',       // 🏹
-    attack: '\u2694',         // ⚔
-    zap: '\u26A1',            // ⚡
-    pray: '\u{1F64F}',        // 🙏
-    door: '\u{1F6AA}',        // 🚪
-    postureBalanced: '\u2696',   // ⚖
-    postureAggressive: '\u2694', // ⚔
-    postureGuarded: '\u{1F6E1}', // 🛡
-    wait: '\u23F3',           // ⏳ (kept for backward compat; button now uses 'search')
-    search: '\u{1F50D}',      // 🔍
-    bug: '\u{1F47E}',         // 👾
-    petDefault: '\u{1F43E}',  // 🐾
-  });
-
-  const PET_STATE_ICONS = Object.freeze({
-    following: '\u{1F43E}',    // 🐾
-    staying: '\u2693',         // ⚓
-    fetching: '\u{1F9B4}',     // 🦴
-    returning: '\u21A9',       // ↩
-    guarding: '\u{1F6E1}\uFE0F', // 🛡️
-    aggressive: '\u2694\uFE0F', // ⚔️
-    fleeing: '\u{1F4A8}',      // 💨
-    idle: '\u{1F4A4}',         // 💤
-  });
+  const ACTION_ICONS = UI_ACTION_GLYPHS;
+  const PET_STATE_ICONS = UI_PET_STATE_GLYPHS;
 
   // Long-press detection for state rotation vs menu (touch and mouse interface)
   let pressTimer = null;
@@ -998,7 +973,7 @@ export function initHUD() {
           lineHeight: '1',
           opacity: '0.8',
           pointerEvents: 'none',
-          fontFamily: 'monospace',
+          fontFamily: GAME_TEXT_FONT_FAMILY,
         });
         btn.appendChild(keySpan);
       }
@@ -1646,7 +1621,7 @@ export function initHUD() {
       Object.assign(keySpan.style, {
         position: 'absolute', top: '2px', right: '4px',
         fontSize: '9px', lineHeight: '1', opacity: '0.8',
-        pointerEvents: 'none', fontFamily: 'monospace',
+        pointerEvents: 'none', fontFamily: GAME_TEXT_FONT_FAMILY,
         zIndex: '3',
       });
       btn.appendChild(keySpan);

@@ -4,16 +4,16 @@ import { Interactable } from "../../rules/components/Interactable.js";
 import { itemsAt } from "../../rules/utils/queries.js";
 
 /**
- * Decide whether a walk-mode tap should be consumed and routed to rules.worldTap.
+ * Classify whether a walk-mode tap should be consumed and routed to rules.worldTap.
  *
  * @param {import("../../lib/ecs-js/index.js").World} world
  * @param {{ id:number, pos:{x:number,y:number} }} actor
  * @param {number} tapX
  * @param {number} tapY
- * @returns {boolean}
+ * @returns {"none"|"pickup"|"interact"}
  */
-export function shouldConsumeWorldTap(world, actor, tapX, tapY) {
-  if (!world || !actor?.id || !actor?.pos) return false;
+export function classifyWorldTapConsumption(world, actor, tapX, tapY) {
+  if (!world || !actor?.id || !actor?.pos) return "none";
   const tx = Number(tapX) | 0;
   const ty = Number(tapY) | 0;
   const px = Number(actor.pos.x) | 0;
@@ -33,7 +33,7 @@ export function shouldConsumeWorldTap(world, actor, tapX, tapY) {
     const dist = Math.max(Math.abs(px - cx), Math.abs(py - cy));
     return dist <= pickupRange && itemsAt(world, cx, cy).length > 0;
   });
-  if (hasTapPickup) return true;
+  if (hasTapPickup) return "pickup";
 
   for (const off of nearbyOffsets) {
     const cx = tx + (off.x | 0);
@@ -42,8 +42,21 @@ export function shouldConsumeWorldTap(world, actor, tapX, tapY) {
       if (!inter) continue;
       if ((pos.x | 0) !== cx || (pos.y | 0) !== cy) continue;
       const dist = Math.abs(px - cx) + Math.abs(py - cy);
-      if (dist <= 1) return true;
+      if (dist <= 1) return "interact";
     }
   }
-  return false;
+  return "none";
+}
+
+/**
+ * Decide whether a walk-mode tap should be consumed and routed to rules.worldTap.
+ *
+ * @param {import("../../lib/ecs-js/index.js").World} world
+ * @param {{ id:number, pos:{x:number,y:number} }} actor
+ * @param {number} tapX
+ * @param {number} tapY
+ * @returns {boolean}
+ */
+export function shouldConsumeWorldTap(world, actor, tapX, tapY) {
+  return classifyWorldTapConsumption(world, actor, tapX, tapY) !== "none";
 }

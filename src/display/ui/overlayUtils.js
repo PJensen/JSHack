@@ -2,6 +2,8 @@
 // Shared utilities, panel management, tooltips, and standalone UI widgets.
 
 import { getHighscoreVersionLabel, getHighscores } from '../../cloud/tombstones/client.js';
+import { GAME_ICON_FONT_FAMILY, GAME_LOG_FONT_FAMILY, GAME_TEXT_FONT_FAMILY } from '../fonts.js';
+import { CHARACTER_MENU_TAB_GLYPHS } from './iconGlyphs.js';
 
 export const PANEL_Z_BASE = 1200;
 export let _panelZCounter = PANEL_Z_BASE;
@@ -29,11 +31,11 @@ export const CHARACTER_SLOT_ORDER = Object.freeze([
   'ranged',
 ]);
 export const CHARACTER_MENU_TABS = Object.freeze([
-  { key: 'character', icon: '@', label: 'Character', eventName: 'ui:openCharacter' },
-  { key: 'inventory', icon: '\u{1F392}', label: 'Inventory', eventName: 'ui:openInventory' },
-  { key: 'equipment', icon: '\u{1F6E1}\uFE0F', label: 'Equipment', eventName: 'ui:openEquipment' },
-  { key: 'quests', icon: '\u{1F4DC}', label: 'Quests', eventName: 'ui:openQuests' },
-  { key: 'settings', icon: '\u2699\uFE0F', label: 'Settings', eventName: 'ui:openSettings' },
+  { key: 'character', icon: CHARACTER_MENU_TAB_GLYPHS.character, label: 'Character', eventName: 'ui:openCharacter' },
+  { key: 'inventory', icon: CHARACTER_MENU_TAB_GLYPHS.inventory, label: 'Inventory', eventName: 'ui:openInventory' },
+  { key: 'equipment', icon: CHARACTER_MENU_TAB_GLYPHS.equipment, label: 'Equipment', eventName: 'ui:openEquipment' },
+  { key: 'quests', icon: CHARACTER_MENU_TAB_GLYPHS.quests, label: 'Quests', eventName: 'ui:openQuests' },
+  { key: 'settings', icon: CHARACTER_MENU_TAB_GLYPHS.settings, label: 'Settings', eventName: 'ui:openSettings' },
 ]);
 
 // --- _itemTooltip module state (mutable let) ---
@@ -85,6 +87,7 @@ export function appendCharacterMenuTabs(host, activeKey) {
     icon.textContent = tab.icon;
     icon.style.lineHeight = '1';
     icon.style.fontSize = '16px';
+    icon.style.fontFamily = GAME_ICON_FONT_FAMILY;
     const label = document.createElement('span');
     label.textContent = tab.label;
     label.style.fontSize = '11px';
@@ -101,6 +104,20 @@ export function appendCharacterMenuTabs(host, activeKey) {
   }
 
   host.appendChild(tabs);
+}
+
+/**
+ * Cycle the shared character-menu tabs from keyboard handlers.
+ * @param {string} activeKey
+ * @param {boolean} reverse
+ */
+export function dispatchCharacterMenuTabCycle(activeKey, reverse = false) {
+  const current = CHARACTER_MENU_TABS.findIndex((tab) => tab.key === activeKey);
+  const start = current >= 0 ? current : 0;
+  const dir = reverse ? -1 : 1;
+  const next = (start + dir + CHARACTER_MENU_TABS.length) % CHARACTER_MENU_TABS.length;
+  const tab = CHARACTER_MENU_TABS[next];
+  if (tab?.eventName) window.dispatchEvent(new CustomEvent(tab.eventName));
 }
 
 /**
@@ -229,7 +246,7 @@ export function ensureGroundTooltip(root) {
     minWidth: '132px', maxWidth: '54vw', pointerEvents: 'auto', display: 'none',
     background: UX_THEME.panelBg, color: UX_THEME.text, borderRadius: UX_THEME.radius,
     border: UX_THEME.panelBorder, boxShadow: '0 16px 42px rgba(0,0,0,0.58), inset 0 0 0 1px rgba(188,206,224,0.05)',
-    fontFamily: 'monospace', padding: '7px 8px', zIndex: 850
+    fontFamily: GAME_TEXT_FONT_FAMILY, padding: '7px 8px', zIndex: 850
   });
   root.appendChild(tip);
   return tip;
@@ -251,7 +268,7 @@ export function ensureItemTooltip(root) {
     borderRadius: UX_THEME.radius,
     border: UX_THEME.panelBorder,
     boxShadow: '0 16px 42px rgba(0,0,0,0.58), inset 0 0 0 1px rgba(188,206,224,0.05)',
-    fontFamily: 'monospace',
+    fontFamily: GAME_TEXT_FONT_FAMILY,
     padding: '10px 12px',
     zIndex: '1400',
     whiteSpace: 'normal',
@@ -438,7 +455,7 @@ export function ensureStairTooltip(root) {
     minWidth: '112px', maxWidth: '50vw', pointerEvents: 'none', display: 'none',
     background: UX_THEME.panelBg, color: UX_THEME.text, borderRadius: UX_THEME.radius,
     border: UX_THEME.panelBorder, boxShadow: '0 16px 42px rgba(0,0,0,0.58), inset 0 0 0 1px rgba(188,206,224,0.05)',
-    fontFamily: 'monospace', padding: '6px 8px', zIndex: 850,
+    fontFamily: GAME_TEXT_FONT_FAMILY, padding: '6px 8px', zIndex: 850,
     textAlign: 'center', cursor: 'pointer'
   });
   root.appendChild(tip);
@@ -476,7 +493,7 @@ export function renderStairTooltip(tip, detail) {
     marginTop: '5px',
     minHeight: '34px',
     minWidth: '80px',
-    fontFamily: 'monospace',
+    fontFamily: GAME_TEXT_FONT_FAMILY,
     fontSize: '11px',
     fontWeight: 'bold',
     padding: '0 10px',
@@ -505,7 +522,7 @@ export function ensureInteractableTooltip(root) {
     minWidth: '112px', maxWidth: '50vw', pointerEvents: 'none', display: 'none',
     background: UX_THEME.panelBg, color: UX_THEME.text, borderRadius: UX_THEME.radius,
     border: UX_THEME.panelBorder, boxShadow: '0 16px 42px rgba(0,0,0,0.58), inset 0 0 0 1px rgba(188,206,224,0.05)',
-    fontFamily: 'monospace', padding: '6px 8px', zIndex: 850,
+    fontFamily: GAME_TEXT_FONT_FAMILY, padding: '6px 8px', zIndex: 850,
     textAlign: 'center', cursor: 'pointer'
   });
   root.appendChild(tip);
@@ -543,7 +560,7 @@ export function renderInteractableTooltip(tip, detail) {
     border: '1px solid #6aa7da',
     background: '#234463',
     color: '#e9f7ff',
-    fontFamily: 'monospace',
+    fontFamily: GAME_TEXT_FONT_FAMILY,
     fontSize: '11px',
     fontWeight: 'bold',
     cursor: 'pointer',
@@ -576,7 +593,7 @@ export function ensureTrapTooltip(root) {
     minWidth: '112px', maxWidth: '50vw', pointerEvents: 'none', display: 'none',
     background: UX_THEME.dangerBg, color: UX_THEME.dangerText, borderRadius: UX_THEME.radius,
     border: UX_THEME.dangerBorder, boxShadow: '0 16px 42px rgba(0,0,0,0.58), inset 0 0 0 1px rgba(255,210,190,0.05)',
-    fontFamily: 'monospace', padding: '6px 8px', zIndex: 850,
+    fontFamily: GAME_TEXT_FONT_FAMILY, padding: '6px 8px', zIndex: 850,
     textAlign: 'center', cursor: 'pointer'
   });
   root.appendChild(tip);
@@ -610,7 +627,7 @@ export function renderTrapTooltip(tip, detail) {
     border: '1px solid #c78c8c',
     background: '#4b2323',
     color: '#ffe4df',
-    fontFamily: 'monospace',
+    fontFamily: GAME_TEXT_FONT_FAMILY,
     fontSize: '11px',
     fontWeight: 'bold',
     cursor: 'pointer',
@@ -641,7 +658,7 @@ export function ensureTombstoneTooltip(root) {
     borderRadius: '4px',
     border: '2px solid #6b6252',
     boxShadow: '0 4px 20px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05)',
-    fontFamily: 'monospace', padding: '14px 20px', zIndex: 900,
+    fontFamily: GAME_TEXT_FONT_FAMILY, padding: '14px 20px', zIndex: 900,
     textAlign: 'center', whiteSpace: 'pre-line'
   });
   root.appendChild(tip);
@@ -693,7 +710,7 @@ export function ensureDevNoticeTooltip(root) {
     borderRadius: '12px',
     border: '1px solid #426084',
     boxShadow: '0 10px 30px rgba(0,0,0,0.55)',
-    fontFamily: 'monospace',
+    fontFamily: GAME_TEXT_FONT_FAMILY,
     padding: '12px 14px',
     zIndex: 920,
   });
@@ -737,7 +754,7 @@ export function renderDevNoticeTooltip(tip, detail) {
     border: '1px solid #6aa7da',
     background: '#234463',
     color: '#e9f7ff',
-    fontFamily: 'monospace',
+    fontFamily: GAME_TEXT_FONT_FAMILY,
     fontSize: '12px',
     fontWeight: 'bold',
     cursor: 'pointer',
@@ -793,7 +810,7 @@ export function ensureTileKeyTooltip(root) {
     borderRadius: '14px',
     border: '1px solid #3a5a80',
     boxShadow: '0 0 60px rgba(30,90,160,0.25), 0 12px 40px rgba(0,0,0,0.6)',
-    fontFamily: 'monospace',
+    fontFamily: GAME_TEXT_FONT_FAMILY,
     padding: '18px 20px 14px',
     zIndex: 930,
   });
@@ -882,7 +899,7 @@ export function renderTileKeyTooltip(tip) {
     border: '1px solid #6aa7da',
     background: '#234463',
     color: '#e9f7ff',
-    fontFamily: 'monospace',
+    fontFamily: GAME_TEXT_FONT_FAMILY,
     fontSize: '13px',
     fontWeight: 'bold',
     cursor: 'pointer',
@@ -911,7 +928,7 @@ export function ensureSpellGestureHint(root) {
   const glyph = document.createElement('div');
   glyph.textContent = 'Z';
   Object.assign(glyph.style, {
-    fontFamily: 'monospace',
+    fontFamily: GAME_TEXT_FONT_FAMILY,
     fontWeight: '700',
     fontSize: 'min(160px, 28vw)',
     color: '#d6f3ff',
@@ -923,7 +940,7 @@ export function ensureSpellGestureHint(root) {
   const caption = document.createElement('div');
   caption.textContent = 'Draw a Z to cast Lightning';
   Object.assign(caption.style, {
-    fontFamily: 'monospace',
+    fontFamily: GAME_TEXT_FONT_FAMILY,
     fontSize: 'min(24px, 5vw)',
     color: '#d6f3ff',
     textShadow: '0 0 6px rgba(80,160,255,0.55)',
@@ -1207,7 +1224,7 @@ export function ensurePanel(kind) {
     display: 'none', pointerEvents: 'auto',
     background: UX_THEME.panelBackdrop, color: UX_THEME.text,
     backdropFilter: 'blur(3px)',
-    fontFamily: 'monospace',
+    fontFamily: GAME_TEXT_FONT_FAMILY,
     zIndex: String(PANEL_Z_BASE),
   });
 
@@ -1420,7 +1437,7 @@ export function ensureMessageTicker(root) {
     pointerEvents: 'auto',
     zIndex: 850,
     color: UX_THEME.text,
-    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, "Courier New", monospace',
+    fontFamily: GAME_LOG_FONT_FAMILY,
     fontSize: 'min(15px, 3.4vw)',
     lineHeight: '1.35',
     background: 'rgba(10, 9, 8, 0.92)',
@@ -1697,7 +1714,7 @@ export function ensureDeathScreen(root) {
     position: 'fixed', left: '0', top: '0', right: '0', bottom: '0',
     display: 'none', pointerEvents: 'auto',
     background: 'rgba(0,0,0,0.88)',
-    fontFamily: 'monospace', zIndex: '1300',
+    fontFamily: GAME_TEXT_FONT_FAMILY, zIndex: '1300',
   });
   root.appendChild(panel);
   return panel;
@@ -1847,7 +1864,7 @@ export function renderDeathScreen(panel, detail) {
         const row = document.createElement('div');
         Object.assign(row.style, {
           display: 'flex', gap: '8px', lineHeight: '1.7',
-          fontSize: '12px', fontFamily: 'monospace',
+          fontSize: '12px', fontFamily: GAME_TEXT_FONT_FAMILY,
           color: isPlayer ? '#ffd700' : '#7a9ab0',
           fontWeight: isPlayer ? 'bold' : 'normal',
         });
@@ -1889,7 +1906,7 @@ export function renderDeathScreen(panel, detail) {
     shareBtn.textContent = '\u2620\uFE0F Share Your Death';
     Object.assign(shareBtn.style, {
       display: 'inline-block', padding: '10px 22px',
-      background: '#1a1a2e', color: '#cfe8ff', fontFamily: 'monospace',
+      background: '#1a1a2e', color: '#cfe8ff', fontFamily: GAME_TEXT_FONT_FAMILY,
       border: '1px solid #2d3b52', borderRadius: '6px',
       cursor: 'pointer', textDecoration: 'none', fontSize: '14px',
       marginBottom: '12px',
@@ -1907,7 +1924,7 @@ export function renderDeathScreen(panel, detail) {
     proofBtn.textContent = '\uD83D\uDD12 Copy Score Proof';
     Object.assign(proofBtn.style, {
       display: 'inline-block', padding: '10px 22px',
-      background: '#1a1a2e', color: '#cfe8ff', fontFamily: 'monospace',
+      background: '#1a1a2e', color: '#cfe8ff', fontFamily: GAME_TEXT_FONT_FAMILY,
       border: '1px solid #2d3b52', borderRadius: '6px',
       cursor: 'pointer', fontSize: '14px',
       marginBottom: '12px',
@@ -1936,7 +1953,7 @@ export function renderDeathScreen(panel, detail) {
     newGameBtn.textContent = '\u2694 New Game';
     Object.assign(newGameBtn.style, {
       display: 'inline-block', padding: '10px 22px',
-      background: '#1a2e1a', color: '#b4ffb4', fontFamily: 'monospace',
+      background: '#1a2e1a', color: '#b4ffb4', fontFamily: GAME_TEXT_FONT_FAMILY,
       border: '1px solid #2d523b', borderRadius: '6px',
       cursor: 'pointer', textDecoration: 'none', fontSize: '14px',
       marginBottom: '12px',

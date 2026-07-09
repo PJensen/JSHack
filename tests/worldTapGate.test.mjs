@@ -1,6 +1,6 @@
 import { assertEquals } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";
-import { shouldConsumeWorldTap } from "../src/main/input/worldTapGate.js";
+import { classifyWorldTapConsumption, shouldConsumeWorldTap } from "../src/main/input/worldTapGate.js";
 import { Position } from "../src/rules/components/Position.js";
 import { Settings } from "../src/rules/components/Settings.js";
 import { ItemInfo } from "../src/rules/components/ItemInfo.js";
@@ -18,6 +18,7 @@ Deno.test("worldTapGate: true when tap has pickup candidate", () => {
 
   const actor = { id: actorId, pos: { x: 5, y: 5 } };
   assertEquals(shouldConsumeWorldTap(world, actor, 6, 5), true);
+  assertEquals(classifyWorldTapConsumption(world, actor, 6, 5), "pickup");
 });
 
 Deno.test("worldTapGate: true when tap has adjacent interactable candidate", () => {
@@ -32,6 +33,7 @@ Deno.test("worldTapGate: true when tap has adjacent interactable candidate", () 
 
   const actor = { id: actorId, pos: { x: 10, y: 10 } };
   assertEquals(shouldConsumeWorldTap(world, actor, 11, 10), true);
+  assertEquals(classifyWorldTapConsumption(world, actor, 11, 10), "interact");
 });
 
 Deno.test("worldTapGate: false when no pickup or interact candidate is in context", () => {
@@ -42,4 +44,5 @@ Deno.test("worldTapGate: false when no pickup or interact candidate is in contex
 
   const actor = { id: actorId, pos: { x: 1, y: 1 } };
   assertEquals(shouldConsumeWorldTap(world, actor, 20, 20), false);
+  assertEquals(classifyWorldTapConsumption(world, actor, 20, 20), "none");
 });
