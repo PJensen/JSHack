@@ -8,9 +8,13 @@
     "VERSION",
     "src/display/ui/characterOverlay.js",
     "src/display/ui/hud.js",
+    "src/display/ui/iconGlyphs.js",
     "src/display/ui/inventoryOverlay.js",
     "src/display/ui/overlayRenders.js",
-    "src/display/ui/overlayUtils.js"
+    "src/display/ui/overlayUtils.js",
+    "src/main.js",
+    "src/main/input/worldTapGate.js",
+    "tests/worldTapGate.test.mjs"
   ],
   "sessions": [
     {
