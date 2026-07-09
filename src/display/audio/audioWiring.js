@@ -240,8 +240,10 @@ export function shouldPlayElectrocutionSound(payload) {
 
 export function shouldPlayTeleportSound(payload, isPlayerFn) {
   const id = Number(payload?.id || 0) | 0;
-  if (!(id > 0) || typeof isPlayerFn !== "function" || !isPlayerFn(id)) return false;
+  if (!(id > 0)) return false;
   const src = String(payload?.source || "");
+  if (src === "ratatoskr") return true;
+  if (typeof isPlayerFn !== "function" || !isPlayerFn(id)) return false;
   return src !== "dungeon:teleport-depth";
 }
 

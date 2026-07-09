@@ -38,7 +38,7 @@ import { aiTownfolkSystem, installTownfolkDoorListener, installBellListener } fr
 import { socialAggroSystem } from "../rules/systems/socialAggroSystem.js";
 import { aiScurrySystem } from "../rules/systems/aiScurrySystem.js";
 import { aiFarmAnimalSystem } from "../rules/systems/aiFarmAnimalSystem.js";
-import { ratatoskrSystem } from "../rules/systems/ratatoskrSystem.js";
+import { installRatatoskrListeners, ratatoskrSystem } from "../rules/systems/ratatoskrSystem.js";
 import { aiWeaponPickupSystem } from "../rules/systems/aiWeaponPickupSystem.js";
 import { aiScrollPickupSystem, aiScrollUseSystem } from "../rules/systems/aiScrollSystem.js";
 import { aiCorpseEatSystem } from "../rules/systems/aiCorpseEatSystem.js";
@@ -147,6 +147,7 @@ export function configureWorld(world) {
   installRatQuestHooks(world);
   installRunContractHooks(world);
   installPriestRiftHooks(world);
+  installRatatoskrListeners(world);
 
   installTownfolkDoorListener(world);
   installBellListener(world);

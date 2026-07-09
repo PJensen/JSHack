@@ -166,7 +166,6 @@ export function registerRatatoskrDialog() {
   registerDialog({
     id: "norse:ratatoskr",
     start: "root",
-    presentation: "overlay",
     maxDistance: 2,
     nodes: {
       root: {

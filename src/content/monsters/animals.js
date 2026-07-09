@@ -784,9 +784,12 @@ defineMonster('ratatoskr', {
   aiHints: { rareMessenger: true, distantOutdoorRegions: true },
   state: {
     ratatoskr: {
+      state: 'dormant',
       nextAppearTurn: 45,
       visits: 0,
       lastBarkTurn: -9999,
+      vanishTurn: 0,
+      trigger: '',
     },
   },
   specials: ['Unique', 'Passive', 'Outdoor messenger', 'Carries rumors, insults, quest state, or items'],

@@ -12,11 +12,13 @@ import { Position } from "../src/rules/components/Position.js";
 import { ScriptState } from "../src/rules/components/ScriptState.js";
 import { ShopInventory } from "../src/rules/components/ShopInventory.js";
 import { Unpaid } from "../src/rules/components/Unpaid.js";
+import { PuffSpawned } from "../src/events/PuffSpawned.js";
+import { Teleported } from "../src/events/Teleported.js";
 import { CHUNK_SIZE, TILE_FLOOR } from "../src/rules/environment/dungeon/constants.js";
 import { clearAll, loadChunk } from "../src/rules/environment/dungeon/tileMap.js";
 import { installDialogRuntime } from "../src/rules/dialogues/runtime.js";
 import { getMonster } from "../src/rules/data/monsters.js";
-import { ratatoskrSystem } from "../src/rules/systems/ratatoskrSystem.js";
+import { installRatatoskrListeners, ratatoskrSystem } from "../src/rules/systems/ratatoskrSystem.js";
 import { toMonsterSpawnParams } from "../src/rules/utils/monsterSpawnParams.js";
 import { inventoryContains, inventoryItems } from "../src/rules/utils/inventoryFacade.js";
 import { spawnMonsterEntity } from "../src/rules/utils/spawnMonsterEntity.js";
@@ -85,6 +87,8 @@ Deno.test("Ratatoskr dialog opens a legendary unpaid cache", () => {
   world.emit("dialog:openRequest", { actorId: player, targetId: ratatoskr, dialogId: "norse:ratatoskr" });
   const sessionId = opened.at(-1)?.sessionId;
   assert(sessionId > 0, "Ratatoskr dialog should open");
+  assertEquals(opened.at(-1)?.presentation, "bubble");
+  assert((opened.at(-1)?.choices?.length || 0) <= 4, "Ratatoskr should fit compact mobile dialog");
   world.emit("dialog:choose", { sessionId, choiceId: "open_cache" });
 
   assertEquals(shops.at(-1)?.vendorKind, "travellingVendor");
@@ -114,4 +118,55 @@ Deno.test("Ratatoskr branch bargain curses the player and grants a cursed legend
   assert(effects.some((effect) => effect.key === "cursed" && effect.potency === 2));
   const cursedItems = inventoryItems(world, player).filter((itemId) => world.get(itemId, Beatitude)?.state === "cursed");
   assertEquals(cursedItems.length, 1);
+});
+
+Deno.test("Ratatoskr quest omens teleport him in with puff and teleport events", () => {
+  const { world, player, ratatoskr } = setupWorld();
+  installRatatoskrListeners(world);
+  world.step = 0;
+  ratatoskrSystem(world);
+  assert(!world.has(ratatoskr, Position), "dormant Ratatoskr should be offstage before a trigger");
+
+  const puffs = [];
+  const teleports = [];
+  world.on(PuffSpawned, (event) => puffs.push(event));
+  world.on(Teleported, (event) => teleports.push(event));
+
+  world.emit("quest:completed", { questId: "starter.priest_fetch", playerId: player });
+  world.step = 2;
+  ratatoskrSystem(world);
+
+  const pos = world.get(ratatoskr, Position);
+  const ppos = world.get(player, Position);
+  const dist = Math.max(Math.abs(pos.x - ppos.x), Math.abs(pos.y - ppos.y));
+  assert(dist >= 4 && dist <= 9, `Ratatoskr should appear near the player, got distance ${dist}`);
+  assertEquals(teleports.at(-1)?.source, "ratatoskr");
+  assertEquals(puffs.at(-1)?.source, "ratatoskr");
+});
+
+Deno.test("Ratatoskr vanishes several turns after interaction in a puff", () => {
+  const { world, player, ratatoskr } = setupWorld();
+  installDialogRuntime(world);
+  installRatatoskrListeners(world);
+  world.set(ratatoskr, Position, { x: 6, y: 5 });
+  ratatoskrSystem(world);
+
+  const opened = [];
+  const puffs = [];
+  const teleports = [];
+  world.on("dialog:opened", (payload) => opened.push(payload));
+  world.on(PuffSpawned, (event) => puffs.push(event));
+  world.on(Teleported, (event) => teleports.push(event));
+
+  world.emit("dialog:openRequest", { actorId: player, targetId: ratatoskr, dialogId: "norse:ratatoskr" });
+  world.emit("dialog:choose", { sessionId: opened.at(-1).sessionId, choiceId: "leave" });
+  const state = world.get(ratatoskr, ScriptState)?.data?.ratatoskr;
+  assert((state?.vanishTurn || 0) > world.step, "interaction should schedule a delayed vanish");
+
+  world.step = state.vanishTurn;
+  ratatoskrSystem(world);
+
+  assert(!world.has(ratatoskr, Position), "Ratatoskr should be offstage after vanishing");
+  assertEquals(teleports.at(-1)?.source, "ratatoskr");
+  assertEquals(puffs.at(-1)?.source, "ratatoskr");
 });

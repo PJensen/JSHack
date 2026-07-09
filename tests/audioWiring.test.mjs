@@ -221,6 +221,7 @@ Deno.test("audio wiring keeps housekeeping teleports silent", () => {
   assert(shouldPlayTeleportSound({ id: 7, source: "scroll:teleportation" }, isPlayer));
   assert(!shouldPlayTeleportSound({ id: 7, source: "dungeon:teleport-depth" }, isPlayer));
   assert(!shouldPlayTeleportSound({ id: 8, source: "scroll:teleportation" }, isPlayer));
+  assert(shouldPlayTeleportSound({ id: 8, source: "ratatoskr" }, isPlayer));
 });
 
 Deno.test("audio wiring gates dungeon omens to rare real dungeon events", () => {

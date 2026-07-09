@@ -1,3 +1,6 @@
+import { defineExtension } from "../../lib/ecs-js/index.js";
+import { PuffSpawned } from "../../events/PuffSpawned.js";
+import { Teleported } from "../../events/Teleported.js";
 import { AggroState, AGGRO_LEVELS } from "../components/AggroState.js";
 import { Inventory } from "../components/Inventory.js";
 import { Interactable } from "../components/Interactable.js";
@@ -17,6 +20,18 @@ const APPEAR_MIN_TURNS = 45;
 const APPEAR_SPREAD_TURNS = 90;
 const NEAR_RADIUS_MIN = 4;
 const NEAR_RADIUS_MAX = 9;
+const VANISH_MIN_TURNS = 4;
+const VANISH_SPREAD_TURNS = 4;
+const RATATOSKR_LISTENERS_KEY = Symbol.for("jshack:ratatoskr:listeners");
+
+const RATATOSKR_STATES = Object.freeze({
+  dormant: "dormant",
+  appearing: "appearing",
+  present: "present",
+  conversing: "conversing",
+  coolingOff: "cooling_off",
+  vanishing: "vanishing",
+});
 
 function chebyshev(a, b) {
   return Math.max(Math.abs((a.x | 0) - (b.x | 0)), Math.abs((a.y | 0) - (b.y | 0)));
@@ -31,11 +46,17 @@ function ensureRatatoskrState(world, id) {
   if (!state || !state.data || typeof state.data !== "object") return null;
   if (!state.data.ratatoskr || typeof state.data.ratatoskr !== "object") {
     state.data.ratatoskr = {
+      state: RATATOSKR_STATES.dormant,
       nextAppearTurn: (world.step | 0) + APPEAR_MIN_TURNS,
       visits: 0,
       lastBarkTurn: -9999,
+      vanishTurn: 0,
+      trigger: "",
     };
   }
+  if (!state.data.ratatoskr.state) state.data.ratatoskr.state = RATATOSKR_STATES.dormant;
+  if (!Number.isFinite(Number(state.data.ratatoskr.vanishTurn))) state.data.ratatoskr.vanishTurn = 0;
+  if (typeof state.data.ratatoskr.trigger !== "string") state.data.ratatoskr.trigger = "";
   return state.data.ratatoskr;
 }
 
@@ -93,6 +114,12 @@ function pickNearPlayer(world, playerPos) {
 
 function scheduleNext(world, state) {
   state.nextAppearTurn = (world.step | 0) + APPEAR_MIN_TURNS + (Math.floor(world.rand() * APPEAR_SPREAD_TURNS) | 0);
+  state.trigger = "";
+}
+
+function scheduleVanish(world, state) {
+  state.state = RATATOSKR_STATES.coolingOff;
+  state.vanishTurn = (world.step | 0) + VANISH_MIN_TURNS + (Math.floor(world.rand() * VANISH_SPREAD_TURNS) | 0);
 }
 
 function bark(world, id, text) {
@@ -104,10 +131,98 @@ function bark(world, id, text) {
 
 function ratatoskrEntities(world) {
   const out = [];
-  for (const [id, ni, pos] of world.query(NamedIdentity, Position)) {
-    if (String(ni?.identity || "") === "ratatoskr") out.push({ id, pos });
+  for (const [id, ni] of world.query(NamedIdentity)) {
+    if (String(ni?.identity || "") === "ratatoskr") out.push({ id, pos: world.get(id, Position) });
   }
   return out;
+}
+
+function emitRatatoskrTeleport(world, id, from, to) {
+  world.emit(new Teleported({ id, from, to, source: "ratatoskr" }));
+}
+
+function emitRatatoskrPuff(world, at) {
+  world.emit(new PuffSpawned({ at, source: "ratatoskr", kind: "smoke" }));
+}
+
+function setRatatoskrPosition(world, id, pos) {
+  if (world.has(id, Position)) {
+    world.set(id, Position, pos);
+  } else {
+    world.add(id, Position, pos);
+  }
+}
+
+function appearRatatoskr(world, id, state, dest, from = null) {
+  state.state = RATATOSKR_STATES.appearing;
+  clearFloorCache(world, id);
+  if (from) emitRatatoskrPuff(world, from);
+  setRatatoskrPosition(world, id, dest);
+  emitRatatoskrTeleport(world, id, from, dest);
+  emitRatatoskrPuff(world, dest);
+  state.visits = (Number(state.visits || 0) | 0) + 1;
+  state.lastBarkTurn = world.step | 0;
+  state.vanishTurn = 0;
+  state.state = RATATOSKR_STATES.present;
+  bark(world, id, state.trigger === "quest:completed"
+    ? "A red-brown streak lands nearby. 'Someone finished a story. That always starts a worse one.'"
+    : "A red-brown streak drops out of nowhere. 'Wrong tree, right customer.'");
+  scheduleNext(world, state);
+}
+
+function vanishRatatoskr(world, id, state, pos) {
+  if (!pos) return;
+  state.state = RATATOSKR_STATES.vanishing;
+  clearFloorCache(world, id);
+  emitRatatoskrPuff(world, pos);
+  emitRatatoskrTeleport(world, id, pos, null);
+  try { if (world.has(id, Position)) world.remove(id, Position); } catch {}
+  state.vanishTurn = 0;
+  state.state = RATATOSKR_STATES.dormant;
+  scheduleNext(world, state);
+}
+
+function markRatatoskrTrigger(world, reason) {
+  for (const { id } of ratatoskrEntities(world)) {
+    const state = ensureRatatoskrState(world, id);
+    if (!state) continue;
+    if (state.state !== RATATOSKR_STATES.dormant) continue;
+    state.trigger = String(reason || "omen");
+    state.nextAppearTurn = Math.min(Number(state.nextAppearTurn || 0) | 0, (world.step | 0) + 2);
+  }
+}
+
+function scheduleRatatoskrVanish(world, targetId) {
+  const id = Number(targetId || 0) | 0;
+  if (!(id > 0)) return;
+  const ni = world.get(id, NamedIdentity);
+  if (String(ni?.identity || "") !== "ratatoskr") return;
+  const state = ensureRatatoskrState(world, id);
+  if (!state) return;
+  scheduleVanish(world, state);
+}
+
+export const ratatoskrListeners = defineExtension("jshack:ratatoskr:listeners", (world) => {
+  const offOpened = world.on("dialog:opened", (payload) => {
+    if (String(payload?.dialogId || "") !== "norse:ratatoskr") return;
+    const state = ensureRatatoskrState(world, Number(payload?.targetId || 0) | 0);
+    if (state) {
+      state.state = RATATOSKR_STATES.conversing;
+      state.vanishTurn = 0;
+    }
+  });
+  const offClosed = world.on("dialog:closed", (payload) => {
+    if (String(payload?.dialogId || "") !== "norse:ratatoskr") return;
+    scheduleRatatoskrVanish(world, payload?.targetId);
+  });
+  const offQuest = world.on("quest:completed", () => {
+    markRatatoskrTrigger(world, "quest:completed");
+  });
+  return () => { offOpened(); offClosed(); offQuest(); };
+}, { key: RATATOSKR_LISTENERS_KEY });
+
+export function installRatatoskrListeners(world) {
+  world.install(ratatoskrListeners);
 }
 
 export function ratatoskrSystem(world) {
@@ -121,6 +236,33 @@ export function ratatoskrSystem(world) {
     ensureRatatoskrAffordances(world, id);
     const state = ensureRatatoskrState(world, id);
     if (!state) continue;
+    const phase = String(state.state || RATATOSKR_STATES.dormant);
+
+    if (phase === RATATOSKR_STATES.dormant) {
+      const dist = rec.pos ? chebyshev(rec.pos, player.pos) : Infinity;
+      if (rec.pos && dist <= 2) {
+        state.state = RATATOSKR_STATES.present;
+        continue;
+      }
+      if (rec.pos && (Number(state.visits || 0) | 0) <= 0 && (world.step | 0) < (Number(state.nextAppearTurn || 0) | 0)) {
+        try { world.remove(id, Position); } catch {}
+      }
+      if ((world.step | 0) >= (Number(state.nextAppearTurn || 0) | 0)) {
+        const dest = pickNearPlayer(world, player.pos);
+        if (dest) appearRatatoskr(world, id, state, dest, rec.pos || null);
+      }
+      continue;
+    }
+
+    if (!rec.pos) {
+      state.state = RATATOSKR_STATES.dormant;
+      continue;
+    }
+
+    if ((Number(state.vanishTurn || 0) | 0) > 0 && (world.step | 0) >= (Number(state.vanishTurn || 0) | 0)) {
+      vanishRatatoskr(world, id, state, rec.pos);
+      continue;
+    }
 
     const dist = chebyshev(rec.pos, player.pos);
     if (dist <= 2) {
@@ -129,19 +271,6 @@ export function ratatoskrSystem(world) {
         state.lastBarkTurn = world.step | 0;
         bark(world, id, "Ratatoskr says, 'If you hear your name from underground, answer in someone else's voice.'");
       }
-      continue;
-    }
-
-    if ((world.step | 0) >= (Number(state.nextAppearTurn || 0) | 0)) {
-      const dest = pickNearPlayer(world, player.pos);
-      if (dest) {
-        clearFloorCache(world, id);
-        world.set(id, Position, dest);
-        state.visits = (Number(state.visits || 0) | 0) + 1;
-        state.lastBarkTurn = world.step | 0;
-        bark(world, id, "A red-brown streak drops out of nowhere. 'Wrong tree, right customer.'");
-      }
-      scheduleNext(world, state);
       continue;
     }
 
