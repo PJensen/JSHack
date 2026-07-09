@@ -3,6 +3,7 @@ import {
   decorateButton, humanize, sanitize, bracketize,
   show, hide, hideItemTooltip, rarityStyle, renderItemDetails,
   CHARACTER_SLOT_ORDER, installDetachableKeyHandler, pulseRow,
+  UI,
 } from './overlayUtils.js';
 
 /**
@@ -43,12 +44,12 @@ export function renderCharacterSheet(panel, data) {
     Object.assign(calendarCard.style, {
       marginBottom: '10px',
       padding: '8px 10px',
-      border: '1px solid #2d3b52',
-      borderRadius: '6px',
-      background: '#0a111f',
+      border: UI.BORDER,
+      borderRadius: UI.RADIUS,
+      background: UI.DEFAULT_BG,
       fontSize: '13px',
       lineHeight: '1.4',
-      color: SEASON_COLORS[String(calendar?.season || '')] || '#cfe8ff',
+      color: SEASON_COLORS[String(calendar?.season || '')] || UI.TEXT,
       wordBreak: 'break-word',
     });
     const moonEmoji = String(calendar?.moonEmoji || '');
@@ -60,9 +61,9 @@ export function renderCharacterSheet(panel, data) {
   const statCard = document.createElement('div');
   Object.assign(statCard.style, {
     padding: '8px',
-    border: '1px solid #2d3b52',
-    borderRadius: '6px',
-    background: '#0a111f',
+    border: UI.BORDER,
+    borderRadius: UI.RADIUS,
+    background: UI.DEFAULT_BG,
     display: 'grid',
     gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
     gap: '6px 12px',
@@ -145,9 +146,9 @@ export function renderCharacterSheet(panel, data) {
     Object.assign(resistCard.style, {
       marginTop: '6px',
       padding: '8px',
-      border: '1px solid #2d3b52',
-      borderRadius: '6px',
-      background: '#0a111f',
+      border: UI.BORDER,
+      borderRadius: UI.RADIUS,
+      background: UI.DEFAULT_BG,
       display: 'grid',
       gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
       gap: '6px 12px',
@@ -159,7 +160,7 @@ export function renderCharacterSheet(panel, data) {
       lbl.textContent = `${label}: `;
       const val = document.createElement('span');
       val.textContent = `${v}`;
-      val.style.color = deltaColor(v) || '#cfe8ff';
+      val.style.color = deltaColor(v) || UI.TEXT;
       row.appendChild(lbl);
       row.appendChild(val);
       resistCard.appendChild(row);
@@ -178,9 +179,9 @@ export function renderCharacterSheet(panel, data) {
     Object.assign(traitsCard.style, {
       marginTop: '6px',
       padding: '8px',
-      border: '1px solid #2d3b52',
-      borderRadius: '6px',
-      background: '#0a111f',
+      border: UI.BORDER,
+      borderRadius: UI.RADIUS,
+      background: UI.DEFAULT_BG,
       fontSize: '13px',
     });
     for (const t of traits) {
@@ -210,9 +211,9 @@ export function renderCharacterSheet(panel, data) {
   Object.assign(effects.style, {
     marginTop: '6px',
     padding: '8px',
-    border: '1px solid #2d3b52',
-    borderRadius: '6px',
-    background: '#0a111f',
+    border: UI.BORDER,
+    borderRadius: UI.RADIUS,
+    background: UI.DEFAULT_BG,
     maxHeight: '24vh',
     overflowY: 'auto',
     fontSize: '13px',
@@ -407,9 +408,9 @@ export function renderEquipment(panel, equippedBySlot, playerName, scrollOfIdent
   Object.assign(detail.style, {
     marginTop: '8px',
     padding: '8px',
-    border: '1px solid #2d3b52',
-    borderRadius: '6px',
-    background: '#0a111f',
+    border: UI.BORDER,
+    borderRadius: UI.RADIUS,
+    background: UI.DEFAULT_BG,
     minHeight: '52px',
   });
   el.appendChild(detail);
@@ -450,10 +451,10 @@ export function renderEquipment(panel, equippedBySlot, playerName, scrollOfIdent
       width: '100%',
       padding: '6px 8px',
       boxSizing: 'border-box',
-      background: '#0f1421',
-      color: '#cfe8ff',
-      border: '1px solid #2d3b52',
-      borderRadius: '6px',
+      background: UI.DEFAULT_BG,
+      color: UI.TEXT,
+      border: UI.BORDER,
+      borderRadius: UI.RADIUS,
       cursor: 'pointer',
     });
 
@@ -629,8 +630,8 @@ export function renderEquipment(panel, equippedBySlot, playerName, scrollOfIdent
   function setSel(next) {
     sel = Math.max(0, Math.min(rowsData.length - 1, next | 0));
     rows.forEach((row, i) => {
-      row.style.outline = (i === sel) ? '2px solid #55aaff' : 'none';
-      row.style.background = (i === sel) ? '#0b1323' : '#0f1421';
+      row.style.outline = (i === sel) ? UI.SEL_OUTLINE : 'none';
+      row.style.background = (i === sel) ? UI.SEL_BG : UI.DEFAULT_BG;
     });
     rows[sel]?.scrollIntoView({ block: 'nearest' });
     updateDetail();

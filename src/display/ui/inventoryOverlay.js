@@ -2,7 +2,7 @@ import {
   appendCharacterMenuTabs, markScrollable, quickPinKeyForItem,
   decorateButton, humanize, sanitize, bracketize,
   hide, hideItemTooltip, rarityStyle, renderItemDetails,
-  installDetachableKeyHandler, pulseRow,
+  installDetachableKeyHandler, pulseRow, UI, UX_THEME,
 } from './overlayUtils.js';
 import { getInventoryDefaultAction, isInventoryItemEquippable, isInventoryItemUsable } from './inventoryUtils.js';
 
@@ -34,7 +34,7 @@ export function renderInventory(panel, items, ground, slotFilter = '', scrollOfI
 
     const row = document.createElement('div');
     Object.assign(row.style, {
-      marginBottom: '8px', fontSize: '12px', color: '#cfe8ff',
+      marginBottom: '8px', fontSize: '12px', color: UI.TEXT,
     });
 
     const label = document.createElement('span');
@@ -48,8 +48,8 @@ export function renderInventory(panel, items, ground, slotFilter = '', scrollOfI
 
     const track = document.createElement('div');
     Object.assign(track.style, {
-      marginTop: '3px', height: '6px', background: '#1a2233',
-      borderRadius: '3px', overflow: 'hidden', border: '1px solid #2d3b52',
+      marginTop: '3px', height: '6px', background: UX_THEME.surfaceBgStrong,
+      borderRadius: '3px', overflow: 'hidden', border: UX_THEME.surfaceBorderSoft,
     });
 
     const fill = document.createElement('div');
@@ -101,7 +101,7 @@ export function renderInventory(panel, items, ground, slotFilter = '', scrollOfI
       display: 'flex', alignItems: 'center', gap: '8px',
       width: '100%', padding: '6px 8px',
       boxSizing: 'border-box',
-      background: '#0f1421', color: '#cfe8ff', border: '1px solid #2d3b52', borderRadius: '6px'
+      background: UI.DEFAULT_BG, color: UI.TEXT, border: UI.BORDER, borderRadius: UI.RADIUS
     });
     if (it.unpaid) {
       row.style.borderColor = '#d9963b';
@@ -121,7 +121,7 @@ export function renderInventory(panel, items, ground, slotFilter = '', scrollOfI
     const pin = document.createElement('span');
     pin.textContent = isPinned ? '\uD83D\uDCCC' : ' ';
     pin.style.width = '1ch';
-    pin.style.color = '#5fb3ff';
+    pin.style.color = UX_THEME.accent;
     pin.title = isPinned ? 'Pinned to quick slot' : '';
 
     const name = document.createElement('span');
@@ -199,9 +199,9 @@ export function renderInventory(panel, items, ground, slotFilter = '', scrollOfI
   Object.assign(detail.style, {
     marginTop: '8px',
     padding: '8px',
-    border: '1px solid #2d3b52',
-    borderRadius: '6px',
-    background: '#0a111f',
+    border: UI.BORDER,
+    borderRadius: UI.RADIUS,
+    background: UI.DEFAULT_BG,
     minHeight: '56px',
     maxHeight: '26vh',
     overflowY: 'auto',
@@ -214,9 +214,9 @@ export function renderInventory(panel, items, ground, slotFilter = '', scrollOfI
   Object.assign(actions.style, {
     marginTop: '8px',
     padding: '8px',
-    border: '1px solid #2d3b52',
-    borderRadius: '6px',
-    background: '#0a111f',
+    border: UI.BORDER,
+    borderRadius: UI.RADIUS,
+    background: UI.DEFAULT_BG,
     display: 'flex',
     flexWrap: 'wrap',
     gap: '8px',
@@ -280,11 +280,11 @@ export function renderInventory(panel, items, ground, slotFilter = '', scrollOfI
       if (opts?.disabledReason) btn.title = String(opts.disabledReason);
     }
     if (opts?.primary) {
-      btn.style.background = '#173458';
-      btn.style.borderColor = '#5fb3ff';
+      btn.style.background = UX_THEME.surfaceSelected;
+      btn.style.borderColor = UX_THEME.accentBorder;
       btn.style.fontWeight = '700';
-      btn.style.color = '#e9f5ff';
-      btn.style.boxShadow = '0 0 0 1px rgba(95,179,255,0.2)';
+      btn.style.color = UX_THEME.textStrong;
+      btn.style.boxShadow = UX_THEME.accentGlow;
       btn.title = 'Default action (Enter)';
     }
     btn.addEventListener('click', onClick);
@@ -401,7 +401,7 @@ export function renderInventory(panel, items, ground, slotFilter = '', scrollOfI
     if (!it) return;
     const row = rows[sel];
     const unpaid = !!it.unpaid;
-    const restoreBg = unpaid ? 'rgba(65, 35, 10, 0.75)' : (row === rows[sel] && row?.style.outline !== 'none') ? '#0b1323' : '#0f1421';
+    const restoreBg = unpaid ? 'rgba(65, 35, 10, 0.75)' : (row === rows[sel] && row?.style.outline !== 'none') ? UI.SEL_BG : UI.DEFAULT_BG;
     const signalPulse = () => window.dispatchEvent(new CustomEvent('ui:inventoryPulse'));
 
     if (actionKey === 'identify') {
@@ -532,9 +532,9 @@ export function renderInventory(panel, items, ground, slotFilter = '', scrollOfI
     (/** @type {any} */ (panel))._inventorySelectionKey = String(items[sel]?.id ?? '');
     (/** @type {any} */ (panel))._inventorySelectionIndex = sel;
     rows.forEach((r, j) => {
-      const baseBg = items[j]?.unpaid ? 'rgba(65, 35, 10, 0.75)' : '#0f1421';
-      const activeBg = items[j]?.unpaid ? 'rgba(85, 45, 14, 0.9)' : '#0b1323';
-      r.style.outline = (j === sel) ? '2px solid #55aaff' : 'none';
+      const baseBg = items[j]?.unpaid ? 'rgba(65, 35, 10, 0.75)' : UI.DEFAULT_BG;
+      const activeBg = items[j]?.unpaid ? 'rgba(85, 45, 14, 0.9)' : UI.SEL_BG;
+      r.style.outline = (j === sel) ? UI.SEL_OUTLINE : 'none';
       r.style.background = (j === sel) ? activeBg : baseBg;
     });
     if (opts?.ensureVisible !== false) {

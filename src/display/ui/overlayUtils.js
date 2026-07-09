@@ -75,10 +75,10 @@ export function appendCharacterMenuTabs(host, activeKey) {
     });
     const isActive = tab.key === activeKey;
     if (isActive) {
-      btn.style.background = '#173458';
-      btn.style.borderColor = '#5fb3ff';
-      btn.style.color = '#e9f5ff';
-      btn.style.boxShadow = '0 0 0 1px rgba(95,179,255,0.2)';
+      btn.style.background = UX_THEME.surfaceSelected;
+      btn.style.borderColor = UX_THEME.accentBorder;
+      btn.style.color = UX_THEME.textStrong;
+      btn.style.boxShadow = UX_THEME.accentGlow;
     }
 
     const icon = document.createElement('span');
@@ -227,8 +227,8 @@ export function ensureGroundTooltip(root) {
     bottom: 'calc(var(--jshack-actionbar-height, 48px) + 46px + env(safe-area-inset-bottom, 0px))',
     transform: 'translateX(-50%)',
     minWidth: '132px', maxWidth: '54vw', pointerEvents: 'auto', display: 'none',
-    background: 'rgba(14,18,26,0.96)', color: '#dbeaff', borderRadius: '10px',
-    border: '1px solid #33435f', boxShadow: '0 10px 30px rgba(0,0,0,0.55)',
+    background: UX_THEME.panelBg, color: UX_THEME.text, borderRadius: UX_THEME.radius,
+    border: UX_THEME.panelBorder, boxShadow: '0 16px 42px rgba(0,0,0,0.58), inset 0 0 0 1px rgba(188,206,224,0.05)',
     fontFamily: 'monospace', padding: '7px 8px', zIndex: 850
   });
   root.appendChild(tip);
@@ -246,11 +246,11 @@ export function ensureItemTooltip(root) {
     display: 'none',
     maxWidth: '280px',
     pointerEvents: 'none',
-    background: 'rgba(14,18,26,0.96)',
-    color: '#dbeaff',
-    borderRadius: '10px',
-    border: '1px solid #33435f',
-    boxShadow: '0 10px 30px rgba(0,0,0,0.55)',
+    background: UX_THEME.panelBg,
+    color: UX_THEME.text,
+    borderRadius: UX_THEME.radius,
+    border: UX_THEME.panelBorder,
+    boxShadow: '0 16px 42px rgba(0,0,0,0.58), inset 0 0 0 1px rgba(188,206,224,0.05)',
     fontFamily: 'monospace',
     padding: '10px 12px',
     zIndex: '1400',
@@ -436,8 +436,8 @@ export function ensureStairTooltip(root) {
     top: '25%',
     transform: 'translate(-50%, -50%)',
     minWidth: '112px', maxWidth: '50vw', pointerEvents: 'none', display: 'none',
-    background: 'rgba(14,18,26,0.96)', color: '#dbeaff', borderRadius: '7px',
-    border: '1px solid #33435f', boxShadow: '0 10px 30px rgba(0,0,0,0.55)',
+    background: UX_THEME.panelBg, color: UX_THEME.text, borderRadius: UX_THEME.radius,
+    border: UX_THEME.panelBorder, boxShadow: '0 16px 42px rgba(0,0,0,0.58), inset 0 0 0 1px rgba(188,206,224,0.05)',
     fontFamily: 'monospace', padding: '6px 8px', zIndex: 850,
     textAlign: 'center', cursor: 'pointer'
   });
@@ -476,17 +476,13 @@ export function renderStairTooltip(tip, detail) {
     marginTop: '5px',
     minHeight: '34px',
     minWidth: '80px',
-    borderRadius: '7px',
-    border: '1px solid #6aa7da',
-    background: '#234463',
-    color: '#e9f7ff',
     fontFamily: 'monospace',
     fontSize: '11px',
     fontWeight: 'bold',
-    cursor: 'pointer',
     padding: '0 10px',
     pointerEvents: 'auto',
   });
+  decorateButton(action);
   action.onclick = () => {
     window.dispatchEvent(new CustomEvent('ui:requestStairTraverse', {
       detail: { stairId: detail?.stairId, direction: dir }
@@ -507,8 +503,8 @@ export function ensureInteractableTooltip(root) {
     top: '25%',
     transform: 'translate(-50%, -50%)',
     minWidth: '112px', maxWidth: '50vw', pointerEvents: 'none', display: 'none',
-    background: 'rgba(14,18,26,0.96)', color: '#dbeaff', borderRadius: '7px',
-    border: '1px solid #33435f', boxShadow: '0 10px 30px rgba(0,0,0,0.55)',
+    background: UX_THEME.panelBg, color: UX_THEME.text, borderRadius: UX_THEME.radius,
+    border: UX_THEME.panelBorder, boxShadow: '0 16px 42px rgba(0,0,0,0.58), inset 0 0 0 1px rgba(188,206,224,0.05)',
     fontFamily: 'monospace', padding: '6px 8px', zIndex: 850,
     textAlign: 'center', cursor: 'pointer'
   });
@@ -578,8 +574,8 @@ export function ensureTrapTooltip(root) {
     top: '25%',
     transform: 'translate(-50%, -50%)',
     minWidth: '112px', maxWidth: '50vw', pointerEvents: 'none', display: 'none',
-    background: 'rgba(30,14,14,0.96)', color: '#ffd6cf', borderRadius: '7px',
-    border: '1px solid #5f3333', boxShadow: '0 10px 30px rgba(0,0,0,0.55)',
+    background: UX_THEME.dangerBg, color: UX_THEME.dangerText, borderRadius: UX_THEME.radius,
+    border: UX_THEME.dangerBorder, boxShadow: '0 16px 42px rgba(0,0,0,0.58), inset 0 0 0 1px rgba(255,210,190,0.05)',
     fontFamily: 'monospace', padding: '6px 8px', zIndex: 850,
     textAlign: 'center', cursor: 'pointer'
   });
@@ -1164,6 +1160,43 @@ export function getUiItemEntityIds(it) {
   return ids;
 }
 
+export const UX_THEME = Object.freeze({
+  panelBackdrop: 'rgba(7, 8, 10, 0.62)',
+  panelBg: 'rgba(10, 9, 8, 0.86)',
+  panelBorder: '1px solid rgba(80, 70, 60, 0.48)',
+  panelShadow: '0 28px 80px rgba(0,0,0,0.62), inset 0 0 0 1px rgba(188,206,224,0.06)',
+  surfaceBg: 'rgba(17, 15, 13, 0.72)',
+  surfaceBgStrong: 'rgba(23, 20, 17, 0.88)',
+  surfaceSelected: 'rgba(43, 48, 54, 0.94)',
+  surfaceBorder: '1px solid rgba(92, 82, 72, 0.58)',
+  surfaceBorderSoft: '1px solid rgba(80, 70, 60, 0.34)',
+  text: '#dde2e8',
+  textStrong: '#eef3f8',
+  muted: '#ad9f8d',
+  low: '#918678',
+  accent: '#c5d4e3',
+  accentBorder: '#8ca2ba',
+  accentGlow: '0 0 18px rgba(140,164,188,0.24)',
+  dangerBg: 'rgba(45, 18, 16, 0.92)',
+  dangerBorder: '1px solid rgba(140, 68, 54, 0.72)',
+  dangerText: '#ffd6cf',
+  radius: '8px',
+  radiusPanel: '12px',
+});
+
+/** @param {HTMLElement} el @param {Record<string,string>} [extra] */
+export function applyPanelChrome(el, extra) {
+  Object.assign(el.style, {
+    background: UX_THEME.panelBg,
+    color: UX_THEME.text,
+    border: UX_THEME.panelBorder,
+    borderRadius: UX_THEME.radiusPanel,
+    boxShadow: UX_THEME.panelShadow,
+    backdropFilter: 'blur(6px)',
+  });
+  if (extra) Object.assign(el.style, extra);
+}
+
 /** @param {string} kind */
 export function ensurePanel(kind) {
   const root = ensureRoot();
@@ -1172,8 +1205,8 @@ export function ensurePanel(kind) {
   Object.assign(panel.style, {
     position: 'absolute', left: '0', top: '0', right: '0', bottom: '0',
     display: 'none', pointerEvents: 'auto',
-    background: 'rgba(6,9,14,0.85)', color: '#cfe8ff',
-    backdropFilter: 'blur(4px)',
+    background: UX_THEME.panelBackdrop, color: UX_THEME.text,
+    backdropFilter: 'blur(3px)',
     fontFamily: 'monospace',
     zIndex: String(PANEL_Z_BASE),
   });
@@ -1190,16 +1223,16 @@ export function ensurePanel(kind) {
     position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)',
     width: 'min(600px, 90vw)', maxHeight: '80vh', overflow: 'auto',
     boxSizing: 'border-box',
-    border: '1px solid #2d3b52', borderRadius: '8px', padding: '12px',
-    background: '#0b0e16', boxShadow: '0 10px 40px rgba(0,0,0,0.6)'
+    padding: '14px',
   });
+  applyPanelChrome(inner);
   markScrollable(inner);
   // Close button
   const close = document.createElement('button');
   close.textContent = '\u00d7';
   Object.assign(close.style, {
     position: 'absolute', right: '6px', top: '6px', width: '28px', height: '28px',
-    border: '1px solid #2d3b52', borderRadius: '6px', background: '#101626', color: '#cfe8ff',
+    border: UX_THEME.surfaceBorderSoft, borderRadius: '6px', background: 'transparent', color: UX_THEME.low,
     cursor: 'pointer'
   });
   close.addEventListener('click', () => hide(panel));
@@ -1236,8 +1269,14 @@ export function bracketize(s) {
 /** @param {HTMLButtonElement} btn */
 export function decorateButton(btn) {
   Object.assign(btn.style, {
-    padding: '6px 10px', background: '#101626', color: '#cfe8ff',
-    border: '1px solid #2d3b52', borderRadius: '6px', cursor: 'pointer'
+    padding: '6px 10px',
+    background: 'linear-gradient(180deg, #2a2f35 0%, #1f2329 100%)',
+    color: '#dce5ef',
+    border: '1px solid #6f7d8d',
+    borderRadius: UX_THEME.radius,
+    cursor: 'pointer',
+    boxShadow: 'inset 0 0 0 1px rgba(188,206,224,0.05)',
+    transition: 'transform 120ms, border-color 120ms, box-shadow 120ms, background 120ms',
   });
 }
 
@@ -1279,12 +1318,12 @@ export function pulseRow(row, actionKey, restoreBg) {
 
 /** Standard colors used across chooser/overlay panels. */
 export const UI = Object.freeze({
-  SEL_OUTLINE: '2px solid #55aaff',
-  SEL_BG:      '#0b1323',
-  DEFAULT_BG:  '#0f1421',
-  BORDER:      '1px solid #2d3b52',
-  TEXT:        '#cfe8ff',
-  RADIUS:      '6px',
+  SEL_OUTLINE: `2px solid ${UX_THEME.accentBorder}`,
+  SEL_BG:      UX_THEME.surfaceSelected,
+  DEFAULT_BG:  UX_THEME.surfaceBg,
+  BORDER:      UX_THEME.surfaceBorder,
+  TEXT:        UX_THEME.text,
+  RADIUS:      UX_THEME.radius,
 });
 
 /**
@@ -1380,15 +1419,15 @@ export function ensureMessageTicker(root) {
     display: 'block',
     pointerEvents: 'auto',
     zIndex: 850,
-    color: '#cfe8ff',
+    color: UX_THEME.text,
     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, "Courier New", monospace',
     fontSize: 'min(15px, 3.4vw)',
     lineHeight: '1.35',
-    background: 'rgba(6, 8, 14, 0.92)',
+    background: 'rgba(10, 9, 8, 0.92)',
     borderRadius: '0',
     padding: '5px 12px',
-    borderTop: '1px solid rgba(60,80,120,0.6)',
-    boxShadow: '0 -2px 12px rgba(0,0,0,0.4)',
+    borderTop: UX_THEME.surfaceBorderSoft,
+    boxShadow: '0 -8px 24px rgba(0,0,0,0.36), inset 0 1px 0 rgba(188,206,224,0.05)',
     overflow: 'hidden',
     cursor: 'pointer',
     userSelect: 'none',
@@ -1426,9 +1465,9 @@ export function renderMessageTicker(container, entries) {
       fontSize: 'min(13px, 3.1vw)',
       lineHeight: '1.45',
       padding: '8px 12px',
-      background: 'rgba(4, 6, 12, 0.96)',
-      borderBottom: '1px solid rgba(80,120,170,0.7)',
-      boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+      background: UX_THEME.panelBg,
+      borderBottom: UX_THEME.surfaceBorderSoft,
+      boxShadow: '0 4px 24px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(188,206,224,0.05)',
       cursor: 'pointer',
     });
   } else {
@@ -1438,9 +1477,9 @@ export function renderMessageTicker(container, entries) {
       fontSize: 'min(15px, 3.4vw)',
       lineHeight: '1.35',
       padding: '5px 12px',
-      background: 'rgba(6, 8, 14, 0.92)',
-      borderBottom: '1px solid rgba(60,80,120,0.6)',
-      boxShadow: '0 2px 12px rgba(0,0,0,0.4)',
+      background: 'rgba(10, 9, 8, 0.92)',
+      borderBottom: UX_THEME.surfaceBorderSoft,
+      boxShadow: '0 2px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(188,206,224,0.05)',
       cursor: 'pointer',
     });
   }
@@ -1575,9 +1614,9 @@ export function renderMessageMore(container, message, hasMore) {
       maxHeight: '', gap: '2px',
       fontSize: 'min(15px, 3.4vw)', lineHeight: '1.35',
       padding: '5px 12px',
-      background: 'rgba(6, 8, 14, 0.92)',
-      borderTop: '1px solid rgba(60,80,120,0.6)',
-      boxShadow: '0 -2px 12px rgba(0,0,0,0.4)',
+      background: 'rgba(10, 9, 8, 0.92)',
+      borderTop: UX_THEME.surfaceBorderSoft,
+      boxShadow: '0 -8px 24px rgba(0,0,0,0.36), inset 0 1px 0 rgba(188,206,224,0.05)',
     });
     container.appendChild(row);
   }

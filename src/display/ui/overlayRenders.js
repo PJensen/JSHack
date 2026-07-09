@@ -574,7 +574,8 @@ export function renderQuestJournal(panel, quests) {
     const sectionLabel = document.createElement('div');
     Object.assign(sectionLabel.style, {
       fontSize: '11px',
-      color: '#7ba7cc',
+      color: UI.TEXT,
+      opacity: '0.78',
       textTransform: 'uppercase',
       letterSpacing: '0.05em',
       marginBottom: '4px',
@@ -595,11 +596,11 @@ export function renderQuestJournal(panel, quests) {
       const row = document.createElement('div');
       Object.assign(row.style, {
         marginBottom: '6px',
-        background: q.questId === expandedQuestId ? 'linear-gradient(180deg, #0f1828 0%, #0a111c 100%)' : '#0a111f',
-        border: q.questId === expandedQuestId ? '1px solid #436a8f' : '1px solid #1e2d45',
-        borderRadius: '8px',
+        background: q.questId === expandedQuestId ? UI.SEL_BG : UI.DEFAULT_BG,
+        border: q.questId === expandedQuestId ? '1px solid #8ca2ba' : UI.BORDER,
+        borderRadius: UI.RADIUS,
         fontSize: '13px',
-        boxShadow: q.questId === expandedQuestId ? '0 0 0 1px rgba(115, 173, 227, 0.08) inset' : 'none',
+        boxShadow: q.questId === expandedQuestId ? '0 0 18px rgba(140,164,188,0.16)' : 'none',
       });
 
       const header = document.createElement('button');
@@ -612,7 +613,7 @@ export function renderQuestJournal(panel, quests) {
         padding: '9px 10px',
         background: 'transparent',
         border: '0',
-        color: '#d7e6f5',
+        color: UI.TEXT,
         cursor: 'pointer',
         textAlign: 'left',
       });
@@ -645,7 +646,7 @@ export function renderQuestJournal(panel, quests) {
       subtitle.textContent = [questNodeLabel(q.node, q.status), progressText].filter(Boolean).join(' · ');
       Object.assign(subtitle.style, {
         fontSize: '11px',
-        color: q.questId === expandedQuestId ? '#a8c7e6' : '#7f9ab6',
+        color: q.questId === expandedQuestId ? '#c5d4e3' : '#ad9f8d',
       });
       titleWrap.appendChild(subtitle);
       header.appendChild(titleWrap);
@@ -669,9 +670,9 @@ export function renderQuestJournal(panel, quests) {
         borderRadius: '10px',
         flexShrink: '0',
         marginLeft: '8px',
-        background: isComplete ? '#163a20' : (q.node === 'report' ? '#2a1f05' : '#0e1e35'),
-        color: isComplete ? '#5ecb72' : (q.node === 'report' ? '#f5c043' : '#5fb3ff'),
-        border: isComplete ? '1px solid #2a6e38' : (q.node === 'report' ? '1px solid #7a5a10' : '1px solid #1e4a7e'),
+        background: isComplete ? 'rgba(28, 70, 38, 0.62)' : (q.node === 'report' ? 'rgba(88, 62, 18, 0.58)' : 'rgba(43, 48, 54, 0.74)'),
+        color: isComplete ? '#7fd28c' : (q.node === 'report' ? '#f5c043' : '#c5d4e3'),
+        border: isComplete ? '1px solid rgba(72, 140, 82, 0.7)' : (q.node === 'report' ? '1px solid rgba(122, 90, 16, 0.8)' : UI.BORDER),
       });
       rightWrap.appendChild(badge);
 
@@ -679,7 +680,7 @@ export function renderQuestJournal(panel, quests) {
       chevron.textContent = q.questId === expandedQuestId ? '▾' : '▸';
       Object.assign(chevron.style, {
         marginLeft: '8px',
-        color: q.questId === expandedQuestId ? '#9dcaef' : '#6285aa',
+        color: q.questId === expandedQuestId ? '#c5d4e3' : '#918678',
         fontSize: '14px',
       });
       rightWrap.appendChild(chevron);
@@ -690,7 +691,7 @@ export function renderQuestJournal(panel, quests) {
         const body = document.createElement('div');
         Object.assign(body.style, {
           padding: '0 10px 10px',
-          borderTop: '1px solid rgba(70, 99, 132, 0.45)',
+          borderTop: '1px solid rgba(120, 105, 90, 0.32)',
         });
 
         const sections = [
@@ -708,7 +709,7 @@ export function renderQuestJournal(panel, quests) {
           labelEl.textContent = section.label;
           Object.assign(labelEl.style, {
             fontSize: '10px',
-            color: '#7ba7cc',
+            color: '#ad9f8d',
             textTransform: 'uppercase',
             letterSpacing: '0.08em',
             marginBottom: '3px',
