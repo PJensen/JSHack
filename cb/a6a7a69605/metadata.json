@@ -1,0 +1,30 @@
+{
+  "cli_version": "0.7.7",
+  "checkpoint_id": "cba6a7a69605",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 3,
+  "files_touched": [
+    "VERSION",
+    "src/display/ui/characterOverlay.js",
+    "src/display/ui/hud.js",
+    "src/display/ui/inventoryOverlay.js",
+    "src/display/ui/overlayRenders.js",
+    "src/display/ui/overlayUtils.js"
+  ],
+  "sessions": [
+    {
+      "metadata": "/cb/a6a7a69605/0/metadata.json",
+      "transcript": "/cb/a6a7a69605/0/full.jsonl",
+      "content_hash": "/cb/a6a7a69605/0/content_hash.txt",
+      "prompt": "/cb/a6a7a69605/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 1053890,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 16139392,
+    "output_tokens": 42013,
+    "api_call_count": 116
+  }
+}
