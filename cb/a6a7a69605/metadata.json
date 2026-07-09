@@ -3,7 +3,7 @@
   "checkpoint_id": "cba6a7a69605",
   "strategy": "manual-commit",
   "branch": "master",
-  "checkpoints_count": 3,
+  "checkpoints_count": 5,
   "files_touched": [
     "VERSION",
     "src/display/ui/characterOverlay.js",
@@ -18,6 +18,12 @@
       "transcript": "/cb/a6a7a69605/0/full.jsonl",
       "content_hash": "/cb/a6a7a69605/0/content_hash.txt",
       "prompt": "/cb/a6a7a69605/0/prompt.txt"
+    },
+    {
+      "metadata": "/cb/a6a7a69605/1/metadata.json",
+      "transcript": "/cb/a6a7a69605/1/full.jsonl",
+      "content_hash": "/cb/a6a7a69605/1/content_hash.txt",
+      "prompt": ""
     }
   ],
   "token_usage": {
