@@ -1,0 +1,93 @@
+{
+  "cli_version": "0.7.7",
+  "checkpoint_id": "0f13df5c4fdb",
+  "session_id": "019f47b7-5da2-76e3-8e93-99749d40d0b8",
+  "strategy": "manual-commit",
+  "created_at": "2026-07-09T18:36:22.443658917Z",
+  "branch": "master",
+  "checkpoints_count": 3,
+  "save_step_count": 3,
+  "files_touched": [
+    "VERSION"
+  ],
+  "agent": "Codex",
+  "model": "gpt-5.5",
+  "turn_id": "8c9a64966eac",
+  "checkpoint_transcript_start": 395,
+  "transcript_lines_at_start": 395,
+  "token_usage": {
+    "input_tokens": 710381,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 9126656,
+    "output_tokens": 16633,
+    "api_call_count": 59
+  },
+  "session_metrics": {
+    "turn_count": 5
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-07-09T18:36:22.245038813Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 3,
+    "human_removed": 1,
+    "total_committed": 0,
+    "total_lines_changed": 4,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 866,
+      "user_lines_removed": 1,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".github/agents/Dungeon Generation and BSP Expert.agent.md": 582,
+        ".github/agents/VFX Agent.agent.md": 283,
+        "VERSION": 1
+      },
+      "user_removed_per_file": {
+        "VERSION": 1
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 866,
+      "user_lines_removed": 1,
+      "agent_lines_added": 39,
+      "agent_lines_removed": 4,
+      "user_added_per_file": {
+        ".github/agents/Dungeon Generation and BSP Expert.agent.md": 582,
+        ".github/agents/VFX Agent.agent.md": 283,
+        "VERSION": 1
+      },
+      "user_removed_per_file": {
+        "VERSION": 1
+      }
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 1029,
+      "user_lines_removed": 51,
+      "agent_lines_added": 17,
+      "agent_lines_removed": 2,
+      "user_added_per_file": {
+        ".github/agents/Dungeon Generation and BSP Expert.agent.md": 582,
+        ".github/agents/VFX Agent.agent.md": 283,
+        "VERSION": 1,
+        "src/display/ui/hud.js": 4,
+        "src/display/ui/iconGlyphs.js": 40,
+        "src/display/ui/overlayUtils.js": 6,
+        "tests/uiIconGlyphs.test.mjs": 113
+      },
+      "user_removed_per_file": {
+        "VERSION": 1,
+        "src/display/ui/hud.js": 36,
+        "src/display/ui/overlayUtils.js": 14
+      }
+    }
+  ]
+}
