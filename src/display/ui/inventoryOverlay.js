@@ -16,6 +16,7 @@ export function renderInventory(panel, items, ground, slotFilter = '', scrollOfI
   const el = /** @type {HTMLDivElement} */ (/** @type {any} */(panel)._inner);
   el.innerHTML = '';
   el.style.overflowX = 'hidden';
+  el.style.overflowY = 'auto';
   el.style.width = 'min(920px, 92vw)';
   appendCharacterMenuTabs(el, 'inventory');
   const pinnedSet = new Set((Array.isArray(pinnedKeys) ? pinnedKeys : []).map((key) => String(key || '')));
@@ -118,11 +119,12 @@ export function renderInventory(panel, items, ground, slotFilter = '', scrollOfI
   list.style.display = 'flex';
   list.style.flexDirection = 'column';
   list.style.gap = '4px';
-  list.style.maxHeight = compact ? '34vh' : '58vh';
+  list.style.maxHeight = compact ? '28vh' : '58vh';
   list.style.overflowY = 'auto';
   list.style.overflowX = 'hidden';
   list.style.paddingRight = '2px';
   markScrollable(list);
+  if (compact) list.style.overscrollBehavior = 'auto';
   layout.appendChild(list);
 
   const savedSelectionKey = String((/** @type {any} */ (panel))._inventorySelectionKey || '');
@@ -220,7 +222,7 @@ export function renderInventory(panel, items, ground, slotFilter = '', scrollOfI
     }
     row.appendChild(qty);
 
-    row.addEventListener('click', () => { setSel(idx); });
+    row.addEventListener('click', () => { setSel(idx, { revealDetail: compact }); });
     row.addEventListener('dblclick', () => {
       setSel(idx);
       defaultAction();
@@ -245,11 +247,12 @@ export function renderInventory(panel, items, ground, slotFilter = '', scrollOfI
     borderRadius: UI.RADIUS,
     background: UI.DEFAULT_BG,
     minHeight: '56px',
-    maxHeight: compact ? '24vh' : '34vh',
+    maxHeight: compact ? '30vh' : '34vh',
     overflowY: 'auto',
     overflowX: 'hidden',
   });
   markScrollable(detail);
+  if (compact) detail.style.overscrollBehavior = 'auto';
 
   const actions = document.createElement('div');
   Object.assign(actions.style, {
@@ -577,7 +580,7 @@ export function renderInventory(panel, items, ground, slotFilter = '', scrollOfI
     };
   }
 
-  /** @param {number} i @param {{ensureVisible?:boolean}} [opts] */
+  /** @param {number} i @param {{ensureVisible?:boolean, revealDetail?:boolean}} [opts] */
   function setSel(i, opts) {
     sel = Math.max(0, Math.min(items.length - 1, i|0));
     (/** @type {any} */ (panel))._inventorySelectionKey = String(items[sel]?.id ?? '');
@@ -592,6 +595,9 @@ export function renderInventory(panel, items, ground, slotFilter = '', scrollOfI
       rows[sel]?.scrollIntoView({ block: 'nearest' });
     }
     updateHint();
+    if (opts?.revealDetail) {
+      side.scrollIntoView({ block: 'nearest' });
+    }
   }
 
   function defaultAction() {

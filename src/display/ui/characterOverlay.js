@@ -350,6 +350,7 @@ export function renderEquipment(panel, equippedBySlot, playerName, scrollOfIdent
   const el = /** @type {HTMLDivElement} */ (/** @type {any} */ (panel)._inner);
   el.innerHTML = '';
   el.style.overflowX = 'hidden';
+  el.style.overflowY = 'auto';
   el.style.width = 'min(880px, 92vw)';
   appendCharacterMenuTabs(el, 'equipment');
 
@@ -431,11 +432,12 @@ export function renderEquipment(panel, equippedBySlot, playerName, scrollOfIdent
   list.style.flexDirection = 'column';
   list.style.gap = '4px';
   const compact = window.innerWidth < 760;
-  list.style.maxHeight = compact ? '34vh' : '56vh';
+  list.style.maxHeight = compact ? '28vh' : '56vh';
   list.style.overflowY = 'auto';
   list.style.overflowX = 'hidden';
   list.style.paddingRight = '2px';
   markScrollable(list);
+  if (compact) list.style.overscrollBehavior = 'auto';
 
   const detail = document.createElement('div');
   Object.assign(detail.style, {
@@ -444,11 +446,12 @@ export function renderEquipment(panel, equippedBySlot, playerName, scrollOfIdent
     borderRadius: UI.RADIUS,
     background: UI.DEFAULT_BG,
     minHeight: '52px',
-    maxHeight: compact ? '24vh' : '34vh',
+    maxHeight: compact ? '30vh' : '34vh',
     overflowY: 'auto',
     overflowX: 'hidden',
   });
   markScrollable(detail);
+  if (compact) detail.style.overscrollBehavior = 'auto';
 
   const actions = document.createElement('div');
   Object.assign(actions.style, {
@@ -555,7 +558,7 @@ export function renderEquipment(panel, equippedBySlot, playerName, scrollOfIdent
       row.appendChild(blocked);
     }
 
-    row.addEventListener('click', () => setSel(idx));
+    row.addEventListener('click', () => setSel(idx, { revealDetail: compact }));
     list.appendChild(row);
     return row;
   });
@@ -685,7 +688,7 @@ export function renderEquipment(panel, equippedBySlot, playerName, scrollOfIdent
 
   }
 
-  function setSel(next) {
+  function setSel(next, opts = {}) {
     sel = Math.max(0, Math.min(rowsData.length - 1, next | 0));
     rows.forEach((row, i) => {
       row.style.outline = (i === sel) ? UI.SEL_OUTLINE : 'none';
@@ -693,6 +696,9 @@ export function renderEquipment(panel, equippedBySlot, playerName, scrollOfIdent
     });
     rows[sel]?.scrollIntoView({ block: 'nearest' });
     updateDetail();
+    if (opts?.revealDetail) {
+      side.scrollIntoView({ block: 'nearest' });
+    }
   }
 
   function onKey(e) {
