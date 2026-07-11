@@ -1166,3 +1166,43 @@ Deno.test("dragon hoard dead-end rooms only keep the lair guardian as a monster 
 
   assertEquals(roomHostiles.length, 1, "dragon hoard room should have exactly one hostile spawn");
 });
+
+Deno.test("hydraulics dead ends align a linked gate and wall valve without overlapping a door", () => {
+  const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
+  tiles.fill(TILE_WALL);
+  for (let y = 10; y < 16; y++) for (let x = 10; x < 16; x++) tiles[y * CHUNK_SIZE + x] = TILE_FLOOR;
+  tiles[12 * CHUNK_SIZE + 9] = TILE_DOOR;
+  tiles[12 * CHUNK_SIZE + 8] = TILE_FLOOR;
+
+  const room = { x: CHUNK_SIZE + 10, y: 10, w: 6, h: 6 };
+  const chunk = {
+    chunkX: 1,
+    chunkY: 0,
+    tiles,
+    rooms: [room],
+    doors: [{ x: CHUNK_SIZE + 9, y: 12 }],
+  };
+  const floorPlan = {
+    depth: 6,
+    difficultyMult: 1.2,
+    profile: { shopChance: 0, doorFeatureRate: 0, featurePool: null, monsterFilter: null },
+  };
+  const rng = {
+    next: () => 0.8,
+    int: (min) => min,
+    choice: (arr) => arr[0],
+    float: (min) => min,
+  };
+
+  const spawns = populateChunk(chunk, floorPlan, rng);
+  const gate = spawns.find((spawn) => spawn.kind === "portcullis");
+  const valve = spawns.find((spawn) => spawn.kind === "flood_gate_wheel");
+
+  assert(gate, "hydraulics room should gate its approach corridor");
+  assert(valve, "hydraulics room should place a flood-gate wheel");
+  assertEquals(gate.params.linkId, valve.params.linkId, "gate and valve should share one mechanism link");
+  assertEquals(gate.x, CHUNK_SIZE + 8, "gate should sit beyond the existing doorway");
+  assertEquals(gate.y, 12);
+  assert(valve.x >= room.x && valve.x < room.x + room.w, "valve should be mounted inside the room");
+  assert(valve.y >= room.y && valve.y < room.y + room.h, "valve should be mounted inside the room");
+});

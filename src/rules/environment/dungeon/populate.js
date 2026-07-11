@@ -234,10 +234,10 @@ const SHOP_MAX_ROOM_WIDTH = 6;
 const SHOP_MAX_ROOM_HEIGHT = 6;
 const SHOP_MIN_INTERIOR_TILES = 2;
 const DEAD_END_CONTENT_CHANCE = 1.0;
-// Torch placement tuning: keep darkness as baseline, with occasional authored pools of light.
+// Torch placement tuning: authored pools of light carry dungeon readability.
 const SACRED_ROOM_TORCH_CHANCE = 0.35;
-const WALL_TORCH_ROOM_CHANCE = 0.22;
-const LARGE_ROOM_EXTRA_TORCH_CHANCE = 0.12;
+const WALL_TORCH_ROOM_CHANCE = 0.45;
+const LARGE_ROOM_EXTRA_TORCH_CHANCE = 0.55;
 const DISPLAY_CONTAINER_IDENTITIES = new Set(["potion_shelf", "gem_display_case"]);
 const DECOR_MIMIC_DISGUISE_POOL = Object.freeze(['chest', 'barrel', 'urn', 'crate', 'sarcophagus']);
 function isPitTrapLandingViable(worldSeed, floorPlan, x, y) {
@@ -1628,10 +1628,6 @@ function findRoomExitCorridor(room, chunk) {
   const rh = room.h;
   const tiles = chunk.tiles;
 
-  // Room center for distance calculation
-  const roomCenterX = room.x + rw / 2;
-  const roomCenterY = room.y + rh / 2;
-
   function getTile(x, y) {
     if (x < 0 || y < 0 || x >= CHUNK_SIZE || y >= CHUNK_SIZE) return -1;
     return tiles[y * CHUNK_SIZE + x];
@@ -1641,52 +1637,71 @@ function findRoomExitCorridor(room, chunk) {
     return tile === TILE_FLOOR || tile === TILE_DOOR;
   }
 
-  // Find all exits
+  // Find all exits and retain the direction away from the room. A gate belongs
+  // in the approach corridor, not on top of an existing door entity.
   const exits = [];
 
   // Check west exit
   for (let y = ry; y < ry + rh; y++) {
     if (isPassable(getTile(rx - 1, y))) {
-      exits.push({ x: ox + rx - 1, y: oy + y });
+      exits.push({ x: ox + rx - 1, y: oy + y, dx: -1, dy: 0 });
     }
   }
 
   // Check east exit
   for (let y = ry; y < ry + rh; y++) {
     if (isPassable(getTile(rx + rw, y))) {
-      exits.push({ x: ox + rx + rw, y: oy + y });
+      exits.push({ x: ox + rx + rw, y: oy + y, dx: 1, dy: 0 });
     }
   }
 
   // Check north exit
   for (let x = rx; x < rx + rw; x++) {
     if (isPassable(getTile(x, ry - 1))) {
-      exits.push({ x: ox + x, y: oy + ry - 1 });
+      exits.push({ x: ox + x, y: oy + ry - 1, dx: 0, dy: -1 });
     }
   }
 
   // Check south exit
   for (let x = rx; x < rx + rw; x++) {
     if (isPassable(getTile(x, ry + rh))) {
-      exits.push({ x: ox + x, y: oy + ry + rh });
+      exits.push({ x: ox + x, y: oy + ry + rh, dx: 0, dy: 1 });
     }
   }
 
   if (exits.length === 0) return null;
 
-  // Pick the exit furthest from room center
-  let furthest = exits[0];
-  let maxDist = Math.hypot(exits[0].x - roomCenterX, exits[0].y - roomCenterY);
-
-  for (let i = 1; i < exits.length; i++) {
-    const dist = Math.hypot(exits[i].x - roomCenterX, exits[i].y - roomCenterY);
-    if (dist > maxDist) {
-      maxDist = dist;
-      furthest = exits[i];
+  const exit = exits[Math.floor(exits.length / 2)];
+  const localX = exit.x - ox;
+  const localY = exit.y - oy;
+  if (getTile(localX, localY) === TILE_DOOR) {
+    const beyondX = localX + exit.dx;
+    const beyondY = localY + exit.dy;
+    if (getTile(beyondX, beyondY) === TILE_FLOOR) {
+      return { x: ox + beyondX, y: oy + beyondY, dx: exit.dx, dy: exit.dy };
     }
   }
+  return exit;
+}
 
-  return furthest;
+function pickValveSpot(room, exit, isSolid) {
+  if (!exit) return null;
+  const wallX = exit.dx < 0 ? room.x : room.x + room.w - 1;
+  const wallY = exit.dy < 0 ? room.y : room.y + room.h - 1;
+  const candidates = exit.dx !== 0
+    ? [
+      { x: wallX, y: exit.y - 1 },
+      { x: wallX, y: exit.y + 1 },
+    ]
+    : [
+      { x: exit.x - 1, y: wallY },
+      { x: exit.x + 1, y: wallY },
+    ];
+  return candidates.find((pos) => (
+    pos.x >= room.x && pos.x < room.x + room.w
+    && pos.y >= room.y && pos.y < room.y + room.h
+    && !isSolid(pos.x, pos.y)
+  )) || null;
 }
 
 function applyDeadEndTheme(ctx) {
@@ -1699,6 +1714,7 @@ function applyDeadEndTheme(ctx) {
     spawns.push({ x: pos.x, y: pos.y, kind, params });
     return pos;
   };
+  const lightKinds = new Set(['torch', 'candle_cluster', 'ember_brazier', 'glowcap_patch', 'cooking_fire']);
 
   switch (theme) {
     case 'treasure': {
@@ -1989,14 +2005,17 @@ function applyDeadEndTheme(ctx) {
 
       const linkId = `hyd:${floorPlan.depth}:${room.x},${room.y}`;
       const thresholdWeight = rng.int(20, 40);
+      const exitCorridor = findRoomExitCorridor(room, chunk);
 
-      const winchPos = pickRoomInteriorSpot(room, rng, isSolid, reserved);
-      if (winchPos) {
-        markSolid(winchPos.x, winchPos.y);
+      const valvePos = pickValveSpot(room, exitCorridor, isSolid)
+        || pickRoomInteriorSpot(room, rng, isSolid, reserved);
+      if (valvePos) {
+        reserved.add(`${valvePos.x},${valvePos.y}`);
+        markSolid(valvePos.x, valvePos.y);
         spawns.push({
-          x: winchPos.x,
-          y: winchPos.y,
-          kind: 'chain_winch',
+          x: valvePos.x,
+          y: valvePos.y,
+          kind: 'flood_gate_wheel',
           params: { depth: floorPlan.depth, linkId },
         });
       }
@@ -2012,8 +2031,7 @@ function applyDeadEndTheme(ctx) {
       }
 
       // Place portcullis on corridor to block exit from hydraulics room
-      const exitCorridor = findRoomExitCorridor(room, chunk);
-      if (exitCorridor) {
+      if (exitCorridor && !isSolid(exitCorridor.x, exitCorridor.y)) {
         markSolid(exitCorridor.x, exitCorridor.y);
         spawns.push({
           x: exitCorridor.x,
@@ -2213,6 +2231,17 @@ function applyDeadEndTheme(ctx) {
       }
       break;
     }
+  }
+
+  // Terminal rooms should read as authored destinations even when their theme
+  // rolled mostly loot or monsters. Give every one a small thematic light pool.
+  if (!roomHasSpawnKind(spawns, room, lightKinds)) {
+    const accent = (theme === 'alchemist_den' || theme === 'spider_nest')
+      ? 'glowcap_patch'
+      : (theme === 'armory' || theme === 'hydraulics' || theme === 'dragon_hoard')
+      ? 'ember_brazier'
+      : 'candle_cluster';
+    addDecor(accent);
   }
 }
 

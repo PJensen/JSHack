@@ -293,6 +293,23 @@ Deno.test("findDoorPositions places double doors across a 2-wide hallway opening
   assert(keys.has("6,6"), "expected bottom door tile in double-door frame");
 });
 
+Deno.test("findDoorPositions never authors procedural doors inside room bounds", () => {
+  const stride = 9;
+  const tiles = new Uint8Array(stride * stride);
+  tiles.fill(TILE_WALL);
+  for (let x = 1; x <= 7; x++) tiles[4 * stride + x] = TILE_FLOOR;
+
+  const doors = findDoorPositions(
+    tiles,
+    stride,
+    createRng(123),
+    1.0,
+    [{ x: 3, y: 3, w: 3, h: 3 }],
+  );
+
+  assert(!doors.some((door) => door.x === 4 && door.y === 4), "room interior should remain door-free");
+});
+
 Deno.test("sanitizeDoorTiles removes unframed doors in open rooms", () => {
   const stride = 9;
   const tiles = new Uint8Array(stride * stride);

@@ -138,7 +138,7 @@ export function generateChunk(worldSeed, depth, chunkX, chunkY, profile = null, 
   // Detect door positions after the final floor geometry is settled so doors
   // cannot preserve stale metadata from pre-connectivity/pre-prefab layouts.
   const doorChance = profile?.doorChance ?? 0.6;
-  const doorPositions = findDoorPositions(tiles, CHUNK_SIZE, rng, doorChance);
+  const doorPositions = findDoorPositions(tiles, CHUNK_SIZE, rng, doorChance, localRooms);
   for (const d of doorPositions) {
     doors.push({ x: d.x + ox, y: d.y + oy });
     tiles[d.y * CHUNK_SIZE + d.x] = TILE_DOOR;
@@ -170,10 +170,15 @@ export function edgeGate(worldSeed, depth, cxA, cyA, cxB, cyB) {
  * @param {number} stride
  * @param {Object} rng
  * @param {number} doorChance
+ * @param {Array<{x:number,y:number,w:number,h:number}>} [rooms]
  * @returns {Array<{x:number, y:number}>} chunk-local positions
  */
-export function findDoorPositions(tiles, stride, rng, doorChance) {
+export function findDoorPositions(tiles, stride, rng, doorChance, rooms = []) {
   const isWalkable = t => t === TILE_FLOOR || t === TILE_DOOR;
+  const isInsideRoom = (x, y) => rooms.some((room) => (
+    x >= room.x && x < room.x + room.w
+    && y >= room.y && y < room.y + room.h
+  ));
 
   /** @type {Array<Array<{x:number,y:number}>>} */
   const groups = [];
@@ -184,6 +189,8 @@ export function findDoorPositions(tiles, stride, rng, doorChance) {
     for (let x = 1; x < stride - 1; x++) {
       // Vertical pair: two stacked doors at (x,y) and (x,y+1)
       if (
+        !isInsideRoom(x, y) &&
+        !isInsideRoom(x, y + 1) &&
         tiles[y * stride + x] === TILE_FLOOR &&
         tiles[(y + 1) * stride + x] === TILE_FLOOR &&
         tiles[(y - 1) * stride + x] === TILE_WALL &&
@@ -208,6 +215,8 @@ export function findDoorPositions(tiles, stride, rng, doorChance) {
     for (let x = 1; x < stride - 2; x++) {
       // Horizontal pair: two side-by-side doors at (x,y) and (x+1,y)
       if (
+        !isInsideRoom(x, y) &&
+        !isInsideRoom(x + 1, y) &&
         tiles[y * stride + x] === TILE_FLOOR &&
         tiles[y * stride + (x + 1)] === TILE_FLOOR &&
         tiles[y * stride + (x - 1)] === TILE_WALL &&
@@ -233,6 +242,7 @@ export function findDoorPositions(tiles, stride, rng, doorChance) {
   for (let y = 1; y < stride - 1; y++) {
     for (let x = 1; x < stride - 1; x++) {
       if (tiles[y * stride + x] !== TILE_FLOOR) continue;
+      if (isInsideRoom(x, y)) continue;
       if (paired.has(`${x},${y}`)) continue;
 
       const n = tiles[(y - 1) * stride + x];
