@@ -943,7 +943,7 @@ export function initOverlays() {
   });
 
   // Shop overlay
-  let _shopState = { shopkeeperId: 0, buyMarkup: 1.0, sellDiscount: 0.5, mode: 'browse', activeTab: 'buy', vendorKind: '' };
+  let _shopState = { shopkeeperId: 0, buyMarkup: 1.0, sellDiscount: 0.5, mode: 'browse', activeTab: 'buy', vendorKind: '', vendorLabel: '' };
   window.addEventListener('ui:openShop', (ev) => {
     /** @type {CustomEvent} */ // @ts-ignore
     const e = ev;
@@ -953,6 +953,7 @@ export function initOverlays() {
     _shopState.sellDiscount = d.sellDiscount ?? 0.5;
     _shopState.mode = d.mode || 'browse';
     _shopState.vendorKind = String(d.vendorKind || '');
+    _shopState.vendorLabel = String(d.vendorLabel || '');
     show(shop);
   });
   window.addEventListener('ui:closeShop', () => {
@@ -960,6 +961,7 @@ export function initOverlays() {
     _shopState.mode = 'browse';
     _shopState.activeTab = 'buy';
     _shopState.vendorKind = '';
+    _shopState.vendorLabel = '';
     hide(shop);
   });
   window.addEventListener('ui:shopData', (ev) => {

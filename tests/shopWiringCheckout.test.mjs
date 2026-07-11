@@ -78,6 +78,7 @@ Deno.test("shop checkout return works while blocked at exit even when not adjace
   const shopkeeperId = world.create();
   world.add(shopkeeperId, Position, { x: 15, y: 15 });
   world.add(shopkeeperId, Inventory, { capacity: 20 });
+  world.add(shopkeeperId, NamedIdentity, { identity: "norse_ratatoskr", name: "Ratatoskr" });
   world.add(shopkeeperId, ShopInventory, { buyMarkup: 1.3, sellDiscount: 0.5 });
 
   const itemId = world.create();
@@ -130,6 +131,7 @@ Deno.test("shop checkout return works while blocked at exit even when not adjace
     const lastShopData = shopDataEvents.at(-1) || {};
     assertEquals(lastShopData.mode, "checkout");
     assertEquals(lastShopData.shopkeeperId, shopkeeperId);
+    assertEquals(lastShopData.vendorLabel, "Ratatoskr");
   } finally {
     removeEventListener("ui:closeShop", onClose);
     removeEventListener("ui:shopData", onShopData);

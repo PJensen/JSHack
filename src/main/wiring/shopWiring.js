@@ -97,6 +97,12 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     return base;
   }
 
+  function resolveVendorLabel(shopkeeperId, explicitLabel = "") {
+    const label = String(explicitLabel || "").trim();
+    if (label) return label;
+    return String(world.get(Number(shopkeeperId || 0) | 0, NamedIdentity)?.name || "").trim();
+  }
+
   function dispatchShopData(shopkeeperId, buyMarkup, sellDiscount, mode = 'browse') {
     const shop = world.get(shopkeeperId, ShopInventory);
     if (!shop) return;
@@ -199,6 +205,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
         sellDiscount,
         mode,
         vendorKind: activeShopSession.vendorKind,
+        vendorLabel: activeShopSession.vendorLabel,
       } }));
     } catch (e) { console.debug('[shopWiring] dispatch ui:shopData:', e); }
   }
@@ -263,7 +270,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
       log("The shop is closed.");
       return;
     }
-    const vlabel = String(vendorLabel || "");
+    const vlabel = resolveVendorLabel(targetId, vendorLabel);
     log(isTravellingVendor(vkind) ? `You bargain with ${vlabel || "the travelling vendor"}.` : "You approach the shopkeeper.");
     const shop = world.get(targetId, ShopInventory);
     const markup = buyMarkup ?? shop?.buyMarkup ?? 1.0;
@@ -397,6 +404,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
   world.on("shop:exit-blocked", ({ actor, shopkeeperId, bill, decision }) => {
     const pe = playerEntity(world);
     if (!pe || actor !== pe.id) return;
+    const vendorLabel = resolveVendorLabel(shopkeeperId);
 
     // Open shop UI in checkout mode
     activeShopSession = {
@@ -404,6 +412,8 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
       buyMarkup: 1.3,
       sellDiscount: 0.5,
       mode: "checkout",
+      vendorKind: "",
+      vendorLabel,
     };
 
     const shop = world.get(shopkeeperId, ShopInventory);
@@ -413,7 +423,7 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     dispatchShopData(shopkeeperId, markup, discount, 'checkout');
     try {
       window.dispatchEvent(new CustomEvent("ui:openShop", {
-        detail: { shopkeeperId, buyMarkup: markup, sellDiscount: discount, mode: 'checkout' }
+        detail: { shopkeeperId, buyMarkup: markup, sellDiscount: discount, mode: 'checkout', vendorLabel }
       }));
     } catch (e) { console.debug('[shopWiring] dispatch ui:openShop:', e); }
   });

@@ -35,6 +35,7 @@ Deno.test("shop appraise tab identifies eligible items, charges fee, and updates
 
   const shopkeeperId = world.create();
   world.add(shopkeeperId, Position, { x: 11, y: 10 });
+  world.add(shopkeeperId, NamedIdentity, { identity: "townfolk_alchemist", name: "Alchemist" });
   world.add(shopkeeperId, ShopInventory, { buyMarkup: 1.3, sellDiscount: 0.5 });
 
   const goldStackA = world.create();
@@ -85,6 +86,7 @@ Deno.test("shop appraise tab identifies eligible items, charges fee, and updates
     const initialData = shopDataEvents.at(-1);
     assert(initialData, "shop data should be dispatched when shop opens");
     assertEquals(initialData.appraisableItems.length, 1, "one item should be appraisable");
+    assertEquals(initialData.vendorLabel, "Alchemist", "shop data should label the vendor from identity");
     assertEquals(initialData.appraisableItems[0].id, scrollId);
     assertEquals(initialData.appraisableItems[0].appraiseFee, 15, "scroll appraisal fee should be 15");
     assertEquals(initialData.gold, 10, "initial gold should be reported");
@@ -110,6 +112,7 @@ Deno.test("shop appraise tab identifies eligible items, charges fee, and updates
 
     const refreshedData = shopDataEvents.at(-1);
     assert(refreshedData, "shop data should refresh after appraisal");
+    assertEquals(refreshedData.vendorLabel, "Alchemist", "refreshed shop data should preserve the vendor label");
     assertEquals(refreshedData.gold, 5, "refreshed shop data should include deducted gold");
     assertEquals(refreshedData.appraisableItems.length, 0, "identified item should leave appraise tab list");
   } finally {

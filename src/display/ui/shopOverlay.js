@@ -15,6 +15,7 @@ export function renderShop(panel, data, state) {
 
   const mode = data?.mode || state?.mode || 'browse';
   const vendorKind = String(data?.vendorKind || state?.vendorKind || '');
+  const vendorLabel = String(data?.vendorLabel || state?.vendorLabel || '').trim();
   const shopItems = data?.shopItems || [];
   const playerItems = data?.playerItems || [];
   const appraisableItems = data?.appraisableItems || [];
@@ -29,9 +30,8 @@ export function renderShop(panel, data, state) {
   const titleWrap = document.createElement('div');
   Object.assign(titleWrap.style, { display: 'flex', flexDirection: 'column', gap: '2px' });
   const title = document.createElement('div');
-  title.textContent = mode === 'checkout'
-    ? (vendorKind === 'gem' ? 'Gem Dealer Invoice' : vendorKind === 'book' ? 'Bookseller Invoice' : 'Shopkeeper Invoice')
-    : (vendorKind === 'gem' ? 'Gem Dealer' : vendorKind === 'book' ? 'Bookseller' : 'Shopkeeper');
+  const vendorTitle = vendorLabel || (vendorKind === 'gem' ? 'Gem Dealer' : vendorKind === 'book' ? 'Bookseller' : 'Shopkeeper');
+  title.textContent = mode === 'checkout' ? `${vendorTitle} Invoice` : vendorTitle;
   title.style.fontWeight = 'bold'; title.style.fontSize = '16px';
   titleWrap.appendChild(title);
   if (mode !== 'checkout' && vendorKind === 'gem') {
