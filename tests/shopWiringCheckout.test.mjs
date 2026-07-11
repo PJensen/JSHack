@@ -62,6 +62,73 @@ Deno.test("shop wiring blocks overworld after-hours inventory but allows dungeon
   }
 });
 
+Deno.test("shop wiring reopens an active travelling vendor session", () => {
+  const priorWindow = globalThis.window;
+  // @ts-ignore Deno test runtime does not always define window, but wiring uses it.
+  globalThis.window = globalThis;
+
+  const world = new World({ seed: 0x5151 });
+  world.step = 0;
+
+  const dungeonId = world.create();
+  world.add(dungeonId, DungeonState, { currentDepth: 0, profileType: "overworld", floorEntityIds: [] });
+
+  const playerId = world.create();
+  world.add(playerId, Player, {});
+  world.add(playerId, Position, { x: 2, y: 2 });
+  world.add(playerId, Inventory, { capacity: 20 });
+
+  const ratatoskr = world.create();
+  world.add(ratatoskr, Position, { x: 3, y: 2 });
+  world.add(ratatoskr, Inventory, { capacity: 20 });
+  world.add(ratatoskr, NamedIdentity, { identity: "ratatoskr", name: "Ratatoskr" });
+  world.add(ratatoskr, ShopInventory, { buyMarkup: 3.0, sellDiscount: 0.15 });
+
+  const openEvents = [];
+  const shopDataEvents = [];
+  const onOpen = (ev) => openEvents.push(ev?.detail || null);
+  const onShopData = (ev) => shopDataEvents.push(ev?.detail || null);
+  addEventListener("ui:openShop", onOpen);
+  addEventListener("ui:shopData", onShopData);
+
+  try {
+    installShopWiring({
+      world,
+      playerEntity: (w) => {
+        const pos = w.get(playerId, Position);
+        return pos ? { id: playerId, pos: { x: pos.x, y: pos.y } } : null;
+      },
+      log: () => {},
+      bracketizeName: (s) => s,
+    });
+
+    const payload = {
+      actor: playerId,
+      targetId: ratatoskr,
+      buyMarkup: 3.0,
+      sellDiscount: 0.15,
+      vendorKind: "travellingVendor",
+      vendorLabel: "Ratatoskr",
+    };
+    world.emit("shop:open", payload);
+    world.emit("shop:open", payload);
+
+    assertEquals(openEvents.length, 2, "same travelling vendor should dispatch a fresh open event");
+    assertEquals(shopDataEvents.length, 2, "same travelling vendor should refresh shop data");
+    assertEquals(openEvents.at(-1)?.vendorLabel, "Ratatoskr");
+  } finally {
+    removeEventListener("ui:openShop", onOpen);
+    removeEventListener("ui:shopData", onShopData);
+    if (typeof priorWindow === "undefined") {
+      // @ts-ignore restore no-window state
+      delete globalThis.window;
+    } else {
+      // @ts-ignore restore prior window reference
+      globalThis.window = priorWindow;
+    }
+  }
+});
+
 Deno.test("shop checkout return works while blocked at exit even when not adjacent", () => {
   const priorWindow = globalThis.window;
   // @ts-ignore Deno test runtime does not always define window, but wiring uses it.

@@ -264,7 +264,6 @@ export function installShopWiring({ world, playerEntity, log, bracketizeName }) 
     if (!pe || actor !== pe.id) return;
     if (!isPlayerAdjacentToEntity(Number(targetId) || 0)) return;
     const sid = Number(targetId) || 0;
-    if (sid > 0 && activeShopSession.shopkeeperId === sid) return;
     const vkind = String(vendorKind || "");
     if (!isTravellingVendor(vkind) && !isShopOpenNow()) {
       log("The shop is closed.");
