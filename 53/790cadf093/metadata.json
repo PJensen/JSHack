@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.7.7",
+  "checkpoint_id": "53790cadf093",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "src/main/wiring/shopWiring.js",
+    "tests/shopWiringCheckout.test.mjs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/53/790cadf093/0/metadata.json",
+      "transcript": "/53/790cadf093/0/full.jsonl",
+      "content_hash": "/53/790cadf093/0/content_hash.txt",
+      "prompt": "/53/790cadf093/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 68907,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 522880,
+    "output_tokens": 4045,
+    "api_call_count": 11
+  }
+}
