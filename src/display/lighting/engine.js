@@ -1245,7 +1245,7 @@ export function createLightingEngine() {
    * @param {{ playerSheltered?: boolean, isShelterInterior?: ((x:number,y:number)=>boolean)|null, materialAt?: ((x:number,y:number)=>any)|null }} [opts]
    */
   function render(ctx, lights, isOpaque, vx0, vy0, vx1, vy1, ambient, maxDark, isRoofed, visionDef, surfaceRegions, fxTime, reliefKey, opts) {
-    const DARK = (maxDark != null) ? maxDark : 140;
+    const DARK = (maxDark != null) ? maxDark : 190;
     const tx0 = Math.floor(vx0) - 1;
     const ty0 = Math.floor(vy0) - 1;
     const tx1 = Math.ceil(vx1)  + 1;
