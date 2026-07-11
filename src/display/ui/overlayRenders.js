@@ -13,6 +13,7 @@ import {
   rarityStyle, getMessageColor,
   UI, createChooserRow, createSimpleSel, installKeyHandler, installDetachableKeyHandler,
   pulseRow, UX_THEME, dispatchCharacterMenuTabCycle,
+  INTERACTION_POPUP_ARM_DELAY_MS,
 } from './overlayUtils.js';
 import {
   readInputMode, readWalkInterval, writeInputMode, writeWalkInterval,
@@ -1239,7 +1240,12 @@ export function renderActionChooser(panel, data) {
   list.style.display = 'flex';
   list.style.flexDirection = 'column';
   list.style.gap = '4px';
+  list.style.pointerEvents = 'none';
   el.appendChild(list);
+  const armAt = performance.now() + INTERACTION_POPUP_ARM_DELAY_MS;
+  setTimeout(() => {
+    list.style.pointerEvents = 'auto';
+  }, INTERACTION_POPUP_ARM_DELAY_MS);
 
   const enabledIndexes = [];
   const rows = options.map((opt, idx) => {
@@ -1286,6 +1292,7 @@ export function renderActionChooser(panel, data) {
   }
 
   function confirmSelected() {
+    if (performance.now() < armAt) return;
     const i = getSel();
     const opt = options[i];
     if (!opt) return;

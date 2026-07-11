@@ -3,6 +3,7 @@
 // Pure DOM — no ECS, no rules imports. Receives position via callbacks.
 
 import { DIALOG_BUBBLE_SCALE } from "../../shared/uiScale.js";
+import { INTERACTION_POPUP_ARM_DELAY_MS } from "./overlayUtils.js";
 
 const dialogPx = (value) => `${Math.round(value * DIALOG_BUBBLE_SCALE)}px`;
 
@@ -167,6 +168,7 @@ export function createBubbleDialogController({ getPosition, playerEntity, canvas
     dom.title.textContent = String(detail?.speakerName || "Someone");
     dom.body.textContent = String(detail?.text || "...");
     dom.choices.innerHTML = "";
+    const armAt = performance.now() + INTERACTION_POPUP_ARM_DELAY_MS;
     for (const choice of choices) {
       const btn = document.createElement("button");
       btn.textContent = String(choice?.label || choice?.id || "Continue");
@@ -182,7 +184,16 @@ export function createBubbleDialogController({ getPosition, playerEntity, canvas
         cursor: "pointer",
         touchAction: "manipulation",
       });
+      btn.disabled = true;
+      btn.style.opacity = "0.62";
+      btn.style.cursor = "default";
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.style.opacity = "1";
+        btn.style.cursor = "pointer";
+      }, INTERACTION_POPUP_ARM_DELAY_MS);
       btn.addEventListener("click", () => {
+        if (performance.now() < armAt) return;
         window.dispatchEvent(new CustomEvent("ui:requestDialogChoice", {
           detail: { sessionId: state.sessionId, choiceId: String(choice?.id || "") },
         }));

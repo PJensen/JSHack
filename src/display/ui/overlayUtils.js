@@ -37,6 +37,7 @@ export const CHARACTER_MENU_TABS = Object.freeze([
   { key: 'quests', icon: CHARACTER_MENU_TAB_GLYPHS.quests, label: 'Quests', eventName: 'ui:openQuests' },
   { key: 'settings', icon: CHARACTER_MENU_TAB_GLYPHS.settings, label: 'Settings', eventName: 'ui:openSettings' },
 ]);
+export const INTERACTION_POPUP_ARM_DELAY_MS = 250;
 
 // --- _itemTooltip module state (mutable let) ---
 let _itemTooltip = null;
@@ -56,10 +57,16 @@ export function setItemTooltip(el) {
 export function appendCharacterMenuTabs(host, activeKey) {
   const tabs = document.createElement('div');
   Object.assign(tabs.style, {
+    position: 'sticky',
+    top: '0',
+    zIndex: '3',
     display: 'grid',
     gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
     gap: '6px',
     marginBottom: '10px',
+    paddingBottom: '8px',
+    background: UX_THEME.panelBg,
+    backdropFilter: 'blur(6px)',
   });
 
   for (const tab of CHARACTER_MENU_TABS) {
@@ -567,7 +574,17 @@ export function renderInteractableTooltip(tip, detail) {
     padding: '0 10px',
     pointerEvents: 'auto',
   });
+  const armAt = performance.now() + INTERACTION_POPUP_ARM_DELAY_MS;
+  action.disabled = true;
+  action.style.opacity = '0.62';
+  action.style.cursor = 'default';
+  setTimeout(() => {
+    action.disabled = false;
+    action.style.opacity = '1';
+    action.style.cursor = 'pointer';
+  }, INTERACTION_POPUP_ARM_DELAY_MS);
   action.onclick = () => {
+    if (performance.now() < armAt) return;
     window.dispatchEvent(new CustomEvent('ui:requestInteractableAction', {
       detail: {
         targetId: detail?.targetId,
@@ -1250,7 +1267,8 @@ export function ensurePanel(kind) {
   Object.assign(close.style, {
     position: 'absolute', right: '6px', top: '6px', width: '28px', height: '28px',
     border: UX_THEME.surfaceBorderSoft, borderRadius: '6px', background: 'transparent', color: UX_THEME.low,
-    cursor: 'pointer'
+    cursor: 'pointer',
+    zIndex: '5',
   });
   close.addEventListener('click', () => hide(panel));
   inner.appendChild(close);

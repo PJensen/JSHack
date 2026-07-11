@@ -24,7 +24,7 @@ function keyboardEvent(key, code = key) {
   return event;
 }
 
-Deno.test("NPC bubble keyboard closes on Escape and accepts the first choice on Enter", () => {
+Deno.test("NPC bubble keyboard closes on Escape and accepts the first choice on Enter", async () => {
   const previous = {
     window: globalThis.window,
     document: globalThis.document,
@@ -63,6 +63,51 @@ Deno.test("NPC bubble keyboard closes on Escape and accepts the first choice on 
       { sessionId: 7, choiceId: "accept" },
       { close: { sessionId: 7 } },
     ]);
+    await new Promise((resolve) => setTimeout(resolve, 260));
+  } finally {
+    globalThis.window = previous.window;
+    globalThis.document = previous.document;
+    globalThis.addEventListener = previous.addEventListener;
+  }
+});
+
+Deno.test("NPC bubble ignores immediate choice clicks after opening", async () => {
+  const previous = {
+    window: globalThis.window,
+    document: globalThis.document,
+    addEventListener: globalThis.addEventListener,
+  };
+  const events = new EventTarget();
+  const body = new FakeElement();
+  globalThis.window = events;
+  globalThis.document = {
+    createElement: () => new FakeElement(),
+    body,
+  };
+  globalThis.addEventListener = events.addEventListener.bind(events);
+
+  try {
+    const requested = [];
+    events.addEventListener("ui:requestDialogChoice", (event) => requested.push(event.detail));
+    const controller = createBubbleDialogController({
+      getPosition: () => ({ x: 1, y: 1 }),
+      playerEntity: () => ({ id: 1, pos: { x: 1, y: 1 } }),
+      canvas: new FakeElement(),
+      getCam: () => ({ scale: 16 }),
+      worldToScreen: () => [100, 100],
+      getCanvasSetup: () => ({ cssW: 320, cssH: 240 }),
+    });
+    controller.open({
+      sessionId: 8,
+      choices: [{ id: "accept", label: "Accept" }],
+    });
+
+    const bubble = body.children.find((child) => child.id === "speech-bubble-dialog");
+    const choiceButton = bubble.children[2].children[0];
+    choiceButton.dispatchEvent(new Event("click"));
+
+    assertEquals(requested, []);
+    await new Promise((resolve) => setTimeout(resolve, 260));
   } finally {
     globalThis.window = previous.window;
     globalThis.document = previous.document;

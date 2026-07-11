@@ -1,3 +1,5 @@
+import { INTERACTION_POPUP_ARM_DELAY_MS } from "./overlayUtils.js";
+
 export function renderDialog(panel, data = {}) {
   if (!(panel instanceof HTMLElement)) return;
   const speakerName = String(data.speakerName || "Someone");
@@ -37,6 +39,7 @@ export function renderDialog(panel, data = {}) {
     display: "grid",
     gap: "10px",
   });
+  const armAt = performance.now() + INTERACTION_POPUP_ARM_DELAY_MS;
 
   const dialogChoices = choices.length > 0 ? choices : [{ id: "close", label: "Goodbye." }];
   for (const choice of dialogChoices) {
@@ -55,7 +58,16 @@ export function renderDialog(panel, data = {}) {
       cursor: "pointer",
       touchAction: "manipulation",
     });
+    btn.disabled = true;
+    btn.style.opacity = "0.62";
+    btn.style.cursor = "default";
+    setTimeout(() => {
+      btn.disabled = false;
+      btn.style.opacity = "1";
+      btn.style.cursor = "pointer";
+    }, INTERACTION_POPUP_ARM_DELAY_MS);
     btn.addEventListener("click", () => {
+      if (performance.now() < armAt) return;
       window.dispatchEvent(new CustomEvent("ui:requestDialogChoice", {
         detail: { sessionId, choiceId: String(choice?.id || "") },
       }));
