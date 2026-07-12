@@ -201,6 +201,20 @@ Deno.test("idle townfolk transitions to walking when idleTurns reaches 0", () =>
   assertEquals(job.state, TOWNFOLK_STATES.walking, "should transition to walking");
 });
 
+Deno.test("town economy workers continue their routines outside the player view radius", () => {
+  const world = makeWorld();
+  const npc = addTownfolk(world, 55, 5, "herbalist", {
+    state: TOWNFOLK_STATES.idle,
+    idleTurns: 0,
+    workX: 55,
+    workY: 5,
+  });
+
+  aiTownfolkSystem(world);
+
+  assertEquals(world.get(npc, TownfolkJob).state, TOWNFOLK_STATES.walking);
+});
+
 Deno.test("idle townfolk does NOT transition when idleTurns > 0", () => {
   const world = makeWorld(3);
 

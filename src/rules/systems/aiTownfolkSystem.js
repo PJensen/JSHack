@@ -58,7 +58,6 @@ import { RAT_INFESTATION_QUEST_ID } from "../quests/definitions/ratInfestation.j
 import { getTownState, getWeather } from "../utils/townStateAccess.js";
 import { isAsleep, putActorToSleep, tryWakeActor } from "../utils/sleep.js";
 
-const TOWNFOLK_RADIUS = 40;
 const MAX_STUCK_TURNS = 5;
 const WORK_RANGE = 15;
 const BELL_GUARD_TURNS = 120;
@@ -991,7 +990,7 @@ function handleIdle(world, id, pos, job) {
       break;
     }
     case TOWNFOLK_ROLES.miner: {
-      const ore = findReadyNode(world, job.workX, job.workY, 8,
+      const ore = findReadyNode(world, job.workX, job.workY, WORK_RANGE,
         (n) => n.requiresTool === "dig");
       if (ore) {
         const adj = findAdjacentWalkable(ore.x, ore.y);
@@ -1665,7 +1664,7 @@ function getRoleWorkTarget(world, job) {
       return { x: job.workX, y: job.workY, kind: "chop", state: TOWNFOLK_STATES.working, radius: 1 };
     }
     case TOWNFOLK_ROLES.miner: {
-      const ore = findReadyNode(world, job.workX, job.workY, 8,
+      const ore = findReadyNode(world, job.workX, job.workY, WORK_RANGE,
         (n) => n.requiresTool === "dig");
       if (ore) {
         return { x: ore.x, y: ore.y, kind: "mine", state: TOWNFOLK_STATES.working, radius: 1 };
@@ -1988,42 +1987,34 @@ export function aiTownfolkSystem(world) {
     }
   }
 
-  const _player = playerEntity(world);
-  if (!_player) return;
-  const playerPos = _player.pos;
-
-  forEachInRadius(world, playerPos.x, playerPos.y, TOWNFOLK_RADIUS, (id, pos) => {
-    if (emergencyProcessed.has(id)) return;
-    const fac = world.get(id, Faction);
-    if (fac?.key !== "townfolk") return;
-
-    const job = world.get(id, TownfolkJob);
-    if (!job) return;
+  for (const [id, pos, fac, job] of world.query(Position, Faction, TownfolkJob)) {
+    if (emergencyProcessed.has(id)) continue;
+    if (fac?.key !== "townfolk") continue;
 
     const spd = world.get(id, Speed);
     const actEvery = spd?.actEvery > 1 ? spd.actEvery : 1;
-    if (actEvery > 1 && ((world.step + id) % actEvery) !== 0) return;
-    if (world.has(id, MoveIntent)) return;
+    if (actEvery > 1 && ((world.step + id) % actEvery) !== 0) continue;
+    if (world.has(id, MoveIntent)) continue;
 
     // Armed state overrides all other behaviour
     if (job.state === TOWNFOLK_STATES.armed) {
       handleArmedTownfolk(world, id, pos, job);
-      return;
+      continue;
     }
 
     if (job.state === TOWNFOLK_STATES.alarming) {
       handleBellRun(world, id, pos, job);
-      return;
+      continue;
     }
 
     if (job.state === TOWNFOLK_STATES.hiding) {
       handleHiding(world, id, pos, job);
-      return;
+      continue;
     }
 
     if (job.scheduleEnabled) {
       handleScheduledTownfolk(world, id, pos, job);
-      return;
+      continue;
     }
 
     switch (job.state) {
@@ -2045,7 +2036,7 @@ export function aiTownfolkSystem(world) {
       default:
         break;
     }
-  });
+  }
 }
 
 const BELL_INSTALLED = Symbol.for("jshack:bellListener:installed");

@@ -259,6 +259,28 @@ Deno.test("scheduled townfolk receive roofed home bed coordinates", async () => 
   }
 });
 
+Deno.test("overworld producers receive harvest nodes inside their work radius", async () => {
+  const { chunks } = await generateOverworldChunks(SEED);
+  const spawns = [];
+  for (const chunk of chunks.values()) spawns.push(...(chunk.spawns || []));
+
+  const cases = [
+    ["herbalist", new Set(["harvest_herbs", "harvest_moonleaf", "harvest_ember_root"]), 15],
+    ["miner", new Set(["harvest_iron_ore", "harvest_coal_ore", "harvest_stone"]), 15],
+    ["woodcutter", new Set(["tree_node"]), 15],
+  ];
+
+  for (const [role, resourceKinds, radius] of cases) {
+    const worker = spawns.find((spawn) => spawn.kind === "townfolk" && spawn.params?.townfolkId === role);
+    assert(worker, `expected ${role} townfolk spawn`);
+    const nearby = spawns.some((spawn) =>
+      resourceKinds.has(spawn.kind)
+      && Math.abs(spawn.x - worker.params.workX) + Math.abs(spawn.y - worker.params.workY) <= radius
+    );
+    assert(nearby, `${role} should have a harvest node inside the configured work radius`);
+  }
+});
+
 Deno.test("overworld places named curiosity landmarks outside the town core", async () => {
   const { chunks, townPlan } = await generateOverworldChunks(SEED);
   const landmarks = landmarkSpawns(chunks);

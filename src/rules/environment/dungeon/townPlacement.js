@@ -786,6 +786,7 @@ function addBuildingResourceSpawns(chunks, building, buildingPlan, bounds) {
     spawns.push(["fishing_spot", (t) => WET_TILES.has(t), 8]);
   }
 
+  const occupied = new Set();
   for (const [spawnKind, predicate, count] of spawns) {
     let placed = 0;
     const minR = kind === "woodcutter_camp" ? 4 : 3;
@@ -797,8 +798,32 @@ function addBuildingResourceSpawns(chunks, building, buildingPlan, bounds) {
           const x = doorX + dx;
           const y = doorY + dy;
           if (x < bounds.minX + 2 || x > bounds.maxX - 2 || y < bounds.minY + 2 || y > bounds.maxY - 2) continue;
+          if (occupied.has(`${x},${y}`)) continue;
           if (!predicate(getWorldTile(chunks, x, y))) continue;
           addChunkSpawn(chunks, x, y, spawnKind);
+          occupied.add(`${x},${y}`);
+          placed++;
+        }
+      }
+    }
+
+    // A camp must always have something to work. Terrain scoring puts these
+    // buildings near suitable biomes, but the stamped clearing can consume all
+    // matching tiles in the local work radius. In that case, place the resource
+    // entity on the nearest remaining natural ground instead.
+    for (let r = minR; r <= maxR && placed < count; r++) {
+      for (let dx = -r; dx <= r && placed < count; dx++) {
+        for (let dy = -r; dy <= r && placed < count; dy++) {
+          if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
+          const x = doorX + dx;
+          const y = doorY + dy;
+          const key = `${x},${y}`;
+          if (occupied.has(key)) continue;
+          if (x < bounds.minX + 2 || x > bounds.maxX - 2 || y < bounds.minY + 2 || y > bounds.maxY - 2) continue;
+          const tile = getWorldTile(chunks, x, y);
+          if (!NATURAL_BUILDABLE.has(tile) || STRUCTURE_TILES.has(tile) || WET_TILES.has(tile)) continue;
+          addChunkSpawn(chunks, x, y, spawnKind);
+          occupied.add(key);
           placed++;
         }
       }
