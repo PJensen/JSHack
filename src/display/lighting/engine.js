@@ -10,7 +10,7 @@ const SQRT2 = 1.4142;
 
 // How much player vision lifts darkness (0=pitch black in sight, 1=fully revealed).
 // Lava uses a lower value so the below-grade depression profile stays legible.
-const VIS_LIFT       = 0.25;
+const VIS_LIFT       = 0.5;
 const VIS_LIFT_LAVA  = 0.44;
 const AMBIENT_DARKNESS_LIFT_SCALE = 0.28;
 const UNSEEN_AMBIENT_LIFT_CAP = 0.42;
