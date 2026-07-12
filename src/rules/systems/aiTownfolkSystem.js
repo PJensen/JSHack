@@ -1200,6 +1200,12 @@ function handleWorking(world, id, pos, job) {
           world.emit("townfolk:planted", { actor: id, x: pos.x, y: pos.y });
         }
         job.carryCount++;
+        const cropPos = world.get(cropId, Position);
+        world.emit("audio:play", {
+          key: "action:harvest_plant",
+          at: cropPos ? { x: cropPos.x | 0, y: cropPos.y | 0 } : { x: pos.x | 0, y: pos.y | 0 },
+          sourceId: id,
+        });
         world.emit("townfolk:harvested", { actor: id, x: pos.x, y: pos.y });
         // Look for more if not full
         if (job.carryMax > 0 && job.carryCount < job.carryMax) {
@@ -1304,7 +1310,15 @@ function handleWorking(world, id, pos, job) {
           herbKind = n.kind;
         }
       });
-      if (herbId) depleteNode(world, herbId);
+      if (herbId) {
+        depleteNode(world, herbId);
+        const herbPos = world.get(herbId, Position);
+        world.emit("audio:play", {
+          key: "action:harvest_plant",
+          at: herbPos ? { x: herbPos.x | 0, y: herbPos.y | 0 } : { x: pos.x | 0, y: pos.y | 0 },
+          sourceId: id,
+        });
+      }
       carryCreated(world, id, HERB_ITEM_IDS[herbKind] || "food_wild_herbs");
       job.carryCount++;
       world.emit("townfolk:gathered_herbs", { actor: id, x: pos.x, y: pos.y });

@@ -87,6 +87,7 @@ export const STATUS_SOUND_BY_KIND = Object.freeze({
 export const SEARCH_PING_SOUND_ID = "action:search_ping";
 export const SEARCH_FOUND_SOUND_ID = "action:search_found";
 export const SECRET_FOUND_SOUND_ID = "action:secret_found";
+export const HARVEST_PLANT_SOUND_ID = "action:harvest_plant";
 export const BONE_CHIME_SOUND_ID = "ambient:bone_chime";
 export const TAMING_SUCCESS_SOUND_ID = "magic:taming";
 export const GENOCIDE_SUCCESS_SOUND_ID = "item:scroll:genocide";
@@ -138,6 +139,22 @@ const PLAYER_NEAR_DEATH_RATIO = 0.25;
 const DUNGEON_OMEN_EVENT_GAP = 18;
 const DUNGEON_OMEN_CHANCE = 12;
 const DEAFENED_SOUND_COOLDOWN_MS = 2500;
+const PLANT_HARVEST_KINDS = new Set([
+  "berries",
+  "carrot",
+  "corn",
+  "ember_root",
+  "herbs",
+  "moonleaf",
+  "mushrooms",
+  "thorn_bramble",
+  "venom_fern",
+  "wheat",
+]);
+
+export function isPlantHarvestKind(kind) {
+  return PLANT_HARVEST_KINDS.has(String(kind || ""));
+}
 const CREATURE_ATTACK_SOUND_COOLDOWN_MS = 700;
 const CREATURE_ALERT_SOUND_COOLDOWN_MS = 1200;
 const KITTY_HAPPY_SOUND_COOLDOWN_MS = 8000;
@@ -1062,13 +1079,16 @@ function installAudioListeners({ world, isPlayer, getItemInfo, getPlayerPosition
     sfxAt(URN_BROKEN_SOUND_ID, pos, pp(), { priority: 1 }, zg());
   });
 
-  world.on('harvest:picked', ({ itemId, targetId }) => {
+  world.on('harvest:picked', ({ itemId, targetId, kind }) => {
+    const pos = targetId != null ? getPosition(targetId) : null;
+    if (isPlantHarvestKind(kind)) {
+      sfxAt(HARVEST_PLANT_SOUND_ID, pos, pp(), null, zg());
+    }
     if (!itemId) return;
     const cat = itemCategory(getItemInfo, itemId);
     if (cat !== "gem") return;
     const info = getItemInfo(itemId);
     const mat = info?.material;
-    const pos = targetId != null ? getPosition(targetId) : null;
     const detune = gemValueToDropDetuneCents(info?.value);
     let dropId = mat && mat !== "gemstone" ? `item:drop:gem:${mat}` : "item:drop:gem";
     if (!resolve(dropId)) dropId = "item:drop:gem";

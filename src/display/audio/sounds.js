@@ -80,6 +80,7 @@ const SOUNDS = {
   "action:search_ping": { file: "action_search_ping.mp3", bus: "ambient", maxVoices: 2, volume: 0.9 },
   "action:search_found": { file: "action_search_found.mp3", bus: "ambient", maxVoices: 2, randomPitch: 8, volume: 0.95 },
   "action:secret_found": { file: "action_secret_found.mp3", bus: "ambient", maxVoices: 1, randomPitch: 8, volume: 0.95 },
+  "action:harvest_plant": { file: "action_harvest_plant.mp3", bus: "ambient", maxVoices: 3, randomPitch: 18, volume: 0.9 },
   "action:wood_chop": { file: "action_wood_chop.mp3", bus: "ambient", maxVoices: 3, randomPitch: 55, volume: 0.95 },
   "action:millstone_grind": { file: "action_millstone_grind.mp3", bus: "ambient", maxVoices: 3, randomPitch: 18, volume: 0.9 },
   "millstone_grind": { file: "action_millstone_grind.mp3", bus: "ambient", maxVoices: 3, randomPitch: 18, volume: 0.9 },

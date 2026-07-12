@@ -111,7 +111,9 @@ Deno.test("sounds registry adopts descriptive weather filenames", () => {
   const smithy = resolve("ambient:smithy");
   const torchFlames = resolve("ambient:torch_flames");
   const woodChop = resolve("action:wood_chop");
+  const harvestPlant = resolve("action:harvest_plant");
   const millstoneGrind = resolve("action:millstone_grind");
+  assertEquals(harvestPlant?.file, "action_harvest_plant.mp3");
   const woodcutter = resolve("ambient:woodcutter");
   const ringing = resolve("ears:ringing");
   const metalDrop = resolve("item:drop:weapon:metal");

@@ -1455,8 +1455,10 @@ Deno.test("farmer auto-replants crop immediately after harvesting", () => {
 
   let harvested = false;
   let planted = false;
+  const audio = [];
   world.on("townfolk:harvested", () => { harvested = true; });
   world.on("townfolk:planted", () => { planted = true; });
+  world.on("audio:play", (payload) => audio.push(payload));
 
   aiTownfolkSystem(world);
 
@@ -1468,4 +1470,5 @@ Deno.test("farmer auto-replants crop immediately after harvesting", () => {
   assertEquals(node.regrowCountdown, 200, "regrow countdown should be set");
   assertEquals(countInventory(world, farmer, "food_wheat"), 1, "farmer should carry the harvested wheat");
   assertEquals(countInventory(world, farmer, "seed_wheat"), 0, "seed should be consumed by planting");
+  assertEquals(audio, [{ key: "action:harvest_plant", at: { x: 8, y: 5 }, sourceId: farmer }]);
 });

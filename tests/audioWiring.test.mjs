@@ -20,6 +20,7 @@ import {
   SEARCH_FOUND_SOUND_ID,
   SEARCH_PING_SOUND_ID,
   SECRET_FOUND_SOUND_ID,
+  HARVEST_PLANT_SOUND_ID,
   GENOCIDE_SUCCESS_SOUND_ID,
   TAMING_SUCCESS_SOUND_ID,
   THROW_SOUND_ID,
@@ -36,6 +37,7 @@ import {
   resolveInteractionSoundId,
   resolveStatusSoundId,
   isSfxDebugEnabled,
+  isPlantHarvestKind,
   reportSfxDebugInvocation,
   setSfxDebugEnabled,
   setSfxDebugLogger,
@@ -110,10 +112,20 @@ Deno.test("audio wiring maps new authored event sounds", () => {
   assert(SEARCH_PING_SOUND_ID === "action:search_ping");
   assert(SEARCH_FOUND_SOUND_ID === "action:search_found");
   assert(SECRET_FOUND_SOUND_ID === "action:secret_found");
+  assert(HARVEST_PLANT_SOUND_ID === "action:harvest_plant");
   assert(BONE_CHIME_SOUND_ID === "ambient:bone_chime");
   assert(TAMING_SUCCESS_SOUND_ID === "magic:taming");
   assert(GENOCIDE_SUCCESS_SOUND_ID === "item:scroll:genocide");
   assert(THROW_SOUND_ID === "action:throw");
+});
+
+Deno.test("audio wiring identifies plant harvests without claiming mining, chopping, or fishing", () => {
+  for (const kind of ["berries", "herbs", "mushrooms", "wheat", "carrot", "corn", "thorn_bramble", "venom_fern", "moonleaf", "ember_root"]) {
+    assert(isPlantHarvestKind(kind), `${kind} should use the plant harvest sound`);
+  }
+  for (const kind of ["tree", "iron_ore", "coal_ore", "stone", "fishing_spot"]) {
+    assert(!isPlantHarvestKind(kind), `${kind} should keep its non-plant sound path`);
+  }
 });
 
 Deno.test("audio wiring delays search reveal sound along the pulse radius", () => {
