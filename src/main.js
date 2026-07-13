@@ -87,6 +87,7 @@ import { installCookingWiring } from "./main/wiring/cookingWiring.js";
 import { installEnchantingWiring } from "./main/wiring/enchantingWiring.js";
 import { installDigWiring } from "./main/wiring/digWiring.js";
 import { installDialogWiring } from "./main/wiring/dialogWiring.js";
+import { installBarkeepStoryWiring } from "./main/wiring/barkeepStoryWiring.js";
 import { installSpeechBubbleWiring } from "./main/wiring/speechBubbleWiring.js";
 import { installSpiritGuideWiring } from "./main/wiring/spiritGuideWiring.js";
 import { createSpiritPointerFx } from "./display/fx/spiritPointerFx.js";
@@ -2737,6 +2738,7 @@ const sceneRuntime = createSceneRuntime({
   getCanvasSetup: () => _canvasSetup,
 });
 installSpeechBubbleWiring({ world, sceneRuntime });
+installBarkeepStoryWiring({ world, sceneRuntime });
 cam.scale = CAMERA_START_SCALE;
 cam.targetScale = CAMERA_START_SCALE;
 if (PERF.cameraLerp !== null && Number.isFinite(PERF.cameraLerp)) cam.lerpSpeed = Math.max(0, PERF.cameraLerp);

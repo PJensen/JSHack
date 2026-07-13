@@ -12,6 +12,7 @@ import { Equipment, NON_AMMO_GEAR_SLOTS } from "../components/Equipment.js";
 import { Status } from "../components/Status.js";
 import { NamedIdentity } from "../components/NamedIdentity.js";
 import { isItemCursed } from "../utils/curseUtils.js";
+import { BarkeepStoryRequested } from "../../events/BarkeepStoryRequested.js";
 
 const MOOD_POOLS = {
   farmer: [
@@ -564,6 +565,17 @@ registerDialog({
               && String(quest?.state?.node || "") === "hunt";
           },
           to: "progress_reminder",
+        },
+        {
+          id: "barkeep_story",
+          label: "Tell me a story.",
+          onSelect: (ctx) => {
+            ctx.world.emit(new BarkeepStoryRequested({
+              actor: ctx.actorId,
+              targetId: ctx.targetId,
+            }));
+          },
+          close: true,
         },
         {
           id: "leave",

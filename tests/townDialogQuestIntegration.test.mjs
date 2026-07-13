@@ -37,6 +37,7 @@ import {
   PRIEST_RIFT_LEVELS,
 } from "../src/rules/quests/definitions/priestRift.js";
 import { riftQuestLinkForPortal } from "../src/rules/utils/riftRuntime.js";
+import { BarkeepStoryRequested } from "../src/events/BarkeepStoryRequested.js";
 
 function floorPatch(cx = 5, cy = 5, radius = 4) {
   for (let y = cy - radius; y <= cy + radius; y++) {
@@ -342,12 +343,21 @@ Deno.test("barkeep rat quest acceptance gives starter bow + arrows and announces
 
   const opened = [];
   const chatter = [];
+  const storyRequests = [];
   world.on("dialog:opened", (payload) => opened.push(payload));
   world.on("npc:dialogue", (payload) => chatter.push(payload));
+  world.on(BarkeepStoryRequested, (event) => storyRequests.push(event));
 
   world.emit("dialog:openRequest", { actorId: player, targetId: barkeep, dialogId: "townfolk:barkeep" });
   assert(opened.length > 0, "barkeep dialog should open");
   assertEquals(opened.at(-1).choices.some((choice) => choice.id === "accept_rat_quest"), true);
+  assertEquals(opened.at(-1).choices.some((choice) => choice.id === "barkeep_story"), true);
+  world.emit("dialog:choose", { sessionId: opened.at(-1).sessionId, choiceId: "barkeep_story" });
+  assertEquals(storyRequests.length, 1);
+  assertEquals(storyRequests[0].actor, player);
+  assertEquals(storyRequests[0].targetId, barkeep);
+
+  world.emit("dialog:openRequest", { actorId: player, targetId: barkeep, dialogId: "townfolk:barkeep" });
   const acceptSessionId = opened.at(-1).sessionId;
   world.emit("dialog:choose", { sessionId: acceptSessionId, choiceId: "accept_rat_quest" });
   world.tick(0);
