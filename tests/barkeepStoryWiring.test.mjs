@@ -1,25 +1,45 @@
 import { assert, assertEquals } from "jsr:@std/assert";
 import { World } from "../src/lib/ecs-js/index.js";
 import { BarkeepStoryRequested } from "../src/events/BarkeepStoryRequested.js";
-import { createBarkeepStoryWiringExtension, normalizeBarkeepStory, splitBarkeepStory } from "../src/main/wiring/barkeepStoryWiring.js";
+import { buildBarkeepStoryContext, createBarkeepStoryWiringExtension, normalizeBarkeepStory, splitBarkeepStory } from "../src/main/wiring/barkeepStoryWiring.js";
 import { AIResource } from "../src/rules/resources/AI.js";
+import { ActiveEffects } from "../src/rules/components/ActiveEffects.js";
+import { AudioEmitter } from "../src/rules/components/AudioEmitter.js";
 import { CalendarState } from "../src/rules/components/CalendarState.js";
 import { DungeonState } from "../src/rules/components/DungeonState.js";
+import { Equipment } from "../src/rules/components/Equipment.js";
 import { NamedIdentity } from "../src/rules/components/NamedIdentity.js";
+import { Position } from "../src/rules/components/Position.js";
 import { TownState } from "../src/rules/components/TownState.js";
 import { WeatherState } from "../src/rules/components/WeatherState.js";
+import { clearAll as clearTileMap, setRoofed } from "../src/rules/environment/dungeon/tileMap.js";
 
 function buildStoryWorld() {
+  clearTileMap();
   const world = new World({ seed: 0x51a7 });
   const player = world.create();
   world.add(player, NamedIdentity, { name: "Runa", identity: "player" });
+  world.add(player, Position, { x: 10, y: 10 });
   const barkeep = world.create();
   world.add(barkeep, NamedIdentity, { name: "Haldor", identity: "townfolk_barkeep" });
+  world.add(barkeep, Position, { x: 11, y: 10 });
+  const amulet = world.create();
+  world.add(amulet, NamedIdentity, { name: "Moon Amulet", identity: "amulet_moon" });
+  world.add(player, Equipment, { neck: amulet });
+  world.add(player, ActiveEffects, {
+    effects: [{ key: "poison", turnsLeft: 5, stacks: 1, potency: 2 }],
+  });
   const state = world.create();
   world.add(state, DungeonState, { worldSeed: 0x51a7, currentDepth: 0, profileType: "overworld" });
   world.add(state, CalendarState, { startDay: 70, startYear: 847 });
   world.add(state, TownState, { morale: 38, threatLevel: 2, lowFood: true });
   world.add(state, WeatherState, { current: "rain" });
+  const tavernAnchor = world.create();
+  world.add(tavernAnchor, Position, { x: 12, y: 10 });
+  world.add(tavernAnchor, AudioEmitter, { emitters: [{ profile: "tavern", interior: true }] });
+  for (let x = 9; x <= 13; x++) {
+    for (let y = 9; y <= 11; y++) setRoofed(x, y, true);
+  }
   return { world, player, barkeep };
 }
 
@@ -74,7 +94,23 @@ Deno.test("barkeep story completion receives world flavor context and queues its
   assertEquals(request.temperature, 0.95);
   assert(String(request.messages[1].content).includes('"weather":"rain"'));
   assert(String(request.messages[1].content).includes('"speaker":"Haldor"'));
+  assert(String(request.messages[1].content).includes('"insideTavern":true'));
+  assert(String(request.messages[1].content).includes('"location":"inside the overworld tavern"'));
+  assert(String(request.messages[1].content).includes('"listenerNeckwear":"Moon Amulet"'));
+  assert(String(request.messages[1].content).includes('"key":"poison"'));
   assert(String(request.messages[0].content).includes("4 to 7 speakable lines"));
+});
+
+Deno.test("barkeep story context distinguishes an outdoor listener", () => {
+  const { world, player, barkeep } = buildStoryWorld();
+  world.set(player, Position, { x: 20, y: 20 });
+  const context = buildBarkeepStoryContext(world, new BarkeepStoryRequested({ actor: player, targetId: barkeep }));
+
+  assertEquals(context.insideTavern, false);
+  assertEquals(context.tavernSetting, "outside the tavern");
+  assertEquals(context.location, "outside the overworld tavern");
+  assertEquals(context.listenerNeckwear, "Moon Amulet");
+  assert(context.listenerStatusEffects.effects.some((effect) => effect.key === "poison"));
 });
 
 Deno.test("barkeep story normalization removes fences and bounds runaway output", () => {

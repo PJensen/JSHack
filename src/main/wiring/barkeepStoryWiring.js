@@ -3,7 +3,9 @@ import { BarkeepStoryRequested } from "../../events/BarkeepStoryRequested.js";
 import { CalendarState } from "../../rules/components/CalendarState.js";
 import { DungeonState } from "../../rules/components/DungeonState.js";
 import { NamedIdentity } from "../../rules/components/NamedIdentity.js";
+import { Position } from "../../rules/components/Position.js";
 import { getCalendarDate } from "../../rules/data/calendar.js";
+import { isRoofed } from "../../rules/environment/dungeon/tileMap.js";
 import { AIResource } from "../../rules/resources/AI.js";
 import { getTownState, getWeather } from "../../rules/utils/townStateAccess.js";
 
@@ -18,7 +20,12 @@ function entityName(world, entityId, fallback) {
   return String(world.get(entityId, NamedIdentity)?.name || fallback).slice(0, 80);
 }
 
-function storyContext(world, event) {
+function isInside(world, entityId) {
+  const entityPosition = world.get(entityId, Position);
+  return entityPosition && isRoofed(entityPosition.x, entityPosition.y);
+}
+
+export function buildBarkeepStoryContext(world, event) {
   let worldSeed = Number(world.seed || 0) >>> 0;
   let depth = 0;
   let plane = "overworld";
@@ -36,16 +43,21 @@ function storyContext(world, event) {
   }
 
   const town = getTownState(world);
+  const blnInside = depth === 0
+    && isInside(world, event.actor)
+    && isInside(world, event.targetId);
   const storySeed = (
     worldSeed ^ Math.imul((world.step | 0) + 1, 0x9e3779b1) ^
     Math.imul(event.actor, 0x85ebca6b) ^ Math.imul(event.targetId, 0xc2b2ae35)
   ) >>> 0;
-
   return {
     storySeed,
     speaker: entityName(world, event.targetId, "the barkeep"),
     listener: entityName(world, event.actor, "a traveler"),
-    location: depth === 0 ? "the overworld tavern" : `${plane}, dungeon depth ${depth}`,
+    location: depth === 0
+      ? (blnInside ? "inside the overworld tavern" : "outside the overworld tavern")
+      : `${plane}, dungeon depth ${depth}`,
+    insideTavern: blnInside,
     weather: getWeather(world),
     season: String(date?.season || "unknown"),
     moon: String(date?.moonLabel || "unknown"),
@@ -153,7 +165,7 @@ export function createBarkeepStoryWiringExtension({ sceneRuntime } = {}) {
 
     world.on(BarkeepStoryRequested, (event) => {
       if (!(event.actor > 0) || !(event.targetId > 0)) return;
-      const context = storyContext(world, event);
+      const context = buildBarkeepStoryContext(world, event);
       const fallback = fallbackStory(context);
       const AI = world.resource(AIResource);
       if (!sceneRuntime?.canActorAddressPlayer?.(event.targetId, 8)) return;
