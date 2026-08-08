@@ -1,0 +1,27 @@
+{
+  "cli_version": "0.9.0",
+  "checkpoint_id": "995851067b8a",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "src/display/audio/sounds.js",
+    "tests/audioSoundsRegistry.test.mjs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/99/5851067b8a/0/metadata.json",
+      "transcript": "/99/5851067b8a/0/full.jsonl",
+      "compact_transcript": "/99/5851067b8a/0/transcript.jsonl",
+      "content_hash": "/99/5851067b8a/0/content_hash.txt",
+      "prompt": "/99/5851067b8a/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 19849,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 375296,
+    "output_tokens": 1150,
+    "api_call_count": 6
+  }
+}
