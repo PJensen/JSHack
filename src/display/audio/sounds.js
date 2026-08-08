@@ -108,7 +108,7 @@ const SOUNDS = {
   "ambient:omen":     { file: "ambient_dungeon_omen.mp3",  bus: "ambient", maxVoices: 1 },
   "ambient:chick":    { file: "chick.mp3",                 bus: "ambient", maxVoices: 4, volume: 0.35 },
   "ambient:chicken":  { file: "chicken.mp3",               bus: "ambient", maxVoices: 4, volume: 0.35 },
-  "ambient:squirrel": { file: "ambient_squirrel.mp3",      bus: "ambient", maxVoices: 1, volume: 0.65 },
+  "ambient:squirrel": { file: "ambient_squirrel.mp3",      bus: "ambient", maxVoices: 1, volume: 1.0 },
   "character:select":  { file: "character_select.mp3",      bus: "ui", maxVoices: 1 },
   "enter:world":       { file: "enter_world.mp3",           bus: "ui", maxVoices: 1 },
   "snake:alert":      { file: "snake_alerted.mp3",         bus: "combat", maxVoices: 2, randomPitch: 18 },

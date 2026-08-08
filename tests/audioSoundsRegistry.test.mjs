@@ -205,6 +205,7 @@ Deno.test("sounds registry adopts descriptive weather filenames", () => {
   assertEquals(ratAlert.file, "rat_alerted_1.mp3");
   assertEquals(squirrel.file, "ambient_squirrel.mp3");
   assertEquals(squirrel.bus, "ambient");
+  assertEquals(squirrel.volume, 1.0);
   assertEquals(boneDrop.file, "bone_dropped.mp3");
   assertEquals(searchPing.file, "action_search_ping.mp3");
   assertEquals(searchPing.maxVoices, 2);
