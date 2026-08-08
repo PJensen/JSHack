@@ -7,6 +7,8 @@ import { CHARACTER_MENU_TAB_GLYPHS } from './iconGlyphs.js';
 
 export const PANEL_Z_BASE = 1200;
 export let _panelZCounter = PANEL_Z_BASE;
+export const UI_ROOT_Z_INDEX = 1000;
+export const DIALOG_LAYER_Z_INDEX = 20000;
 
 /** Increment and return the panel z-index counter. */
 export function bumpPanelZ() {
@@ -160,7 +162,7 @@ export function ensureRoot() {
     root.style.right = '0';
     root.style.bottom = '0';
     root.style.pointerEvents = 'none';
-    root.style.zIndex = '1000';
+    root.style.zIndex = String(UI_ROOT_Z_INDEX);
     document.body.appendChild(root);
   }
   return root;

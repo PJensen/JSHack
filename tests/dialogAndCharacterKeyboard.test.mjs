@@ -1,5 +1,6 @@
 import { assertEquals, assertStringIncludes } from "jsr:@std/assert";
 import { createBubbleDialogController } from "../src/display/ui/bubbleDialog.js";
+import { DIALOG_LAYER_Z_INDEX } from "../src/display/ui/overlayUtils.js";
 
 class FakeElement extends EventTarget {
   constructor() {
@@ -103,6 +104,9 @@ Deno.test("NPC bubble ignores immediate choice clicks after opening", async () =
     });
 
     const bubble = body.children.find((child) => child.id === "speech-bubble-dialog");
+    assertEquals(bubble.style.zIndex, String(DIALOG_LAYER_Z_INDEX + 2));
+    assertEquals(body.children[0].style.zIndex, String(DIALOG_LAYER_Z_INDEX));
+    assertEquals(body.children[1].style.zIndex, String(DIALOG_LAYER_Z_INDEX + 1));
     const choiceButton = bubble.children[2].children[0];
     choiceButton.dispatchEvent(new Event("click"));
 
@@ -121,6 +125,8 @@ Deno.test("character menu remembers its active tab and Escape closes visible pan
 
   assertStringIncludes(overlay, "let lastCharacterMenuTab = 'character';");
   assertStringIncludes(overlay, "detail: { restoreLastTab: true }");
+  assertStringIncludes(overlay, "root.style.zIndex = String(DIALOG_LAYER_Z_INDEX);");
+  assertStringIncludes(overlay, "root.style.zIndex = String(UI_ROOT_Z_INDEX);");
   assertStringIncludes(overlay, "if (e.key === 'Escape')");
   assertStringIncludes(overlay, "for (const p of document.querySelectorAll('.ui-panel'))");
   assertStringIncludes(main, "detail: { restoreLastTab: true }");

@@ -31,6 +31,8 @@ import {
   drawGestureDebug, buildLightningShadow,
   showItemTooltip, hideItemTooltip,
   CHARACTER_MENU_TABS,
+  DIALOG_LAYER_Z_INDEX,
+  UI_ROOT_Z_INDEX,
 } from './overlayUtils.js';
 
 // Re-export renderItemDetails from overlayUtils as a public API
@@ -787,6 +789,7 @@ export function initOverlays() {
     hide(rack);
     hide(altar);
     renderDialog(dialog, d);
+    root.style.zIndex = String(DIALOG_LAYER_Z_INDEX);
     show(dialog);
     const dialogKey = (/** @type {KeyboardEvent} */ ke) => {
       if (dialog.style.display !== 'block') return;
@@ -814,6 +817,7 @@ export function initOverlays() {
     dialog.addEventListener('pointerdown', backdropClose);
     const obs = new MutationObserver(() => {
       if (dialog.style.display === 'none') {
+        root.style.zIndex = String(UI_ROOT_Z_INDEX);
         window.removeEventListener('keydown', dialogKey, { capture: true });
         dialog.removeEventListener('pointerdown', backdropClose);
         obs.disconnect();

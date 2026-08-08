@@ -3,7 +3,7 @@
 // Pure DOM — no ECS, no rules imports. Receives position via callbacks.
 
 import { DIALOG_BUBBLE_SCALE } from "../../shared/uiScale.js";
-import { INTERACTION_POPUP_ARM_DELAY_MS } from "./overlayUtils.js";
+import { DIALOG_LAYER_Z_INDEX, INTERACTION_POPUP_ARM_DELAY_MS } from "./overlayUtils.js";
 
 const dialogPx = (value) => `${Math.round(value * DIALOG_BUBBLE_SCALE)}px`;
 
@@ -35,7 +35,7 @@ function createBubbleDialogDom() {
     position: "fixed",
     left: "0",
     top: "0",
-    zIndex: "90",
+    zIndex: String(DIALOG_LAYER_Z_INDEX + 2),
     display: "none",
     pointerEvents: "auto",
     minWidth: dialogPx(220),
@@ -73,7 +73,7 @@ function createBubbleDialogDom() {
     transformOrigin: "0 50%",
     backgroundImage: "repeating-linear-gradient(90deg, rgba(90,74,48,0.92) 0 7px, rgba(90,74,48,0) 7px 13px)",
     filter: "drop-shadow(0 0 1px rgba(255,250,240,0.85))",
-    zIndex: "91",
+    zIndex: String(DIALOG_LAYER_Z_INDEX),
   });
   Object.assign(speakerDot.style, {
     position: "fixed",
@@ -87,7 +87,7 @@ function createBubbleDialogDom() {
     border: "2px solid rgba(75,62,43,0.95)",
     background: "rgba(252,248,238,1)",
     boxShadow: "0 0 0 2px rgba(255,250,240,0.65)",
-    zIndex: "92",
+    zIndex: String(DIALOG_LAYER_Z_INDEX + 1),
   });
   Object.assign(title.style, {
     font: `700 ${dialogPx(14)} 'Trebuchet MS', sans-serif`,
