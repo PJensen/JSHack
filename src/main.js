@@ -191,6 +191,7 @@ import { installContentAbilityHandler } from "./content/abilityHandler.js";
 import { installPetWiring } from "./main/wiring/petWiring.js";
 import { createDeathLootArcFx } from "./display/fx/deathLootArcFx.js";
 import { createBubbleDialogController } from "./display/ui/bubbleDialog.js";
+import { createSpeechBubbleLayer } from "./display/ui/speechBubbleLayer.js";
 import { createTransitionController } from "./main/wiring/transitionWiring.js";
 import { BedSleepRequested } from "./events/BedSleepRequested.js";
 
@@ -212,6 +213,7 @@ const CAMERA_START_SCALE = (() => {
 })();
 const _canvasSetup = createCanvasSetup({ canvasId: 'stage', TILE_PX, dprCap: PERF.dprCap });
 const { canvas, ctx, back, bctx } = _canvasSetup;
+const speechBubbleLayer = createSpeechBubbleLayer({ sourceCanvas: canvas });
 
 // Lock down browser-driven inputs/scroll/zoom so the app fully controls them
 enableInputLockdown({ canvas });
@@ -5851,7 +5853,6 @@ function render(worldView) {
 
   // Screen-space wrath flash drawn after world present so lethal hits still read.
   drawScreenEffects({ ctx, W, H, boltFx });
-  sceneRuntime.drawSpeechBubble(ctx);
   teleportFx.draw(ctx, W, H);
 
   if (_rpOn && _rp) {
@@ -5863,6 +5864,7 @@ function render(worldView) {
   }
   drawRulesProfilerOverlay({ ctx, quality: PERF.quality, prof: /** @type any */ (window).__JSHACK_RULES_PROF });
   drawRenderProfilerOverlay({ ctx, quality: PERF.quality, prof: _renderProfile });
+  speechBubbleLayer.render((speechCtx) => sceneRuntime.drawSpeechBubble(speechCtx));
 }
 
 // ---- Frame loop (FXClock) --------------------------------------------------

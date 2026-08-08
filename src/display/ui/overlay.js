@@ -32,7 +32,6 @@ import {
   showItemTooltip, hideItemTooltip,
   CHARACTER_MENU_TABS,
   DIALOG_LAYER_Z_INDEX,
-  UI_ROOT_Z_INDEX,
 } from './overlayUtils.js';
 
 // Re-export renderItemDetails from overlayUtils as a public API
@@ -63,6 +62,8 @@ export function initOverlays() {
   const alchemy = ensurePanel('alchemy');
   const cooking = ensurePanel('cooking');
   const dialog = ensurePanel('dialog');
+  dialog.style.position = 'fixed';
+  document.body.appendChild(dialog);
   const lockPicking = ensurePanel('lockPicking');
   const monsterChooser = ensurePanel('monsterChooser');
   const shop = ensurePanel('shop');
@@ -789,8 +790,8 @@ export function initOverlays() {
     hide(rack);
     hide(altar);
     renderDialog(dialog, d);
-    root.style.zIndex = String(DIALOG_LAYER_Z_INDEX);
     show(dialog);
+    dialog.style.zIndex = String(DIALOG_LAYER_Z_INDEX);
     const dialogKey = (/** @type {KeyboardEvent} */ ke) => {
       if (dialog.style.display !== 'block') return;
       if (ke.key === 'Escape') {
@@ -817,7 +818,6 @@ export function initOverlays() {
     dialog.addEventListener('pointerdown', backdropClose);
     const obs = new MutationObserver(() => {
       if (dialog.style.display === 'none') {
-        root.style.zIndex = String(UI_ROOT_Z_INDEX);
         window.removeEventListener('keydown', dialogKey, { capture: true });
         dialog.removeEventListener('pointerdown', backdropClose);
         obs.disconnect();

@@ -125,8 +125,8 @@ Deno.test("character menu remembers its active tab and Escape closes visible pan
 
   assertStringIncludes(overlay, "let lastCharacterMenuTab = 'character';");
   assertStringIncludes(overlay, "detail: { restoreLastTab: true }");
-  assertStringIncludes(overlay, "root.style.zIndex = String(DIALOG_LAYER_Z_INDEX);");
-  assertStringIncludes(overlay, "root.style.zIndex = String(UI_ROOT_Z_INDEX);");
+  assertStringIncludes(overlay, "document.body.appendChild(dialog);");
+  assertStringIncludes(overlay, "dialog.style.zIndex = String(DIALOG_LAYER_Z_INDEX);");
   assertStringIncludes(overlay, "if (e.key === 'Escape')");
   assertStringIncludes(overlay, "for (const p of document.querySelectorAll('.ui-panel'))");
   assertStringIncludes(main, "detail: { restoreLastTab: true }");
