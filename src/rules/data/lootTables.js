@@ -252,6 +252,7 @@ export const LOOT_TABLES = {
       { type: "item",      weight: 3, itemId: "potion_speed" },
       { type: "item",      weight: 3, itemId: "potion_acid" },
       { type: "item",      weight: 2, itemId: "potion_oil" },
+      { type: "item",      weight: 2, itemId: "potion_echoing_focus" },
     ],
   },
 

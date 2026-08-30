@@ -108,6 +108,7 @@ export const basePalette = {
   potion_blindness:       { glyph: "!", fg: "#555566", glow: "#333344", baseScale: S_POTION },
   potion_weakness:        { glyph: "!", fg: "#99887a", glow: "#665544", baseScale: S_POTION },
   potion_confusion:       { glyph: "!", fg: "#ddaa55", glow: "#aa7722", baseScale: 0.65 },
+  potion_echoing_focus:   { glyph: "!", fg: "#d28cff", glow: "#8c4fc4", baseScale: S_POTION },
   // Spellbooks
   spellbook_fire: { glyph: "?", fg: "#ff704d", glow: "#ff704d", baseScale: 0.7 },
   spellbook_ice: { glyph: "?", fg: "#4da6ff", glow: "#4da6ff", baseScale: 0.7 },
